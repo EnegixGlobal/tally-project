@@ -1,0 +1,14 @@
+/* Progress bar styles for B2B and B2C reports */
+.progress-bar {
+  transition: width 0.3s ease;
+  width: 0%;
+}
+
+/* Fallback classes for common percentages */
+.progress-bar[data-percentage="0"] { width: 0%; }
+.progress-bar[data-percentage="25"] { width: 25%; }
+.progress-bar[data-percentage="33"] { width: 33%; }
+.progress-bar[data-percentage="50"] { width: 50%; }
+.progress-bar[data-percentage="67"] { width: 67%; }
+.progress-bar[data-percentage="75"] { width: 75%; }
+.progress-bar[data-percentage="100"] { width: 100%; }

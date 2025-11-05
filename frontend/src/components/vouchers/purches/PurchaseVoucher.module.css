@@ -1,0 +1,88 @@
+/* Print styles for Purchase Voucher */
+.printContainer {
+  display: none;
+}
+
+.printContent {
+  padding: 20mm;
+  font-family: Arial, sans-serif;
+  font-size: 12pt;
+}
+
+.printHeader {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 20px;
+}
+
+.companyTitle {
+  font-size: 16pt;
+  font-weight: bold;
+}
+
+.invoiceTitle {
+  text-align: right;
+}
+
+.invoiceHeading {
+  font-size: 14pt;
+  font-weight: bold;
+}
+
+.section {
+  margin-bottom: 20px;
+}
+
+.printTable {
+  width: 100%;
+  border-collapse: collapse;
+  margin-bottom: 20px;
+}
+
+.printTableCell {
+  border: 1px solid #000;
+  padding: 5px;
+}
+
+.printTableCellRight {
+  border: 1px solid #000;
+  padding: 5px;
+  text-align: right;
+}
+
+.printTableCellBold {
+  border: 1px solid #000;
+  padding: 5px;
+  text-align: right;
+  font-weight: bold;
+}
+
+.signatureSection {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 40px;
+}
+
+.signatureMargin {
+  margin-top: 40px;
+}
+
+@media print {
+  body {
+    font-size: 12pt;
+  }
+  
+  table {
+    width: 100%;
+    border-collapse: collapse;
+  }
+  
+  th, td {
+    border: 1px solid #000;
+    padding: 5px;
+  }
+  
+  .no-print {
+    display: none;
+  }
+}

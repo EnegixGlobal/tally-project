@@ -1,0 +1,139 @@
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const db = require('../db'); // your DB connection module
+
+router.post('/ca-employee', async (req, res) => {
+  const { ca_id, name, email, phone, adhar, password } = req.body;
+  if (!ca_id || !name || !email || !password) {
+    return res.status(400).json({ message: "Required fields missing" });
+  }
+
+  try {
+    const hashedPassword = await bcrypt.hash(password, 10);
+    const connection = await db.getConnection();
+
+    const [result] = await connection.query(
+      `INSERT INTO tbCAEmployees (ca_id, name, email, phone, adhar, password)
+       VALUES (?, ?, ?, ?, ?, ?)`,
+      [ca_id, name, email, phone, adhar, hashedPassword]
+    );
+
+    connection.release();
+    res.status(201).json({ message: 'CA Employee created', ca_employee_id: result.insertId });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+router.post('/assign-companies-to-ca-employee', async (req, res) => {
+  const { ca_employee_id, company_ids } = req.body; // company_ids = [1, 2, 3]
+
+  if (!ca_employee_id || !Array.isArray(company_ids)) {
+    return res.status(400).json({ message: "CA Employee ID and company_ids are required" });
+  }
+
+  try {
+    const connection = await db.getConnection();
+    await connection.beginTransaction();
+
+    // Delete old assignments (optional)
+    // await connection.query(
+    //   `DELETE FROM tbcaemployeecompanies WHERE ca_employee_id = ?`,
+    //   [ca_employee_id]
+    // );
+
+    // Insert new assignments
+    for (const companyId of company_ids) {
+          console.log("Assigning company:", companyId, "to ca_employee:", ca_employee_id);
+
+      await connection.query(
+        `INSERT INTO tbcaemployeecompanies (ca_employee_id, company_id)
+         VALUES (?, ?)`,
+        [ca_employee_id, companyId]
+      );
+    }
+
+    await connection.commit();
+    connection.release();
+
+    res.json({ message: 'Companies assigned successfully' });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+router.get('/ca-employee-companies', async (req, res) => {
+  const ca_employee_id = req.query.ca_employee_id;
+  if (!ca_employee_id) {
+    return res.status(400).json({ message: 'ca_employee_id is required' });
+  }
+
+  try {
+    const connection = await db.getConnection();
+    const [rows] = await connection.query(
+      `SELECT c.id, c.name
+       FROM tbcompanies c
+       INNER JOIN tbCAEmployeeCompanies a ON c.id = a.company_id
+       WHERE a.ca_employee_id = ?`,
+      [ca_employee_id]
+    );
+    connection.release();
+    res.json({ companies: rows });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+router.post('/ca-employee-login', async (req, res) => {
+  const { email, password } = req.body;
+  if (!email || !password) return res.status(400).json({ message: 'Email and password required' });
+
+  try {
+    const connection = await db.getConnection();
+    const [rows] = await connection.query(
+      `SELECT id, password FROM tbCAEmployees WHERE email = ?`,
+      [email]
+    );
+
+    if (rows.length === 0) {
+      connection.release();
+      return res.status(401).json({ message: 'Invalid email/password' });
+    }
+
+    const user = rows[0];
+    const isMatch = await bcrypt.compare(password, user.password);
+    connection.release();
+
+    if (!isMatch) return res.status(401).json({ message: 'Invalid email/password' });
+
+    // On success return ca_employee_id for frontend storage
+    return res.json({ message: 'Login success', ca_employee_id: user.id });
+  } catch (err) {
+    return res.status(500).json({ message: err.message });
+  }
+});
+// Get all CA employees with their assigned companies for a CA
+router.get('/ca-employees-with-companies', async (req, res) => {
+  const ca_id = req.query.ca_id;
+  if (!ca_id) return res.status(400).json({ message: "Missing ca_id" });
+
+  try {
+    const connection = await db.getConnection();
+    // Get CA employees and their assigned companies in a joined query
+    const [rows] = await connection.query(
+      `SELECT e.id AS employee_id, e.name, e.adhar, e.phone, e.email, 
+              GROUP_CONCAT(c.name) AS company_names
+         FROM tbCAEmployees e
+    LEFT JOIN tbCAEmployeeCompanies ec ON e.id = ec.ca_employee_id
+    LEFT JOIN tbcompanies c ON ec.company_id = c.id
+        WHERE e.ca_id = ?
+        GROUP BY e.id`,
+      [ca_id]
+    );
+    // console.log(rows);
+    connection.release();
+    res.json({ employees: rows });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
+  }
+});
+
+module.exports = router;

@@ -1,0 +1,16 @@
+{
+  "buildCommand": "npm ci && npm run build",
+  "installCommand": "npm ci",
+  "framework": "vite",
+  "outputDirectory": "dist",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "SKIP_INSTALL_SIMPLE_GIT_HOOKS": "1",
+    "CI": "true"
+  }
+}
