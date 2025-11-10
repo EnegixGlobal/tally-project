@@ -73,6 +73,7 @@ const LoginPage: React.FC = () => {
 
     const data = await response.json();
 
+
     if (response.ok) {
       // Store user in localStorage
       // localStorage.setItem('user', JSON.stringify(data.user));

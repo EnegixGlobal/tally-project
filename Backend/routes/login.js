@@ -46,6 +46,8 @@ router.post('/', async (req, res) => {
       }
     ];
 
+
+
     for (const { table, role, supplier, passwordField, idField, nameField } of roleTables) {
       const [rows] = await db.query(
         `SELECT * FROM ${table} WHERE email = ?`,
@@ -54,6 +56,7 @@ router.post('/', async (req, res) => {
       if (!rows.length) continue;
 
       const user = rows[0];
+    
       if (!user[passwordField]) {
         return res.status(500).json({ message: 'User password not set' });
       }
@@ -64,6 +67,8 @@ router.post('/', async (req, res) => {
       let employeeId = null;
       let companyRow = null;
 
+      
+
       if (role === 'employee') {
         // It's an employee; use own id
         employeeId = user[idField];
@@ -71,6 +76,7 @@ router.post('/', async (req, res) => {
         // Optionally, get company for info (if needed)
         const [[company]] = await db.query('SELECT * FROM tbcompanies WHERE employee_id = ?', [user[idField]]);
         companyRow = company || null;
+       
 
       } else if (role === 'ca') {
         // It's a CA; get their company by fdAccountantName, fetch its employee_id
@@ -108,6 +114,8 @@ router.post('/', async (req, res) => {
         JWT_SECRET,
         { expiresIn: '7d' }
       );
+
+      console.log()
 
       return res.json({
         success: true,

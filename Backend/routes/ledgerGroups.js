@@ -22,6 +22,8 @@ router.get('/', async (req, res) => {
        ORDER BY name`,
       [company_id, owner_type, owner_id]
     );
+
+    // console.log('rows', rows)
     res.json(rows);
   } catch (err) {
     console.error('Error fetching ledger groups:', err);

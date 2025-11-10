@@ -7,6 +7,7 @@ const bcrypt = require('bcryptjs');
 require('dotenv').config(); // Load env variables
 const JWT_SECRET = process.env.JWT_SECRET;
 
+
 router.post('/register', async (req, res) => {
   console.log("📥 /register hit");
 
@@ -22,6 +23,8 @@ router.post('/register', async (req, res) => {
   if (!firstName || !lastName || !email || !password || !phoneNumber || !userLimit) {
     return res.status(400).json({ message: 'All fields are required' });
   }
+
+  console.log(firstName ,!lastName, email , password , phoneNumber, userLimit)
 
   try {
     // 🔍 Check if email already exists

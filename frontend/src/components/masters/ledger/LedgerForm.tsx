@@ -1,11 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../../../context/AppContext';
-import { useNavigate, useParams } from 'react-router-dom';
-import type { Ledger } from '../../../types';
-import type { LedgerGroup } from '../../../types';
-import { ArrowLeft, Save } from 'lucide-react';
-import Swal from 'sweetalert2';
-import { validateGSTIN } from '../../../utils/ledgerUtils';
+import React, { useState, useEffect } from "react";
+import { useAppContext } from "../../../context/AppContext";
+import { useNavigate, useParams } from "react-router-dom";
+import type { Ledger } from "../../../types";
+import type { LedgerGroup } from "../../../types";
+import { ArrowLeft, Save } from "lucide-react";
+import Swal from "sweetalert2";
+import { validateGSTIN } from "../../../utils/ledgerUtils";
 
 const LedgerForm: React.FC = () => {
   const { theme, ledgers } = useAppContext();
@@ -13,22 +13,24 @@ const LedgerForm: React.FC = () => {
 
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  
   const isEditMode = Boolean(id);
 
   const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("userType"); // 'employee' or 'user'
-  const ownerId = localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id");
-
-  const [formData, setFormData] = useState<Omit<Ledger, 'id'>>({
-    name: '',
-    groupId: '',
+  const ownerType = localStorage.getItem("userType"); 
+  const ownerId = localStorage.getItem(
+    ownerType === "employee" ? "employee_id" : "user_id"
+  );
+  const [formData, setFormData] = useState<Omit<Ledger, "id">>({
+    name: "",
+    groupId: "",
     openingBalance: 0,
-    balanceType: 'debit',
-    address: '',
-    email: '',
-    phone: '',
-    gstNumber: '',
-    panNumber: ''
+    balanceType: "debit",
+    address: "",
+    email: "",
+    phone: "",
+    gstNumber: "",
+    panNumber: "",
   });
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -61,23 +63,24 @@ const LedgerForm: React.FC = () => {
         );
         const data = await res.json();
 
+
         if (res.ok) {
           setFormData({
-            name: data.name || '',
-            groupId: data.groupId || '',
+            name: data.name || "",
+            groupId: data.groupId || "",
             openingBalance: data.opening_balance || 0,
-            balanceType: data.balance_type || 'debit',
-            address: data.address || '',
-            email: data.email || '',
-            phone: data.phone || '',
-            gstNumber: data.gst_number || '',
-            panNumber: data.pan_number || '',
+            balanceType: data.balance_type || "debit",
+            address: data.address || "",
+            email: data.email || "",
+            phone: data.phone || "",
+            gstNumber: data.gst_number || "",
+            panNumber: data.pan_number || "",
           });
         } else {
-          console.error('Failed to fetch ledger by ID:', data.message);
+          console.error("Failed to fetch ledger by ID:", data.message);
         }
       } catch (err) {
-        console.error('Error fetching ledger by ID:', err);
+        console.error("Error fetching ledger by ID:", err);
       }
     };
 
@@ -87,47 +90,51 @@ const LedgerForm: React.FC = () => {
   // Prefill from context if available
   useEffect(() => {
     if (isEditMode && id) {
-      const ledger = ledgers.find(l => l.id === id);
+      const ledger = ledgers.find((l) => l.id === id);
       if (ledger) {
         setFormData({
           name: ledger.name,
           groupId: ledger.groupId,
           openingBalance: ledger.openingBalance,
           balanceType: ledger.balanceType,
-          address: ledger.address || '',
-          email: ledger.email || '',
-          phone: ledger.phone || '',
-          gstNumber: ledger.gstNumber || '',
-          panNumber: ledger.panNumber || ''
+          address: ledger.address || "",
+          email: ledger.email || "",
+          phone: ledger.phone || "",
+          gstNumber: ledger.gstNumber || "",
+          panNumber: ledger.panNumber || "",
         });
       }
     }
   }, [id, isEditMode, ledgers]);
 
   // Handle input changes
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<
+      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
+    >
+  ) => {
     const { name, value, type } = e.target as HTMLInputElement;
 
     let processedValue = value;
-    if (name === 'gstNumber') {
+    if (name === "gstNumber") {
       processedValue = value.toUpperCase();
     }
 
-    setFormData(prev => ({
+    setFormData((prev) => ({
       ...prev,
-      [name]: type === 'number' ? parseFloat(value) || 0 : processedValue
+      [name]: type === "number" ? parseFloat(value) || 0 : processedValue,
     }));
 
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
 
-    if (name === 'gstNumber' && processedValue) {
+    if (name === "gstNumber" && processedValue) {
       if (!validateGSTIN(processedValue)) {
-        setErrors(prev => ({
+        setErrors((prev) => ({
           ...prev,
           gstNumber:
-            'Invalid GSTIN/UIN format. GSTIN: A22AAAA0000A1Z5 or UIN: 4 digits + 7 chars + 4 digits'
+            "Invalid GSTIN/UIN format. GSTIN: A22AAAA0000A1Z5 or UIN: 4 digits + 7 chars + 4 digits",
         }));
       }
     }
@@ -136,10 +143,10 @@ const LedgerForm: React.FC = () => {
   // Validate before submit
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
-    if (!formData.name.trim()) newErrors.name = 'Ledger name is required';
-    if (!formData.groupId) newErrors.groupId = 'Ledger group is required';
+    if (!formData.name.trim()) newErrors.name = "Ledger name is required";
+    if (!formData.groupId) newErrors.groupId = "Ledger group is required";
     if (formData.gstNumber && !validateGSTIN(formData.gstNumber)) {
-      newErrors.gstNumber = 'Invalid GSTIN/UIN format';
+      newErrors.gstNumber = "Invalid GSTIN/UIN format";
     }
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -159,7 +166,11 @@ const LedgerForm: React.FC = () => {
       const data = await res.json();
 
       if (res.ok) {
-        Swal.fire("Success", data.message || "Ledger created successfully!", "success");
+        Swal.fire(
+          "Success",
+          data.message || "Ledger created successfully!",
+          "success"
+        );
         navigate("/app/masters/ledger");
       } else {
         Swal.fire("Error", data.message || "Failed to create ledger", "error");
@@ -187,7 +198,11 @@ const LedgerForm: React.FC = () => {
       const data = await res.json();
 
       if (res.ok) {
-        Swal.fire("Success", data.message || "Ledger updated successfully!", "success");
+        Swal.fire(
+          "Success",
+          data.message || "Ledger updated successfully!",
+          "success"
+        );
         navigate("/app/masters/ledger");
       } else {
         Swal.fire("Error", data.message || "Failed to update ledger", "error");
@@ -211,21 +226,27 @@ const LedgerForm: React.FC = () => {
   };
 
   return (
-    <div className='pt-[56px] px-4 '>
+    <div className="pt-[56px] px-4 ">
       <div className="flex items-center mb-6">
         <button
-          onClick={() => navigate('/app/masters/ledger')}
+          onClick={() => navigate("/app/masters/ledger")}
           className={`mr-4 p-2 rounded-full ${
-            theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
           }`}
           aria-label="Back"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold">{isEditMode ? 'Edit' : 'Create'} Ledger</h1>
+        <h1 className="text-2xl font-bold">
+          {isEditMode ? "Edit" : "Create"} Ledger
+        </h1>
       </div>
 
-      <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+      <div
+        className={`p-6 rounded-lg ${
+          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+        }`}
+      >
         <form onSubmit={handleSubmit}>
           {/* Ledger Info */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -242,10 +263,10 @@ const LedgerForm: React.FC = () => {
                 required
                 className={`w-full p-2 rounded border ${
                   errors.name
-                    ? 'border-red-500 focus:border-red-500'
-                    : theme === 'dark'
-                    ? 'bg-gray-700 border-gray-600 focus:border-blue-500'
-                    : 'bg-white border-gray-300 focus:border-blue-500'
+                    ? "border-red-500 focus:border-red-500"
+                    : theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                    : "bg-white border-gray-300 focus:border-blue-500"
                 } outline-none transition-colors`}
               />
               {errors.name && (
@@ -254,7 +275,10 @@ const LedgerForm: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1" htmlFor="groupId">
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="groupId"
+              >
                 Under Group
               </label>
               <select
@@ -265,10 +289,10 @@ const LedgerForm: React.FC = () => {
                 required
                 className={`w-full p-2 rounded border ${
                   errors.groupId
-                    ? 'border-red-500 focus:border-red-500'
-                    : theme === 'dark'
-                    ? 'bg-gray-700 border-gray-600 focus:border-blue-500'
-                    : 'bg-white border-gray-300 focus:border-blue-500'
+                    ? "border-red-500 focus:border-red-500"
+                    : theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                    : "bg-white border-gray-300 focus:border-blue-500"
                 } outline-none transition-colors`}
               >
                 <option value="">Select Group</option>
@@ -284,7 +308,10 @@ const LedgerForm: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1" htmlFor="openingBalance">
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="openingBalance"
+              >
                 Opening Balance
               </label>
               <input
@@ -295,15 +322,18 @@ const LedgerForm: React.FC = () => {
                 onChange={handleChange}
                 step="0.01"
                 className={`w-full p-2 rounded border ${
-                  theme === 'dark'
-                    ? 'bg-gray-700 border-gray-600 focus:border-blue-500'
-                    : 'bg-white border-gray-300 focus:border-blue-500'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                    : "bg-white border-gray-300 focus:border-blue-500"
                 } outline-none transition-colors`}
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1" htmlFor="balanceType">
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="balanceType"
+              >
                 Balance Type
               </label>
               <div className="flex space-x-4 mt-2">
@@ -312,7 +342,7 @@ const LedgerForm: React.FC = () => {
                     type="radio"
                     name="balanceType"
                     value="debit"
-                    checked={formData.balanceType === 'debit'}
+                    checked={formData.balanceType === "debit"}
                     onChange={handleChange}
                     className="mr-2"
                   />
@@ -323,7 +353,7 @@ const LedgerForm: React.FC = () => {
                     type="radio"
                     name="balanceType"
                     value="credit"
-                    checked={formData.balanceType === 'credit'}
+                    checked={formData.balanceType === "credit"}
                     onChange={handleChange}
                     className="mr-2"
                   />
@@ -334,12 +364,19 @@ const LedgerForm: React.FC = () => {
           </div>
 
           {/* Additional Info */}
-          <div className={`p-4 mb-6 rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+          <div
+            className={`p-4 mb-6 rounded ${
+              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+            }`}
+          >
             <h3 className="font-semibold mb-4">Additional Information</h3>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium mb-1" htmlFor="address">
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="address"
+                >
                   Address
                 </label>
                 <textarea
@@ -349,16 +386,19 @@ const LedgerForm: React.FC = () => {
                   onChange={handleChange}
                   rows={3}
                   className={`w-full p-2 rounded border ${
-                    theme === 'dark'
-                      ? 'bg-gray-700 border-gray-600 focus:border-blue-500'
-                      : 'bg-white border-gray-300 focus:border-blue-500'
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                      : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none transition-colors`}
                 />
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="email">
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    htmlFor="email"
+                  >
                     Email
                   </label>
                   <input
@@ -368,15 +408,18 @@ const LedgerForm: React.FC = () => {
                     value={formData.email}
                     onChange={handleChange}
                     className={`w-full p-2 rounded border ${
-                      theme === 'dark'
-                        ? 'bg-gray-700 border-gray-600 focus:border-blue-500'
-                        : 'bg-white border-gray-300 focus:border-blue-500'
+                      theme === "dark"
+                        ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                        : "bg-white border-gray-300 focus:border-blue-500"
                     } outline-none transition-colors`}
                   />
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="phone">
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    htmlFor="phone"
+                  >
                     Phone
                   </label>
                   <input
@@ -386,9 +429,9 @@ const LedgerForm: React.FC = () => {
                     value={formData.phone}
                     onChange={handleChange}
                     className={`w-full p-2 rounded border ${
-                      theme === 'dark'
-                        ? 'bg-gray-700 border-gray-600 focus:border-blue-500'
-                        : 'bg-white border-gray-300 focus:border-blue-500'
+                      theme === "dark"
+                        ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                        : "bg-white border-gray-300 focus:border-blue-500"
                     } outline-none transition-colors`}
                   />
                 </div>
@@ -397,8 +440,12 @@ const LedgerForm: React.FC = () => {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
               <div>
-                <label className="block text-sm font-medium mb-1" htmlFor="gstNumber">
-                  GSTIN/UIN Number <span className="text-xs text-gray-500">(Optional)</span>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="gstNumber"
+                >
+                  GSTIN/UIN Number{" "}
+                  <span className="text-xs text-gray-500">(Optional)</span>
                 </label>
                 <input
                   type="text"
@@ -410,23 +457,28 @@ const LedgerForm: React.FC = () => {
                   maxLength={15}
                   className={`w-full p-2 rounded border ${
                     errors.gstNumber
-                      ? 'border-red-500 focus:border-red-500'
-                      : theme === 'dark'
-                      ? 'bg-gray-700 border-gray-600 focus:border-blue-500'
-                      : 'bg-white border-gray-300 focus:border-blue-500'
+                      ? "border-red-500 focus:border-red-500"
+                      : theme === "dark"
+                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                      : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none transition-colors`}
                 />
                 {errors.gstNumber && (
-                  <p className="text-red-500 text-xs mt-1">{errors.gstNumber}</p>
+                  <p className="text-red-500 text-xs mt-1">
+                    {errors.gstNumber}
+                  </p>
                 )}
                 <p className="text-xs text-gray-500 mt-1">
-                  📊 <strong>B2B:</strong> Ledgers with GSTIN/UIN | <strong>B2C:</strong> Ledgers
-                  without GSTIN/UIN
+                  📊 <strong>B2B:</strong> Ledgers with GSTIN/UIN |{" "}
+                  <strong>B2C:</strong> Ledgers without GSTIN/UIN
                 </p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1" htmlFor="panNumber">
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="panNumber"
+                >
                   PAN Number
                 </label>
                 <input
@@ -436,9 +488,9 @@ const LedgerForm: React.FC = () => {
                   value={formData.panNumber}
                   onChange={handleChange}
                   className={`w-full p-2 rounded border ${
-                    theme === 'dark'
-                      ? 'bg-gray-700 border-gray-600 focus:border-blue-500'
-                      : 'bg-white border-gray-300 focus:border-blue-500'
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                      : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none transition-colors`}
                 />
               </div>
@@ -449,11 +501,11 @@ const LedgerForm: React.FC = () => {
           <div className="flex justify-end space-x-4">
             <button
               type="button"
-              onClick={() => navigate('/app/masters/ledger')}
+              onClick={() => navigate("/app/masters/ledger")}
               className={`px-4 py-2 rounded ${
-                theme === 'dark'
-                  ? 'bg-gray-700 hover:bg-gray-600'
-                  : 'bg-gray-200 hover:bg-gray-300'
+                theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-200 hover:bg-gray-300"
               }`}
             >
               Cancel
@@ -461,13 +513,13 @@ const LedgerForm: React.FC = () => {
             <button
               type="submit"
               className={`flex items-center px-4 py-2 rounded ${
-                theme === 'dark'
-                  ? 'bg-blue-600 hover:bg-blue-700'
-                  : 'bg-blue-600 hover:bg-blue-700 text-white'
+                theme === "dark"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
               }`}
             >
               <Save size={18} className="mr-1" />
-              {isEditMode ? 'Update' : 'Save'}
+              {isEditMode ? "Update" : "Save"}
             </button>
           </div>
         </form>
