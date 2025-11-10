@@ -1,20 +1,28 @@
-import React, { useState, useEffect } from 'react';
-import { useAppContext } from '../../../context/AppContext';
-import { useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeft, Save } from 'lucide-react';
-import type { LedgerGroup, GstClassification, LedgerType } from '../../../types';
-import Swal from 'sweetalert2';
+import React, { useState, useEffect } from "react";
+import { useAppContext } from "../../../context/AppContext";
+import { useNavigate, useParams } from "react-router-dom";
+import { ArrowLeft, Save } from "lucide-react";
+import type {
+  LedgerGroup,
+  GstClassification,
+  LedgerType,
+} from "../../../types";
+import Swal from "sweetalert2";
 
 interface FormData {
   name: string;
   alias: string;
   under: string;
-  type: LedgerType | '';
-  nature: 'Assets' | 'Liabilities' | 'Income' | 'Expenses' | '';
+  type: LedgerType | "";
+  nature: "Assets" | "Liabilities" | "Income" | "Expenses" | "";
   behavesLikeSubLedger: string;
   nettBalancesForReporting: string;
   usedForCalculation: string;
-  allocationMethod: 'Appropriate by Qty' | 'Appropriate by Value' | 'No Appropriation' | '';
+  allocationMethod:
+    | "Appropriate by Qty"
+    | "Appropriate by Value"
+    | "No Appropriation"
+    | "";
   setAlterHSNSAC: string;
   hsnSacClassificationId: string;
   hsnCode: string;
@@ -22,43 +30,52 @@ interface FormData {
   setAlterGST: string;
   gstClassificationId: string;
   typeOfSupply: string;
-  taxability: 'Taxable' | 'Exempt' | 'Nil-rated' | '';
+  taxability: "Taxable" | "Exempt" | "Nil-rated" | "";
   integratedTaxRate: string;
   cess: string;
 }
 
 const GroupForm: React.FC = () => {
-  const { theme} = useAppContext();
+  const { theme } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  console.log("this is paramsid", id);
   const isEditMode = Boolean(id);
   const [ledgerGroups] = useState<LedgerGroup[]>([]);
   const [gstClassifications] = useState<GstClassification[]>([]);
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("userType"); // 'employee' or 'user'
-  const ownerId = localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id");
+  const ownerId = localStorage.getItem(
+    ownerType === "employee" ? "employee_id" : "user_id"
+  );
+  console.log("componeyId", companyId);
+  console.log("ownerType", ownerType);
+  console.log("ownerId", ownerId);
+
   const [formData, setFormData] = useState<FormData>({
-    name: '',
-    alias: '',
-    under: '',
-    type: '',
-    nature: '',
-    behavesLikeSubLedger: 'no',
-    nettBalancesForReporting: 'yes',
-    usedForCalculation: 'no',
-    allocationMethod: 'No Appropriation',
-    setAlterHSNSAC: 'no',
-    hsnSacClassificationId: '',
-    hsnCode: '',
-    hsnSacDescription: '',
-    setAlterGST: 'no',
-    gstClassificationId: '',
-    typeOfSupply: '',
-    taxability: '',
-    integratedTaxRate: '',
-    cess: '',
+    name: "",
+    alias: "",
+    under: "",
+    type: "",
+    nature: "",
+    behavesLikeSubLedger: "no",
+    nettBalancesForReporting: "yes",
+    usedForCalculation: "no",
+    allocationMethod: "No Appropriation",
+    setAlterHSNSAC: "no",
+    hsnSacClassificationId: "",
+    hsnCode: "",
+    hsnSacDescription: "",
+    setAlterGST: "no",
+    gstClassificationId: "",
+    typeOfSupply: "",
+    taxability: "",
+    integratedTaxRate: "",
+    cess: "",
   });
-  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>({});
+  const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
+    {}
+  );
 
   // useEffect(() => {
   //   const fetchData = async () => {
@@ -85,82 +102,133 @@ const GroupForm: React.FC = () => {
 
   useEffect(() => {
     if (isEditMode && id) {
-      const group = ledgerGroups.find((g) => g.id === id);
-      if (group) {
-        setFormData({
-          name: group.name,
-          alias: group.alias || '',
-          under: group.parent || 'Primary',
-          type: group.parent ? '' : group.type,
-          nature: '',
-          behavesLikeSubLedger: group.behavesLikeSubLedger ? 'yes' : 'no',
-          nettBalancesForReporting: group.nettBalancesForReporting ? 'yes' : 'no',
-          usedForCalculation: group.usedForCalculation ? 'yes' : 'no',
-          allocationMethod: group.allocationMethod || 'No Appropriation',
-          setAlterHSNSAC: group.gstDetails?.setAlterHSNSAC ? 'yes' : 'no',
-          hsnSacClassificationId: group.gstDetails?.hsnSacClassificationId || '',
-          hsnCode: group.gstDetails?.hsnCode || '',
-          hsnSacDescription: '',
-          setAlterGST: group.gstDetails?.setAlterGST ? 'yes' : 'no',
-          gstClassificationId: group.gstDetails?.gstClassificationId || '',
-          typeOfSupply: group.gstDetails?.typeOfSupply || '',
-          taxability: group.gstDetails?.taxability || '',
-          integratedTaxRate: group.gstDetails?.integratedTaxRate?.toString() || '',
-          cess: group.gstDetails?.cess?.toString() || '',
-        });
-      }
+      const fetchGroup = async () => {
+        try {
+          const res = await fetch(
+            `http://localhost:5000/api/ledger-groups/${id}?ownerType=${ownerType}&ownerId=${ownerId}`
+          );
+          const data = await res.json();
+          console.log("this is data", data);
+
+          if (res.ok) {
+            setFormData({
+              ...formData,
+              name: data.name || "",
+              alias: data.alias || "",
+              under: data.under || "",
+              type: data.type || "",
+              nature: data.nature || "",
+              behavesLikeSubLedger: data.behavesLikeSubLedger ? "yes" : "no",
+              nettBalancesForReporting: data.nettBalancesForReporting
+                ? "yes"
+                : "no",
+              usedForCalculation: data.usedForCalculation ? "yes" : "no",
+              allocationMethod: data.allocationMethod || "No Appropriation",
+              setAlterHSNSAC: data.setAlterHSNSAC ? "yes" : "no",
+              hsnSacClassificationId: data.hsnSacClassificationId || "",
+              hsnCode: data.hsnCode || "",
+              hsnSacDescription: data.hsnSacDescription || "",
+              setAlterGST: data.setAlterGST ? "yes" : "no",
+              gstClassificationId: data.gstClassificationId || "",
+              typeOfSupply: data.typeOfSupply || "",
+              taxability: data.taxability || "",
+              integratedTaxRate: data.integratedTaxRate?.toString() || "",
+              cess: data.cess?.toString() || "",
+            });
+          } else {
+            Swal.fire(
+              "Error",
+              data.message || "Failed to fetch group details",
+              "error"
+            );
+          }
+        } catch (err) {
+          console.error("Error fetching group:", err);
+          Swal.fire(
+            "Error",
+            "Something went wrong while loading data!",
+            "error"
+          );
+        }
+      };
+
+      fetchGroup();
     }
-  }, [id, isEditMode, ledgerGroups]);
+  }, [id, isEditMode]);
 
   useEffect(() => {
-    if (formData.setAlterHSNSAC === 'yes' && formData.hsnSacClassificationId) {
-      const classification = gstClassifications.find(c => c.id === formData.hsnSacClassificationId);
+    if (formData.setAlterHSNSAC === "yes" && formData.hsnSacClassificationId) {
+      const classification = gstClassifications.find(
+        (c) => c.id === formData.hsnSacClassificationId
+      );
       if (classification) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
           hsnCode: classification.hsnCode || prev.hsnCode,
           hsnSacDescription: classification.name || prev.hsnSacDescription,
         }));
       }
     }
-    if (formData.setAlterGST === 'yes' && formData.gstClassificationId) {
-      const classification = gstClassifications.find(c => c.id === formData.gstClassificationId);
+    if (formData.setAlterGST === "yes" && formData.gstClassificationId) {
+      const classification = gstClassifications.find(
+        (c) => c.id === formData.gstClassificationId
+      );
       if (classification) {
-        setFormData(prev => ({
+        setFormData((prev) => ({
           ...prev,
-          integratedTaxRate: classification.gstRate?.toString() || prev.integratedTaxRate,
+          integratedTaxRate:
+            classification.gstRate?.toString() || prev.integratedTaxRate,
           cess: classification.cess?.toString() || prev.cess,
         }));
       }
     }
-  }, [formData.hsnSacClassificationId, formData.gstClassificationId, formData.setAlterHSNSAC, formData.setAlterGST, gstClassifications]);
+  }, [
+    formData.hsnSacClassificationId,
+    formData.gstClassificationId,
+    formData.setAlterHSNSAC,
+    formData.setAlterGST,
+    gstClassifications,
+  ]);
 
   const validateForm = () => {
     const newErrors: Partial<Record<keyof FormData, string>> = {};
-    if (!formData.name) newErrors.name = 'Group Name is required';
-    if (!formData.under) newErrors.under = 'Under Group is required';
-    if (formData.under === 'Primary' && !formData.nature)
-      newErrors.nature = 'Nature of Group is required for Primary groups';
-    if (formData.setAlterHSNSAC === 'yes' && !formData.hsnSacClassificationId)
-      newErrors.hsnSacClassificationId = 'HSN/SAC Classification is required';
-    if (formData.setAlterGST === 'yes' && !formData.gstClassificationId)
-      newErrors.gstClassificationId = 'GST Classification is required';
-    if (formData.setAlterGST === 'yes' && !formData.typeOfSupply)
-      newErrors.typeOfSupply = 'Type of Supply is required';
-    if (formData.setAlterGST === 'yes' && !formData.taxability)
-      newErrors.taxability = 'Taxability is required';
+    if (!formData.name) newErrors.name = "Group Name is required";
+    if (!formData.under) newErrors.under = "Under Group is required";
+    if (formData.under === "Primary" && !formData.nature)
+      newErrors.nature = "Nature of Group is required for Primary groups";
+    if (formData.setAlterHSNSAC === "yes" && !formData.hsnSacClassificationId)
+      newErrors.hsnSacClassificationId = "HSN/SAC Classification is required";
+    if (formData.setAlterGST === "yes" && !formData.gstClassificationId)
+      newErrors.gstClassificationId = "GST Classification is required";
+    if (formData.setAlterGST === "yes" && !formData.typeOfSupply)
+      newErrors.typeOfSupply = "Type of Supply is required";
+    if (formData.setAlterGST === "yes" && !formData.taxability)
+      newErrors.taxability = "Taxability is required";
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
+  const handleChange = (
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value } = e.target;
+
     setFormData((prev) => ({
       ...prev,
       [name]: value,
-      ...(name === 'under' && value !== 'Primary' ? { nature: '' } : {}),
-      ...(name === 'setAlterHSNSAC' && value === 'no' ? { hsnSacClassificationId: '', hsnCode: '', hsnSacDescription: '' } : {}),
-      ...(name === 'setAlterGST' && value === 'no' ? { gstClassificationId: '', typeOfSupply: '', taxability: '', integratedTaxRate: '', cess: '' } : {}),
+      ...(name === "under" && value !== "Primary" ? { nature: "" } : {}),
+      ...(name === "setAlterHSNSAC" && value === "no"
+        ? { hsnSacClassificationId: "", hsnCode: "", hsnSacDescription: "" }
+        : {}),
+      ...(name === "setAlterGST" && value === "no"
+        ? {
+            gstClassificationId: "",
+            typeOfSupply: "",
+            taxability: "",
+            integratedTaxRate: "",
+            cess: "",
+          }
+        : {}),
     }));
   };
 
@@ -217,100 +285,152 @@ const GroupForm: React.FC = () => {
   //     alert('Something went wrong!');
   //   }
   // };
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
-if (!validateForm()) {
-      alert('Please fix the errors before submitting.');
-       return;
-    }
-  try {
-    const payload = {
-      ...formData,
-      companyId,
-      ownerType,
-      ownerId,
-    };
-    const res = await fetch('http://localhost:5000/api/group', {
-      method: 'POST',
-      headers: {
-          "Content-Type": "application/json",
-         
-        },
-      body: JSON.stringify(payload)
-    });
 
-    const data = await res.json();
-    if (res.ok) {
-      Swal.fire("Success", data.message, "success"); // Use sweetalert2
-      navigate('/app/masters/group');
-    } else {
-      Swal.fire("Error", data.message || "Failed to create group", "error");
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!validateForm()) {
+      Swal.fire("Error", "Please fix the errors before submitting.", "error");
+      return;
     }
-  } catch (err) {
-    console.error('Group create error:', err);
-    Swal.fire("Error", 'Something went wrong!', "error");
-  }
-};
+
+    try {
+      const payload = {
+        ...formData,
+        companyId: Number(companyId),
+        ownerType,
+        ownerId: Number(ownerId),
+      };
+
+      const url = isEditMode
+        ? `http://localhost:5000/api/ledger-groups/${id}`
+        : `http://localhost:5000/api/ledger-groups`;
+
+      const method = isEditMode ? "PUT" : "POST";
+
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        Swal.fire(
+          "Success",
+          data.message ||
+            `Group ${isEditMode ? "updated" : "created"} successfully!`,
+          "success"
+        );
+        navigate("/app/masters/group");
+      } else {
+        Swal.fire(
+          "Error",
+          data.message || `Failed to ${isEditMode ? "update" : "create"} group`,
+          "error"
+        );
+      }
+    } catch (err) {
+      console.error("Error saving group:", err);
+      Swal.fire(
+        "Error",
+        `Something went wrong while ${isEditMode ? "updating" : "creating"}!`,
+        "error"
+      );
+    }
+  };
+
   const handleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Escape') {
-      navigate('/app/masters/group');
-    } else if (e.ctrlKey && e.key === 'a') {
+    if (e.key === "Escape") {
+      navigate("/app/masters/group");
+    } else if (e.ctrlKey && e.key === "a") {
       e.preventDefault();
       handleSubmit(e);
-    } else if (e.key === 'F12') {
+    } else if (e.key === "F12") {
       e.preventDefault();
-      alert('Configuration options not implemented yet.');
+      alert("Configuration options not implemented yet.");
     }
   };
 
   const yesNoOptions = [
-    { value: 'yes', label: 'Yes' },
-    { value: 'no', label: 'No' },
+    { value: "yes", label: "Yes" },
+    { value: "no", label: "No" },
   ];
 
   const allocationOptions = [
-    { value: 'Appropriate by Qty', label: 'Appropriate by Qty' },
-    { value: 'Appropriate by Value', label: 'Appropriate by Value' },
-    { value: 'No Appropriation', label: 'No Appropriation' },
+    { value: "Appropriate by Qty", label: "Appropriate by Qty" },
+    { value: "Appropriate by Value", label: "Appropriate by Value" },
+    { value: "No Appropriation", label: "No Appropriation" },
   ];
 
   const typeOfSupplyOptions = [
-    { value: 'Goods', label: 'Goods' },
-    { value: 'Services', label: 'Services' },
+    { value: "Goods", label: "Goods" },
+    { value: "Services", label: "Services" },
   ];
 
   const taxabilityOptions = [
-    { value: 'Taxable', label: 'Taxable' },
-    { value: 'Exempt', label: 'Exempt' },
-    { value: 'Nil-rated', label: 'Nil-rated' },
+    { value: "Taxable", label: "Taxable" },
+    { value: "Exempt", label: "Exempt" },
+    { value: "Nil-rated", label: "Nil-rated" },
   ];
 
   const gstRateOptions = [
-    '0', '0.1', '0.25', '1', '1.5', '3', '5', '6', '7.5', '12', '18', '28',
+    "0",
+    "0.1",
+    "0.25",
+    "1",
+    "1.5",
+    "3",
+    "5",
+    "6",
+    "7.5",
+    "12",
+    "18",
+    "28",
   ];
 
-  const isPurchaseRelated = formData.under === 'Primary'
-    ? formData.nature === 'Expenses'
-    : formData.under.includes('expense') || formData.under.includes('purchase');
+  const isPurchaseRelated =
+    formData.under === "Primary"
+      ? formData.nature === "Expenses"
+      : formData.under.includes("expense") ||
+        formData.under.includes("purchase");
 
   return (
     <div className="pt-[56px] px-4" onKeyDown={handleKeyDown} tabIndex={0}>
       <div className="flex items-center mb-6">
         <button
           title="Back to Group List"
-          onClick={() => navigate('/app/masters/group')}
-          className={`mr-4 p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
+          onClick={() => navigate("/app/masters/group")}
+          className={`mr-4 p-2 rounded-full ${
+            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+          }`}
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className={`text-2xl font-bold ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>{isEditMode ? 'Edit' : 'Create'} Group</h1>
+        <h1
+          className={`text-2xl font-bold ${
+            theme === "dark" ? "text-gray-100" : "text-gray-900"
+          }`}
+        >
+          {isEditMode ? "Edit" : "Create"} Group
+        </h1>
       </div>
 
-      <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+      <div
+        className={`p-6 rounded-lg ${
+          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+        }`}
+      >
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
-              <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="name">
+              <label
+                className={`block text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+                htmlFor="name"
+              >
                 Group Name *
               </label>
               <input
@@ -321,14 +441,25 @@ if (!validateForm()) {
                 onChange={handleChange}
                 required
                 className={`w-full p-2 rounded border ${
-                  errors.name ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
+                  errors.name
+                    ? "border-red-500"
+                    : theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
                 } outline-none transition-colors`}
               />
-              {errors.name && <p className="text-red-500 text-xs mt-1">{errors.name}</p>}
+              {errors.name && (
+                <p className="text-red-500 text-xs mt-1">{errors.name}</p>
+              )}
             </div>
 
             <div>
-              <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="alias">
+              <label
+                className={`block text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+                htmlFor="alias"
+              >
                 Alias
               </label>
               <input
@@ -338,13 +469,20 @@ if (!validateForm()) {
                 value={formData.alias}
                 onChange={handleChange}
                 className={`w-full p-2 rounded border ${
-                  theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
                 } outline-none transition-colors`}
               />
             </div>
 
             <div>
-              <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="under">
+              <label
+                className={`block text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+                htmlFor="under"
+              >
                 Under *
               </label>
               <select
@@ -354,7 +492,11 @@ if (!validateForm()) {
                 onChange={handleChange}
                 required
                 className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
+                  errors.under
+                    ? "border-red-500"
+                    : theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
                 } outline-none transition-colors`}
               >
                 <option value="">Select Group</option>
@@ -365,12 +507,19 @@ if (!validateForm()) {
                   </option>
                 ))}
               </select>
-              {errors.under && <p className="text-red-500 text-xs mt-1">{errors.under}</p>}
+              {errors.under && (
+                <p className="text-red-500 text-xs mt-1">{errors.under}</p>
+              )}
             </div>
 
-            {formData.under === 'Primary' && (
+            {formData.under === "Primary" && (
               <div>
-                <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="nature">
+                <label
+                  className={`block text-sm font-medium mb-1 ${
+                    theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
+                  htmlFor="nature"
+                >
                   Nature of Group *
                 </label>
                 <select
@@ -380,8 +529,12 @@ if (!validateForm()) {
                   onChange={handleChange}
                   required
                   className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
-                } outline-none transition-colors`}
+                    errors.under
+                      ? "border-red-500"
+                      : theme === "dark"
+                      ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                      : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                  } outline-none transition-colors`}
                 >
                   <option value="">Select Nature</option>
                   <option value="Assets">Assets</option>
@@ -389,12 +542,19 @@ if (!validateForm()) {
                   <option value="Income">Income</option>
                   <option value="Expenses">Expenses</option>
                 </select>
-                {errors.nature && <p className="text-red-500 text-xs mt-1">{errors.nature}</p>}
+                {errors.nature && (
+                  <p className="text-red-500 text-xs mt-1">{errors.nature}</p>
+                )}
               </div>
             )}
 
             <div>
-              <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="behavesLikeSubLedger">
+              <label
+                className={`block text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+                htmlFor="behavesLikeSubLedger"
+              >
                 Group Behaves Like a Sub-Ledger
               </label>
               <select
@@ -403,7 +563,11 @@ if (!validateForm()) {
                 value={formData.behavesLikeSubLedger}
                 onChange={handleChange}
                 className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
+                  errors.under
+                    ? "border-red-500"
+                    : theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
                 } outline-none transition-colors`}
               >
                 {yesNoOptions.map((option) => (
@@ -415,7 +579,12 @@ if (!validateForm()) {
             </div>
 
             <div>
-              <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="nettBalancesForReporting">
+              <label
+                className={`block text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+                htmlFor="nettBalancesForReporting"
+              >
                 Nett Debit/Credit Balances for Reporting
               </label>
               <select
@@ -424,7 +593,11 @@ if (!validateForm()) {
                 value={formData.nettBalancesForReporting}
                 onChange={handleChange}
                 className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
+                  errors.under
+                    ? "border-red-500"
+                    : theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
                 } outline-none transition-colors`}
               >
                 {yesNoOptions.map((option) => (
@@ -436,7 +609,12 @@ if (!validateForm()) {
             </div>
 
             <div>
-              <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="usedForCalculation">
+              <label
+                className={`block text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+                htmlFor="usedForCalculation"
+              >
                 Used for Calculation (e.g., Taxes, Discounts)
               </label>
               <select
@@ -445,7 +623,11 @@ if (!validateForm()) {
                 value={formData.usedForCalculation}
                 onChange={handleChange}
                 className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
+                  errors.under
+                    ? "border-red-500"
+                    : theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
                 } outline-none transition-colors`}
               >
                 {yesNoOptions.map((option) => (
@@ -458,7 +640,12 @@ if (!validateForm()) {
 
             {isPurchaseRelated && (
               <div>
-                <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="allocationMethod">
+                <label
+                  className={`block text-sm font-medium mb-1 ${
+                    theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
+                  htmlFor="allocationMethod"
+                >
                   Method to Allocate when Used in Purchase Ledger
                 </label>
                 <select
@@ -467,8 +654,12 @@ if (!validateForm()) {
                   value={formData.allocationMethod}
                   onChange={handleChange}
                   className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
-                } outline-none transition-colors`}
+                    errors.under
+                      ? "border-red-500"
+                      : theme === "dark"
+                      ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                      : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                  } outline-none transition-colors`}
                 >
                   {allocationOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -480,7 +671,12 @@ if (!validateForm()) {
             )}
 
             <div>
-              <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="setAlterHSNSAC">
+              <label
+                className={`block text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+                htmlFor="setAlterHSNSAC"
+              >
                 Set/Alter HSN/SAC Details
               </label>
               <select
@@ -489,7 +685,11 @@ if (!validateForm()) {
                 value={formData.setAlterHSNSAC}
                 onChange={handleChange}
                 className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
+                  errors.under
+                    ? "border-red-500"
+                    : theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
                 } outline-none transition-colors`}
               >
                 {yesNoOptions.map((option) => (
@@ -500,10 +700,15 @@ if (!validateForm()) {
               </select>
             </div>
 
-            {formData.setAlterHSNSAC === 'yes' && (
+            {formData.setAlterHSNSAC === "yes" && (
               <>
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}    htmlFor="hsnSacClassificationId">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                    htmlFor="hsnSacClassificationId"
+                  >
                     HSN/SAC Classification *
                   </label>
                   <select
@@ -513,21 +718,34 @@ if (!validateForm()) {
                     onChange={handleChange}
                     required
                     className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
-                } outline-none transition-colors`}
+                      errors.under
+                        ? "border-red-500"
+                        : theme === "dark"
+                        ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                        : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                    } outline-none transition-colors`}
                   >
                     <option value="">Select Classification</option>
                     {allocationOptions.map((option) => (
-                   <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
-                  {errors.hsnSacClassificationId && <p className="text-red-500 text-xs mt-1">{errors.hsnSacClassificationId}</p>}
+                  {errors.hsnSacClassificationId && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.hsnSacClassificationId}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="hsnCode">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                    htmlFor="hsnCode"
+                  >
                     HSN/SAC Code *
                   </label>
                   <input
@@ -538,14 +756,27 @@ if (!validateForm()) {
                     onChange={handleChange}
                     required
                     className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
-                } outline-none transition-colors`}
+                      errors.under
+                        ? "border-red-500"
+                        : theme === "dark"
+                        ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                        : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                    } outline-none transition-colors`}
                   />
-                  {errors.hsnCode && <p className="text-red-500 text-xs mt-1">{errors.hsnCode}</p>}
+                  {errors.hsnCode && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.hsnCode}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="hsnSacDescription">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                    htmlFor="hsnSacDescription"
+                  >
                     HSN/SAC Description
                   </label>
                   <input
@@ -555,15 +786,24 @@ if (!validateForm()) {
                     value={formData.hsnSacDescription}
                     onChange={handleChange}
                     className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
-                } outline-none transition-colors`}
+                      errors.under
+                        ? "border-red-500"
+                        : theme === "dark"
+                        ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                        : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                    } outline-none transition-colors`}
                   />
                 </div>
               </>
             )}
 
             <div>
-              <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}  htmlFor="setAlterGST">
+              <label
+                className={`block text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+                htmlFor="setAlterGST"
+              >
                 Set/Alter GST Details
               </label>
               <select
@@ -572,7 +812,11 @@ if (!validateForm()) {
                 value={formData.setAlterGST}
                 onChange={handleChange}
                 className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
+                  errors.under
+                    ? "border-red-500"
+                    : theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
                 } outline-none transition-colors`}
               >
                 {yesNoOptions.map((option) => (
@@ -583,10 +827,15 @@ if (!validateForm()) {
               </select>
             </div>
 
-            {formData.setAlterGST === 'yes' && (
+            {formData.setAlterGST === "yes" && (
               <>
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}  htmlFor="gstClassificationId">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                    htmlFor="gstClassificationId"
+                  >
                     GST Classification *
                   </label>
                   <select
@@ -596,21 +845,34 @@ if (!validateForm()) {
                     onChange={handleChange}
                     required
                     className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
-                } outline-none transition-colors`}
+                      errors.under
+                        ? "border-red-500"
+                        : theme === "dark"
+                        ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                        : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                    } outline-none transition-colors`}
                   >
                     <option value="">Select Classification</option>
                     {allocationOptions.map((option) => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
                   </select>
-                  {errors.gstClassificationId && <p className="text-red-500 text-xs mt-1">{errors.gstClassificationId}</p>}
+                  {errors.gstClassificationId && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.gstClassificationId}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="typeOfSupply">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                    htmlFor="typeOfSupply"
+                  >
                     Type of Supply *
                   </label>
                   <select
@@ -620,8 +882,12 @@ if (!validateForm()) {
                     onChange={handleChange}
                     required
                     className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
-                } outline-none transition-colors`}
+                      errors.under
+                        ? "border-red-500"
+                        : theme === "dark"
+                        ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                        : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                    } outline-none transition-colors`}
                   >
                     <option value="">Select Type</option>
                     {typeOfSupplyOptions.map((option) => (
@@ -630,11 +896,20 @@ if (!validateForm()) {
                       </option>
                     ))}
                   </select>
-                  {errors.typeOfSupply && <p className="text-red-500 text-xs mt-1">{errors.typeOfSupply}</p>}
+                  {errors.typeOfSupply && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.typeOfSupply}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="taxability">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                    htmlFor="taxability"
+                  >
                     Taxability *
                   </label>
                   <select
@@ -644,8 +919,12 @@ if (!validateForm()) {
                     onChange={handleChange}
                     required
                     className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
-                } outline-none transition-colors`}
+                      errors.under
+                        ? "border-red-500"
+                        : theme === "dark"
+                        ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                        : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                    } outline-none transition-colors`}
                   >
                     <option value="">Select Taxability</option>
                     {taxabilityOptions.map((option) => (
@@ -654,11 +933,20 @@ if (!validateForm()) {
                       </option>
                     ))}
                   </select>
-                  {errors.taxability && <p className="text-red-500 text-xs mt-1">{errors.taxability}</p>}
+                  {errors.taxability && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.taxability}
+                    </p>
+                  )}
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="integratedTaxRate">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                    htmlFor="integratedTaxRate"
+                  >
                     Integrated Tax Rate (%) *
                   </label>
                   <select
@@ -666,10 +954,14 @@ if (!validateForm()) {
                     name="integratedTaxRate"
                     value={formData.integratedTaxRate}
                     onChange={handleChange}
-                    required={formData.taxability === 'Taxable'}
+                    required={formData.taxability === "Taxable"}
                     className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
-                } outline-none transition-colors`}
+                      errors.under
+                        ? "border-red-500"
+                        : theme === "dark"
+                        ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                        : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                    } outline-none transition-colors`}
                   >
                     <option value="">Select Rate</option>
                     {gstRateOptions.map((rate) => (
@@ -681,7 +973,12 @@ if (!validateForm()) {
                 </div>
 
                 <div>
-                  <label className={`block text-sm font-medium mb-1 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`} htmlFor="cess">
+                  <label
+                    className={`block text-sm font-medium mb-1 ${
+                      theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
+                    htmlFor="cess"
+                  >
                     Cess (%)
                   </label>
                   <input
@@ -693,8 +990,12 @@ if (!validateForm()) {
                     min="0"
                     step="0.01"
                     className={`w-full p-2 rounded border ${
-                  errors.under ? 'border-red-500' : theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100' : 'bg-white border-gray-300 focus:border-blue-500 text-gray-900'
-                } outline-none transition-colors`} 
+                      errors.under
+                        ? "border-red-500"
+                        : theme === "dark"
+                        ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                        : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                    } outline-none transition-colors`}
                   />
                 </div>
               </>
@@ -705,9 +1006,11 @@ if (!validateForm()) {
             <button
               title="Cancel Group Creation"
               type="button"
-              onClick={() => navigate('/app/masters/group')}
+              onClick={() => navigate("/app/masters/group")}
               className={`px-4 py-2 rounded text-sm font-medium ${
-                theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600 text-gray-100' : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600 text-gray-100"
+                  : "bg-gray-200 hover:bg-gray-300 text-gray-700"
               }`}
             >
               Cancel
@@ -716,19 +1019,26 @@ if (!validateForm()) {
               title="Save Group"
               type="submit"
               className={`flex items-center px-4 py-2 rounded text-sm font-medium ${
-                theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'
+                theme === "dark"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
               }`}
             >
               <Save size={18} className="mr-1" />
-              {isEditMode ? 'Update' : 'Save'}
+              {isEditMode ? "Update" : "Save"}
             </button>
           </div>
         </form>
       </div>
 
-      <div className={`mt-6 p-4 rounded ${theme === 'dark' ? 'bg-gray-800' : 'bg-blue-50'}`}>
+      <div
+        className={`mt-6 p-4 rounded ${
+          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+        }`}
+      >
         <p className="text-sm text-gray-700 dark:text-gray-300">
-          <span className="font-semibold">Keyboard Shortcuts:</span> Ctrl+A to save, Esc to cancel, F12 to configure.
+          <span className="font-semibold">Keyboard Shortcuts:</span> Ctrl+A to
+          save, Esc to cancel, F12 to configure.
         </p>
       </div>
     </div>

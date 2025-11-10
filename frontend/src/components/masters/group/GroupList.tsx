@@ -14,12 +14,18 @@ const GroupList: React.FC = () => {
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("userType"); // 'employee' or 'user'
   const ownerId = localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id");
+
+  console.log('companyId', companyId)
+  console.log('ownerType', ownerType)
+  console.log('ownerId', ownerId)
+
  
   useEffect(() => {
       const fetchLedgerGroups = async () => {
         try {
           const data = await apiFetch(`http://localhost:5000/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
           setGroups(data);
+          console.log('data', data);
         } catch (err) {
           console.error("Failed to load ledger groups", err);
         }
@@ -123,6 +129,7 @@ const GroupList: React.FC = () => {
                 <th className={`px-4 py-3 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>GST Classification</th>
                 <th className={`px-4 py-3 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>HSN/SAC</th>
                 <th className={`px-4 py-3 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Taxability</th>
+                <th className={`px-4 py-3 text-left ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Actions</th>
                 
               </tr>
             </thead>
@@ -145,7 +152,7 @@ const GroupList: React.FC = () => {
                   </td>
                   <td className={`px-4 py-3 ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>{group.gstDetails?.hsnCode || '-'}</td>
                   <td className={`px-4 py-3 ${theme === 'dark' ? 'text-gray-100' : 'text-gray-900'}`}>{group.gstDetails?.taxability || '-'}</td>
-                  {/* <td className="px-4 py-3">
+                  <td className="px-4 py-3">
                     <div className="flex justify-center space-x-2">
                       {ownerType !== "user" &&(
                         <>
@@ -166,7 +173,7 @@ const GroupList: React.FC = () => {
                       </>
                       )}
                     </div>
-                  </td> */}
+                  </td>
                 </tr>
               ))}
             </tbody>
