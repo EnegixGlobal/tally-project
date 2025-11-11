@@ -24,6 +24,7 @@ const StockGroupList: React.FC = () => {
     try {
       const res = await fetch(`http://localhost:5000/api/stock-groups/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
       const data = await res.json();
+      console.log('this is list data', data)
       setStockGroupData(data);
     } catch (err) {
       console.error('Failed to fetch stock groups:', err);
@@ -34,10 +35,33 @@ const StockGroupList: React.FC = () => {
 }, []);
   
   // Mock deleteStockGroup function since it's not in context
-  const deleteStockGroup = useCallback((id: string) => {
-    console.log('Delete stock group:', id);
-    alert('Stock group deleted successfully!');
-  }, []);
+  const deleteStockGroup = useCallback(async (id: string) => {
+  const ownerType = localStorage.getItem('userType');
+  const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
+
+  if (!ownerType || !ownerId) return;
+
+  if (!window.confirm('Are you sure you want to delete this stock group?')) return;
+
+  try {
+    const res = await fetch(`http://localhost:5000/api/stock-groups/delete/${id}?owner_type=${ownerType}&owner_id=${ownerId}`, {
+      method: 'DELETE',
+    });
+
+    const result = await res.json();
+
+    if (res.ok) {
+      alert(result.message || 'Stock group deleted successfully!');
+      // Update the state to remove the deleted group from the list
+      setStockGroupData(prev => prev.filter(g => g.id !== id));
+    } else {
+      alert(result.message || 'Failed to delete stock group.');
+    }
+  } catch (err) {
+    console.error('Failed to delete stock group:', err);
+    alert('Failed to delete stock group. See console for details.');
+  }
+}, []);
 
   // Mock stock groups
   const [mockStockGroups] = useState<StockGroup[]>([
