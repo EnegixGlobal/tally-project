@@ -15,6 +15,7 @@ const StockCategoryList: React.FC = () => {
   const queryParams = `company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
 
+
   useEffect(() => {
     const fetchData = async () => {
       try {

@@ -66,19 +66,36 @@ const StockItemList = () => {
 //   };
 
 
-  const handleDelete = (id: string) => {
-    const itemToDelete = stockItems.find(item => item.id === id);
-    if (!itemToDelete) {
-      alert('Stock item not found.');
-      return;
-    }
+ const handleDelete = async (id: string) => {
+  const itemToDelete = stockItems.find(item => item.id === id);
+  if (!itemToDelete) {
+    alert('Stock item not found.');
+    return;
+  }
 
-    if (window.confirm(`Are you sure you want to delete "${itemToDelete.name}"? This action cannot be undone.`)) {
-      // TODO: Implement delete API call, passing tenant/role info as query params or auth
-      alert('Delete functionality requires backend integration.');
-      console.log('Stock item to delete:', itemToDelete);
+  if (window.confirm(`Are you sure you want to delete "${itemToDelete.name}"? This action cannot be undone.`)) {
+    try {
+      const res = await fetch(`http://localhost:5000/api/stock-items/${id}`, {
+        method: 'DELETE',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+      });
+
+      const json = await res.json();
+      if (json.success) {
+        alert('Stock item deleted successfully.');
+        // Update local state without reloading
+        setStockItems(prev => prev.filter(item => item.id !== id));
+      } else {
+        alert(json.message || 'Failed to delete stock item.');
+      }
+    } catch (err) {
+      console.error('❌ Error deleting stock item:', err);
+      alert('Something went wrong while deleting the stock item.');
     }
-  };
+  }
+};
 
  
 

@@ -6,6 +6,8 @@ import type {GodownAllocation, Godown, UnitOfMeasurement, StockGroup, GstClassif
 import Swal from 'sweetalert2';
 import Barcode from 'react-barcode';
 import { nanoid } from 'nanoid';
+import { useParams } from 'react-router-dom';
+
 
 // Interface for InputField props
 interface InputFieldProps {
@@ -191,6 +193,7 @@ const StockItemForm = () => {
   const ownerType = localStorage.getItem('userType');
   const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
 const [barcode, setBarcode] = useState<string>('');
+const { id } = useParams<{ id?: string }>();
 
 
 const [categories, setCategories] = useState<{value: string; label: string}[]>([]);
@@ -224,6 +227,56 @@ useEffect(() => {
 
   fetchCategories();
 }, [companyId, ownerType, ownerId]);
+
+useEffect(() => {
+  async function fetchStockItem() {
+    if (!id) return; // if not editing
+
+    try {
+      const res = await fetch(`http://localhost:5000/api/stock-items/${id}`);
+      const data = await res.json();
+
+      if (res.ok && data.success) {
+        const item = data.data;
+
+        setFormData({
+          name: item.name || '',
+          stockGroupId: item.stockGroupId?.toString() || '',
+          categoryId: item.categoryId?.toString() || '',
+          unit: item.unit?.toString() || '',
+          openingBalance: item.openingBalance || 0,
+          openingValue: item.openingValue || 0,
+          hsnSacOption: 'specify-details',
+          hsnCode: item.hsnCode || '',
+          gstRateOption: 'specify-details',
+          gstRate: item.gstRate?.toString() || '',
+          gstClassification: '',
+          taxType: item.taxType || 'Taxable',
+          standardPurchaseRate: item.standardPurchaseRate || 0,
+          standardSaleRate: item.standardSaleRate || 0,
+          enableBatchTracking: !!item.enableBatchTracking,
+          batchName: item.batchNumber || '',
+          batchExpiryDate: item.batchExpiryDate || '',
+          batchManufacturingDate: item.batchManufacturingDate || '',
+          allowNegativeStock: !!item.allowNegativeStock,
+          maintainInPieces: !!item.maintainInPieces,
+          secondaryUnit: item.secondaryUnit || ''
+        });
+
+        setGodownAllocations(item.godownAllocations || []);
+        setBarcode(item.barcode || '');
+      } else {
+        Swal.fire('Error', data.message || 'Failed to fetch stock item', 'error');
+      }
+    } catch (err) {
+      console.error('🔥 Error fetching stock item:', err);
+      Swal.fire('Error', 'Unable to fetch stock item', 'error');
+    }
+  }
+
+  fetchStockItem();
+}, [id]);
+
 
 
 // const [dynamicStockGroups, setDynamicStockGroups] = useState<{value: string; label: string}[]>([]);
@@ -331,102 +384,110 @@ useEffect(() => {
   };
 
   const validateForm = () => {
-    const newErrors: Errors = {};
-    if (!formData.name) newErrors.name = 'Name is required';
-    if (!formData.stockGroupId) newErrors.stockGroupId = 'Group is required';
-    if (!formData.unit) newErrors.unit = 'Unit is required';
-    if (!formData.taxType) newErrors.taxType = 'Tax Type is required';
-    if (formData.openingBalance < 0 && !formData.allowNegativeStock) {
-      newErrors.openingBalance = 'Opening Balance cannot be negative';
-    }
-    if (formData.openingValue < 0) newErrors.openingValue = 'Opening Value cannot be negative';
-    if (formData.standardPurchaseRate < 0) newErrors.standardPurchaseRate = 'Purchase Rate cannot be negative';
-    if (formData.standardSaleRate < 0) newErrors.standardSaleRate = 'Sale Rate cannot be negative';
-    if (formData.taxType === 'Taxable' && formData.hsnSacOption === 'as-per-company' && !stockGroups.find((g: StockGroup) => g.id === formData.stockGroupId)?.hsnCode) {
-      newErrors.hsnSacOption = 'Group must have HSN/SAC for taxable items';
-    }
-    if (formData.hsnSacOption === 'specify-details' && !formData.hsnCode) {
-      newErrors.hsnCode = 'HSN/SAC Code is required';
-    } else if (formData.hsnSacOption === 'specify-details') {
-      const turnover = companyInfo?.turnover || 0;
-      const hsnLength = formData.hsnCode.length;
-      const requiredLength = turnover <= 50000000 ? 4 : turnover <= 150000000 ? 6 : 8;
-      if (!/^\d{4,8}$/.test(formData.hsnCode) || hsnLength < requiredLength) {
-        newErrors.hsnCode = `HSN/SAC must be at least ${requiredLength} digits for turnover ₹${(turnover / 10000000).toFixed(1)} crore`;
-      }
-    }
-    if (formData.gstRateOption === 'specify-details' && !formData.gstRate) {
-      newErrors.gstRate = 'GST Rate is required';
-    } else if (formData.gstRateOption === 'specify-details' && (Number(formData.gstRate) < 0 || Number(formData.gstRate) > 28)) {
-      newErrors.gstRate = 'GST Rate must be between 0 and 28%';
-    }
-    godownAllocations.forEach((alloc: GodownAllocation, index: number) => {
-      if (!alloc.godownId) newErrors[`godown-${index}`] = 'Godown is required';
-      if (alloc.quantity < 0) newErrors[`quantity-${index}`] = 'Quantity cannot be negative';
-      if (alloc.value < 0) newErrors[`value-${index}`] = 'Value cannot be negative';
-    });
-    if (formData.enableBatchTracking && !formData.batchName) {
-      newErrors.batchName = 'Batch Name is required';
-    }
-    if (formData.maintainInPieces && !formData.secondaryUnit) {
-      newErrors.secondaryUnit = 'Secondary Unit is required';
-    }
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  const newErrors: Errors = {};
 
-  const handleSubmit = (e: React.FormEvent) => {
+  if (!formData.name) newErrors.name = 'Name is required';
+  // Use categoryId (you switched to Category select in UI)
+  if (!formData.categoryId) newErrors.categoryId = 'Category is required';
+  if (!formData.unit) newErrors.unit = 'Unit is required';
+  if (!formData.taxType) newErrors.taxType = 'Tax Type is required';
+
+  if (formData.openingBalance < 0 && !formData.allowNegativeStock) {
+    newErrors.openingBalance = 'Opening Balance cannot be negative';
+  }
+  if (formData.openingValue < 0) newErrors.openingValue = 'Opening Value cannot be negative';
+  if (formData.standardPurchaseRate < 0) newErrors.standardPurchaseRate = 'Purchase Rate cannot be negative';
+  if (formData.standardSaleRate < 0) newErrors.standardSaleRate = 'Sale Rate cannot be negative';
+
+  // Removed strict dependency on stockGroupId/Group HSN (because UI uses categories)
+  // Validate HSN when user chooses to specify details
+  if (formData.hsnSacOption === 'specify-details' && !formData.hsnCode) {
+    newErrors.hsnCode = 'HSN/SAC Code is required';
+  } else if (formData.hsnSacOption === 'specify-details') {
+    const turnover = companyInfo?.turnover || 0;
+    const hsnLength = (formData.hsnCode || '').toString().length;
+    const requiredLength = turnover <= 50000000 ? 4 : turnover <= 150000000 ? 6 : 8;
+    if (!/^\d{4,8}$/.test(formData.hsnCode) || hsnLength < requiredLength) {
+      newErrors.hsnCode = `HSN/SAC must be at least ${requiredLength} digits for turnover ₹${(turnover / 10000000).toFixed(1)} crore`;
+    }
+  }
+
+  if (formData.gstRateOption === 'specify-details' && !formData.gstRate) {
+    newErrors.gstRate = 'GST Rate is required';
+  } else if (formData.gstRateOption === 'specify-details' && (Number(formData.gstRate) < 0 || Number(formData.gstRate) > 28)) {
+    newErrors.gstRate = 'GST Rate must be between 0 and 28%';
+  }
+
+  godownAllocations.forEach((alloc: GodownAllocation, index: number) => {
+    if (!alloc.godownId) newErrors[`godown-${index}`] = 'Godown is required';
+    if (alloc.quantity < 0) newErrors[`quantity-${index}`] = 'Quantity cannot be negative';
+    if (alloc.value < 0) newErrors[`value-${index}`] = 'Value cannot be negative';
+  });
+
+  if (formData.enableBatchTracking && !formData.batchName) {
+    newErrors.batchName = 'Batch Name is required';
+  }
+
+  if (formData.maintainInPieces && !formData.secondaryUnit) {
+    newErrors.secondaryUnit = 'Secondary Unit is required';
+  }
+
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+
+
+const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!validateForm()) {
     Swal.fire('Validation Error', 'Please fix the errors before submitting.', 'warning');
     return;
   }
 
-  // Construct the stockItem object from formData and godownAllocations
   const stockItem = {
     ...formData,
     godownAllocations,
     companyId,
     ownerType,
     ownerId,
-    barcode, // <-- include generated barcode here
-
+    barcode,
   };
 
-  fetch('http://localhost:5000/api/stock-items', {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(stockItem),
-  })
-    .then(res => res.json())
-    .then(data => {
-      if (data.success) {
 
-        Swal.fire({
-          icon: 'success',
-          title: 'Success',
-          text: 'Stock item saved successfully!',
-        }).then(() => {
-          navigate('/app/masters/stock-item');
-        });
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: 'Failed to save stock item',
-        });
-      }
-    })
-    .catch(err => {
-      console.error(err);
+  try {
+    const res = await fetch('http://localhost:5000/api/stock-items', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(stockItem),
+    });
+
+    const data = await res.json().catch(() => ({}));
+
+    if (!res.ok) {
+      console.error('❌ Backend error:', data);
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: 'An error occurred',
+        text: data.message || 'Failed to save stock item',
       });
+      return;
+    }
+
+    Swal.fire({
+      icon: 'success',
+      title: 'Success',
+      text: data.message || 'Stock item saved successfully!',
+    }).then(() => {
+      navigate('/app/masters/stock-item');
     });
+  } catch (err) {
+    console.error('🔥 Network/Error:', err);
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'An error occurred while saving the stock item.',
+    });
+  }
 };
 
 

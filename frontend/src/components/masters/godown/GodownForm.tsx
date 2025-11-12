@@ -26,23 +26,33 @@ const GodownForm: React.FC = () => {
   });
 
   useEffect(() => {
-    if (isEditMode && id) {
-      // Fetch godown data by id and set form data
-      // This is just mock data for demonstration
-      const mockGodown = {
-        id: '1',
-        name: 'Main Warehouse',
-        address: '123 Industrial Area, City',
-        description: 'Primary storage facility for finished goods'
-      };
-      
-      setFormData({
-        name: mockGodown.name,
-        address: mockGodown.address,
-        description: mockGodown.description
-      });
-    }
-  }, [id, isEditMode]);
+  if (isEditMode && id) {
+    const fetchGodown = async () => {
+      try {
+        const response = await fetch(
+          `http://localhost:5000/api/godowns/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const result = await response.json();
+
+        if (result.success && result.data) {
+          setFormData({
+            name: result.data.name || '',
+            address: result.data.address || '',
+            description: result.data.description || ''
+          });
+        } else {
+          Swal.fire('Error', result.message || 'Failed to fetch godown', 'error');
+        }
+      } catch (error) {
+        console.error('Error fetching godown:', error);
+        Swal.fire('Error', 'Something went wrong while fetching!', 'error');
+      }
+    };
+
+    fetchGodown();
+  }
+}, [id, isEditMode]);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -53,12 +63,21 @@ const GodownForm: React.FC = () => {
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
+  const url = isEditMode
+    ? `http://localhost:5000/api/godowns/${id}`
+    : `http://localhost:5000/api/godowns`;
+
+  const method = isEditMode ? 'PUT' : 'POST';
+
   try {
-    const response = await fetch('http://localhost:5000/api/godowns', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ ...formData, companyId, ownerType, ownerId }),
-    });
+    const response = await fetch(
+      `${url}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+      {
+        method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...formData, companyId, ownerType, ownerId }),
+      }
+    );
 
     const result = await response.json();
 
@@ -154,7 +173,7 @@ const handleSubmit = async (e: React.FormEvent) => {
           <div className="flex justify-end space-x-4">
             <button
               type="button"
-              onClick={() => navigate('/app/masters/godown')}
+              onClick={() => navigate('/app/masters/godowns')}
               className={`px-4 py-2 rounded ${
                 theme === 'dark' 
                   ? 'bg-gray-700 hover:bg-gray-600' 
