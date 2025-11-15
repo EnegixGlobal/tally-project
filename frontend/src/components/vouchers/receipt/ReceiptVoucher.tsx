@@ -15,6 +15,7 @@ const ReceiptVoucher: React.FC = () => {
   const ownerType = localStorage.getItem('userType');
   const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
 
+
   const generateVoucherNumber = () => {
   const prefix = 'RV';
   const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit
@@ -150,6 +151,7 @@ useEffect(() => {
         const res = await fetch(`http://localhost:5000/api/ledger/cash-bank?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`)
 
         const data = await res.json();
+        console.log('cashbank', data)
         setLedgers(data);
       } catch (err) {
         console.error("Failed to load ledgers", err);

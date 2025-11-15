@@ -3,36 +3,51 @@ import { useAppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { 
   BookOpen, Users, Package, Truck, Briefcase, Building, 
-  CreditCard, DollarSign, FileText, BarChart2 
+  CreditCard, DollarSign, FileText, BarChart2, 
+  Settings
 } from 'lucide-react';
 
 const MastersIndex: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
 
-  const masterCategories = [
-    {
-      title: 'Accounting Masters',
-      items: [
-        { icon: <BookOpen size={20} />, name: 'Ledger', path: '/app/masters/ledger' },
-        { icon: <Users size={20} />, name: 'Group', path: '/app/masters/group' },
-        { icon: <CreditCard size={20} />, name: 'Currency', path: '/app/masters/currency' },
-        { icon: <DollarSign size={20} />, name: 'Budgets', path: '/app/masters/budgets' },
-        { icon: <FileText size={20} />, name: 'Scenarios', path: '/app/masters/scenarios' },
-        { icon: <BarChart2 size={20} />, name: 'Cost Centers', path: '/app/masters/cost-centers' },
-      ]
-    },
-    {
-      title: 'Inventory Masters',
-      items: [
-        { icon: <Package size={20} />, name: 'Stock Item', path: '/app/masters/stock-item' },
-        { icon: <Users size={20} />, name: 'Stock Group', path: '/app/masters/stock-group' },
-        { icon: <Truck size={20} />, name: 'Units', path: '/app/masters/units' },
-        { icon: <Building size={20} />, name: 'Godowns', path: '/app/masters/godowns' },
-        { icon: <Briefcase size={20} />, name: 'Stock Categories', path: '/app/masters/stock-categories' }
-      ]
-    }
-  ];
+ const masterCategories = [
+  {
+    title: 'Accounting Masters',
+    items: [
+      { icon: <BookOpen size={20} />, name: 'Ledger', path: '/app/masters/ledger' },
+      { icon: <Users size={20} />, name: 'Group', path: '/app/masters/group' },
+      { icon: <CreditCard size={20} />, name: 'Currency', path: '/app/masters/currency' },
+      { icon: <DollarSign size={20} />, name: 'Budgets', path: '/app/masters/budgets' },
+      { icon: <FileText size={20} />, name: 'Scenarios', path: '/app/masters/scenarios' },
+      { icon: <BarChart2 size={20} />, name: 'Cost Centers', path: '/app/masters/cost-centers' },
+    ]
+  },
+  {
+    title: 'Inventory Masters',
+    items: [
+      { icon: <Package size={20} />, name: 'Stock Item', path: '/app/masters/stock-item' },
+      { icon: <Users size={20} />, name: 'Stock Group', path: '/app/masters/stock-group' },
+      { icon: <Truck size={20} />, name: 'Units', path: '/app/masters/units' },
+      { icon: <Building size={20} />, name: 'Godowns', path: '/app/masters/godowns' },
+      { icon: <Briefcase size={20} />, name: 'Stock Categories', path: '/app/masters/stock-categories' }
+    ]
+  },
+  {
+    title: 'Voucher Types Management',
+    items: [
+      {
+        icon: <Settings size={20} />,
+        name: 'Manage Types',
+        path: '/app/vouchers/types',
+        color: theme === 'dark' ? 'bg-gray-900/50 hover:bg-gray-800/50' : 'bg-gray-50 hover:bg-gray-100',
+        iconBg: theme === 'dark' ? 'bg-gray-800/70' : 'bg-gray-100',
+        description: 'Configure voucher types',
+        category: 'import'
+      }
+    ]
+  }
+];
 
   return (
     <div className='pt-[56px] px-4 '>

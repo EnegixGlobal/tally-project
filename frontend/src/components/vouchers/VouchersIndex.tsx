@@ -257,23 +257,7 @@ const VouchersIndex: React.FC = () => {
         }
       ]
     },
-    {
-      title: "Voucher Types Management",
-      description: "Configure and manage voucher types",
-      icon: <Settings size={20} />,
-      vouchers: [
-        {
-          id: 'voucher-types',
-          icon: <Settings size={20} />,
-          name: 'Manage Types',
-          path: '/app/vouchers/types',
-          color: theme === 'dark' ? 'bg-gray-900/50 hover:bg-gray-800/50' : 'bg-gray-50 hover:bg-gray-100',
-          iconBg: theme === 'dark' ? 'bg-gray-800/70' : 'bg-gray-100',
-          description: 'Configure voucher types',
-          category: 'import'
-        }
-      ]
-    },
+    
   ];
 
   return (
