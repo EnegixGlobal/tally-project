@@ -1,7 +1,14 @@
-import React, { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { useAppContext } from '../../../context/AppContext';
-import { ArrowLeft, Calendar, AlertTriangle, Package, Search, Filter } from 'lucide-react';
+import React, { useState, useMemo, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useAppContext } from "../../../context/AppContext";
+import {
+  ArrowLeft,
+  Calendar,
+  AlertTriangle,
+  Package,
+  Search,
+  Filter,
+} from "lucide-react";
 
 interface BatchInfo {
   id: string;
@@ -13,7 +20,7 @@ interface BatchInfo {
   stockUnit: string;
   currentStock: number;
   daysToExpiry: number;
-  status: 'active' | 'expiring' | 'expired';
+  status: "active" | "expiring" | "expired";
 }
 
 interface StockItem {
@@ -21,6 +28,7 @@ interface StockItem {
   name: string;
   unit: string;
   openingBalance: number;
+  hsnCode?: string;
   enableBatchTracking: boolean;
   batchNumber?: string;
   batchExpiryDate?: string;
@@ -34,108 +42,133 @@ const BatchList: React.FC = () => {
 
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'expiring' | 'expired'>('all');
-  const [filterStockItem, setFilterStockItem] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [filterStatus, setFilterStatus] = useState<
+    "all" | "active" | "expiring" | "expired"
+  >("all");
+  const [filterStockItem, setFilterStockItem] = useState("");
 
   // Fetch stock items on mount
   useEffect(() => {
     let isMounted = true;
     setLoading(true);
-    fetch('http://localhost:5000/api/stock-items')
-      .then(res => res.json())
-      .then(json => {
+
+    const fetchData = async () => {
+      try {
+        const res = await fetch("http://localhost:5000/api/stock-items");
+        const json = await res.json();
+
         if (isMounted) {
-          if (json.success) setStockItems(json.data);
-          else setStockItems([]);
+          if (json.success) {
+            // Parse the 'batches' field from JSON string to array of objects
+            const parsedData = json.data.map((item) => {
+              if (item.batches) {
+                item.batches = JSON.parse(item.batches); // Parse the batches JSON string
+              }
+              return item;
+            });
+
+            setStockItems(parsedData);
+          } else {
+            setStockItems([]);
+          }
         }
-      })
-      .catch(() => {
-        if (isMounted) setStockItems([]);
-      })
-      .finally(() => {
-        if (isMounted) setLoading(false);
-      });
-    return () => { isMounted = false; };
+      } catch (error) {
+        if (isMounted) setStockItems([]); // If there is an error, clear stock items
+      } finally {
+        if (isMounted) setLoading(false); // Stop loading when request finishes
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
   }, []);
 
-  // Construct batches from stock items
-  const allBatches = useMemo(() => {
-    const batches: BatchInfo[] = [];
+  // NEW: overall status calculator
+  const getOverallStatus = (batches: any[]) => {
+    if (!batches || batches.length === 0) return "active";
 
-    stockItems.forEach(item => {
-      // if (item.enableBatchTracking && item.batchNumber) {
-      if (item.batchNumber) {
+    let status: "active" | "expiring" | "expired" = "active";
 
-        const today = new Date();
-        const expiryDate = item.batchExpiryDate ? new Date(item.batchExpiryDate) : null;
+    for (let b of batches) {
+      const days = Math.ceil(
+        (new Date(b.batchExpiryDate).getTime() - Date.now()) /
+          (1000 * 60 * 60 * 24)
+      );
 
-        let daysToExpiry = 0;
-        let status: 'active' | 'expiring' | 'expired' = 'active';
+      if (days < 0) return "expired";
+      if (days <= 30) status = "expiring";
+    }
 
-        if (expiryDate) {
-          const diffTime = expiryDate.getTime() - today.getTime();
-          daysToExpiry = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
-          if (daysToExpiry < 0) status = 'expired';
-          else if (daysToExpiry <= 30) status = 'expiring';
-        }
+    return status;
+  };
 
-        batches.push({
-          id: item.id,
-          name: item.batchNumber,
-          expiryDate: item.batchExpiryDate,
-          manufacturingDate: item.batchManufacturingDate,
-          stockItemId: item.id,
-          stockItemName: item.name,
-          stockUnit: item.unit,
-          currentStock: item.openingBalance || 0,
-          daysToExpiry,
-          status,
-        });
-      }
-    });
+  // NEW: filtered stock items (1 row per item)
+  const filteredStockItems = useMemo(() => {
+    return stockItems.filter((item) => {
+      const q = searchTerm.toLowerCase();
 
-    return batches;
-  }, [stockItems]);
-
-  // Filter batches based on search and filters
-  const filteredBatches = useMemo(() => {
-    return allBatches.filter(batch => {
       const matchesSearch =
-        batch.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-        batch.stockItemName.toLowerCase().includes(searchTerm.toLowerCase());
+        item.name.toLowerCase().includes(q) ||
+        (item.batches &&
+          item.batches.some((b) => b.batchName.toLowerCase().includes(q)));
 
-      const matchesStatus = filterStatus === 'all' || batch.status === filterStatus;
-      const matchesStockItem = !filterStockItem || batch.stockItemId === filterStockItem;
+      const overallStatus = getOverallStatus(item.batches || []);
+      const matchesStatus =
+        filterStatus === "all" || filterStatus === overallStatus;
+
+      const matchesStockItem = !filterStockItem || filterStockItem === item.id;
 
       return matchesSearch && matchesStatus && matchesStockItem;
     });
-  }, [allBatches, searchTerm, filterStatus, filterStockItem]);
+  }, [stockItems, searchTerm, filterStatus, filterStockItem]);
 
-  // Statistics
-  const stats = useMemo(() => ({
-    total: allBatches.length,
-    active: allBatches.filter(b => b.status === 'active').length,
-    expiring: allBatches.filter(b => b.status === 'expiring').length,
-    expired: allBatches.filter(b => b.status === 'expired').length
-  }), [allBatches]);
+  // NEW: Stats based on filtered items
+  const stats = useMemo(() => {
+    let total = 0;
+    let active = 0;
+    let expiring = 0;
+    let expired = 0;
+
+    stockItems.forEach((item) => {
+      total++;
+      const status = getOverallStatus(item.batches || []);
+
+      if (status === "active") active++;
+      else if (status === "expiring") expiring++;
+      else if (status === "expired") expired++;
+    });
+
+    return { total, active, expiring, expired };
+  }, [stockItems]);
 
   // Utility functions for UI
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'expiring': return 'bg-yellow-100 text-yellow-800';
-      case 'expired': return 'bg-red-100 text-red-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "active":
+        return "bg-green-100 text-green-800";
+      case "expiring":
+        return "bg-yellow-100 text-yellow-800";
+      case "expired":
+        return "bg-red-100 text-red-800";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getStatusIcon = (status: string) => {
     switch (status) {
-      case 'active': return <Package size={16} className="text-green-600" />;
-      case 'expiring': return <AlertTriangle size={16} className="text-yellow-600" />;
-      case 'expired': return <AlertTriangle size={16} className="text-red-600" />;
-      default: return <Package size={16} className="text-gray-600" />;
+      case "active":
+        return <Package size={16} className="text-green-600" />;
+      case "expiring":
+        return <AlertTriangle size={16} className="text-yellow-600" />;
+      case "expired":
+        return <AlertTriangle size={16} className="text-red-600" />;
+      default:
+        return <Package size={16} className="text-gray-600" />;
     }
   };
 
@@ -147,8 +180,10 @@ const BatchList: React.FC = () => {
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
         <button
-          onClick={() => navigate('/app/masters/stock-item')}
-          className={`mr-4 p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
+          onClick={() => navigate("/app/masters/stock-item")}
+          className={`mr-4 p-2 rounded-full ${
+            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+          }`}
           aria-label="Back"
         >
           <ArrowLeft size={20} />
@@ -158,7 +193,11 @@ const BatchList: React.FC = () => {
 
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-        <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+        <div
+          className={`p-4 rounded-lg ${
+            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
+        >
           <div className="flex items-center">
             <Package size={24} className="text-blue-600 mr-3" />
             <div>
@@ -167,25 +206,41 @@ const BatchList: React.FC = () => {
             </div>
           </div>
         </div>
-        <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+        <div
+          className={`p-4 rounded-lg ${
+            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
+        >
           <div className="flex items-center">
             <Package size={24} className="text-green-600 mr-3" />
             <div>
               <p className="text-sm text-gray-500">Active</p>
-              <p className="text-2xl font-bold text-green-600">{stats.active}</p>
+              <p className="text-2xl font-bold text-green-600">
+                {stats.active}
+              </p>
             </div>
           </div>
         </div>
-        <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+        <div
+          className={`p-4 rounded-lg ${
+            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
+        >
           <div className="flex items-center">
             <AlertTriangle size={24} className="text-yellow-600 mr-3" />
             <div>
               <p className="text-sm text-gray-500">Expiring Soon</p>
-              <p className="text-2xl font-bold text-yellow-600">{stats.expiring}</p>
+              <p className="text-2xl font-bold text-yellow-600">
+                {stats.expiring}
+              </p>
             </div>
           </div>
         </div>
-        <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+        <div
+          className={`p-4 rounded-lg ${
+            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
+        >
           <div className="flex items-center">
             <AlertTriangle size={24} className="text-red-600 mr-3" />
             <div>
@@ -197,7 +252,11 @@ const BatchList: React.FC = () => {
       </div>
 
       {/* Search and Filter */}
-      <div className={`p-4 rounded-lg mb-6 ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+      <div
+        className={`p-4 rounded-lg mb-6 ${
+          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+        }`}
+      >
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
             <label className="block text-sm font-medium mb-1">
@@ -210,7 +269,9 @@ const BatchList: React.FC = () => {
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search batch or item name..."
               className={`w-full p-2 rounded border ${
-                theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500' : 'bg-white border-gray-300 focus:border-blue-500'
+                theme === "dark"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
               } outline-none transition-colors`}
             />
           </div>
@@ -222,10 +283,16 @@ const BatchList: React.FC = () => {
             </label>
             <select
               value={filterStatus}
-              onChange={(e) => setFilterStatus(e.target.value as 'all' | 'active' | 'expiring' | 'expired')}
+              onChange={(e) =>
+                setFilterStatus(
+                  e.target.value as "all" | "active" | "expiring" | "expired"
+                )
+              }
               title="Filter by Status"
               className={`w-full p-2 rounded border ${
-                theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500' : 'bg-white border-gray-300 focus:border-blue-500'
+                theme === "dark"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
               } outline-none transition-colors`}
             >
               <option value="all">All Status</option>
@@ -245,7 +312,9 @@ const BatchList: React.FC = () => {
               onChange={(e) => setFilterStockItem(e.target.value)}
               title="Filter by Stock Item"
               className={`w-full p-2 rounded border ${
-                theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500' : 'bg-white border-gray-300 focus:border-blue-500'
+                theme === "dark"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
               } outline-none transition-colors`}
             >
               <option value="">All Items</option>
@@ -262,12 +331,14 @@ const BatchList: React.FC = () => {
           <div className="flex items-end">
             <button
               onClick={() => {
-                setSearchTerm('');
-                setFilterStatus('all');
-                setFilterStockItem('');
+                setSearchTerm("");
+                setFilterStatus("all");
+                setFilterStockItem("");
               }}
               className={`w-full px-4 py-2 rounded ${
-                theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white'
+                theme === "dark"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
               }`}
             >
               Clear Filters
@@ -277,93 +348,193 @@ const BatchList: React.FC = () => {
       </div>
 
       {/* Batch List */}
-      <div className={`rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+      <div
+        className={`rounded-lg ${
+          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+        }`}
+      >
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Batch Details</h2>
             <span className="text-sm text-gray-500">
-              Showing {filteredBatches.length} of {stats.total} batches
+              Showing {filteredStockItems.length} of {stockItems.length} batches
             </span>
           </div>
         </div>
 
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+            <thead
+              className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}
+            >
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Status</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Batch Number</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Stock Item</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Current Stock</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Manufacturing Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Expiry Date</th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Days to Expiry</th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Status
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Batch Number
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Stock Item
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  HSN Code
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Current Stock
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Manufacturing Date
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Expiry Date
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Days to Expiry
+                </th>
               </tr>
             </thead>
-            <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
-              {filteredBatches.length === 0 ? (
+            <tbody
+              className={`divide-y ${
+                theme === "dark" ? "divide-gray-700" : "divide-gray-200"
+              }`}
+            >
+              {filteredStockItems.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-4 py-8 text-center text-gray-500">
+                  <td
+                    colSpan={7}
+                    className="px-4 py-8 text-center text-gray-500"
+                  >
                     No batches found matching your criteria
                   </td>
                 </tr>
               ) : (
-                filteredBatches.map((batch) => (
-                  <tr
-                    key={`${batch.stockItemId}-${batch.id}`}
-                    className={`${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}
-                  >
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getStatusIcon(batch.status)}
-                        <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(batch.status)}`}>
-                          {batch.status.charAt(0).toUpperCase() + batch.status.slice(1)}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap font-medium">{batch.name}</td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div>
-                        <div className="font-medium">{batch.stockItemName}</div>
-                        <div className="text-sm text-gray-500">Unit: {batch.stockUnit}</div>
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      {batch.currentStock.toLocaleString()} {batch.stockUnit}
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Calendar size={16} className="mr-1 text-gray-400" />
-                        {batch.manufacturingDate ? new Date(batch.manufacturingDate).toLocaleDateString() : 'Not specified'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Calendar size={16} className="mr-1 text-gray-400" />
-                        {batch.expiryDate ? new Date(batch.expiryDate).toLocaleDateString() : 'No expiry'}
-                      </div>
-                    </td>
-                    <td className="px-4 py-4 whitespace-nowrap">
-                      {batch.expiryDate ? (
-                        <span
-                          className={`font-medium ${
-                            batch.status === 'expired'
-                              ? 'text-red-600'
-                              : batch.status === 'expiring'
-                              ? 'text-yellow-600'
-                              : 'text-green-600'
-                          }`}
-                        >
-                          {batch.daysToExpiry < 0
-                            ? `Expired ${Math.abs(batch.daysToExpiry)} days ago`
-                            : `${batch.daysToExpiry} days`}
-                        </span>
-                      ) : (
-                        <span className="text-gray-500">No expiry</span>
-                      )}
-                    </td>
-                  </tr>
-                ))
+                filteredStockItems.map((item) => {
+                  const batches = item.batches || [];
+
+                  return (
+                    <tr
+                      key={item.id}
+                      className={`${
+                        theme === "dark"
+                          ? "hover:bg-gray-700"
+                          : "hover:bg-gray-50"
+                      }`}
+                    >
+                      {/* STATUS */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {(() => {
+                          const status = getOverallStatus(batches);
+                          return (
+                            <div className="flex items-center">
+                              {getStatusIcon(status)}
+                              <span
+                                className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                                  status
+                                )}`}
+                              >
+                                {status.toUpperCase()}
+                              </span>
+                            </div>
+                          );
+                        })()}
+                      </td>
+
+                      {/* BATCH NUMBER — SCROLL */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="max-h-20 overflow-y-auto space-y-1">
+                          {batches.map((b, i) => (
+                            <div key={i} className="font-medium">
+                              {b.batchName}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+
+                      {/* ITEM NAME */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="font-medium">{item.name}</div>
+                        <div className="text-sm text-gray-500">
+                          Unit: {item.unit}
+                        </div>
+                      </td>
+
+                      {/* HSN CODE */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="font-medium">
+                          {item.hsnCode ? item.hsnCode : "—"}
+                        </div>
+                      </td>
+
+                      {/* STOCK */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        {item.openingBalance}
+                      </td>
+
+                      {/* MFG DATE — SCROLL */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="max-h-20 overflow-y-auto space-y-1">
+                          {batches.map((b, i) => (
+                            <div key={i} className="flex items-center">
+                              <Calendar
+                                size={14}
+                                className="mr-1 text-gray-400"
+                              />
+                              {new Date(
+                                b.batchManufacturingDate
+                              ).toLocaleDateString()}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+
+                      {/* EXP DATE — SCROLL */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="max-h-20 overflow-y-auto space-y-1">
+                          {batches.map((b, i) => (
+                            <div key={i} className="flex items-center">
+                              <Calendar
+                                size={14}
+                                className="mr-1 text-gray-400"
+                              />
+                              {new Date(b.batchExpiryDate).toLocaleDateString()}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+
+                      {/* DAYS — SCROLL */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="max-h-20 overflow-y-auto space-y-1">
+                          {batches.map((b, i) => {
+                            const days = Math.ceil(
+                              (new Date(b.batchExpiryDate).getTime() -
+                                Date.now()) /
+                                (1000 * 60 * 60 * 24)
+                            );
+
+                            return (
+                              <div
+                                key={i}
+                                className={`font-medium ${
+                                  days < 0
+                                    ? "text-red-600"
+                                    : days <= 30
+                                    ? "text-yellow-600"
+                                    : "text-green-600"
+                                }`}
+                              >
+                                {days < 0
+                                  ? `Expired ${Math.abs(days)} days ago`
+                                  : `${days} days`}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>
