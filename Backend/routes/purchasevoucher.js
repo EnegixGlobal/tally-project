@@ -113,4 +113,153 @@ router.post('/', async (req, res) => {
   }
 });
 
+// get ourchase vouncher
+router.get("/", async (req, res) => {
+  try {
+    const [rows] = await db.execute('SELECT * FROM purchase_vouchers');
+    res.json(rows);
+  } catch (err) {
+    res.status(500).json({ error: err.message });
+  }
+});
+
+router.delete("/:id", async (req, res) => {
+  const id = parseInt(req.params.id);
+
+  try {
+    await db.execute(
+      "DELETE FROM voucher_entries WHERE voucher_id = ?",
+      [id]
+    );
+
+    await db.execute(
+      "DELETE FROM purchase_voucher_items WHERE voucherId = ?",
+      [id]
+    );
+
+    const [result] = await db.execute(
+      "DELETE FROM purchase_vouchers WHERE id = ?",
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Voucher not found" });
+    }
+
+    return res.json({ message: "Voucher deleted successfully" });
+  } catch (err) {
+    console.error("Delete error:", err);
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+//single GET
+router.get("/:id", async (req, res) => {
+  try {
+    const voucherId = req.params.id;
+
+    const [voucherRows] = await db.execute(
+      "SELECT * FROM purchase_vouchers WHERE id = ?",
+      [voucherId]
+    );
+
+    if (voucherRows.length === 0) {
+      return res.status(404).json({ message: "Voucher not found" });
+    }
+
+    const voucher = voucherRows[0];
+
+    const [itemRows] = await db.execute(
+      "SELECT * FROM purchase_voucher_items WHERE voucherId = ?",
+      [voucherId]
+    );
+
+    const [ledgerRows] = await db.execute(
+      "SELECT * FROM voucher_entries WHERE voucher_id = ?",
+      [voucherId]
+    );
+
+    return res.json({
+      ...voucher,
+      entries: [...itemRows, ...ledgerRows],
+    });
+
+  } catch (err) {
+    return res.status(500).json({ error: err.message });
+  }
+});
+
+
+//put code
+// UPDATE PURCHASE VOUCHER
+router.put("/:id", async (req, res) => {
+  const voucherId = req.params.id;
+
+  const {
+    number, date, narration, partyId, referenceNo, supplierInvoiceDate,
+    dispatchDetails, subtotal, cgstTotal, sgstTotal, igstTotal,
+    discountTotal, total, purchaseLedgerId
+  } = req.body;
+
+  const dispatchDocNo = dispatchDetails?.docNo || null;
+  const dispatchThrough = dispatchDetails?.through || null;
+  const destination = dispatchDetails?.destination || null;
+
+  try {
+    const updateSql = `
+      UPDATE purchase_vouchers SET
+        number = ?,
+        date = ?,
+        supplierInvoiceDate = ?,
+        narration = ?,
+        partyId = ?,
+        referenceNo = ?,
+        dispatchDocNo = ?,
+        dispatchThrough = ?,
+        destination = ?,
+        purchaseLedgerId = ?,
+        subtotal = ?,
+        cgstTotal = ?,
+        sgstTotal = ?,
+        igstTotal = ?,
+        discountTotal = ?,
+        total = ?
+      WHERE id = ?
+    `;
+
+    await db.execute(updateSql, [
+      number ?? null,
+      date ?? null,
+      supplierInvoiceDate ?? null,
+      narration ?? null,
+      partyId ?? null,
+      referenceNo ?? null,
+      dispatchDocNo ?? null,
+      dispatchThrough ?? null,
+      destination ?? null,
+      purchaseLedgerId ?? null,
+      subtotal ?? 0,
+      cgstTotal ?? 0,
+      sgstTotal ?? 0,
+      igstTotal ?? 0,
+      discountTotal ?? 0,
+      total ?? 0,
+      voucherId
+    ]);
+
+    res.json({
+      message: "Voucher updated successfully",
+      id: voucherId
+    });
+
+  } catch (err) {
+    console.error("Update failed:", err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
+
+
+
+
 module.exports = router;

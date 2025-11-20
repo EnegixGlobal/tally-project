@@ -29,7 +29,6 @@ router.get("/", async (req, res) => {
       ORDER BY s.id DESC
     `);
 
-
     res.json({ success: true, data: rows });
   } catch (err) {
     console.error("🔥 Error fetching stock items:", err);

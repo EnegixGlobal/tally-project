@@ -385,6 +385,10 @@ function App() {
                 element={<JournalVoucher />}
               />
               <Route
+                path="vouchers/journal/create/:id"
+                element={<JournalVoucher />}
+              />
+              <Route
                 path="vouchers/journal/edit/:id"
                 element={<JournalVoucher />}
               />

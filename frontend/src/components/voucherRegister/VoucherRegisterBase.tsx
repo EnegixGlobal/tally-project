@@ -1,9 +1,9 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer } from 'lucide-react';
-import type { VoucherEntry } from '../../types';
-import { useAppContext } from '../../context/AppContext';
-import PrintOptions from '../vouchers/sales/PrintOptions';
+import React, { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Printer } from "lucide-react";
+import type { VoucherEntry } from "../../types";
+import { useAppContext } from "../../context/AppContext";
+import PrintOptions from "../vouchers/sales/PrintOptions";
 
 interface VoucherRegisterBaseProps {
   title: string;
@@ -17,40 +17,62 @@ interface VoucherRegisterBaseProps {
   onView?: (voucher: VoucherEntry) => void;
 }
 
+interface PurchaseVoucher {
+  id: number;
+  date: string;
+  number: string;
+  partyId: number;
+  supplierInvoiceDate: string;
+  referenceNo: string;
+  subtotal: string;
+  cgstTotal: string;
+  sgstTotal: string;
+  igstTotal: string;
+  total: string;
+}
 
 // Mock role-based access control
 const hasPermission = (action: string): boolean => {
   // Mock implementation - in real app, this would check user permissions
-  const userRole = 'admin'; // This would come from auth context
+  const userRole = "admin"; // This would come from auth context
   const permissions = {
-    admin: ['add', 'edit', 'delete', 'view', 'export', 'print'],
-    user: ['view', 'export'],
-    viewer: ['view']
+    admin: ["add", "edit", "delete", "view", "export", "print"],
+    user: ["view", "export"],
+    viewer: ["view"],
   };
-  return permissions[userRole as keyof typeof permissions]?.includes(action) || false;
+  return (
+    permissions[userRole as keyof typeof permissions]?.includes(action) || false
+  );
 };
 
 const getVoucherStatus = (voucher: VoucherEntry): string => {
-  if (!voucher.referenceNo) return 'draft';
-  const totalAmount = voucher.entries.reduce((sum, entry) => sum + entry.amount, 0);
-  if (totalAmount > 5000) return 'approved';
-  return 'pending';
+  if (!voucher.referenceNo) return "draft";
+  const totalAmount = voucher.entries.reduce(
+    (sum, entry) => sum + entry.amount,
+    0
+  );
+  if (totalAmount > 5000) return "approved";
+  return "pending";
 };
 
 const getStatusColor = (status: string): string => {
   switch (status) {
-    case 'approved': return 'bg-green-100 text-green-800';
-    case 'pending': return 'bg-yellow-100 text-yellow-800';
-    case 'draft': return 'bg-gray-100 text-gray-800';
-    default: return 'bg-gray-100 text-gray-800';
+    case "approved":
+      return "bg-green-100 text-green-800";
+    case "pending":
+      return "bg-yellow-100 text-yellow-800";
+    case "draft":
+      return "bg-gray-100 text-gray-800";
+    default:
+      return "bg-gray-100 text-gray-800";
   }
 };
 
 const formatCurrency = (amount: number): string => {
-  return new Intl.NumberFormat('en-IN', {
-    style: 'currency',
-    currency: 'INR',
-    minimumFractionDigits: 2
+  return new Intl.NumberFormat("en-IN", {
+    style: "currency",
+    currency: "INR",
+    minimumFractionDigits: 2,
   }).format(amount);
 };
 
@@ -60,97 +82,99 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   onAdd,
   onEdit,
   onDelete,
-  onView
+  onView,
 }) => {
   const navigate = useNavigate();
   const { theme } = useAppContext();
-  const [ledgers, setLedgers] = useState<{ id: string, name: string }[]>([]);
-  
-  const [vouchers, setVouchers] = useState<VoucherEntry[]>([]);
+  const [ledgers, setLedgers] = useState<{ id: string; name: string }[]>([]);
+
+  const [vouchers, setVouchers] = useState<PurchaseVoucher[]>([]);
   const [loading, setLoading] = useState(true);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [dateFilter, setDateFilter] = useState('');
-  const [statusFilter, setStatusFilter] = useState('');
+  const [searchTerm, setSearchTerm] = useState("");
+  const [dateFilter, setDateFilter] = useState("");
+  const [statusFilter, setStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [showPrintOptions, setShowPrintOptions] = useState(false);
-  const [selectedVoucher, setSelectedVoucher] = useState<VoucherEntry | null>(null);
-  
+  const [selectedVoucher, setSelectedVoucher] = useState<VoucherEntry | null>(
+    null
+  );
+
   // New state for Change View functionality
-  const [viewType, setViewType] = useState<'Daily' | 'Weekly' | 'Fortnightly' | 'Monthly' | 'Quarterly' | 'Half-yearly'>('Daily');
-  const [selectedMonth, setSelectedMonth] = useState<string>('');
+  const [viewType, setViewType] = useState<
+    "Daily" | "Weekly" | "Fortnightly" | "Monthly" | "Quarterly" | "Half-yearly"
+  >("Daily");
+  const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [showMonthList, setShowMonthList] = useState(false);
-const companyId = localStorage.getItem("company_id") || '';
-  const ownerType = localStorage.getItem("userType") || '';
-  const ownerId = localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id") || '';
+  const companyId = localStorage.getItem("company_id") || "";
+  const ownerType = localStorage.getItem("userType") || "";
+  const ownerId =
+    localStorage.getItem(
+      ownerType === "employee" ? "employee_id" : "user_id"
+    ) || "";
 
   // const [isLoading, setIsLoading] = useState(true);
-// Helper function for date formatting
-const formatDate = (dateString: string) => {
-  if (!dateString) return "";
-  const date = new Date(dateString);
-  const day = String(date.getDate()).padStart(2, "0");
-  const month = String(date.getMonth() + 1).padStart(2, "0"); // Month 0 se start hota hai
-  const year = date.getFullYear();
-  return `${day}-${month}-${year}`;
-};
+  // Helper function for date formatting
+  const formatDate = (dateString: string) => {
+    if (!dateString) return "";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, "0");
+    const month = String(date.getMonth() + 1).padStart(2, "0"); // Month 0 se start hota hai
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
   // Initialize mock data
-  useEffect(() => {
-    const fetchLedgers = async () => {
-      try {
-        const res = await fetch(`http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
-        const data = await res.json();
-  
-        // Agar API seedha array bhejti hai:
-        const ledgersArray = Array.isArray(data) ? data : data.data;
-  
-        console.log("Fetched ledgers:", ledgersArray); // Debug
-        setLedgers(ledgersArray || []);
-      } catch (err) {
-        console.error("Failed to fetch ledgers:", err);
-      }
-    };
-  
-    fetchLedgers();
-  }, []);
-  
-    const getLedgerName = (ledgerId?: number | string) => {
+
+  const getLedgerName = (ledgerId?: number | string) => {
     if (!ledgerId) return "Unknown Ledger (-)";
-  
-    const ledger = ledgers.find(l => String(l.id) === String(ledgerId));
-  
+
+    const ledger = ledgers.find((l) => String(l.id) === String(ledgerId));
+
     return ledger ? ledger.name : `Unknown Ledger (${ledgerId})`;
   };
-    const getParticulars = (voucher: VoucherEntry): string => {
+  const getParticulars = (voucher: VoucherEntry): string => {
     return voucher.entries
-      .map(entry => getLedgerName(entry.ledgerId ?? entry.ledgerId))
+      .map((entry) => getLedgerName(entry.ledgerId ?? entry.ledgerId))
       .join(", ");
   };
-  
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      const deletedId = e.detail.id;
+
+      setVouchers((prev) =>
+        prev.filter((v) => String(v.id) !== String(deletedId))
+      );
+    };
+
+    window.addEventListener("voucher-deleted", handler);
+
+    return () => window.removeEventListener("voucher-deleted", handler);
+  }, []);
 
   // Helper function to calculate debit and credit amounts from entries
-  const calculateDebitCredit = (voucher: VoucherEntry): { debit: number; credit: number } => {
+  const calculateDebitCredit = (
+    voucher: VoucherEntry
+  ): { debit: number; credit: number } => {
     const debit = voucher.entries
-      .filter(entry => entry.type === 'debit')
+      .filter((entry) => entry.type === "debit")
       .reduce((sum, entry) => sum + entry.amount, 0);
     const credit = voucher.entries
-      .filter(entry => entry.type === 'credit')
+      .filter((entry) => entry.type === "credit")
       .reduce((sum, entry) => sum + entry.amount, 0);
     return { debit, credit };
   };
 
-  // Helper function to get particulars (ledger details) from entries
-  // const getParticulars = (voucher: VoucherEntry): string => {
   //   if (voucherType === 'sales') {
   //     // For sales register, show customer/party names (debit entries in sales)
   //     const customerEntries = voucher.entries.filter(entry => entry.type === 'debit');
   //     const customerNames = customerEntries.map(entry => {
   //       if (!entry.ledgerId) return 'Cash Customer';
-        
+
   //       const parts = entry.ledgerId.split('-');
   //       const ledgerType = parts[0] || 'Customer';
   //       const ledgerNumber = parts[1] || '0';
-        
+
   //       // Customer names for sales vouchers
   //       const customerNamesList = [
   //         'ABC Enterprises', 'XYZ Pvt Ltd', 'Mahindra Corp', 'Tata Industries', 'Reliance Co',
@@ -159,7 +183,7 @@ const formatDate = (dateString: string) => {
   //         'Aditya Birla', 'ITC Limited', 'Hindustan Unilever', 'Asian Paints', 'UltraTech Cement',
   //         'Maruti Suzuki', 'Hero MotoCorp', 'Bajaj Auto', 'TVS Motors', 'Royal Enfield'
   //       ];
-        
+
   //       // For sales, show actual customer names
   //       if (ledgerType.toLowerCase() === 'customer') {
   //         const customerIndex = parseInt(ledgerNumber) - 1;
@@ -171,22 +195,22 @@ const formatDate = (dateString: string) => {
   //         return `${formattedType} ${ledgerNumber}`;
   //       }
   //     });
-      
+
   //     return customerNames.length > 0 ? customerNames.join(' / ') : 'Cash Sale';
   //   } else {
   //     // For other voucher types, show all ledger names
   //     const ledgerNames = voucher.entries.map(entry => {
   //       if (!entry.ledgerId) return 'Unknown Account';
-        
+
   //       const parts = entry.ledgerId.split('-');
   //       const ledgerType = parts[0] || 'Unknown';
   //       const ledgerNumber = parts[1] || '0';
-        
+
   //       // Capitalize first letter and format properly
   //       const formattedType = ledgerType.charAt(0).toUpperCase() + ledgerType.slice(1);
   //       return `${formattedType} A/c ${ledgerNumber}`;
   //     });
-      
+
   //     return ledgerNames.join(' / ');
   //   }
   // };
@@ -194,47 +218,48 @@ const formatDate = (dateString: string) => {
   // Helper function to get available months from vouchers
   const getAvailableMonths = (): { value: string; label: string }[] => {
     const months = [
-      { value: '01', label: 'January' },
-      { value: '02', label: 'February' },
-      { value: '03', label: 'March' },
-      { value: '04', label: 'April' },
-      { value: '05', label: 'May' },
-      { value: '06', label: 'June' },
-      { value: '07', label: 'July' },
-      { value: '08', label: 'August' },
-      { value: '09', label: 'September' },
-      { value: '10', label: 'October' },
-      { value: '11', label: 'November' },
-      { value: '12', label: 'December' }
+      { value: "01", label: "January" },
+      { value: "02", label: "February" },
+      { value: "03", label: "March" },
+      { value: "04", label: "April" },
+      { value: "05", label: "May" },
+      { value: "06", label: "June" },
+      { value: "07", label: "July" },
+      { value: "08", label: "August" },
+      { value: "09", label: "September" },
+      { value: "10", label: "October" },
+      { value: "11", label: "November" },
+      { value: "12", label: "December" },
     ];
     return months;
   };
 
   // Helper function to filter vouchers by date range based on view type
   const filterVouchersByView = (vouchers: VoucherEntry[]): VoucherEntry[] => {
-    if (!viewType || viewType === 'Daily') return vouchers;
+    if (!viewType || viewType === "Daily") return vouchers;
 
     const today = new Date();
     let startDate: Date;
 
     switch (viewType) {
-      case 'Weekly': {
+      case "Weekly": {
         const weekAgo = new Date(today);
         weekAgo.setDate(weekAgo.getDate() - 7);
         startDate = weekAgo;
         break;
       }
-      case 'Fortnightly': {
+      case "Fortnightly": {
         const fortnightAgo = new Date(today);
         fortnightAgo.setDate(fortnightAgo.getDate() - 14);
         startDate = fortnightAgo;
         break;
       }
-      case 'Monthly': {
+      case "Monthly": {
         if (selectedMonth) {
           // Filter by selected month
-          return vouchers.filter(voucher => {
-            const voucherMonth = voucher.date.split('-')[1];
+          return vouchers.filter((voucher) => {
+            const voucherMonth = new Date(voucher.date).getMonth() + 1;
+
             return voucherMonth === selectedMonth;
           });
         } else {
@@ -243,12 +268,12 @@ const formatDate = (dateString: string) => {
         }
         break;
       }
-      case 'Quarterly': {
+      case "Quarterly": {
         const currentQuarter = Math.floor(today.getMonth() / 3);
         startDate = new Date(today.getFullYear(), currentQuarter * 3, 1);
         break;
       }
-      case 'Half-yearly': {
+      case "Half-yearly": {
         const currentHalf = Math.floor(today.getMonth() / 6);
         startDate = new Date(today.getFullYear(), currentHalf * 6, 1);
         break;
@@ -257,8 +282,8 @@ const formatDate = (dateString: string) => {
         return vouchers;
     }
 
-    if (viewType !== 'Monthly' || !selectedMonth) {
-      return vouchers.filter(voucher => {
+    if (viewType !== "Monthly" || !selectedMonth) {
+      return vouchers.filter((voucher) => {
         const voucherDate = new Date(voucher.date);
         return voucherDate >= startDate;
       });
@@ -268,36 +293,259 @@ const formatDate = (dateString: string) => {
   };
 
   // Filter vouchers based on search, filters, and view type
+  const convertToVoucherEntry = (p: any): VoucherEntry & any => {
+  // ---------------------- PURCHASE ----------------------
+  if (voucherType === "purchase") {
+    return {
+      id: String(p.id),
+      date: p.date,
+      number: p.number,
+      referenceNo: p.referenceNo || "",
+      type: "purchase",
+
+      supplierInvoiceDate: p.supplierInvoiceDate || "",
+      subtotal: Number(p.subtotal || 0),
+      cgstTotal: Number(p.cgstTotal || 0),
+      sgstTotal: Number(p.sgstTotal || 0),
+      igstTotal: Number(p.igstTotal || 0),
+      total: Number(p.total || 0),
+
+      entries: [
+        {
+          ledgerId: "Purchase",
+          type: "debit",
+          amount: Number(p.total || 0),
+        },
+        {
+          ledgerId: String(p.partyId),
+          type: "credit",
+          amount: Number(p.total || 0),
+        },
+      ],
+    };
+  }
+
+  // ---------------------- SALES ----------------------
+  if (voucherType === "sales") {
+    return {
+      id: String(p.id),
+      date: p.date,
+      number: p.number,
+      referenceNo: p.referenceNo || "",
+      type: "sales",
+
+      supplierInvoiceDate: "",
+      subtotal: Number(p.totalAmount || 0),
+      cgstTotal: Number(p.cgstTotal || 0),
+      sgstTotal: Number(p.sgstTotal || 0),
+      igstTotal: Number(p.igstTotal || 0),
+      total: Number(p.totalAmount || 0),
+
+      entries: [
+        {
+          ledgerId: p.partyName,
+          type: "debit",
+          amount: Number(p.totalAmount || 0),
+        },
+        {
+          ledgerId: p.salesLedgerName,
+          type: "credit",
+          amount: Number(p.totalAmount || 0),
+        },
+      ],
+    };
+  }
+
+  // ---------------------- SALES ORDER ----------------------
+  if (voucherType === "sales_order") {
+    return {
+      id: String(p.id),
+      date: p.date,
+      number: p.number,
+      referenceNo: p.referenceNo || "",
+      type: "sales_order",
+
+      supplierInvoiceDate: "",
+      subtotal: Number(p.totalAmount || 0),
+      cgstTotal: 0,
+      sgstTotal: 0,
+      igstTotal: 0,
+      total: Number(p.totalAmount || 0),
+
+      entries: [
+        {
+          ledgerId: p.partyName,
+          type: "debit",
+          amount: Number(p.totalAmount || 0),
+        },
+        {
+          ledgerId: p.salesLedgerName,
+          type: "credit",
+          amount: Number(p.totalAmount || 0),
+        },
+      ],
+    };
+  }
+
+  // ---------------------- RECEIPT ----------------------
+  if (voucherType === "receipt") {
+    return {
+      id: String(p.id),
+      date: p.date,
+      number: p.number || p.voucher_number || "",
+      referenceNo: p.referenceNo || p.reference_no || "",
+      narration: p.narration || "",
+      type: "receipt",
+
+      supplierInvoiceDate: "",
+      subtotal: 0,
+      cgstTotal: 0,
+      sgstTotal: 0,
+      igstTotal: 0,
+
+      entries: (p.entries || []).map((e: any) => ({
+        ledgerId: String(e.ledger_id || ""),
+        amount: Number(e.amount || 0),
+        type: e.type || e.entry_type,
+        narration: e.narration || "",
+      })),
+
+      total: (p.entries || []).reduce(
+        (sum, e) => sum + Number(e.amount || 0),
+        0
+      ),
+    };
+  }
+
+  // ---------------------- CONTRA ----------------------
+  if (voucherType === "contra") {
+    return {
+      id: String(p.id),
+      date: p.date,
+      number: p.number || p.voucher_number || "",
+      referenceNo: p.referenceNo || p.reference_no || "",
+      narration: p.narration || "",
+      type: "contra",
+
+      supplierInvoiceDate: "",
+      subtotal: 0,
+      cgstTotal: 0,
+      sgstTotal: 0,
+      igstTotal: 0,
+
+      entries: (p.entries || []).map((e: any) => ({
+        ledgerId: String(e.ledger_id || ""),
+        amount: Number(e.amount || 0),
+        type: e.type || e.entry_type,
+        narration: e.narration || "",
+      })),
+
+      total: (p.entries || []).reduce(
+        (sum, e) => sum + Number(e.amount || 0),
+        0
+      ),
+    };
+  }
+
+  // ---------------------- JOURNAL ----------------------
+  if (voucherType === "journal") {
+    return {
+      id: String(p.id),
+      date: p.date,
+      number: p.number || p.voucher_number || "",
+      referenceNo: p.referenceNo || p.reference_no || "",
+      narration: p.narration || "",
+      type: "journal",
+
+      supplierInvoiceDate: "",
+      subtotal: 0,
+      cgstTotal: 0,
+      sgstTotal: 0,
+      igstTotal: 0,
+
+      entries: (p.entries || []).map((e: any) => ({
+        ledgerId: String(e.ledger_id || ""),
+        amount: Number(e.amount || 0),
+        type: e.type || e.entry_type,
+        narration: e.narration || "",
+      })),
+
+      total: (p.entries || []).reduce(
+        (sum, e) => sum + Number(e.amount || 0),
+        0
+      ),
+    };
+  }
+
+  return p;
+};
+
+
+  // --- Safe Date Parser ---
+  const normalizeDate = (dateStr: string) => {
+    if (!dateStr) return null;
+
+    // Handle DD-MM-YYYY
+    if (dateStr.includes("-") && dateStr.split("-")[0].length === 2) {
+      const [d, m, y] = dateStr.split("-");
+      return new Date(`${y}-${m}-${d}`);
+    }
+
+    // Handle ISO YYYY-MM-DD
+    return new Date(dateStr);
+  };
+
+  // ---- FINAL FILTERING LOGIC ----
   const filteredVouchers = (() => {
     try {
-      // First apply view type filtering
-      const viewFilteredVouchers = filterVouchersByView(vouchers);
-      
-      // Then apply other filters
-      return viewFilteredVouchers.filter(voucher => {
-        // Search filter
-        const searchMatch = !searchTerm || 
-          voucher.number.toLowerCase().includes(searchTerm.toLowerCase()) ||
-          (voucher.narration && voucher.narration.toLowerCase().includes(searchTerm.toLowerCase())) ||
-          (voucher.referenceNo && voucher.referenceNo.toLowerCase().includes(searchTerm.toLowerCase()));
-        
-        // Date filter
-        const dateMatch = !dateFilter ||  formatDate(voucher.date) === formatDate(dateFilter);
-        
-        // Status filter
-        const voucherStatus = getVoucherStatus(voucher);
-        const statusMatch = !statusFilter || voucherStatus === statusFilter;
-        
+      // Convert PurchaseVoucher → VoucherEntry
+      const converted = vouchers.map((v) => {
+        const entry = convertToVoucherEntry(v);
+        return {
+          ...entry,
+          safeDate: normalizeDate(v.date),
+        };
+      });
+
+      // Apply View Type filter (Daily / Weekly / Monthly etc.)
+      const viewFiltered = filterVouchersByView(converted);
+
+      // Apply Search, Date, Status filters
+      return viewFiltered.filter((voucher) => {
+        const safeNumber = (voucher.number || "").toLowerCase();
+        const safeRef = (voucher.referenceNo || "").toLowerCase();
+        const safeNarration = ""; // since purchase voucher has no narration field
+
+        // Search Filter
+        const searchMatch =
+          !searchTerm ||
+          safeNumber.includes(searchTerm.toLowerCase()) ||
+          safeRef.includes(searchTerm.toLowerCase()) ||
+          safeNarration.includes(searchTerm.toLowerCase());
+
+        // Date Filter
+        const formattedVoucherDate =
+          voucher.safeDate?.toISOString().slice(0, 10) || "";
+
+        const dateMatch = !dateFilter || formattedVoucherDate === dateFilter;
+
+        // Status Filter
+        const status = getVoucherStatus(voucher);
+        const statusMatch = !statusFilter || status === statusFilter;
+
         return searchMatch && dateMatch && statusMatch;
       });
-    } catch (error) {
-      console.error('Error filtering vouchers:', error);
+    } catch (err) {
+      console.error("Filter Error:", err);
       return [];
     }
   })();
 
   // Pagination
-  const totalPages = Math.max(1, Math.ceil(filteredVouchers.length / itemsPerPage));
+  const totalPages = Math.max(
+    1,
+    Math.ceil(filteredVouchers.length / itemsPerPage)
+  );
   const startIndex = Math.max(0, (currentPage - 1) * itemsPerPage);
   const endIndex = Math.min(startIndex + itemsPerPage, filteredVouchers.length);
   const paginatedVouchers = filteredVouchers.slice(startIndex, endIndex);
@@ -310,8 +558,14 @@ const formatDate = (dateString: string) => {
   }, [currentPage, totalPages]);
 
   // Calculate summary statistics
-  const totalDebit = filteredVouchers.reduce((sum, voucher) => sum + calculateDebitCredit(voucher).debit, 0);
-  const totalCredit = filteredVouchers.reduce((sum, voucher) => sum + calculateDebitCredit(voucher).credit, 0);
+  const totalDebit = filteredVouchers.reduce(
+    (sum, voucher) => sum + calculateDebitCredit(voucher).debit,
+    0
+  );
+  const totalCredit = filteredVouchers.reduce(
+    (sum, voucher) => sum + calculateDebitCredit(voucher).credit,
+    0
+  );
   const statusCounts = filteredVouchers.reduce((acc, voucher) => {
     const status = getVoucherStatus(voucher);
     acc[status] = (acc[status] || 0) + 1;
@@ -319,35 +573,43 @@ const formatDate = (dateString: string) => {
   }, {} as Record<string, number>);
 
   const handleExport = () => {
-    if (!hasPermission('export')) {
-      alert('You do not have permission to export data');
+    if (!hasPermission("export")) {
+      alert("You do not have permission to export data");
       return;
     }
 
     try {
       if (filteredVouchers.length === 0) {
-        alert('No data to export');
+        alert("No data to export");
         return;
       }
 
       const csvContent = [
         // Always show both debit and credit columns for consistency
-        ['Date', 'Voucher Number', 'Voucher Type', 'Particulars', 'Debit Amount', 'Credit Amount', 'Status'].join(','),
-        ...filteredVouchers.map(voucher => {
+        [
+          "Date",
+          "Voucher Number",
+          "Voucher Type",
+          "Particulars",
+          "Debit Amount",
+          "Credit Amount",
+          "Status",
+        ].join(","),
+        ...filteredVouchers.map((voucher) => {
           const { debit, credit } = calculateDebitCredit(voucher);
           const particulars = getParticulars(voucher).replace(/"/g, '""'); // Escape quotes
           const status = getVoucherStatus(voucher);
-          
-          if (voucherType === 'sales') {
+
+          if (voucherType === "sales") {
             return [
               voucher.date,
               voucher.number,
               voucher.type.toUpperCase(),
               `"${particulars}"`,
               debit.toFixed(2),
-              '0.00', // Sales only show debit amounts
-              status
-            ].join(',');
+              "0.00", // Sales only show debit amounts
+              status,
+            ].join(",");
           } else {
             return [
               voucher.date,
@@ -356,41 +618,45 @@ const formatDate = (dateString: string) => {
               `"${particulars}"`,
               debit.toFixed(2),
               credit.toFixed(2),
-              status
-            ].join(',');
+              status,
+            ].join(",");
           }
-        })
-      ].join('\n');
+        }),
+      ].join("\n");
 
-      const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+      const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = window.URL.createObjectURL(blob);
-      const a = document.createElement('a');
+      const a = document.createElement("a");
       a.href = url;
-      a.download = `${title.replace(/\s+/g, '_')}_${new Date().toISOString().split('T')[0]}.csv`;
+      a.download = `${title.replace(/\s+/g, "_")}_${
+        new Date().toISOString().split("T")[0]
+      }.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
       window.URL.revokeObjectURL(url);
     } catch (error) {
-      console.error('Error exporting data:', error);
-      alert('Error occurred while exporting data');
+      console.error("Error exporting data:", error);
+      alert("Error occurred while exporting data");
     }
   };
 
   const handlePrint = () => {
-    if (!hasPermission('print')) {
-      alert('You do not have permission to print');
+    if (!hasPermission("print")) {
+      alert("You do not have permission to print");
       return;
     }
 
     try {
       if (filteredVouchers.length === 0) {
-        alert('No data to print');
+        alert("No data to print");
         return;
       }
 
-      const selectedMonthName = selectedMonth ? 
-        getAvailableMonths().find(m => m.value === selectedMonth)?.label || 'Unknown Month' : '';
+      const selectedMonthName = selectedMonth
+        ? getAvailableMonths().find((m) => m.value === selectedMonth)?.label ||
+          "Unknown Month"
+        : "";
 
       const printContent = `
         <html>
@@ -415,7 +681,9 @@ const formatDate = (dateString: string) => {
             <div class="header">
               <h1>${title}</h1>
               <p>Generated on: ${new Date().toLocaleString()}</p>
-              <p>View Type: ${viewType}${selectedMonth ? ` - ${selectedMonthName}` : ''}</p>
+              <p>View Type: ${viewType}${
+        selectedMonth ? ` - ${selectedMonthName}` : ""
+      }</p>
               <p>Total Records: ${filteredVouchers.length}</p>
             </div>
             <table>
@@ -431,11 +699,12 @@ const formatDate = (dateString: string) => {
                 </tr>
               </thead>
               <tbody>
-                ${filteredVouchers.map(voucher => {
-                  const { debit, credit } = calculateDebitCredit(voucher);
-                  const particulars = getParticulars(voucher);
-                  if (voucherType === 'sales') {
-                    return `
+                ${filteredVouchers
+                  .map((voucher) => {
+                    const { debit, credit } = calculateDebitCredit(voucher);
+                    const particulars = getParticulars(voucher);
+                    if (voucherType === "sales") {
+                      return `
                     <tr>
                       <td>${formatDate(voucher.date)}</td>
                       <td>${voucher.number}</td>
@@ -445,25 +714,34 @@ const formatDate = (dateString: string) => {
                       <td class="text-right">-</td>
                       <td class="text-center">${getVoucherStatus(voucher)}</td>
                     </tr>`;
-                  } else {
-                    return `
+                    } else {
+                      return `
                     <tr>
                       <td>${formatDate(voucher.date)}</td>
                       <td>${voucher.number}</td>
                       <td>${voucher.type.toUpperCase()}</td>
                       <td>${particulars}</td>
-                      <td class="text-right">${debit > 0 ? formatCurrency(debit) : '-'}</td>
-                      <td class="text-right">${credit > 0 ? formatCurrency(credit) : '-'}</td>
+                      <td class="text-right">${
+                        debit > 0 ? formatCurrency(debit) : "-"
+                      }</td>
+                      <td class="text-right">${
+                        credit > 0 ? formatCurrency(credit) : "-"
+                      }</td>
                       <td class="text-center">${getVoucherStatus(voucher)}</td>
                     </tr>`;
-                  }
-                }).join('')}
+                    }
+                  })
+                  .join("")}
               </tbody>
               <tfoot>
                 <tr class="font-bold">
-                  <td colspan="4" class="text-right">Total (${filteredVouchers.length} vouchers)</td>
+                  <td colspan="4" class="text-right">Total (${
+                    filteredVouchers.length
+                  } vouchers)</td>
                   <td class="text-right">${formatCurrency(totalDebit)}</td>
-                  <td class="text-right">${voucherType === 'sales' ? '-' : formatCurrency(totalCredit)}</td>
+                  <td class="text-right">${
+                    voucherType === "sales" ? "-" : formatCurrency(totalCredit)
+                  }</td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -472,18 +750,18 @@ const formatDate = (dateString: string) => {
         </html>
       `;
 
-      const printWindow = window.open('', '_blank');
+      const printWindow = window.open("", "_blank");
       if (printWindow) {
         printWindow.document.write(printContent);
         printWindow.document.close();
         printWindow.focus();
         printWindow.print();
       } else {
-        alert('Please allow pop-ups to print the report');
+        alert("Please allow pop-ups to print the report");
       }
     } catch (error) {
-      console.error('Error printing data:', error);
-      alert('Error occurred while printing data');
+      console.error("Error printing data:", error);
+      alert("Error occurred while printing data");
     }
   };
 
@@ -497,28 +775,52 @@ const formatDate = (dateString: string) => {
     setShowPrintOptions(false);
     setSelectedVoucher(null);
   };
-useEffect(() => {
-    if (!companyId || !ownerType || !ownerId) {
-      console.error('Missing tenant information');
-      setLoading(false);
-      return;
-    }
+  useEffect(() => {
+    const loadVouchers = async () => {
+      try {
+        let url = "";
 
-    fetch(`http://localhost:5000/api/vouchers?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&voucherType=${voucherType}`)
-      .then(res => res.json())
-      .then(data => {
-        if (data.data) {
-          setVouchers(data.data);
-        } else {
-          setError('Invalid response from server');
+        // --- SALES VOUCHERS ---
+        if (voucherType === "sales") {
+          url = `http://localhost:5000/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         }
+
+        // --- PURCHASE VOUCHERS ---
+        else if (voucherType === "purchase") {
+          url = `http://localhost:5000/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        } else if (voucherType === "sales_order") {
+          url = `http://localhost:5000/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
+        } else if (voucherType === "purchase_order") {
+          url = `http://localhost:5000/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
+        } else if (voucherType === "receipt") {
+          url = `http://localhost:5000/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=receipt`;
+        } else if (voucherType === "contra") {
+          url = `http://localhost:5000/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=contra`;
+        } else if (voucherType === "journal") {
+          url = `http://localhost:5000/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=journal`;
+        } else {
+          console.warn("Unknown voucherType:", voucherType);
+          return;
+        }
+
+        const res = await fetch(url);
+        const json = await res.json();
+ 
+
+        // -- Handle different API response formats --
+        if (json.data) setVouchers(json.data);
+        else if (Array.isArray(json)) setVouchers(json);
+        else if (json.purchaseOrders) setVouchers(json.purchaseOrders);
+        else setVouchers([]);
+      } catch (err) {
+        console.error("Failed to fetch vouchers:", err);
+      } finally {
         setLoading(false);
-      })
-      .catch(() => {
-        setError('Failed to load vouchers');
-        setLoading(false);
-      });
-  }, [companyId, ownerType, ownerId]);
+      }
+    };
+
+    loadVouchers();
+  }, [voucherType]);
 
   const printSingleVoucher = (voucher: VoucherEntry) => {
     try {
@@ -540,7 +842,11 @@ useEffect(() => {
           </head>
           <body>
             <h1>Invoice</h1>
-            <div class="muted">Voucher No: ${voucher.number} | Date: ${formatDate(voucher.date)} | Type: ${voucher.type.toUpperCase()}</div>
+            <div class="muted">Voucher No: ${
+              voucher.number
+            } | Date: ${formatDate(
+        voucher.date
+      )} | Type: ${voucher.type.toUpperCase()}</div>
             <div>Particulars: ${particulars}</div>
             <table>
               <thead>
@@ -553,14 +859,22 @@ useEffect(() => {
                 </tr>
               </thead>
               <tbody>
-                ${voucher.entries.map((e, idx) => `
+                ${voucher.entries
+                  .map(
+                    (e, idx) => `
                   <tr>
                     <td>${idx + 1}</td>
-                    <td>${e.ledgerId || e.itemId || '-'}</td>
-                    <td class="right">${e.type === 'debit' ? e.amount.toFixed(2) : '-'}</td>
-                    <td class="right">${e.type === 'credit' ? e.amount.toFixed(2) : '-'}</td>
-                    <td>${e.narration || ''}</td>
-                  </tr>`).join('')}
+                    <td>${e.ledgerId || e.itemId || "-"}</td>
+                    <td class="right">${
+                      e.type === "debit" ? e.amount.toFixed(2) : "-"
+                    }</td>
+                    <td class="right">${
+                      e.type === "credit" ? e.amount.toFixed(2) : "-"
+                    }</td>
+                    <td>${e.narration || ""}</td>
+                  </tr>`
+                  )
+                  .join("")}
               </tbody>
               <tfoot>
                 <tr>
@@ -574,9 +888,9 @@ useEffect(() => {
           </body>
         </html>`;
 
-      const w = window.open('', '_blank');
+      const w = window.open("", "_blank");
       if (!w) {
-        alert('Please allow pop-ups to print the invoice.');
+        alert("Please allow pop-ups to print the invoice.");
         return false;
       }
       w.document.write(content);
@@ -585,21 +899,21 @@ useEffect(() => {
       w.print();
       return true;
     } catch (err) {
-      console.error('Error printing voucher:', err);
-      alert('Failed to print invoice');
+      console.error("Error printing voucher:", err);
+      alert("Failed to print invoice");
       return false;
     }
   };
 
   const handleGenerateEWayBill = (voucher: VoucherEntry) => {
     // Placeholder: integrate real E-Way Bill modal/API here
-    console.log('E-Way Bill generation started for', voucher.number);
+    // console.log("E-Way Bill generation started for", voucher.number);
     alert(`E-Way Bill generated (mock) for ${voucher.number}`);
   };
 
   const handleGenerateEInvoice = (voucher: VoucherEntry) => {
     // Placeholder: integrate real E-Invoice (IRN) API/print here
-    console.log('E-Invoice generation started for', voucher.number);
+    // console.log("E-Invoice generation started for", voucher.number);
     alert(`E-Invoice generated (mock) for ${voucher.number}`);
   };
 
@@ -649,8 +963,8 @@ useEffect(() => {
       <div className="mb-6">
         <div className="flex justify-between items-center">
           <div className="flex items-center">
-            <button 
-              onClick={() => navigate('/app/voucher-register')}
+            <button
+              onClick={() => navigate("/app/voucher-register")}
               className="flex items-center text-gray-600 hover:text-gray-900 transition-colors mr-3"
               title="Back to Voucher Register"
             >
@@ -658,7 +972,7 @@ useEffect(() => {
             </button>
             <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
           </div>
-          {hasPermission('add') && onAdd && (
+          {hasPermission("add") && onAdd && (
             <button
               onClick={onAdd}
               className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
@@ -674,32 +988,48 @@ useEffect(() => {
       <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
         <div className="bg-white p-4 rounded-lg shadow border">
           <h3 className="text-sm font-medium text-gray-500">Total Vouchers</h3>
-          <p className="text-2xl font-bold text-gray-900">{filteredVouchers.length}</p>
+          <p className="text-2xl font-bold text-gray-900">
+            {filteredVouchers.length}
+          </p>
         </div>
-        {voucherType === 'sales' ? (
+        {voucherType === "sales" ? (
           <div className="bg-white p-4 rounded-lg shadow border">
-            <h3 className="text-sm font-medium text-gray-500">Total Sales Amount</h3>
-            <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalDebit)}</p>
+            <h3 className="text-sm font-medium text-gray-500">
+              Total Sales Amount
+            </h3>
+            <p className="text-2xl font-bold text-blue-600">
+              {formatCurrency(totalDebit)}
+            </p>
           </div>
         ) : (
           <>
             <div className="bg-white p-4 rounded-lg shadow border">
               <h3 className="text-sm font-medium text-gray-500">Total Debit</h3>
-              <p className="text-2xl font-bold text-blue-600">{formatCurrency(totalDebit)}</p>
+              <p className="text-2xl font-bold text-blue-600">
+                {formatCurrency(totalDebit)}
+              </p>
             </div>
             <div className="bg-white p-4 rounded-lg shadow border">
-              <h3 className="text-sm font-medium text-gray-500">Total Credit</h3>
-              <p className="text-2xl font-bold text-green-600">{formatCurrency(totalCredit)}</p>
+              <h3 className="text-sm font-medium text-gray-500">
+                Total Credit
+              </h3>
+              <p className="text-2xl font-bold text-green-600">
+                {formatCurrency(totalCredit)}
+              </p>
             </div>
           </>
         )}
         <div className="bg-white p-4 rounded-lg shadow border">
           <h3 className="text-sm font-medium text-gray-500">Approved</h3>
-          <p className="text-2xl font-bold text-green-600">{statusCounts.approved || 0}</p>
+          <p className="text-2xl font-bold text-green-600">
+            {statusCounts.approved || 0}
+          </p>
         </div>
         <div className="bg-white p-4 rounded-lg shadow border">
           <h3 className="text-sm font-medium text-gray-500">Pending</h3>
-          <p className="text-2xl font-bold text-yellow-600">{statusCounts.pending || 0}</p>
+          <p className="text-2xl font-bold text-yellow-600">
+            {statusCounts.pending || 0}
+          </p>
         </div>
       </div>
 
@@ -707,7 +1037,10 @@ useEffect(() => {
       <div className="bg-white p-4 rounded-lg shadow border mb-6">
         <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
           <div>
-            <label htmlFor="search" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="search"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Search
             </label>
             <input
@@ -720,7 +1053,10 @@ useEffect(() => {
             />
           </div>
           <div>
-            <label htmlFor="change-view" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="change-view"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Change View
             </label>
             <select
@@ -729,11 +1065,11 @@ useEffect(() => {
               onChange={(e) => {
                 const newViewType = e.target.value as typeof viewType;
                 setViewType(newViewType);
-                if (newViewType === 'Monthly') {
+                if (newViewType === "Monthly") {
                   setShowMonthList(true);
                 } else {
                   setShowMonthList(false);
-                  setSelectedMonth('');
+                  setSelectedMonth("");
                 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -746,9 +1082,12 @@ useEffect(() => {
               <option value="Half-yearly">Half-yearly</option>
             </select>
           </div>
-          {viewType === 'Monthly' && showMonthList && (
+          {viewType === "Monthly" && showMonthList && (
             <div>
-              <label htmlFor="month-select" className="block text-sm font-medium text-gray-700 mb-1">
+              <label
+                htmlFor="month-select"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
                 Select Month
               </label>
               <select
@@ -758,7 +1097,7 @@ useEffect(() => {
                 className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               >
                 <option value="">Current Month</option>
-                {getAvailableMonths().map(month => (
+                {getAvailableMonths().map((month) => (
                   <option key={month.value} value={month.value}>
                     {month.label}
                   </option>
@@ -767,7 +1106,10 @@ useEffect(() => {
             </div>
           )}
           <div>
-            <label htmlFor="date-filter" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="date-filter"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Date Filter
             </label>
             <input
@@ -779,7 +1121,10 @@ useEffect(() => {
             />
           </div>
           <div>
-            <label htmlFor="status-filter" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="status-filter"
+              className="block text-sm font-medium text-gray-700 mb-1"
+            >
               Status Filter
             </label>
             <select
@@ -796,7 +1141,7 @@ useEffect(() => {
             </select>
           </div>
           <div className="flex items-end gap-2">
-            {hasPermission('export') && (
+            {hasPermission("export") && (
               <button
                 onClick={handleExport}
                 className="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded-md transition-colors"
@@ -805,7 +1150,7 @@ useEffect(() => {
                 Export
               </button>
             )}
-            {hasPermission('print') && (
+            {hasPermission("print") && (
               <button
                 onClick={handlePrint}
                 className="bg-gray-500 hover:bg-gray-600 text-white px-4 py-2 rounded-md transition-colors"
@@ -831,137 +1176,136 @@ useEffect(() => {
                   Voucher No
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Voucher Type
+                  Party
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Particulars
+                  Supplier Invoice Date
                 </th>
-                {voucherType === 'sales' ? (
-                  <>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Debit Amount
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Credit Amount
-                    </th>
-                  </>
-                ) : (
-                  <>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Debit Amount
-                    </th>
-                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Credit Amount
-                    </th>
-                  </>
-                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
+                  Reference No
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Subtotal
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  GST Total
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Total
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
+
             <tbody className="bg-white divide-y divide-gray-200">
-              {paginatedVouchers.map((voucher) => {
-                const status = getVoucherStatus(voucher);
-                const { debit, credit } = calculateDebitCredit(voucher);
-                const particulars = getParticulars(voucher);
+              {filteredVouchers.map((voucher) => {
+                const debitEntry = voucher.entries.find(
+                  (e) => e.type === "debit"
+                );
+                const creditEntry = voucher.entries.find(
+                  (e) => e.type === "credit"
+                );
+
+                const total = debitEntry?.amount || 0;
+
                 return (
                   <tr key={voucher.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    {/* Date */}
+                    <td className="px-6 py-4 text-sm text-gray-500">
                       {formatDate(voucher.date)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+
+                    {/* Voucher Number */}
+                    <td className="px-6 py-4 text-sm font-medium text-gray-900">
                       {voucher.number}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-blue-100 text-blue-800">
-                        {voucher.type.toUpperCase()}
-                      </span>
+
+                    {/* Party (credit entry ledgerId) */}
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {creditEntry?.ledgerId || "-"}
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate" title={particulars}>
-                      {particulars}
+
+                    {/* Supplier Invoice Date (not available in VoucherEntry) */}
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {formatDate(voucher.supplierInvoiceDate)}
                     </td>
-                    {voucherType === 'sales' ? (
-                      <>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
-                          {formatCurrency(debit)}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-right">
-                          -
-                        </td>
-                      </>
-                    ) : (
-                      <>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {debit > 0 ? formatCurrency(debit) : '-'}
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right">
-                          {credit > 0 ? formatCurrency(credit) : '-'}
-                        </td>
-                      </>
-                    )}
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getStatusColor(status)}`}>
-                        {status}
-                      </span>
+
+                    {/* Reference No */}
+                    <td className="px-6 py-4 text-sm text-gray-500">
+                      {voucher.referenceNo}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-3 items-center">
-                        {hasPermission('view') && onView && (
-                          <button
-                            onClick={() => onView(voucher)}
-                            className="text-blue-600 hover:text-blue-900"
-                            title="View voucher"
-                          >
-                            View
-                          </button>
-                        )}
-                        {hasPermission('edit') && onEdit && (
-                          <button
-                            onClick={() => onEdit(voucher)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                            title="Edit voucher"
-                          >
-                            Edit
-                          </button>
-                        )}
-                        {hasPermission('delete') && onDelete && (
-                          <button
-                            onClick={() => onDelete(voucher.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete voucher"
-                          >
-                            Delete
-                          </button>
-                        )}
-                        {hasPermission('print') && (
-                          <button
-                            onClick={() => openPrintOptions(voucher)}
-                            className="text-gray-700 hover:text-gray-900 flex items-center"
-                            title="Print options"
-                          >
-                            <Printer size={16} className="mr-1" /> Print
-                          </button>
-                        )}
-                      </div>
+
+                    {/* Subtotal = total - GST */}
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {voucher.subtotal}
+                    </td>
+
+                    {/* GST (Purchase voucher me debit = total, GST included) */}
+                    <td className="px-6 py-4 text-sm text-gray-900">
+                      {voucher.cgstTotal +
+                        voucher.sgstTotal +
+                        voucher.igstTotal}
+                    </td>
+
+                    {/* Total */}
+                    <td className="px-6 py-4 text-sm text-gray-900 font-bold">
+                      {voucher.total}
+                    </td>
+
+                    <td className="px-6 py-4 text-sm font-medium space-x-3">
+                      {onView && (
+                        <button
+                          onClick={() => onView(voucher)}
+                          className="text-blue-600 hover:text-blue-900"
+                        >
+                          View
+                        </button>
+                      )}
+
+                      {onEdit && (
+                        <button
+                          onClick={() => onEdit(voucher)}
+                          className="text-indigo-600 hover:text-indigo-900"
+                        >
+                          Edit
+                        </button>
+                      )}
+
+                      {onDelete && (
+                        <button
+                          onClick={() => onDelete(voucher.id)}
+                          className="text-red-600 hover:text-red-900"
+                        >
+                          Delete
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
               })}
             </tbody>
+
             {/* Summary Row */}
             <tfoot className="bg-gray-100">
               <tr>
-                <td colSpan={4} className="px-6 py-4 text-sm font-semibold text-gray-900">
+                <td
+                  colSpan={4}
+                  className="px-6 py-4 text-sm font-semibold text-gray-900"
+                >
                   Total ({filteredVouchers.length} vouchers)
                 </td>
-                {voucherType === 'sales' ? (
+                {voucherType === "sales" ? (
                   <>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600 text-right">
-                      {formatCurrency(filteredVouchers.reduce((sum: number, v: VoucherEntry) => sum + calculateDebitCredit(v).debit, 0))}
+                      {formatCurrency(
+                        filteredVouchers.reduce(
+                          (sum: number, v: VoucherEntry) =>
+                            sum + calculateDebitCredit(v).debit,
+                          0
+                        )
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-500 text-right">
                       -
@@ -970,10 +1314,22 @@ useEffect(() => {
                 ) : (
                   <>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
-                      {formatCurrency(filteredVouchers.reduce((sum: number, v: VoucherEntry) => sum + calculateDebitCredit(v).debit, 0))}
+                      {formatCurrency(
+                        filteredVouchers.reduce(
+                          (sum: number, v: VoucherEntry) =>
+                            sum + calculateDebitCredit(v).debit,
+                          0
+                        )
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
-                      {formatCurrency(filteredVouchers.reduce((sum: number, v: VoucherEntry) => sum + calculateDebitCredit(v).credit, 0))}
+                      {formatCurrency(
+                        filteredVouchers.reduce(
+                          (sum: number, v: VoucherEntry) =>
+                            sum + calculateDebitCredit(v).credit,
+                          0
+                        )
+                      )}
                     </td>
                   </>
                 )}
@@ -995,7 +1351,9 @@ useEffect(() => {
                 Previous
               </button>
               <button
-                onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                onClick={() =>
+                  setCurrentPage(Math.min(totalPages, currentPage + 1))
+                }
                 disabled={currentPage === totalPages}
                 className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
               >
@@ -1005,13 +1363,17 @@ useEffect(() => {
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700">
-                  Showing <span className="font-medium">{startIndex + 1}</span> to{' '}
-                  <span className="font-medium">{endIndex}</span> of{' '}
-                  <span className="font-medium">{filteredVouchers.length}</span> results
+                  Showing <span className="font-medium">{startIndex + 1}</span>{" "}
+                  to <span className="font-medium">{endIndex}</span> of{" "}
+                  <span className="font-medium">{filteredVouchers.length}</span>{" "}
+                  results
                 </p>
               </div>
               <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px" aria-label="Pagination">
+                <nav
+                  className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px"
+                  aria-label="Pagination"
+                >
                   <button
                     onClick={() => setCurrentPage(Math.max(1, currentPage - 1))}
                     disabled={currentPage === 1}
@@ -1019,21 +1381,25 @@ useEffect(() => {
                   >
                     Previous
                   </button>
-                  {Array.from({ length: totalPages }, (_, i) => i + 1).map((page) => (
-                    <button
-                      key={page}
-                      onClick={() => setCurrentPage(page)}
-                      className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                        page === currentPage
-                          ? 'z-10 bg-blue-50 border-blue-500 text-blue-600'
-                          : 'bg-white border-gray-300 text-gray-500 hover:bg-gray-50'
-                      }`}
-                    >
-                      {page}
-                    </button>
-                  ))}
+                  {Array.from({ length: totalPages }, (_, i) => i + 1).map(
+                    (page) => (
+                      <button
+                        key={page}
+                        onClick={() => setCurrentPage(page)}
+                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
+                          page === currentPage
+                            ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
+                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                        }`}
+                      >
+                        {page}
+                      </button>
+                    )
+                  )}
                   <button
-                    onClick={() => setCurrentPage(Math.min(totalPages, currentPage + 1))}
+                    onClick={() =>
+                      setCurrentPage(Math.min(totalPages, currentPage + 1))
+                    }
                     disabled={currentPage === totalPages}
                     className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
                   >
@@ -1060,7 +1426,9 @@ useEffect(() => {
 
       {filteredVouchers.length === 0 && (
         <div className="text-center py-12">
-          <p className="text-gray-500 text-lg">No vouchers found matching your criteria.</p>
+          <p className="text-gray-500 text-lg">
+            No vouchers found matching your criteria.
+          </p>
         </div>
       )}
     </div>
@@ -1069,6 +1437,5 @@ useEffect(() => {
 
 export default VoucherRegisterBase;
 function setError(_arg0: string) {
-  throw new Error('Function not implemented.');
+  throw new Error("Function not implemented.");
 }
-

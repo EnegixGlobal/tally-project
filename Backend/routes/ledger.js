@@ -37,6 +37,8 @@ router.get("/", async (req, res) => {
       [company_id, owner_type, owner_id]
     );
 
+ 
+
     res.json(rows);
   } catch (err) {
     console.error("Error fetching ledgers:", err);
@@ -97,6 +99,7 @@ router.post("/", async (req, res) => {
 // Other Ledger routes (PUT for update, DELETE for remove) also need to include similar scoping checks.
 // Get only Cash/Bank Ledgers (for Contra Voucher)
 router.get("/cash-bank", async (req, res) => {
+ 
   const { company_id, owner_type, owner_id } = req.query;
 
   try {
@@ -215,6 +218,7 @@ router.get("/:id", async (req, res) => {
   const { owner_type } = req.query;
 
 
+
   if (isNaN(ledgerId)) {
     return res.status(400).json({ message: "Invalid ledger ID" });
   }
@@ -237,6 +241,8 @@ router.get("/:id", async (req, res) => {
     if (rows.length === 0) {
       return res.status(404).json({ message: "Ledger not found" });
     }
+
+    console.log(rows[0])
 
     res.json(rows[0]);
   } catch (err) {

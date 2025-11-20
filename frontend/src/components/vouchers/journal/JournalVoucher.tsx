@@ -134,42 +134,85 @@ useEffect(() => {
   
       fetchLedgers();
     }, []);
-  const handleSubmit = useCallback(async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (validateForm()) {
-      try {
-        
-        const payload = {
-        ...formData,
-        companyId,
-        ownerType,
-        ownerId,
-      };
-        const res = await fetch(`http://localhost:5000/api/vouchers`, {
-          method: isEditMode ? 'PUT' : 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        const data = await res.json();
-        if (res.ok) {
-                Swal.fire({
-                  icon: 'success',
-                  title: 'Success',
-                  text: data.message,
-                }).then(() => {
-                  navigate('/app/vouchers'); // or your route to go back
-                });
-              } else {
-                Swal.fire('Error', data.message || 'Something went wrong', 'error');
-              }
-      } catch (err) {
-        console.error(err);
-        Swal.fire('Error', 'Network or server issue', 'error');
-      }
-    } else {
-      Swal.fire('Error', 'Please correct the errors in the form', 'error');
+
+
+    useEffect(() => {
+  if (!isEditMode) return;
+
+  const fetchVoucher = async () => {
+    try {
+      const res = await fetch(`http://localhost:5000/api/vouchers/${id}`);
+      const json = await res.json();
+
+      if (!json.data) return;
+
+      const v = json.data;
+
+      // Map backend → frontend
+      const mappedEntries = v.entries.map((e, i) => ({
+        id: (i + 1).toString(),
+        ledgerId: e.ledger_id?.toString() || "",
+        amount: Number(e.amount) || 0,
+        type: e.type || "debit",
+        narration: e.narration || "",
+      }));
+
+      setFormData({
+        date: v.date?.split("T")[0] || "",
+        type: v.type || "journal",
+        number: v.number || "",
+        narration: v.narration || "",
+        referenceNo: v.reference_no || "",
+        supplierInvoiceDate: v.supplier_invoice_date
+          ? v.supplier_invoice_date.split("T")[0]
+          : "",
+        entries: mappedEntries,
+      });
+
+    } catch (err) {
+      console.error("Fetch error:", err);
     }
-  }, [formData, isEditMode, id, validateForm, updateVoucher, addVoucher, navigate]);
+  };
+
+  fetchVoucher();
+}, [isEditMode, id]);
+
+
+ const handleSubmit = async (e) => {
+  e.preventDefault();
+  if (!validateForm()) return;
+
+  const payload = {
+    ...formData,
+    id,
+    companyId,
+    ownerType,
+    ownerId
+  };
+
+  const url = isEditMode
+    ? `http://localhost:5000/api/vouchers/${id}`
+    : `http://localhost:5000/api/vouchers`;
+
+  const method = isEditMode ? "PUT" : "POST";
+
+  const res = await fetch(url, {
+    method,
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload)
+  });
+
+  const data = await res.json();
+
+  if (res.ok) {
+    Swal.fire("Success", data.message, "success").then(() => {
+      navigate("/app/vouchers");
+    });
+  } else {
+    Swal.fire("Error", data.message, "error");
+  }
+};
+
 
   const handlePrint = useCallback(() => {
     const printWindow = window.open('', '_blank');

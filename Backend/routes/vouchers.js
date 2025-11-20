@@ -130,6 +130,7 @@ router.post("/", async (req, res) => {
 router.get("/", async (req, res) => {
   const { ownerType, ownerId, voucherType } = req.query;
 
+  // Validate query parameters
   if (!ownerType || !ownerId || !voucherType) {
     return res
       .status(400)
@@ -137,6 +138,7 @@ router.get("/", async (req, res) => {
   }
 
   try {
+    // Fetch vouchers
     const [vouchers] = await db.execute(
       `SELECT v.id, v.voucher_number AS number, v.voucher_type AS type, 
               v.date, v.reference_no, v.narration
@@ -146,10 +148,12 @@ router.get("/", async (req, res) => {
       [ownerType, ownerId, voucherType]
     );
 
+    // Extract voucher IDs
     const voucherIds = vouchers.map((v) => v.id);
 
     let entries = [];
 
+    // Fetch voucher entries
     if (voucherIds.length > 0) {
       const [entryRows] = await db.query(
         `SELECT e.id, e.voucher_id, e.ledger_id, e.amount, 
@@ -163,13 +167,16 @@ router.get("/", async (req, res) => {
       entries = entryRows;
     }
 
+    // Attach entries to vouchers
     const result = vouchers.map((voucher) => ({
       ...voucher,
       entries: entries
         .filter((e) => e.voucher_id === voucher.id)
-        .map(({ voucher_id, ...rest }) => rest), // voucher_id remove kar diya
+        .map(({ voucher_id, ...rest }) => rest), // Remove voucher_id
     }));
 
+
+    // Send response
     res.json({ data: result });
   } catch (error) {
     console.error("Error fetching vouchers:", error);
@@ -187,24 +194,34 @@ router.delete("/:id", async (req, res) => {
       return res.status(400).json({ message: "id is required" });
     }
 
-    const [result] = await db.execute("DELETE FROM voucher_main WHERE id = ?", [
-      id,
-    ]);
+    // delete child entries first
+    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
 
-    if (result.offectedRows === 0) {
-      return res.status(404).json({ message: "Voucher not found " });
+    // delete main
+    const [result] = await db.execute(
+      "DELETE FROM voucher_main WHERE id = ?",
+      [id]
+    );
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ message: "Voucher not found" });
     }
 
     res.status(200).json({
+      success: true,
       message: "Voucher deleted successfully",
     });
+
   } catch (error) {
     console.error("Error deleting voucher:", error);
     res.status(500).json({
-      message: "Faild to delete voucher",
+      success: false,
+      message: "Failed to delete voucher",
     });
   }
 });
+
+
 
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
