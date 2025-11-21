@@ -7,7 +7,8 @@ import type {
   Godown,
   LedgerWithGroup,
 } from "../../../types";
-import { Save, Plus, Trash2, ArrowLeft, Printer } from "lucide-react";
+import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
+
 import Swal from "sweetalert2";
 import EWayBillGeneration from "./EWayBillGeneration";
 import InvoicePrint from "./InvoicePrint";
@@ -147,7 +148,15 @@ const SalesVoucher: React.FC = () => {
   const [showPrintOptions, setShowPrintOptions] = useState(false); // Print options popup state
   const [showEWayBill, setShowEWayBill] = useState(false); // E-way Bill modal state
   const [showInvoicePrint, setShowInvoicePrint] = useState(false); // Invoice print modal state
-  const [godownList ,setGodownList] = useState(false)
+  const [godownList, setGodownList] = useState(false);
+  const [showConfig, setShowConfig] = useState(false);
+
+  const [columnSettings, setColumnSettings] = useState({
+    showGodown: true,
+    showBatch: true,
+    showDiscount: true,
+    showGST: true,
+  });
 
   // Regenerate voucher number when quotation mode changes
   useEffect(() => {
@@ -159,7 +168,6 @@ const SalesVoucher: React.FC = () => {
       }));
     }
   }, [isQuotation, isEditMode, generateVoucherNumber]);
-  const [showConfig, setShowConfig] = useState(false);
 
   // Load voucher in edit mode
   useEffect(() => {
@@ -235,34 +243,31 @@ const SalesVoucher: React.FC = () => {
 
   //godown fatch
   useEffect(() => {
-  const fetchGodowns = async () => {
-    try {
-      const companyId = localStorage.getItem("company_id");
-      const ownerType = localStorage.getItem("userType");
-      const ownerId = localStorage.getItem(
-        ownerType === "employee" ? "employee_id" : "user_id"
-      );
+    const fetchGodowns = async () => {
+      try {
+        const companyId = localStorage.getItem("company_id");
+        const ownerType = localStorage.getItem("userType");
+        const ownerId = localStorage.getItem(
+          ownerType === "employee" ? "employee_id" : "user_id"
+        );
 
+        if (!companyId || !ownerType || !ownerId) {
+          console.error("Missing auth params");
+          return;
+        }
 
-      if (!companyId || !ownerType || !ownerId) {
-        console.error("Missing auth params");
-        return;
+        const url = `http://localhost:5000/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+
+        const res = await fetch(url);
+        const data = await res.json();
+        setGodownList(data.data);
+      } catch (err) {
+        console.error("Error loading godowns:", err);
       }
+    };
 
-      const url = `http://localhost:5000/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
-
-      const res = await fetch(url);
-      const data = await res.json();
-      setGodownList(data.data)
-    } catch (err) {
-      console.error("Error loading godowns:", err);
-    }
-  };
-
-  fetchGodowns();
-}, []);
-
-
+    fetchGodowns();
+  }, []);
 
   // Keyboard shortcuts
   useEffect(() => {
@@ -874,19 +879,29 @@ const SalesVoucher: React.FC = () => {
   return (
     <React.Fragment>
       <div className="pt-[56px] px-4">
-        <div className="flex items-center mb-6">
+        <div className="flex items-center mb-6 justify-between">
+          {/* LEFT SIDE - Back Button + Page Title */}
+          <div className="flex items-center">
+            <button
+              onClick={() => navigate("/app/vouchers")}
+              className="mr-4 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+            >
+              <ArrowLeft size={20} />
+            </button>
+
+            <h1 className="text-2xl font-bold">
+              {isQuotation ? "📋 Sales Quotation" : "📝 Sales Voucher"}
+            </h1>
+          </div>
+
+          {/* RIGHT SIDE - ⚙ SETTINGS ICON */}
           <button
-            title="Back to Vouchers"
-            onClick={() => navigate("/app/vouchers")}
-            className={`mr-4 p-2 rounded-full ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            onClick={() => setShowConfig(true)}
+            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+            title="Voucher Display Settings"
           >
-            <ArrowLeft size={20} />
+            <Settings size={22} />
           </button>
-          <h1 className="text-2xl font-bold">
-            {isQuotation ? "📋 Sales Quotation" : "📝 Sales Voucher"}
-          </h1>
         </div>
 
         <div
@@ -1156,25 +1171,28 @@ const SalesVoucher: React.FC = () => {
                 </div>
 
                 {/* Godown Enable/Disable toggle */}
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    htmlFor="godownEnabled"
-                  >
-                    Enable Godown Selection
-                  </label>
-                  <select
-                    id="godownEnabled"
-                    value={godownEnabled}
-                    onChange={(e) =>
-                      setGodownEnabled(e.target.value as "yes" | "no")
-                    }
-                    className={FORM_STYLES.select(theme)}
-                  >
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
-                  </select>
-                </div>
+                {columnSettings.showGodown && (
+                  <div>
+                    <label
+                      className="block text-sm font-medium mb-1"
+                      htmlFor="godownEnabled"
+                    >
+                      Enable Godown Selection
+                    </label>
+
+                    <select
+                      id="godownEnabled"
+                      value={godownEnabled}
+                      onChange={(e) =>
+                        setGodownEnabled(e.target.value as "yes" | "no")
+                      }
+                      className={FORM_STYLES.select(theme)}
+                    >
+                      <option value="yes">Yes</option>
+                      <option value="no">No</option>
+                    </select>
+                  </div>
+                )}
               </div>
             )}
             <div
@@ -1216,12 +1234,15 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-left">S.No</th>
                         <th className="px-4 py-2 text-left">Item</th>
                         <th className="px-4 py-2 text-left">HSN/SAC</th>
-                        <th className="px-4 py-2 text-left">Batch</th>
+                        {columnSettings.showBatch && <th>Batch</th>}
+
                         <th className="px-4 py-2 text-right">Quantity</th>
                         <th className="px-4 py-2 text-left">Unit</th>
                         <th className="px-4 py-2 text-right">Rate</th>
-                        <th className="px-4 py-2 text-right">Gst%</th>
-                        <th className="px-4 py-2 text-right">Discount</th>
+                        {columnSettings.showGST && <th>GST%</th>}
+
+                        {columnSettings.showDiscount && <th>Discount</th>}
+
                         <th className="px-4 py-2 text-right">Amount</th>
                         {godownEnabled === "yes" && (
                           <th className="px-4 py-2 text-left">Godown</th>
@@ -1249,7 +1270,7 @@ const SalesVoucher: React.FC = () => {
                                 value={entry.itemId}
                                 onChange={(e) => handleEntryChange(index, e)}
                                 required
-                                className={FORM_STYLES.tableSelect(theme)}
+                                 className={`${FORM_STYLES.tableSelect(theme)} min-w-[220px]`}
                               >
                                 <option value="" disabled>
                                   -- Select Item --
@@ -1756,7 +1777,7 @@ const SalesVoucher: React.FC = () => {
 
         {/* Configuration Modal (F12) */}
         {showConfig && (
-          <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="fixed inset-0 bg-black/40  flex items-center justify-center z-50">
             <div
               className={`p-6 rounded-lg ${
                 theme === "dark" ? "bg-gray-800" : "bg-white shadow"
@@ -1837,6 +1858,87 @@ const SalesVoucher: React.FC = () => {
             Esc to cancel.
           </p>
         </div>
+
+        {showConfig && (
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96 shadow-xl">
+              <h2 className="text-xl font-bold mb-4">
+                Voucher Display Settings
+              </h2>
+
+              <div className="space-y-4">
+                {/* Godown Toggle */}
+                <label className="flex justify-between items-center">
+                  <span>Enable Godown Selection</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showGodown}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showGodown: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
+                {/* Batch Toggle */}
+                <label className="flex justify-between items-center">
+                  <span>Enable Batch Column</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showBatch}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showBatch: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
+                {/* Discount Toggle */}
+                <label className="flex justify-between items-center">
+                  <span>Enable Discount Column</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showDiscount}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showDiscount: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
+                {/* GST Toggle */}
+                <label className="flex justify-between items-center">
+                  <span>Enable GST Column</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showGST}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showGST: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="flex justify-end mt-6">
+                <button
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded"
+                  onClick={() => setShowConfig(false)}
+                >
+                  Close
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </React.Fragment>
   );
