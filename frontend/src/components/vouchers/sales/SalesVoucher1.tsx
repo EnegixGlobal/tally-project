@@ -53,7 +53,7 @@ const SalesVoucher: React.FC = () => {
   } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  console.log('this is id', id)
+
   const [searchParams] = useSearchParams();
   const isEditMode = !!id;
   const companyId = localStorage.getItem("company_id");
@@ -147,6 +147,7 @@ const SalesVoucher: React.FC = () => {
   const [showPrintOptions, setShowPrintOptions] = useState(false); // Print options popup state
   const [showEWayBill, setShowEWayBill] = useState(false); // E-way Bill modal state
   const [showInvoicePrint, setShowInvoicePrint] = useState(false); // Invoice print modal state
+  const [godownList ,setGodownList] = useState(false)
 
   // Regenerate voucher number when quotation mode changes
   useEffect(() => {
@@ -232,6 +233,37 @@ const SalesVoucher: React.FC = () => {
     loadSingleVoucher();
   }, [isEditMode, id]);
 
+  //godown fatch
+  useEffect(() => {
+  const fetchGodowns = async () => {
+    try {
+      const companyId = localStorage.getItem("company_id");
+      const ownerType = localStorage.getItem("userType");
+      const ownerId = localStorage.getItem(
+        ownerType === "employee" ? "employee_id" : "user_id"
+      );
+
+
+      if (!companyId || !ownerType || !ownerId) {
+        console.error("Missing auth params");
+        return;
+      }
+
+      const url = `http://localhost:5000/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+
+      const res = await fetch(url);
+      const data = await res.json();
+      setGodownList(data.data)
+    } catch (err) {
+      console.error("Error loading godowns:", err);
+    }
+  };
+
+  fetchGodowns();
+}, []);
+
+
+
   // Keyboard shortcuts
   useEffect(() => {
     const companyId = localStorage.getItem("company_id");
@@ -252,7 +284,6 @@ const SalesVoucher: React.FC = () => {
       .then((data) => {
         if (data.success) {
           setStockItems(data.data);
-          console.log("stock data", data.data);
         } else setStockItems([]);
       })
       .catch(() => setStockItems([]));
@@ -603,45 +634,44 @@ const SalesVoucher: React.FC = () => {
 
     const totals = calculateTotals();
 
-   const payload = {
-  date: formData.date,
-  number: formData.number,
-  referenceNo: formData.referenceNo,
-  partyId: formData.partyId,
-  salesLedgerId: formData.salesLedgerId,
-  orderRef: formData.orderRef || "",
-  termsOfDelivery: formData.termsOfDelivery || "",
-  narration: formData.narration,
+    const payload = {
+      date: formData.date,
+      number: formData.number,
+      referenceNo: formData.referenceNo,
+      partyId: formData.partyId,
+      salesLedgerId: formData.salesLedgerId,
+      orderRef: formData.orderRef || "",
+      termsOfDelivery: formData.termsOfDelivery || "",
+      narration: formData.narration,
 
-  // IMPORTANT multi-tenant fields
-  companyId,
-  ownerType,
-  ownerId,
+      // IMPORTANT multi-tenant fields
+      companyId,
+      ownerType,
+      ownerId,
 
-  // Dispatch fields (backend naming required)
-  dispatchDocNo: formData.dispatchDetails.docNo,
-  dispatchThrough: formData.dispatchDetails.through,
-  destination: formData.dispatchDetails.destination,
+      // Dispatch fields (backend naming required)
+      dispatchDocNo: formData.dispatchDetails.docNo,
+      dispatchThrough: formData.dispatchDetails.through,
+      destination: formData.dispatchDetails.destination,
 
-  expectedDeliveryDate: formData.expectedDeliveryDate || null,
-  status: "pending",
+      expectedDeliveryDate: formData.expectedDeliveryDate || null,
+      status: "pending",
 
-  items: formData.entries.map(e => ({
-    itemId: e.itemId,
-    hsnCode: e.hsnCode,
-    quantity: e.quantity,
-    rate: e.rate,
-    amount: e.amount,
-    discount: e.discount,
-    cgstRate: e.cgstRate,
-    sgstRate: e.sgstRate,
-    igstRate: e.igstRate,
-    godownId: e.godownId,
-  })),
+      items: formData.entries.map((e) => ({
+        itemId: e.itemId,
+        hsnCode: e.hsnCode,
+        quantity: e.quantity,
+        rate: e.rate,
+        amount: e.amount,
+        discount: e.discount,
+        cgstRate: e.cgstRate,
+        sgstRate: e.sgstRate,
+        igstRate: e.igstRate,
+        godownId: e.godownId,
+      })),
 
-  ...totals,
-};
-
+      ...totals,
+    };
 
     try {
       // -------------------------
@@ -1354,7 +1384,7 @@ const SalesVoucher: React.FC = () => {
                                   name="godownId"
                                   value={entry.godownId}
                                   onChange={(e) => handleEntryChange(index, e)}
-                                  required={godowns.length > 0}
+                                  required={godownList.length > 0}
                                   className={`${FORM_STYLES.tableSelect(
                                     theme
                                   )} ${
@@ -1364,8 +1394,8 @@ const SalesVoucher: React.FC = () => {
                                   }`}
                                 >
                                   <option value="">Select Godown</option>
-                                  {godowns.length > 0 ? (
-                                    godowns.map((godown: Godown) => (
+                                  {godownList.length > 0 ? (
+                                    godownList.map((godown: Godown) => (
                                       <option key={godown.id} value={godown.id}>
                                         {godown.name}
                                       </option>

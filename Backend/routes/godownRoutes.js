@@ -73,6 +73,7 @@ router.get('/:id', async (req, res) => {
 
 // List All Godowns (multi-tenant scoped)
 router.get('/', async (req, res) => {
+
   const {  owner_type, owner_id } = req.query;
   if (  !owner_type || !owner_id) {
     return res.status(400).json({ success: false, message: 'company_id, owner_type, and owner_id are required' });
