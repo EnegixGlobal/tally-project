@@ -291,195 +291,230 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
     return vouchers;
   };
+  console.log("voucher", voucherType);
 
   // Filter vouchers based on search, filters, and view type
   const convertToVoucherEntry = (p: any): VoucherEntry & any => {
-  // ---------------------- PURCHASE ----------------------
-  if (voucherType === "purchase") {
-    return {
-      id: String(p.id),
-      date: p.date,
-      number: p.number,
-      referenceNo: p.referenceNo || "",
-      type: "purchase",
+    // ---------------------- PURCHASE ----------------------
+    if (voucherType === "purchase") {
+      return {
+        id: String(p.id),
+        date: p.date,
+        number: p.number,
+        referenceNo: p.referenceNo || "",
+        type: "purchase",
 
-      supplierInvoiceDate: p.supplierInvoiceDate || "",
-      subtotal: Number(p.subtotal || 0),
-      cgstTotal: Number(p.cgstTotal || 0),
-      sgstTotal: Number(p.sgstTotal || 0),
-      igstTotal: Number(p.igstTotal || 0),
-      total: Number(p.total || 0),
+        supplierInvoiceDate: p.supplierInvoiceDate || "",
+        subtotal: Number(p.subtotal || 0),
+        cgstTotal: Number(p.cgstTotal || 0),
+        sgstTotal: Number(p.sgstTotal || 0),
+        igstTotal: Number(p.igstTotal || 0),
+        total: Number(p.total || 0),
 
-      entries: [
-        {
-          ledgerId: "Purchase",
-          type: "debit",
-          amount: Number(p.total || 0),
-        },
-        {
-          ledgerId: String(p.partyId),
-          type: "credit",
-          amount: Number(p.total || 0),
-        },
-      ],
-    };
-  }
+        entries: [
+          {
+            ledgerId: "Purchase",
+            type: "debit",
+            amount: Number(p.total || 0),
+          },
+          {
+            ledgerId: String(p.partyId),
+            type: "credit",
+            amount: Number(p.total || 0),
+          },
+        ],
+      };
+    }
 
-  // ---------------------- SALES ----------------------
-  if (voucherType === "sales") {
-    return {
-      id: String(p.id),
-      date: p.date,
-      number: p.number,
-      referenceNo: p.referenceNo || "",
-      type: "sales",
+    // ---------------------- SALES ----------------------
 
-      supplierInvoiceDate: "",
-      subtotal: Number(p.totalAmount || 0),
-      cgstTotal: Number(p.cgstTotal || 0),
-      sgstTotal: Number(p.sgstTotal || 0),
-      igstTotal: Number(p.igstTotal || 0),
-      total: Number(p.totalAmount || 0),
+    if (voucherType === "sales") {
+       console.log("SALES CONVERT INPUT:", p)
+      const party =
+        p.partyName ||
+        p.party_name ||
+        p.customerName ||
+        p.customer_name ||
+        p.partyId ||
+        p.customerId ||
+        "-";
 
-      entries: [
-        {
-          ledgerId: p.partyName,
-          type: "debit",
-          amount: Number(p.totalAmount || 0),
-        },
-        {
-          ledgerId: p.salesLedgerName,
-          type: "credit",
-          amount: Number(p.totalAmount || 0),
-        },
-      ],
-    };
-  }
+      const invoiceDate =
+        p.supplierInvoiceDate ||
+        p.invoiceDate ||
+        p.invoice_date ||
+        p.billDate ||
+        p.bill_date ||
+        "";
 
-  // ---------------------- SALES ORDER ----------------------
-  if (voucherType === "sales_order") {
-    return {
-      id: String(p.id),
-      date: p.date,
-      number: p.number,
-      referenceNo: p.referenceNo || "",
-      type: "sales_order",
+      const subtotal =
+        Number(p.subtotal) ||
+        Number(p.sub_total) ||
+        Number(p.beforeTax) ||
+        Number(p.totalAmount) -
+          (Number(p.cgstTotal || 0) +
+            Number(p.sgstTotal || 0) +
+            Number(p.igstTotal || 0)) ||
+        0;
 
-      supplierInvoiceDate: "",
-      subtotal: Number(p.totalAmount || 0),
-      cgstTotal: 0,
-      sgstTotal: 0,
-      igstTotal: 0,
-      total: Number(p.totalAmount || 0),
+      const cgst = Number(p.cgstTotal || p.cgst || 0);
+      const sgst = Number(p.sgstTotal || p.sgst || 0);
+      const igst = Number(p.igstTotal || p.igst || 0);
+      const total = subtotal + cgst + sgst + igst;
 
-      entries: [
-        {
-          ledgerId: p.partyName,
-          type: "debit",
-          amount: Number(p.totalAmount || 0),
-        },
-        {
-          ledgerId: p.salesLedgerName,
-          type: "credit",
-          amount: Number(p.totalAmount || 0),
-        },
-      ],
-    };
-  }
+      return {
+        id: String(p.id),
+        date: p.date,
+        number: p.number,
+        referenceNo: p.referenceNo || p.reference_no || "",
+        type: "sales",
 
-  // ---------------------- RECEIPT ----------------------
-  if (voucherType === "receipt") {
-    return {
-      id: String(p.id),
-      date: p.date,
-      number: p.number || p.voucher_number || "",
-      referenceNo: p.referenceNo || p.reference_no || "",
-      narration: p.narration || "",
-      type: "receipt",
+        party, 
+        supplierInvoiceDate: invoiceDate, 
+        subtotal,
+        cgstTotal: cgst,
+        sgstTotal: sgst,
+        igstTotal: igst,
+        total,
 
-      supplierInvoiceDate: "",
-      subtotal: 0,
-      cgstTotal: 0,
-      sgstTotal: 0,
-      igstTotal: 0,
+        entries: [
+          {
+            ledgerId: party,
+            type: "debit",
+            amount: total,
+          },
+          {
+            ledgerId: p.salesLedgerName || p.salesLedger || "Sales A/c",
+            type: "credit",
+            amount: total,
+          },
+        ],
+      };
+    }
 
-      entries: (p.entries || []).map((e: any) => ({
-        ledgerId: String(e.ledger_id || ""),
-        amount: Number(e.amount || 0),
-        type: e.type || e.entry_type,
-        narration: e.narration || "",
-      })),
+    // ---------------------- SALES ORDER ----------------------
+    if (voucherType === "sales_order") {
+      return {
+        id: String(p.id),
+        date: p.date,
+        number: p.number,
+        referenceNo: p.referenceNo || "",
+        type: "sales_order",
 
-      total: (p.entries || []).reduce(
-        (sum, e) => sum + Number(e.amount || 0),
-        0
-      ),
-    };
-  }
+        supplierInvoiceDate: "",
+        subtotal: Number(p.totalAmount || 0),
+        cgstTotal: 0,
+        sgstTotal: 0,
+        igstTotal: 0,
+        total: Number(p.totalAmount || 0),
 
-  // ---------------------- CONTRA ----------------------
-  if (voucherType === "contra") {
-    return {
-      id: String(p.id),
-      date: p.date,
-      number: p.number || p.voucher_number || "",
-      referenceNo: p.referenceNo || p.reference_no || "",
-      narration: p.narration || "",
-      type: "contra",
+        entries: [
+          {
+            ledgerId: p.partyName,
+            type: "debit",
+            amount: Number(p.totalAmount || 0),
+          },
+          {
+            ledgerId: p.salesLedgerName,
+            type: "credit",
+            amount: Number(p.totalAmount || 0),
+          },
+        ],
+      };
+    }
 
-      supplierInvoiceDate: "",
-      subtotal: 0,
-      cgstTotal: 0,
-      sgstTotal: 0,
-      igstTotal: 0,
+    // ---------------------- RECEIPT ----------------------
+    if (voucherType === "receipt") {
+      return {
+        id: String(p.id),
+        date: p.date,
+        number: p.number || p.voucher_number || "",
+        referenceNo: p.referenceNo || p.reference_no || "",
+        narration: p.narration || "",
+        type: "receipt",
 
-      entries: (p.entries || []).map((e: any) => ({
-        ledgerId: String(e.ledger_id || ""),
-        amount: Number(e.amount || 0),
-        type: e.type || e.entry_type,
-        narration: e.narration || "",
-      })),
+        supplierInvoiceDate: "",
+        subtotal: 0,
+        cgstTotal: 0,
+        sgstTotal: 0,
+        igstTotal: 0,
 
-      total: (p.entries || []).reduce(
-        (sum, e) => sum + Number(e.amount || 0),
-        0
-      ),
-    };
-  }
+        entries: (p.entries || []).map((e: any) => ({
+          ledgerId: String(e.ledger_id || ""),
+          amount: Number(e.amount || 0),
+          type: e.type || e.entry_type,
+          narration: e.narration || "",
+        })),
 
-  // ---------------------- JOURNAL ----------------------
-  if (voucherType === "journal") {
-    return {
-      id: String(p.id),
-      date: p.date,
-      number: p.number || p.voucher_number || "",
-      referenceNo: p.referenceNo || p.reference_no || "",
-      narration: p.narration || "",
-      type: "journal",
+        total: (p.entries || []).reduce(
+          (sum, e) => sum + Number(e.amount || 0),
+          0
+        ),
+      };
+    }
 
-      supplierInvoiceDate: "",
-      subtotal: 0,
-      cgstTotal: 0,
-      sgstTotal: 0,
-      igstTotal: 0,
+    // ---------------------- CONTRA ----------------------
+    if (voucherType === "contra") {
+      return {
+        id: String(p.id),
+        date: p.date,
+        number: p.number || p.voucher_number || "",
+        referenceNo: p.referenceNo || p.reference_no || "",
+        narration: p.narration || "",
+        type: "contra",
 
-      entries: (p.entries || []).map((e: any) => ({
-        ledgerId: String(e.ledger_id || ""),
-        amount: Number(e.amount || 0),
-        type: e.type || e.entry_type,
-        narration: e.narration || "",
-      })),
+        supplierInvoiceDate: "",
+        subtotal: 0,
+        cgstTotal: 0,
+        sgstTotal: 0,
+        igstTotal: 0,
 
-      total: (p.entries || []).reduce(
-        (sum, e) => sum + Number(e.amount || 0),
-        0
-      ),
-    };
-  }
+        entries: (p.entries || []).map((e: any) => ({
+          ledgerId: String(e.ledger_id || ""),
+          amount: Number(e.amount || 0),
+          type: e.type || e.entry_type,
+          narration: e.narration || "",
+        })),
 
-  return p;
-};
+        total: (p.entries || []).reduce(
+          (sum, e) => sum + Number(e.amount || 0),
+          0
+        ),
+      };
+    }
 
+    // ---------------------- JOURNAL ----------------------
+    if (voucherType === "journal") {
+      return {
+        id: String(p.id),
+        date: p.date,
+        number: p.number || p.voucher_number || "",
+        referenceNo: p.referenceNo || p.reference_no || "",
+        narration: p.narration || "",
+        type: "journal",
+
+        supplierInvoiceDate: "",
+        subtotal: 0,
+        cgstTotal: 0,
+        sgstTotal: 0,
+        igstTotal: 0,
+
+        entries: (p.entries || []).map((e: any) => ({
+          ledgerId: String(e.ledger_id || ""),
+          amount: Number(e.amount || 0),
+          type: e.type || e.entry_type,
+          narration: e.narration || "",
+        })),
+
+        total: (p.entries || []).reduce(
+          (sum, e) => sum + Number(e.amount || 0),
+          0
+        ),
+      };
+    }
+
+    return p;
+  };
 
   // --- Safe Date Parser ---
   const normalizeDate = (dateStr: string) => {
@@ -497,49 +532,55 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
   // ---- FINAL FILTERING LOGIC ----
   const filteredVouchers = (() => {
-    try {
-      // Convert PurchaseVoucher → VoucherEntry
-      const converted = vouchers.map((v) => {
-        const entry = convertToVoucherEntry(v);
-        return {
-          ...entry,
-          safeDate: normalizeDate(v.date),
-        };
-      });
+  try {
+    // Convert raw data → VoucherEntry
+    const converted = vouchers.map((v) => {
+      const entry = convertToVoucherEntry(v);
+      return {
+        ...entry,
+        safeDate: normalizeDate(v.date), // safe date object
+      };
+    });
 
-      // Apply View Type filter (Daily / Weekly / Monthly etc.)
-      const viewFiltered = filterVouchersByView(converted);
+    // Apply View Type filter
+    const viewFiltered = filterVouchersByView(converted);
 
-      // Apply Search, Date, Status filters
-      return viewFiltered.filter((voucher) => {
-        const safeNumber = (voucher.number || "").toLowerCase();
-        const safeRef = (voucher.referenceNo || "").toLowerCase();
-        const safeNarration = ""; // since purchase voucher has no narration field
+    // Apply Search, Date, Status filters
+    let finalList = viewFiltered.filter((voucher) => {
+      const safeNumber = (voucher.number || "").toLowerCase();
+      const safeRef = (voucher.referenceNo || "").toLowerCase();
 
-        // Search Filter
-        const searchMatch =
-          !searchTerm ||
-          safeNumber.includes(searchTerm.toLowerCase()) ||
-          safeRef.includes(searchTerm.toLowerCase()) ||
-          safeNarration.includes(searchTerm.toLowerCase());
+      // Search filter
+      const searchMatch =
+        !searchTerm ||
+        safeNumber.includes(searchTerm.toLowerCase()) ||
+        safeRef.includes(searchTerm.toLowerCase());
 
-        // Date Filter
-        const formattedVoucherDate =
-          voucher.safeDate?.toISOString().slice(0, 10) || "";
+      // Date filter
+      const formattedVoucherDate =
+        voucher.safeDate?.toISOString().slice(0, 10) || "";
+      const dateMatch = !dateFilter || formattedVoucherDate === dateFilter;
 
-        const dateMatch = !dateFilter || formattedVoucherDate === dateFilter;
+      // Status filter
+      const status = getVoucherStatus(voucher);
+      const statusMatch = !statusFilter || status === statusFilter;
 
-        // Status Filter
-        const status = getVoucherStatus(voucher);
-        const statusMatch = !statusFilter || status === statusFilter;
+      return searchMatch && dateMatch && statusMatch;
+    });
 
-        return searchMatch && dateMatch && statusMatch;
-      });
-    } catch (err) {
-      console.error("Filter Error:", err);
-      return [];
-    }
-  })();
+    finalList.sort((a, b) => {
+      const da = a.safeDate ? a.safeDate.getTime() : 0;
+      const db = b.safeDate ? b.safeDate.getTime() : 0;
+      return da - db; // ascending order
+    });
+
+    return finalList;
+  } catch (err) {
+    console.error("Filter Error:", err);
+    return [];
+  }
+})();
+
 
   // Pagination
   const totalPages = Math.max(
@@ -805,7 +846,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
         const res = await fetch(url);
         const json = await res.json();
- 
 
         // -- Handle different API response formats --
         if (json.data) setVouchers(json.data);

@@ -176,28 +176,7 @@ const VoucherRegisterIndex: React.FC = () => {
           category: 'trading',
           count: getVoucherCount('credit-note')
         },
-        {
-          id: 'sales-return-register',
-          icon: <RotateCcw size={20} />,
-          name: 'Sales Return Register',
-          path: '/app/voucher-register/sales-return',
-          color: theme === 'dark' ? 'bg-orange-900/50 hover:bg-orange-800/50' : 'bg-orange-50 hover:bg-orange-100',
-          iconBg: theme === 'dark' ? 'bg-orange-800/70' : 'bg-orange-100',
-          description: 'View all sales returns',
-          category: 'trading',
-          count: getVoucherCount('sales-return')
-        },
-        {
-          id: 'purchase-return-register',
-          icon: <RefreshCcw size={20} />,
-          name: 'Purchase Return Register',
-          path: '/app/voucher-register/purchase-return',
-          color: theme === 'dark' ? 'bg-emerald-900/50 hover:bg-emerald-800/50' : 'bg-emerald-50 hover:bg-emerald-100',
-          iconBg: theme === 'dark' ? 'bg-emerald-800/70' : 'bg-emerald-100',
-          description: 'View all purchase returns',
-          category: 'trading',
-          count: getVoucherCount('purchase-return')
-        }
+       
       ]
     },
     {

@@ -24,7 +24,6 @@ interface SalesOrderItem {
   rate: number;
   discount: number;
   amount: number;
-  godownId?: string;
   unit?: string;
   cgstRate?: number;
   sgstRate?: number;
@@ -74,11 +73,7 @@ interface Ledger {
 //   gstRate?: number;
 // }
 
-interface Godown {
-  id: string;
-  name: string;
-  location?: string;
-}
+
 
 const SalesOrder: React.FC = () => {
   const { theme, companyInfo } = useAppContext();
@@ -132,7 +127,6 @@ const SalesOrder: React.FC = () => {
             sgstRate: Number(it.sgstRate || 0),
             igstRate: Number(it.igstRate || 0),
             amount: Number(it.amount),
-            godownId: it.godownId || "",
           })),
         });
       }
@@ -203,28 +197,7 @@ const SalesOrder: React.FC = () => {
     },
   ]);
 
-  // const [salesLedgers] = useState<Ledger[]>([
-  //   { id: '11', name: 'Sales - Electronics', type: 'sales' },
-  //   { id: '12', name: 'Sales - Computer Hardware', type: 'sales' },
-  //   { id: '13', name: 'Sales - Office Equipment', type: 'sales' },
-  //   { id: '14', name: 'Sales - Finished Goods', type: 'sales' },
-  //   { id: '15', name: 'Sales - General', type: 'sales' },
-  // ]);
-
-  // const [stockItems] = useState<StockItem[]>([
-  //   { id: '1', name: 'Laptop Dell Inspiron', unit: 'Nos', hsnCode: '8471', standardSaleRate: 55000, gstRate: 18 },
-  //   { id: '2', name: 'Desktop Computer', unit: 'Nos', hsnCode: '8471', standardSaleRate: 45000, gstRate: 18 },
-  //   { id: '3', name: 'Printer HP LaserJet', unit: 'Nos', hsnCode: '8443', standardSaleRate: 18000, gstRate: 18 },
-  //   { id: '4', name: 'Monitor LED 24 inch', unit: 'Nos', hsnCode: '8528', standardSaleRate: 15000, gstRate: 18 },
-  //   { id: '5', name: 'Keyboard Wireless', unit: 'Nos', hsnCode: '8471', standardSaleRate: 3000, gstRate: 18 },
-  //   { id: '6', name: 'Mouse Optical', unit: 'Nos', hsnCode: '8471', standardSaleRate: 1200, gstRate: 18 },
-  // ]);
-
-  const [godowns] = useState<Godown[]>([
-    { id: "1", name: "Main Warehouse", location: "Ground Floor" },
-    { id: "2", name: "Electronics Storage", location: "First Floor" },
-    { id: "3", name: "Finished Goods", location: "Second Floor" },
-  ]);
+ ;
 
   const generateOrderNumber = () => {
     const prefix = "SO";
@@ -376,7 +349,6 @@ const SalesOrder: React.FC = () => {
       field === "itemName" ||
       field === "hsnCode" ||
       field === "unit" ||
-      field === "godownId" ||
       field === "id"
     ) {
       item[field] = value as any;
@@ -1024,9 +996,7 @@ const SalesOrder: React.FC = () => {
                       <th className="px-2 py-2 text-center">GST %</th>
                     )}
                     <th className="px-2 py-2 text-right">Amount</th>
-                    {config.showGodown && (
-                      <th className="px-2 py-2 text-left">Godown</th>
-                    )}
+                   
                     <th className="px-2 py-2 text-center">Action</th>
                   </tr>
                 </thead>
@@ -1189,35 +1159,6 @@ const SalesOrder: React.FC = () => {
                           } opacity-60`}
                         />
                       </td>
-
-                      {config.showGodown && (
-                        <td className="px-2 py-2">
-                          <select
-                            value={item.godownId || ""}
-                            onChange={(e) =>
-                              handleItemChange(
-                                index,
-                                "godownId",
-                                e.target.value
-                              )
-                            }
-                            className={`w-full p-1 rounded border text-sm ${
-                              theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
-                            } focus:border-blue-500`}
-                            title="Select Godown"
-                            aria-label="Select Godown"
-                          >
-                            <option value="">Select Godown</option>
-                            {godowns.map((godown) => (
-                              <option key={godown.id} value={godown.id}>
-                                {godown.name}
-                              </option>
-                            ))}
-                          </select>
-                        </td>
-                      )}
 
                       <td className="px-2 py-2 text-center">
                         <button
