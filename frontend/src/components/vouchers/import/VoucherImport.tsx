@@ -1,7 +1,16 @@
-import React, { useState, useRef } from 'react';
-import { Upload, FileText, Download, ArrowLeft, CheckCircle, AlertTriangle, RefreshCw, FileSpreadsheet } from 'lucide-react';
-import { useNavigate } from 'react-router-dom';
-import * as XLSX from 'xlsx';
+import React, { useState, useRef } from "react";
+import {
+  Upload,
+  FileText,
+  Download,
+  ArrowLeft,
+  CheckCircle,
+  AlertTriangle,
+  RefreshCw,
+  FileSpreadsheet,
+} from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import * as XLSX from "xlsx";
 
 interface ImportedVoucher {
   id: string;
@@ -12,7 +21,7 @@ interface ImportedVoucher {
   amount: number;
   narration: string;
   items?: ImportedItem[];
-  status: 'pending' | 'imported' | 'error';
+  status: "pending" | "imported" | "error";
   errorMessage?: string;
 }
 
@@ -36,95 +45,150 @@ interface VoucherTemplate {
 const VoucherImport: React.FC = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
-  
+
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [importedVouchers, setImportedVouchers] = useState<ImportedVoucher[]>([]);
+  const [importedVouchers, setImportedVouchers] = useState<ImportedVoucher[]>(
+    []
+  );
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState('sales');
-  const [activeTab, setActiveTab] = useState<'import' | 'preview' | 'templates'>('import');
+  const [selectedTemplate, setSelectedTemplate] = useState("sales");
+  const [activeTab, setActiveTab] = useState<
+    "import" | "preview" | "templates"
+  >("import");
 
   const voucherTemplates: VoucherTemplate[] = [
     {
-      name: 'Sales Voucher Template',
-      type: 'sales',
-      description: 'Import sales invoices with item details',
-      fields: ['Date', 'Voucher No', 'Party Name', 'Item Name', 'Quantity', 'Rate', 'Amount', 'HSN Code', 'GST Rate', 'Narration'],
+      name: "Sales Voucher Template",
+      type: "sales",
+      description: "Import sales invoices with item details",
+      fields: [
+        "Date",
+        "Voucher No",
+        "Party Name",
+        "Item Name",
+        "Quantity",
+        "Rate",
+        "Amount",
+        "HSN Code",
+        "GST Rate",
+        "Narration",
+      ],
       sampleData: [
         {
-          'Date': '15/01/2024',
-          'Voucher No': 'SAL001',
-          'Party Name': 'ABC Electronics',
-          'Item Name': 'Laptop HP',
-          'Quantity': 2,
-          'Rate': 45000,
-          'Amount': 90000,
-          'HSN Code': '8471',
-          'GST Rate': 18,
-          'Narration': 'Sales to ABC Electronics'
-        }
-      ]
+          Date: "15/01/2024",
+          "Voucher No": "SAL001",
+          "Party Name": "ABC Electronics",
+          "Item Name": "Laptop HP",
+          Quantity: 2,
+          Rate: 45000,
+          Amount: 90000,
+          "HSN Code": "8471",
+          "GST Rate": 18,
+          Narration: "Sales to ABC Electronics",
+        },
+      ],
     },
     {
-      name: 'Purchase Voucher Template',
-      type: 'purchase',
-      description: 'Import purchase invoices with supplier details',
-      fields: ['Date', 'Voucher No', 'Supplier Name', 'Item Name', 'Quantity', 'Rate', 'Amount', 'HSN Code', 'GST Rate', 'Narration'],
+      name: "Purchase Voucher Template",
+      type: "purchase",
+      description: "Import purchase invoices with supplier details",
+      fields: [
+        "Date",
+        "Voucher No",
+        "Supplier Name",
+        "Item Name",
+        "Quantity",
+        "Rate",
+        "Amount",
+        "HSN Code",
+        "GST Rate",
+        "Narration",
+      ],
       sampleData: [
         {
-          'Date': '15/01/2024',
-          'Voucher No': 'PUR001',
-          'Supplier Name': 'Tech Suppliers Ltd',
-          'Item Name': 'Mobile Phone',
-          'Quantity': 5,
-          'Rate': 25000,
-          'Amount': 125000,
-          'HSN Code': '8517',
-          'GST Rate': 18,
-          'Narration': 'Purchase from Tech Suppliers'
-        }
-      ]
+          Date: "15/01/2024",
+          "Voucher No": "PUR001",
+          "Supplier Name": "Tech Suppliers Ltd",
+          "Item Name": "Mobile Phone",
+          Quantity: 5,
+          Rate: 25000,
+          Amount: 125000,
+          "HSN Code": "8517",
+          "GST Rate": 18,
+          Narration: "Purchase from Tech Suppliers",
+        },
+      ],
     },
     {
-      name: 'Payment Voucher Template',
-      type: 'payment',
-      description: 'Import payment vouchers',
-      fields: ['Date', 'Voucher No', 'Paid To', 'Amount', 'Payment Mode', 'Narration'],
+      name: "Payment Voucher Template",
+      type: "payment",
+      description: "Import payment vouchers",
+      fields: [
+        "Date",
+        "Voucher No",
+        "Paid To",
+        "Amount",
+        "Payment Mode",
+        "Narration",
+      ],
       sampleData: [
         {
-          'Date': '15/01/2024',
-          'Voucher No': 'PAY001',
-          'Paid To': 'Office Rent',
-          'Amount': 25000,
-          'Payment Mode': 'Cash',
-          'Narration': 'Monthly office rent payment'
-        }
-      ]
+          Date: "15/01/2024",
+          "Voucher No": "PAY001",
+          "Paid To": "Office Rent",
+          Amount: 25000,
+          "Payment Mode": "Cash",
+          Narration: "Monthly office rent payment",
+        },
+      ],
     },
     {
-      name: 'Receipt Voucher Template',
-      type: 'receipt',
-      description: 'Import receipt vouchers',
-      fields: ['Date', 'Voucher No', 'Received From', 'Amount', 'Receipt Mode', 'Narration'],
+      name: "Receipt Voucher Template",
+      type: "receipt",
+      description: "Import receipt vouchers",
+      fields: [
+        "Date",
+        "Voucher No",
+        "Received From",
+        "Amount",
+        "Receipt Mode",
+        "Narration",
+      ],
       sampleData: [
         {
-          'Date': '15/01/2024',
-          'Voucher No': 'REC001',
-          'Received From': 'Customer Payment',
-          'Amount': 50000,
-          'Receipt Mode': 'Bank',
-          'Narration': 'Payment received from customer'
-        }
-      ]
-    }
+          Date: "15/01/2024",
+          "Voucher No": "REC001",
+          "Received From": "Customer Payment",
+          Amount: 50000,
+          "Receipt Mode": "Bank",
+          Narration: "Payment received from customer",
+        },
+      ],
+    },
+    {
+      name: "Bank Voucher Template",
+      type: "bank",
+      description: "Import bank voucher entries",
+      fields: ["Date", "voucher No", "Bank Name", "Amount", "Narration"],
+      sampleData: [
+        {
+          Date: "15/01/2024",
+          "voucher No": "BNk001",
+          "Bank Name": "HDFC Bank",
+          Amount: 50000,
+          Narration: "Bank transaction",
+        },
+      ],
+    },
   ];
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === 'dragenter' || e.type === 'dragover') {
+    if (e.type === "dragenter" || e.type === "dragover") {
       setDragActive(true);
-    } else if (e.type === 'dragleave') {
+    } else if (e.type === "dragleave") {
       setDragActive(false);
     }
   };
@@ -133,7 +197,7 @@ const VoucherImport: React.FC = () => {
     e.preventDefault();
     e.stopPropagation();
     setDragActive(false);
-    
+
     if (e.dataTransfer.files && e.dataTransfer.files[0]) {
       handleFileSelect(e.dataTransfer.files[0]);
     }
@@ -141,133 +205,158 @@ const VoucherImport: React.FC = () => {
 
   const handleFileSelect = (file: File) => {
     if (!file) return;
-    
+
     const validTypes = [
-      'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-      'application/vnd.ms-excel',
-      'text/csv'
+      "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+      "application/vnd.ms-excel",
+      "text/csv",
     ];
-    
+
     if (!validTypes.includes(file.type)) {
-      alert('Please select a valid Excel (.xlsx, .xls) or CSV file');
+      alert("Please select a valid Excel (.xlsx, .xls) or CSV file");
       return;
     }
-    
+
     setSelectedFile(file);
     processFile(file);
   };
 
   const processFile = async (file: File) => {
     setIsProcessing(true);
-    
+
     try {
       const data = await file.arrayBuffer();
       const workbook = XLSX.read(data);
       const sheetName = workbook.SheetNames[0];
       const worksheet = workbook.Sheets[sheetName];
       const jsonData = XLSX.utils.sheet_to_json(worksheet);
-      
-      const processedVouchers: ImportedVoucher[] = (jsonData as Record<string, unknown>[]).map((row: Record<string, unknown>, index: number) => {
+
+      const processedVouchers: ImportedVoucher[] = (
+        jsonData as Record<string, unknown>[]
+      ).map((row: Record<string, unknown>, index: number) => {
         try {
           const getString = (key: string): string => {
-            return String(row[key] || '');
+            return String(row[key] || "");
           };
-          
+
           const getNumber = (key: string): number => {
             const value = row[key];
-            return typeof value === 'number' ? value : parseFloat(String(value || 0)) || 0;
+            return typeof value === "number"
+              ? value
+              : parseFloat(String(value || 0)) || 0;
           };
 
           return {
             id: `import_${index + 1}`,
-            date: formatDate(row['Date'] || row['date']),
+            date: formatDate(row["Date"] || row["date"]),
             voucherType: selectedTemplate,
-            voucherNumber: getString('Voucher No') || getString('voucher_no') || `AUTO${index + 1}`,
-            partyName: getString('Party Name') || getString('Supplier Name') || getString('Paid To') || getString('Received From') || 'Unknown',
-            amount: getNumber('Amount') || getNumber('amount'),
-            narration: getString('Narration') || getString('narration'),
-            items: selectedTemplate === 'sales' || selectedTemplate === 'purchase' ? [{
-              itemName: getString('Item Name') || getString('item_name'),
-              quantity: getNumber('Quantity') || getNumber('quantity'),
-              rate: getNumber('Rate') || getNumber('rate'),
-              amount: getNumber('Amount') || getNumber('amount'),
-              hsnCode: getString('HSN Code') || getString('hsn_code') || undefined,
-              gstRate: getNumber('GST Rate') || getNumber('gst_rate')
-            }] : undefined,
-            status: 'pending' as const
+            voucherNumber:
+              getString("Voucher No") ||
+              getString("voucher_no") ||
+              `AUTO${index + 1}`,
+            partyName:
+              getString("Party Name") ||
+              getString("Supplier Name") ||
+              getString("Paid To") ||
+              getString("Received From") ||
+              "Unknown",
+            amount: getNumber("Amount") || getNumber("amount"),
+            narration: getString("Narration") || getString("narration"),
+            items:
+              selectedTemplate === "sales" || selectedTemplate === "purchase"
+                ? [
+                    {
+                      itemName:
+                        getString("Item Name") || getString("item_name"),
+                      quantity: getNumber("Quantity") || getNumber("quantity"),
+                      rate: getNumber("Rate") || getNumber("rate"),
+                      amount: getNumber("Amount") || getNumber("amount"),
+                      hsnCode:
+                        getString("HSN Code") ||
+                        getString("hsn_code") ||
+                        undefined,
+                      gstRate: getNumber("GST Rate") || getNumber("gst_rate"),
+                    },
+                  ]
+                : undefined,
+            status: "pending" as const,
           };
         } catch {
           return {
             id: `import_${index + 1}`,
-            date: '',
+            date: "",
             voucherType: selectedTemplate,
             voucherNumber: `ERROR${index + 1}`,
-            partyName: 'Error',
+            partyName: "Error",
             amount: 0,
-            narration: '',
-            status: 'error' as const,
-            errorMessage: 'Invalid data format'
+            narration: "",
+            status: "error" as const,
+            errorMessage: "Invalid data format",
           };
         }
       });
-      
+
       setImportedVouchers(processedVouchers);
-      setActiveTab('preview');
+      setActiveTab("preview");
     } catch {
-      alert('Error processing file. Please check the format and try again.');
+      alert("Error processing file. Please check the format and try again.");
     } finally {
       setIsProcessing(false);
     }
   };
 
   const formatDate = (dateValue: unknown): string => {
-    if (!dateValue) return '';
-    
+    if (!dateValue) return "";
+
     try {
       // Handle Excel date numbers
-      if (typeof dateValue === 'number') {
+      if (typeof dateValue === "number") {
         const date = new Date((dateValue - 25569) * 86400 * 1000);
-        return date.toISOString().split('T')[0];
+        return date.toISOString().split("T")[0];
       }
-      
+
       // Handle string dates
-      if (typeof dateValue === 'string') {
-        const parts = dateValue.split('/');
+      if (typeof dateValue === "string") {
+        const parts = dateValue.split("/");
         if (parts.length === 3) {
-          const day = parts[0].padStart(2, '0');
-          const month = parts[1].padStart(2, '0');
+          const day = parts[0].padStart(2, "0");
+          const month = parts[1].padStart(2, "0");
           const year = parts[2];
           return `${year}-${month}-${day}`;
         }
       }
-      
-      return new Date(dateValue as string | number | Date).toISOString().split('T')[0];
+
+      return new Date(dateValue as string | number | Date)
+        .toISOString()
+        .split("T")[0];
     } catch {
-      return '';
+      return "";
     }
   };
 
   const saveImportedVouchers = async () => {
     setIsProcessing(true);
-    
+
     try {
-      const validVouchers = importedVouchers.filter(v => v.status !== 'error');
-      
+      const validVouchers = importedVouchers.filter(
+        (v) => v.status !== "error"
+      );
+
       for (const voucher of validVouchers) {
         // Prepare voucher data for API
-        console.log('Preparing voucher:', voucher);
-        
+        console.log("Preparing voucher:", voucher);
+
         // Here you would make API call to save each voucher
         // await saveVoucherToAPI(voucher.voucherType, voucherData);
-        
+
         // For now, just mark as imported
-        voucher.status = 'imported';
+        voucher.status = "imported";
       }
-      
+
       setImportedVouchers([...importedVouchers]);
-      alert('Vouchers imported successfully!');
+      alert("Vouchers imported successfully!");
     } catch {
-      alert('Error saving vouchers. Please try again.');
+      alert("Error saving vouchers. Please try again.");
     } finally {
       setIsProcessing(false);
     }
@@ -276,14 +365,14 @@ const VoucherImport: React.FC = () => {
   const downloadTemplate = (template: VoucherTemplate) => {
     const ws = XLSX.utils.json_to_sheet(template.sampleData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Template');
-    XLSX.writeFile(wb, `${template.name.replace(' ', '_')}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, "Template");
+    XLSX.writeFile(wb, `${template.name.replace(" ", "_")}.xlsx`);
   };
 
   const resetImport = () => {
     setSelectedFile(null);
     setImportedVouchers([]);
-    setActiveTab('import');
+    setActiveTab("import");
   };
 
   return (
@@ -291,33 +380,52 @@ const VoucherImport: React.FC = () => {
       <div className="mb-6">
         <div className="flex items-center mb-4">
           <button
-            title='Back to Vouchers'
-            type='button'
-            onClick={() => navigate('/app/vouchers')}
+            title="Back to Vouchers"
+            type="button"
+            onClick={() => navigate("/app/vouchers")}
             className="mr-4 p-2 rounded-full hover:bg-gray-200"
           >
             <ArrowLeft size={20} />
           </button>
-          <h2 className="text-xl font-semibold text-gray-900">Import Vouchers</h2>
+          <h2 className="text-xl font-semibold text-gray-900">
+            Import Vouchers
+          </h2>
         </div>
-        <p className="text-sm text-gray-600">Import vouchers from Excel or CSV files - data will auto-fill like Tally</p>
+        <p className="text-sm text-gray-600">
+          Import vouchers from Excel or CSV files - data will auto-fill like
+          Tally
+        </p>
       </div>
 
       {/* Tab Navigation */}
       <div className="border-b border-gray-200 mb-6">
         <nav className="flex space-x-8">
           {[
-            { id: 'import', label: 'Import Data', icon: <Upload className="h-4 w-4" /> },
-            { id: 'preview', label: 'Preview & Save', icon: <FileText className="h-4 w-4" /> },
-            { id: 'templates', label: 'Download Templates', icon: <Download className="h-4 w-4" /> }
+            {
+              id: "import",
+              label: "Import Data",
+              icon: <Upload className="h-4 w-4" />,
+            },
+            {
+              id: "preview",
+              label: "Preview & Save",
+              icon: <FileText className="h-4 w-4" />,
+            },
+            {
+              id: "templates",
+              label: "Download Templates",
+              icon: <Download className="h-4 w-4" />,
+            },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => setActiveTab(tab.id as 'import' | 'preview' | 'templates')}
+              onClick={() =>
+                setActiveTab(tab.id as "import" | "preview" | "templates")
+              }
               className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? "border-blue-500 text-blue-600"
+                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
               }`}
             >
               {tab.icon}
@@ -328,7 +436,7 @@ const VoucherImport: React.FC = () => {
       </div>
 
       {/* Import Tab */}
-      {activeTab === 'import' && (
+      {activeTab === "import" && (
         <div className="space-y-6">
           {/* Template Selection */}
           <div>
@@ -346,6 +454,7 @@ const VoucherImport: React.FC = () => {
               <option value="payment">Payment Voucher</option>
               <option value="receipt">Receipt Voucher</option>
               <option value="journal">Journal Voucher</option>
+              <option value="bank">Bank Voucher</option>
             </select>
           </div>
 
@@ -353,8 +462,8 @@ const VoucherImport: React.FC = () => {
           <div
             className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
               dragActive
-                ? 'border-blue-500 bg-blue-50'
-                : 'border-gray-300 hover:border-gray-400'
+                ? "border-blue-500 bg-blue-50"
+                : "border-gray-300 hover:border-gray-400"
             }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
@@ -378,7 +487,9 @@ const VoucherImport: React.FC = () => {
               ref={fileInputRef}
               type="file"
               accept=".xlsx,.xls,.csv"
-              onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
+              onChange={(e) =>
+                e.target.files?.[0] && handleFileSelect(e.target.files[0])
+              }
               className="hidden"
               title="Select file for import"
             />
@@ -391,7 +502,9 @@ const VoucherImport: React.FC = () => {
                 <div className="flex items-center space-x-3">
                   <FileSpreadsheet className="h-8 w-8 text-green-600" />
                   <div>
-                    <div className="font-medium text-gray-900">{selectedFile.name}</div>
+                    <div className="font-medium text-gray-900">
+                      {selectedFile.name}
+                    </div>
                     <div className="text-sm text-gray-600">
                       {(selectedFile.size / 1024 / 1024).toFixed(2)} MB
                     </div>
@@ -420,12 +533,16 @@ const VoucherImport: React.FC = () => {
       )}
 
       {/* Preview Tab */}
-      {activeTab === 'preview' && (
+      {activeTab === "preview" && (
         <div className="space-y-6">
           <div className="flex items-center justify-between">
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">Preview Imported Vouchers</h3>
-              <p className="text-sm text-gray-600">Review the data before saving to your accounts</p>
+              <h3 className="text-lg font-semibold text-gray-900">
+                Preview Imported Vouchers
+              </h3>
+              <p className="text-sm text-gray-600">
+                Review the data before saving to your accounts
+              </p>
             </div>
             <div className="flex space-x-3">
               <button
@@ -439,7 +556,7 @@ const VoucherImport: React.FC = () => {
                 disabled={isProcessing || importedVouchers.length === 0}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 transition-colors"
               >
-                {isProcessing ? 'Saving...' : 'Save All Vouchers'}
+                {isProcessing ? "Saving..." : "Save All Vouchers"}
               </button>
             </div>
           </div>
@@ -449,10 +566,12 @@ const VoucherImport: React.FC = () => {
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
               <div className="flex items-center space-x-2">
                 <CheckCircle className="h-5 w-5 text-blue-600" />
-                <span className="font-medium text-blue-900">Ready to Import</span>
+                <span className="font-medium text-blue-900">
+                  Ready to Import
+                </span>
               </div>
               <div className="text-2xl font-bold text-blue-600 mt-2">
-                {importedVouchers.filter(v => v.status === 'pending').length}
+                {importedVouchers.filter((v) => v.status === "pending").length}
               </div>
             </div>
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -461,7 +580,7 @@ const VoucherImport: React.FC = () => {
                 <span className="font-medium text-red-900">Errors</span>
               </div>
               <div className="text-2xl font-bold text-red-600 mt-2">
-                {importedVouchers.filter(v => v.status === 'error').length}
+                {importedVouchers.filter((v) => v.status === "error").length}
               </div>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -470,7 +589,7 @@ const VoucherImport: React.FC = () => {
                 <span className="font-medium text-green-900">Imported</span>
               </div>
               <div className="text-2xl font-bold text-green-600 mt-2">
-                {importedVouchers.filter(v => v.status === 'imported').length}
+                {importedVouchers.filter((v) => v.status === "imported").length}
               </div>
             </div>
           </div>
@@ -481,34 +600,67 @@ const VoucherImport: React.FC = () => {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Voucher No</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Type</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Party</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Amount</th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Narration</th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Status
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Date
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Voucher No
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Type
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Party
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Amount
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                      Narration
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
                   {importedVouchers.map((voucher) => (
                     <tr key={voucher.id} className="hover:bg-gray-50">
                       <td className="px-4 py-3">
-                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                          voucher.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                          voucher.status === 'imported' ? 'bg-green-100 text-green-800' :
-                          'bg-red-100 text-red-800'
-                        }`}>
-                          {voucher.status === 'pending' ? 'Ready' :
-                           voucher.status === 'imported' ? 'Imported' : 'Error'}
+                        <span
+                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                            voucher.status === "pending"
+                              ? "bg-yellow-100 text-yellow-800"
+                              : voucher.status === "imported"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
+                          }`}
+                        >
+                          {voucher.status === "pending"
+                            ? "Ready"
+                            : voucher.status === "imported"
+                            ? "Imported"
+                            : "Error"}
                         </span>
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{voucher.date}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{voucher.voucherNumber}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900 capitalize">{voucher.voucherType}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{voucher.partyName}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">₹{voucher.amount.toLocaleString()}</td>
-                      <td className="px-4 py-3 text-sm text-gray-900">{voucher.narration}</td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {voucher.date}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {voucher.voucherNumber}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900 capitalize">
+                        {voucher.voucherType}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {voucher.partyName}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        ₹{voucher.amount.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-gray-900">
+                        {voucher.narration}
+                      </td>
                     </tr>
                   ))}
                 </tbody>
@@ -519,20 +671,31 @@ const VoucherImport: React.FC = () => {
       )}
 
       {/* Templates Tab */}
-      {activeTab === 'templates' && (
+      {activeTab === "templates" && (
         <div className="space-y-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Download Import Templates</h3>
-            <p className="text-sm text-gray-600">Use these templates to format your data for import</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Download Import Templates
+            </h3>
+            <p className="text-sm text-gray-600">
+              Use these templates to format your data for import
+            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             {voucherTemplates.map((template) => (
-              <div key={template.type} className="border border-gray-200 rounded-lg p-6">
+              <div
+                key={template.type}
+                className="border border-gray-200 rounded-lg p-6"
+              >
                 <div className="flex items-start justify-between mb-4">
                   <div>
-                    <h4 className="font-semibold text-gray-900">{template.name}</h4>
-                    <p className="text-sm text-gray-600 mt-1">{template.description}</p>
+                    <h4 className="font-semibold text-gray-900">
+                      {template.name}
+                    </h4>
+                    <p className="text-sm text-gray-600 mt-1">
+                      {template.description}
+                    </p>
                   </div>
                   <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
                     Excel
@@ -540,10 +703,15 @@ const VoucherImport: React.FC = () => {
                 </div>
 
                 <div className="mb-4">
-                  <h5 className="text-sm font-medium text-gray-900 mb-2">Required Fields:</h5>
+                  <h5 className="text-sm font-medium text-gray-900 mb-2">
+                    Required Fields:
+                  </h5>
                   <div className="flex flex-wrap gap-1">
                     {template.fields.map((field, index) => (
-                      <span key={index} className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-800">
+                      <span
+                        key={index}
+                        className="inline-flex items-center px-2 py-1 rounded text-xs bg-gray-100 text-gray-800"
+                      >
                         {field}
                       </span>
                     ))}
@@ -563,13 +731,20 @@ const VoucherImport: React.FC = () => {
 
           {/* Import Guidelines */}
           <div className="bg-gray-50 rounded-lg p-6">
-            <h4 className="font-medium text-gray-900 mb-3">Import Guidelines</h4>
+            <h4 className="font-medium text-gray-900 mb-3">
+              Import Guidelines
+            </h4>
             <ul className="text-sm text-gray-600 space-y-2">
               <li>• Use the exact column headers as shown in templates</li>
               <li>• Dates should be in DD/MM/YYYY format</li>
               <li>• Amount fields should contain only numeric values</li>
-              <li>• Party names should match existing ledger names for auto-mapping</li>
-              <li>• Item names should match existing stock items for auto-mapping</li>
+              <li>
+                • Party names should match existing ledger names for
+                auto-mapping
+              </li>
+              <li>
+                • Item names should match existing stock items for auto-mapping
+              </li>
               <li>• GST rates should be in percentage (e.g., 18 for 18%)</li>
               <li>• Remove any extra columns not mentioned in the template</li>
             </ul>
