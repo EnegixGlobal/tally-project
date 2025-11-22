@@ -4,7 +4,7 @@ import { useReactToPrint } from "react-to-print";
 import { useAppContext } from "../../../context/AppContext";
 import { useNavigate, useParams } from "react-router-dom";
 import type { LedgerWithGroup, VoucherEntry } from "../../../types";
-import { Save, Plus, Trash2, ArrowLeft, Printer } from "lucide-react";
+import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 import Swal from "sweetalert2";
 import type { StockItem } from "../../../types";
 
@@ -84,6 +84,15 @@ const PurchaseVoucher: React.FC = () => {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const { id } = useParams();
   const isEditMode = Boolean(id);
+
+  const [showTableConfig, setShowTableConfig] = useState(false);
+
+  const [visibleColumns, setVisibleColumns] = useState({
+    hsn: true,
+    gst: true,
+    batch: true,
+    godown: true,
+  });
 
   useEffect(() => {
     if (!isEditMode || !id) return;
@@ -725,7 +734,6 @@ const PurchaseVoucher: React.FC = () => {
           // AUTO FILL
           hsnCode: selectedItem?.hsnCode || "",
 
-          // ⭐ FIXED UNIT FIELD ⭐
           unitName: selectedItem?.unitName || selectedItem?.unit || "",
 
           rate: Number(selectedItem?.rate) || 0,
@@ -955,63 +963,62 @@ const PurchaseVoucher: React.FC = () => {
       return { debitTotal, creditTotal, total: debitTotal };
     }
   };
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  if (!validateForm()) {
-    alert("Please fix the errors before submitting");
-    return;
-  }
+    if (!validateForm()) {
+      alert("Please fix the errors before submitting");
+      return;
+    }
 
-  try {
-    const totals = calculateTotals();
+    try {
+      const totals = calculateTotals();
 
-    const payload = {
-      ...formData,
-      ...totals,
-      companyId,
-      ownerType,
-      ownerId,
-    };
+      const payload = {
+        ...formData,
+        ...totals,
+        companyId,
+        ownerType,
+        ownerId,
+      };
 
-    // ⭐ Auto Detect Add or Update Mode
-    const url = isEditMode
-      ? `http://localhost:5000/api/purchase-vouchers/${id}`
-      : "http://localhost:5000/api/purchase-vouchers";
+      // ⭐ Auto Detect Add or Update Mode
+      const url = isEditMode
+        ? `http://localhost:5000/api/purchase-vouchers/${id}`
+        : "http://localhost:5000/api/purchase-vouchers";
 
-    const method = isEditMode ? "PUT" : "POST";
+      const method = isEditMode ? "PUT" : "POST";
 
-    // ⭐ API Request
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const data = await res.json();
-    console.log("Server response:", data);
-
-    if (res.ok) {
-      // SUCCESS MODAL
-      await Swal.fire({
-        title: isEditMode ? "Updated!" : "Success",
-        text: isEditMode
-          ? "Voucher updated successfully!"
-          : "Voucher saved successfully!",
-        icon: "success",
-        confirmButtonText: "OK",
+      // ⭐ API Request
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
 
-      navigate("/app/vouchers/purchase");
-    } else {
-      Swal.fire("Error", data.message || "Something went wrong", "error");
-    }
-  } catch (err) {
-    console.error("Error:", err);
-    Swal.fire("Error", "Network or server issue", "error");
-  }
-};
+      const data = await res.json();
+      console.log("Server response:", data);
 
+      if (res.ok) {
+        // SUCCESS MODAL
+        await Swal.fire({
+          title: isEditMode ? "Updated!" : "Success",
+          text: isEditMode
+            ? "Voucher updated successfully!"
+            : "Voucher saved successfully!",
+          icon: "success",
+          confirmButtonText: "OK",
+        });
+
+        navigate("/app/vouchers/purchase");
+      } else {
+        Swal.fire("Error", data.message || "Something went wrong", "error");
+      }
+    } catch (err) {
+      console.error("Error:", err);
+      Swal.fire("Error", "Network or server issue", "error");
+    }
+  };
 
   const {
     subtotal = 0,
@@ -1091,16 +1098,72 @@ const PurchaseVoucher: React.FC = () => {
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
         <button
-          title="Back to Vouchers"
           onClick={() => navigate("/app/vouchers")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className="mr-4 p-2 rounded-full"
         >
           <ArrowLeft size={20} />
         </button>
+
         <h1 className="text-2xl font-bold">Purchase Voucher</h1>
+
+        {/* ⚙ SETTINGS BUTTON */}
+        <button
+          type="button"
+          onClick={() => setShowTableConfig(!showTableConfig)}
+          className="ml-auto p-2 rounded-full hover:bg-gray-200"
+          title="Table Settings"
+        >
+          <Settings size={20} />
+        </button>
       </div>
+      {showTableConfig && (
+        <div
+          className="fixed inset-0 bg-black/40 flex items-center justify-center z-[200]"
+          onClick={() => setShowTableConfig(false)} // outside click close
+        >
+          <div
+            className={`p-6 rounded-lg w-[350px] ${
+              theme === "dark" ? "bg-gray-800 text-white" : "bg-white"
+            } shadow-xl`}
+            onClick={(e) => e.stopPropagation()} // stop outside close
+          >
+            <h3 className="text-lg font-semibold mb-4">Table Settings</h3>
+
+            {[
+              { key: "hsn", label: "Show HSN Column" },
+              { key: "batch", label: "Show Batch Column" },
+              { key: "gst", label: "Show GST Column" },
+              { key: "godown", label: "Show Godown Column" },
+            ].map(({ key, label }) => (
+              <label
+                key={key}
+                className="flex justify-between items-center mb-3"
+              >
+                {label}
+                <input
+                  type="checkbox"
+                  checked={visibleColumns[key]}
+                  onChange={() =>
+                    setVisibleColumns((prev) => ({
+                      ...prev,
+                      [key]: !prev[key],
+                    }))
+                  }
+                />
+              </label>
+            ))}
+
+            <div className="flex justify-end mt-5">
+              <button
+                onClick={() => setShowTableConfig(false)}
+                className="px-4 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700"
+              >
+                Apply & Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div
         className={`p-6 rounded-lg ${
           theme === "dark" ? "bg-gray-800" : "bg-white shadow"
@@ -1396,12 +1459,17 @@ const PurchaseVoucher: React.FC = () => {
                     >
                       <th className={TABLE_STYLES.headerCenter}>Sr No</th>
                       <th className={TABLE_STYLES.header}>Item</th>
-                      <th className={TABLE_STYLES.header}>HSN/SAC</th>
-                      <th className={TABLE_STYLES.header}>Batch</th>
+                      {visibleColumns.hsn && <th>HSN/SAC</th>}
+
+                      {visibleColumns.batch && (
+                        <th className={TABLE_STYLES.header}>Batch</th>
+                      )}
                       <th className={TABLE_STYLES.headerRight}>Quantity</th>
                       <th className={TABLE_STYLES.header}>Unit</th>
                       <th className={TABLE_STYLES.headerRight}>Rate</th>
-                      <th className={TABLE_STYLES.headerRight}>GST (%)</th>
+                      {visibleColumns.gst && (
+                        <th className={TABLE_STYLES.headerRight}>GST (%)</th>
+                      )}
                       <th className={TABLE_STYLES.headerRight}>Discount</th>
                       <th className={TABLE_STYLES.headerRight}>Amount</th>
                       {godownEnabled === "yes" && (
@@ -1412,9 +1480,7 @@ const PurchaseVoucher: React.FC = () => {
                   </thead>
                   <tbody>
                     {formData.entries.map((entry, index) => {
-                      const selectedItem = stockItems.find(
-                        (item) => item.id == entry.itemId
-                      );
+                      const itemDetails = getItemDetails(entry.itemId || "");
 
                       return (
                         <tr
@@ -1425,20 +1491,20 @@ const PurchaseVoucher: React.FC = () => {
                               : "border-b border-gray-300"
                           }`}
                         >
-                          {/* SR NO */}
-                          <td className="px-4 py-2 text-center font-semibold">
+                          {/* SR */}
+                          <td className="px-1 py-2 text-center min-w-[28px] text-xs font-semibold">
                             {index + 1}
                           </td>
 
-                          {/* ITEM DROPDOWN */}
-                          <td className="px-4 py-2">
+                          {/* ITEM */}
+                          <td className="px-1 py-2 min-w-[110px]">
                             <select
                               name="itemId"
                               value={entry.itemId}
                               onChange={(e) => handleEntryChange(index, e)}
-                              className={TABLE_STYLES.select}
+                              className={`${TABLE_STYLES.select} min-w-[110px] text-xs`}
                             >
-                              <option value="">-- Select Item --</option>
+                              <option value="">Item</option>
                               {stockItems.map((item) => (
                                 <option key={item.id} value={item.id}>
                                   {item.name}
@@ -1448,99 +1514,106 @@ const PurchaseVoucher: React.FC = () => {
                           </td>
 
                           {/* HSN */}
-                          <td className="px-4 py-2">{entry.hsnCode || "-"}</td>
+                          {visibleColumns.hsn && (
+                            <td className="px-1 py-2 min-w-[55px] text-center text-xs">
+                              <input
+                                type="text"
+                                name="hsnCode"
+                                value={entry.hsnCode || ""}
+                                onChange={(e) => handleEntryChange(index, e)}
+                                className={`${TABLE_STYLES.input} text-center text-xs`}
+                                placeholder="HSN"
+                              />
+                            </td>
+                          )}
 
-                          {/* BATCH SELECT */}
-                          <td className="px-4 py-2">
+                          {/* BATCH */}
+                          <td className="px-1 py-2 min-w-[100px]">
                             <select
-                              value={entry.batchNumber}
-                              onChange={(e) => {
-                                const selectedBatch = entry.batches?.find(
-                                  (b) => b.batchName === e.target.value
-                                );
-
-                                const updatedEntries = [...formData.entries];
-                                updatedEntries[index] = {
-                                  ...entry,
-                                  batchNumber: e.target.value,
-                                  batchExpiryDate:
-                                    selectedBatch?.batchExpiryDate || "",
-                                  batchManufacturingDate:
-                                    selectedBatch?.batchManufacturingDate || "",
-                                };
-
-                                setFormData((prev) => ({
-                                  ...prev,
-                                  entries: updatedEntries,
-                                }));
-                              }}
-                              className="border p-1 rounded w-full"
+                              name="batchNumber"
+                              value={entry.batchNumber || ""}
+                              onChange={(e) => handleEntryChange(index, e)}
+                              className={`${TABLE_STYLES.select} min-w-[100px] text-xs`}
                             >
-                              <option value="">Select Batch</option>
-                              {(entry.batches || []).map((b, idx) => (
-                                <option key={idx} value={b.batchName}>
-                                  {b.batchName}
+                              <option value="">Batch</option>
+                              {(entry.batches || []).map((batch, i) => (
+                                <option key={i} value={batch.batchName}>
+                                  {batch.batchName}
                                 </option>
                               ))}
                             </select>
                           </td>
 
                           {/* QUANTITY */}
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-2 min-w-[55px]">
                             <input
                               type="number"
                               name="quantity"
-                              value={entry.quantity}
+                              value={entry.quantity ?? ""}
                               onChange={(e) => handleEntryChange(index, e)}
-                              className={TABLE_STYLES.input}
+                              className={`${TABLE_STYLES.input} text-right text-xs`}
                             />
                           </td>
 
-                          {/* UNIT (FIXED) */}
-                          <td className="px-4 py-2">{entry.unitName || "-"}</td>
+                          {/* UNIT */}
+                          <td className="px-1 py-2 min-w-[45px] text-center text-xs">
+                            {itemDetails.unit || "-"}
+                          </td>
 
                           {/* RATE */}
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-2 min-w-[70px]">
                             <input
                               type="number"
                               name="rate"
-                              value={entry.rate}
+                              value={entry.rate ?? ""}
                               onChange={(e) => handleEntryChange(index, e)}
-                              className={TABLE_STYLES.input}
+                              className={`${TABLE_STYLES.input} text-right text-xs`}
                             />
                           </td>
 
-                          {/* GST RATE */}
-                          <td className="px-4 py-2 text-right">
-                            {(entry.cgstRate || 0) + (entry.sgstRate || 0)}%
-                          </td>
+                          {/* GST Single Column */}
+                          {visibleColumns.gst && (
+                            <td
+                              className="px-1 py-2 min-w-[50px] text-center font-semibold text-xs"
+                              title={`CGST: ${entry.cgstRate || 0}%, SGST: ${
+                                entry.sgstRate || 0
+                              }%, IGST: ${entry.igstRate || 0}%`}
+                            >
+                              {(
+                                (entry.cgstRate || 0) +
+                                (entry.sgstRate || 0) +
+                                (entry.igstRate || 0)
+                              ).toFixed(0)}
+                              %
+                            </td>
+                          )}
 
                           {/* DISCOUNT */}
-                          <td className="px-4 py-2">
+                          <td className="px-1 py-2 min-w-[70px]">
                             <input
                               type="number"
                               name="discount"
-                              value={entry.discount}
+                              value={entry.discount ?? ""}
                               onChange={(e) => handleEntryChange(index, e)}
-                              className={TABLE_STYLES.input}
+                              className={`${TABLE_STYLES.input} text-right text-xs`}
                             />
                           </td>
 
                           {/* AMOUNT */}
-                          <td className="px-4 py-2 text-right">
-                            {entry.amount?.toLocaleString()}
+                          <td className="px-1 py-2 min-w-[75px] text-right text-xs font-medium">
+                            {Number(entry.amount ?? 0).toLocaleString()}
                           </td>
 
-                          {/* GODOWN - OPTIONAL */}
+                          {/* GODOWN (Show only if Enabled) */}
                           {godownEnabled === "yes" && (
-                            <td className="px-4 py-2">
+                            <td className="px-1 py-2 min-w-[95px]">
                               <select
                                 name="godownId"
                                 value={entry.godownId}
                                 onChange={(e) => handleEntryChange(index, e)}
-                                className={TABLE_STYLES.select}
+                                className={`${TABLE_STYLES.select} min-w-[95px] text-xs`}
                               >
-                                <option value="">Select Godown</option>
+                                <option value="">Gdn</option>
                                 {safeGodowns.map((g) => (
                                   <option key={g.id} value={g.id}>
                                     {g.name}
@@ -1550,13 +1623,14 @@ const PurchaseVoucher: React.FC = () => {
                             </td>
                           )}
 
-                          {/* REMOVE BUTTON */}
-                          <td className="px-4 py-2 text-center">
+                          {/* ACTION */}
+                          <td className="px-1 py-2 text-center min-w-[40px]">
                             <button
                               onClick={() => removeEntry(index)}
-                              className="p-1 rounded hover:bg-gray-300"
+                              className="p-1 rounded hover:bg-gray-200"
+                              disabled={formData.entries.length <= 1}
                             >
-                              <Trash2 size={16} />
+                              <Trash2 size={14} />
                             </button>
                           </td>
                         </tr>
@@ -1597,10 +1671,10 @@ const PurchaseVoucher: React.FC = () => {
                       >
                         GST Total:
                       </td>
-                      <td className="px-4 py-2 text-right">
-                        {cgstTotal.toLocaleString()} +{" "}
-                        {sgstTotal.toLocaleString()}
-                      </td>
+                     <td className="px-4 py-2 text-right">
+  {(cgstTotal + sgstTotal).toLocaleString()}
+</td>
+
                       <td className="px-4 py-2"></td>
                       <td className="px-4 py-2"></td>
                     </tr>

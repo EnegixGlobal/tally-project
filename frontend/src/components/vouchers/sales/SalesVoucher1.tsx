@@ -85,6 +85,7 @@ const SalesVoucher: React.FC = () => {
 
   // State initialization first
   const [isQuotation, setIsQuotation] = useState(isQuotationMode); // Initialize with URL parameter
+  const [godownList, setGodownList] = useState<Godown[]>([]);
 
   // Generate voucher number (e.g., ABCDEF0001 or QT0001)
   const generateVoucherNumber = useCallback(() => {
@@ -148,7 +149,7 @@ const SalesVoucher: React.FC = () => {
   const [showPrintOptions, setShowPrintOptions] = useState(false); // Print options popup state
   const [showEWayBill, setShowEWayBill] = useState(false); // E-way Bill modal state
   const [showInvoicePrint, setShowInvoicePrint] = useState(false); // Invoice print modal state
-  const [godownList, setGodownList] = useState(false);
+
   const [showConfig, setShowConfig] = useState(false);
 
   const [columnSettings, setColumnSettings] = useState({
@@ -1262,182 +1263,141 @@ const SalesVoucher: React.FC = () => {
                                 : "border-b border-gray-300"
                             }`}
                           >
-                            <td className="px-4 py-2">{index + 1}</td>
-                            <td className="px-4 py-2">
+                            {/* SR */}
+                            <td className="px-1 py-2 text-center min-w-[28px] text-xs">
+                              {index + 1}
+                            </td>
+
+                            {/* ITEM */}
+                            <td className="px-1 py-2 min-w-[110px]">
                               <select
-                                title="Select Item"
                                 name="itemId"
                                 value={entry.itemId}
                                 onChange={(e) => handleEntryChange(index, e)}
-                                required
-                                 className={`${FORM_STYLES.tableSelect(theme)} min-w-[220px]`}
+                                className={`${FORM_STYLES.tableSelect(
+                                  theme
+                                )} text-xs min-w-[110px]`}
                               >
-                                <option value="" disabled>
-                                  -- Select Item --
-                                </option>
-                                {stockItems.length === 0 ? (
-                                  <option value="" disabled>
-                                    No items available
+                                <option value="">Item</option>
+                                {stockItems.map((item) => (
+                                  <option key={item.id} value={item.id}>
+                                    {item.name}
                                   </option>
-                                ) : (
-                                  stockItems.map((item) => (
-                                    <option key={item.id} value={item.id}>
-                                      {item.name}
-                                    </option>
-                                  ))
-                                )}
+                                ))}
                               </select>
-
-                              {errors[`entry${index}.itemId`] && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors[`entry${index}.itemId`]}
-                                </p>
-                              )}
                             </td>
-                            <td className="px-4 py-2">
+
+                            {/* HSN */}
+                            <td className="px-1 py-2 text-center min-w-[55px] text-xs">
                               <input
-                                title="Enter HSN/SAC Code"
                                 type="text"
                                 name="hsnCode"
                                 value={entry.hsnCode || ""}
                                 onChange={(e) => handleEntryChange(index, e)}
-                                placeholder="HSN/SAC"
-                                className={FORM_STYLES.tableInput(theme)}
+                                className={`${FORM_STYLES.tableInput(
+                                  theme
+                                )} text-center text-xs`}
+                                placeholder="HSN"
                               />
                             </td>
-                            <td className="px-4 py-2">
+
+                            {/* BATCH */}
+                            <td className="px-1 py-2 min-w-[100px]">
                               <select
-                                title="Select Batch"
                                 name="batchNumber"
                                 value={entry.batchNumber || ""}
                                 onChange={(e) => handleEntryChange(index, e)}
                                 className={`${FORM_STYLES.tableSelect(
                                   theme
-                                )} max-h-32 overflow-y-auto`}
+                                )} min-w-[100px] text-xs`}
                               >
-                                <option value="">-- Select Batch --</option>
-
-                                {entry.batches && entry.batches.length > 0 ? (
-                                  entry.batches.map((b, i) => (
-                                    <option key={i} value={b.batchName}>
-                                      {b.batchName}{" "}
-                                      {/* ONLY batch name shown */}
-                                    </option>
-                                  ))
-                                ) : (
-                                  <option disabled>No Batch Available</option>
-                                )}
+                                <option value="">Batch</option>
+                                {(entry.batches || []).map((b, i) => (
+                                  <option key={i} value={b.batchName}>
+                                    {b.batchName}
+                                  </option>
+                                ))}
                               </select>
                             </td>
-                            <td className="px-4 py-2">
+
+                            {/* QTY */}
+                            <td className="px-1 py-2 min-w-[55px]">
                               <input
-                                title="Enter Quantity"
                                 type="number"
                                 name="quantity"
                                 value={entry.quantity ?? ""}
                                 onChange={(e) => handleEntryChange(index, e)}
-                                required
-                                min="0"
-                                step="0.01"
                                 className={`${FORM_STYLES.tableInput(
                                   theme
-                                )} text-right ${
-                                  errors[`entry${index}.quantity`]
-                                    ? "border-red-500"
-                                    : ""
-                                }`}
+                                )} text-right text-xs`}
                               />
-                              {errors[`entry${index}.quantity`] && (
-                                <p className="text-red-500 text-xs mt-1">
-                                  {errors[`entry${index}.quantity`]}
-                                </p>
-                              )}
                             </td>
-                            <td className="px-4 py-2">{itemDetails.unit}</td>
-                            <td className="px-4 py-2">
+
+                            {/* UNIT */}
+                            <td className="px-1 py-2 text-center min-w-[45px] text-xs">
+                              {itemDetails.unit || "-"}
+                            </td>
+
+                            {/* RATE */}
+                            <td className="px-1 py-2 min-w-[70px]">
                               <input
-                                title="Enter Rate"
                                 type="number"
                                 name="rate"
                                 value={entry.rate ?? ""}
                                 onChange={(e) => handleEntryChange(index, e)}
-                                min="0"
-                                step="0.01"
                                 className={`${FORM_STYLES.tableInput(
                                   theme
-                                )} text-right`}
+                                )} text-right text-xs`}
                               />
                             </td>
-                            <td className="px-4 py-2">
-                              <input
-                                type="number"
-                                name="gstRate"
-                                value={entry.gstRate || ""}
-                                readOnly
-                                className={`${FORM_STYLES.tableInput(
-                                  theme
-                                )} text-right bg-gray-100`}
-                                title="GST rate auto-filled from item master"
-                              />
+
+                            {/* GST */}
+                            <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                              {entry.gstRate || 0}%
                             </td>
-                            <td className="px-4 py-2">
+
+                            {/* DISCOUNT */}
+                            <td className="px-1 py-2 min-w-[70px]">
                               <input
-                                title="Enter Discount"
                                 type="number"
                                 name="discount"
                                 value={entry.discount ?? ""}
                                 onChange={(e) => handleEntryChange(index, e)}
-                                min="0"
-                                step="0.01"
                                 className={`${FORM_STYLES.tableInput(
                                   theme
-                                )} text-right`}
+                                )} text-right text-xs`}
                               />
                             </td>
-                            <td className="px-4 py-2 text-right">
+
+                            {/* AMOUNT */}
+                            <td className="px-1 py-2 text-right min-w-[75px] font-medium text-xs">
                               {Number(entry.amount ?? 0).toLocaleString()}
                             </td>
 
+                            {/* GODOWN */}
                             {godownEnabled === "yes" && (
-                              <td className="px-4 py-2">
+                              <td className="px-1 py-2 min-w-[95px]">
                                 <select
-                                  title="Select Godown"
                                   name="godownId"
                                   value={entry.godownId}
                                   onChange={(e) => handleEntryChange(index, e)}
-                                  required={godownList.length > 0}
                                   className={`${FORM_STYLES.tableSelect(
                                     theme
-                                  )} ${
-                                    errors[`entry${index}.godownId`]
-                                      ? "border-red-500"
-                                      : ""
-                                  }`}
+                                  )} min-w-[95px] text-xs`}
                                 >
-                                  <option value="">Select Godown</option>
-                                  {godownList.length > 0 ? (
-                                    godownList.map((godown: Godown) => (
-                                      <option key={godown.id} value={godown.id}>
-                                        {godown.name}
-                                      </option>
-                                    ))
-                                  ) : (
-                                    <option value="" disabled>
-                                      No godowns available
+                                  <option value="">Gdn</option>
+                                  {godownList.map((g) => (
+                                    <option key={g.id} value={g.id}>
+                                      {g.name}
                                     </option>
-                                  )}
+                                  ))}
                                 </select>
-                                {errors[`entry${index}.godownId`] && (
-                                  <p className="text-red-500 text-xs mt-1">
-                                    {errors[`entry${index}.godownId`]}
-                                  </p>
-                                )}
                               </td>
                             )}
-                            <td className="px-4 py-2 text-center">
+
+                            {/* DELETE */}
+                            <td className="px-1 py-2 text-center min-w-[40px]">
                               <button
-                                title="Remove Item"
-                                type="button"
                                 onClick={() => removeEntry(index)}
                                 disabled={formData.entries.length <= 1}
                                 className={`p-1 rounded ${
@@ -1445,10 +1405,10 @@ const SalesVoucher: React.FC = () => {
                                     ? "opacity-50 cursor-not-allowed"
                                     : theme === "dark"
                                     ? "hover:bg-gray-600"
-                                    : "hover:bg-gray-300"
+                                    : "hover:bg-gray-200"
                                 }`}
                               >
-                                <Trash2 size={16} />
+                                <Trash2 size={14} />
                               </button>
                             </td>
                           </tr>
@@ -1456,86 +1416,7 @@ const SalesVoucher: React.FC = () => {
                       })}
                     </tbody>
                     <tfoot>
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-right" colSpan={8}>
-                          Subtotal:
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          {subtotal.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-2"></td>
-                        <td className="px-4 py-2"></td>
-                      </tr>
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-right" colSpan={8}>
-                          CGST Total:
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          {cgstTotal.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-2"></td>
-                        <td className="px-4 py-2"></td>
-                      </tr>
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-right" colSpan={8}>
-                          SGST Total:
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          {sgstTotal.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-2"></td>
-                        <td className="px-4 py-2"></td>
-                      </tr>
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-right" colSpan={8}>
-                          IGST Total:
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          {igstTotal.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-2"></td>
-                        <td className="px-4 py-2"></td>
-                      </tr>
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-right" colSpan={8}>
-                          Discount Total:
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          {discountTotal.toLocaleString()}
-                        </td>
-                        <td className="px-4 py-2"></td>
-                        <td className="px-4 py-2"></td>
-                      </tr>
+                      {/* SUBTOTAL */}
                       <tr
                         className={`font-semibold ${
                           theme === "dark"
@@ -1544,13 +1425,70 @@ const SalesVoucher: React.FC = () => {
                         }`}
                       >
                         <td className="px-4 py-2 text-right" colSpan={7}>
-                          Grand Total:
+                          Subtotal:
                         </td>
                         <td className="px-4 py-2 text-right">
+                          {subtotal.toLocaleString()}
+                        </td>
+                        <td></td>
+                        <td></td>
+                      </tr>
+
+                      {/* GST TOTAL (CGST + SGST + IGST Combined) */}
+                      <tr
+                        className={`font-semibold ${
+                          theme === "dark"
+                            ? "border-t border-gray-600"
+                            : "border-t border-gray-300"
+                        }`}
+                      >
+                        <td className="px-4 py-2 text-right" colSpan={7}>
+                          GST Total:
+                        </td>
+                        <td className="px-4 py-2 text-right text-blue-600 font-bold">
+                          {(cgstTotal + sgstTotal + igstTotal).toLocaleString()}
+                        </td>
+                        <td></td>
+                        <td></td>
+                      </tr>
+
+                      {/* DISCOUNT TOTAL */}
+                      <tr
+                        className={`font-semibold ${
+                          theme === "dark"
+                            ? "border-t border-gray-600"
+                            : "border-t border-gray-300"
+                        }`}
+                      >
+                        <td className="px-4 py-2 text-right" colSpan={7}>
+                          Discount:
+                        </td>
+                        <td className="px-4 py-2 text-right text-red-600 font-bold">
+                          {discountTotal.toLocaleString()}
+                        </td>
+                        <td></td>
+                        <td></td>
+                      </tr>
+
+                      {/* GRAND TOTAL */}
+                      <tr
+                        className={`font-bold ${
+                          theme === "dark"
+                            ? "border-t-2 border-gray-500"
+                            : "border-t-2 border-black"
+                        }`}
+                      >
+                        <td
+                          className="px-4 py-2 text-right text-lg"
+                          colSpan={7}
+                        >
+                          Grand Total:
+                        </td>
+                        <td className="px-4 py-2 text-right text-lg text-green-600 font-bold">
                           {total.toLocaleString()}
                         </td>
-                        <td className="px-4 py-2"></td>
-                        <td className="px-4 py-2"></td>
+                        <td></td>
+                        <td></td>
                       </tr>
                     </tfoot>
                   </table>
