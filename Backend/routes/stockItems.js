@@ -104,7 +104,6 @@ router.get("/", async (req, res) => {
 router.post("/", async (req, res) => {
   const connection = await db.getConnection();
   try {
-    // Start the transaction
     await connection.beginTransaction();
 
     const {
@@ -122,16 +121,15 @@ router.post("/", async (req, res) => {
       allowNegativeStock,
       maintainInPieces,
       secondaryUnit,
-      batches, // Array of batches
+      batches = [], 
       godownAllocations = [],
       barcode,
-      ownerType = "employee", // Default to 'employee' if not provided
+      ownerType = "employee",
       ownerId,
     } = req.body;
 
-    // Debugging: Log the incoming request body
 
-    // Basic validation for required fields
+
     if (!name || !unit || !taxType) {
       return res.status(400).json({
         success: false,
@@ -139,42 +137,44 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Validate if 'batches' is an array and handle it properly
     if (
       enableBatchTracking &&
       (!Array.isArray(batches) ||
         batches.some(
           (batch) =>
             !batch.batchName ||
+            batch.batchQuantity == null ||
+            isNaN(batch.batchQuantity) ||
+            batch.batchRate == null ||
+            isNaN(batch.batchRate) ||
             !batch.batchExpiryDate ||
             !batch.batchManufacturingDate
         ))
     ) {
       return res.status(400).json({
         success: false,
-        message:
-          "Invalid batch data. Ensure all batches have batchName, batchExpiryDate, and batchManufacturingDate",
+        message: "Invalid batch data. Fix missing or invalid fields",
       });
     }
 
-    // Convert batches to JSON format for storage
+    // Convert string → number & format properly
     const batchData = batches.map((batch) => ({
       batchName: batch.batchName,
+      batchQuantity: Number(batch.batchQuantity),
+      batchRate: Number(batch.batchRate),
       batchExpiryDate: batch.batchExpiryDate,
       batchManufacturingDate: batch.batchManufacturingDate,
     }));
 
-    // Get column names dynamically from the database
+
     const [columnsResult] = await connection.execute(`
       SHOW COLUMNS FROM stock_items
     `);
 
-    // Extract column names and remove 'id' and 'company_id' since 'id' is auto-incremented and 'company_id' is not needed
     const columnNames = columnsResult
-      .filter((col) => col.Field !== "id" && col.Field !== "company_id") // Exclude 'company_id' and 'id'
+      .filter((col) => col.Field !== "id" && col.Field !== "company_id")
       .map((col) => col.Field);
 
-    // Construct values array dynamically based on the incoming request data
     const values = columnNames.map((column) => {
       switch (column) {
         case "name":
@@ -192,7 +192,7 @@ router.post("/", async (req, res) => {
         case "gstRate":
           return gstRate ?? 0;
         case "taxType":
-          return taxType ?? "Taxable";
+          return taxType;
         case "standardPurchaseRate":
           return standardPurchaseRate ?? 0;
         case "standardSaleRate":
@@ -207,27 +207,17 @@ router.post("/", async (req, res) => {
           return secondaryUnit ?? null;
         case "barcode":
           return barcode;
-        case "owner_type": // Explicitly handle the 'owner_type' column
-          return ownerType; // Use the 'ownerType' value from the request
-        case "owner_id": // Handle 'owner_id' column
+        case "owner_type":
+          return ownerType;
+        case "owner_id":
           return ownerId ?? null;
         case "batches":
-          return JSON.stringify(batchData); // Store batches as a JSON string
+          return JSON.stringify(batchData);
         default:
           return null;
       }
     });
 
-
-    // Check if the number of values matches the number of columns
-    if (values.length !== columnNames.length) {
-      return res.status(400).json({
-        success: false,
-        message: `Column count and values count mismatch. Expected ${columnNames.length} values, but found ${values.length}`,
-      });
-    }
-
-    // Insert the stock item into the database
     const placeholders = columnNames.map(() => "?").join(", ");
     const insertQuery = `
       INSERT INTO stock_items (${columnNames.join(", ")})
@@ -235,35 +225,30 @@ router.post("/", async (req, res) => {
     `;
 
     const [result] = await connection.execute(insertQuery, values);
-
     const stockItemId = result.insertId;
 
-    // Commit the transaction if everything is successful
     await connection.commit();
 
-    // Return success message with stock item details
     res.json({
       success: true,
       message: "Stock item saved successfully",
       stockItemId: stockItemId,
       batchesInserted: batches.length,
-      batchDetails: batches.map((batch) => batch.batchName),
+      batchDetails: batchData,
     });
   } catch (err) {
     console.error("🔥 Error saving stock item:", err);
-
-    // Rollback transaction on error
     await connection.rollback();
-
-    // Send the error response
-    res
-      .status(500)
-      .json({ success: false, message: "Error saving stock item" });
+    res.status(500).json({
+      success: false,
+      message: "Error saving stock item",
+      error: err.message,
+    });
   } finally {
     connection.release();
-    console.log("Database connection released.");
   }
 });
+
 
 // GET item details by barcode
 router.get("/barcode/:barcode", async (req, res) => {
@@ -367,70 +352,28 @@ router.put("/:id", async (req, res) => {
       ownerId,
     } = req.body;
 
-    // ---- BASIC VALIDATION ----
     if (!name || !unit || !taxType) {
-      return res.status(400).json({
-        success: false,
-        message: "Missing required fields: name, unit, or taxType",
-      });
+      return res.status(400).json({ success: false, message: "Missing fields" });
     }
 
-    // ---- FETCH EXISTING ITEM ----
-    const [existingStockItem] = await connection.execute(
-      "SELECT * FROM stock_items WHERE id = ?",
-      [id]
-    );
+    const batchData = enableBatchTracking
+      ? batches.map((batch) => ({
+          batchName: batch.batchName || "",
+          batchQuantity: Number(batch.batchQuantity) || 0,
+          batchRate: Number(batch.batchRate) || 0,
+          batchExpiryDate: batch.batchExpiryDate || null,
+          batchManufacturingDate: batch.batchManufacturingDate || null,
+        }))
+      : [];
 
-    if (existingStockItem.length === 0) {
-      return res.status(404).json({
-        success: false,
-        message: `Stock item with ID ${id} not found.`,
-      });
-    }
-
-    // ---- BATCH VALIDATION ----
-    if (
-      enableBatchTracking &&
-      batches.some(
-        (batch) =>
-          !batch.batchName ||
-          !batch.batchExpiryDate ||
-          !batch.batchManufacturingDate
-      )
-    ) {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid batch data",
-      });
-    }
-
-    const batchData = batches.map((batch) => ({
-      batchName: batch.batchName,
-      batchExpiryDate: batch.batchExpiryDate, // Ensure this is in 'YYYY-MM-DD' format
-      batchManufacturingDate: batch.batchManufacturingDate, // Ensure this is in 'YYYY-MM-DD' format
-    }));
-
-    // ---- PREPARE UPDATE QUERY ----
-    const columnNames = [
-      "name",
-      "stockGroupId",
-      "unit",
-      "openingBalance",
-      "openingValue",
-      "hsnCode",
-      "gstRate",
-      "taxType",
-      "standardPurchaseRate",
-      "standardSaleRate",
-      "enableBatchTracking",
-      "allowNegativeStock",
-      "maintainInPieces",
-      "secondaryUnit",
-      "barcode",
-      "owner_type",
-      "owner_id",
-      "batches",
-    ];
+    const updateQuery = `
+      UPDATE stock_items SET 
+        name=?, stockGroupId=?, unit=?, openingBalance=?, openingValue=?,
+        hsnCode=?, gstRate=?, taxType=?, standardPurchaseRate=?, standardSaleRate=?,
+        enableBatchTracking=?, allowNegativeStock=?, maintainInPieces=?, secondaryUnit=?,
+        batches=?, barcode=?, owner_type=?, owner_id=?
+      WHERE id=?
+    `;
 
     const values = [
       name,
@@ -447,67 +390,28 @@ router.put("/:id", async (req, res) => {
       allowNegativeStock ? 1 : 0,
       maintainInPieces ? 1 : 0,
       secondaryUnit ?? null,
+      JSON.stringify(batchData),
       barcode,
       ownerType,
       ownerId ?? null,
-      JSON.stringify(batchData),
+      id,
     ];
 
-    const setClause = columnNames.map((column) => `${column} = ?`).join(", ");
-    const updateQuery = `UPDATE stock_items SET ${setClause} WHERE id = ?`;
-
-
-    await connection.execute(updateQuery, [...values, id]);
-
-    // ---- BATCH TABLE UPDATE ----
-    if (enableBatchTracking) {
-      // Delete old batches first
-      await connection.execute(
-        "DELETE FROM stock_item_batches WHERE stockItemId = ?",
-        [id]
-      );
-
-      // Insert new batches if any
-      if (batches.length > 0) {
-        const batchPlaceholders = batches.map(() => "(?, ?, ?, ?)").join(", ");
-
-        const batchValues = batches.flatMap((batch) => [
-          id, // stockItemId
-          batch.batchName, // batchName
-          batch.batchExpiryDate, // batchExpiryDate (YYYY-MM-DD)
-          batch.batchManufacturingDate, // batchManufacturingDate (YYYY-MM-DD)
-        ]);
-
-        const insertBatchesQuery = `
-          INSERT INTO stock_item_batches 
-          (stockItemId, batchName, batchExpiryDate, batchManufacturingDate)
-          VALUES ${batchPlaceholders}
-        `;
-
-
-
-        try {
-          // Try inserting batches, ignore the error if column does not exist
-          await connection.execute(insertBatchesQuery, batchValues);
-        } catch (batchError) {
-          console.warn("Batch insertion error:", batchError.message);
-          // Continue processing even if batch insertion fails
-        }
-      }
-    }
+    await connection.execute(updateQuery, values);
 
     await connection.commit();
 
-    res.json({
+    return res.json({
       success: true,
-      message: "Stock item updated successfully",
-      stockItemId: id,
-      batchesUpdated: batches.length,
+      message: "Stock item updated successfully!",
+      id,
+      batches: batchData,
     });
+
   } catch (err) {
-    console.error("🔥 Error updating stock item:", err);
     await connection.rollback();
-    res.status(500).json({
+    console.error("🔥 Update Error:", err);
+    return res.status(500).json({
       success: false,
       message: "Error updating stock item",
       error: err.message,
@@ -516,6 +420,7 @@ router.put("/:id", async (req, res) => {
     connection.release();
   }
 });
+
 
 //single get
 
@@ -550,6 +455,7 @@ router.get("/:id", async (req, res) => {
 
     // If batches are returned as a string, parse it into an array
     const batches = item.batches ? JSON.parse(item.batches) : [];
+
 
     res.json({
       success: true,

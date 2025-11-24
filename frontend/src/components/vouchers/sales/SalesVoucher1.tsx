@@ -1781,198 +1781,145 @@ const SalesVoucher: React.FC = () => {
                       })}
                     </tbody>
                     <tfoot>
-                      {/* SUBTOTAL */}
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-left" colSpan={7}>
-                          Subtotal:
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          {subtotal.toLocaleString()}
-                        </td>
-                        <td></td>
-                        <td></td>
-                      </tr>
+  {/* SUBTOTAL */}
+  <tr
+    className={`font-semibold ${
+      theme === "dark"
+        ? "border-t border-gray-600"
+        : "border-t border-gray-300"
+    }`}
+  >
+    <td className="px-4 py-2 text-left" colSpan={7}>
+      Subtotal:
+    </td>
+    <td className="px-4 py-2 text-right">
+      {subtotal.toLocaleString()}
+    </td>
+    <td></td>
+    <td></td>
+  </tr>
 
-                      {/* GST TOTAL */}
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-left" colSpan={7}>
-                          GST Total:
-                        </td>
-                        <td className="px-4 py-2 text-right text-blue-600 font-bold">
-                          {(cgstTotal + sgstTotal + igstTotal).toLocaleString()}
-                        </td>
-                        <td></td>
-                        <td></td>
-                      </tr>
+  {/* GST TOTAL */}
+  <tr
+    className={`font-semibold ${
+      theme === "dark"
+        ? "border-t border-gray-600"
+        : "border-t border-gray-300"
+    }`}
+  >
+    <td className="px-4 py-2 text-left" colSpan={7}>
+      GST Total:
+    </td>
+    <td className="px-4 py-2 text-right text-blue-600 font-bold">
+      {(cgstTotal + sgstTotal + igstTotal).toLocaleString()}
+    </td>
+    <td></td>
+    <td></td>
+  </tr>
 
-                      {/* 🚀 PRICING APPLIED */}
-                      {/* PRICING APPLIED */}
-                      {pricingSelection.main !== "" && (
-                        <tr
-                          className={`font-semibold ${
-                            theme === "dark"
-                              ? "border-t border-gray-600 text-white"
-                              : "border-t border-gray-300 text-black"
-                          }`}
-                        >
-                          <td className="px-4 py-2 text-left" colSpan={7}>
-                            {(() => {
-                              let totalProfit = 0;
-                              let methodText = "";
-                              let modeText =
-                                pricingSelection.main === "wholesale"
-                                  ? "Wholesale"
-                                  : "Retailer";
+  {/* 🚀 PRICING APPLIED */}
+  {pricingSelection.main !== "" && (
+    <tr
+      className={`font-semibold ${
+        theme === "dark"
+          ? "border-t border-gray-600 text-white"
+          : "border-t border-gray-300 text-black"
+      }`}
+    >
+      <td className="px-4 py-2 text-left" colSpan={7}>
+        {(() => {
+          let totalProfit = 0;
+          let methodText = "";
+          let modeText =
+            pricingSelection.main === "wholesale"
+              ? "Wholesale"
+              : "Retailer";
 
-                              formData.entries.forEach((e) => {
-                                if (!e.rate || !e.quantity) return;
-                                const baseAmount = e.rate * e.quantity;
+          formData.entries.forEach((e) => {
+            if (!e.itemId || !e.quantity) return;
 
-                                if (pricingSelection.main === "wholesale") {
-                                  if (
-                                    pricingSelection.wholesale ===
-                                    "percentProfit"
-                                  ) {
-                                    const percent = parseFloat(
-                                      formData.whPercent || "0"
-                                    );
-                                    methodText = `Percent on Profit (${percent}%)`;
-                                    totalProfit += (baseAmount * percent) / 100;
-                                  }
-                                  if (
-                                    pricingSelection.wholesale === "sellProfit"
-                                  ) {
-                                    const profit = parseFloat(
-                                      formData.whSellProfit || "0"
-                                    );
-                                    methodText = `Sell on Profit (₹${profit})`;
-                                    totalProfit += profit * e.quantity;
-                                  }
-                                }
+            const itemDetails = getItemDetails(e.itemId);
+            const baseRate = parseFloat(itemDetails.rate) || 0;
+            const qty = e.quantity;
+            const baseAmount = baseRate * qty;
 
-                                if (pricingSelection.main === "retailer") {
-                                  if (
-                                    pricingSelection.retailer ===
-                                    "percentProfit"
-                                  ) {
-                                    const percent = parseFloat(
-                                      formData.rtPercent || "0"
-                                    );
-                                    methodText = `Percent on Profit (${percent}%)`;
-                                    totalProfit += (baseAmount * percent) / 100;
-                                  }
-                                  if (
-                                    pricingSelection.retailer === "sellProfit"
-                                  ) {
-                                    const profit = parseFloat(
-                                      formData.rtSellProfit || "0"
-                                    );
-                                    methodText = `Sell on Profit (₹${profit})`;
-                                    totalProfit += profit * e.quantity;
-                                  }
-                                  if (pricingSelection.retailer === "onMRP") {
-                                    methodText = "Selling on MRP";
-                                  }
-                                }
-                              });
+            if (pricingSelection.main === "wholesale") {
+              if (pricingSelection.wholesale === "percentProfit") {
+                const percent = parseFloat(formData.whPercent || "0");
+                totalProfit += (baseAmount * percent) / 100;
+                methodText = `Percent on Profit (${percent}%)`;
+              }
+              if (pricingSelection.wholesale === "sellProfit") {
+                const profit = parseFloat(formData.whSellProfit || "0");
+                totalProfit += profit * qty;
+                methodText = `Sell on Profit (₹${profit})`;
+              }
+            }
 
-                              return `Pricing Applied: ${modeText} – ${methodText} = ₹${totalProfit.toFixed(
-                                2
-                              )}`;
-                            })()}
-                          </td>
+            if (pricingSelection.main === "retailer") {
+              if (pricingSelection.retailer === "percentProfit") {
+                const percent = parseFloat(formData.rtPercent || "0");
+                totalProfit += (baseAmount * percent) / 100;
+                methodText = `Percent on Profit (${percent}%)`;
+              }
+              if (pricingSelection.retailer === "sellProfit") {
+                const profit = parseFloat(formData.rtSellProfit || "0");
+                totalProfit += profit * qty;
+                methodText = `Sell on Profit (₹${profit})`;
+              }
+              if (pricingSelection.retailer === "onMRP") {
+                methodText = "On MRP";
+              }
+            }
+          });
 
-                          {/* Right aligned total */}
-                          <td className="px-4 py-2 text-right text-green-600 font-bold"></td>
-                          <td></td>
-                        </tr>
-                      )}
+          return `Pricing Applied: ${modeText} – ${methodText} = ₹${totalProfit.toFixed(
+            2
+          )}`;
+        })()}
+      </td>
+      <td className="px-4 py-2 text-right text-green-600 font-bold"></td>
+      <td></td>
+    </tr>
+  )}
 
-                      {/* DISCOUNT */}
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-left" colSpan={7}>
-                          Discount:
-                        </td>
-                        <td className="px-4 py-2 text-right text-red-600 font-bold">
-                          {discountTotal.toLocaleString()}
-                        </td>
-                        <td></td>
-                        <td></td>
-                      </tr>
+  {/* DISCOUNT */}
+  <tr
+    className={`font-semibold ${
+      theme === "dark"
+        ? "border-t border-gray-600"
+        : "border-t border-gray-300"
+    }`}
+  >
+    <td className="px-4 py-2 text-left" colSpan={7}>
+      Discount:
+    </td>
+    <td className="px-4 py-2 text-right text-red-600 font-bold">
+      {discountTotal.toLocaleString()}
+    </td>
+    <td></td>
+    <td></td>
+  </tr>
 
-                      {/* GRAND TOTAL INCLUDING PROFIT */}
-                      <tr
-                        className={`font-bold ${
-                          theme === "dark"
-                            ? "border-t-2 border-gray-500"
-                            : "border-t-2 border-black"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-left text-lg" colSpan={7}>
-                          Grand Total:
-                        </td>
-                        <td className="px-4 py-2 text-right text-lg text-green-600 font-bold">
-                          {(() => {
-                            let totalProfit = 0;
+  {/* GRAND TOTAL (🔥 FINAL FIX ✔ No double profit) */}
+  <tr
+    className={`font-bold ${
+      theme === "dark"
+        ? "border-t-2 border-gray-500"
+        : "border-t-2 border-black"
+    }`}
+  >
+    <td className="px-4 py-2 text-left text-lg" colSpan={7}>
+      Grand Total:
+    </td>
+    <td className="px-4 py-2 text-right text-lg text-green-600 font-bold">
+      {total.toLocaleString()}
+    </td>
+    <td></td>
+    <td></td>
+  </tr>
+</tfoot>
 
-                            formData.entries.forEach((e) => {
-                              if (!e.rate || !e.quantity) return;
-                              const baseAmount = e.rate * e.quantity;
-
-                              if (pricingSelection.main === "wholesale") {
-                                if (
-                                  pricingSelection.wholesale === "percentProfit"
-                                )
-                                  totalProfit +=
-                                    (baseAmount *
-                                      parseFloat(formData.whPercent || "0")) /
-                                    100;
-                                if (pricingSelection.wholesale === "sellProfit")
-                                  totalProfit +=
-                                    parseFloat(formData.whSellProfit || "0") *
-                                    e.quantity;
-                              }
-
-                              if (pricingSelection.main === "retailer") {
-                                if (
-                                  pricingSelection.retailer === "percentProfit"
-                                )
-                                  totalProfit +=
-                                    (baseAmount *
-                                      parseFloat(formData.rtPercent || "0")) /
-                                    100;
-                                if (pricingSelection.retailer === "sellProfit")
-                                  totalProfit +=
-                                    parseFloat(formData.rtSellProfit || "0") *
-                                    e.quantity;
-                              }
-                            });
-
-                            return Number(total + totalProfit).toLocaleString();
-                          })()}
-                        </td>
-                        <td></td>
-                        <td></td>
-                      </tr>
-                    </tfoot>
                   </table>
                 ) : (
                   <table className="w-full mb-4">

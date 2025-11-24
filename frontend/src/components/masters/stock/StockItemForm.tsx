@@ -403,7 +403,13 @@ const StockItemForm = () => {
     GodownAllocation[]
   >([]);
   const [batchRows, setBatchRows] = useState([
-    { batchName: "", batchExpiryDate: "", batchManufacturingDate: "" },
+    {
+      batchName: "",
+      batchExpiryDate: "",
+      batchManufacturingDate: "",
+      batchQuantity: "",
+      batchRate: "",
+    },
   ]);
   const [errors, setErrors] = useState<Errors>({});
 
@@ -423,7 +429,13 @@ const StockItemForm = () => {
   const addBatchRow = () => {
     setBatchRows([
       ...batchRows,
-      { batchName: "", batchExpiryDate: "", batchManufacturingDate: "" },
+      {
+        batchName: "",
+        batchExpiryDate: "",
+        batchManufacturingDate: "",
+        batchQuantity: "",
+        batchRate: "",
+      },
     ]);
   };
 
@@ -431,11 +443,22 @@ const StockItemForm = () => {
     setBatchRows(batchRows.filter((_, i) => i !== index));
   };
 
-  const updateBatchRow = (index: number, field: string, value: string) => {
-    setBatchRows((prev) =>
-      prev.map((row, i) => (i === index ? { ...row, [field]: value } : row))
-    );
-  };
+ const updateBatchRow = (index: number, field: string, value: string) => {
+  setBatchRows((prev) =>
+    prev.map((row, i) =>
+      i === index
+        ? {
+            ...row,
+            [field]:
+              field === "batchQuantity" || field === "batchRate"
+                ? Number(value)
+                : value,
+          }
+        : row
+    )
+  );
+};
+
   // --- End batch rows ---
 
   const validateForm = () => {
@@ -821,54 +844,90 @@ const StockItemForm = () => {
               )}
             </div>
 
-            {formData.enableBatchTracking && (
-              <div className="flex flex-col gap-4 mt-4 col-span-2">
+             {formData.enableBatchTracking && (
+              <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
                 {batchRows.map((row, index) => (
                   <div
                     key={index}
-                    className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end  p-3 rounded"
+                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end w-full"
                   >
-                    <InputField
-                      id={`batchName-${index}`}
-                      name={`batchName-${index}`}
-                      label="Batch Number"
-                      value={row.batchName}
-                      onChange={(e) =>
-                        updateBatchRow(index, "batchName", e.target.value)
-                      }
-                      error={errors[`batchName-${index}`]}
-                    />
+                    <div className="flex-1 min-w-[120px]">
+                      <InputField
+                        id={`batchName-${index}`}
+                        name={`batchName-${index}`}
+                        label="Batch"
+                        value={row.batchName}
+                        onChange={(e) =>
+                          updateBatchRow(index, "batchName", e.target.value)
+                        }
+                        error={errors[`batchName-${index}`]}
+                      />
+                    </div>
 
-                    <InputField
-                      id={`batchManufacturingDate-${index}`}
-                      name={`batchManufacturingDate-${index}`}
-                      type="date"
-                      label="Manufacturing Date"
-                      value={row.batchManufacturingDate}
-                      onChange={(e) =>
-                        updateBatchRow(
-                          index,
-                          "batchManufacturingDate",
-                          e.target.value
-                        )
-                      }
-                    />
-                    
-                    <InputField
-                      id={`batchExpiryDate-${index}`}
-                      name={`batchExpiryDate-${index}`}
-                      type="date"
-                      label="Expiry Date"
-                      value={row.batchExpiryDate}
-                      onChange={(e) =>
-                        updateBatchRow(index, "batchExpiryDate", e.target.value)
-                      }
-                    />
-                    
+                    <div className="flex-1 min-w-[120px]">
+                      <InputField
+                        id={`batchQuantity-${index}`}
+                        name={`batchQuantity-${index}`}
+                        label="Qty"
+                        value={row.batchQuantity}
+                        onChange={(e) =>
+                          updateBatchRow(index, "batchQuantity", e.target.value)
+                        }
+                        error={errors[`batchQuantity-${index}`]}
+                      />
+                    </div>
+
+                    <div className="flex-1 min-w-[120px]">
+                      <InputField
+                        id={`batchRate-${index}`}
+                        name={`batchRate-${index}`}
+                        label="Rate"
+                        value={row.batchRate}
+                        onChange={(e) =>
+                          updateBatchRow(index, "batchRate", e.target.value)
+                        }
+                        error={errors[`batchRate-${index}`]}
+                      />
+                    </div>
+
+                    <div className="flex-1 min-w-[120px]">
+                      <InputField
+                        id={`batchManufacturingDate-${index}`}
+                        name={`batchManufacturingDate-${index}`}
+                        type="date"
+                        label="MFG"
+                        value={row.batchManufacturingDate}
+                        onChange={(e) =>
+                          updateBatchRow(
+                            index,
+                            "batchManufacturingDate",
+                            e.target.value
+                          )
+                        }
+                      />
+                    </div>
+
+                    <div className="flex-1 min-w-[120px]">
+                      <InputField
+                        id={`batchExpiryDate-${index}`}
+                        name={`batchExpiryDate-${index}`}
+                        type="date"
+                        label="Expiry"
+                        value={row.batchExpiryDate}
+                        onChange={(e) =>
+                          updateBatchRow(
+                            index,
+                            "batchExpiryDate",
+                            e.target.value
+                          )
+                        }
+                      />
+                    </div>
+
                     <button
                       type="button"
                       onClick={() => removeBatchRow(index)}
-                      className="p-2  text-red-900 rounded"
+                      className="p-2 text-red-700 hover:text-red-900"
                     >
                       <Trash2 size={20} />
                     </button>
@@ -876,6 +935,7 @@ const StockItemForm = () => {
                 ))}
               </div>
             )}
+
             {/* ---------------------------------------------------------------- */}
 
             <div>

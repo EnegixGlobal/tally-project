@@ -56,7 +56,7 @@ const LedgerReport: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   // const [selectedLedger, setSelectedLedger] = useState('');
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(true);
   const [viewMode, setViewMode] = useState<'detailed' | 'summary' | 'monthly'>('detailed');
   const [selectedDateRange, setSelectedDateRange] = useState('current-year');
   const [fromDate, setFromDate] = useState('2024-04-01');

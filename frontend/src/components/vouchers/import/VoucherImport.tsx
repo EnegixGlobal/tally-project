@@ -1,3 +1,4 @@
+
 import React, { useState, useRef } from "react";
 import {
   Upload,
@@ -166,21 +167,7 @@ const VoucherImport: React.FC = () => {
         },
       ],
     },
-    {
-      name: "Bank Voucher Template",
-      type: "bank",
-      description: "Import bank voucher entries",
-      fields: ["Date", "voucher No", "Bank Name", "Amount", "Narration"],
-      sampleData: [
-        {
-          Date: "15/01/2024",
-          "voucher No": "BNk001",
-          "Bank Name": "HDFC Bank",
-          Amount: 50000,
-          Narration: "Bank transaction",
-        },
-      ],
-    },
+    
   ];
 
   const handleDrag = (e: React.DragEvent) => {
@@ -221,89 +208,90 @@ const VoucherImport: React.FC = () => {
     processFile(file);
   };
 
-  const processFile = async (file: File) => {
-    setIsProcessing(true);
+const processFile = async (file: File) => {
+  setIsProcessing(true);
 
-    try {
-      const data = await file.arrayBuffer();
-      const workbook = XLSX.read(data);
-      const sheetName = workbook.SheetNames[0];
-      const worksheet = workbook.Sheets[sheetName];
-      const jsonData = XLSX.utils.sheet_to_json(worksheet);
+  console.log("📌 Selected Voucher Type :", selectedTemplate);
 
-      const processedVouchers: ImportedVoucher[] = (
-        jsonData as Record<string, unknown>[]
-      ).map((row: Record<string, unknown>, index: number) => {
-        try {
-          const getString = (key: string): string => {
-            return String(row[key] || "");
-          };
+  try {
+    const data = await file.arrayBuffer();
+    const workbook = XLSX.read(data);
+    const sheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[sheetName];
+    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
 
-          const getNumber = (key: string): number => {
-            const value = row[key];
-            return typeof value === "number"
-              ? value
-              : parseFloat(String(value || 0)) || 0;
-          };
+    console.log("📌 Uploaded Excel Data:", jsonData);
 
-          return {
-            id: `import_${index + 1}`,
-            date: formatDate(row["Date"] || row["date"]),
-            voucherType: selectedTemplate,
-            voucherNumber:
-              getString("Voucher No") ||
-              getString("voucher_no") ||
-              `AUTO${index + 1}`,
-            partyName:
-              getString("Party Name") ||
-              getString("Supplier Name") ||
-              getString("Paid To") ||
-              getString("Received From") ||
-              "Unknown",
-            amount: getNumber("Amount") || getNumber("amount"),
-            narration: getString("Narration") || getString("narration"),
-            items:
-              selectedTemplate === "sales" || selectedTemplate === "purchase"
-                ? [
-                    {
-                      itemName:
-                        getString("Item Name") || getString("item_name"),
-                      quantity: getNumber("Quantity") || getNumber("quantity"),
-                      rate: getNumber("Rate") || getNumber("rate"),
-                      amount: getNumber("Amount") || getNumber("amount"),
-                      hsnCode:
-                        getString("HSN Code") ||
-                        getString("hsn_code") ||
-                        undefined,
-                      gstRate: getNumber("GST Rate") || getNumber("gst_rate"),
-                    },
-                  ]
-                : undefined,
-            status: "pending" as const,
-          };
-        } catch {
-          return {
-            id: `import_${index + 1}`,
-            date: "",
-            voucherType: selectedTemplate,
-            voucherNumber: `ERROR${index + 1}`,
-            partyName: "Error",
-            amount: 0,
-            narration: "",
-            status: "error" as const,
-            errorMessage: "Invalid data format",
-          };
-        }
-      });
+    const processedVouchers: ImportedVoucher[] = (
+      jsonData as Record<string, unknown>[]
+    ).map((row: Record<string, unknown>, index: number) => {
+      try {
+        const getString = (key: string): string => String(row[key] || "");
+        const getNumber = (key: string): number =>
+          typeof row[key] === "number"
+            ? (row[key] as number)
+            : parseFloat(String(row[key] || 0)) || 0;
 
-      setImportedVouchers(processedVouchers);
-      setActiveTab("preview");
-    } catch {
-      alert("Error processing file. Please check the format and try again.");
-    } finally {
-      setIsProcessing(false);
-    }
-  };
+        return {
+          id: `import_${index + 1}`,
+          date: formatDate(row["Date"] || row["date"]),
+          voucherType: selectedTemplate, // 👈 Dropdown wale type se set
+          voucherNumber:
+            getString("Voucher No") ||
+            getString("voucher_no") ||
+            `AUTO${index + 1}`,
+          partyName:
+            getString("Party Name") ||
+            getString("Supplier Name") ||
+            getString("Paid To") ||
+            getString("Received From") ||
+            "Unknown",
+          amount: getNumber("Amount") || getNumber("amount"),
+          narration: getString("Narration") || "",
+
+          items:
+            selectedTemplate === "sales" ||
+            selectedTemplate === "purchase"
+              ? [
+                  {
+                    itemName: getString("Item Name"),
+                    quantity: getNumber("Quantity"),
+                    rate: getNumber("Rate"),
+                    amount: getNumber("Amount"),
+                    hsnCode: getString("HSN Code"),
+                    gstRate: getNumber("GST Rate"),
+                  },
+                ]
+              : undefined,
+
+          status: "pending",
+        };
+      } catch (err) {
+        console.error("❌ Row Parse Failed", err);
+        return {
+          id: `import_${index + 1}`,
+          date: "",
+          voucherType: selectedTemplate,
+          voucherNumber: `ERROR${index + 1}`,
+          partyName: "Error",
+          amount: 0,
+          narration: "",
+          status: "error",
+        };
+      }
+    });
+
+    setImportedVouchers(processedVouchers);
+    setActiveTab("preview");
+  } catch (err) {
+    console.error("❌ File Processing Failed:", err);
+    alert("Invalid Excel Format!");
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+
 
   const formatDate = (dateValue: unknown): string => {
     if (!dateValue) return "";
@@ -334,33 +322,105 @@ const VoucherImport: React.FC = () => {
     }
   };
 
-  const saveImportedVouchers = async () => {
-    setIsProcessing(true);
 
-    try {
-      const validVouchers = importedVouchers.filter(
-        (v) => v.status !== "error"
-      );
+const saveImportedVouchers = async () => {
+  setIsProcessing(true);
 
-      for (const voucher of validVouchers) {
-        // Prepare voucher data for API
-        console.log("Preparing voucher:", voucher);
+  try {
+    const validVouchers = importedVouchers.filter(v => v.status !== "error");
 
-        // Here you would make API call to save each voucher
-        // await saveVoucherToAPI(voucher.voucherType, voucherData);
+    const userType = localStorage.getItem("userType") || "employee";
+    const userId = Number(localStorage.getItem("user_id")) || 1;
+    const companyId = Number(localStorage.getItem("company_id")) || 1;
 
-        // For now, just mark as imported
-        voucher.status = "imported";
+    for (const voucher of validVouchers) {
+      console.log("▶ Saving Voucher:", voucher);
+
+      let apiUrl = "";
+      const payload: any = {
+        number: voucher.voucherNumber,
+        date: voucher.date,
+        narration: voucher.narration,
+        subtotal: voucher.amount,
+        total: voucher.amount,
+        type: voucher.voucherType,
+
+        // 🔹 Auto Assign user details
+        companyId,
+        ownerType: userType,
+        ownerId: userId,
+      };
+
+      // 🔹 Items Mapping for Sales / Purchase Only
+      if (voucher.items && (voucher.voucherType === "sales" || voucher.voucherType === "purchase")) {
+        payload.entries = voucher.items.map(item => ({
+          itemId: 1, // TODO → Auto Item Mapping Later
+          quantity: item.quantity,
+          rate: item.rate,
+          amount: item.amount,
+          cgstRate: item.gstRate ? item.gstRate / 2 : 0,
+          sgstRate: item.gstRate ? item.gstRate / 2 : 0,
+          igstRate: 0,
+          hsnCode: item.hsnCode || "",
+          discount: 0,
+        }));
+
+        payload.mode = "item-invoice";
       }
 
-      setImportedVouchers([...importedVouchers]);
-      alert("Vouchers imported successfully!");
-    } catch {
-      alert("Error saving vouchers. Please try again.");
-    } finally {
-      setIsProcessing(false);
+      // 🔹 API URL Detection
+      switch (voucher.voucherType) {
+        case "sales":
+          apiUrl = "http://localhost:5000/api/sales-vouchers";
+          break;
+        case "purchase":
+          apiUrl = "http://localhost:5000/api/purchase-vouchers";
+          break;
+        case "payment":
+          apiUrl = "http://localhost:5000/api/vouchers";
+          break;
+        case "receipt":
+          apiUrl = "http://localhost:5000/api/receipt-vouchers";
+          break;
+        case "bank":
+          apiUrl = "http://localhost:5000/api/bank-vouchers";
+          break;
+        default:
+          console.warn("❓ Unknown type:", voucher.voucherType);
+          continue;
+      }
+
+      console.log("📤 Sending →", apiUrl);
+      console.log("📦 Payload:", payload);
+
+      const res = await fetch(apiUrl, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+      console.log("📥 Response:", result);
+
+      if (result.success) {
+        voucher.status = "imported";
+      } else {
+        voucher.status = "error";
+        voucher.errorMessage = result.message;
+      }
     }
-  };
+
+    setImportedVouchers([...importedVouchers]);
+    alert("✨ All vouchers saved successfully!");
+  } catch (error) {
+    console.error("❌ Save failed:", error);
+    alert("Error occurred while saving vouchers!");
+  } finally {
+    setIsProcessing(false);
+  }
+};
+
+
 
   const downloadTemplate = (template: VoucherTemplate) => {
     const ws = XLSX.utils.json_to_sheet(template.sampleData);
@@ -454,7 +514,6 @@ const VoucherImport: React.FC = () => {
               <option value="payment">Payment Voucher</option>
               <option value="receipt">Receipt Voucher</option>
               <option value="journal">Journal Voucher</option>
-              <option value="bank">Bank Voucher</option>
             </select>
           </div>
 

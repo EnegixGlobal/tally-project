@@ -55,6 +55,7 @@ router.post('/', async (req, res) => {
       entries,
       items
     } = req.body;
+    console.log('total', total)
 
     // Required Fields
     if (!companyId || !ownerType || !ownerId) {
@@ -192,24 +193,23 @@ router.post('/', async (req, res) => {
 
 // get ourchase vouncher
 router.get('/', async (req, res) => {
-  const { company_id, owner_type, owner_id } = req.query;
+  const { owner_type, owner_id } = req.query;
 
-  if (!company_id || !owner_type || !owner_id) {
+  if (!owner_type || !owner_id) {
     return res.status(400).json({
-      message: "company_id, owner_type, owner_id are required"
+      message: "owner_type & owner_id are required"
     });
   }
 
   try {
-    // --- Get all sales vouchers for company ---
     const [voucherRows] = await db.execute(
       `SELECT 
           id, number, date, partyId, referenceNo, supplierInvoiceDate,
           subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total
        FROM sales_vouchers
-       WHERE company_id = ? AND owner_type = ? AND owner_id = ?
+       WHERE owner_type = ? AND owner_id = ?
        ORDER BY id DESC`,
-      [company_id, owner_type, owner_id]
+      [owner_type, owner_id]
     );
 
     return res.status(200).json(voucherRows);
@@ -219,6 +219,7 @@ router.get('/', async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 });
+
 
 //delete
 router.delete('/:id', async (req, res) => {
