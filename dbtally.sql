@@ -1370,38 +1370,45 @@ CREATE TABLE `stock_items` (
   `company_id` int NOT NULL,
   `owner_type` varchar(50) COLLATE utf8mb4_general_ci NOT NULL,
   `owner_id` int NOT NULL,
-  `barcode` varchar(200) COLLATE utf8mb4_general_ci NOT NULL
+  `barcode` varchar(200) COLLATE utf8mb4_general_ci NOT NULL,
+  `batches` JSON DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `stock_items`
 --
 
-INSERT INTO `stock_items` (`id`, `name`, `stockGroupId`, `unit`, `openingBalance`, `openingValue`, `hsnCode`, `gstRate`, `taxType`, `standardPurchaseRate`, `standardSaleRate`, `enableBatchTracking`, `allowNegativeStock`, `maintainInPieces`, `secondaryUnit`, `createdAt`, `batchNumber`, `batchExpiryDate`, `batchManufacturingDate`, `company_id`, `owner_type`, `owner_id`, `barcode`) VALUES
-(5, 'Sample Item', 1, 'PCS', '100.00', '5000.00', '1234', '18.00', 'Taxable', '50.00', '60.00', 1, 0, 0, NULL, '2025-08-01 18:29:41', 'BATCH001', '2025-12-31', '2025-01-01', 0, 'employee', 0, ''),
-(6, 'Computer', 0, '1', '1000.00', '1000.00', '', '0.00', 'Exempt', '1000.00', '1000.00', 1, 1, 1, '1', '2025-08-01 19:31:51', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(7, 'laptop', 0, '1', '1000.00', '1000.00', '', '0.00', 'Taxable', '1000.00', '1000.00', 1, 1, 1, '1', '2025-08-01 19:46:00', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(8, 'Computer', 0, '1', '1000.00', '1000.00', '', '0.00', 'Taxable', '1000.00', '1000.00', 1, 1, 0, '', '2025-08-01 19:51:44', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(9, 'Computer', 0, '1', '1000.00', '1000.00', '', '0.00', 'Taxable', '1000.00', '1000.00', 1, 1, 0, '', '2025-08-01 19:55:36', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(10, 'Computer', 0, '1', '1000.00', '1000.00', '', '0.00', 'Taxable', '1000.00', '997.00', 1, 1, 0, '', '2025-08-01 19:59:31', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(11, 'T-shirt', 0, '1', '2000.00', '2000.00', '6204', '14.00', 'Taxable', '1999.00', '1999.00', 1, 1, 1, '1', '2025-08-02 19:12:05', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(12, 'shirt', 0, '1', '1000.00', '1000.00', '', '0.00', 'Taxable', '0.00', '0.00', 1, 1, 0, '', '2025-08-02 19:14:19', 'BTH102', '2025-08-31', '2025-08-03', 0, 'employee', 0, ''),
-(13, 'phone', 0, 'Piece', '100.00', '100.00', '675', '18.00', 'Taxable', '100.00', '100.00', 0, 0, 1, '', '2025-08-02 20:44:40', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(14, 'Mobile', 0, 'Piece', '10000.00', '1000.00', '6564', '18.00', 'Taxable', '100.00', '100.00', 0, 0, 1, '', '2025-08-02 20:44:40', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(15, 'Laptop Dell Inspiron', NULL, 'Piece', '10.00', '450000.00', '8471', '18.00', 'Taxable', '40000.00', '45000.00', 0, 0, 1, '', '2025-08-03 17:23:48', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(16, 'Mobile Samsung Galaxy', NULL, 'Piece', '25.00', '625000.00', '8517', '18.00', 'Taxable', '22000.00', '25000.00', 0, 0, 1, '', '2025-08-03 17:23:48', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(17, 'Office Chair Premium', NULL, 'Piece', '15.00', '120000.00', '9401', '18.00', 'Taxable', '7000.00', '8000.00', 0, 0, 1, '', '2025-08-03 17:23:48', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(18, 'czc', 0, 'Box', '0.00', '0.00', NULL, '18.00', 'Taxable', '0.00', '0.00', 0, 0, 1, '', '2025-08-15 11:54:34', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(19, 'acc', 0, '1', '1000.00', '100.00', '1001', '9.00', 'Taxable', '90.00', '120.00', 1, 1, 1, '3', '2025-08-18 05:09:31', '12323', '2026-06-18', '2025-08-18', 0, 'employee', 0, ''),
-(20, 'telivision', 0, '1', '1000.00', '12323.00', '', '18.00', 'Taxable', '123283.00', '12323232.00', 0, 1, 0, '', '2025-08-18 07:44:48', '', '0000-00-00', '0000-00-00', 0, 'employee', 0, ''),
-(21, 'Computer12', 0, '1', '10000.00', '10000.00', '', '0.00', 'Taxable', '9999.00', '9990.00', 1, 1, 0, '', '2025-08-25 19:29:22', 'BTH102', '2025-08-13', '2025-08-31', 38, 'employee', 10, ''),
-(22, 'Mobile', 0, 'Piece', '100.00', '100.00', '7897', '18.00', 'Exempt', '100.00', '10.00', 0, 0, 1, '', '2025-08-26 18:16:00', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(23, 'Tshirt', 0, 'Pack', '100.00', '100.00', '798', '18.00', 'Taxable', '100.00', '1.00', 0, 0, 1, '', '2025-08-26 18:16:00', NULL, NULL, NULL, 0, 'employee', 0, ''),
-(24, 'Mobilee', 0, 'Piece', '1000.00', '1000.00', '123', '18.00', 'Taxable', '999.00', '1000.00', 0, 0, 1, '', '2025-08-26 18:29:43', NULL, NULL, NULL, 38, 'employee', 10, ''),
-(25, 'pant', 0, 'Piece', '100.00', '100.00', '1234', '18.00', 'Taxable', '99.00', '99.00', 0, 0, 1, '', '2025-08-26 18:29:43', NULL, NULL, NULL, 38, 'employee', 10, ''),
-(26, 'Detergent', NULL, NULL, '0.00', '0.00', '3402', '0.00', 'Taxable', '0.00', '0.00', 0, 0, 0, NULL, '2025-09-04 09:49:09', NULL, NULL, NULL, 38, 'employee', 10, ''),
-(27, 'Computer12', 0, '1', '100.00', '98.00', '', '0.00', 'Taxable', '100.00', '8.00', 1, 1, 1, '1', '2025-09-09 10:59:40', 'BTH1022', '2025-09-30', '2025-09-09', 38, 'employee', 10, ''),
-(28, 'Computer23', 0, '1', '10.00', '10.00', '', '0.00', 'Taxable', '10.00', '10.00', 1, 1, 1, '1', '2025-09-09 11:01:36', 'BTH102', '2025-09-30', '2025-09-09', 38, 'employee', 10, 'zyE9aT9D3LN0');
+INSERT INTO `stock_items` (
+  `id`, `name`, `stockGroupId`, `unit`, `openingBalance`, `openingValue`,
+  `hsnCode`, `gstRate`, `taxType`, `standardPurchaseRate`, `standardSaleRate`,
+  `enableBatchTracking`, `allowNegativeStock`, `maintainInPieces`, `secondaryUnit`,
+  `createdAt`, `batchNumber`, `batchExpiryDate`, `batchManufacturingDate`,
+  `company_id`, `owner_type`, `owner_id`, `barcode`, `batches`
+) VALUES
+(5, 'Sample Item', 1, 'PCS', '100.00', '5000.00', '1234', '18.00', 'Taxable', '50.00', '60.00', 1, 0, 0, NULL, '2025-08-01 18:29:41', 'BATCH001', '2025-12-31', '2025-01-01', 0, 'employee', 0, '', '[{"batchName":"BATCH001","batchExpiryDate":"2025-12-31","batchManufacturingDate":"2025-01-01"}]'),
+(6, 'Computer', 0, '1', '1000.00', '1000.00', '', '0.00', 'Exempt', '1000.00', '1000.00', 1, 1, 1, '1', '2025-08-01 19:31:51', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(7, 'laptop', 0, '1', '1000.00', '1000.00', '', '0.00', 'Taxable', '1000.00', '1000.00', 1, 1, 1, '1', '2025-08-01 19:46:00', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(8, 'Computer', 0, '1', '1000.00', '1000.00', '', '0.00', 'Taxable', '1000.00', '1000.00', 1, 1, 0, '', '2025-08-01 19:51:44', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(9, 'Computer', 0, '1', '1000.00', '1000.00', '', '0.00', 'Taxable', '1000.00', '1000.00', 1, 1, 0, '', '2025-08-01 19:55:36', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(10, 'Computer', 0, '1', '1000.00', '1000.00', '', '0.00', 'Taxable', '1000.00', '997.00', 1, 1, 0, '', '2025-08-01 19:59:31', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(11, 'T-shirt', 0, '1', '2000.00', '2000.00', '6204', '14.00', 'Taxable', '1999.00', '1999.00', 1, 1, 1, '1', '2025-08-02 19:12:05', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(12, 'shirt', 0, '1', '1000.00', '1000.00', '', '0.00', 'Taxable', '0.00', '0.00', 1, 1, 0, '', '2025-08-02 19:14:19', 'BTH102', '2025-08-31', '2025-08-03', 0, 'employee', 0, '', '[{"batchName":"BTH102","batchExpiryDate":"2025-08-31","batchManufacturingDate":"2025-08-03"}]'),
+(13, 'phone', 0, 'Piece', '100.00', '100.00', '675', '18.00', 'Taxable', '100.00', '100.00', 0, 0, 1, '', '2025-08-02 20:44:40', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(14, 'Mobile', 0, 'Piece', '10000.00', '1000.00', '6564', '18.00', 'Taxable', '100.00', '100.00', 0, 0, 1, '', '2025-08-02 20:44:40', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(15, 'Laptop Dell Inspiron', NULL, 'Piece', '10.00', '450000.00', '8471', '18.00', 'Taxable', '40000.00', '45000.00', 0, 0, 1, '', '2025-08-03 17:23:48', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(16, 'Mobile Samsung Galaxy', NULL, 'Piece', '25.00', '625000.00', '8517', '18.00', 'Taxable', '22000.00', '25000.00', 0, 0, 1, '', '2025-08-03 17:23:48', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(17, 'Office Chair Premium', NULL, 'Piece', '15.00', '120000.00', '9401', '18.00', 'Taxable', '7000.00', '8000.00', 0, 0, 1, '', '2025-08-03 17:23:48', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(18, 'czc', 0, 'Box', '0.00', '0.00', NULL, '18.00', 'Taxable', '0.00', '0.00', 0, 0, 1, '', '2025-08-15 11:54:34', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(19, 'acc', 0, '1', '1000.00', '100.00', '1001', '9.00', 'Taxable', '90.00', '120.00', 1, 1, 1, '3', '2025-08-18 05:09:31', '12323', '2026-06-18', '2025-08-18', 0, 'employee', 0, '', '[{"batchName":"12323","batchExpiryDate":"2026-06-18","batchManufacturingDate":"2025-08-18"}]'),
+(20, 'telivision', 0, '1', '1000.00', '12323.00', '', '18.00', 'Taxable', '123283.00', '12323232.00', 0, 1, 0, '', '2025-08-18 07:44:48', '', '0000-00-00', '0000-00-00', 0, 'employee', 0, '', NULL),
+(21, 'Computer12', 0, '1', '10000.00', '10000.00', '', '0.00', 'Taxable', '9999.00', '9990.00', 1, 1, 0, '', '2025-08-25 19:29:22', 'BTH102', '2025-08-13', '2025-08-31', 38, 'employee', 10, '', '[{"batchName":"BTH102","batchExpiryDate":"2025-08-13","batchManufacturingDate":"2025-08-31"}]'),
+(22, 'Mobile', 0, 'Piece', '100.00', '100.00', '7897', '18.00', 'Exempt', '100.00', '10.00', 0, 0, 1, '', '2025-08-26 18:16:00', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(23, 'Tshirt', 0, 'Pack', '100.00', '100.00', '798', '18.00', 'Taxable', '100.00', '1.00', 0, 0, 1, '', '2025-08-26 18:16:00', NULL, NULL, NULL, 0, 'employee', 0, '', NULL),
+(24, 'Mobilee', 0, 'Piece', '1000.00', '1000.00', '123', '18.00', 'Taxable', '999.00', '1000.00', 0, 0, 1, '', '2025-08-26 18:29:43', NULL, NULL, NULL, 38, 'employee', 10, '', NULL),
+(25, 'pant', 0, 'Piece', '100.00', '100.00', '1234', '18.00', 'Taxable', '99.00', '99.00', 0, 0, 1, '', '2025-08-26 18:29:43', NULL, NULL, NULL, 38, 'employee', 10, '', NULL),
+(26, 'Detergent', NULL, NULL, '0.00', '0.00', '3402', '0.00', 'Taxable', '0.00', '0.00', 0, 0, 0, NULL, '2025-09-04 09:49:09', NULL, NULL, NULL, 38, 'employee', 10, '', NULL),
+(27, 'Computer12', 0, '1', '100.00', '98.00', '', '0.00', 'Taxable', '100.00', '8.00', 1, 1, 1, '1', '2025-09-09 10:59:40', 'BTH1022', '2025-09-30', '2025-09-09', 38, 'employee', 10, '', '[{"batchName":"BTH1022","batchExpiryDate":"2025-09-30","batchManufacturingDate":"2025-09-09"}]'),
+(28, 'Computer23', 0, '1', '10.00', '10.00', '', '0.00', 'Taxable', '10.00', '10.00', 1, 1, 1, '1', '2025-09-09 11:01:36', 'BTH102', '2025-09-30', '2025-09-09', 38, 'employee', 10, 'zyE9aT9D3LN0', '[{"batchName":"BTH102","batchExpiryDate":"2025-09-30","batchManufacturingDate":"2025-09-09"}]');
 
 -- --------------------------------------------------------
 

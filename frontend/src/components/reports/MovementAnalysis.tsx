@@ -30,7 +30,6 @@ const MovementAnalysis: React.FC = () => {
     new Date().toISOString().slice(0, 10)
   );
 
-
   const [data, setData] = useState<MovementEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);

@@ -156,49 +156,6 @@ const SalesVoucher: React.FC = () => {
     showDiscount: true,
     showGST: true,
   });
-  const [pricingType, setPricingType] = useState<
-    "wholesale" | "retailer" | "none"
-  >("none");
-  const [pricingData, setPricingData] = useState({
-    wholesale: { sellOnProfit: "", profitPercent: "" },
-    retailer: { sellOnProfit: "", profitPercent: "", onMRP: "yes" },
-  });
-  const [pricingSelection, setPricingSelection] = useState({
-    main: "", // "wholesale" | "retailer"
-    wholesale: "",
-    retailer: "",
-  });
-
-  const resetWholesale = () =>
-    setPricingData((prev) => ({
-      ...prev,
-      wholesale: { sellOnProfit: "", profitPercent: "" },
-    }));
-
-  const resetRetailer = () =>
-    setPricingData((prev) => ({
-      ...prev,
-      retailer: { sellOnProfit: "", profitPercent: "", onMRP: "yes" },
-    }));
-
-  useEffect(() => {
-    const w = pricingData.wholesale;
-    const r = pricingData.retailer;
-
-    const wholesaleActive = w.sellOnProfit !== "" || w.profitPercent !== "";
-    const retailerActive =
-      r.sellOnProfit !== "" || r.profitPercent !== "" || r.onMRP === "no";
-
-    if (wholesaleActive && !retailerActive) {
-      setPricingType("wholesale");
-      resetRetailer();
-    } else if (retailerActive && !wholesaleActive) {
-      setPricingType("retailer");
-      resetWholesale();
-    } else if (!wholesaleActive && !retailerActive) {
-      setPricingType("none");
-    }
-  }, [pricingData]);
 
   // Regenerate voucher number when quotation mode changes
   useEffect(() => {
@@ -563,96 +520,6 @@ const SalesVoucher: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const calculateTotals = () => {
-    if (formData.mode === "item-invoice") {
-      const subtotal = formData.entries.reduce(
-        (sum, e) => sum + (e.quantity ?? 0) * (e.rate ?? 0),
-        0
-      );
-
-      const cgstTotal = formData.entries.reduce(
-        (sum, e) =>
-          sum + ((e.quantity ?? 0) * (e.rate ?? 0) * (e.cgstRate ?? 0)) / 100,
-        0
-      );
-
-      const sgstTotal = formData.entries.reduce(
-        (sum, e) =>
-          sum + ((e.quantity ?? 0) * (e.rate ?? 0) * (e.sgstRate ?? 0)) / 100,
-        0
-      );
-
-      const igstTotal = formData.entries.reduce(
-        (sum, e) =>
-          sum + ((e.quantity ?? 0) * (e.rate ?? 0) * (e.igstRate ?? 0)) / 100,
-        0
-      );
-
-      const discountTotal = formData.entries.reduce(
-        (sum, e) => sum + (e.discount ?? 0),
-        0
-      );
-
-      // 🔥 Profit Calculation Included Here
-      let totalProfit = 0;
-      formData.entries.forEach((e) => {
-        if (!e.rate || !e.quantity) return;
-        const baseAmount = e.rate * e.quantity;
-
-        if (pricingSelection.main === "wholesale") {
-          if (pricingSelection.wholesale === "percentProfit") {
-            totalProfit +=
-              (baseAmount * parseFloat(formData.whPercent || "0")) / 100;
-          }
-          if (pricingSelection.wholesale === "sellProfit") {
-            totalProfit +=
-              parseFloat(formData.whSellProfit || "0") * e.quantity;
-          }
-        }
-
-        if (pricingSelection.main === "retailer") {
-          if (pricingSelection.retailer === "percentProfit") {
-            totalProfit +=
-              (baseAmount * parseFloat(formData.rtPercent || "0")) / 100;
-          }
-          if (pricingSelection.retailer === "sellProfit") {
-            totalProfit +=
-              parseFloat(formData.rtSellProfit || "0") * e.quantity;
-          }
-        }
-      });
-
-      // 🔥 Correct Total = subtotal + GST + Profit – discount
-      const total =
-        subtotal +
-        cgstTotal +
-        sgstTotal +
-        igstTotal +
-        totalProfit -
-        discountTotal;
-
-      return {
-        subtotal,
-        cgstTotal,
-        sgstTotal,
-        igstTotal,
-        discountTotal,
-        totalProfit,
-        total,
-      };
-    }
-
-    return {
-      subtotal: 0,
-      cgstTotal: 0,
-      sgstTotal: 0,
-      igstTotal: 0,
-      discountTotal: 0,
-      totalProfit: 0,
-      total: formData.entries.reduce((sum, e) => sum + (e.amount ?? 0), 0),
-    };
-  };
-
   useEffect(() => {
     const fetchLedgers = async () => {
       try {
@@ -669,6 +536,42 @@ const SalesVoucher: React.FC = () => {
 
     fetchLedgers();
   }, [companyId, ownerType, ownerId]);
+
+  const calculateTotals = () => {
+    let subtotal = 0;
+    let cgstTotal = 0;
+    let sgstTotal = 0;
+    let igstTotal = 0;
+    let discountTotal = 0;
+
+    formData.entries.forEach((entry) => {
+      const qty = entry.quantity || 0;
+      const rate = entry.rate || 0;
+      const discount = entry.discount || 0;
+
+      const baseAmount = qty * rate;
+      const gstRate =
+        (entry.cgstRate || 0) + (entry.sgstRate || 0) + (entry.igstRate || 0);
+      const gstAmount = (baseAmount * gstRate) / 100;
+
+      subtotal += baseAmount;
+      discountTotal += discount;
+      cgstTotal += (baseAmount * (entry.cgstRate || 0)) / 100;
+      sgstTotal += (baseAmount * (entry.sgstRate || 0)) / 100;
+      igstTotal += (baseAmount * (entry.igstRate || 0)) / 100;
+    });
+
+    const total = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
+
+    return {
+      subtotal,
+      cgstTotal,
+      sgstTotal,
+      igstTotal,
+      discountTotal,
+      total,
+    };
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -706,7 +609,6 @@ const SalesVoucher: React.FC = () => {
       igstTotal: totals.igstTotal,
       discountTotal: totals.discountTotal,
       total: totals.total,
-      totalProfit: totals.totalProfit,
     };
 
     try {
@@ -862,39 +764,6 @@ const SalesVoucher: React.FC = () => {
   };
 
   // compute the detail like wholesell, reatiler
-  const computeAutoRate = (details: any) => {
-    const baseRate = parseFloat(details.rate) || 0;
-    const mrp = parseFloat(details.mrp) || baseRate;
-
-    if (!pricingSelection.main) return baseRate;
-
-    if (pricingSelection.main === "wholesale") {
-      if (pricingSelection.wholesale === "sellProfit") {
-        const profit = parseFloat(formData.whSellProfit || "0");
-        return baseRate + profit;
-      }
-      if (pricingSelection.wholesale === "percentProfit") {
-        const percent = parseFloat(formData.whPercent || "0");
-        return baseRate + (baseRate * percent) / 100;
-      }
-    }
-
-    if (pricingSelection.main === "retailer") {
-      if (pricingSelection.retailer === "sellProfit") {
-        const profit = parseFloat(formData.rtSellProfit || "0");
-        return baseRate + profit;
-      }
-      if (pricingSelection.retailer === "percentProfit") {
-        const percent = parseFloat(formData.rtPercent || "0");
-        return baseRate + (baseRate * percent) / 100;
-      }
-      if (pricingSelection.retailer === "onMRP") {
-        return mrp;
-      }
-    }
-
-    return baseRate;
-  };
 
   const getPartyName = (partyId: string) => {
     if (!safeLedgers || safeLedgers.length === 0) return "Unknown Party";
@@ -1277,290 +1146,7 @@ const SalesVoucher: React.FC = () => {
                 )}
               </div>
             )}
-            {/* Pricing Section */}
-            <div className=" p-4 mb-6 rounded">
-              <h3 className="font-semibold mb-3">Pricing</h3>
-
-              {/* MAIN LEVEL SELECTION */}
-              <div className="flex gap-4 mb-4">
-                {/* Wholesale Select */}
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    checked={pricingSelection.main === "wholesale"}
-                    onChange={() =>
-                      setPricingSelection({
-                        main: "wholesale",
-                        wholesale: "",
-                        retailer: "",
-                      })
-                    }
-                  />
-                  Wholesale
-                </label>
-
-                {/* Retailer Select */}
-                <label className="flex items-center gap-2">
-                  <input
-                    type="radio"
-                    checked={pricingSelection.main === "retailer"}
-                    onChange={() =>
-                      setPricingSelection({
-                        main: "retailer",
-                        wholesale: "",
-                        retailer: "",
-                      })
-                    }
-                  />
-                  Retailer
-                </label>
-              </div>
-
-              {/* WHOLESALE SECTION */}
-              {pricingSelection.main === "wholesale" && (
-                <div className="border p-3 rounded mb-4">
-                  <h4 className="font-semibold mb-2">Wholesale Pricing</h4>
-
-                  {/* SELL ON PROFIT */}
-                  <div className="mb-3">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="wh-method"
-                        checked={pricingSelection.wholesale === "sellProfit"}
-                        onChange={() =>
-                          setPricingSelection((p) => ({
-                            ...p,
-                            wholesale: "sellProfit",
-                          }))
-                        }
-                      />
-                      Sell on Profit (₹)
-                    </label>
-
-                    <input
-                      type="number"
-                      placeholder="₹ Profit"
-                      className={FORM_STYLES.input(theme)}
-                      disabled={pricingSelection.wholesale !== "sellProfit"}
-                      value={
-                        pricingSelection.wholesale === "sellProfit"
-                          ? formData.whSellProfit || ""
-                          : ""
-                      }
-                      onChange={(e) => {
-                        setPricingSelection({
-                          main: "wholesale",
-                          wholesale: "sellProfit",
-                          retailer: "",
-                        });
-                        setFormData((prev) => ({
-                          ...prev,
-                          whSellProfit: e.target.value,
-                          whPercent: "",
-                        }));
-                      }}
-                    />
-                  </div>
-
-                  {/* PERCENT ON PROFIT */}
-                  <div>
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="wh-method"
-                        checked={pricingSelection.wholesale === "percentProfit"}
-                        onChange={() =>
-                          setPricingSelection((p) => ({
-                            ...p,
-                            wholesale: "percentProfit",
-                          }))
-                        }
-                      />
-                      Percent on Profit (%)
-                    </label>
-
-                    <input
-                      type="number"
-                      placeholder="% Profit"
-                      className={FORM_STYLES.input(theme)}
-                      disabled={pricingSelection.wholesale !== "percentProfit"}
-                      value={
-                        pricingSelection.wholesale === "percentProfit"
-                          ? formData.whPercent || ""
-                          : ""
-                      }
-                      onChange={(e) => {
-                        setPricingSelection({
-                          main: "wholesale",
-                          wholesale: "percentProfit",
-                          retailer: "",
-                        });
-                        setFormData((prev) => ({
-                          ...prev,
-                          whPercent: e.target.value,
-                          whSellProfit: "",
-                        }));
-                      }}
-                    />
-                  </div>
-                </div>
-              )}
-
-              {/* RETAILER SECTION */}
-              {pricingSelection.main === "retailer" && (
-                <div className="border p-3 rounded">
-                  <h4 className="font-semibold mb-2">Retail Pricing</h4>
-
-                  {/* Sell on Profit */}
-                  <div className="mb-3">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="ret-method"
-                        checked={pricingSelection.retailer === "sellProfit"}
-                        onChange={() =>
-                          setPricingSelection((p) => ({
-                            ...p,
-                            retailer: "sellProfit",
-                          }))
-                        }
-                      />
-                      Sell on Profit (₹)
-                    </label>
-
-                    <input
-                      type="number"
-                      placeholder="₹ Profit"
-                      className={FORM_STYLES.input(theme)}
-                      disabled={pricingSelection.retailer !== "sellProfit"}
-                      value={
-                        pricingSelection.retailer === "sellProfit"
-                          ? formData.rtSellProfit || ""
-                          : ""
-                      }
-                      onChange={(e) => {
-                        setPricingSelection({
-                          main: "retailer",
-                          retailer: "sellProfit",
-                          wholesale: "",
-                        });
-                        setFormData((prev) => ({
-                          ...prev,
-                          rtSellProfit: e.target.value,
-                          rtPercent: "",
-                          rtOnMRP: false,
-                        }));
-                      }}
-                    />
-                  </div>
-
-                  {/* Percent on Profit */}
-                  <div className="mb-3">
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="ret-method"
-                        checked={pricingSelection.retailer === "percentProfit"}
-                        onChange={() =>
-                          setPricingSelection((p) => ({
-                            ...p,
-                            retailer: "percentProfit",
-                          }))
-                        }
-                      />
-                      Percent on Profit (%)
-                    </label>
-
-                    <input
-                      type="number"
-                      placeholder="% Profit"
-                      className={FORM_STYLES.input(theme)}
-                      disabled={pricingSelection.retailer !== "percentProfit"}
-                      value={
-                        pricingSelection.retailer === "percentProfit"
-                          ? formData.rtPercent || ""
-                          : ""
-                      }
-                      onChange={(e) => {
-                        setPricingSelection({
-                          main: "retailer",
-                          retailer: "percentProfit",
-                          wholesale: "",
-                        });
-                        setFormData((prev) => ({
-                          ...prev,
-                          rtPercent: e.target.value,
-                          rtSellProfit: "",
-                          rtOnMRP: false,
-                        }));
-                      }}
-                    />
-                  </div>
-
-                  {/* On MRP */}
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="ret-method"
-                      checked={pricingSelection.retailer === "onMRP"}
-                      onChange={() => {
-                        setPricingSelection({
-                          main: "retailer",
-                          retailer: "onMRP",
-                          wholesale: "",
-                        });
-                        setFormData((prev) => ({
-                          ...prev,
-                          rtSellProfit: "",
-                          rtPercent: "",
-                          rtOnMRP: true,
-                        }));
-                      }}
-                    />
-                    On MRP (No change)
-                  </label>
-                </div>
-              )}
-            </div>
-            {/* ✔ Pricing Status Summary */}
-            {/* ✔ Simple Pricing Mode & Method Indicator */}
-            <div className="mb-4">
-              {pricingSelection.main ? (
-                <div
-                  className={`p-2 rounded font-semibold border-l-4 ${
-                    theme === "dark"
-                      ? "bg-gray-900 border-blue-500 text-blue-300"
-                      : "bg-blue-50 border-blue-600 text-blue-900"
-                  }`}
-                >
-                  ✔{" "}
-                  {pricingSelection.main === "wholesale"
-                    ? "Wholesale"
-                    : "Retailer"}{" "}
-                  –{" "}
-                  {pricingSelection.wholesale === "sellProfit" &&
-                    "Sell on Profit"}
-                  {pricingSelection.wholesale === "percentProfit" &&
-                    "Percent on Profit"}
-                  {pricingSelection.retailer === "sellProfit" &&
-                    "Sell on Profit"}
-                  {pricingSelection.retailer === "percentProfit" &&
-                    "Percent on Profit"}
-                  {pricingSelection.retailer === "onMRP" && "On MRP"}
-                </div>
-              ) : (
-                <div
-                  className={`p-2 rounded font-semibold border-l-4 ${
-                    theme === "dark"
-                      ? "bg-red-900 border-red-500 text-red-300"
-                      : "bg-red-50 border-red-600 text-red-900"
-                  }`}
-                >
-                  ⚠ Please select pricing mode & method!
-                </div>
-              )}
-            </div>
+           
             <div
               className={`p-4 mb-6 rounded ${
                 theme === "dark" ? "bg-gray-700" : "bg-gray-50"
@@ -1781,145 +1367,79 @@ const SalesVoucher: React.FC = () => {
                       })}
                     </tbody>
                     <tfoot>
-  {/* SUBTOTAL */}
-  <tr
-    className={`font-semibold ${
-      theme === "dark"
-        ? "border-t border-gray-600"
-        : "border-t border-gray-300"
-    }`}
-  >
-    <td className="px-4 py-2 text-left" colSpan={7}>
-      Subtotal:
-    </td>
-    <td className="px-4 py-2 text-right">
-      {subtotal.toLocaleString()}
-    </td>
-    <td></td>
-    <td></td>
-  </tr>
+                      {/* SUBTOTAL */}
+                      <tr
+                        className={`font-semibold ${
+                          theme === "dark"
+                            ? "border-t border-gray-600"
+                            : "border-t border-gray-300"
+                        }`}
+                      >
+                        <td className="px-4 py-2 text-left" colSpan={7}>
+                          Subtotal:
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          ₹{subtotal.toLocaleString()}
+                        </td>
+                        <td></td>
+                        <td></td>
+                      </tr>
 
-  {/* GST TOTAL */}
-  <tr
-    className={`font-semibold ${
-      theme === "dark"
-        ? "border-t border-gray-600"
-        : "border-t border-gray-300"
-    }`}
-  >
-    <td className="px-4 py-2 text-left" colSpan={7}>
-      GST Total:
-    </td>
-    <td className="px-4 py-2 text-right text-blue-600 font-bold">
-      {(cgstTotal + sgstTotal + igstTotal).toLocaleString()}
-    </td>
-    <td></td>
-    <td></td>
-  </tr>
+                      {/* GST TOTAL */}
+                      <tr
+                        className={`font-semibold ${
+                          theme === "dark"
+                            ? "border-t border-gray-600"
+                            : "border-t border-gray-300"
+                        }`}
+                      >
+                        <td className="px-4 py-2 text-left" colSpan={7}>
+                          GST Total:
+                        </td>
+                        <td className="px-4 py-2 text-right text-blue-600 font-bold">
+                          ₹
+                          {(cgstTotal + sgstTotal + igstTotal).toLocaleString()}
+                        </td>
+                        <td></td>
+                        <td></td>
+                      </tr>
 
-  {/* 🚀 PRICING APPLIED */}
-  {pricingSelection.main !== "" && (
-    <tr
-      className={`font-semibold ${
-        theme === "dark"
-          ? "border-t border-gray-600 text-white"
-          : "border-t border-gray-300 text-black"
-      }`}
-    >
-      <td className="px-4 py-2 text-left" colSpan={7}>
-        {(() => {
-          let totalProfit = 0;
-          let methodText = "";
-          let modeText =
-            pricingSelection.main === "wholesale"
-              ? "Wholesale"
-              : "Retailer";
+                      {/* DISCOUNT */}
+                      <tr
+                        className={`font-semibold ${
+                          theme === "dark"
+                            ? "border-t border-gray-600"
+                            : "border-t border-gray-300"
+                        }`}
+                      >
+                        <td className="px-4 py-2 text-left" colSpan={7}>
+                          Discount:
+                        </td>
+                        <td className="px-4 py-2 text-right text-red-600 font-bold">
+                          ₹{discountTotal.toLocaleString()}
+                        </td>
+                        <td></td>
+                        <td></td>
+                      </tr>
 
-          formData.entries.forEach((e) => {
-            if (!e.itemId || !e.quantity) return;
-
-            const itemDetails = getItemDetails(e.itemId);
-            const baseRate = parseFloat(itemDetails.rate) || 0;
-            const qty = e.quantity;
-            const baseAmount = baseRate * qty;
-
-            if (pricingSelection.main === "wholesale") {
-              if (pricingSelection.wholesale === "percentProfit") {
-                const percent = parseFloat(formData.whPercent || "0");
-                totalProfit += (baseAmount * percent) / 100;
-                methodText = `Percent on Profit (${percent}%)`;
-              }
-              if (pricingSelection.wholesale === "sellProfit") {
-                const profit = parseFloat(formData.whSellProfit || "0");
-                totalProfit += profit * qty;
-                methodText = `Sell on Profit (₹${profit})`;
-              }
-            }
-
-            if (pricingSelection.main === "retailer") {
-              if (pricingSelection.retailer === "percentProfit") {
-                const percent = parseFloat(formData.rtPercent || "0");
-                totalProfit += (baseAmount * percent) / 100;
-                methodText = `Percent on Profit (${percent}%)`;
-              }
-              if (pricingSelection.retailer === "sellProfit") {
-                const profit = parseFloat(formData.rtSellProfit || "0");
-                totalProfit += profit * qty;
-                methodText = `Sell on Profit (₹${profit})`;
-              }
-              if (pricingSelection.retailer === "onMRP") {
-                methodText = "On MRP";
-              }
-            }
-          });
-
-          return `Pricing Applied: ${modeText} – ${methodText} = ₹${totalProfit.toFixed(
-            2
-          )}`;
-        })()}
-      </td>
-      <td className="px-4 py-2 text-right text-green-600 font-bold"></td>
-      <td></td>
-    </tr>
-  )}
-
-  {/* DISCOUNT */}
-  <tr
-    className={`font-semibold ${
-      theme === "dark"
-        ? "border-t border-gray-600"
-        : "border-t border-gray-300"
-    }`}
-  >
-    <td className="px-4 py-2 text-left" colSpan={7}>
-      Discount:
-    </td>
-    <td className="px-4 py-2 text-right text-red-600 font-bold">
-      {discountTotal.toLocaleString()}
-    </td>
-    <td></td>
-    <td></td>
-  </tr>
-
-  {/* GRAND TOTAL (🔥 FINAL FIX ✔ No double profit) */}
-  <tr
-    className={`font-bold ${
-      theme === "dark"
-        ? "border-t-2 border-gray-500"
-        : "border-t-2 border-black"
-    }`}
-  >
-    <td className="px-4 py-2 text-left text-lg" colSpan={7}>
-      Grand Total:
-    </td>
-    <td className="px-4 py-2 text-right text-lg text-green-600 font-bold">
-      {total.toLocaleString()}
-    </td>
-    <td></td>
-    <td></td>
-  </tr>
-</tfoot>
-
+                      {/* GRAND TOTAL */}
+                      <tr
+                        className={`font-bold ${
+                          theme === "dark"
+                            ? "border-t-2 border-gray-500"
+                            : "border-t-2 border-black"
+                        }`}
+                      >
+                        <td className="px-4 py-2 text-left text-lg" colSpan={7}>
+                          Grand Total:
+                        </td>
+                        <td className="px-4 py-2 text-right text-lg text-green-600 font-bold">
+                          ₹{total.toLocaleString()}
+                        </td>
+                        <td></td>
+                        <td></td>
+                      </tr>
+                    </tfoot>
                   </table>
                 ) : (
                   <table className="w-full mb-4">
