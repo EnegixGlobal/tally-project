@@ -3,6 +3,8 @@ import { Link, useNavigate } from 'react-router-dom';
 import { Plus, Edit, Trash2, Package, Upload } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
 import Barcode from 'react-barcode';
+import Swal from 'sweetalert2';
+
 
 interface StockItem {
   id: string;
@@ -66,14 +68,29 @@ const StockItemList = () => {
 //   };
 
 
- const handleDelete = async (id: string) => {
+const handleDelete = async (id: string) => {
   const itemToDelete = stockItems.find(item => item.id === id);
   if (!itemToDelete) {
-    alert('Stock item not found.');
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Stock item not found.'
+    });
     return;
   }
 
-  if (window.confirm(`Are you sure you want to delete "${itemToDelete.name}"? This action cannot be undone.`)) {
+  const result = await Swal.fire({
+    title: `Are you sure?`,
+    text: `Do you really want to delete "${itemToDelete.name}"? This action cannot be undone.`,
+    icon: 'warning',
+    showCancelButton: true,
+    confirmButtonColor: '#d33',
+    cancelButtonColor: '#3085d6',
+    confirmButtonText: 'Yes, delete it!',
+    cancelButtonText: 'Cancel'
+  });
+
+  if (result.isConfirmed) {
     try {
       const res = await fetch(`http://localhost:5000/api/stock-items/${id}`, {
         method: 'DELETE',
@@ -84,18 +101,30 @@ const StockItemList = () => {
 
       const json = await res.json();
       if (json.success) {
-        alert('Stock item deleted successfully.');
-        // Update local state without reloading
+        Swal.fire({
+          icon: 'success',
+          title: 'Deleted!',
+          text: 'Stock item deleted successfully.'
+        });
         setStockItems(prev => prev.filter(item => item.id !== id));
       } else {
-        alert(json.message || 'Failed to delete stock item.');
+        Swal.fire({
+          icon: 'error',
+          title: 'Error',
+          text: json.message || 'Failed to delete stock item.'
+        });
       }
     } catch (err) {
       console.error('❌ Error deleting stock item:', err);
-      alert('Something went wrong while deleting the stock item.');
+      Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Something went wrong while deleting the stock item.'
+      });
     }
   }
 };
+
 
  
 
