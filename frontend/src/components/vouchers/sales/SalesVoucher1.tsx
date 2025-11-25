@@ -157,6 +157,58 @@ const SalesVoucher: React.FC = () => {
     showGST: true,
   });
 
+  //wholsell or retailer
+  const [profitConfig, setProfitConfig] = useState({
+    customerType: "",
+    method: "",
+    value: "",
+  });
+
+  // Add these states at top of your component:
+  const [statusMsg, setStatusMsg] = useState("");
+  const [statusColor, setStatusColor] = useState("");
+
+  // Add this useEffect() in component (below states)
+  useEffect(() => {
+    const ownerId = localStorage.getItem("employee_id") || 1;
+    const ownerType = localStorage.getItem("userType") || "admin";
+
+    // nothing selected → no message, no API call
+    if (!profitConfig.customerType || !profitConfig.method) {
+      setStatusMsg("");
+      return;
+    }
+
+    fetch(`http://localhost:5000/api/set-profit/${ownerId}/${ownerType}`)
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && data.data) {
+          const saved = data.data;
+
+          if (
+            saved.customer_type === profitConfig.customerType &&
+            saved.method === profitConfig.method
+          ) {
+            setProfitConfig({
+              ...profitConfig,
+              value: saved.value,
+            });
+
+            setStatusMsg(`Value: ${saved.customer_type } ${saved.method} ${saved.value}%`);
+            setStatusColor("text-green-600 font-semibold");
+          } else {
+            setStatusMsg("Not Set");
+            setStatusColor("text-red-600 font-semibold");
+          }
+        } else {
+          setStatusMsg("Not Set");
+          setStatusColor("text-red-600 font-semibold");
+        }
+      })
+      .catch((error) => console.error("❌ Fetch failed:", error));
+  }, [profitConfig.customerType, profitConfig.method]);
+  
+
   // Regenerate voucher number when quotation mode changes
   useEffect(() => {
     if (!isEditMode) {
@@ -527,7 +579,6 @@ const SalesVoucher: React.FC = () => {
           `http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
-        console.log("this is data", data);
         setLedgers(data);
       } catch (error) {
         console.error("Failed to fetch ledgers:", error);
@@ -762,8 +813,6 @@ const SalesVoucher: React.FC = () => {
       batches: item.batches ? JSON.parse(item.batches) : [],
     };
   };
-
-  // compute the detail like wholesell, reatiler
 
   const getPartyName = (partyId: string) => {
     if (!safeLedgers || safeLedgers.length === 0) return "Unknown Party";
@@ -1146,7 +1195,149 @@ const SalesVoucher: React.FC = () => {
                 )}
               </div>
             )}
-           
+            {/* ///whollsell or retailer */}
+            <div>
+              <div className="flex gap-6 mb-3">
+                {/* Wholesale */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="customerType"
+                    value="wholesale"
+                    checked={profitConfig.customerType === "wholesale"}
+                    onChange={(e) =>
+                      setProfitConfig({
+                        customerType: e.target.value,
+                        method: "",
+                        value: "",
+                      })
+                    }
+                    className="h-4 w-4"
+                  />
+                  <span className="font-medium">Wholesale</span>
+                </label>
+
+                {/* Retailer */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="customerType"
+                    value="retailer"
+                    checked={profitConfig.customerType === "retailer"}
+                    onChange={(e) =>
+                      setProfitConfig({
+                        customerType: e.target.value,
+                        method: "",
+                        value: "",
+                      })
+                    }
+                    className="h-4 w-4"
+                  />
+                  <span className="font-medium">Retailer</span>
+                </label>
+              </div>
+
+              {/* Wholesale Inner Options */}
+              {profitConfig.customerType === "wholesale" && (
+                <div className="ml-6 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="wholesaleMethod"
+                      value="sell_on_profit"
+                      checked={profitConfig.method === "sell_on_profit"}
+                      onChange={(e) =>
+                        setProfitConfig({
+                          ...profitConfig,
+                          method: e.target.value,
+                        })
+                      }
+                      className="h-4 w-4"
+                    />
+                    <span>Sell on Profit %</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="wholesaleMethod"
+                      value="percent_on_profit"
+                      checked={profitConfig.method === "percent_on_profit"}
+                      onChange={(e) =>
+                        setProfitConfig({
+                          ...profitConfig,
+                          method: e.target.value,
+                        })
+                      }
+                      className="h-4 w-4"
+                    />
+                    <span>Percent on Profit %</span>
+                  </label>
+                </div>
+              )}
+
+              {/* Retailer Inner Options */}
+              {profitConfig.customerType === "retailer" && (
+                <div className="ml-6 space-y-2">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="retailerMethod"
+                      value="sell_on_profit"
+                      checked={profitConfig.method === "sell_on_profit"}
+                      onChange={(e) =>
+                        setProfitConfig({
+                          ...profitConfig,
+                          method: e.target.value,
+                        })
+                      }
+                      className="h-4 w-4"
+                    />
+                    <span>Sell on Profit %</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="retailerMethod"
+                      value="percent_on_profit"
+                      checked={profitConfig.method === "percent_on_profit"}
+                      onChange={(e) =>
+                        setProfitConfig({
+                          ...profitConfig,
+                          method: e.target.value,
+                        })
+                      }
+                      className="h-4 w-4"
+                    />
+                    <span>Percent on Profit %</span>
+                  </label>
+
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="radio"
+                      name="retailerMethod"
+                      value="on_mrp"
+                      checked={profitConfig.method === "on_mrp"}
+                      onChange={(e) =>
+                        setProfitConfig({
+                          ...profitConfig,
+                          method: e.target.value,
+                          value: "0", // Auto-set value when On MRP
+                        })
+                      }
+                      className="h-4 w-4"
+                    />
+                    <span>On MRP</span>
+                  </label>
+                </div>
+              )}
+
+              {/* Status Display */}
+              {statusMsg && (
+                <p className={`mt-2 text-sm ${statusColor}`}>{statusMsg}</p>
+              )}
+            </div>
             <div
               className={`p-4 mb-6 rounded ${
                 theme === "dark" ? "bg-gray-700" : "bg-gray-50"
@@ -1382,6 +1573,22 @@ const SalesVoucher: React.FC = () => {
                           ₹{subtotal.toLocaleString()}
                         </td>
                         <td></td>
+                      </tr>
+
+                       {/* Profit */}
+                      <tr
+                        className={`font-semibold ${
+                          theme === "dark"
+                            ? "border-t border-gray-600"
+                            : "border-t border-gray-300"
+                        }`}
+                      >
+                        <td className="px-4 py-2 text-left" colSpan={7}>
+                          Profit:
+                        </td>
+                        <td className="px-4 py-2 text-right">
+                          ₹{subtotal.toLocaleString()}
+                        </td>
                         <td></td>
                       </tr>
 

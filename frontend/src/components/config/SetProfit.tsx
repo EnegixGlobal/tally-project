@@ -12,6 +12,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import Swal from "sweetalert2";
 
 interface ProfitRule {
   id: string;
@@ -43,62 +44,58 @@ const SetProfit: React.FC = () => {
     enableCustomerGroupPricing: false,
   });
 
-  const [profitRules, setProfitRules] = useState<ProfitRule[]>([
-    {
-      id: "1",
-      name: "Electronics High Margin",
-      type: "percentage",
-      value: 25,
-      applicableToCategories: ["Electronics", "Mobile"],
-      applicableToItems: [],
-      minQuantity: 1,
-      maxQuantity: 10,
-      isActive: true,
-      priority: 1,
-    },
-    {
-      id: "2",
-      name: "Bulk Sale Discount",
-      type: "percentage",
-      value: 15,
-      applicableToCategories: [],
-      applicableToItems: [],
-      minQuantity: 50,
-      isActive: true,
-      priority: 2,
-    },
-    {
-      id: "3",
-      name: "Premium Items Fixed",
-      type: "fixed_amount",
-      value: 500,
-      applicableToCategories: ["Premium"],
-      applicableToItems: [],
-      isActive: true,
-      priority: 3,
-    },
-  ]);
+  const [profitRules, setProfitRules] = useState<ProfitRule[]>([]);
 
   const [showAddRuleModal, setShowAddRuleModal] = useState(false);
   const [editingRule, setEditingRule] = useState<ProfitRule | null>(null);
-  const [newRule, setNewRule] = useState<Partial<ProfitRule>>({
-    name: "",
-    type: "percentage",
-    value: 0,
-    applicableToCategories: [],
-    applicableToItems: [],
-    isActive: true,
-    priority: profitRules.length + 1,
+
+  /*  wholsel and retailer section state */
+  const [profitConfig, setProfitConfig] = useState({
+    customerType: "",
+    method: "",
+    value: "",
   });
 
   const [isLoading, setIsLoading] = useState(false);
 
   const handleSave = async () => {
-    setIsLoading(true);
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    setIsLoading(false);
-    alert("Profit settings saved successfully!");
+    const ownerId = localStorage.getItem("employee_id") || 1;
+    const ownerType = localStorage.getItem("userType") || "admin";
+
+
+    try {
+      const response = await fetch("http://localhost:5000/api/set-profit", {
+          method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          customerType: profitConfig.customerType,
+          method: profitConfig.method,
+          value: profitConfig.value || 0, // default 0
+          ownerType,
+          ownerId,
+        }),
+      });
+
+      const data = await response.json();
+
+      if (!data.success) {
+        throw new Error(data.message);
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Saved Successfully!",
+        timer: 2000,
+        showConfirmButton: false,
+      });
+    } catch (error) {
+      console.error("❌ Save failed:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Failed!",
+        text: error.message || "Unable to save profit settings",
+      });
+    }
   };
 
   const handleReset = () => {
@@ -122,76 +119,6 @@ const SetProfit: React.FC = () => {
       });
       setProfitRules([]);
     }
-  };
-
-  const handleAddRule = () => {
-    if (newRule.name && newRule.value !== undefined) {
-      const rule: ProfitRule = {
-        id: Date.now().toString(),
-        name: newRule.name,
-        type: newRule.type || "percentage",
-        value: newRule.value,
-        applicableToCategories: newRule.applicableToCategories || [],
-        applicableToItems: newRule.applicableToItems || [],
-        minQuantity: newRule.minQuantity,
-        maxQuantity: newRule.maxQuantity,
-        isActive: newRule.isActive || true,
-        priority: newRule.priority || profitRules.length + 1,
-      };
-      setProfitRules([...profitRules, rule]);
-      setNewRule({
-        name: "",
-        type: "percentage",
-        value: 0,
-        applicableToCategories: [],
-        applicableToItems: [],
-        isActive: true,
-        priority: profitRules.length + 2,
-      });
-      setShowAddRuleModal(false);
-    }
-  };
-
-  const handleEditRule = (rule: ProfitRule) => {
-    setEditingRule(rule);
-    setNewRule(rule);
-    setShowAddRuleModal(true);
-  };
-
-  const handleUpdateRule = () => {
-    if (editingRule && newRule.name && newRule.value !== undefined) {
-      const updatedRules = profitRules.map((rule) =>
-        rule.id === editingRule.id
-          ? ({ ...rule, ...newRule } as ProfitRule)
-          : rule
-      );
-      setProfitRules(updatedRules);
-      setEditingRule(null);
-      setNewRule({
-        name: "",
-        type: "percentage",
-        value: 0,
-        applicableToCategories: [],
-        applicableToItems: [],
-        isActive: true,
-        priority: profitRules.length + 1,
-      });
-      setShowAddRuleModal(false);
-    }
-  };
-
-  const handleDeleteRule = (ruleId: string) => {
-    if (confirm("Are you sure you want to delete this profit rule?")) {
-      setProfitRules(profitRules.filter((rule) => rule.id !== ruleId));
-    }
-  };
-
-  const toggleRuleActive = (ruleId: string) => {
-    setProfitRules(
-      profitRules.map((rule) =>
-        rule.id === ruleId ? { ...rule, isActive: !rule.isActive } : rule
-      )
-    );
   };
 
   return (
@@ -246,50 +173,184 @@ const SetProfit: React.FC = () => {
             </h3>
           </div>
 
+          {/*  wholsel and retailer section */}
           <div className="space-y-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">
-                Default Profit Method
+                Default Customer Type
               </label>
-              <select
-                title="Default Profit Method"
-                value={profitSettings.defaultProfitMethod}
-                onChange={(e) =>
-                  setProfitSettings({
-                    ...profitSettings,
-                    defaultProfitMethod: e.target.value,
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="percentage">Percentage on Cost</option>
-                <option value="fixed_amount">Fixed Amount</option>
-                <option value="markup">Markup on Cost</option>
-              </select>
+
+              <div className="flex items-center gap-6 mb-4">
+                {/* Wholesale */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="customerType"
+                    value="wholesale"
+                    checked={profitConfig.customerType === "wholesale"}
+                    onChange={(e) =>
+                      setProfitConfig({
+                        customerType: e.target.value,
+                        method: "",
+                        value: "",
+                      })
+                    }
+                    className="h-4 w-4 text-blue-600"
+                  />
+                  <span className="font-medium text-gray-700">Wholesale</span>
+                </label>
+
+                {/* Retailer */}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="radio"
+                    name="customerType"
+                    value="retailer"
+                    checked={profitConfig.customerType === "retailer"}
+                    onChange={(e) =>
+                      setProfitConfig({
+                        customerType: e.target.value,
+                        method: "",
+                        value: "",
+                      })
+                    }
+                    className="h-4 w-4 text-blue-600"
+                  />
+                  <span className="font-medium text-gray-700">Retailer</span>
+                </label>
+              </div>
+
+              {/* Wholesale Options */}
+              {profitConfig.customerType === "wholesale" && (
+                <>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Wholesale Profit Method
+                  </label>
+
+                  <div className="flex items-center gap-6 mb-3">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="wholesaleMethod"
+                        value="sell_on_profit"
+                        checked={profitConfig.method === "sell_on_profit"}
+                        onChange={(e) =>
+                          setProfitConfig({
+                            ...profitConfig,
+                            method: e.target.value,
+                            value: "", // value enter karni hogi
+                          })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm">Sell on Profit %</span>
+                    </label>
+
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="wholesaleMethod"
+                        value="percent_on_profit"
+                        checked={profitConfig.method === "percent_on_profit"}
+                        onChange={(e) =>
+                          setProfitConfig({
+                            ...profitConfig,
+                            method: e.target.value,
+                            value: "", // user input required
+                          })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm">Percent on Profit %</span>
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {/* Retailer Options */}
+              {profitConfig.customerType === "retailer" && (
+                <>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Retailer Profit Method
+                  </label>
+
+                  <div className="flex items-center gap-6 mb-3 flex-wrap">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="retailerMethod"
+                        value="sell_on_profit"
+                        checked={profitConfig.method === "sell_on_profit"}
+                        onChange={(e) =>
+                          setProfitConfig({
+                            ...profitConfig,
+                            method: e.target.value,
+                            value: "",
+                          })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm">Sell on Profit %</span>
+                    </label>
+
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="retailerMethod"
+                        value="percent_on_profit"
+                        checked={profitConfig.method === "percent_on_profit"}
+                        onChange={(e) =>
+                          setProfitConfig({
+                            ...profitConfig,
+                            method: e.target.value,
+                            value: "",
+                          })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm">Percent on Profit %</span>
+                    </label>
+
+                    {/* On MRP — auto 0 */}
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="retailerMethod"
+                        value="on_mrp"
+                        checked={profitConfig.method === "on_mrp"}
+                        onChange={(e) =>
+                          setProfitConfig({
+                            ...profitConfig,
+                            method: e.target.value,
+                            value: "0", // 👈 auto-set
+                          })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <span className="text-sm">On MRP</span>
+                    </label>
+                  </div>
+                </>
+              )}
+
+              {/* Input show only when NOT 'on_mrp' */}
+              {profitConfig.method && profitConfig.method !== "on_mrp" && (
+                <input
+                  type="number"
+                  placeholder="Enter percentage"
+                  value={profitConfig.value}
+                  onChange={(e) =>
+                    setProfitConfig({
+                      ...profitConfig,
+                      value: e.target.value,
+                    })
+                  }
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                />
+              )}
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-2">
-                Default Profit Value (
-                {profitSettings.defaultProfitMethod === "fixed_amount"
-                  ? "₹"
-                  : "%"}
-                )
-              </label>
-              <input
-                title="Default Profit Value"
-                type="number"
-                step="0.01"
-                value={profitSettings.defaultProfitValue}
-                onChange={(e) =>
-                  setProfitSettings({
-                    ...profitSettings,
-                    defaultProfitValue: parseFloat(e.target.value) || 0,
-                  })
-                }
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-              />
-            </div>
+            {/* £££££££££££££££££££££££££££££££££££££££££££££££££££££££££ */}
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-2">

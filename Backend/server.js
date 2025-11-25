@@ -212,6 +212,9 @@ app.use('/api/fund-flow', fundflow);
 const salesreport = require('./routes/sales-report');
 app.use('/api/sales-report', salesreport);
 
+const setProfit = require('./routes/setProfit')
+app.use('/api/set-profit', setProfit)
+
 const salesinvoicematching = require('./routes/sales-invoice-matching');
 app.use('/api/sales-invoice-matching', salesinvoicematching);
 
