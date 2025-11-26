@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../../context/AppContext";
 import {
   ArrowLeft,
@@ -14,7 +14,6 @@ import ReportTable from "../../reports/ReportTable";
 import type { Scenario } from "../../../types";
 
 const ScenarioList: React.FC = () => {
-    const { id } = useParams();
   const { theme, companyInfo } = useAppContext();
   const navigate = useNavigate();
   const [filterName, setFilterName] = useState("");
@@ -22,7 +21,7 @@ const ScenarioList: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const itemsPerPage = 10;
   const [scenarios, setScenarios] = useState<Scenario[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [, setLoading] = useState(true);
 
   // Fetch from API
   useEffect(() => {
@@ -63,31 +62,6 @@ const ScenarioList: React.FC = () => {
 
     fetchScenarios();
   }, []);
-
-  // Mock scenarios - in a real app, this would come from an API or context
-  // const [mockScenarios] = useState<Scenario[]>([
-  //   {
-  //     id: 'SCN-001',
-  //     name: 'Budget Q1 2025',
-  //     includeActuals: true,
-  //     includedVoucherTypes: ['sales', 'purchase'],
-  //     excludedVoucherTypes: ['journal'],
-  //     fromDate: '2025-04-01',
-  //     toDate: '2025-06-30',
-  //     createdAt: '2025-06-01T10:00:00Z',
-  //   },
-  //   {
-  //     id: 'SCN-002',
-  //     name: 'Forecast H2 2025',
-  //     includeActuals: false,
-  //     includedVoucherTypes: ['journal'],
-  //     excludedVoucherTypes: ['sales', 'purchase'],
-  //     fromDate: '2025-07-01',
-  //     toDate: '2025-12-31',
-  //     createdAt: '2025-06-15T12:00:00Z',
-  //     updatedAt: '2025-06-20T14:00:00Z',
-  //   },
-  // ]);
 
   // Mock delete function
   const deleteScenario = useCallback(async (id: string) => {
@@ -331,7 +305,7 @@ const ScenarioList: React.FC = () => {
         <div className="ml-auto flex space-x-2">
           <button
             title="Create Scenario"
-            onClick={() =>  navigate("/app/masters/scenario/create")}
+            onClick={() => navigate("/app/masters/scenario/create")}
             className={`px-4 py-2 rounded-md ${
               theme === "dark"
                 ? "bg-blue-600 hover:bg-blue-700"
@@ -445,7 +419,7 @@ const ScenarioList: React.FC = () => {
           Next
         </button>
       </div>
-      
+
       <div
         className={`mt-6 p-4 rounded ${
           theme === "dark" ? "bg-gray-800" : "bg-blue-50"

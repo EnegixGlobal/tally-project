@@ -87,12 +87,14 @@ const PurchaseVoucher: React.FC = () => {
 
   const [showTableConfig, setShowTableConfig] = useState(false);
 
-  const [visibleColumns, setVisibleColumns] = useState({
-    hsn: true,
-    gst: true,
-    batch: true,
-    godown: true,
-  });
+  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
+    {
+      hsn: true,
+      gst: true,
+      batch: true,
+      godown: true,
+    }
+  );
 
   useEffect(() => {
     if (!isEditMode || !id) return;
@@ -124,7 +126,7 @@ const PurchaseVoucher: React.FC = () => {
 
           // ⭐⭐⭐ ITEMS + BATCH + HSN + GST AUTO LOAD ⭐⭐⭐
           entries:
-            data.entries?.map((e, idx) => {
+            data.entries?.map((e: any, idx: number) => {
               const stockItem = stockItems.find(
                 (item) => String(item.id) === String(e.itemId)
               );
@@ -186,7 +188,7 @@ const PurchaseVoucher: React.FC = () => {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          const formatted = data.data.map((item) => ({
+          const formatted = data.data.map((item: any) => ({
             ...item,
             batches: item.batches ? JSON.parse(item.batches) : [],
           }));
@@ -1536,11 +1538,13 @@ const PurchaseVoucher: React.FC = () => {
                               className={`${TABLE_STYLES.select} min-w-[100px] text-xs`}
                             >
                               <option value="">Batch</option>
-                              {(entry.batches || []).map((batch, i) => (
-                                <option key={i} value={batch.batchName}>
-                                  {batch.batchName}
-                                </option>
-                              ))}
+                              {(entry.batches || []).map(
+                                (batch: any, i: number) => (
+                                  <option key={i} value={batch.batchName}>
+                                    {batch.batchName}
+                                  </option>
+                                )
+                              )}
                             </select>
                           </td>
 
@@ -1671,9 +1675,9 @@ const PurchaseVoucher: React.FC = () => {
                       >
                         GST Total:
                       </td>
-                     <td className="px-4 py-2 text-right">
-  {(cgstTotal + sgstTotal).toLocaleString()}
-</td>
+                      <td className="px-4 py-2 text-right">
+                       {gstTotal.toLocaleString()}
+                      </td>
 
                       <td className="px-4 py-2"></td>
                       <td className="px-4 py-2"></td>

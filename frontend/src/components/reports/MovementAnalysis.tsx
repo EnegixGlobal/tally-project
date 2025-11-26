@@ -4,16 +4,30 @@ import { useAppContext } from "../../context/AppContext";
 import { ArrowLeft, Printer, Download, Filter } from "lucide-react";
 
 interface MovementEntry {
-  date: string;
-  stockItemId: number | string;
-  stockItemName: string;
-  voucherType: string;
-  voucherNumber: string;
-  inwardQty: number;
-  outwardQty: number;
-  rate: number;
-  value: number;
+  // For table display
+  name: string; // Stock item name
+
+  // Batches for movement rows
+  batches?: {
+    batchName: string;
+    batchQuantity: number;
+    batchRate: number;
+    batchExpiryDate?: string;
+    batchManufacturingDate?: string;
+  }[];
+
+  // Optional because API may not send them
+  date?: string;
+  stockItemId?: number | string;
+  stockItemName?: string;
+  voucherType?: string;
+  voucherNumber?: string;
+  inwardQty?: number;
+  outwardQty?: number;
+  rate?: number;
+  value?: number;
 }
+
 
 const MovementAnalysis: React.FC = () => {
   const { theme } = useAppContext();

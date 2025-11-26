@@ -3,26 +3,26 @@ import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { ArrowLeft, Printer, Download, Filter } from "lucide-react";
 import ReportTable from "./ReportTable";
-import type { StockItem, StockGroup } from "../../types";
+// import type { StockItem, StockGroup } from "../../types";
 
 // Define types for summary data
-interface ItemSummary {
-  item: StockItem;
-  inwardQty: number;
-  outwardQty: number;
-  closingQty: number;
-  closingValue: number;
-  profit: number;
-}
+// interface ItemSummary {
+//   item: StockItem;
+//   inwardQty: number;
+//   outwardQty: number;
+//   closingQty: number;
+//   closingValue: number;
+//   profit: number;
+// }
 
-interface GroupSummary {
-  group: StockGroup;
-  inwardQty: number;
-  outwardQty: number;
-  closingQty: number;
-  closingValue: number;
-  profit: number;
-}
+// interface GroupSummary {
+//   group: StockGroup;
+//   inwardQty: number;
+//   outwardQty: number;
+//   closingQty: number;
+//   closingValue: number;
+//   profit: number;
+// }
 
 // type SummaryData = ItemSummary | GroupSummary;
 

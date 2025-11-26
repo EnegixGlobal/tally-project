@@ -20,7 +20,6 @@ const Dashboard: React.FC = () => {
   const [vouchers, setVouchers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [userLimit, setUserLimit] = useState(1);
-  const role: string | null = localStorage.getItem("userType"); // employee | ca | ca_employee
   const [allCompanies, setAllCompanies] = useState<AllCompanies[]>([]);
   const [selectedCompany, setSelectedCompany] = useState("");
   const [caAllCompanies, setCaAllCompanies] = useState<AllCompanies[]>([]);
@@ -28,7 +27,6 @@ const Dashboard: React.FC = () => {
   const [caEmployees, setCaEmployees] = useState<any[]>([]); // Optional to reload list after create
   const [showAddForm, setShowAddForm] = useState(false);
   const caId = localStorage.getItem("user_id");
-  const companyId = localStorage.getItem("company_id");
   const suppl: string | null = localStorage.getItem("supplier"); // employee | ca | ca_employee
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(null);

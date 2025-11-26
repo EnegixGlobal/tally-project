@@ -15,7 +15,7 @@ export type CompanyInfo = {
   cinNumber: string;
   state?: string;
   country?: string;
-  taxType?: 'GST' | 'VAT';
+  taxType?: "GST" | "VAT";
   employeeId?: number;
   turnover?: number;
   registrationType?: string;
@@ -29,32 +29,32 @@ export type CompanyInfo = {
   lutBondNumber?: string;
   lutBondValidity?: string;
   taxLiabilityOnAdvanceReceipts?: boolean;
-  maintainBy?: 'self' | 'accountant';
+  maintainBy?: "self" | "accountant";
   accountantName?: string;
   godowns?: Godown[];
 };
 
-export type LedgerType = 
-  | 'capital' 
-  | 'loans' 
-  | 'fixed-assets'
-  | 'current-assets'
-  | 'current-liabilities'
-  | 'purchase'
-  | 'direct-expenses'
-  | 'sales'
-  | 'indirect-expenses'
-  | 'indirect-income'
-  | 'sundry-debtors'
-  | 'sundry-creditors'
-  | 'cash'
-  | 'bank'
-  | 'cgst'
-  | 'sgst'
-  | 'igst'
-  | 'stock'
-  | 'opening-stock'
-  | 'closing-stock';
+export type LedgerType =
+  | "capital"
+  | "loans"
+  | "fixed-assets"
+  | "current-assets"
+  | "current-liabilities"
+  | "purchase"
+  | "direct-expenses"
+  | "sales"
+  | "indirect-expenses"
+  | "indirect-income"
+  | "sundry-debtors"
+  | "sundry-creditors"
+  | "cash"
+  | "bank"
+  | "cgst"
+  | "sgst"
+  | "igst"
+  | "stock"
+  | "opening-stock"
+  | "closing-stock";
 
 export type LedgerGroup = {
   id: string;
@@ -65,15 +65,18 @@ export type LedgerGroup = {
   behavesLikeSubLedger?: boolean;
   nettBalancesForReporting?: boolean;
   usedForCalculation?: boolean;
-  allocationMethod?: 'Appropriate by Qty' | 'Appropriate by Value' | 'No Appropriation';
+  allocationMethod?:
+    | "Appropriate by Qty"
+    | "Appropriate by Value"
+    | "No Appropriation";
   gstDetails?: {
     setAlterHSNSAC?: boolean;
     hsnSacClassificationId?: string;
     hsnCode?: string;
     setAlterGST?: boolean;
     gstClassificationId?: string;
-    typeOfSupply?: 'Goods' | 'Services';
-    taxability?: 'Taxable' | 'Exempt' | 'Nil-rated';
+    typeOfSupply?: "Goods" | "Services";
+    taxability?: "Taxable" | "Exempt" | "Nil-rated";
     integratedTaxRate?: number;
     cess?: number;
   };
@@ -84,7 +87,7 @@ export type Ledger = {
   name: string;
   groupId: string;
   openingBalance: number;
-  balanceType: 'debit' | 'credit';
+  balanceType: "debit" | "credit";
   address?: string;
   email?: string;
   phone?: string;
@@ -99,23 +102,36 @@ export interface LedgerWithGroup extends Ledger {
   groupNature?: string;
 }
 export type VoucherEntryLine = {
-  // ledger_id: string | undefined;
   id: string;
   ledgerId?: string;
   itemId?: string;
   amount: number;
-  type: 'debit' | 'credit' | 'source' | 'destination';
+  type: "debit" | "credit" | "source" | "destination";
+
   quantity?: number;
-  rate?: number;
-  cgstRate?: number;
-  sgstRate?: number;
-  igstRate?: number;
+  rate?: any;
+
+  // GST - relaxed to `any` because many components supply string or number
+  cgstRate?: any;
+  sgstRate?: any;
+  igstRate?: any;
+  gstRate?: any;
+
   godownId?: string;
-  batchId?: string;
   batchNumber?: string;
-  expiryDate?: string;
-  manufacturingDate?: string;
-  discount?: number;
+  batchExpiryDate?: string;
+  batchManufacturingDate?: string;
+
+  unitName?: string;
+
+  unit?: string;
+  batches?: {
+    batchName: string;
+    expiryDate?: string;
+    manufacturingDate?: string;
+  }[];
+
+  discount?: any;
   hsnCode?: string;
   narration?: string;
   costCentreId?: string;
@@ -130,7 +146,15 @@ export type VoucherEntry = {
   number: string;
   narration?: string;
   entries: VoucherEntryLine[];
-  mode?: 'item-invoice' | 'accounting-invoice' | 'as-voucher' | 'transfer' | 'adjustment' | 'double-entry' | 'single-entry' | 'sales-order';
+  mode?:
+    | "item-invoice"
+    | "accounting-invoice"
+    | "as-voucher"
+    | "transfer"
+    | "adjustment"
+    | "double-entry"
+    | "single-entry"
+    | "sales-order";
   referenceNo?: string;
   partyId?: string;
   salesLedgerId?: string;
@@ -144,33 +168,72 @@ export type VoucherEntry = {
   orderRef?: string;
   termsOfDelivery?: string;
   isQuotation?: boolean;
+
+  subtotal?: number;
+  cgstTotal?: number;
+  sgstTotal?: number;
+  igstTotal?: number;
+  total?: number;
+
+  safeDate?: Date | null;
 };
 
 export type StockItem = {
   id: string;
   name: string;
+
   unit: string;
+  unitName?: string;
+  secondaryUnit?: string;
+  maintainInPieces?: boolean;
+
   openingBalance: number;
   openingValue: number;
+
   stockGroupId?: string;
-  gstRate?: number;
-  hsnCode?: string;
-  taxType?: 'Taxable' | 'Exempt' | 'Nil-rated';
-  standardPurchaseRate?: number;
-  standardSaleRate?: number;
-  enableBatchTracking?: boolean;
-  batchDetails?: BatchDetails[];
   godownAllocations?: GodownAllocation[];
+
+  gstRate?: number | string; // <-- added string support
+  hsnCode?: string;
+  taxType?: "Taxable" | "Exempt" | "Nil-rated";
+
+  standardPurchaseRate?: number | string;
+  standardSaleRate?: number | string;
+  rate?: number | string;
+
+  enableBatchTracking?: boolean;
   allowNegativeStock?: boolean;
-  maintainInPieces?: boolean;
-  secondaryUnit?: string;
+
+  // 🆕 Added missing fields returned from DB/UI
+  sellingRate?: number | string;
+  sellingPrice?: number | string;
+  saleRate?: number | string;
+  mrp?: number | string;
+  MRP?: number | string;
+
+  // UI expects this (KEEP)
+  batchDetails?: {
+    id?: string;
+    name: string;
+    expiryDate?: string;
+    manufacturingDate?: string;
+  }[];
+
+  // API or future mapping may use this (KEEP)
+  batches?: {
+    batchName: string;
+    expiryDate?: string;
+    manufacturingDate?: string;
+  }[];
 };
+
+
 
 export type UnitOfMeasurement = {
   id: string;
   name: string;
   symbol: string;
-  type: 'Simple' | 'Compound';
+  type: "Simple" | "Compound";
   // Simple unit fields
   formalName?: string;
   decimalPlaces?: number;
@@ -189,37 +252,43 @@ export type LedgerEntry = {
   id: string;
   ledgerId: string;
   amount: number;
-  type: 'debit' | 'credit';
+  type: "debit" | "credit";
   voucherId: string;
   date: string;
 };
 
 export type AppContextType = {
-  theme: 'light' | 'dark';
+  theme: "light" | "dark";
   companyInfo?: CompanyInfo;
   stockItems?: StockItem[];
   ledgers?: Ledger[];
   ledgerGroups?: LedgerGroup[];
   godowns?: Godown[];
   vouchers?: VoucherEntry[];
-  addStockItem: (item: Omit<StockItem, 'id'>) => void;
+  addStockItem: (item: Omit<StockItem, "id">) => void;
   updateStockItem: (id: string, item: Partial<StockItem>) => void;
-  addLedger: (ledger: Omit<Ledger, 'id'>) => void;
-  addLedgerGroup: (group: Omit<LedgerGroup, 'id'>) => void;
+  addLedger: (ledger: Omit<Ledger, "id">) => void;
+  addLedgerGroup: (group: Omit<LedgerGroup, "id">) => void;
   addVoucher: (voucher: VoucherEntry) => void;
   updateVoucher: (id: string, voucher: Partial<VoucherEntry>) => void;
   addLedgerEntry: (entry: LedgerEntry) => void;
 };
 
 // Capital Gains Management Types
-export type CapitalAsset = 'equity' | 'mutual_fund' | 'real_estate' | 'gold' | 'bonds' | 'other';
+export type CapitalAsset =
+  | "equity"
+  | "mutual_fund"
+  | "real_estate"
+  | "gold"
+  | "bonds"
+  | "other";
 
 export type CapitalGain = {
   id: string;
-    employeeId: string;
+  employeeId: string;
 
   assetType: CapitalAsset;
-  gainType: 'short' | 'long';
+  gainType: "short" | "long";
   purchaseDate: string;
   saleDate: string;
   purchaseValue: number;
@@ -234,11 +303,28 @@ export type CapitalGain = {
 };
 
 // TDS Management Types
-export type TDSSection = '194A' | '194B' | '194C' | '194D' | '194G' | '194H' | '194I' | '194J' | '194K' | '194LA' | '194M' | '194N' | '194O' | '194P' | '194Q' | '194R' | '194S';
+export type TDSSection =
+  | "194A"
+  | "194B"
+  | "194C"
+  | "194D"
+  | "194G"
+  | "194H"
+  | "194I"
+  | "194J"
+  | "194K"
+  | "194LA"
+  | "194M"
+  | "194N"
+  | "194O"
+  | "194P"
+  | "194Q"
+  | "194R"
+  | "194S";
 
 export type TDSEntry = {
   id: string;
-  type: 'deducted' | 'collected';
+  type: "deducted" | "collected";
   section: TDSSection;
   deductorName: string;
   deductorPAN: string;
@@ -246,7 +332,7 @@ export type TDSEntry = {
   tdsAmount: number;
   rate: number;
   assessmentYear: string;
-  quarter: 'Q1' | 'Q2' | 'Q3' | 'Q4';
+  quarter: "Q1" | "Q2" | "Q3" | "Q4";
   dateOfDeduction: string;
   challanNumber: string;
   description: string;
@@ -255,20 +341,20 @@ export type TDSEntry = {
 };
 
 // Scenario Management Types
-export type VoucherType = 
-  | 'payment' 
-  | 'receipt' 
-  | 'contra' 
-  | 'journal' 
-  | 'sales' 
-  | 'purchase'
-  | 'debit-note' 
-  | 'credit-note' 
-  | 'stock-journal' 
-  | 'delivery-note'
-  | 'sales-order'
-  | 'purchase-order'
-  | 'quotation';
+export type VoucherType =
+  | "payment"
+  | "receipt"
+  | "contra"
+  | "journal"
+  | "sales"
+  | "purchase"
+  | "debit-note"
+  | "credit-note"
+  | "stock-journal"
+  | "delivery-note"
+  | "sales-order"
+  | "purchase-order"
+  | "quotation";
 
 export type Scenario = {
   id: string;
@@ -297,7 +383,7 @@ export type StockTransaction = {
   rate: number;
   value: number;
   unit: string;
-  type: 'in' | 'out';
+  type: "in" | "out";
   referenceId?: string;
   batchNumber?: string;
   expiryDate?: string;
@@ -332,7 +418,6 @@ export type StockCategory = {
   parent: string;
   description: string;
 };
-
 
 export type GstClassification = {
   id: string;

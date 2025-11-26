@@ -6,7 +6,7 @@ import {
   FileText, ShoppingCart, ShoppingBag, 
   FileMinus, FilePlus, Truck,  Clipboard,
   Package, 
-  ImportIcon, Settings
+  ImportIcon
 } from 'lucide-react';
 
 interface VoucherType {

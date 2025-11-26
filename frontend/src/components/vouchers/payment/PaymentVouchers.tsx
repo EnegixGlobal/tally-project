@@ -10,7 +10,7 @@ interface Ledgers {
   groupName: string;
 }
 const PaymentVoucher: React.FC = () => {
-  const { theme, vouchers, companyInfo, addVoucher, updateVoucher } =
+  const { theme, vouchers, companyInfo } =
     useAppContext();
 
   const navigate = useNavigate();
@@ -18,7 +18,7 @@ const PaymentVoucher: React.FC = () => {
 
   const isEditMode = !!id;
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
-  const [originalEntries, setOriginalEntries] = useState([]);
+  const [_originalEntries, setOriginalEntries] = useState<any[]>([]);
 
   const [cashBankLedgers, setCashBankLedgers] = useState<Ledgers[]>([]);
   const companyId = localStorage.getItem("company_id");
@@ -96,7 +96,7 @@ const PaymentVoucher: React.FC = () => {
         // -----------------------------
         // FIX: Convert backend entries
         // -----------------------------
-        const mappedEntries = (v.entries || []).map((e) => ({
+        const mappedEntries = (v.entries || []).map((e:any) => ({
           id: e.id?.toString() || "",
           ledgerId: e.ledger_id?.toString() || "",
           amount: Number(e.amount) || 0,

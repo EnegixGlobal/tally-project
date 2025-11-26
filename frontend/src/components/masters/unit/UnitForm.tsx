@@ -6,16 +6,14 @@ import type { UnitOfMeasurement } from "../../../types";
 import Swal from "sweetalert2";
 
 const UnitForm: React.FC = () => {
-  const { theme, units } = useAppContext();
+  const { theme } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = Boolean(id);
-  const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("userType");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
-  const queryParams = `company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
   const [formData, setFormData] = useState<Omit<UnitOfMeasurement, "id">>({
     name: "",

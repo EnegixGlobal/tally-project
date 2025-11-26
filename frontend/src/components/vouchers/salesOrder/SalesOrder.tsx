@@ -114,7 +114,7 @@ const SalesOrder: React.FC = () => {
           },
 
           // IMPORTANT: Backend items → frontend items format conversion
-          items: order.items.map((it, idx) => ({
+          items: order.items.map((it: any, idx: number) => ({
             id: String(idx + 1),
             itemId: it.itemId,
             itemName: it.itemName,
@@ -311,7 +311,8 @@ const SalesOrder: React.FC = () => {
       const rawGST = Number(selectedItem?.gstRate) || 0;
 
       // FIX UNIT — API gives unitName (ex: "Kilogram")
-      const unitValue = selectedItem?.unitName || selectedItem?.unit || "";
+      const unitValue = (selectedItem as any)?.unitName || selectedItem?.unit || "";
+
 
       // FIX RATE — your API may not have standardSaleRate
       const rateValue = Number(selectedItem?.standardSaleRate) || 0;

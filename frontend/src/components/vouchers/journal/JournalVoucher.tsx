@@ -6,7 +6,7 @@ import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from 'lucide-react';
 import type { VoucherEntry, Ledger } from '../../../types';
 
 const JournalVoucher: React.FC = () => {
-  const { theme, companyInfo, vouchers, addVoucher, updateVoucher } = useAppContext();
+  const { theme, companyInfo, vouchers } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
@@ -149,7 +149,7 @@ useEffect(() => {
       const v = json.data;
 
       // Map backend → frontend
-      const mappedEntries = v.entries.map((e, i) => ({
+      const mappedEntries = v.entries.map((e: any, i: number) => ({
         id: (i + 1).toString(),
         ledgerId: e.ledger_id?.toString() || "",
         amount: Number(e.amount) || 0,
@@ -178,7 +178,7 @@ useEffect(() => {
 }, [isEditMode, id]);
 
 
- const handleSubmit = async (e) => {
+ const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
   if (!validateForm()) return;
 

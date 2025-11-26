@@ -11,7 +11,7 @@ const SalesOrderRegister: React.FC = () => {
     navigate(`/app/vouchers/sales-order/edit/${voucher.id}`);
   };
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     Swal.fire({
       title: "Are you sure?",
       text: "Do you want to delete this Sales Order?",

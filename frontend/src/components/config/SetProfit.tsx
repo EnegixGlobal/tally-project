@@ -56,16 +56,27 @@ const SetProfit: React.FC = () => {
     value: "",
   });
 
-  const [isLoading, setIsLoading] = useState(false);
+  const [isLoading] = useState(false);
+  const [newRule, setNewRule] = useState<ProfitRule>({
+    id: crypto.randomUUID(),
+    name: "",
+    type: "percentage",
+    value: 0,
+    applicableToCategories: [],
+    applicableToItems: [],
+    minQuantity: undefined,
+    maxQuantity: undefined,
+    isActive: true,
+    priority: 1,
+  });
 
   const handleSave = async () => {
     const ownerId = localStorage.getItem("employee_id") || 1;
     const ownerType = localStorage.getItem("userType") || "admin";
 
-
     try {
       const response = await fetch("http://localhost:5000/api/set-profit", {
-          method: "PUT",
+        method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           customerType: profitConfig.customerType,
@@ -93,7 +104,7 @@ const SetProfit: React.FC = () => {
       Swal.fire({
         icon: "error",
         title: "Failed!",
-        text: error.message || "Unable to save profit settings",
+        text: (error as Error).message || "Unable to save profit settings",
       });
     }
   };
@@ -119,6 +130,59 @@ const SetProfit: React.FC = () => {
       });
       setProfitRules([]);
     }
+  };
+
+  // 🔄 Toggle Rule Active
+  const toggleRuleActive = (id: string) => {
+    setProfitRules((prev) =>
+      prev.map((rule) =>
+        rule.id === id ? { ...rule, isActive: !rule.isActive } : rule
+      )
+    );
+  };
+
+  // ✏ Edit Rule
+  const handleEditRule = (rule: ProfitRule) => {
+    setEditingRule(rule);
+    setNewRule(rule);
+    setShowAddRuleModal(true);
+  };
+
+  // 🗑 Delete Rule
+  const handleDeleteRule = (id: string) => {
+    setProfitRules((prev) => prev.filter((rule) => rule.id !== id));
+  };
+
+  // ➕ Add Rule
+  const handleAddRule = () => {
+    const id = crypto.randomUUID();
+    setProfitRules((prev) => [...prev, { ...newRule, id }]);
+    resetRuleForm();
+  };
+
+  // ♻ Update Rule
+  const handleUpdateRule = () => {
+    if (!editingRule) return;
+    setProfitRules((prev) =>
+      prev.map((rule) => (rule.id === editingRule.id ? newRule : rule))
+    );
+    resetRuleForm();
+  };
+
+  // 🔙 Reset Form
+  const resetRuleForm = () => {
+    setShowAddRuleModal(false);
+    setEditingRule(null);
+    setNewRule({
+      id: "",
+      name: "",
+      type: "percentage",
+      value: 0,
+      applicableToCategories: [],
+      applicableToItems: [],
+      isActive: true,
+      priority: profitRules.length + 1,
+    });
   };
 
   return (
@@ -834,6 +898,7 @@ const SetProfit: React.FC = () => {
                   setShowAddRuleModal(false);
                   setEditingRule(null);
                   setNewRule({
+                    id: crypto.randomUUID(),
                     name: "",
                     type: "percentage",
                     value: 0,

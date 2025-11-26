@@ -10,7 +10,6 @@ const StockCategoryForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
-  const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("userType");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
@@ -18,12 +17,12 @@ const StockCategoryForm: React.FC = () => {
 
   // Mock stockCategories and functions since they're not in context
   const stockCategories = useMemo<StockCategory[]>(() => [], []);
-  const addStockCategory = useCallback((category: StockCategory) => {
-    alert("Stock category added successfully!");
-  }, []);
-  const updateStockCategory = useCallback((category: StockCategory) => {
-    alert("Stock category updated successfully!");
-  }, []);
+  // const addStockCategory = useCallback((category: StockCategory) => {
+  //   alert("Stock category added successfully!");
+  // }, []);
+  // const updateStockCategory = useCallback((category: StockCategory) => {
+  //   alert("Stock category updated successfully!");
+  // }, []);
 
   const initialFormData: StockCategory = {
     id: "",

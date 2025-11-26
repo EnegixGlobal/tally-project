@@ -8,7 +8,7 @@ const ContraRegister: React.FC = () => {
   const navigate = useNavigate();
 
   // ----------------------- EDIT -----------------------
-  const handleEdit = (voucher) => {
+  const handleEdit = (voucher: { id: string }) => {
     navigate(`/app/vouchers/contra/edit/${voucher.id}`);
   };
 
@@ -58,7 +58,7 @@ const ContraRegister: React.FC = () => {
   };
 
   // ----------------------- VIEW -----------------------
-  const handleView = (voucher) => {
+  const handleView = (voucher: { id: string }) => {
     navigate(`/app/voucher-view/${voucher.id}`);
   };
 

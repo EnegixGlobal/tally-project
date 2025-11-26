@@ -10,19 +10,6 @@ import {
   Filter,
 } from "lucide-react";
 
-interface BatchInfo {
-  id: string;
-  name: string; // batchNumber
-  expiryDate?: string;
-  manufacturingDate?: string;
-  stockItemId: string;
-  stockItemName: string;
-  stockUnit: string;
-  currentStock: number;
-  daysToExpiry: number;
-  status: "active" | "expiring" | "expired";
-}
-
 interface StockItem {
   id: string;
   name: string;
@@ -30,10 +17,18 @@ interface StockItem {
   openingBalance: number;
   hsnCode?: string;
   enableBatchTracking: boolean;
+
+  // Old single values from DB
   batchNumber?: string;
   batchExpiryDate?: string;
   batchManufacturingDate?: string;
-  // other fields omitted for brevity
+
+  // New parsed multiple batches
+  batches?: Array<{
+    batchName: string;
+    batchExpiryDate: string;
+    batchManufacturingDate: string;
+  }>;
 }
 
 const BatchList: React.FC = () => {
@@ -61,7 +56,7 @@ const BatchList: React.FC = () => {
         if (isMounted) {
           if (json.success) {
             // Parse the 'batches' field from JSON string to array of objects
-            const parsedData = json.data.map((item) => {
+            const parsedData = json.data.map((item: any) => {
               if (item.batches) {
                 item.batches = JSON.parse(item.batches); // Parse the batches JSON string
               }
@@ -443,7 +438,7 @@ const BatchList: React.FC = () => {
                       {/* BATCH NUMBER — SCROLL */}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b, i) => (
+                          {batches.map((b: any, i: number) => (
                             <div key={i} className="font-medium">
                               {b.batchName}
                             </div>
@@ -474,7 +469,7 @@ const BatchList: React.FC = () => {
                       {/* MFG DATE — SCROLL */}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b, i) => (
+                          {batches.map((b: any, i: number) => (
                             <div key={i} className="flex items-center">
                               <Calendar
                                 size={14}
@@ -491,7 +486,7 @@ const BatchList: React.FC = () => {
                       {/* EXP DATE — SCROLL */}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b, i) => (
+                          {batches.map((b: any, i: number) => (
                             <div key={i} className="flex items-center">
                               <Calendar
                                 size={14}
@@ -506,7 +501,7 @@ const BatchList: React.FC = () => {
                       {/* DAYS — SCROLL */}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b, i) => {
+                          {batches.map((b: any, i: number) => {
                             const days = Math.ceil(
                               (new Date(b.batchExpiryDate).getTime() -
                                 Date.now()) /

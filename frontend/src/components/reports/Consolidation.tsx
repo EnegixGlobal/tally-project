@@ -234,8 +234,3 @@ export default function ConsolidatedFinancialReport() {
   );
 }
 
-// Helper flattened function outside component or inside, depending on your preference
-function flattenSections(sectionMap: { [companyId: string]: any[] } | undefined): any[] {
-  if (!sectionMap) return [];
-  return Object.values(sectionMap).flat();
-}

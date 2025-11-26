@@ -66,7 +66,7 @@ interface ItemDetails {
   name: string;
   hsnCode?: string;
   unit: string;
-  gstRate: number;
+  gstRate: number | string;
 }
 
 interface TotalCalculation {

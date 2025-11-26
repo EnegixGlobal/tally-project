@@ -52,14 +52,14 @@ interface PurchaseOrderData {
   };
 }
 
-interface Ledger {
-  id: string;
-  name: string;
-  type: string;
-  currentBalance?: number;
-  state?: string;
-  gstNumber?: string;
-}
+// interface Ledger {
+//   id: string;
+//   name: string;
+//   type: string;
+//   currentBalance?: number;
+//   state?: string;
+//   gstNumber?: string;
+// }
 
 interface StockItem {
   id: string;
@@ -86,7 +86,15 @@ const PurchaseOrderVoucher: React.FC = () => {
     ownerType === "employee" ? "employee_id" : "user_id"
   );
 
-  const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
+  type PartyLedger = LedgerWithGroup & {
+  currentBalance?: number;
+  gstNumber?: string;
+  state?: string;
+};
+
+
+  const [ledgers, setLedgers] = useState<PartyLedger[]>([]);
+
   const [godowns, setGodowns] = useState<Godown[]>([]);
   useEffect(() => {
     const fetchGodowns = async () => {

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import type { VoucherEntry } from "../../types";
 import { useAppContext } from "../../context/AppContext";
 import PrintOptions from "../vouchers/sales/PrintOptions";
@@ -55,19 +55,6 @@ const getVoucherStatus = (voucher: VoucherEntry): string => {
   return "pending";
 };
 
-const getStatusColor = (status: string): string => {
-  switch (status) {
-    case "approved":
-      return "bg-green-100 text-green-800";
-    case "pending":
-      return "bg-yellow-100 text-yellow-800";
-    case "draft":
-      return "bg-gray-100 text-gray-800";
-    default:
-      return "bg-gray-100 text-gray-800";
-  }
-};
-
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -86,7 +73,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 }) => {
   const navigate = useNavigate();
   const { theme } = useAppContext();
-  const [ledgers, setLedgers] = useState<{ id: string; name: string }[]>([]);
+  const { ledgers } = useAppContext();
 
   const [vouchers, setVouchers] = useState<PurchaseVoucher[]>([]);
   const [loading, setLoading] = useState(true);
@@ -128,7 +115,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   const getLedgerName = (ledgerId?: number | string) => {
     if (!ledgerId) return "Unknown Ledger (-)";
 
-    const ledger = ledgers.find((l) => String(l.id) === String(ledgerId));
+    const ledger = ledgers?.find((l: any) => String(l.id) === String(ledgerId));
 
     return ledger ? ledger.name : `Unknown Ledger (${ledgerId})`;
   };
@@ -260,7 +247,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           return vouchers.filter((voucher) => {
             const voucherMonth = new Date(voucher.date).getMonth() + 1;
 
-            return voucherMonth === selectedMonth;
+            return String(voucherMonth).padStart(2, "0") === selectedMonth;
           });
         } else {
           // Show current month by default
@@ -329,7 +316,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     // ---------------------- SALES ----------------------
 
     if (voucherType === "sales") {
-       console.log("SALES CONVERT INPUT:", p)
+      console.log("SALES CONVERT INPUT:", p);
       const party =
         p.partyName ||
         p.party_name ||
@@ -369,8 +356,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         referenceNo: p.referenceNo || p.reference_no || "",
         type: "sales",
 
-        party, 
-        supplierInvoiceDate: invoiceDate, 
+        party,
+        supplierInvoiceDate: invoiceDate,
         subtotal,
         cgstTotal: cgst,
         sgstTotal: sgst,
@@ -447,7 +434,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         })),
 
         total: (p.entries || []).reduce(
-          (sum, e) => sum + Number(e.amount || 0),
+          (sum: number, e: any) => sum + Number(e.amount || 0),
           0
         ),
       };
@@ -477,7 +464,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         })),
 
         total: (p.entries || []).reduce(
-          (sum, e) => sum + Number(e.amount || 0),
+          (sum: number, e: any) => sum + Number(e.amount || 0),
           0
         ),
       };
@@ -507,7 +494,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         })),
 
         total: (p.entries || []).reduce(
-          (sum, e) => sum + Number(e.amount || 0),
+          (sum: number, e: any) => sum + Number(e.amount || 0),
           0
         ),
       };
@@ -532,55 +519,54 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
   // ---- FINAL FILTERING LOGIC ----
   const filteredVouchers = (() => {
-  try {
-    // Convert raw data → VoucherEntry
-    const converted = vouchers.map((v) => {
-      const entry = convertToVoucherEntry(v);
-      return {
-        ...entry,
-        safeDate: normalizeDate(v.date), // safe date object
-      };
-    });
+    try {
+      // Convert raw data → VoucherEntry
+      const converted = vouchers.map((v) => {
+        const entry = convertToVoucherEntry(v);
+        return {
+          ...entry,
+          safeDate: normalizeDate(v.date), // safe date object
+        };
+      });
 
-    // Apply View Type filter
-    const viewFiltered = filterVouchersByView(converted);
+      // Apply View Type filter
+      const viewFiltered = filterVouchersByView(converted);
 
-    // Apply Search, Date, Status filters
-    let finalList = viewFiltered.filter((voucher) => {
-      const safeNumber = (voucher.number || "").toLowerCase();
-      const safeRef = (voucher.referenceNo || "").toLowerCase();
+      // Apply Search, Date, Status filters
+      let finalList = viewFiltered.filter((voucher) => {
+        const safeNumber = (voucher.number || "").toLowerCase();
+        const safeRef = (voucher.referenceNo || "").toLowerCase();
 
-      // Search filter
-      const searchMatch =
-        !searchTerm ||
-        safeNumber.includes(searchTerm.toLowerCase()) ||
-        safeRef.includes(searchTerm.toLowerCase());
+        // Search filter
+        const searchMatch =
+          !searchTerm ||
+          safeNumber.includes(searchTerm.toLowerCase()) ||
+          safeRef.includes(searchTerm.toLowerCase());
 
-      // Date filter
-      const formattedVoucherDate =
-        voucher.safeDate?.toISOString().slice(0, 10) || "";
-      const dateMatch = !dateFilter || formattedVoucherDate === dateFilter;
+        // Date filter
+        const formattedVoucherDate =
+          voucher.safeDate?.toISOString().slice(0, 10) || "";
+        const dateMatch = !dateFilter || formattedVoucherDate === dateFilter;
 
-      // Status filter
-      const status = getVoucherStatus(voucher);
-      const statusMatch = !statusFilter || status === statusFilter;
+        // Status filter
+        const status = getVoucherStatus(voucher);
+        const statusMatch = !statusFilter || status === statusFilter;
 
-      return searchMatch && dateMatch && statusMatch;
-    });
+        return searchMatch && dateMatch && statusMatch;
+      });
 
-    finalList.sort((a, b) => {
-      const da = a.safeDate ? a.safeDate.getTime() : 0;
-      const db = b.safeDate ? b.safeDate.getTime() : 0;
-      return da - db; // ascending order
-    });
+      finalList.sort((a, b) => {
+        const da = a.safeDate ? a.safeDate.getTime() : 0;
+        const db = b.safeDate ? b.safeDate.getTime() : 0;
+        return da - db; // ascending order
+      });
 
-    return finalList;
-  } catch (err) {
-    console.error("Filter Error:", err);
-    return [];
-  }
-})();
-
+      return finalList;
+    } catch (err) {
+      console.error("Filter Error:", err);
+      return [];
+    }
+  })();
 
   // Pagination
   const totalPages = Math.max(
@@ -589,7 +575,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   );
   const startIndex = Math.max(0, (currentPage - 1) * itemsPerPage);
   const endIndex = Math.min(startIndex + itemsPerPage, filteredVouchers.length);
-  const paginatedVouchers = filteredVouchers.slice(startIndex, endIndex);
 
   // Reset to first page if current page is out of bounds
   useEffect(() => {
@@ -804,12 +789,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       console.error("Error printing data:", error);
       alert("Error occurred while printing data");
     }
-  };
-
-  // Row-level print options handlers
-  const openPrintOptions = (voucher: VoucherEntry) => {
-    setSelectedVoucher(voucher);
-    setShowPrintOptions(true);
   };
 
   const closePrintOptions = () => {
@@ -1240,7 +1219,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             </thead>
 
             <tbody className="bg-white divide-y divide-gray-200">
-              {filteredVouchers.map((voucher) => {
+              {(filteredVouchers as VoucherEntry[]).map((voucher) => {
+                if (!voucher || !voucher.entries) return null; // Safety
+
                 const debitEntry = voucher.entries.find(
                   (e) => e.type === "debit"
                 );
@@ -1248,50 +1229,59 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   (e) => e.type === "credit"
                 );
 
-                const total = debitEntry?.amount || 0;
+                const subtotal =
+                  typeof voucher.subtotal === "number" ? voucher.subtotal : 0;
+                const cgst =
+                  typeof voucher.cgstTotal === "number" ? voucher.cgstTotal : 0;
+                const sgst =
+                  typeof voucher.sgstTotal === "number" ? voucher.sgstTotal : 0;
+                const igst =
+                  typeof voucher.igstTotal === "number" ? voucher.igstTotal : 0;
+                const total =
+                  typeof voucher.total === "number" ? voucher.total : 0;
 
                 return (
                   <tr key={voucher.id} className="hover:bg-gray-50">
                     {/* Date */}
                     <td className="px-6 py-4 text-sm text-gray-500">
-                      {formatDate(voucher.date)}
+                      {voucher.date ? formatDate(voucher.date) : "-"}
                     </td>
 
                     {/* Voucher Number */}
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {voucher.number}
+                      {voucher.number ?? "-"}
                     </td>
 
-                    {/* Party (credit entry ledgerId) */}
+                    {/* Party */}
                     <td className="px-6 py-4 text-sm text-gray-500">
-                      {creditEntry?.ledgerId || "-"}
+                      {creditEntry?.ledgerId ?? "-"}
                     </td>
 
-                    {/* Supplier Invoice Date (not available in VoucherEntry) */}
+                    {/* Supplier Invoice Date */}
                     <td className="px-6 py-4 text-sm text-gray-500">
-                      {formatDate(voucher.supplierInvoiceDate)}
+                      {voucher.supplierInvoiceDate
+                        ? formatDate(voucher.supplierInvoiceDate)
+                        : "-"}
                     </td>
 
                     {/* Reference No */}
                     <td className="px-6 py-4 text-sm text-gray-500">
-                      {voucher.referenceNo}
+                      {voucher.referenceNo ?? "-"}
                     </td>
 
-                    {/* Subtotal = total - GST */}
+                    {/* Subtotal */}
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {voucher.subtotal}
+                      {subtotal.toLocaleString()}
                     </td>
 
-                    {/* GST (Purchase voucher me debit = total, GST included) */}
+                    {/* GST Total */}
                     <td className="px-6 py-4 text-sm text-gray-900">
-                      {voucher.cgstTotal +
-                        voucher.sgstTotal +
-                        voucher.igstTotal}
+                      {(cgst + sgst + igst).toLocaleString()}
                     </td>
 
                     {/* Total */}
                     <td className="px-6 py-4 text-sm text-gray-900 font-bold">
-                      {voucher.total}
+                      {total.toLocaleString()}
                     </td>
 
                     <td className="px-6 py-4 text-sm font-medium space-x-3">
@@ -1315,7 +1305,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
                       {onDelete && (
                         <button
-                          onClick={() => onDelete(voucher.id)}
+                          onClick={() => onDelete(String(voucher.id))} // TS-safe
                           className="text-red-600 hover:text-red-900"
                         >
                           Delete
@@ -1476,6 +1466,3 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 };
 
 export default VoucherRegisterBase;
-function setError(_arg0: string) {
-  throw new Error("Function not implemented.");
-}

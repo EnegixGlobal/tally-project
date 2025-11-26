@@ -338,7 +338,7 @@ const PaymentRegister: React.FC = () => {
 
   //delete handler
 
-  const deleteHandler = async (id) => {
+  const deleteHandler = async (id: string) => {
     // ID check
     if (!id) {
       Swal.fire({
@@ -400,7 +400,7 @@ const PaymentRegister: React.FC = () => {
 
   // Edit Handler
 
-  const editHandler = async (id) => {
+  const editHandler = async (id: string) => {
     // ID check
     if (!id) {
       Swal.fire({

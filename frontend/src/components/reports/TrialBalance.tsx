@@ -98,7 +98,7 @@ const TrialBalance: React.FC = () => {
     credit: true,
   });
 
-  const handleCheckboxChange = (e) => {
+  const handleCheckboxChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, checked } = e.target;
     setColumnVisibility((prev) => ({
       ...prev,

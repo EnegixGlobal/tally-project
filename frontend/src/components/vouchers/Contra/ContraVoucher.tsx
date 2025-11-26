@@ -123,7 +123,7 @@ const ContraVoucher: React.FC = () => {
         const v = json.data;
 
         // Transform entries because DB keys ≠ front-end keys
-        const mappedEntries = v.entries.map((e, i) => ({
+        const mappedEntries = v.entries.map((e: any, i: number) => ({
           id: (i + 1).toString(),
           ledgerId: e.ledger_id?.toString() || "",
           amount: Number(e.amount) || 0,

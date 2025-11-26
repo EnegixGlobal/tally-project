@@ -6,7 +6,7 @@ import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 import type { VoucherEntry, Ledger } from "../../../types";
 
 const ReceiptVoucher: React.FC = () => {
-  const { theme, companyInfo, vouchers } = useAppContext();
+  const { theme, companyInfo } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
@@ -16,14 +16,9 @@ const ReceiptVoucher: React.FC = () => {
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
-  // --- FIX: DATE FORMATTER ---
-  const formatDate = (d?: string) => {
-    if (!d) return "";
-    return d.split("T")[0]; 
-  };
 
-  const [cashBankLedgers, setCashBankLedgers] = useState([]);
-  const [allLedgers, setAllLedgers] = useState([]);
+  const [cashBankLedgers, setCashBankLedgers] = useState<Ledger[]>([]);
+  const [allLedgers, setAllLedgers] = useState<Ledger[]>([]);
 
   const generateVoucherNumber = () => {
     const prefix = "RV";
@@ -65,88 +60,90 @@ const ReceiptVoucher: React.FC = () => {
     []
   );
 
- const validateForm = () => {
-  const newErrors: { [key: string]: string } = {};
+  const validateForm = () => {
+    const newErrors: { [key: string]: string } = {};
 
-  // ----------- COMMON VALIDATIONS ------------
-  if (!formData.date) newErrors.date = "Date is required";
-  if (!formData.number) newErrors.number = "Voucher number is required";
+    // ----------- COMMON VALIDATIONS ------------
+    if (!formData.date) newErrors.date = "Date is required";
+    if (!formData.number) newErrors.number = "Voucher number is required";
 
-  // ----------- SINGLE ENTRY MODE VALIDATIONS ------------
-  if (formData.mode === "single-entry") {
-
-    // Must have at least 1 debit + 1 credit
-    if (formData.entries.length < 2) {
-      newErrors.entries = "At least one debit and one credit entry required";
-    }
-
-    // First entry must ALWAYS be debit (Cash/Bank)
-    if (formData.entries[0].type !== "debit") {
-      newErrors.entries = "First entry must be debit (Cash/Bank)";
-    }
-
-    // Debit ledger must be cash or bank
-    const debitLedger = [...cashBankLedgers, ...allLedgers].find(
-      (l) => l.id === formData.entries[0].ledgerId
-    );
-
-    if (
-      debitLedger &&
-      debitLedger.type !== "cash" &&
-      debitLedger.type !== "bank"
-    ) {
-      newErrors.ledgerId0 = "Debit ledger must be Cash or Bank";
-    }
-
-    // ALL remaining entries must be CREDIT
-    for (let i = 1; i < formData.entries.length; i++) {
-      const entry = formData.entries[i];
-
-      if (entry.type !== "credit") {
-        newErrors[`type${i}`] = "All party entries must be Credit";
+    // ----------- SINGLE ENTRY MODE VALIDATIONS ------------
+    if (formData.mode === "single-entry") {
+      // Must have at least 1 debit + 1 credit
+      if (formData.entries.length < 2) {
+        newErrors.entries = "At least one debit and one credit entry required";
       }
 
-      // Allowed: Sundry Debtors OR Income
-      const ledger = ledgers.find((l) => l.id === entry.ledgerId);
+      // First entry must ALWAYS be debit (Cash/Bank)
+      if (formData.entries[0].type !== "debit") {
+        newErrors.entries = "First entry must be debit (Cash/Bank)";
+      }
+
+      // Debit ledger must be cash or bank
+      const debitLedger = [...cashBankLedgers, ...allLedgers].find(
+        (l) => l.id === formData.entries[0].ledgerId
+      );
+
       if (
-        ledger &&
-        ledger.type !== "sundry-debtors" &&
-        ledger.type !== "indirect-income"
+        debitLedger &&
+        debitLedger.type !== "cash" &&
+        debitLedger.type !== "bank"
       ) {
-        newErrors[`ledgerId${i}`] =
-          "Credit ledger must be Sundry Debtors or Income";
+        newErrors.ledgerId0 = "Debit ledger must be Cash or Bank";
+      }
+
+      // ALL remaining entries must be CREDIT
+      for (let i = 1; i < formData.entries.length; i++) {
+        const entry = formData.entries[i];
+
+        if (entry.type !== "credit") {
+          newErrors[`type${i}`] = "All party entries must be Credit";
+        }
+
+        // Allowed: Sundry Debtors OR Income
+        const ledger = ledgers.find((l) => l.id === entry.ledgerId);
+        if (
+          ledger &&
+          ledger.type !== "sundry-debtors" &&
+          ledger.type !== "indirect-income"
+        ) {
+          newErrors[`ledgerId${i}`] =
+            "Credit ledger must be Sundry Debtors or Income";
+        }
       }
     }
-  }
 
-  // ----------- DOUBLE ENTRY MODE VALIDATION ------------
-  if (formData.mode === "double-entry") {
-    const totalDebit = formData.entries
-      .filter((e) => e.type === "debit")
-      .reduce((s, e) => s + e.amount, 0);
+    // ----------- DOUBLE ENTRY MODE VALIDATION ------------
+    if (formData.mode === "double-entry") {
+      const totalDebit = formData.entries
+        .filter((e) => e.type === "debit")
+        .reduce((s, e) => s + e.amount, 0);
 
-    const totalCredit = formData.entries
-      .filter((e) => e.type === "credit")
-      .reduce((s, e) => s + e.amount, 0);
+      const totalCredit = formData.entries
+        .filter((e) => e.type === "credit")
+        .reduce((s, e) => s + e.amount, 0);
 
-    if (totalDebit !== totalCredit) {
-      newErrors.balance = "Total debit must equal total credit";
+      if (totalDebit !== totalCredit) {
+        newErrors.balance = "Total debit must equal total credit";
+      }
     }
-  }
 
-  // ----------- COMMON ENTRY VALIDATIONS (Both modes) ------------
-  formData.entries.forEach((entry, index) => {
-    if (!entry.ledgerId)
-      newErrors[`ledgerId${index}`] = `Ledger is required (line ${index + 1})`;
+    // ----------- COMMON ENTRY VALIDATIONS (Both modes) ------------
+    formData.entries.forEach((entry, index) => {
+      if (!entry.ledgerId)
+        newErrors[`ledgerId${index}`] = `Ledger is required (line ${
+          index + 1
+        })`;
 
-    if (entry.amount <= 0)
-      newErrors[`amount${index}`] = `Amount must be greater than 0 (line ${index + 1})`;
-  });
+      if (entry.amount <= 0)
+        newErrors[`amount${index}`] = `Amount must be greater than 0 (line ${
+          index + 1
+        })`;
+    });
 
-  setErrors(newErrors);
-  return Object.keys(newErrors).length === 0;
-};
-
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -158,7 +155,10 @@ const ReceiptVoucher: React.FC = () => {
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
-  const handleEntryChange = (index, e) => {
+  const handleEntryChange = (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
     const { name, value, type } = e.target;
 
     const updatedEntries = [...formData.entries];
@@ -184,86 +184,103 @@ const ReceiptVoucher: React.FC = () => {
     }));
   };
 
-useEffect(() => {
-  if (!isEditMode) return;
-  if (!id) return;
+  useEffect(() => {
+    if (!isEditMode) return;
+    if (!id) return;
 
-  const fetchSingleVoucher = async () => {
-    try {
-      const res = await fetch(
-        `http://localhost:5000/api/vouchers/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
-      );
+    const fetchSingleVoucher = async () => {
+      try {
+        const res = await fetch(
+          `http://localhost:5000/api/vouchers/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
+        );
 
-      const resJson = await res.json();
+        const resJson = await res.json();
 
-      // prefer resJson.data when API returns { data: {...} }
-      const v = resJson?.data ?? resJson;
+        // prefer resJson.data when API returns { data: {...} }
+        const v = resJson?.data ?? resJson;
 
-      if (!v) {
-        console.warn("No voucher data returned for id", id);
-        return;
-      }
+        if (!v) {
+          console.warn("No voucher data returned for id", id);
+          return;
+        }
 
-      // Normalize date to yyyy-mm-dd (input date value)
-      const normalize = (d?: string) => {
-        if (!d) return "";
-        return d.split("T")[0];
-      };
-
-      // Ensure entries is an array
-      const entriesFromApi = Array.isArray(v.entries) ? v.entries : [];
-
-      // Map entries to your form shape and ensure ledgerId is string
-      const mappedEntries = entriesFromApi.map((e: any, idx: number) => ({
-        id: String(idx + 1),
-        ledgerId: e.ledger_id !== undefined ? String(e.ledger_id ?? e.ledgerId ?? "") : String(e.ledgerId ?? ""),
-        amount: Number(e.amount ?? 0),
-        type: e.type ?? e.entry_type ?? "credit",
-        narration: e.narration ?? "",
-        bankName: e.bank_name ?? e.bankName ?? "",
-        chequeNumber: e.cheque_number ?? e.chequeNumber ?? "",
-        costCentreId: e.cost_centre_id ? String(e.cost_centre_id) : e.costCentreId ? String(e.costCentreId) : "",
-      }));
-
-      // If API returned single-entry vouchers with only one entry, ensure we have debit + credit
-      if (v.mode === "single-entry" && mappedEntries.length === 1) {
-        const e0 = mappedEntries[0];
-        const balancing = {
-          id: "2",
-          ledgerId: "",
-          amount: e0.amount,
-          type: e0.type === "debit" ? "credit" : "debit",
-          narration: "",
+        // Normalize date to yyyy-mm-dd (input date value)
+        const normalize = (d?: string) => {
+          if (!d) return "";
+          return d.split("T")[0];
         };
-        mappedEntries.push(balancing);
+
+        // Ensure entries is an array
+        const entriesFromApi = Array.isArray(v.entries) ? v.entries : [];
+
+        // Map entries to your form shape and ensure ledgerId is string
+        const mappedEntries = entriesFromApi.map((e: any, idx: number) => ({
+          id: String(idx + 1),
+          ledgerId:
+            e.ledger_id !== undefined
+              ? String(e.ledger_id ?? e.ledgerId ?? "")
+              : String(e.ledgerId ?? ""),
+          amount: Number(e.amount ?? 0),
+          type: e.type ?? e.entry_type ?? "credit",
+          narration: e.narration ?? "",
+          bankName: e.bank_name ?? e.bankName ?? "",
+          chequeNumber: e.cheque_number ?? e.chequeNumber ?? "",
+          costCentreId: e.cost_centre_id
+            ? String(e.cost_centre_id)
+            : e.costCentreId
+            ? String(e.costCentreId)
+            : "",
+        }));
+
+        // If API returned single-entry vouchers with only one entry, ensure we have debit + credit
+        if (v.mode === "single-entry" && mappedEntries.length === 1) {
+          const e0 = mappedEntries[0];
+          const balancing = {
+            id: "2",
+            ledgerId: "",
+            amount: e0.amount,
+            type: e0.type === "debit" ? "credit" : "debit",
+            narration: "",
+          };
+          mappedEntries.push(balancing);
+        }
+
+        setFormData({
+          date: normalize(v.date),
+          type: v.type ?? "receipt",
+          number: v.number ?? initialFormData.number,
+          narration: v.narration ?? "",
+          mode: v.mode ?? "double-entry",
+          referenceNo: v.referenceNo ?? "",
+          supplierInvoiceDate: normalize(v.supplierInvoiceDate),
+          entries:
+            mappedEntries.length > 0
+              ? mappedEntries
+              : // fallback to initial two-line structure
+                [
+                  {
+                    id: "1",
+                    ledgerId: "",
+                    amount: 0,
+                    type: "debit",
+                    narration: "",
+                  },
+                  {
+                    id: "2",
+                    ledgerId: "",
+                    amount: 0,
+                    type: "credit",
+                    narration: "",
+                  },
+                ],
+        });
+      } catch (err) {
+        console.error("Single fetch error:", err);
       }
+    };
 
-      setFormData({
-        date: normalize(v.date),
-        type: v.type ?? "receipt",
-        number: v.number ?? initialFormData.number,
-        narration: v.narration ?? "",
-        mode: v.mode ?? "double-entry",
-        referenceNo: v.referenceNo ?? "",
-        supplierInvoiceDate: normalize(v.supplierInvoiceDate),
-        entries:
-          mappedEntries.length > 0
-            ? mappedEntries
-            : // fallback to initial two-line structure
-              [
-                { id: "1", ledgerId: "", amount: 0, type: "debit", narration: "" },
-                { id: "2", ledgerId: "", amount: 0, type: "credit", narration: "" },
-              ],
-      });
-    } catch (err) {
-      console.error("Single fetch error:", err);
-    }
-  };
-
-  fetchSingleVoucher();
-}, [isEditMode, id]); // no dependence on ledgers/cashBankLedgers
-
-
+    fetchSingleVoucher();
+  }, [isEditMode, id]); // no dependence on ledgers/cashBankLedgers
 
   const addEntry = () => {
     if (formData.mode === "single-entry") {
@@ -301,12 +318,10 @@ useEffect(() => {
   };
 
   const removeEntry = (index: number) => {
-
     if (index === 0) return;
 
     const updated = [...formData.entries];
 
- 
     if (updated.length <= 2) return;
 
     updated.splice(index, 1);
@@ -333,7 +348,7 @@ useEffect(() => {
         );
         let cashData = await cashRes.json();
 
-        cashData = cashData.map((item) => ({
+        cashData = cashData.map((item :any) => ({
           ...item,
           type: item.groupType?.toLowerCase(),
         }));
@@ -346,13 +361,13 @@ useEffect(() => {
         );
         let allData = await allRes.json();
 
-        allData = allData.map((l) => ({
+        allData = allData.map((l:any) => ({
           ...l,
           type: l.type?.toLowerCase() || l.groupType?.toLowerCase() || "",
         }));
 
         setAllLedgers(allData);
-        setLedgers(allData); 
+        setLedgers(allData);
       } catch (err) {
         console.log("Ledger Load Error :", err);
       }
@@ -821,7 +836,7 @@ useEffect(() => {
                   >
                     <option value="">Select Cash/Bank Ledger</option>
 
-                    {cashBankLedgers.map((l) => (
+                    {cashBankLedgers.map((l:Ledger) => (
                       <option key={l.id} value={String(l.id)}>
                         {l.name}
                       </option>
@@ -899,7 +914,7 @@ useEffect(() => {
                             >
                               <option value="">Select Ledger</option>
 
-                              {allLedgers.map((l) => (
+                              {allLedgers.map((l: Ledger) => (
                                 <option key={l.id} value={String(l.id)}>
                                   {l.name}
                                 </option>

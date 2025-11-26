@@ -6,7 +6,7 @@ import type {
   GodownAllocation,
   Godown,
   UnitOfMeasurement,
-  StockGroup,
+
   GstClassification,
 } from "../../../types";
 import Swal from "sweetalert2";
@@ -228,14 +228,14 @@ const GodownAllocationField: React.FC<GodownAllocationFieldProps> = ({
 };
 
 const StockItemForm = () => {
-  const {
-    theme,
-    stockGroups = [],
-    gstClassifications = [],
-    units = [],
-    godowns = [],
-    companyInfo,
-  } = useAppContext();
+ const {
+  theme,
+  gstClassifications = [],
+  units = [],
+  godowns = [],
+  companyInfo,
+} = useAppContext();
+
   const navigate = useNavigate();
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("userType");

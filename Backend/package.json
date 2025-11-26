@@ -4,8 +4,8 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node server index.js",
-    "dev": "concurrently \"tsc -b --watch\" \"nodemon index.js\"",
+    "start": "node server.js",
+    "dev": "concurrently \"tsc -b --watch\" \"nodemon server.js\"",
     "build": "tsc",
     "postinstall": "npx prisma generate"
   },

@@ -16,29 +16,29 @@ const ScenarioForm: React.FC = () => {
     ownerType === "employee" ? "employee_id" : "user_id"
   );
   // Mock scenarios data - in a real app, this would come from an API or context
-  const [mockScenarios] = useState<Scenario[]>([
-    {
-      id: "SCN-001",
-      name: "Budget Q1 2025",
-      includeActuals: true,
-      includedVoucherTypes: ["sales", "purchase"],
-      excludedVoucherTypes: ["journal"],
-      fromDate: "2025-04-01",
-      toDate: "2025-06-30",
-      createdAt: "2025-06-01T10:00:00Z",
-    },
-    {
-      id: "SCN-002",
-      name: "Forecast H2 2025",
-      includeActuals: false,
-      includedVoucherTypes: ["journal"],
-      excludedVoucherTypes: ["sales", "purchase"],
-      fromDate: "2025-07-01",
-      toDate: "2025-12-31",
-      createdAt: "2025-06-15T12:00:00Z",
-      updatedAt: "2025-06-20T14:00:00Z",
-    },
-  ]);
+  // const [mockScenarios] = useState<Scenario[]>([
+  //   {
+  //     id: "SCN-001",
+  //     name: "Budget Q1 2025",
+  //     includeActuals: true,
+  //     includedVoucherTypes: ["sales", "purchase"],
+  //     excludedVoucherTypes: ["journal"],
+  //     fromDate: "2025-04-01",
+  //     toDate: "2025-06-30",
+  //     createdAt: "2025-06-01T10:00:00Z",
+  //   },
+  //   {
+  //     id: "SCN-002",
+  //     name: "Forecast H2 2025",
+  //     includeActuals: false,
+  //     includedVoucherTypes: ["journal"],
+  //     excludedVoucherTypes: ["sales", "purchase"],
+  //     fromDate: "2025-07-01",
+  //     toDate: "2025-12-31",
+  //     createdAt: "2025-06-15T12:00:00Z",
+  //     updatedAt: "2025-06-20T14:00:00Z",
+  //   },
+  // ]);
 
   const initialFormData: Scenario = {
     id: "",
