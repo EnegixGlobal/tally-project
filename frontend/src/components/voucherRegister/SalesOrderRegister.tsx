@@ -24,7 +24,7 @@ const SalesOrderRegister: React.FC = () => {
       if (result.isConfirmed) {
         try {
           const res = await fetch(
-            `http://localhost:5000/api/sales-orders/${id}`,
+            `${import.meta.env.VITE_API_URL}/api/sales-orders/${id}`,
             { method: "DELETE" }
           );
 

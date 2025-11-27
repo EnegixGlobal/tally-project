@@ -802,22 +802,22 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
         // --- SALES VOUCHERS ---
         if (voucherType === "sales") {
-          url = `http://localhost:5000/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          url = `${import.meta.env.VITE_API_URL}/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         }
 
         // --- PURCHASE VOUCHERS ---
         else if (voucherType === "purchase") {
-          url = `http://localhost:5000/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          url = `${import.meta.env.VITE_API_URL}/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         } else if (voucherType === "sales_order") {
-          url = `http://localhost:5000/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
+          url = `${import.meta.env.VITE_API_URL}/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
         } else if (voucherType === "purchase_order") {
-          url = `http://localhost:5000/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
+          url = `${import.meta.env.VITE_API_URL}/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
         } else if (voucherType === "receipt") {
-          url = `http://localhost:5000/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=receipt`;
+          url = `${import.meta.env.VITE_API_URL}/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=receipt`;
         } else if (voucherType === "contra") {
-          url = `http://localhost:5000/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=contra`;
+          url = `${import.meta.env.VITE_API_URL}/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=contra`;
         } else if (voucherType === "journal") {
-          url = `http://localhost:5000/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=journal`;
+          url = `${import.meta.env.VITE_API_URL}/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=journal`;
         } else {
           console.warn("Unknown voucherType:", voucherType);
           return;

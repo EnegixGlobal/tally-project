@@ -188,7 +188,7 @@ const SalesInvoiceMatching: React.FC = () => {
         if (filters.minAmount) params.append('minAmount', filters.minAmount);
         if (filters.maxAmount) params.append('maxAmount', filters.maxAmount);
 
-        const res = await fetch(`http://localhost:5000/api/sales-invoice-matching?${params.toString()}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-invoice-matching?${params.toString()}`);
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
         const normalizedData = normalizeBackendData(data);

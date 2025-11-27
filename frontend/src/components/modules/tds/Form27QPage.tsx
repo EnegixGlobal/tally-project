@@ -436,7 +436,7 @@ useEffect(() => {
   const params = [];
   if (selectedYear) params.push(`year=${selectedYear}`);
   if (selectedQuarter) params.push(`quarter=${selectedQuarter}`);
-  const url = `http://localhost:5000/api/tcs27q${params.length ? '?' + params.join('&') : ''}`;
+  const url = `${import.meta.env.VITE_API_URL}/api/tcs27q${params.length ? '?' + params.join('&') : ''}`;
 
   fetch(url)
     .then(res => res.json())
@@ -464,7 +464,7 @@ useEffect(() => {
   };
 
   try {
-    const response = await fetch('http://localhost:5000/api/tcs27q', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tcs27q`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload)

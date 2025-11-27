@@ -152,7 +152,7 @@ const PaymentRegister: React.FC = () => {
 
   // useEffect(() => {
   //   // Replace with your actual API endpoint and tenant params as required
-  //   fetch(`http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`)
+  //   fetch(`${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`)
   //     .then(res => res.json())
   //     .then(data => setLedgers(data.data || [])) // adjust key as per your API
   //     .then(() => setIsLoading(false)) // Set loading to false after data is fetched
@@ -163,7 +163,7 @@ const PaymentRegister: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
 
@@ -278,7 +278,7 @@ const PaymentRegister: React.FC = () => {
     }
 
     fetch(
-      `http://localhost:5000/api/vouchers?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`
+      `${import.meta.env.VITE_API_URL}/api/vouchers?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`
     )
       .then((res) => res.json())
       .then((data) => {
@@ -371,7 +371,7 @@ const PaymentRegister: React.FC = () => {
     try {
       // DELETE API call
       const response = await fetch(
-        `http://localhost:5000/api/vouchers/${id}?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`,
+        `${import.meta.env.VITE_API_URL}/api/vouchers/${id}?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`,
         {
           method: "DELETE",
         }

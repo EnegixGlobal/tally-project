@@ -25,7 +25,7 @@ useEffect(() => {
     const caId = localStorage.getItem("employee_id");
     if (!caId) return;
 
-    fetch(`http://localhost:5000/api/companies-by-ca?ca_id=${caId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-ca?ca_id=${caId}`)
       .then((res) => res.json())
       .then((data) => setCompanies(data.companies || []))
       .catch((err) => console.error("Error fetching CA companies:", err));
@@ -35,7 +35,7 @@ useEffect(() => {
 
   // Fetch only companies assigned to this CA
 //   useEffect(() => {
-//     fetch(`http://localhost:5000/api/companies-by-employee?employee_id=${caId}`)
+//     fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-employee?employee_id=${caId}`)
 //       .then((res) => res.json())
 //       .then((data) => setCompanies(data.companies || []))
 //       .catch(console.error);
@@ -58,7 +58,7 @@ useEffect(() => {
 
     try {
       // 1. Create CA Employee
-      const res = await fetch("http://localhost:5000/api/ca-employee", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ca-employee`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -75,7 +75,7 @@ useEffect(() => {
       const ca_employee_id = data.ca_employee_id;
 
       // 2. Assign Companies
-      const res2 = await fetch("http://localhost:5000/api/assign-companies-to-ca-employee", {
+      const res2 = await fetch(`${import.meta.env.VITE_API_URL}/api/assign-companies-to-ca-employee`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

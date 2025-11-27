@@ -25,7 +25,7 @@ const BudgetList: React.FC = () => {
     if (!companyId || !ownerType || !ownerId) {
       return;
     }
-    fetch(`http://localhost:5000/api/budgets?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/budgets?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`)
       .then((res) => res.json())
       .then((data) => setBudgets(data))
       .catch((err) => console.error('Failed to fetch budgets:', err));
@@ -41,7 +41,7 @@ const BudgetList: React.FC = () => {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/budgets/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        `${import.meta.env.VITE_API_URL}/api/budgets/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
         {
           method: 'DELETE',
         }

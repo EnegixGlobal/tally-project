@@ -314,7 +314,7 @@ const companyId = localStorage.getItem('company_id');
   useEffect(() => {
       const fetchLedgers = async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
           const data = await res.json();
           setLedgers(data);
         } catch (err) {
@@ -348,7 +348,7 @@ useEffect(() => {
   setLoading(true);
   setError(null);
 
-  fetch(`http://localhost:5000/api/ledger-report/report?ledgerId=${ledgerId}&fromDate=${fromDate}&toDate=${toDate}&includeOpening=${includeOpening}&includeClosing=${includeClosing}`)
+  fetch(`${import.meta.env.VITE_API_URL}/api/ledger-report/report?ledgerId=${ledgerId}&fromDate=${fromDate}&toDate=${toDate}&includeOpening=${includeOpening}&includeClosing=${includeClosing}`)
     .then(res => res.json())
     .then(data => {
       if(data.success) setLedgerData(data);

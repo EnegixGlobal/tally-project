@@ -76,7 +76,7 @@ const owner_id = localStorage.getItem(owner_type === 'employee' ? 'employee_id' 
         if (sortBy) params.append('sortBy', sortBy);
         if (sortOrder) params.append('sortOrder', sortOrder);
 
-        const res = await fetch(`http://localhost:5000/api/billwise-receivables?${params.toString()}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/billwise-receivables?${params.toString()}`);
         if (!res.ok) {
           throw new Error(`Error ${res.status} - ${await res.text()}`);
         }

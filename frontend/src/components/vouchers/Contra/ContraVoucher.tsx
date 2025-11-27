@@ -115,7 +115,7 @@ const ContraVoucher: React.FC = () => {
 
     const fetchVoucher = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/vouchers/${id}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers/${id}`);
         const json = await res.json();
 
         if (!json.data) return;
@@ -185,7 +185,7 @@ const ContraVoucher: React.FC = () => {
   };
   useEffect(() => {
     fetch(
-      `http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((res) => res.json())
       .then((data) => setCashBankLedgers(data))
@@ -211,7 +211,7 @@ const ContraVoucher: React.FC = () => {
           ownerType,
           ownerId,
         };
-        const response = await fetch("http://localhost:5000/api/vouchers", {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",

@@ -39,7 +39,7 @@ useEffect(() => {
     setLoading(true);
     setError(null);
     try {
-      const url = `http://localhost:5000/api/balance-sheet?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+      const url = `${import.meta.env.VITE_API_URL}/api/balance-sheet?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to load balance sheet data');
       const data = await res.json();

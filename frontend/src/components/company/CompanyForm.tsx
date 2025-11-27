@@ -213,7 +213,7 @@ const CompanyForm: React.FC = () => {
    useEffect(() => {
     const fetchAccountants = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/company/accountants"); // your API endpoint
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/company/accountants`); // your API endpoint
         const data = await res.json();
         if (res.ok) {
           setAccountantsList(data); // assuming data = [{id: "1", name: "John Doe"}, ...]
@@ -450,7 +450,7 @@ const CompanyForm: React.FC = () => {
       };
 
       // Step 4: Submit to backend
-      const res = await fetch("http://localhost:5000/api/company/company", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/company/company`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

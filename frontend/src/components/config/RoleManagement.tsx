@@ -70,13 +70,13 @@ useEffect(() => {
 
   const fetchRoles = async () => {
     setLoading(true);
-    const res = await fetch('http://localhost:5000/api/roles');
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/roles`);
     const data = await res.json();
     setRoles(data.roles || []);
     setLoading(false);
   };
   const fetchOptions = async () => {
-    const res = await fetch('http://localhost:5000/api/role-management/options');
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/role-management/options`);
     const data = await res.json();
     setPermissions(data.permissions || []);
     setScreens(data.screens || []);
@@ -160,7 +160,7 @@ useEffect(() => {
       .filter(([, permIds]) => (permIds as number[]).length > 0)
       .map(([sid, permIds]) => ({ screen_id: Number(sid), permission_ids: permIds }));
     setLoading(true);
-    const res = await fetch('http://localhost:5000/api/roles', {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/roles`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: roleForm.name, description: roleForm.description, permissions: permsPayload })
@@ -181,7 +181,7 @@ useEffect(() => {
       .map(([sid, permIds]) => ({ screen_id: Number(sid), permission_ids: permIds }));
 
     setLoading(true);
-    const res = await fetch(`http://localhost:5000/api/roles/${editingRoleId}`, {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/roles/${editingRoleId}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ name: roleForm.name, description: roleForm.description, permissions: permsPayload })
@@ -198,7 +198,7 @@ useEffect(() => {
     if (role.isSystem) return alert('System roles cannot be deleted!');
     if (!window.confirm(`Delete ${role.name}? This affects ${role.userCount} users.`)) return;
     setLoading(true);
-    const res = await fetch(`http://localhost:5000/api/roles/${role.id}`, { method: 'DELETE' });
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/roles/${role.id}`, { method: 'DELETE' });
     if (res.ok) {
       await fetchRoles();
     } else {

@@ -99,7 +99,7 @@ const PurchaseVoucher: React.FC = () => {
   useEffect(() => {
     if (!isEditMode || !id) return;
 
-    fetch(`http://localhost:5000/api/purchase-vouchers/${id}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${id}`)
       .then((res) => res.json())
       .then((data) => {
         console.log("Fetched Voucher For Edit:", data);
@@ -184,7 +184,7 @@ const PurchaseVoucher: React.FC = () => {
       owner_id: ownerId,
     });
 
-    fetch(`http://localhost:5000/api/stock-items?${params.toString()}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -208,7 +208,7 @@ const PurchaseVoucher: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
         setLedgers(data);
@@ -986,8 +986,8 @@ const PurchaseVoucher: React.FC = () => {
 
       // ⭐ Auto Detect Add or Update Mode
       const url = isEditMode
-        ? `http://localhost:5000/api/purchase-vouchers/${id}`
-        : "http://localhost:5000/api/purchase-vouchers";
+        ? `${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${id}`
+        : `${import.meta.env.VITE_API_URL}/api/purchase-vouchers`;
 
       const method = isEditMode ? "PUT" : "POST";
 

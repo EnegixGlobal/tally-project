@@ -85,7 +85,7 @@ const StockSummary: React.FC = () => {
         if (filters.show) params.append("show", String(filters.show));
 
         const response = await fetch(
-          `http://localhost:5000/api/stock-items?${params.toString()}`
+          `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
         );
 
         if (!response.ok) {

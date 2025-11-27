@@ -29,7 +29,7 @@ const PurchaseRegister: React.FC = () => {
         }).then((result) => {
           if (!result.isConfirmed) return;
 
-          fetch(`http://localhost:5000/api/purchase-vouchers/${id}`, {
+          fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${id}`, {
             method: "DELETE",
           })
             .then((res) => res.json())

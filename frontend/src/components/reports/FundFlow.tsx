@@ -63,7 +63,7 @@ useEffect(() => {
       setLoading(true);
       setError(null);
       try {
-        const url = new URL('http://localhost:5000/api/fund-flow');
+        const url = new URL(`${import.meta.env.VITE_API_URL}/api/fund-flow`);
         url.searchParams.append('financialYear', selectedYear);
         url.searchParams.append('company_id', companyId);
         url.searchParams.append('owner_type', ownerType);

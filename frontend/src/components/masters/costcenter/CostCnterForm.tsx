@@ -26,7 +26,7 @@ const CostCenterForm: React.FC = () => {
 
   useEffect(() => {
     if (isEditMode && id) {
-      fetch(`http://localhost:5000/api/cost-centers/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`)
+      fetch(`${import.meta.env.VITE_API_URL}/api/cost-centers/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`)
         .then(res => res.json())
         .then(data => {
           setFormData({
@@ -69,8 +69,8 @@ const handleSubmit = async (e: React.FormEvent) => {
 
   try {
     const url = isEditMode
-      ? `http://localhost:5000/api/cost-centers/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-      : 'http://localhost:5000/api/cost-centers/save';
+      ? `${import.meta.env.VITE_API_URL}/api/cost-centers/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      : `${import.meta.env.VITE_API_URL}/api/cost-centers/save`;
 
     const method = isEditMode ? 'PUT' : 'POST';
 
@@ -105,7 +105,7 @@ const handleSubmit = async (e: React.FormEvent) => {
 //   const handleSubmit = async (e: React.FormEvent) => {
 //   e.preventDefault();
 // try {
-//     const response = await fetch('http://localhost:5000/api/cost-centers/save', {
+//     const response = await fetch('${import.meta.env.VITE_API_URL}/api/cost-centers/save', {
 //       method: 'POST',
 //       headers: { 'Content-Type': 'application/json' },
 //       body: JSON.stringify({ ...formData, id }),

@@ -48,7 +48,7 @@ const [assignedCompanies, setAssignedCompanies] = useState<CompanyInfo[]>([]);
   useEffect(() => {
     if (!caEmployeeId) return;
 
-  fetch(`http://localhost:5000/api/companies-by-ca-employee?ca_employee_id=${caEmployeeId}`)
+  fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-ca-employee?ca_employee_id=${caEmployeeId}`)
       .then((res) => res.json())
       .then(data => {
       const companies: CompanyInfo[] = (data?.companies || []).map((c: any) => ({

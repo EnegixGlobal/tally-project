@@ -35,7 +35,7 @@ const ContraRegister: React.FC = () => {
     });
 
     try {
-      const res = await fetch(`http://localhost:5000/api/vouchers/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers/${id}`, {
         method: "DELETE",
       });
 

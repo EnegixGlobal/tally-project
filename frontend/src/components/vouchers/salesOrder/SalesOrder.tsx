@@ -88,7 +88,7 @@ const SalesOrder: React.FC = () => {
 
   const fetchOrder = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/sales-orders/${id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-orders/${id}`);
       const data = await res.json();
       console.log('ye data hai single ka', data)
 
@@ -152,7 +152,7 @@ const SalesOrder: React.FC = () => {
       owner_id: ownerId,
     });
 
-    fetch(`http://localhost:5000/api/stock-items?${params.toString()}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -386,7 +386,7 @@ const SalesOrder: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
         setLedgers(data);
@@ -466,8 +466,8 @@ const SalesOrder: React.FC = () => {
       };
 
       const url = isEditMode
-        ? `http://localhost:5000/api/sales-orders/${id}`
-        : "http://localhost:5000/api/sales-orders";
+        ? `${import.meta.env.VITE_API_URL}/api/sales-orders/${id}`
+        : `${import.meta.env.VITE_API_URL}/api/sales-orders`;
 
       const response = await fetch(url, {
         method: isEditMode ? "PUT" : "POST",

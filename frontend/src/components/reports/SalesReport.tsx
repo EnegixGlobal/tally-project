@@ -133,7 +133,7 @@ const SalesReport: React.FC = () => {
 
       // If you want you can process voucherType, amount etc. filters here
 
-      const res = await fetch(`http://localhost:5000/api/sales-report?${params.toString()}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-report?${params.toString()}`);
       if (!res.ok) throw new Error(await res.text());
       const data = await res.json();
       setBackendSales(data);

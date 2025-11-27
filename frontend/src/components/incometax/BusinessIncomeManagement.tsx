@@ -88,7 +88,7 @@ const BusinessIncomeManagement: React.FC = () => {
           return;
         }
 
-        const response = await fetch(`http://localhost:5000/api/business-income?employee_id=${encodeURIComponent(employee_id)}`, {
+        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/business-income?employee_id=${encodeURIComponent(employee_id)}`, {
           headers: {
             'Content-Type': 'application/json',
           },
@@ -171,7 +171,7 @@ const BusinessIncomeManagement: React.FC = () => {
       employee_id, // add employee_id here
     };
 
-    const response = await fetch('http://localhost:5000/api/business-income', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/business-income`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(payload),
@@ -242,7 +242,7 @@ const BusinessIncomeManagement: React.FC = () => {
   if (!window.confirm('Are you sure you want to delete this business income record?')) return;
 
   try {
-    const response = await fetch(`http://localhost:5000/api/business-income/${id}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/business-income/${id}`, {
       method: 'DELETE',
     });
 

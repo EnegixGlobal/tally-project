@@ -43,7 +43,7 @@ useEffect(() => {
       }
 
       // Add employee_id as a query parameter
-      const response = await fetch(`http://localhost:5000/api/assessee?employee_id=${encodeURIComponent(employee_id)}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assessee?employee_id=${encodeURIComponent(employee_id)}`, {
         headers: {
           'Content-Type': 'application/json',
         },
@@ -155,8 +155,8 @@ useEffect(() => {
       };
 
       const url = editingAssessee
-        ? `http://localhost:5000/api/assessee/${editingAssessee.id}` // For update (assuming you have PUT)
-        : 'http://localhost:5000/api/assessee'; // For create
+        ? `${import.meta.env.VITE_API_URL}/api/assessee/${editingAssessee.id}` // For update (assuming you have PUT)
+        : `${import.meta.env.VITE_API_URL}/api/assessee`; // For create
 
       const method = editingAssessee ? 'PUT' : 'POST';
 
@@ -241,7 +241,7 @@ const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this assessee?')) return;
 
     try {
-      const response = await fetch(`http://localhost:5000/api/assessee/${id}`, {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assessee/${id}`, {
         method: 'DELETE',
       });
       if (!response.ok) {

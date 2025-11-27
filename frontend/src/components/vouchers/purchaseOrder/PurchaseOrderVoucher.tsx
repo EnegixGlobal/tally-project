@@ -100,7 +100,7 @@ const PurchaseOrderVoucher: React.FC = () => {
     const fetchGodowns = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
 
@@ -128,7 +128,7 @@ const PurchaseOrderVoucher: React.FC = () => {
   useEffect(() => {
     const fetchLedgers = async () => {
       const res = await fetch(
-        `http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
       );
       const data = await res.json();
       setLedgers(data);
@@ -142,7 +142,7 @@ const PurchaseOrderVoucher: React.FC = () => {
     const fetchStockItems = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
 
@@ -364,7 +364,7 @@ const PurchaseOrderVoucher: React.FC = () => {
         };
 
         const response = await fetch(
-          "http://localhost:5000/api/purchase-orders",
+          `${import.meta.env.VITE_API_URL}/api/purchase-orders`,
           {
             method: isEditMode ? "PUT" : "POST",
             headers: {

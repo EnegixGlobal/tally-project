@@ -23,7 +23,7 @@ useEffect(() => {
   const fetchGroups = async () => {
     try {
       const res = await fetch(
-        `http://localhost:5000/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        `${import.meta.env.VITE_API_URL}/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
       );
       const data = await res.json();
 

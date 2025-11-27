@@ -20,7 +20,7 @@ const GodownList: React.FC = () => {
     );
 
     fetch(
-      `http://localhost:5000/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      `${import.meta.env.VITE_API_URL}/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((res) => res.json())
       .then((data) => {
@@ -53,7 +53,7 @@ const GodownList: React.FC = () => {
 
     try {
       const response = await fetch(
-        `http://localhost:5000/api/godowns/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        `${import.meta.env.VITE_API_URL}/api/godowns/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
         { method: "DELETE" }
       );
 

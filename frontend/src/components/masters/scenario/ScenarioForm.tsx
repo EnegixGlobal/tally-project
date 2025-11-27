@@ -59,7 +59,7 @@ const ScenarioForm: React.FC = () => {
     const fetchScenario = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/scenario/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/scenario/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await response.json();
         if (!response.ok)
@@ -164,8 +164,8 @@ const payload = {
   try {
     // Step 3: Decide endpoint & method based on mode
     const endpoint = isEditMode
-      ? `http://localhost:5000/api/scenario/update/${scenarioId}`
-      : `http://localhost:5000/api/scenario/create`;
+      ? `${import.meta.env.VITE_API_URL}/api/scenario/update/${scenarioId}`
+      : `${import.meta.env.VITE_API_URL}/api/scenario/create`;
 
     const method = isEditMode ? "PUT" : "POST";
 

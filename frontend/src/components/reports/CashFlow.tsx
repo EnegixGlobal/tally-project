@@ -58,7 +58,7 @@ useEffect(() => {
       if (endDate) params.push(`endDate=${endDate}`);
       if (!startDate && !endDate) params.push(`financialYear=${selectedYear}`);
 
-      const url = `http://localhost:5000/api/cash-flow?${selectedMonth}&${params.join('&')}`;
+      const url = `${import.meta.env.VITE_API_URL}/api/cash-flow?${selectedMonth}&${params.join('&')}`;
       const res = await fetch(url);
       if (!res.ok) throw new Error('Failed to load cash flow data');
       const data = await res.json();

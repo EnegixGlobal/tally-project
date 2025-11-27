@@ -19,7 +19,7 @@ const UnitList: React.FC = () => {
   const fetchUnits = async () => {
     try {
       const res = await fetch(
-        `http://localhost:5000/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        `${import.meta.env.VITE_API_URL}/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
       );
       const data = await res.json();
       setUnits(data);
@@ -42,7 +42,7 @@ const UnitList: React.FC = () => {
     if (confirm.isConfirmed) {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/stock-units/${unitId}?owner_type=${ownerType}&owner_id=${ownerId}`,
+          `${import.meta.env.VITE_API_URL}/api/stock-units/${unitId}?owner_type=${ownerType}&owner_id=${ownerId}`,
           {
             method: "DELETE",
           }

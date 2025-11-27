@@ -65,7 +65,7 @@ const MovementAnalysis: React.FC = () => {
 
       try {
         const response = await fetch(
-          `http://localhost:5000/api/stock-items/${stockItemId}`
+          `${import.meta.env.VITE_API_URL}/api/stock-items/${stockItemId}`
         );
 
         if (!response.ok) {

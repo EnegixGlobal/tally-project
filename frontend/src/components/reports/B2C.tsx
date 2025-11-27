@@ -169,7 +169,7 @@ const B2C: React.FC = () => {
 useEffect(() => {
     // Replace url with your backend host
     axios
-      .get('http://localhost:5000/api/b2c-customers', {
+      .get(`${import.meta.env.VITE_API_URL}/api/b2c-customers`, {
         params: {
           company_id,
           owner_type,
@@ -282,7 +282,7 @@ useEffect(() => {
 useEffect(() => {
     // Use params matching filters from frontend UI
     axios
-      .get('http://localhost:5000/api/b2c-orders', {
+      .get(`${import.meta.env.VITE_API_URL}/api/b2c-orders`, {
         params: {
           company_id,
           owner_type,

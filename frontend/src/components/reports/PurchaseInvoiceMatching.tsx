@@ -114,7 +114,7 @@ const [data, setData] = useState<PurchaseInvoiceMatch[]>([]);
     setLoading(true);
     setError(null);
     axios
-      .get('http://localhost:5000/api/purchase-invoice-matching', {
+      .get(`${import.meta.env.VITE_API_URL}/api/purchase-invoice-matching`, {
         params: {
           company_id: 38,
           owner_type: 'employee',

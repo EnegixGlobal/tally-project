@@ -22,7 +22,7 @@ const StockGroupList: React.FC = () => {
 
   const fetchData = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/stock-groups/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-groups/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
       const data = await res.json();
       console.log('this is list data', data)
       setStockGroupData(data);
@@ -44,7 +44,7 @@ const StockGroupList: React.FC = () => {
   if (!window.confirm('Are you sure you want to delete this stock group?')) return;
 
   try {
-    const res = await fetch(`http://localhost:5000/api/stock-groups/delete/${id}?owner_type=${ownerType}&owner_id=${ownerId}`, {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-groups/delete/${id}?owner_type=${ownerType}&owner_id=${ownerId}`, {
       method: 'DELETE',
     });
 

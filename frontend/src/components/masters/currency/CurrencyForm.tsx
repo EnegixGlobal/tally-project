@@ -32,8 +32,8 @@ const handleSubmit = async (e: React.FormEvent) => {
   try {
     const payload = { ...formData, companyId, ownerType, ownerId };
     const url = isEditMode
-      ? `http://localhost:5000/api/currencies/${id}`
-      : 'http://localhost:5000/api/currencies';
+      ? `${import.meta.env.VITE_API_URL}/api/currencies/${id}`
+      : `${import.meta.env.VITE_API_URL}/api/currencies`;
     const method = isEditMode ? 'PUT' : 'POST';
 
     const res = await fetch(url, {
@@ -61,7 +61,7 @@ const handleSubmit = async (e: React.FormEvent) => {
   if (isEditMode && id) {
     const fetchCurrency = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/currencies/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/currencies/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
         const data = await res.json();
 
         if (res.ok && data) {

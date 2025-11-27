@@ -43,7 +43,7 @@ const TrialBalance: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const url = `http://localhost:5000/api/trial-balance?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+      const url = `${import.meta.env.VITE_API_URL}/api/trial-balance?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
       const res = await fetch(url);
       if (!res.ok) {
         const text = await res.text();

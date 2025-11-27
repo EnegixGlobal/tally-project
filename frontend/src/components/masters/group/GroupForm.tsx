@@ -81,8 +81,8 @@ const GroupForm: React.FC = () => {
   //   const fetchData = async () => {
   //     try {
   //       const [groupsRes, classificationsRes] = await Promise.all([
-  //         fetch('http://localhost:5000/api/ledger-groups'),
-  //         fetch('http://localhost:5000/api/gst-classifications'),
+  //         fetch('${import.meta.env.VITE_API_URL}/api/ledger-groups'),
+  //         fetch('${import.meta.env.VITE_API_URL}/api/gst-classifications'),
   //       ]);
   //       if (!groupsRes.ok || !classificationsRes.ok) {
   //         throw new Error('Failed to fetch data');
@@ -105,7 +105,7 @@ const GroupForm: React.FC = () => {
       const fetchGroup = async () => {
         try {
           const res = await fetch(
-            `http://localhost:5000/api/ledger-groups/${id}?ownerType=${ownerType}&ownerId=${ownerId}`
+            `${import.meta.env.VITE_API_URL}/api/ledger-groups/${id}?ownerType=${ownerType}&ownerId=${ownerId}`
           );
           const data = await res.json();
           console.log("this is data", data);
@@ -263,7 +263,7 @@ const GroupForm: React.FC = () => {
   //   };
 
   //   try {
-  //     const url = isEditMode && id ? `http://localhost:5000/api/ledger-groups/${id}` : 'http://localhost:5000/api/ledger-groups';
+  //     const url = isEditMode && id ? `${import.meta.env.VITE_API_URL}/api/ledger-groups/${id}` : '${import.meta.env.VITE_API_URL}/api/ledger-groups';
   //     const method = isEditMode ? 'PUT' : 'POST';
   //     const res = await fetch(url, {
   //       method,
@@ -303,8 +303,8 @@ const GroupForm: React.FC = () => {
       };
 
       const url = isEditMode
-        ? `http://localhost:5000/api/ledger-groups/${id}`
-        : `http://localhost:5000/api/ledger-groups`;
+        ? `${import.meta.env.VITE_API_URL}/api/ledger-groups/${id}`
+        : `${import.meta.env.VITE_API_URL}/api/ledger-groups`;
 
       const method = isEditMode ? "PUT" : "POST";
 

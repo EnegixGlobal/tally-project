@@ -75,7 +75,7 @@ const SetProfit: React.FC = () => {
     const ownerType = localStorage.getItem("userType") || "admin";
 
     try {
-      const response = await fetch("http://localhost:5000/api/set-profit", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/set-profit`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

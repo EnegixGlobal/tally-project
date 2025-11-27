@@ -425,7 +425,7 @@ React.useEffect(() => {
   const fetchReturns = async () => {
     setLoading(true);
     try {
-      const res = await fetch(`http://localhost:5000/api/tds26q?year=${selectedYear}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tds26q?year=${selectedYear}`);
       if (!res.ok) throw new Error("Failed to fetch");
       const data = await res.json();
       setReturnsList(data);
@@ -569,7 +569,7 @@ React.useEffect(() => {
   };
 
   try {
-    const res = await fetch("http://localhost:5000/api/tds26q", {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/tds26q`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),

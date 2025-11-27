@@ -179,7 +179,7 @@ const SalesVoucher: React.FC = () => {
       return;
     }
 
-    fetch(`http://localhost:5000/api/set-profit/${ownerId}/${ownerType}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/set-profit/${ownerId}/${ownerType}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.data) {
@@ -227,7 +227,7 @@ const SalesVoucher: React.FC = () => {
     const loadSingleVoucher = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/sales-vouchers/${id}`
+          `${import.meta.env.VITE_API_URL}/api/sales-vouchers/${id}`
         );
         const data = await res.json();
 
@@ -307,7 +307,7 @@ const SalesVoucher: React.FC = () => {
           return;
         }
 
-        const url = `http://localhost:5000/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        const url = `${import.meta.env.VITE_API_URL}/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
         const res = await fetch(url);
         const data = await res.json();
@@ -335,7 +335,7 @@ const SalesVoucher: React.FC = () => {
       owner_id: ownerId,
     });
 
-    fetch(`http://localhost:5000/api/stock-items?${params.toString()}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -576,7 +576,7 @@ const SalesVoucher: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
         setLedgers(data);
@@ -668,7 +668,7 @@ const SalesVoucher: React.FC = () => {
       // -------------------------
       if (id) {
         const res = await fetch(
-          `http://localhost:5000/api/sales-vouchers/${id}`,
+          `${import.meta.env.VITE_API_URL}/api/sales-vouchers/${id}`,
           {
             method: "PUT",
             headers: { "Content-Type": "application/json" },
@@ -691,7 +691,7 @@ const SalesVoucher: React.FC = () => {
       // -------------------------
       // CREATE MODE → POST REQUEST
       // -------------------------
-      const res = await fetch("http://localhost:5000/api/sales-vouchers", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),

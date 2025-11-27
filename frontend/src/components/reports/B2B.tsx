@@ -333,7 +333,7 @@ const B2B: React.FC = () => {
       setError(null);
       try {
         const params = new URLSearchParams({ company_id, owner_type, owner_id });
-        const res = await fetch(`http://localhost:5000/api/b2b-partners?${params.toString()}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/b2b-partners?${params.toString()}`);
         if (!res.ok) throw new Error(await res.text());
         const data = await res.json();
         const sanitized = (data as any[]).map((partner) => ({
@@ -428,7 +428,7 @@ useEffect(() => {
           fromDate: filters.fromDate,
           toDate: filters.toDate,
         });
-        const resp = await fetch(`http://localhost:5000/api/b2b-transactions?${params.toString()}`);
+        const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/b2b-transactions?${params.toString()}`);
         if (!resp.ok) {
           const errText = await resp.text();
           throw new Error(errText);

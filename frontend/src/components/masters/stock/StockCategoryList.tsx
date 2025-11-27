@@ -19,7 +19,7 @@ const StockCategoryList: React.FC = () => {
   useEffect(() => {
     const fetchData = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/stock-categories?${queryParams}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-categories?${queryParams}`);
         const data = await res.json();
         setCategories(data);
       } catch (err) {
@@ -33,7 +33,7 @@ const StockCategoryList: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this stock category?')) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/stock-categories/${id}?${queryParams}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-categories/${id}?${queryParams}`, {
         method: 'DELETE',
       });
       const data = await res.json();

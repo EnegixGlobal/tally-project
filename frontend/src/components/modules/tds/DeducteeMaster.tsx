@@ -56,7 +56,7 @@ const DeducteeMaster: React.FC = () => {
       if (searchTerm) params.append("search", searchTerm);
       if (selectedCategory !== "all") params.append("category", selectedCategory);
 
-      const res = await fetch(`http://localhost:5000/api/deductees?${params.toString()}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/deductees?${params.toString()}`);
       if (!res.ok) throw new Error("Failed to fetch deductees");
       const data: Deductee[] = await res.json();
       setDeductees(data);
@@ -161,7 +161,7 @@ const DeducteeMaster: React.FC = () => {
     if (!validateForm()) return;
 
     try {
-      const res = await fetch("http://localhost:5000/api/deductees", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/deductees`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -186,7 +186,7 @@ const DeducteeMaster: React.FC = () => {
     if (!validateForm() || !editDeductee) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/deductees/${editDeductee.id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/deductees/${editDeductee.id}`, {
         method: "PUT",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(formData),
@@ -210,7 +210,7 @@ const DeducteeMaster: React.FC = () => {
     if (!window.confirm("Are you sure you want to delete this deductee?")) return;
 
     try {
-      const res = await fetch(`http://localhost:5000/api/deductees/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/deductees/${id}`, {
         method: "DELETE",
       });
       if (!res.ok) {

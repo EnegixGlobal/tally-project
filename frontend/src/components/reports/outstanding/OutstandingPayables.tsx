@@ -157,7 +157,7 @@ const OutstandingPayables: React.FC = () => {
         if (sortBy) params.append('sortBy', sortBy);
         if (sortOrder) params.append('sortOrder', sortOrder);
 
-        const res = await fetch(`http://localhost:5000/api/outstanding-payables?${params.toString()}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/outstanding-payables?${params.toString()}`);
         if (!res.ok) {
           throw new Error(`${res.status} - ${await res.text()}`);
         }

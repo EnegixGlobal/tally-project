@@ -34,7 +34,7 @@ const StockItemList = () => {
 
     const fetchData = async () => {
       try {
-        const res = await fetch(`http://localhost:5000/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
         const json = await res.json();
 
         if (json.success) {
@@ -55,7 +55,7 @@ const StockItemList = () => {
 //     setItemDetails(null);
 //     // API call to backend
 //     try {
-//       const res = await fetch(`http://localhost:5000/api/stock-items/barcode/${barcodeValue}`);
+//       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/barcode/${barcodeValue}`);
 //       const json = await res.json();
 //       if (json.success) {
 //         setItemDetails(json.data);
@@ -92,7 +92,7 @@ const handleDelete = async (id: string) => {
 
   if (result.isConfirmed) {
     try {
-      const res = await fetch(`http://localhost:5000/api/stock-items/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/${id}`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

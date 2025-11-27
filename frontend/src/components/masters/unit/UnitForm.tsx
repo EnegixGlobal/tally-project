@@ -54,7 +54,7 @@ const UnitForm: React.FC = () => {
       const fetchUnit = async () => {
         try {
           const res = await fetch(
-            `http://localhost:5000/api/stock-units/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
+            `${import.meta.env.VITE_API_URL}/api/stock-units/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
           );
           if (!res.ok) throw new Error("Unit not found");
           const unit = await res.json();
@@ -96,7 +96,7 @@ const UnitForm: React.FC = () => {
 
   const payload = { ...formData }; // only formData
   const queryParams = `owner_type=${ownerType}&owner_id=${ownerId}`;
-  const apiUrl = `http://localhost:5000/api/stock-units`;
+  const apiUrl = `${import.meta.env.VITE_API_URL}/api/stock-units`;
   const url = isEditMode ? `${apiUrl}/${id}?${queryParams}` : `${apiUrl}?${queryParams}`;
   const method = isEditMode ? "PUT" : "POST";
 

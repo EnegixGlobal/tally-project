@@ -124,7 +124,7 @@ const JournalVoucher: React.FC = () => {
 useEffect(() => {
       const fetchLedgers = async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
           const data = await res.json();
           setLedgers(data);
         } catch (err) {
@@ -141,7 +141,7 @@ useEffect(() => {
 
   const fetchVoucher = async () => {
     try {
-      const res = await fetch(`http://localhost:5000/api/vouchers/${id}`);
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers/${id}`);
       const json = await res.json();
 
       if (!json.data) return;
@@ -191,8 +191,8 @@ useEffect(() => {
   };
 
   const url = isEditMode
-    ? `http://localhost:5000/api/vouchers/${id}`
-    : `http://localhost:5000/api/vouchers`;
+    ? `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`
+    : `${import.meta.env.VITE_API_URL}/api/vouchers`;
 
   const method = isEditMode ? "PUT" : "POST";
 

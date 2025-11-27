@@ -29,7 +29,7 @@ React.useEffect(() => {
     owner_id: ownerId,
   });
 
-  fetch(`http://localhost:5000/api/stock-categories?${params.toString()}`)
+  fetch(`${import.meta.env.VITE_API_URL}/api/stock-categories?${params.toString()}`)
     .then(res => res.json())
     .then(categoriesData => {
       setCategories(Array.isArray(categoriesData) && categoriesData.length
@@ -58,7 +58,7 @@ React.useEffect(() => {
 //     owner_id: ownerId,
 //   });
 
-//   fetch(`http://localhost:5000/api/stock-groups/list?${params.toString()}`)
+//   fetch(`${import.meta.env.VITE_API_URL}/api/stock-groups/list?${params.toString()}`)
 //     .then(res => res.json())
 //     .then(groups => {
 //       setDynamicStockGroups(Array.isArray(groups) && groups.length
@@ -169,7 +169,7 @@ const uploadCSVFile = async (file: File) => {
   formData.append('file', file);
 
   try {
-    const response = await fetch('http://localhost:5000/api/stock-items/bulk-csv', {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/bulk-csv`, {
       method: 'POST',
       body: formData,
     });
@@ -277,7 +277,7 @@ const handleSaveAll = async (bulkItems: BulkStockItemRow[]) => {
     const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
 
     // Attach tenant info to the payload, or send as query params
-    const response = await fetch(`http://localhost:5000/api/stock-items/bulk?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`, {
+    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/bulk?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(

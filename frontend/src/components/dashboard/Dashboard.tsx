@@ -88,7 +88,7 @@ const Dashboard: React.FC = () => {
       try {
         const token = localStorage.getItem("token");
         const res = await fetch(
-          `http://localhost:5000/api/dashboard-data?employee_id=${employeeId}`,
+          `${import.meta.env.VITE_API_URL}/api/dashboard-data?employee_id=${employeeId}`,
           {
             headers: {
               Authorization: `Bearer ${token}`,
@@ -129,7 +129,7 @@ const Dashboard: React.FC = () => {
 
     if (!employeeId) return;
 
-    fetch(`http://localhost:5000/api/companies-by-employee?employee_id=${employeeId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-employee?employee_id=${employeeId}`)
       .then((res) => res.json())
       .then((data) => {
         setAllCompanies(data.companies || []); // ✅ pick companies array
@@ -141,7 +141,7 @@ const Dashboard: React.FC = () => {
     const caId = localStorage.getItem("user_id");
     if (!caId) return;
 
-    fetch(`http://localhost:5000/api/companies-by-ca?ca_id=${caId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-ca?ca_id=${caId}`)
       .then((res) => res.json())
       .then((data) => setCaAllCompanies(data.companies || []))
       .catch((err) => console.error("Error fetching CA companies:", err));
@@ -152,7 +152,7 @@ const Dashboard: React.FC = () => {
   };
 useEffect(() => {
   if (!caId) return;
-  fetch(`http://localhost:5000/api/ca-employees-with-companies?ca_id=${caId}`)
+  fetch(`${import.meta.env.VITE_API_URL}/api/ca-employees-with-companies?ca_id=${caId}`)
     .then(res => res.json())
     .then(data => setCaEmployees(data.employees || []))
     .catch(console.error);
@@ -171,7 +171,7 @@ const closeAssignModal = () => {
 
 // Fetch function to reload employees after assignment
 const fetchEmployees = () => {
-  fetch(`http://localhost:5000/api/ca-employees-with-companies?ca_id=${caId}`)
+  fetch(`${import.meta.env.VITE_API_URL}/api/ca-employees-with-companies?ca_id=${caId}`)
     .then((res) => res.json())
     .then((data) => setCaEmployees(data.employees || []))
     .catch(console.error);

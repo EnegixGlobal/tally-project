@@ -79,7 +79,7 @@ const StockGroupForm: React.FC = () => {
       owner_id: ownerId,
     });
 
-    fetch(`http://localhost:5000/api/stock-categories?${params.toString()}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/stock-categories?${params.toString()}`)
       .then((res) => res.json())
       .then((categoriesData) => {
         setCategories(Array.isArray(categoriesData) ? categoriesData : []);
@@ -170,7 +170,7 @@ const StockGroupForm: React.FC = () => {
   useEffect(() => {
     if (isEditMode && id) {
       fetch(
-        `http://localhost:5000/api/stock-groups/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        `${import.meta.env.VITE_API_URL}/api/stock-groups/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
       )
         .then((res) => res.json())
         .then((data) => {
@@ -201,8 +201,8 @@ const StockGroupForm: React.FC = () => {
 
   try {
     const url = isEditMode
-      ? `http://localhost:5000/api/stock-groups/${formData.id}`
-      : 'http://localhost:5000/api/stock-groups';
+      ? `${import.meta.env.VITE_API_URL}/api/stock-groups/${formData.id}`
+      : `${import.meta.env.VITE_API_URL}/api/stock-groups`;
 
     const method = isEditMode ? 'PUT' : 'POST';
 

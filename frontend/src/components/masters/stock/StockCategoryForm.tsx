@@ -45,7 +45,7 @@ const StockCategoryForm: React.FC = () => {
       try {
         console.log("id", id, "ownerType", ownerType, "ownerId", ownerId);
         const res = await fetch(
-          `http://localhost:5000/api/stock-categories/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/stock-categories/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
         const data = await res.json();
@@ -106,7 +106,7 @@ const StockCategoryForm: React.FC = () => {
 
       if (isEditMode) {
         // 🟢 PUT request (Edit Mode)
-        res = await fetch(`http://localhost:5000/api/stock-categories/${id}`, {
+        res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-categories/${id}`, {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),
@@ -114,7 +114,7 @@ const StockCategoryForm: React.FC = () => {
       } else {
         // 🟢 POST request (Create Mode)
         payload.id = `SC-${Date.now()}`;
-        res = await fetch("http://localhost:5000/api/stock-categories", {
+        res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-categories`, {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(payload),

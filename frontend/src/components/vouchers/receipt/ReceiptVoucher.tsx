@@ -191,7 +191,7 @@ const ReceiptVoucher: React.FC = () => {
     const fetchSingleVoucher = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/vouchers/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/vouchers/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
         const resJson = await res.json();
@@ -344,7 +344,7 @@ const ReceiptVoucher: React.FC = () => {
       try {
         // 1) Cash / Bank Ledgers
         const cashRes = await fetch(
-          `http://localhost:5000/api/ledger/cash-bank?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger/cash-bank?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         let cashData = await cashRes.json();
 
@@ -357,7 +357,7 @@ const ReceiptVoucher: React.FC = () => {
 
         // 2) All Ledgers
         const allRes = await fetch(
-          `http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         let allData = await allRes.json();
 
@@ -395,7 +395,7 @@ const ReceiptVoucher: React.FC = () => {
         ownerType,
         ownerId,
       };
-      const response = await fetch("http://localhost:5000/api/vouchers", {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

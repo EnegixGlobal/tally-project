@@ -81,7 +81,7 @@ const OutstandingReceivables: React.FC = () => {
       if (sortBy) params.append("sortBy", sortBy);
       if (sortOrder) params.append("sortOrder", sortOrder);
 
-      const url = `http://localhost:5000/api/outstanding-receivables?${params.toString()}`;
+      const url = `${import.meta.env.VITE_API_URL}/api/outstanding-receivables?${params.toString()}`;
       const response = await fetch(url);
 
       if (!response.ok) {

@@ -405,7 +405,7 @@ const years = [
 useEffect(() => {
   const fetchReturns = async () => {
     try {
-      const response = await fetch(`http://localhost:5000/api/tds24q?year=${selectedYear}`);
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/tds24q?year=${selectedYear}`);
       const data = await response.json();
       setQuarterlyReturns(Array.isArray(data) ? data : []);
     } catch (e) {
@@ -574,7 +574,7 @@ useEffect(() => {
         verification,
         status: 'draft',
       };
-      const response = await axios.post("http://localhost:5000/api/tds24q", payload);
+      const response = await axios.post(`${import.meta.env.VITE_API_URL}/api/tds24q`, payload);
       const data = response.data as { success: boolean; error?: string };
       if (data.success) {
         alert("Form 24Q saved successfully!");

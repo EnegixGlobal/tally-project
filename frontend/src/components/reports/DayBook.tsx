@@ -85,7 +85,7 @@ const [processedEntries, setProcessedEntries] = useState<DayBookEntry[]>([]);
   //  const [entries, setEntries] = useState([]);
 //  const [entries, setEntries] = useState<DayBookEntry[]>([]);
 useEffect(() => {
-  fetch('http://localhost:5000/api/daybookTable2')
+  fetch(`${import.meta.env.VITE_API_URL}/api/daybookTable2`)
     .then(res => res.json())
     .then((data) => {
       // 🔁 Map and normalize backend field names to match frontend expectation
@@ -131,7 +131,7 @@ useEffect(() => {
     const employeeId = localStorage.getItem('employee_id');
     if (!employeeId) return;
 
-    fetch(`http://localhost:5000/api/DayBookCards`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/DayBookCards`)
         .then(res => res.json())
         .then(data => {
             setTotals({
@@ -146,7 +146,7 @@ useEffect(() => {
 
 useEffect(() => {
   const fetchData = async () => {
-    const res = await fetch('http://localhost:5000/api/daybookTable');
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/daybookTable`);
     const data = await res.json();
 
     setGroupedVouchers(data.groupedVouchers  || []);

@@ -36,7 +36,7 @@ const ScenarioList: React.FC = () => {
     const fetchScenarios = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/scenario/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/scenario/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const rawData = await response.json();
 
@@ -79,7 +79,7 @@ const ScenarioList: React.FC = () => {
     try {
       // 🔹 Backend route: DELETE /api/scenario/:id
       const response = await fetch(
-        `http://localhost:5000/api/scenario/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        `${import.meta.env.VITE_API_URL}/api/scenario/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
         { method: "DELETE" }
       );
 

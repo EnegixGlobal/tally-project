@@ -371,19 +371,19 @@ const saveImportedVouchers = async () => {
       // 🔹 API URL Detection
       switch (voucher.voucherType) {
         case "sales":
-          apiUrl = "http://localhost:5000/api/sales-vouchers";
+          apiUrl = `${import.meta.env.VITE_API_URL}/api/sales-vouchers`;
           break;
         case "purchase":
-          apiUrl = "http://localhost:5000/api/purchase-vouchers";
+          apiUrl = `${import.meta.env.VITE_API_URL}/api/purchase-vouchers`;
           break;
         case "payment":
-          apiUrl = "http://localhost:5000/api/vouchers";
+          apiUrl = `${import.meta.env.VITE_API_URL}/api/vouchers`;
           break;
         case "receipt":
-          apiUrl = "http://localhost:5000/api/receipt-vouchers";
+          apiUrl = `${import.meta.env.VITE_API_URL}/api/receipt-vouchers`;
           break;
         case "bank":
-          apiUrl = "http://localhost:5000/api/bank-vouchers";
+          apiUrl = `${import.meta.env.VITE_API_URL}/api/bank-vouchers`;
           break;
         default:
           console.warn("❓ Unknown type:", voucher.voucherType);

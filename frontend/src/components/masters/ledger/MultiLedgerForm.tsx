@@ -36,7 +36,7 @@ const ownerId = ownerType === "employee"
   useEffect(() => {
       const fetchLedgerGroups = async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
           const data = await res.json();
           if (res.ok) {
             setLedgerGroups(Array.isArray(data) ? data : []);
@@ -133,7 +133,7 @@ const ownerId = ownerType === "employee"
         panNumber: ''
       }));
 
-      const res = await fetch("http://localhost:5000/api/ledger/bulk", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger/bulk`, {
         method: "POST",
         headers: {
         'Content-Type': 'application/json'

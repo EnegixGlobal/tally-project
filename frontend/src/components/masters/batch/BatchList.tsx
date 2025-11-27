@@ -50,7 +50,7 @@ const BatchList: React.FC = () => {
 
     const fetchData = async () => {
       try {
-        const res = await fetch("http://localhost:5000/api/stock-items");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items`);
         const json = await res.json();
 
         if (isMounted) {

@@ -4,7 +4,7 @@ import { ArrowLeft, Plus, Edit, Trash2, Search, Download, Upload } from 'lucide-
 import type { CapitalGain, CapitalAsset } from '../../types';
 import { useAppContext } from '../../context/AppContext';
 
-const API_BASE = 'http://localhost:5000/api/capital-gains';
+const API_BASE = `${import.meta.env.VITE_API_URL}/api/capital-gains`;
 
 const CapitalGainsManagement: React.FC = () => {
   const { theme} = useAppContext();

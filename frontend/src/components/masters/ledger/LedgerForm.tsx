@@ -40,7 +40,7 @@ const LedgerForm: React.FC = () => {
     const fetchLedgerGroups = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
         setLedgerGroups(data);
@@ -59,7 +59,7 @@ const LedgerForm: React.FC = () => {
     const fetchLedgerById = async () => {
       try {
         const res = await fetch(
-          `http://localhost:5000/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
 
@@ -157,7 +157,7 @@ const LedgerForm: React.FC = () => {
     try {
       const payload = { ...formData, companyId, ownerType, ownerId };
 
-      const res = await fetch("http://localhost:5000/api/ledger", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(payload),
@@ -187,7 +187,7 @@ const LedgerForm: React.FC = () => {
       const payload = { ...formData, companyId, ownerType, ownerId };
 
       const res = await fetch(
-        `http://localhost:5000/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },

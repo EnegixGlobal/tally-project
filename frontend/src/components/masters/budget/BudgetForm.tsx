@@ -33,7 +33,7 @@ const BudgetForm: React.FC = () => {
       // TODO: Fetch existing budget by id scoped to tenant and owner and fill formData
       // Example:
     
-      fetch(`http://localhost:5000/api/budgets/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`)
+      fetch(`${import.meta.env.VITE_API_URL}/api/budgets/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`)
         .then(res => res.json())
         .then(data => {
           const formatDate = (isoString: string) => isoString ? isoString.split("T")[0] : "";
@@ -66,7 +66,7 @@ const handleSubmit = async (e: React.FormEvent) => {
         ownerId,
       };
 
-      const url = isEditMode ? `http://localhost:5000/api/budgets/${id}` : 'http://localhost:5000/api/budgets';
+      const url = isEditMode ? `${import.meta.env.VITE_API_URL}/api/budgets/${id}` : `${import.meta.env.VITE_API_URL}/api/budgets`;
       const method = isEditMode ? 'PUT' : 'POST';
 
       const res = await fetch(url, {

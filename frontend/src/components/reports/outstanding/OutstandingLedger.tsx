@@ -73,7 +73,7 @@ const companyId = localStorage.getItem('company_id') || localStorage.getItem('co
       if (to) params.append('to', to);
 
       try {
-        const res = await fetch(`http://localhost:5000/api/outstanding-ledger?${params.toString()}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/outstanding-ledger?${params.toString()}`);
         if (!res.ok) throw new Error(await res.text());
         const json = await res.json();
         setData(json);
@@ -91,7 +91,7 @@ const companyId = localStorage.getItem('company_id') || localStorage.getItem('co
   useEffect(() => {
       const fetchLedgers = async () => {
         try {
-          const res = await fetch(`http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
           const data = await res.json();
           setLedgers(data);
         } catch (err) {

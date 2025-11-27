@@ -45,8 +45,8 @@ export default function ConsolidatedFinancialReport() {
       setLoading(true);
       try {
         const [summaryRes, detailsRes] = await Promise.all([
-          fetch(`http://localhost:5000/api/employee-financial-report?employee_id=${employeeId}`),
-          fetch(`http://localhost:5000/api/employee-financial-report-consolidated?employee_id=${employeeId}`),
+          fetch(`${import.meta.env.VITE_API_URL}/api/employee-financial-report?employee_id=${employeeId}`),
+          fetch(`${import.meta.env.VITE_API_URL}/api/employee-financial-report-consolidated?employee_id=${employeeId}`),
         ]);
         const summaryData = await summaryRes.json();
         const detailsData = await detailsRes.json();

@@ -260,7 +260,7 @@ const StockItemForm = () => {
           owner_id: ownerId,
         });
         const res = await fetch(
-          `http://localhost:5000/api/stock-categories?${params.toString()}`
+          `${import.meta.env.VITE_API_URL}/api/stock-categories?${params.toString()}`
         );
         const data = await res.json();
 
@@ -288,7 +288,7 @@ const StockItemForm = () => {
       if (!id) return;
 
       try {
-        const res = await fetch(`http://localhost:5000/api/stock-items/${id}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/${id}`);
         const data = await res.json();
 
         if (res.ok && data.success) {
@@ -553,8 +553,8 @@ const StockItemForm = () => {
     // Determine if we're updating or creating a new record
     const method = id ? "PUT" : "POST"; // Use PUT for update, POST for new
     const url = id
-      ? `http://localhost:5000/api/stock-items/${id}` // URL with ID for update
-      : "http://localhost:5000/api/stock-items"; // URL for new record creation
+      ? `${import.meta.env.VITE_API_URL}/api/stock-items/${id}` // URL with ID for update
+      : `${import.meta.env.VITE_API_URL}/api/stock-items`; // URL for new record creation
 
     try {
       const res = await fetch(url, {

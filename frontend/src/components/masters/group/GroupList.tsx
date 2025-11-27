@@ -23,7 +23,7 @@ const GroupList: React.FC = () => {
   useEffect(() => {
       const fetchLedgerGroups = async () => {
         try {
-          const data = await apiFetch(`http://localhost:5000/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+          const data = await apiFetch(`${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
           setGroups(data);
           console.log('data', data);
         } catch (err) {
@@ -36,7 +36,7 @@ const GroupList: React.FC = () => {
   const handleDelete = async (id: string) => {
     if (!window.confirm('Are you sure you want to delete this group?')) return;
     try {
-      const res = await fetch(`http://localhost:5000/api/ledger-groups/${id}`, {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger-groups/${id}`, {
         method: 'DELETE',
       });
       const data = await res.json();

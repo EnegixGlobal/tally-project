@@ -35,7 +35,7 @@ const CurrencyList: React.FC = () => {
     }
 
     fetch(
-      `http://localhost:5000/api/currencies?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      `${import.meta.env.VITE_API_URL}/api/currencies?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((res) => res.json())
       .then((data) => {
@@ -54,7 +54,7 @@ const CurrencyList: React.FC = () => {
 
     try {
       const res = await fetch(
-        `http://localhost:5000/api/currencies/${currencyId}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        `${import.meta.env.VITE_API_URL}/api/currencies/${currencyId}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
         {
           method: "DELETE",
         }

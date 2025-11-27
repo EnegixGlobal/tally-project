@@ -48,7 +48,7 @@ const ownerId = ownerType === 'employee'
         params.append('owner_type', ownerType);
         params.append('owner_id', ownerId);
 
-        const res = await fetch(`http://localhost:5000/api/godown-summary?${params.toString()}`);
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/godown-summary?${params.toString()}`);
         if (!res.ok) {
           const text = await res.text();
           throw new Error(text || `Error: ${res.status}`);

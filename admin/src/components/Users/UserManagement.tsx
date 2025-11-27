@@ -29,7 +29,7 @@ const UserManagement: React.FC = () => {
     status: 'active' as 'active' | 'suspended' | 'pending',
   });
 
-  const API_URL = 'http://localhost:5000/api/adminUser';
+  const API_URL = `${import.meta.env.VITE_API_URL}/api/adminUser`;
 
   // Fetch users
   const fetchUsers = async () => {
@@ -133,7 +133,7 @@ const handleUpdateUser = async () => {
 
 const handleStatusChange = async (id: string, status: 'active' | 'suspended') => {
   try {
-    const res = await fetch(`http://localhost:5000/api/adminUser/${id}/status`, {
+    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/adminUser/${id}/status`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ status }),

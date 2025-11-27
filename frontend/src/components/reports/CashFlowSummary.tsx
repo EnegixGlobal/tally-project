@@ -29,7 +29,7 @@ const CashFlowSummary: React.FC = () => {
       setError(null);
       try {
         // Construct URL with optional monthCode param
-        let url = `http://localhost:5000/api/cashflow/summary`;
+        let url = `${import.meta.env.VITE_API_URL}/api/cashflow/summary`;
         if (monthCode) {
           url += `/${encodeURIComponent(monthCode)}`;
         }

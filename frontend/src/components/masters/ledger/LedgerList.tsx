@@ -38,7 +38,7 @@ const LedgerList: React.FC = () => {
 
         // Fetch ledgers scoped to company & owner
         const ledgerRes = await fetch(
-          `http://localhost:5000/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const ledgerData = await ledgerRes.json();
 
@@ -51,7 +51,7 @@ const LedgerList: React.FC = () => {
 
         // Fetch ledger groups (no scoping in your current backend — optional to scope later)
         const groupRes = await fetch(
-          `http://localhost:5000/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const groupData = await groupRes.json();
         setLedgerGroups(Array.isArray(groupData) ? groupData : []);
@@ -104,7 +104,7 @@ const LedgerList: React.FC = () => {
       }
 
       const res = await fetch(
-        `http://localhost:5000/api/ledger/${ledgerId}?owner_type=${ownerType}&owner_id=${ownerId}`,
+        `${import.meta.env.VITE_API_URL}/api/ledger/${ledgerId}?owner_type=${ownerType}&owner_id=${ownerId}`,
         { method: "DELETE" }
       );
 

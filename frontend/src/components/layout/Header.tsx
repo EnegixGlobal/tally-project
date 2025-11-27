@@ -22,7 +22,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
 
     if (!storedCompanyId) return;
 
-    fetch(`http://localhost:5000/api/header/${storedCompanyId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/header/${storedCompanyId}`)
   .then(res => res.json())
   .then((data) => {
     if (data.error) {

@@ -53,8 +53,8 @@ const GroupSummary: React.FC = () => {
       try {
         // Call backend API with optional query param for groupType filtering
         const url = groupType
-          ? `http://localhost:5000/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&groupType=${encodeURIComponent(groupType)}`
-          : `http://localhost:5000/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&`;
+          ? `${import.meta.env.VITE_API_URL}/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&groupType=${encodeURIComponent(groupType)}`
+          : `${import.meta.env.VITE_API_URL}/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&`;
 
         const res = await fetch(url);
         if (!res.ok) throw new Error('Failed to load group summary data');

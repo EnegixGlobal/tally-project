@@ -20,14 +20,14 @@ const AssignCompaniesModal: React.FC<Props> = ({
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/api/companies-by-ca?ca_id=${caId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-ca?ca_id=${caId}`)
       .then((res) => res.json())
       .then((data) => setCompanies(data.companies || []))
       .catch(console.error);
   }, [caId]);
 
   useEffect(() => {
-    fetch(`http://localhost:5000/api/ca-employee-companies?ca_employee_id=${employeeId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/ca-employee-companies?ca_employee_id=${employeeId}`)
       .then((res) => res.json())
       .then((data) => {
         const ids = data.companies?.map((c: any) => c.id) || [];
@@ -45,7 +45,7 @@ const AssignCompaniesModal: React.FC<Props> = ({
   const handleSubmit = async () => {
     setLoading(true);
     try {
-      const res = await fetch("http://localhost:5000/api/assign-companies-to-ca-employee", {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/assign-companies-to-ca-employee`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({

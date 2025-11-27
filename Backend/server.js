@@ -7,6 +7,16 @@ require('dotenv').config();
 
 const app = express();
 app.use(cors());
+// app.use(cors({
+//   origin: [
+//     "http://localhost:5174",
+//     "http://31.97.202.210",
+//     "https://apnabook.com",  // If you host domain later
+//   ],
+//   methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+//   credentials: true
+// }));
+
 app.use(bodyParser.json());
 // const authMiddleware = require('./middlewares/authMiddleware');
 // const loadPermissions = require('./middlewares/loadPermissions');

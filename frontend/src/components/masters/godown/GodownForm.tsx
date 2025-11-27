@@ -30,7 +30,7 @@ const GodownForm: React.FC = () => {
     const fetchGodown = async () => {
       try {
         const response = await fetch(
-          `http://localhost:5000/api/godowns/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/godowns/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const result = await response.json();
 
@@ -64,8 +64,8 @@ const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
   const url = isEditMode
-    ? `http://localhost:5000/api/godowns/${id}`
-    : `http://localhost:5000/api/godowns`;
+    ? `${import.meta.env.VITE_API_URL}/api/godowns/${id}`
+    : `${import.meta.env.VITE_API_URL}/api/godowns`;
 
   const method = isEditMode ? 'PUT' : 'POST';
 
