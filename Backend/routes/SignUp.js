@@ -5,7 +5,7 @@ const db = require("../db"); // already a promise-based pool
 const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
 
-const JWT_SECRET = process.env.JWT_SECRET;
+const JWT_SECRET = process.env.JWT_SECRET || "8fbd@hG35kd93JK!hG2c90MZ";
 
 router.post("/register", async (req, res) => {
   console.log("📥 /register hit");
@@ -40,9 +40,7 @@ router.post("/register", async (req, res) => {
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 📌 Generate JWT token
-    const token = jwt.sign({ email }, process.env.JWT_SECRET, {
-      expiresIn: "7d",
-    });
+    const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: "7d" });
 
     // 📥 Insert into DB
     const sql = `
