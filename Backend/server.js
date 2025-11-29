@@ -1,9 +1,9 @@
 // ✅ server.js (Updated without express-session)
-const express = require('express');
-const mysql = require('mysql2');
-const cors = require('cors');
-const bodyParser = require('body-parser');
-require('dotenv').config();
+require("dotenv").config();
+const express = require("express");
+const mysql = require("mysql2");
+const cors = require("cors");
+const bodyParser = require("body-parser");
 
 const app = express();
 // app.use(cors());
@@ -21,12 +21,11 @@ app.use(
   })
 );
 
-
 app.use(bodyParser.json());
 // const authMiddleware = require('./middlewares/authMiddleware');
 // const loadPermissions = require('./middlewares/loadPermissions');
-const loginRoute = require('./routes/login');
-app.use('/api/login', loginRoute);
+const loginRoute = require("./routes/login");
+app.use("/api/login", loginRoute);
 // const checkPermission = require('./middlewares/checkPermission');
 
 // 1. JWT Authentication parses token and sets req.user
@@ -38,90 +37,90 @@ app.use('/api/login', loginRoute);
 // Your protected API routes go here, guarded by checkPermission
 
 // ✅ Routes
-const ledgerGroupRoutes = require('./routes/ledgerGroups');
-app.use('/api/ledger-groups', ledgerGroupRoutes);
+const ledgerGroupRoutes = require("./routes/ledgerGroups");
+app.use("/api/ledger-groups", ledgerGroupRoutes);
 
-const ledgerRoutes = require('./routes/ledger');
-app.use('/api/ledger', ledgerRoutes);
+const ledgerRoutes = require("./routes/ledger");
+app.use("/api/ledger", ledgerRoutes);
 
-const GroupRoutes = require('./routes/group');
-app.use('/api/group', GroupRoutes);
+const GroupRoutes = require("./routes/group");
+app.use("/api/group", GroupRoutes);
 
-const currencyRoutes = require('./routes/currency');
-app.use('/api/currencies', currencyRoutes);
+const currencyRoutes = require("./routes/currency");
+app.use("/api/currencies", currencyRoutes);
 
-const budgetRoutes = require('./routes/budgets');
-app.use('/api/budgets', budgetRoutes);
+const budgetRoutes = require("./routes/budgets");
+app.use("/api/budgets", budgetRoutes);
 
-const voucherRoutes = require('./routes/vouchers');
-app.use('/api/vouchers', voucherRoutes);
+const voucherRoutes = require("./routes/vouchers");
+app.use("/api/vouchers", voucherRoutes);
 
-const saleVoucherRoutes = require('./routes/salevoucher');
-app.use('/api/sale-vouchers', saleVoucherRoutes);
+const saleVoucherRoutes = require("./routes/salevoucher");
+app.use("/api/sale-vouchers", saleVoucherRoutes);
 
-const purchaseVoucherRoutes = require('./routes/purchasevoucher');  
-app.use('/api/purchase-vouchers', purchaseVoucherRoutes);
+const purchaseVoucherRoutes = require("./routes/purchasevoucher");
+app.use("/api/purchase-vouchers", purchaseVoucherRoutes);
 
-const scenarioRoutes = require('./routes/scenarioRoutes');
-app.use('/api/scenario', scenarioRoutes);
+const scenarioRoutes = require("./routes/scenarioRoutes");
+app.use("/api/scenario", scenarioRoutes);
 
-const costCenterRoutes = require('./routes/costCenterRoutes');
-app.use('/api/cost-centers', costCenterRoutes);
+const costCenterRoutes = require("./routes/costCenterRoutes");
+app.use("/api/cost-centers", costCenterRoutes);
 
-const stockCategoriesRoutes = require('./routes/stockCategories');
-app.use('/api/stock-categories', stockCategoriesRoutes);
+const stockCategoriesRoutes = require("./routes/stockCategories");
+app.use("/api/stock-categories", stockCategoriesRoutes);
 
-const stockUnitsRoutes = require('./routes/stockUnits');  
-app.use('/api/stock-units', stockUnitsRoutes);
+const stockUnitsRoutes = require("./routes/stockUnits");
+app.use("/api/stock-units", stockUnitsRoutes);
 
-const stockGroupRoutes = require('./routes/stockGroupRoutes');    
-app.use('/api/stock-groups', stockGroupRoutes);
+const stockGroupRoutes = require("./routes/stockGroupRoutes");
+app.use("/api/stock-groups", stockGroupRoutes);
 
-const godownRoutes = require('./routes/godownRoutes');
-app.use('/api/godowns', godownRoutes);
+const godownRoutes = require("./routes/godownRoutes");
+app.use("/api/godowns", godownRoutes);
 
-const stockItemRoutes = require('./routes/stockItems');
-app.use('/api/stock-items', stockItemRoutes);
+const stockItemRoutes = require("./routes/stockItems");
+app.use("/api/stock-items", stockItemRoutes);
 
-const signupRoute = require('./routes/SignUp');
-app.use('/api/SignUp', signupRoute);
+const signupRoute = require("./routes/SignUp");
+app.use("/api/SignUp", signupRoute);
 
-const companyRoutes = require('./routes/company');
-app.use('/api/company', companyRoutes);
+const companyRoutes = require("./routes/company");
+app.use("/api/company", companyRoutes);
 
-const adminloginRoute = require('./routes/adminlogin');
-app.use('/api/admin/login', adminloginRoute);
+const adminloginRoute = require("./routes/adminlogin");
+app.use("/api/admin/login", adminloginRoute);
 
 const ledgerDropdown = require("./routes/ledgerDropdown");
 app.use("/api/ledger-dropdown", ledgerDropdown);
 
-const salesOrders = require('./routes/salesOrders');
-app.use('/api/sales-orders', salesOrders);
+const salesOrders = require("./routes/salesOrders");
+app.use("/api/sales-orders", salesOrders);
 
-const purchaseOrders = require('./routes/purchaseOrder');
-app.use('/api/purchase-orders', purchaseOrders);
+const purchaseOrders = require("./routes/purchaseOrder");
+app.use("/api/purchase-orders", purchaseOrders);
 
-const salesVoucher = require('./routes/salevoucher');
-app.use('/api/sales-vouchers', salesVoucher);
-const DebitNoteVoucher = require('./routes/DebitNoteVoucher');
-app.use('/api/DebitNoteVoucher', DebitNoteVoucher);
+const salesVoucher = require("./routes/salevoucher");
+app.use("/api/sales-vouchers", salesVoucher);
+const DebitNoteVoucher = require("./routes/DebitNoteVoucher");
+app.use("/api/DebitNoteVoucher", DebitNoteVoucher);
 
-const CreditNotevoucher = require('./routes/CreditNotevoucher');
-app.use('/api/CreditNotevoucher', CreditNotevoucher);
+const CreditNotevoucher = require("./routes/CreditNotevoucher");
+app.use("/api/CreditNotevoucher", CreditNotevoucher);
 
-const StockJournal = require('./routes/StockJournal');
-app.use('/api/StockJournal', StockJournal);
+const StockJournal = require("./routes/StockJournal");
+app.use("/api/StockJournal", StockJournal);
 
-const DeliveryItem = require('./routes/DeliveryItem');
-app.use('/api/DeliveryItem', DeliveryItem);
+const DeliveryItem = require("./routes/DeliveryItem");
+app.use("/api/DeliveryItem", DeliveryItem);
 
-const DayBookCards = require('./routes/DayBookCards');
-app.use('/api/DayBookCards', DayBookCards);
+const DayBookCards = require("./routes/DayBookCards");
+app.use("/api/DayBookCards", DayBookCards);
 
-const daybookTable = require('./routes/daybookTable');
-app.use('/api/daybookTable', daybookTable);
-const daybookTable2 = require('./routes/daybookTable2');
-app.use('/api/daybookTable2', daybookTable2);
+const daybookTable = require("./routes/daybookTable");
+app.use("/api/daybookTable", daybookTable);
+const daybookTable2 = require("./routes/daybookTable2");
+app.use("/api/daybookTable2", daybookTable2);
 const gstRoutes = require("./routes/gst");
 app.use("/api/gst", gstRoutes);
 
@@ -144,126 +143,123 @@ app.use(tds27qRouter);
 const tds27eqRouter = require("./routes/tds_27eq");
 app.use(tds27eqRouter);
 
-const deducteesRouter = require('./routes/deductees');
+const deducteesRouter = require("./routes/deductees");
 app.use(deducteesRouter);
 
-const trialBalanceRouter = require('./routes/trialBalance');
+const trialBalanceRouter = require("./routes/trialBalance");
 app.use(trialBalanceRouter);
 
-const profitLossRouter = require('./routes/profitloss'); // Assuming you saved route above as profitLoss.js
+const profitLossRouter = require("./routes/profitloss"); // Assuming you saved route above as profitLoss.js
 app.use(profitLossRouter);
 
-const balanceSheetRouter = require('./routes/balanceSheet');
+const balanceSheetRouter = require("./routes/balanceSheet");
 app.use(balanceSheetRouter);
 
 // Remember to have your mysql2 pool connection in db.js and export it properly.
-const groupSummaryRouter = require('./routes/groupSummary');
+const groupSummaryRouter = require("./routes/groupSummary");
 app.use(groupSummaryRouter);
 // Remember to have your mysql2 pool connection in db.js and export it properly.
-const cashflowRouter = require('./routes/cashFlow');
+const cashflowRouter = require("./routes/cashFlow");
 app.use(cashflowRouter);
 
-const stockSummaryRouter = require('./routes/stockSummary');
+const stockSummaryRouter = require("./routes/stockSummary");
 app.use(stockSummaryRouter);
 
-const movementAnalysisRouter = require('./routes/movementAnalysis');
+const movementAnalysisRouter = require("./routes/movementAnalysis");
 app.use(movementAnalysisRouter);
 
-const ageingAnalysisRouter = require('./routes/ageingAnalysis');
+const ageingAnalysisRouter = require("./routes/ageingAnalysis");
 app.use(ageingAnalysisRouter);
 
-const godownSummaryRouter = require('./routes/godownSummary');
+const godownSummaryRouter = require("./routes/godownSummary");
 app.use(godownSummaryRouter);
 
-const fifoRouter = require('./routes/fifo');
+const fifoRouter = require("./routes/fifo");
 app.use(fifoRouter);
 
-const outstandingRouter = require('./routes/outstandingReceivables');
+const outstandingRouter = require("./routes/outstandingReceivables");
 app.use(outstandingRouter);
 
-const outstandingPayablesRouter = require('./routes/outstandingPayables');
+const outstandingPayablesRouter = require("./routes/outstandingPayables");
 app.use(outstandingPayablesRouter);
 
-const billwiseReceivablesRouter = require('./routes/billwiseReceivables');
+const billwiseReceivablesRouter = require("./routes/billwiseReceivables");
 app.use(billwiseReceivablesRouter);
 
 // in your app.js or server.js
-const billwisePayablesRouter = require('./routes/billwisePayables');
+const billwisePayablesRouter = require("./routes/billwisePayables");
 app.use(billwisePayablesRouter);
 
-const outstandingLedgerRouter = require('./routes/outstandingLedger');
+const outstandingLedgerRouter = require("./routes/outstandingLedger");
 app.use(outstandingLedgerRouter);
 
-const outstandingSummaryRouter = require('./routes/outstandingSummary');
+const outstandingSummaryRouter = require("./routes/outstandingSummary");
 app.use(outstandingSummaryRouter);
 
-const bulkStockItemsRouter = require('./routes/bulk-stock-items'); // the above file
-app.use('/api/stock-items', bulkStockItemsRouter);
+const bulkStockItemsRouter = require("./routes/bulk-stock-items"); // the above file
+app.use("/api/stock-items", bulkStockItemsRouter);
 
-const ledgerReportRouter = require('./routes/ledger-report');
-app.use('/api/ledger-report', ledgerReportRouter);
+const ledgerReportRouter = require("./routes/ledger-report");
+app.use("/api/ledger-report", ledgerReportRouter);
 
-const permissionsRouter = require('./routes/permissions');
+const permissionsRouter = require("./routes/permissions");
 app.use(permissionsRouter);
 
-const roleManagementRouter = require('./routes/roleManagement');
-app.use('/api', roleManagementRouter);
+const roleManagementRouter = require("./routes/roleManagement");
+app.use("/api", roleManagementRouter);
 
-const userAccountsRouter = require('./routes/userAccounts');
-app.use('/api', userAccountsRouter);
+const userAccountsRouter = require("./routes/userAccounts");
+app.use("/api", userAccountsRouter);
 
-const assessee = require('./routes/assessee');
-app.use('/api/assessee', assessee);
+const assessee = require("./routes/assessee");
+app.use("/api/assessee", assessee);
 
-const itrfiling = require('./routes/ITRFilling');
-app.use('/api/itr-filling', itrfiling);
+const itrfiling = require("./routes/ITRFilling");
+app.use("/api/itr-filling", itrfiling);
 
-const dashboard = require('./routes/dashboard');
-app.use('/api/', dashboard);
+const dashboard = require("./routes/dashboard");
+app.use("/api/", dashboard);
 
-const fundflow = require('./routes/fundflow');
-app.use('/api/fund-flow', fundflow);
+const fundflow = require("./routes/fundflow");
+app.use("/api/fund-flow", fundflow);
 
-const salesreport = require('./routes/sales-report');
-app.use('/api/sales-report', salesreport);
+const salesreport = require("./routes/sales-report");
+app.use("/api/sales-report", salesreport);
 
-const setProfit = require('./routes/setProfit')
-app.use('/api/set-profit', setProfit)
+const setProfit = require("./routes/setProfit");
+app.use("/api/set-profit", setProfit);
 
-const salesinvoicematching = require('./routes/sales-invoice-matching');
-app.use('/api/sales-invoice-matching', salesinvoicematching);
+const salesinvoicematching = require("./routes/sales-invoice-matching");
+app.use("/api/sales-invoice-matching", salesinvoicematching);
 
-const b2bRoutes = require('./routes/b2b');
-app.use('/api/', b2bRoutes);
-const b2cRoutes = require('./routes/b2c');
-app.use('/api/', b2cRoutes);
+const b2bRoutes = require("./routes/b2b");
+app.use("/api/", b2bRoutes);
+const b2cRoutes = require("./routes/b2c");
+app.use("/api/", b2cRoutes);
 
-const purchaseinvoicematching = require('./routes/purchaseinvoicematching');
-app.use('/api/', purchaseinvoicematching);
-const AdminUser = require('./routes/AdminUser');
-app.use('/api/adminUser', AdminUser);
-const caEmployee = require('./routes/caemployee');
-app.use('/api/', caEmployee);
+const purchaseinvoicematching = require("./routes/purchaseinvoicematching");
+app.use("/api/", purchaseinvoicematching);
+const AdminUser = require("./routes/AdminUser");
+app.use("/api/adminUser", AdminUser);
+const caEmployee = require("./routes/caemployee");
+app.use("/api/", caEmployee);
 
-const consolidatereport = require('./routes/consolidatereport');
-app.use('/api/', consolidatereport);
-const Header =require('./routes/Header');
-app.use('/api/header/',Header);
-
+const consolidatereport = require("./routes/consolidatereport");
+app.use("/api/", consolidatereport);
+const Header = require("./routes/Header");
+app.use("/api/header/", Header);
 
 // ✅ Local MySQL Connection
 const db = mysql.createConnection({
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'dbenegix'
+  host: "localhost",
+  user: "root",
+  password: "",
+  database: "dbenegix",
 });
-
-
 
 db.connect((err) => {
   if (err) throw err;
-  console.log('MySQL Connected!');
+  console.log("MySQL Connected!");
 });
 
 // ✅ Start Server
