@@ -11,6 +11,7 @@ app.use(
   cors({
     origin: [
       "https://apnabook.com",
+      "https://www.apnabook.com",
       "http://localhost:5173",
       "http://localhost:5174",
     ],
@@ -20,6 +21,8 @@ app.use(
   })
 );
 
+// Allow preflight
+app.options("*", cors());
 app.use(bodyParser.json());
 // const authMiddleware = require('./middlewares/authMiddleware');
 // const loadPermissions = require('./middlewares/loadPermissions');
