@@ -1,44 +1,48 @@
-require('dotenv').config(); // Load env variables
-const express = require('express');
+require("dotenv").config(); // Load env variables
+const express = require("express");
 const router = express.Router();
-const db = require('../db'); // already a promise-based pool
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
-
+const db = require("../db"); // already a promise-based pool
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
 const JWT_SECRET = process.env.JWT_SECRET;
 
-
-router.post('/register', async (req, res) => {
+router.post("/register", async (req, res) => {
   console.log("📥 /register hit");
 
-  const {
-    firstName,
-    lastName,
-    email,
-    phoneNumber,
-    password,
-    userLimit
-  } = req.body;
+  const { firstName, lastName, email, phoneNumber, password, userLimit } =
+    req.body;
 
-  if (!firstName || !lastName || !email || !password || !phoneNumber || !userLimit) {
-    return res.status(400).json({ message: 'All fields are required' });
+  if (
+    !firstName ||
+    !lastName ||
+    !email ||
+    !password ||
+    !phoneNumber ||
+    !userLimit
+  ) {
+    return res.status(400).json({ message: "All fields are required" });
   }
 
-  console.log(firstName ,!lastName, email , password , phoneNumber, userLimit)
+  console.log(firstName, !lastName, email, password, phoneNumber, userLimit);
 
   try {
     // 🔍 Check if email already exists
-    const [existing] = await db.query(`SELECT id FROM tbemployees WHERE email = ?`, [email]);
+    const [existing] = await db.query(
+      `SELECT id FROM tbemployees WHERE email = ?`,
+      [email]
+    );
     if (existing.length > 0) {
-      return res.status(409).json({ message: 'Email already registered' }); // 409 = Conflict
+      return res.status(409).json({ message: "Email already registered" }); // 409 = Conflict
     }
 
     // 🔒 Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
     // 📌 Generate JWT token
-    const token = jwt.sign({ email }, JWT_SECRET, { expiresIn: '7d' });
+    const token = jwt.sign({ email }, process.env.JWT_SECRET, {
+      expiresIn: "7d",
+    });
 
     // 📥 Insert into DB
     const sql = `
@@ -53,20 +57,21 @@ router.post('/register', async (req, res) => {
       phoneNumber,
       hashedPassword,
       userLimit,
-      token
+      token,
     ]);
 
     console.log("✅ User inserted:", result.insertId);
 
     return res.status(200).json({
-      message: 'User registered successfully',
+      message: "User registered successfully",
       userId: result.insertId,
-      token
+      token,
     });
-
   } catch (err) {
-    console.error('❌ DB Error:', err.message);
-    return res.status(500).json({ message: 'Database error', error: err.message });
+    console.error("❌ DB Error:", err.message);
+    return res
+      .status(500)
+      .json({ message: "Database error", error: err.message });
   }
 });
 
