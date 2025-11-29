@@ -10,7 +10,7 @@ const app = express();
 app.use(
   cors({
     origin: [
-      "https://api.apnabook.com",
+      "https://apnabook.com",
       "http://localhost:5173",
       "http://localhost:5174",
     ],
