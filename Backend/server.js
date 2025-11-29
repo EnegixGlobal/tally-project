@@ -21,8 +21,7 @@ app.use(
   })
 );
 
-// Allow preflight
-app.options("*", cors());
+
 app.use(bodyParser.json());
 // const authMiddleware = require('./middlewares/authMiddleware');
 // const loadPermissions = require('./middlewares/loadPermissions');
