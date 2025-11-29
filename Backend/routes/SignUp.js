@@ -1,10 +1,11 @@
+require('dotenv').config(); // Load env variables
 const express = require('express');
 const router = express.Router();
 const db = require('../db'); // already a promise-based pool
 const jwt = require('jsonwebtoken');
 const bcrypt = require('bcryptjs');
 
-require('dotenv').config(); // Load env variables
+
 const JWT_SECRET = process.env.JWT_SECRET;
 
 
