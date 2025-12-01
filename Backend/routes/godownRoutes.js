@@ -55,9 +55,14 @@ router.put('/:id', async (req, res) => {
 // Fetch Godown by ID (multi-tenant scoped)
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
-  const {  owner_type, owner_id } = req.query;
-  if ( !owner_type || !owner_id) {
-    return res.status(400).json({ success: false, message: ' owner_type, and owner_id are required' });
+  const rawOwnerType = req.query.owner_type;
+  const rawOwnerId = req.query.owner_id;
+
+  const owner_type = rawOwnerType === 'null' || rawOwnerType === 'undefined' ? null : rawOwnerType;
+  const owner_id = rawOwnerId === 'null' || rawOwnerId === 'undefined' ? null : rawOwnerId;
+
+  if (!owner_type || !owner_id) {
+    return res.status(400).json({ success: false, message: 'owner_type and owner_id are required' });
   }
   try {
     const [rows] = await db.execute(
@@ -73,19 +78,34 @@ router.get('/:id', async (req, res) => {
 
 // List All Godowns (multi-tenant scoped)
 router.get('/', async (req, res) => {
+  const rawOwnerType = req.query.owner_type;
+  const rawOwnerId = req.query.owner_id;
+  const rawCompanyId = req.query.company_id;
 
-  const {  owner_type, owner_id } = req.query;
-  if (  !owner_type || !owner_id) {
-    return res.status(400).json({ success: false, message: 'company_id, owner_type, and owner_id are required' });
-  }
+  const owner_type = rawOwnerType === 'null' || rawOwnerType === 'undefined' ? null : rawOwnerType;
+  const owner_id = rawOwnerId === 'null' || rawOwnerId === 'undefined' ? null : rawOwnerId;
+  const company_id = rawCompanyId ? parseInt(rawCompanyId, 10) : null;
+
   try {
-    const [rows] = await db.execute(
-      'SELECT * FROM godowns WHERE  owner_type = ? AND owner_id = ? ORDER BY name',
-      [ owner_type, owner_id]
-    );
+    let rows;
+    if (owner_type && owner_id) {
+      [rows] = await db.execute(
+        'SELECT * FROM godowns WHERE owner_type = ? AND owner_id = ? ORDER BY name',
+        [owner_type, owner_id]
+      );
+    } else if (company_id) {
+      // If owner not provided, return godowns for the company plus any global defaults
+      [rows] = await db.execute(
+        `SELECT * FROM godowns WHERE company_id = ? OR (company_id = 0 AND owner_type = 'employee' AND owner_id = 0) ORDER BY name`,
+        [company_id]
+      );
+    } else {
+      return res.status(400).json({ success: false, message: 'company_id, owner_type, or owner_id are required' });
+    }
 
     res.json({ success: true, data: rows });
   } catch (err) {
+    console.error('Error fetching godowns:', err);
     res.status(500).json({ success: false, message: 'Error fetching godowns' });
   }
 });

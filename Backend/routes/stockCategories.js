@@ -65,26 +65,54 @@ router.get("/:id", async (req, res) => {
 
 // CREATE stock category (multi-tenant scoped)
 router.post("/", async (req, res) => {
-  const { id, name, parent, description, ownerType, ownerId } = req.body;
+  const {
+    id,
+    name,
+    parent,
+    description,
+    ownerType,
+    ownerId,
+    companyId,
+    company_id, 
+  } = req.body;
 
-  if (!ownerType || !ownerId) {
-    return res
-      .status(400)
-      .json({ success: false, message: "ownerType and ownerId are required" });
+  const finalCompanyId = companyId || company_id;
+
+  if (!name || !finalCompanyId || !ownerType || !ownerId) {
+    return res.status(400).json({
+      success: false,
+      message: "name, companyId, ownerType and ownerId are required",
+    });
   }
 
   try {
     await db.execute(
-      "INSERT INTO stock_categories (id, name, parent, description, owner_type, owner_id) VALUES (?, ?, ?, ?, ?, ?)",
-      [id, name, parent || null, description || null, ownerType, ownerId]
+      `INSERT INTO stock_categories 
+        (id, name, parent, description, company_id, owner_type, owner_id) 
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [
+        id,
+        name,
+        parent || null,
+        description || null,
+        finalCompanyId,
+        ownerType,
+        ownerId,
+      ]
     );
 
-    res.json({ success: true, message: "Stock category created successfully" });
+    res.json({
+      success: true,
+      message: "Stock category created successfully",
+    });
   } catch (err) {
     console.error("Error creating stock category:", err);
-    res.status(500).json({ success: false, message: "Failed to create stock category" });
+    res
+      .status(500)
+      .json({ success: false, message: "Failed to create stock category" });
   }
 });
+
 
 
 // UPDATE stock category (scoped)

@@ -2,6 +2,7 @@ import { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AppProvider } from "./context/AppContext";
 import MainLayout from "./components/layout/MainLayout";
+import RequireCompany from "./components/layout/RequireCompany";
 import Dashboard from "./components/dashboard/Dashboard";
 import CompanyForm from "./components/company/CompanyForm";
 
@@ -234,447 +235,250 @@ function App() {
               <Route index element={<Dashboard />} />
               <Route path="company" element={<CompanyForm />} />
               {/* Masters Routes */}
-              <Route path="masters" element={<MastersIndex />} />
-              <Route path="masters/ledger" element={<LedgerList />} />
-              <Route path="masters/ledger/create" element={<LedgerForm />} />
+              <Route path="masters" element={<RequireCompany><MastersIndex /></RequireCompany>} />
+              <Route path="masters/ledger" element={<RequireCompany><LedgerList /></RequireCompany>} />
+              <Route path="masters/ledger/create" element={<RequireCompany><LedgerForm /></RequireCompany>} />
               <Route
                 path="masters/ledger/bulk-create"
-                element={<MultiLedgerForm />}
+                element={<RequireCompany><MultiLedgerForm /></RequireCompany>}
               />
-              <Route path="masters/ledger/edit/:id" element={<LedgerForm />} />
-              <Route path="masters/group" element={<GroupList />} />
-              <Route path="masters/group/create" element={<GroupForm />} />
-              <Route path="masters/group/edit/:id" element={<GroupForm />} />
-              <Route path="masters/budgets" element={<BudgetList />} />
-              <Route path="masters/budget/create" element={<BudgetForm />} />
-              <Route path="masters/budget/edit/:id" element={<BudgetForm />} />
-              <Route path="masters/currency" element={<CurrencyList />} />
+              <Route path="masters/ledger/edit/:id" element={<RequireCompany><LedgerForm /></RequireCompany>} />
+              <Route path="masters/group" element={<RequireCompany><GroupList /></RequireCompany>} />
+              <Route path="masters/group/create" element={<RequireCompany><GroupForm /></RequireCompany>} />
+              <Route path="masters/group/edit/:id" element={<RequireCompany><GroupForm /></RequireCompany>} />
+              <Route path="masters/budgets" element={<RequireCompany><BudgetList /></RequireCompany>} />
+              <Route path="masters/budget/create" element={<RequireCompany><BudgetForm /></RequireCompany>} />
+              <Route path="masters/budget/edit/:id" element={<RequireCompany><BudgetForm /></RequireCompany>} />
+              <Route path="masters/currency" element={<RequireCompany><CurrencyList /></RequireCompany>} />
               <Route
                 path="masters/currency/create"
-                element={<CurrencyForm />}
+                element={<RequireCompany><CurrencyForm /></RequireCompany>}
               />
               <Route
                 path="masters/currency/edit/:id"
-                element={<CurrencyForm />}
+                element={<RequireCompany><CurrencyForm /></RequireCompany>}
               />
-              <Route path="masters/cost-centers" element={<CostCenterList />} />
+              <Route path="masters/cost-centers" element={<RequireCompany><CostCenterList /></RequireCompany>} />
               <Route
                 path="masters/cost-center/create"
-                element={<CostCenterForm />}
+                element={<RequireCompany><CostCenterForm /></RequireCompany>}
               />
               <Route
                 path="masters/cost-center/edit/:id"
-                element={<CostCenterForm />}
+                element={<RequireCompany><CostCenterForm /></RequireCompany>}
               />
               <Route
                 path="masters/stock-categories"
-                element={<StockCategoryList />}
+                element={<RequireCompany><StockCategoryList /></RequireCompany>}
               />
               <Route
                 path="masters/stock-category/create"
-                element={<StockCategoryForm />}
+                element={<RequireCompany><StockCategoryForm /></RequireCompany>}
               />
               <Route
                 path="masters/stock-category/edit/:id"
-                element={<StockCategoryForm />}
+                element={<RequireCompany><StockCategoryForm /></RequireCompany>}
               />
-              <Route path="masters/stock-item" element={<StockItemList />} />
+              <Route path="masters/stock-item" element={<RequireCompany><StockItemList /></RequireCompany>} />
               <Route
                 path="masters/stock-item/create"
-                element={<StockItemForm />}
+                element={<RequireCompany><StockItemForm /></RequireCompany>}
               />
               <Route
                 path="masters/stock-item/bulk-create"
-                element={<BulkStockItemCreate />}
+                element={<RequireCompany><BulkStockItemCreate /></RequireCompany>}
               />
               <Route
                 path="masters/stock-item/edit/:id"
-                element={<StockItemForm />}
+                element={<RequireCompany><StockItemForm /></RequireCompany>}
               />
               <Route
                 path="masters/stock-item/edit-stock/:id"
-                element={<StockItemEdit />}
+                element={<RequireCompany><StockItemEdit /></RequireCompany>}
               />
               <Route
                 path="masters/stock-item/batches"
-                element={<BatchList />}
+                element={<RequireCompany><BatchList /></RequireCompany>}
               />
               <Route
                 path="masters/stock-item/batch-selection/:id"
-                element={<BatchSelectionPage />}
+                element={<RequireCompany><BatchSelectionPage /></RequireCompany>}
               />
-              <Route path="masters/stock-group" element={<StockGroupList />} />
+              <Route path="masters/stock-group" element={<RequireCompany><StockGroupList /></RequireCompany>} />
               <Route
                 path="masters/stock-group/create"
-                element={<StockGroupForm />}
+                element={<RequireCompany><StockGroupForm /></RequireCompany>}
               />
               <Route
                 path="masters/stock-group/edit/:id"
-                element={<StockGroupForm />}
+                element={<RequireCompany><StockGroupForm /></RequireCompany>}
               />
-              <Route path="masters/units" element={<UnitList />} />
-              <Route path="masters/unit/create" element={<UnitForm />} />
-              <Route path="masters/unit/edit/:id" element={<UnitForm />} />{" "}
-              <Route path="masters/godowns" element={<GodownList />} />
-              <Route path="masters/godown/create" element={<GodownForm />} />
-              <Route path="masters/godown/edit/:id" element={<GodownForm />} />
-              <Route path="masters/scenarios" element={<ScenarioList />} />
+              <Route path="masters/units" element={<RequireCompany><UnitList /></RequireCompany>} />
+              <Route path="masters/unit/create" element={<RequireCompany><UnitForm /></RequireCompany>} />
+              <Route path="masters/unit/edit/:id" element={<RequireCompany><UnitForm /></RequireCompany>} />{" "}
+              <Route path="masters/godowns" element={<RequireCompany><GodownList /></RequireCompany>} />
+              <Route path="masters/godown/create" element={<RequireCompany><GodownForm /></RequireCompany>} />
+              <Route path="masters/godown/edit/:id" element={<RequireCompany><GodownForm /></RequireCompany>} />
+              <Route path="masters/scenarios" element={<RequireCompany><ScenarioList /></RequireCompany>} />
               <Route
                 path="masters/scenario/create"
-                element={<ScenarioForm />}
+                element={<RequireCompany><ScenarioForm /></RequireCompany>}
               />
               <Route
                 path="masters/scenario/edit/:id"
-                element={<ScenarioForm />}
+                element={<RequireCompany><ScenarioForm /></RequireCompany>}
               />
               {/* <Route path="scenarios" element={<ScenarioList />} />
             <Route path="scenarios/create" element={<ScenarioForm />} />
             <Route path="scenarios/edit/:id" element={<ScenarioForm />} /> */}
               {/* Vouchers Routes */}
-              <Route path="vouchers" element={<VouchersIndex />} />
-              <Route
-                path="vouchers/payment/create"
-                element={<PaymentVoucher />}
-              />
-              <Route
-                path="vouchers/payment/edit/:id"
-                element={<PaymentVoucher />}
-              />
-              <Route
-                path="vouchers/receipt/create"
-                element={<ReceiptVoucher />}
-              />
-              <Route
-                path="vouchers/receipt/edit/:id"
-                element={<ReceiptVoucher />}
-              />
-              <Route
-                path="vouchers/contra/create"
-                element={<ContraVoucher />}
-              />
-              <Route
-                path="vouchers/contra/edit/:id"
-                element={<ContraVoucher />}
-              />
-              <Route
-                path="vouchers/credit-note/create"
-                element={<CreditNoteVoucher />}
-              />
-              <Route
-                path="vouchers/credit-note/edit/:id"
-                element={<CreditNoteVoucher />}
-              />
-              <Route
-                path="vouchers/debit-note/create"
-                element={<DebitNoteVoucher />}
-              />
-              <Route
-                path="vouchers/debit-note/edit/:id"
-                element={<DebitNoteVoucher />}
-              />
-              <Route
-                path="vouchers/delivery-note/create"
-                element={<DeliveryNoteVoucher />}
-              />
-              <Route
-                path="vouchers/delivery-note/edit/:id"
-                element={<DeliveryNoteVoucher />}
-              />
-              <Route
-                path="vouchers/journal/create"
-                element={<JournalVoucher />}
-              />
-              <Route
-                path="vouchers/journal/create/:id"
-                element={<JournalVoucher />}
-              />
-              <Route
-                path="vouchers/journal/edit/:id"
-                element={<JournalVoucher />}
-              />
-              <Route
-                path="vouchers/purchase/create"
-                element={<PurchaseVoucher1 />}
-              />
-              <Route
-                path="vouchers/purchase/edit/:id"
-                element={<PurchaseVoucher1 />}
-              />
-              <Route
-                path="vouchers/stock-journal/create"
-                element={<StockJournalVoucher1 />}
-              />
-              <Route
-                path="vouchers/stock-journal/edit/:id"
-                element={<StockJournalVoucher1 />}
-              />
-              <Route path="vouchers/sales/create" element={<SalesVoucher1 />} />
-              <Route
-                path="vouchers/sales/edit/:id"
-                element={<SalesVoucher1 />}
-              />
-              <Route
-                path="vouchers/sales-order/create"
-                element={<SalesOrder />}
-              />
-              <Route
-                path="vouchers/sales-order/edit/:id"
-                element={<SalesOrder />}
-              />
-              <Route
-                path="vouchers/quotation/create"
-                element={<QuotationCreate />}
-              />
-              <Route
-                path="vouchers/quotation/list"
-                element={<QuotationList />}
-              />
-              <Route
-                path="vouchers/purchase-order/create"
-                element={<PurchaseOrderVoucher />}
-              />
-              <Route
-                path="vouchers/purchase-order/edit/:id"
-                element={<PurchaseOrderVoucher />}
-              />
-              <Route
-                path="vouchers/view/:voucherType/:voucherNo"
-                element={<VoucherView />}
-              />
-              <Route path="vouchers/import" element={<VoucherImport />} />
+              <Route path="vouchers" element={<RequireCompany><VouchersIndex /></RequireCompany>} />
+              <Route path="vouchers/payment/create" element={<RequireCompany><PaymentVoucher /></RequireCompany>} />
+              <Route path="vouchers/payment/edit/:id" element={<RequireCompany><PaymentVoucher /></RequireCompany>} />
+              <Route path="vouchers/receipt/create" element={<RequireCompany><ReceiptVoucher /></RequireCompany>} />
+              <Route path="vouchers/receipt/edit/:id" element={<RequireCompany><ReceiptVoucher /></RequireCompany>} />
+              <Route path="vouchers/contra/create" element={<RequireCompany><ContraVoucher /></RequireCompany>} />
+              <Route path="vouchers/contra/edit/:id" element={<RequireCompany><ContraVoucher /></RequireCompany>} />
+              <Route path="vouchers/credit-note/create" element={<RequireCompany><CreditNoteVoucher /></RequireCompany>} />
+              <Route path="vouchers/credit-note/edit/:id" element={<RequireCompany><CreditNoteVoucher /></RequireCompany>} />
+              <Route path="vouchers/debit-note/create" element={<RequireCompany><DebitNoteVoucher /></RequireCompany>} />
+              <Route path="vouchers/debit-note/edit/:id" element={<RequireCompany><DebitNoteVoucher /></RequireCompany>} />
+              <Route path="vouchers/delivery-note/create" element={<RequireCompany><DeliveryNoteVoucher /></RequireCompany>} />
+              <Route path="vouchers/delivery-note/edit/:id" element={<RequireCompany><DeliveryNoteVoucher /></RequireCompany>} />
+              <Route path="vouchers/journal/create" element={<RequireCompany><JournalVoucher /></RequireCompany>} />
+              <Route path="vouchers/journal/create/:id" element={<RequireCompany><JournalVoucher /></RequireCompany>} />
+              <Route path="vouchers/journal/edit/:id" element={<RequireCompany><JournalVoucher /></RequireCompany>} />
+              <Route path="vouchers/purchase/create" element={<RequireCompany><PurchaseVoucher1 /></RequireCompany>} />
+              <Route path="vouchers/purchase/edit/:id" element={<RequireCompany><PurchaseVoucher1 /></RequireCompany>} />
+              <Route path="vouchers/stock-journal/create" element={<RequireCompany><StockJournalVoucher1 /></RequireCompany>} />
+              <Route path="vouchers/stock-journal/edit/:id" element={<RequireCompany><StockJournalVoucher1 /></RequireCompany>} />
+              <Route path="vouchers/sales/create" element={<RequireCompany><SalesVoucher1 /></RequireCompany>} />
+              <Route path="vouchers/sales/edit/:id" element={<RequireCompany><SalesVoucher1 /></RequireCompany>} />
+              <Route path="vouchers/sales-order/create" element={<RequireCompany><SalesOrder /></RequireCompany>} />
+              <Route path="vouchers/sales-order/edit/:id" element={<RequireCompany><SalesOrder /></RequireCompany>} />
+              <Route path="vouchers/quotation/create" element={<RequireCompany><QuotationCreate /></RequireCompany>} />
+              <Route path="vouchers/quotation/list" element={<RequireCompany><QuotationList /></RequireCompany>} />
+              <Route path="vouchers/purchase-order/create" element={<RequireCompany><PurchaseOrderVoucher /></RequireCompany>} />
+              <Route path="vouchers/purchase-order/edit/:id" element={<RequireCompany><PurchaseOrderVoucher /></RequireCompany>} />
+              <Route path="vouchers/view/:voucherType/:voucherNo" element={<RequireCompany><VoucherView /></RequireCompany>} />
+              <Route path="vouchers/import" element={<RequireCompany><VoucherImport /></RequireCompany>} />
               {/* Voucher Register Routes */}
-              <Route
-                path="voucher-register"
-                element={<VoucherRegisterIndex />}
-              />
-              <Route
-                path="voucher-register/payment"
-                element={<PaymentRegister />}
-              />
-              <Route
-                path="voucher-register/receipt"
-                element={<ReceiptRegister />}
-              />
-              <Route
-                path="voucher-register/contra"
-                element={<ContraRegister />}
-              />
-              <Route
-                path="voucher-register/journal"
-                element={<JournalRegister />}
-              />
-              <Route
-                path="voucher-register/sales"
-                element={<SalesRegister />}
-              />
-              <Route
-                path="voucher-register/purchase"
-                element={<PurchaseRegister />}
-              />
-              <Route
-                path="voucher-register/credit-note"
-                element={<CreditNoteRegister />}
-              />
-              <Route
-                path="voucher-register/debit-note"
-                element={<DebitNoteRegister />}
-              />
-              <Route
-                path="voucher-register/sales-order"
-                element={<SalesOrderRegister />}
-              />
-              <Route
-                path="voucher-register/purchase-return"
-                element={<PurchaseReturnRegister />}
-              />
-              <Route
-                path="voucher-register/stock-journal"
-                element={<StockJournalRegister />}
-              />
-              <Route
-                path="voucher-register/delivery-note"
-                element={<DeliveryNoteRegister />}
-              />
-              <Route
-                path="voucher-register/quotation"
-                element={<QuotationRegister />}
-              />
-              <Route
-                path="voucher-register/sales-return"
-                element={<SalesReturnRegister />}
-              />
-              //Accounting Routes
-              {/* <Route path="accounting" element={<AccountingModule />} /> */}
-              <Route path="reports/day-book" element={<DayBook />} />
-              <Route path="reports/ledger" element={<LedgerReport />} />
-              <Route path="reports/trial-balance" element={<TrialBalance />} />
-              {/* <Route path="reports/trading-account" element={<TradingAccount />} /> */}
-              <Route path="reports/profit-loss" element={<ProfitLoss />} />
-              <Route path="reports/balance-sheet" element={<BalanceSheet />} />
-              <Route
-                path="reports/group-summary"
-                element={<GroupSummaryIndex />}
-              />
-              <Route
-                path="reports/group-summary/:groupType"
-                element={<GroupSummary />}
-              />
-              <Route path="reports/cash-flow" element={<CashFlow />} />
-              <Route path="reports/fund-flow" element={<FundFlow />} />
-              <Route
-                path="reports/cash-flow-summary/:monthCode"
-                element={<CashFlowSummary />}
-              />
-              <Route
-                path="reports/group-cash-flow/:accountName"
-                element={<GroupCashFlow />}
-              />
-              <Route
-                path="reports/ledger-vouchers/:ledgerName"
-                element={<LedgerVouchers />}
-              />
-              <Route
-                path="reports/outstanding"
-                element={<OutstandingReports />}
-              />
-              //inventory Routes
-              <Route path="reports/stock-summary" element={<StockSummary />} />
-              <Route
-                path="reports/movement-analysis"
-                element={<MovementAnalysis />}
-              />
-              <Route
-                path="reports/ageing-analysis"
-                element={<AgeingAnalysis />}
-              />
-              <Route
-                path="reports/godown-summary"
-                element={<GodownSummary />}
-              />
-              {/* Sales Reports Routes */}
-              <Route path="reports/sales-report" element={<SalesReport />} />
-              <Route
-                path="reports/sales-invoice-matching"
-                element={<SalesInvoiceMatching />}
-              />
-              {/* Purchase Reports Routes */}
-              <Route
-                path="reports/purchase-report"
-                element={<PurchaseReport1 />}
-              />
-              <Route
-                path="reports/purchase-invoice-matching"
-                element={<PurchaseInvoiceMatching1 />}
-              />
-              {/* B2B and B2C Routes */}
-              <Route path="reports/b2b" element={<B2B />} />
-              <Route path="reports/b2c" element={<B2C />} />
-              <Route path="reports/consolidation" element={<Consolidation />} />
+              <Route path="voucher-register" element={<RequireCompany><VoucherRegisterIndex /></RequireCompany>} />
+              <Route path="voucher-register/payment" element={<RequireCompany><PaymentRegister /></RequireCompany>} />
+              <Route path="voucher-register/receipt" element={<RequireCompany><ReceiptRegister /></RequireCompany>} />
+              <Route path="voucher-register/contra" element={<RequireCompany><ContraRegister /></RequireCompany>} />
+              <Route path="voucher-register/journal" element={<RequireCompany><JournalRegister /></RequireCompany>} />
+              <Route path="voucher-register/sales" element={<RequireCompany><SalesRegister /></RequireCompany>} />
+              <Route path="voucher-register/purchase" element={<RequireCompany><PurchaseRegister /></RequireCompany>} />
+              <Route path="voucher-register/credit-note" element={<RequireCompany><CreditNoteRegister /></RequireCompany>} />
+              <Route path="voucher-register/debit-note" element={<RequireCompany><DebitNoteRegister /></RequireCompany>} />
+              <Route path="voucher-register/sales-order" element={<RequireCompany><SalesOrderRegister /></RequireCompany>} />
+              <Route path="voucher-register/purchase-return" element={<RequireCompany><PurchaseReturnRegister /></RequireCompany>} />
+              <Route path="voucher-register/stock-journal" element={<RequireCompany><StockJournalRegister /></RequireCompany>} />
+              <Route path="voucher-register/delivery-note" element={<RequireCompany><DeliveryNoteRegister /></RequireCompany>} />
+              <Route path="voucher-register/quotation" element={<RequireCompany><QuotationRegister /></RequireCompany>} />
+              <Route path="voucher-register/sales-return" element={<RequireCompany><SalesReturnRegister /></RequireCompany>} />
+              
               {/* Reports Routes */}
-              <Route path="reports" element={<ReportsIndex />} />
-              {/* <Route path="reports/trading-account" element={<TradingAccount />} /> */}
+              <Route path="reports" element={<RequireCompany><ReportsIndex /></RequireCompany>} />
+              <Route path="reports/day-book" element={<RequireCompany><DayBook /></RequireCompany>} />
+              <Route path="reports/ledger" element={<RequireCompany><LedgerReport /></RequireCompany>} />
+              <Route path="reports/trial-balance" element={<RequireCompany><TrialBalance /></RequireCompany>} />
+              <Route path="reports/profit-loss" element={<RequireCompany><ProfitLoss /></RequireCompany>} />
+              <Route path="reports/balance-sheet" element={<RequireCompany><BalanceSheet /></RequireCompany>} />
+              <Route path="reports/group-summary" element={<RequireCompany><GroupSummaryIndex /></RequireCompany>} />
+              <Route path="reports/group-summary/:groupType" element={<RequireCompany><GroupSummary /></RequireCompany>} />
+              <Route path="reports/cash-flow" element={<RequireCompany><CashFlow /></RequireCompany>} />
+              <Route path="reports/fund-flow" element={<RequireCompany><FundFlow /></RequireCompany>} />
+              <Route path="reports/cash-flow-summary/:monthCode" element={<RequireCompany><CashFlowSummary /></RequireCompany>} />
+              <Route path="reports/group-cash-flow/:accountName" element={<RequireCompany><GroupCashFlow /></RequireCompany>} />
+              <Route path="reports/ledger-vouchers/:ledgerName" element={<RequireCompany><LedgerVouchers /></RequireCompany>} />
+              <Route path="reports/outstanding" element={<RequireCompany><OutstandingReports /></RequireCompany>} />
+              <Route path="reports/stock-summary" element={<RequireCompany><StockSummary /></RequireCompany>} />
+              <Route path="reports/movement-analysis" element={<RequireCompany><MovementAnalysis /></RequireCompany>} />
+              <Route path="reports/ageing-analysis" element={<RequireCompany><AgeingAnalysis /></RequireCompany>} />
+              <Route path="reports/godown-summary" element={<RequireCompany><GodownSummary /></RequireCompany>} />
+              <Route path="reports/sales-report" element={<RequireCompany><SalesReport /></RequireCompany>} />
+              <Route path="reports/sales-invoice-matching" element={<RequireCompany><SalesInvoiceMatching /></RequireCompany>} />
+              <Route path="reports/purchase-report" element={<RequireCompany><PurchaseReport1 /></RequireCompany>} />
+              <Route path="reports/purchase-invoice-matching" element={<RequireCompany><PurchaseInvoiceMatching1 /></RequireCompany>} />
+              <Route path="reports/b2b" element={<RequireCompany><B2B /></RequireCompany>} />
+              <Route path="reports/b2c" element={<RequireCompany><B2C /></RequireCompany>} />
+              <Route path="reports/consolidation" element={<RequireCompany><Consolidation /></RequireCompany>} />
               {/* GST Module Routes */}
-              <Route path="gst/gstr-1" element={<GSTR1 />} />
-              <Route path="gst/gstr-3b" element={<GSTR3B />} />
-              <Route path="gst/gst-analysis" element={<GSTAnalysis />} />
-              <Route path="gst" element={<GSTModule />} />
-              <Route path="gst/calculator" element={<GSTCalculator />} />
-              <Route path="gst/hsn-codes" element={<HSNCodes />} />
-              <Route path="gst/compliance" element={<ComplianceCheck />} />
-              <Route path="gst/rates" element={<GSTRates />} />
-              <Route path="gst/registration" element={<GSTRegistration />} />
-              <Route path="gst/import" element={<ImportData />} />
-              <Route path="gst/reconciliation" element={<Reconciliation />} />
-              <Route path="gst/export" element={<ExportReturns />} />
-              <Route path="gst/e-way-bill" element={<EWayBill />} />
-              <Route path="gst/summary" element={<GSTSummary />} />
+              <Route path="gst/gstr-1" element={<RequireCompany><GSTR1 /></RequireCompany>} />
+              <Route path="gst/gstr-3b" element={<RequireCompany><GSTR3B /></RequireCompany>} />
+              <Route path="gst/gst-analysis" element={<RequireCompany><GSTAnalysis /></RequireCompany>} />
+              <Route path="gst" element={<RequireCompany><GSTModule /></RequireCompany>} />
+              <Route path="gst/calculator" element={<RequireCompany><GSTCalculator /></RequireCompany>} />
+              <Route path="gst/hsn-codes" element={<RequireCompany><HSNCodes /></RequireCompany>} />
+              <Route path="gst/compliance" element={<RequireCompany><ComplianceCheck /></RequireCompany>} />
+              <Route path="gst/rates" element={<RequireCompany><GSTRates /></RequireCompany>} />
+              <Route path="gst/registration" element={<RequireCompany><GSTRegistration /></RequireCompany>} />
+              <Route path="gst/import" element={<RequireCompany><ImportData /></RequireCompany>} />
+              <Route path="gst/reconciliation" element={<RequireCompany><Reconciliation /></RequireCompany>} />
+              <Route path="gst/export" element={<RequireCompany><ExportReturns /></RequireCompany>} />
+              <Route path="gst/e-way-bill" element={<RequireCompany><EWayBill /></RequireCompany>} />
+              <Route path="gst/summary" element={<RequireCompany><GSTSummary /></RequireCompany>} />
               {/* TDS Module Routes */}
-              <Route path="tds" element={<TDSModule />} />
-              <Route path="tds/form-24q" element={<Form24Q />} />
-              <Route path="tds/form-26q" element={<Form26Q />} />
-              <Route path="tds/form-27q" element={<Form27QPage />} />
-              <Route path="tds/form-27eq" element={<Form27EQ />} />
-              <Route path="tds/summary" element={<TDSSummary />} />
-              <Route path="tds/rates" element={<TDSRates />} />
-              <Route path="tds/form-16" element={<Form16 />} />
-              <Route path="tds/compliance" element={<ComplianceCheck2 />} />
-              <Route path="tds/deductees" element={<DeducteeMaster />} />
-              <Route path="tds/tan" element={<TANRegistration />} />
-              <Route path="tds/form-26qb" element={<Form26QB />} />
-              <Route path="tds/form-26qc" element={<Form26QC />} />
+              <Route path="tds" element={<RequireCompany><TDSModule /></RequireCompany>} />
+              <Route path="tds/form-24q" element={<RequireCompany><Form24Q /></RequireCompany>} />
+              <Route path="tds/form-26q" element={<RequireCompany><Form26Q /></RequireCompany>} />
+              <Route path="tds/form-27q" element={<RequireCompany><Form27QPage /></RequireCompany>} />
+              <Route path="tds/form-27eq" element={<RequireCompany><Form27EQ /></RequireCompany>} />
+              <Route path="tds/summary" element={<RequireCompany><TDSSummary /></RequireCompany>} />
+              <Route path="tds/rates" element={<RequireCompany><TDSRates /></RequireCompany>} />
+              <Route path="tds/form-16" element={<RequireCompany><Form16 /></RequireCompany>} />
+              <Route path="tds/compliance" element={<RequireCompany><ComplianceCheck2 /></RequireCompany>} />
+              <Route path="tds/deductees" element={<RequireCompany><DeducteeMaster /></RequireCompany>} />
+              <Route path="tds/tan" element={<RequireCompany><TANRegistration /></RequireCompany>} />
+              <Route path="tds/form-26qb" element={<RequireCompany><Form26QB /></RequireCompany>} />
+              <Route path="tds/form-26qc" element={<RequireCompany><Form26QC /></RequireCompany>} />
               {/* Audit Module Routes */}
-              <Route path="audit" element={<AuditModule />} />
-              <Route path="audit/summary" element={<AuditSummary />} />
-              <Route
-                path="audit/transaction-log"
-                element={<TransactionLog />}
-              />
-              <Route path="audit/user-activity" element={<UserActivity />} />
-              <Route path="audit/login-history" element={<LoginHistory />} />
-              <Route path="audit/data-changes" element={<DataChanges />} />
-              <Route path="audit/security" element={<SecuritySettings />} />
-              <Route path="audit/compliance" element={<AuditCompliance />} />
-              <Route path="audit/risk" element={<RiskAssessment />} />
-              <Route path="audit/fraud" element={<FraudDetection />} />
-              <Route path="audit/exceptions" element={<ExceptionReports />} />
-              <Route
-                path="audit/period-analysis"
-                element={<PeriodAnalysis />}
-              />
-              <Route path="audit/user-reports" element={<UserReports />} />
-              <Route path="audit/cma" element={<CMAModule />} />
-              <Route path="audit/cma-report" element={<CMAReport />} />
-              <Route path="audit/dpr" element={<DPRReport />} />
-              <Route path="audit/3-Cb" element={<Form3CB />} />
-              <Route path="audit/3-ca" element={<Form3CA />} />
-              <Route path="audit/3-cd" element={<Form3CD />} />
+              <Route path="audit" element={<RequireCompany><AuditModule /></RequireCompany>} />
+              <Route path="audit/summary" element={<RequireCompany><AuditSummary /></RequireCompany>} />
+              <Route path="audit/transaction-log" element={<RequireCompany><TransactionLog /></RequireCompany>} />
+              <Route path="audit/user-activity" element={<RequireCompany><UserActivity /></RequireCompany>} />
+              <Route path="audit/login-history" element={<RequireCompany><LoginHistory /></RequireCompany>} />
+              <Route path="audit/data-changes" element={<RequireCompany><DataChanges /></RequireCompany>} />
+              <Route path="audit/security" element={<RequireCompany><SecuritySettings /></RequireCompany>} />
+              <Route path="audit/compliance" element={<RequireCompany><AuditCompliance /></RequireCompany>} />
+              <Route path="audit/risk" element={<RequireCompany><RiskAssessment /></RequireCompany>} />
+              <Route path="audit/fraud" element={<RequireCompany><FraudDetection /></RequireCompany>} />
+              <Route path="audit/exceptions" element={<RequireCompany><ExceptionReports /></RequireCompany>} />
+              <Route path="audit/period-analysis" element={<RequireCompany><PeriodAnalysis /></RequireCompany>} />
+              <Route path="audit/user-reports" element={<RequireCompany><UserReports /></RequireCompany>} />
+              <Route path="audit/cma" element={<RequireCompany><CMAModule /></RequireCompany>} />
+              <Route path="audit/cma-report" element={<RequireCompany><CMAReport /></RequireCompany>} />
+              <Route path="audit/dpr" element={<RequireCompany><DPRReport /></RequireCompany>} />
+              <Route path="audit/3-Cb" element={<RequireCompany><Form3CB /></RequireCompany>} />
+              <Route path="audit/3-ca" element={<RequireCompany><Form3CA /></RequireCompany>} />
+              <Route path="audit/3-cd" element={<RequireCompany><Form3CD /></RequireCompany>} />
               {/* Income Tax Module Routes */}
-              <Route path="income-tax" element={<IncomeTaxIndex />} />
-              <Route path="income-tax/itr-filing" element={<ITRFiling />} />
-              <Route path="income-tax/calculator" element={<TaxCalculator />} />
-              <Route
-                path="income-tax/assessee"
-                element={<AssesseeManagement />}
-              />
-              <Route
-                path="income-tax/business-income"
-                element={<BusinessIncomeManagement />}
-              />
-              <Route
-                path="income-tax/investment"
-                element={<InvestmentManagement />}
-              />
-              <Route
-                path="income-tax/capital-gains"
-                element={<CapitalGainsManagement />}
-              />
-              <Route path="income-tax/tds" element={<TDSManagement />} />
-              <Route path="income-tax/reports" element={<IncomeTaxReports />} />
+              <Route path="income-tax" element={<RequireCompany><IncomeTaxIndex /></RequireCompany>} />
+              <Route path="income-tax/itr-filing" element={<RequireCompany><ITRFiling /></RequireCompany>} />
+              <Route path="income-tax/calculator" element={<RequireCompany><TaxCalculator /></RequireCompany>} />
+              <Route path="income-tax/assessee" element={<RequireCompany><AssesseeManagement /></RequireCompany>} />
+              <Route path="income-tax/business-income" element={<RequireCompany><BusinessIncomeManagement /></RequireCompany>} />
+              <Route path="income-tax/investment" element={<RequireCompany><InvestmentManagement /></RequireCompany>} />
+              <Route path="income-tax/capital-gains" element={<RequireCompany><CapitalGainsManagement /></RequireCompany>} />
+              <Route path="income-tax/tds" element={<RequireCompany><TDSManagement /></RequireCompany>} />
+              <Route path="income-tax/reports" element={<RequireCompany><IncomeTaxReports /></RequireCompany>} />
               {/* Legacy route aliases for backward compatibility */}
-              <Route
-                path="income-tax/business"
-                element={<BusinessIncomeManagement />}
-              />
-              <Route
-                path="income-tax/deductions"
-                element={<InvestmentManagement />}
-              />
-              {/* Other Module Routes */}
-              {/* <Route path="inventory" element={<InventoryModule />} /> */}
-              <Route path="gst" element={<GSTModule />} />
+              <Route path="income-tax/business" element={<RequireCompany><BusinessIncomeManagement /></RequireCompany>} />
+              <Route path="income-tax/deductions" element={<RequireCompany><InvestmentManagement /></RequireCompany>} />
               {/* Config Module Routes */}
-              <Route path="config" element={<ConfigModule />} />
-              <Route path="config/general" element={<GeneralSettings />} />
-              <Route path="config/database" element={<DatabaseSettings />} />
-              <Route path="config/backup" element={<BackupRestore />} />
-              <Route path="config/display" element={<DisplaySettings />} />
-              <Route path="config/backup" element={<BackupRestore />} />
-              <Route path="config/users" element={<UserAccounts />} />
-              <Route path="config/permissions" element={<Permissions />} />
-              <Route path="config/roles" element={<RoleManagement />} />
-              <Route path="config/access" element={<AccessControl />} />
-              <Route path="config/set-profit" element={<SetProfit />} />
-              <Route path="config/sales-fifo" element={<SalesByFifo />} />
+              <Route path="config" element={<RequireCompany><ConfigModule /></RequireCompany>} />
+              <Route path="config/general" element={<RequireCompany><GeneralSettings /></RequireCompany>} />
+              <Route path="config/database" element={<RequireCompany><DatabaseSettings /></RequireCompany>} />
+              <Route path="config/backup" element={<RequireCompany><BackupRestore /></RequireCompany>} />
+              <Route path="config/display" element={<RequireCompany><DisplaySettings /></RequireCompany>} />
+              <Route path="config/users" element={<RequireCompany><UserAccounts /></RequireCompany>} />
+              <Route path="config/permissions" element={<RequireCompany><Permissions /></RequireCompany>} />
+              <Route path="config/roles" element={<RequireCompany><RoleManagement /></RequireCompany>} />
+              <Route path="config/access" element={<RequireCompany><AccessControl /></RequireCompany>} />
+              <Route path="config/set-profit" element={<RequireCompany><SetProfit /></RequireCompany>} />
+              <Route path="config/sales-fifo" element={<RequireCompany><SalesByFifo /></RequireCompany>} />
             </Route>
           </Routes>
         </Router>

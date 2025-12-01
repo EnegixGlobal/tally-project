@@ -38,6 +38,7 @@ router.post('/', async (req, res) => {
     ownerType,
     ownerId
   } = req.body;
+  // console.log(companyId,ownerType,ownerId)
 
   if (!code || !name || !companyId || !ownerType || !ownerId) {
     return res.status(400).json({ message: "code, name, companyId, ownerType, and ownerId are required" });

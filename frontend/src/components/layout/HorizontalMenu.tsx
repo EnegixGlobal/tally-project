@@ -60,6 +60,7 @@
 
 import React from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { useAuth } from '../../home/context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 
 interface HorizontalMenuProps {
@@ -86,6 +87,10 @@ const HorizontalMenu: React.FC<HorizontalMenuProps> = ({ sidebarOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
+  const { hasCompany } = useAuth();
+
+  const allowedWhenNoCompany = ['/app', '/app/company'];
+
   const isActive = (path: string) =>
     location.pathname === path || location.pathname.startsWith(`${path}/`);
 
@@ -100,21 +105,26 @@ const HorizontalMenu: React.FC<HorizontalMenuProps> = ({ sidebarOpen }) => {
       }`}
     >
       <div className="flex items-center h-full px-2 space-x-2 min-w-max">
-        {menuItems.map((item, index) => (
-          <button
-            key={index}
-            onClick={() => navigate(item.path)}
-            className={`px-3 py-1 rounded text-sm transition-colors flex-shrink-0 ${
-              isActive(item.path)
-                ? theme === 'dark'
-                  ? 'bg-gray-700'
-                  : 'bg-blue-700'
-                : 'hover:bg-blue-700 dark:hover:bg-gray-700'
-            }`}
-          >
-            {item.title}
-          </button>
-        ))}
+        {menuItems.map((item, index) => {
+          const disabled = !hasCompany && !allowedWhenNoCompany.includes(item.path);
+          return (
+            <button
+              key={index}
+              onClick={() => !disabled && navigate(item.path)}
+              disabled={disabled}
+              title={disabled ? 'Create a company first to access this' : undefined}
+              className={`px-3 py-1 rounded text-sm transition-colors flex-shrink-0 ${
+                isActive(item.path)
+                  ? theme === 'dark'
+                    ? 'bg-gray-700'
+                    : 'bg-blue-700'
+                  : 'hover:bg-blue-700 dark:hover:bg-gray-700'
+              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+            >
+              {item.title}
+            </button>
+          );
+        })}
       </div>
     </div>
   );

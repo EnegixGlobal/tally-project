@@ -10,7 +10,7 @@ const StockCategoryList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categories, setCategories] = useState<StockCategory[]>([]);
   const companyId = localStorage.getItem('company_id');
-  const ownerType = localStorage.getItem('userType');
+  const ownerType = localStorage.getItem('supplier');
   const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
   const queryParams = `company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 

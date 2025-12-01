@@ -6,12 +6,15 @@ const db = require("../db"); // your MySQL pool
 // Get Ledgers scoped by company and owner
 router.get("/", async (req, res) => {
   const { company_id, owner_type, owner_id } = req.query;
+  console.log(company_id, owner_type, owner_id);
 
   if (!company_id || !owner_type || !owner_id) {
     return res
       .status(400)
       .json({ message: "company_id, owner_type and owner_id are required" });
   }
+
+
 
   try {
     const [rows] = await db.execute(
@@ -48,6 +51,7 @@ router.get("/", async (req, res) => {
 
 // Create a new ledger scoped by company and owner
 router.post("/", async (req, res) => {
+
   const {
     name,
     groupId,

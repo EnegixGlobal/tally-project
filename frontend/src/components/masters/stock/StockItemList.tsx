@@ -23,14 +23,15 @@ const StockItemList = () => {
   const navigate = useNavigate();
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const companyId = localStorage.getItem('company_id');
-  const ownerType = localStorage.getItem('userType');
+  const ownerType = localStorage.getItem('supplier');
   const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
+
 //   const [barcodeValue] = useState('');
 // const [, setItemDetails] = useState<StockItem | null>(null);
 //   const [, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (!companyId || !ownerType || !ownerId) return; // Prevent fetch without proper tenant/role
+    if (!companyId || !ownerType || !ownerId) return; 
 
     const fetchData = async () => {
       try {
@@ -70,11 +71,12 @@ const StockItemList = () => {
 
 const handleDelete = async (id: string) => {
   const itemToDelete = stockItems.find(item => item.id === id);
+
   if (!itemToDelete) {
     Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'Stock item not found.'
+      icon: "error",
+      title: "Error",
+      text: "Stock item not found.",
     });
     return;
   }
@@ -82,48 +84,65 @@ const handleDelete = async (id: string) => {
   const result = await Swal.fire({
     title: `Are you sure?`,
     text: `Do you really want to delete "${itemToDelete.name}"? This action cannot be undone.`,
-    icon: 'warning',
+    icon: "warning",
     showCancelButton: true,
-    confirmButtonColor: '#d33',
-    cancelButtonColor: '#3085d6',
-    confirmButtonText: 'Yes, delete it!',
-    cancelButtonText: 'Cancel'
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "Yes, delete it!",
   });
 
-  if (result.isConfirmed) {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/${id}`, {
-        method: 'DELETE',
+  if (!result.isConfirmed) return;
+
+  const companyId = localStorage.getItem("company_id");
+  const ownerType = localStorage.getItem("supplier"); 
+  const ownerId = localStorage.getItem(
+    ownerType === "employee" ? "employee_id" : "user_id"
+  );
+
+  const params = new URLSearchParams({
+    company_id: companyId!,
+    owner_type: ownerType!,
+    owner_id: ownerId!,
+  });
+
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/stock-items/${id}?${params.toString()}`,
+      {
+        method: "DELETE",
         headers: {
-          'Content-Type': 'application/json',
+          "Content-Type": "application/json",
         },
+      }
+    );
+
+    const json = await res.json();
+
+    if (json.success) {
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        text: "Stock item deleted successfully.",
       });
 
-      const json = await res.json();
-      if (json.success) {
-        Swal.fire({
-          icon: 'success',
-          title: 'Deleted!',
-          text: 'Stock item deleted successfully.'
-        });
-        setStockItems(prev => prev.filter(item => item.id !== id));
-      } else {
-        Swal.fire({
-          icon: 'error',
-          title: 'Error',
-          text: json.message || 'Failed to delete stock item.'
-        });
-      }
-    } catch (err) {
-      console.error('❌ Error deleting stock item:', err);
+      setStockItems(prev => prev.filter(item => item.id !== id));
+    } else {
       Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: 'Something went wrong while deleting the stock item.'
+        icon: "error",
+        title: "Error",
+        text: json.message || "Failed to delete stock item.",
       });
     }
+  } catch (err) {
+    console.error("❌ Error deleting stock item:", err);
+    Swal.fire({
+      icon: "error",
+      title: "Error",
+      text: "Something went wrong while deleting the stock item.",
+    });
   }
 };
+
 
 
  

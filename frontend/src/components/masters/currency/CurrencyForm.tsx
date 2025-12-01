@@ -18,7 +18,7 @@ const CurrencyForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = Boolean(id);
   const companyId = localStorage.getItem('company_id');
-  const ownerType = localStorage.getItem('userType'); // e.g. 'employee' or 'user'
+  const ownerType = localStorage.getItem('supplier'); // e.g. 'employee' or 'user'
   const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
   const [formData, setFormData] = useState<CurrencyFormData>({
     code: '',
@@ -27,33 +27,52 @@ const CurrencyForm: React.FC = () => {
     exchangeRate: 1,
     isBase: false
   });
+
+
 const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
-  try {
-    const payload = { ...formData, companyId, ownerType, ownerId };
-    const url = isEditMode
-      ? `${import.meta.env.VITE_API_URL}/api/currencies/${id}`
-      : `${import.meta.env.VITE_API_URL}/api/currencies`;
-    const method = isEditMode ? 'PUT' : 'POST';
 
+  if (!companyId || !ownerType || !ownerId) {
+    Swal.fire("Error", "Invalid session. Please login again.", "error");
+    return;
+  }
+
+  const payload = {
+    ...formData,
+    companyId,
+    ownerType,
+    ownerId,
+  };
+
+  const queryParams = `?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+
+  const url = isEditMode
+    ? `${import.meta.env.VITE_API_URL}/api/currencies/${id}${queryParams}`
+    : `${import.meta.env.VITE_API_URL}/api/currencies${queryParams}`;
+
+  const method = isEditMode ? "PUT" : "POST";
+
+  try {
     const res = await fetch(url, {
       method,
-      headers: { 'Content-Type': 'application/json' },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(payload),
     });
 
     const data = await res.json();
+
     if (res.ok) {
-      Swal.fire('Success', data.message, 'success');
-      navigate('/app/masters/currency');
+      Swal.fire("Success", data.message, "success");
+      navigate("/app/masters/currency");
     } else {
-      Swal.fire('Error', data.message || 'Operation failed', 'error');
+      Swal.fire("Error", data.message || "Operation failed", "error");
     }
   } catch (err) {
-    console.error('Submit Error:', err);
-    Swal.fire('Error', 'Something went wrong!', 'error');
+    console.error("Submit Error:", err);
+    Swal.fire("Error", "Something went wrong!", "error");
   }
 };
+
 
   
 

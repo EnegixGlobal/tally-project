@@ -33,7 +33,7 @@ const TrialBalance: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const companyId = localStorage.getItem("company_id") || "";
-  const ownerType = localStorage.getItem("userType") || "";
+  const ownerType = localStorage.getItem("supplier") || "";
   const ownerId =
     localStorage.getItem(
       ownerType === "employee" ? "employee_id" : "user_id"

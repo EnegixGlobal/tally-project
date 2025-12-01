@@ -4,6 +4,7 @@ import { useAppContext } from '../../../context/AppContext';
 import { Plus, Edit, Trash, Printer, Download, Filter, ArrowLeft } from 'lucide-react';
 import ReportTable from '../../reports/ReportTable';
 import type { StockGroup } from '../../../types';
+import Swal from 'sweetalert2';
 
 const StockGroupList: React.FC = () => {
   const { theme, companyInfo } = useAppContext();
@@ -15,7 +16,7 @@ const StockGroupList: React.FC = () => {
   const [stockGroups, setStockGroupData] = useState<StockGroup[]>([]);
   useEffect(() => {
   const companyId = localStorage.getItem('company_id');
-  const ownerType = localStorage.getItem('userType');
+  const ownerType = localStorage.getItem('supplier');
   const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
 
   if (!companyId || !ownerType || !ownerId) return;
@@ -35,76 +36,52 @@ const StockGroupList: React.FC = () => {
 }, []);
   
   // Mock deleteStockGroup function since it's not in context
-  const deleteStockGroup = useCallback(async (id: string) => {
-  const ownerType = localStorage.getItem('userType');
-  const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
+const deleteStockGroup = useCallback(async (id: string) => {
+  const company_id = localStorage.getItem('company_id');
+  const owner_type = localStorage.getItem('supplier') || 'employee';
+  const owner_id = localStorage.getItem(
+    owner_type === 'employee' ? 'employee_id' : 'user_id'
+  );
 
-  if (!ownerType || !ownerId) return;
+  if (!company_id || !owner_type || !owner_id) {
+    return Swal.fire("Error", "Missing required authentication data", "error");
+  }
 
-  if (!window.confirm('Are you sure you want to delete this stock group?')) return;
+  const confirm = await Swal.fire({
+    title: "Are you sure?",
+    text: "This action cannot be undone",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonText: "Yes, delete it!",
+    cancelButtonText: "Cancel",
+  });
+
+  if (!confirm.isConfirmed) return;
 
   try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-groups/delete/${id}?owner_type=${ownerType}&owner_id=${ownerId}`, {
-      method: 'DELETE',
-    });
+    const url = `${import.meta.env.VITE_API_URL}/api/stock-groups/delete/${id}?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`;
 
+    const res = await fetch(url, { method: "DELETE" });
     const result = await res.json();
 
-    if (res.ok) {
-      alert(result.message || 'Stock group deleted successfully!');
-      // Update the state to remove the deleted group from the list
+    if (res.ok && result.success) {
+      Swal.fire("Deleted!", result.message, "success");
+
       setStockGroupData(prev => prev.filter(g => g.id !== id));
+
     } else {
-      alert(result.message || 'Failed to delete stock group.');
+      Swal.fire("Error", result.message || "Failed to delete", "error");
     }
+
   } catch (err) {
-    console.error('Failed to delete stock group:', err);
-    alert('Failed to delete stock group. See console for details.');
+    console.error("❌ Failed to delete:", err);
+    Swal.fire("Error", "Network error occurred", "error");
   }
 }, []);
 
-  // Mock stock groups
-  const [mockStockGroups] = useState<StockGroup[]>([
-    {
-      id: 'SG1',
-      name: 'Cleaning Supplies',
-      parent: '',
-      shouldQuantitiesBeAdded: true,
-      hsnSacDetails: { 
-        setAlterHSNSAC: true, 
-        hsnSacClassificationId: '',
-        hsnCode: '3402', 
-        description: 'Cleaning Products' 
-      },
-      gstDetails: { 
-        setAlterGST: true, 
-        gstClassificationId: '',
-        taxability: 'Taxable', 
-        integratedTaxRate: 18, 
-        cess: 0 
-      },
-    },
-    {
-      id: 'SG2',
-      name: 'Car Accessories',
-      parent: 'SG1',
-      shouldQuantitiesBeAdded: false,
-      hsnSacDetails: { 
-        setAlterHSNSAC: true, 
-        hsnSacClassificationId: '',
-        hsnCode: '8708', 
-        description: 'Car Accessories' 
-      },
-      gstDetails: { 
-        setAlterGST: true, 
-        gstClassificationId: '',
-        taxability: 'Taxable', 
-        integratedTaxRate: 28, 
-        cess: 1 
-      },
-    },
-  ]);
 
+  // Mock stock groups
+  const [mockStockGroups] = useState<StockGroup[]>([])
   const filteredStockGroups = (stockGroups.length > 0 ? stockGroups : mockStockGroups).filter(
     g => g.name.toLowerCase().includes(filterName.toLowerCase())
   );

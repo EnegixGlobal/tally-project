@@ -20,14 +20,14 @@ const CurrencyList: React.FC = () => {
   const [currencies, setCurrencies] = useState<Currency[]>([]);
   const [loading, setLoading] = useState(true);
   const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("userType"); // e.g., 'employee' or 'user'
+  const ownerType = localStorage.getItem("supplier"); // e.g., 'employee' or 'user'
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
 
-  console.log(companyId, "companyId")
-  console.log(ownerType, "ownerType")
-  console.log(ownerId, "ownerId")
+  // console.log( "companyId",companyId)
+  // console.log( "ownerType",ownerType)
+  // console.log( "ownerId", ownerId)
   useEffect(() => {
     if ( !ownerType || !ownerId) {
       setLoading(false);

@@ -7,6 +7,7 @@ router.post('/', async (req, res) => {
   const s = req.body;
   const { companyId, ownerType, ownerId } = s;
 
+
   if (!companyId || !ownerType || !ownerId) {
     return res.status(400).json({ message: 'companyId, ownerType, and ownerId are required.' });
   }
@@ -69,6 +70,7 @@ router.get('/list', async (req, res) => {
 router.get('/:id', async (req, res) => {
   const { id } = req.params;
   const { company_id, owner_type, owner_id } = req.query;
+ 
 
   if (!company_id || !owner_type || !owner_id) {
     return res.status(400).json({ message: 'company_id, owner_type, owner_id required.' });
@@ -90,21 +92,21 @@ router.get('/:id', async (req, res) => {
 
 
 
-router.put('/:id', async (req, res) => {
+router.put("/:id", async (req, res) => {
   const { id } = req.params;
+  const { company_id, owner_type, owner_id } = req.query;
   const s = req.body;
-
-
+  console.log(company_id, owner_type, owner_id);
 
   if (!id) {
-    return res.status(400).json({ message: 'Stock Group ID is required for update.' });
+    return res.status(400).json({ success: false, message: "ID is required" });
   }
 
-  const ownerType = s.ownerType;
-  const ownerId = s.ownerId;
-
-  if (!ownerType || !ownerId) {
-    return res.status(400).json({ message: 'ownerType and ownerId are required.' });
+  if (!company_id || !owner_type || !owner_id) {
+    return res.status(400).json({
+      success: false,
+      message: "company_id, owner_type & owner_id are required",
+    });
   }
 
   try {
@@ -123,39 +125,51 @@ router.put('/:id', async (req, res) => {
         taxability = ?,
         gst_rate = ?,
         cess = ?
-      WHERE id = ? AND owner_type = ? AND owner_id = ?
+      WHERE id = ? AND company_id = ? AND owner_type = ? AND owner_id = ?
     `;
 
     const values = [
       s.name,
-      s.parent || null,
-      s.shouldQuantitiesBeAdded,
-      s.hsnSacDetails?.setAlterHSNSAC || false,
-      s.hsnSacDetails?.hsnSacClassificationId || null,
-      s.hsnSacDetails?.hsnCode || null,
-      s.hsnSacDetails?.description || null,
-      s.gstDetails?.setAlterGST || false,
-      s.gstDetails?.gstClassificationId || null,
-      s.gstDetails?.taxability || null,
-      s.gstDetails?.integratedTaxRate || 0,
-      s.gstDetails?.cess || 0,
+      s.parent ?? null,
+      s.shouldQuantitiesBeAdded ?? false,
+      s.hsnSacDetails?.setAlterHSNSAC ?? false,
+      s.hsnSacDetails?.hsnSacClassificationId ?? null,
+      s.hsnSacDetails?.hsnCode ?? null,
+      s.hsnSacDetails?.description ?? null,
+      s.gstDetails?.setAlterGST ?? false,
+      s.gstDetails?.gstClassificationId ?? null,
+      s.gstDetails?.taxability ?? null,
+      s.gstDetails?.integratedTaxRate ?? 0,
+      s.gstDetails?.cess ?? 0,
       id,
-      ownerType,
-      ownerId
+      company_id,
+      owner_type,
+      owner_id,
     ];
 
     const [result] = await db.execute(sql, values);
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Stock Group not found or unauthorized.' });
+      return res.status(404).json({
+        success: false,
+        message: "Not found or Unauthorized",
+      });
     }
 
-    res.json({ message: 'Stock Group updated successfully.' });
+    res.json({
+      success: true,
+      message: "Stock Group updated successfully",
+    });
   } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: 'Failed to update', details: err.message });
+    console.error("🔥 Update stock-group error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update",
+      error: err.message,
+    });
   }
 });
+
 
 
 
@@ -163,30 +177,43 @@ router.put('/:id', async (req, res) => {
 
 // Delete Stock Group (multi-tenant scoped)
 router.delete('/delete/:id', async (req, res) => {
-  const { owner_type, owner_id } = req.query;
+  const { owner_type, owner_id, company_id } = req.query;
   const { id } = req.params;
 
-
-  if (!owner_type || !owner_id) {
-    return res.status(400).json({ message: 'owner_type and owner_id are required.' });
+  if (!owner_type || !owner_id || !company_id) {
+    return res.status(400).json({
+      success: false,
+      message: 'company_id, owner_type & owner_id are required'
+    });
   }
 
   try {
     const [result] = await db.execute(
-      'DELETE FROM stock_groups WHERE id = ? AND owner_type = ? AND owner_id = ?',
-      [id, owner_type, owner_id]
+      'DELETE FROM stock_groups WHERE id = ? AND owner_type = ? AND owner_id = ? AND company_id = ?',
+      [id, owner_type, owner_id, company_id]
     );
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Stock group not found or unauthorized' });
+      return res.status(404).json({
+        success: false,
+        message: 'Stock group not found or unauthorized'
+      });
     }
 
-    res.json({ success: true, message: 'Stock Group deleted successfully' });
+    res.json({
+      success: true,
+      message: 'Stock Group deleted successfully'
+    });
+
   } catch (err) {
-    console.error('Error deleting stock group:', err);
-    res.status(500).json({ success: false, message: 'Failed to delete stock group' });
+    console.error('🔥 Error deleting stock group:', err);
+    res.status(500).json({
+      success: false,
+      message: 'Failed to delete stock group'
+    });
   }
 });
+
 
 
 module.exports = router;

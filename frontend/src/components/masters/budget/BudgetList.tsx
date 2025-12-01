@@ -18,7 +18,7 @@ const BudgetList: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
 
   const companyId = localStorage.getItem('company_id');
-  const ownerType = localStorage.getItem('userType');
+  const ownerType = localStorage.getItem('supplier');
   const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
 
   useEffect(() => {

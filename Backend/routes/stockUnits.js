@@ -5,6 +5,7 @@ const db = require("../db");
 // Get all units
 router.get("/", async (req, res) => {
   const { company_id, owner_type, owner_id } = req.query;
+  console.log("this is" ,company_id, owner_type, owner_id);
   if (!company_id || !owner_type || !owner_id) {
     return res
       .status(400)
@@ -51,26 +52,29 @@ router.get("/:id", async (req, res) => {
 
 // Create unit
 router.post("/", async (req, res) => {
-  const { owner_type, owner_id } = req.query;
-  const { name, symbol } = req.body;
-  if (!owner_type || !owner_id) {
-    return res
-      .status(400)
-      .json({ message: " owner_type, and owner_id are required" });
+  const { name, symbol, company_id, owner_type, owner_id } = req.body;
+  console.log(company_id, owner_type, owner_id);
+
+  if (!company_id || !owner_type || !owner_id) {
+    return res.status(400).json({
+      message: "company_id, owner_type, and owner_id are required"
+    });
   }
   if (!name || !symbol)
     return res.status(400).json({ message: "Name and symbol are required" });
 
   try {
     await db.query(
-      "INSERT INTO stock_units (name, symbol, owner_type, owner_id) VALUES (?, ?, ?, ?)",
-      [name, symbol, owner_type, owner_id] // 4 values
+      "INSERT INTO stock_units (name, symbol, company_id, owner_type, owner_id) VALUES (?, ?, ?, ?, ?)",
+      [name, symbol, company_id, owner_type, owner_id]
     );
+
     res.json({ message: "Unit created successfully" });
   } catch (err) {
     res.status(500).json({ message: "Error creating unit", error: err });
   }
 });
+
 
 // Update unit
 router.put("/:id", async (req, res) => {

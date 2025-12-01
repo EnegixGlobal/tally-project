@@ -32,7 +32,7 @@ const StockGroupForm: React.FC = () => {
   console.log("this is id", id);
   const isEditMode = !!id;
   const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("userType");
+  const ownerType = localStorage.getItem("supplier");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
@@ -67,7 +67,7 @@ const StockGroupForm: React.FC = () => {
 
   useEffect(() => {
     const companyId = localStorage.getItem("company_id");
-    const ownerType = localStorage.getItem("userType");
+    const ownerType = localStorage.getItem("supplier");
     const ownerId = localStorage.getItem(
       ownerType === "employee" ? "employee_id" : "user_id"
     );
@@ -188,21 +188,24 @@ const StockGroupForm: React.FC = () => {
     }
   }, [id, isEditMode]);
 
- const handleSubmit = useCallback(async () => {
+const handleSubmit = useCallback(async () => {
   if (!validateForm()) return;
 
   const stockGroupData = {
-    ...formData,
-    id: isEditMode ? formData.id : `SG-${Date.now()}`,
-    companyId,
-    ownerType,
-    ownerId,
+    ...formData
+    // ❌ companyId, ownerType, ownerId body me nahi bhejna
   };
+
+  const params = new URLSearchParams({
+    company_id: companyId!,
+    owner_type: ownerType!,
+    owner_id: ownerId!,
+  }).toString();
 
   try {
     const url = isEditMode
-      ? `${import.meta.env.VITE_API_URL}/api/stock-groups/${formData.id}`
-      : `${import.meta.env.VITE_API_URL}/api/stock-groups`;
+      ? `${import.meta.env.VITE_API_URL}/api/stock-groups/${formData.id}?${params}`
+      : `${import.meta.env.VITE_API_URL}/api/stock-groups?${params}`;
 
     const method = isEditMode ? 'PUT' : 'POST';
 
@@ -219,20 +222,23 @@ const StockGroupForm: React.FC = () => {
         icon: 'success',
         title: 'Success!',
         text: result.message || (isEditMode ? 'Stock Group updated successfully' : 'Stock Group saved successfully'),
-      }).then(() => {
-        navigate('/app/masters/stock-group');
-      });
+      }).then(() => navigate('/app/masters/stock-group'));
     } else {
       Swal.fire({
         icon: 'error',
         title: 'Error',
-        text: result.error || 'Something went wrong.',
+        text: result.message || 'Something went wrong.',
       });
     }
   } catch (error) {
-    Swal.fire('Error', 'Something went wrong!', 'error');
+    Swal.fire({
+      icon: 'error',
+      title: 'Error',
+      text: 'Something went wrong!',
+    });
   }
-}, [formData, isEditMode, navigate, validateForm]);
+}, [formData, isEditMode, navigate, validateForm, companyId, ownerType, ownerId]);
+
 
 
   const handlePrint = useCallback(() => {

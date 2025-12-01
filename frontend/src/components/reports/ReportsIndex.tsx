@@ -18,7 +18,7 @@ const ReportsIndex: React.FC = () => {
   const { theme } = useAppContext(); // 👈 get role here
   const navigate = useNavigate();
   // Read role from localStorage (always lowercase for safety)
-  const role: string | null = localStorage.getItem("userType")?.toLowerCase() || null;
+  const role: string | null = localStorage.getItem("supplier")?.toLowerCase() || null;
   const reportCategories = [
     {
       title: 'Accounting Reports',
