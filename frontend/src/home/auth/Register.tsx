@@ -18,7 +18,7 @@ const Register: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
 
   const location = useLocation();
-  const userLimit = location.state?.userLimit || 1; // Default to 1 if not set
+  const userLimit = location.state?.userLimit || 1; 
   // const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 

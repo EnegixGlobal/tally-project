@@ -38,8 +38,9 @@ router.post("/", async (req, res) => {
 
   const ownerId = parseInt(payload.ownerId, 10);
   const ownerType = payload.ownerType;
+  const companyId = parseInt(payload.companyId, 10);
 
-  if (!ownerType || isNaN(ownerId)) {
+  if (!ownerType || isNaN(ownerId) || isNaN(companyId)) {
     return res
       .status(400)
       .json({ message: "Missing or invalid ownerType/ownerId/companyId" });
@@ -55,13 +56,14 @@ router.post("/", async (req, res) => {
     // 🔹 Insert into DB
     const [result] = await db.execute(
       `INSERT INTO ledger_groups
-       (name, alias, parent, type, nature, behavesLikeSubLedger, 
+       (company_id, name, alias, parent, type, nature, behavesLikeSubLedger, 
         nettBalancesForReporting, usedForCalculation, allocationMethod, 
         setAlterHSNSAC, hsnSacClassificationId, hsnCode, 
         setAlterGST, gstClassificationId, typeOfSupply, taxability, 
         integratedTaxRate, cess, owner_type, owner_id)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
+        companyId,
         payload.name,
         payload.alias || null,
         payload.under || null,

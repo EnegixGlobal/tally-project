@@ -29,7 +29,7 @@ const GroupSummary: React.FC = () => {
   const [, setError] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'consolidated' | 'monthly'>('consolidated');
   const companyId = localStorage.getItem("company_id") || '';
-  const ownerType = localStorage.getItem("userType") || '';
+  const ownerType = localStorage.getItem("supplier") || '';
   const ownerId = localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id") || '';
   // Map group types to display names for header
   const groupDisplayNames: Record<string, string> = {

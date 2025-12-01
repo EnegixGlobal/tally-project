@@ -26,7 +26,7 @@ const ScenarioList: React.FC = () => {
   // Fetch from API
   useEffect(() => {
     const companyId = localStorage.getItem("company_id");
-    const ownerType = localStorage.getItem("userType");
+    const ownerType = localStorage.getItem("supplier");
     const ownerId = localStorage.getItem(
       ownerType === "employee" ? "employee_id" : "user_id"
     );
@@ -66,7 +66,7 @@ const ScenarioList: React.FC = () => {
   // Mock delete function
   const deleteScenario = useCallback(async (id: string) => {
     const companyId = localStorage.getItem("company_id");
-    const ownerType = localStorage.getItem("userType");
+    const ownerType = localStorage.getItem("supplier");
     const ownerId = localStorage.getItem(
       ownerType === "employee" ? "employee_id" : "user_id"
     );

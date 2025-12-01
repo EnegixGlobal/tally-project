@@ -27,7 +27,7 @@ const [totalInflow, setTotalInflow] = useState<number>(0);
 const [totalOutflow, setTotalOutflow] = useState<number>(0);
 const [totalNetFlow, setTotalNetFlow] = useState<number>(0);
 const companyId = localStorage.getItem("company_id") || '';
-const ownerType = localStorage.getItem("userType") || '';
+const ownerType = localStorage.getItem("supplier") || '';
 const ownerId = localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id") || '';
 
   const formatCurrency = (amount: number) => {

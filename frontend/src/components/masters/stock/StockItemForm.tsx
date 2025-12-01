@@ -238,10 +238,11 @@ const StockItemForm = () => {
 
   const navigate = useNavigate();
   const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("userType");
+  const ownerType = localStorage.getItem("supplier");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
+
   const [barcode, setBarcode] = useState<string>("");
   const { id } = useParams<{ id?: string }>();
 
@@ -283,64 +284,68 @@ const StockItemForm = () => {
     fetchCategories();
   }, [companyId, ownerType, ownerId]);
 
-  useEffect(() => {
-    async function fetchStockItem() {
-      if (!id) return;
+useEffect(() => {
+  async function fetchStockItem() {
+    if (!id) return;
 
-      try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/${id}`);
-        const data = await res.json();
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stock-items/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      );
 
-        if (res.ok && data.success) {
-          const item = data.data;
+      const data = await res.json();
 
-          setFormData({
-            name: item.name || "",
-            stockGroupId: item.stockGroupId?.toString() || "",
-            categoryId: item.categoryId?.toString() || "",
-            unit: item.unit?.toString() || "",
-            openingBalance: item.openingBalance || 0,
-            openingValue: item.openingValue || 0,
-            hsnSacOption: "specify-details", // Default option
-            hsnCode: item.hsnCode || "",
-            gstRateOption: "specify-details", // Default option
-            gstRate: item.gstRate?.toString() || "",
-            gstClassification: "", // Leave empty for now
-            taxType: item.taxType || "Taxable",
-            standardPurchaseRate: item.standardPurchaseRate || 0,
-            standardSaleRate: item.standardSaleRate || 0,
-            enableBatchTracking: !!item.enableBatchTracking,
-            batchName: item.batchNumber || "",
-            batchExpiryDate: item.batchExpiryDate || "",
-            batchManufacturingDate: item.batchManufacturingDate || "",
-            allowNegativeStock: !!item.allowNegativeStock,
-            maintainInPieces: !!item.maintainInPieces,
-            secondaryUnit: item.secondaryUnit || "",
-          });
+      if (res.ok && data.success) {
+        const item = data.data;
 
-          // Set godown allocations and barcode
-          setGodownAllocations(item.godownAllocations || []);
-          setBarcode(item.barcode || "");
+        setFormData({
+          name: item.name || "",
+          stockGroupId: item.stockGroupId?.toString() || "",
+          categoryId: item.categoryId?.toString() || "",
+          unit: item.unit?.toString() || "",
+          openingBalance: item.openingBalance || 0,
+          openingValue: item.openingValue || 0,
+          hsnSacOption: "specify-details",
+          hsnCode: item.hsnCode || "",
+          gstRateOption: "specify-details",
+          gstRate: item.gstRate?.toString() || "",
+          gstClassification: "",
+          taxType: item.taxType || "Taxable",
+          standardPurchaseRate: item.standardPurchaseRate || 0,
+          standardSaleRate: item.standardSaleRate || 0,
+          enableBatchTracking: !!item.enableBatchTracking,
+          batchName: item.batchNumber || "",
+          batchExpiryDate: item.batchExpiryDate || "",
+          batchManufacturingDate: item.batchManufacturingDate || "",
+          allowNegativeStock: !!item.allowNegativeStock,
+          maintainInPieces: !!item.maintainInPieces,
+          secondaryUnit: item.secondaryUnit || "",
+        });
 
-          // Set batch rows from the backend
-          if (Array.isArray(item.batches) && item.batches.length > 0) {
-            setBatchRows(item.batches); // Set batches directly as an array
-          }
-        } else {
-          Swal.fire(
-            "Error",
-            data.message || "Failed to fetch stock item",
-            "error"
-          );
+        setGodownAllocations(item.godownAllocations || []);
+        setBarcode(item.barcode || "");
+
+        if (Array.isArray(item.batches) && item.batches.length > 0) {
+          setBatchRows(item.batches);
         }
-      } catch (err) {
-        console.error("🔥 Error fetching stock item:", err);
-        Swal.fire("Error", "Unable to fetch stock item", "error");
-      }
-    }
 
-    fetchStockItem();
-  }, [id]);
+      } else {
+        Swal.fire(
+          "Error",
+          data.message || "Failed to fetch stock item",
+          "error"
+        );
+      }
+
+    } catch (err) {
+      console.error("🔥 Error fetching stock item:", err);
+      Swal.fire("Error", "Unable to fetch stock item", "error");
+    }
+  }
+
+  fetchStockItem();
+}, [id, companyId, ownerType, ownerId]);
+
 
   // Generate barcode on first load or on form reset
   useEffect(() => {
@@ -540,15 +545,16 @@ const StockItemForm = () => {
     }
 
     // Construct stockItem object
-    const stockItem = {
-      ...formData,
-      batches: batchRows,
-      godownAllocations,
-      companyId,
-      ownerType,
-      ownerId,
-      barcode,
-    };
+   const stockItem = {
+  ...formData,
+  batches: batchRows,
+  godownAllocations,
+  company_id: companyId,
+  owner_type: ownerType, 
+  owner_id: ownerId,     
+  barcode,
+};
+
 
     // Determine if we're updating or creating a new record
     const method = id ? "PUT" : "POST"; // Use PUT for update, POST for new

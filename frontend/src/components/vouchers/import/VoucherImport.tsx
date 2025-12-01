@@ -329,7 +329,7 @@ const saveImportedVouchers = async () => {
   try {
     const validVouchers = importedVouchers.filter(v => v.status !== "error");
 
-    const userType = localStorage.getItem("userType") || "employee";
+    const userType = localStorage.getItem("supplier") || "employee";
     const userId = Number(localStorage.getItem("user_id")) || 1;
     const companyId = Number(localStorage.getItem("company_id")) || 1;
 

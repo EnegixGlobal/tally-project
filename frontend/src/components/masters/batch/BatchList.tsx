@@ -44,43 +44,57 @@ const BatchList: React.FC = () => {
   const [filterStockItem, setFilterStockItem] = useState("");
 
   // Fetch stock items on mount
-  useEffect(() => {
-    let isMounted = true;
-    setLoading(true);
+ useEffect(() => {
+  let isMounted = true;
+  setLoading(true);
 
-    const fetchData = async () => {
-      try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items`);
-        const json = await res.json();
+  const company_id = localStorage.getItem("company_id");
+  const owner_type = localStorage.getItem("supplier"); // supplier stored
+  const owner_id = localStorage.getItem(
+    owner_type === "employee" ? "employee_id" : "user_id"
+  );
 
-        if (isMounted) {
-          if (json.success) {
-            // Parse the 'batches' field from JSON string to array of objects
-            const parsedData = json.data.map((item: any) => {
-              if (item.batches) {
-                item.batches = JSON.parse(item.batches); // Parse the batches JSON string
-              }
-              return item;
-            });
+  // Agar kuch missing hai → data load mat karo
+  if (!company_id || !owner_type || !owner_id) {
+    console.log("Missing auth params");
+    setLoading(false);
+    return;
+  }
 
-            setStockItems(parsedData);
-          } else {
-            setStockItems([]);
-          }
+  const params = new URLSearchParams({
+    company_id,
+    owner_type,
+    owner_id,
+  });
+
+  const fetchData = async () => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
+      );
+      const json = await res.json();
+
+      if (isMounted) {
+        if (json.success) {
+          setStockItems(json.data); // Backend already JSON.parse batches
+        } else {
+          setStockItems([]);
         }
-      } catch (error) {
-        if (isMounted) setStockItems([]); // If there is an error, clear stock items
-      } finally {
-        if (isMounted) setLoading(false); // Stop loading when request finishes
       }
-    };
+    } catch (error) {
+      if (isMounted) setStockItems([]);
+    } finally {
+      if (isMounted) setLoading(false);
+    }
+  };
 
-    fetchData();
+  fetchData();
 
-    return () => {
-      isMounted = false;
-    };
-  }, []);
+  return () => {
+    isMounted = false;
+  };
+}, []);
+
 
   // NEW: overall status calculator
   const getOverallStatus = (batches: any[]) => {

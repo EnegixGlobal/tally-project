@@ -94,7 +94,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [showMonthList, setShowMonthList] = useState(false);
   const companyId = localStorage.getItem("company_id") || "";
-  const ownerType = localStorage.getItem("userType") || "";
+  const ownerType = localStorage.getItem("supplier") || "";
   const ownerId =
     localStorage.getItem(
       ownerType === "employee" ? "employee_id" : "user_id"

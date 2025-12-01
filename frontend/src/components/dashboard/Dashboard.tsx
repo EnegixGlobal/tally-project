@@ -550,7 +550,7 @@ const fetchEmployees = () => {
         </div>
       ) : suppl === "ca_employee" ? (
         <div className="pt-[56px] px-4">
-         <DashboardCaEmployee />;
+         <DashboardCaEmployee />
         </div>
       ) : null}
 {showAssignModal && selectedEmployeeId !== null && (

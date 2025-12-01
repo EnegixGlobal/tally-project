@@ -18,7 +18,7 @@ const ContraVoucher: React.FC = () => {
   const [ledgers] = useState<Ledger[]>([]);
   const [cashBankLedgers, setCashBankLedgers] = useState<Ledgers[]>([]);
   const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("userType");
+  const ownerType = localStorage.getItem("supplier");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );

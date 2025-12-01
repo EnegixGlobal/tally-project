@@ -10,10 +10,11 @@ const UnitForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = Boolean(id);
-  const ownerType = localStorage.getItem("userType");
+  const ownerType = localStorage.getItem("supplier");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
+  console.log(ownerType, ownerId);
 
   const [formData, setFormData] = useState<Omit<UnitOfMeasurement, "id">>({
     name: "",
@@ -54,7 +55,9 @@ const UnitForm: React.FC = () => {
       const fetchUnit = async () => {
         try {
           const res = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/stock-units/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
+            `${
+              import.meta.env.VITE_API_URL
+            }/api/stock-units/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
           );
           if (!res.ok) throw new Error("Unit not found");
           const unit = await res.json();
@@ -91,13 +94,24 @@ const UnitForm: React.FC = () => {
     }));
   };
 
- const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
   e.preventDefault();
 
-  const payload = { ...formData }; // only formData
-  const queryParams = `owner_type=${ownerType}&owner_id=${ownerId}`;
+  const companyId = localStorage.getItem("company_id");
+
+  const payload = {
+    ...formData,
+    company_id: companyId,
+    owner_type: ownerType,
+    owner_id: ownerId,
+  };
+
   const apiUrl = `${import.meta.env.VITE_API_URL}/api/stock-units`;
-  const url = isEditMode ? `${apiUrl}/${id}?${queryParams}` : `${apiUrl}?${queryParams}`;
+
+  const url = isEditMode
+    ? `${apiUrl}/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+    : `${apiUrl}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+
   const method = isEditMode ? "PUT" : "POST";
 
   try {

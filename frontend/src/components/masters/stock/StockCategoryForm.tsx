@@ -10,13 +10,18 @@ const StockCategoryForm: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
-  const ownerType = localStorage.getItem("userType");
+  const ownerType = localStorage.getItem("supplier");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
 
   // Mock stockCategories and functions since they're not in context
-  const stockCategories = useMemo<StockCategory[]>(() => [], []);
+  const stockCategories: StockCategory[] = [
+  { id: "SC-001", name: "Electronics", parent: "", description: "Electronic devices" },
+  { id: "SC-002", name: "Furniture", parent: "", description: "Home and office furniture" },
+  { id: "SC-003", name: "Groceries", parent: "", description: "Food and daily items" }
+];
+
   // const addStockCategory = useCallback((category: StockCategory) => {
   //   alert("Stock category added successfully!");
   // }, []);
@@ -43,7 +48,6 @@ const StockCategoryForm: React.FC = () => {
     const fetchSingleCategory = async () => {
       if (!isEditMode || !id) return;
       try {
-        console.log("id", id, "ownerType", ownerType, "ownerId", ownerId);
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/stock-categories/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
         );
@@ -99,6 +103,7 @@ const StockCategoryForm: React.FC = () => {
       ...formData,
       ownerType,
       ownerId,
+      companyId: localStorage.getItem("company_id"),  
     };
 
     try {

@@ -134,7 +134,7 @@ const OutstandingPayables: React.FC = () => {
       setError(null);
 
       const company_id = localStorage.getItem("company_id") || '';
-      const owner_type = localStorage.getItem("userType") || '';
+      const owner_type = localStorage.getItem("supplier") || '';
       const owner_id = localStorage.getItem(owner_type === 'employee' ? "employee_id" : "user_id") || '';
 
       if (!company_id || !owner_type || !owner_id) {

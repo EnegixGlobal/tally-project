@@ -28,7 +28,7 @@ const MultiLedgerForm: React.FC = () => {
   ]);
   const [isSubmitting, setIsSubmitting] = useState(false);
 const companyId = localStorage.getItem("company_id");
-const ownerType = localStorage.getItem("userType");
+const ownerType = localStorage.getItem("supplier");
 const ownerId = ownerType === "employee"
   ? localStorage.getItem("employee_id")
   : localStorage.getItem("user_id");

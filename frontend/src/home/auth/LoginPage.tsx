@@ -13,7 +13,7 @@ const LoginPage: React.FC = () => {
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const { } = useAuth();
+  const { login } = useAuth();
   const navigate = useNavigate();
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,72 +51,43 @@ const LoginPage: React.FC = () => {
 
 
   
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  if (!validateForm()) {
-    return;
-  }
-
-  setIsLoading(true);
-  setErrors({});
-
-  try {
-    const response = await fetch(`${import.meta.env.VITE_API_URL}/api/login`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        email: formData.email,
-        password: formData.password
-      })
-    });
-
-    const data = await response.json();
-
-
-    if (response.ok) {
-      // Store user in localStorage
-      // localStorage.setItem('user', JSON.stringify(data.user));
-      localStorage.setItem('token', data.token);
-      localStorage.setItem('user', JSON.stringify(data.user));
-      localStorage.setItem('userType', 'employee'); 
-      
-      localStorage.setItem('employee_id', data.employee_id);
-      // localStorage.setItem('token', data.token);
-      localStorage.setItem('supplier', data.supplier);
-
-      localStorage.setItem('company', data.hasCompany);
-      localStorage.setItem('company_id', data.companyId);   // integer company ID
-      
-
-      localStorage.setItem('user',JSON.stringify(data.user));
-      console.log('user:', data.user.roles);
-      // Redirect based on subscription status
-      if (data.userType === 'employee') {
-      localStorage.setItem('employee_id', data.user.id);
-
-    if (data.hasCompany) {
-      // Save company info to context or session
-      localStorage.setItem('companyInfo', JSON.stringify(data.companyInfo));
-      navigate('/app'); // goes to dashboard
-    } else {
-      navigate('/app/company'); // create company
+    if (!validateForm()) {
+      return;
     }
-  } else {
-    // For tbUsers
-    localStorage.setItem('user_id', data.user.id);
-    navigate('/app');
-  }
-}
-  } catch (error) {
-    console.error('Login Error:', error);
-    setErrors({ submit: 'An unexpected error occurred' });
-  } finally {
-    setIsLoading(false);
-  }
-};
+
+    setIsLoading(true);
+    setErrors({});
+
+    try {
+      const success = await login(formData.email, formData.password);
+
+      if (success) {
+        const userType = localStorage.getItem('userType') ?? 'employee';
+        const hasCompanyRaw = localStorage.getItem('company');
+        const hasCompany = hasCompanyRaw === 'true' || hasCompanyRaw === '1' || hasCompanyRaw === 'True';
+
+        if (userType === 'employee') {
+          if (hasCompany) {
+            navigate('/app');
+          } else {
+            navigate('/app/company');
+          }
+        } else {
+          navigate('/app');
+        }
+      } else {
+        setErrors({ submit: 'Invalid email or password' });
+      }
+    } catch (error) {
+      console.error('Login Error:', error);
+      setErrors({ submit: 'An unexpected error occurred' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
   return (

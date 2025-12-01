@@ -11,7 +11,7 @@ const ScenarioForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
   const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("userType");
+  const ownerType = localStorage.getItem("supplier");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );

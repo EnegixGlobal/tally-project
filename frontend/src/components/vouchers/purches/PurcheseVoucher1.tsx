@@ -64,10 +64,17 @@ const PurchaseVoucher: React.FC = () => {
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("userType");
-  const ownerId = localStorage.getItem(
-    ownerType === "employee" ? "employee_id" : "user_id"
-  );
+  // Prefer `userType` (set at login) but fall back to legacy `supplier` key
+  const _rawOwnerType =
+    localStorage.getItem("userType") || localStorage.getItem("supplier");
+  const ownerType =
+    _rawOwnerType === "null" || _rawOwnerType === "undefined"
+      ? null
+      : _rawOwnerType;
+  const ownerId =
+    localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id") ||
+    localStorage.getItem("user_id") ||
+    localStorage.getItem("employee_id");
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
   const partyLedgers = ledgers.filter(
     (l) =>
@@ -170,38 +177,66 @@ const PurchaseVoucher: React.FC = () => {
   }, [id, isEditMode, stockItems]);
 
   useEffect(() => {
-    const companyId = localStorage.getItem("company_id");
-    const ownerType = localStorage.getItem("userType");
-    const ownerId = localStorage.getItem(
-      ownerType === "employee" ? "employee_id" : "user_id"
-    );
-
-    if (!companyId || !ownerType || !ownerId) return;
-
-    const params = new URLSearchParams({
-      company_id: companyId,
-      owner_type: ownerType,
-      owner_id: ownerId,
-    });
-
-    fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`)
-      .then((res) => res.json())
-      .then((data) => {
-        if (data.success) {
-          const formatted = data.data.map((item: any) => ({
-            ...item,
-            batches: item.batches ? JSON.parse(item.batches) : [],
-          }));
-
-          setStockItems(formatted);
-        } else {
+    const fetchStockItems = async () => {
+      try {
+        if (!companyId || !ownerType || !ownerId) {
+          console.error("Missing auth params for stock-items", { companyId, ownerType, ownerId });
           setStockItems([]);
+          return;
         }
-      })
-      .catch((err) => {
+
+        const params = new URLSearchParams({
+          company_id: companyId,
+          owner_type: ownerType,
+          owner_id: ownerId,
+        });
+
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
+        );
+        const data = await res.json();
+        console.log('data', data)
+
+        // Accept multiple response shapes: array, { success, data }, or nested
+        let items: any[] = [];
+        if (Array.isArray(data)) items = data;
+        else if (data && Array.isArray((data as any).data)) items = (data as any).data;
+        else {
+          const arr = Object.values(data || {}).find((v) => Array.isArray(v));
+          if (Array.isArray(arr)) items = arr as any[];
+        }
+
+        const formatted = (items || []).map((item: any) => ({
+          ...item,
+          // Normalize batches: accept stringified JSON, array of strings or objects
+          batches: (() => {
+            try {
+              if (!item || item.batches === undefined || item.batches === null) return [];
+              const raw = typeof item.batches === "string" ? JSON.parse(item.batches) : item.batches;
+              const arr = Array.isArray(raw) ? raw : [];
+              return arr.map((b: any) => {
+                if (!b) return { batchName: "" };
+                if (typeof b === "string") return { batchName: b };
+                return {
+                  ...b,
+                  batchName:
+                    b.batchName ?? b.name ?? b.batch_name ?? b.batch_no ?? b.batchNo ?? String(b.id ?? ""),
+                };
+              });
+            } catch (e) {
+              return [];
+            }
+          })(),
+        }));
+
+        setStockItems(formatted);
+      } catch (err) {
         console.error("Stock fetch error:", err);
         setStockItems([]);
-      });
+      }
+    };
+
+    fetchStockItems();
   }, []);
 
   useEffect(() => {
@@ -211,6 +246,7 @@ const PurchaseVoucher: React.FC = () => {
           `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
+
         setLedgers(data);
       } catch (err) {
         console.error("Failed to fetch ledgers:", err);
@@ -762,6 +798,51 @@ const PurchaseVoucher: React.FC = () => {
         name === "batchExpiryDate" ||
         name === "batchManufacturingDate"
       ) {
+        // If user selected a batch number, look up the batch object and
+        // auto-fill quantity, rate, expiry/manufacturing and recompute amount
+        if (name === "batchNumber") {
+          const selectedBatch = (entry.batches || []).find((b: any) =>
+            b == null
+              ? false
+              : String(b.batchName ?? b.name ?? b.batch_no ?? b.batchNo ?? b.id) ===
+                String(value)
+          );
+
+          const batchExpiryDate =
+            selectedBatch?.batchExpiryDate || selectedBatch?.expiryDate || "";
+          const batchManufacturingDate =
+            selectedBatch?.batchManufacturingDate || selectedBatch?.manufacturingDate || "";
+
+          const quantity = Number(
+            selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? entry.quantity ?? 0
+          );
+          const rate = Number(
+            selectedBatch?.batchRate ?? selectedBatch?.rate ?? entry.rate ?? 0
+          );
+
+          const discount = Number(entry.discount ?? 0);
+          const gstRateTotal =
+            Number(entry.cgstRate ?? 0) + Number(entry.sgstRate ?? 0) + Number(entry.igstRate ?? 0);
+
+          const baseAmount = quantity * rate;
+          const gstAmount = (baseAmount * gstRateTotal) / 100;
+          const amount = baseAmount + gstAmount - discount;
+
+          updatedEntries[index] = {
+            ...entry,
+            batchNumber: value,
+            batchExpiryDate,
+            batchManufacturingDate,
+            quantity,
+            rate,
+            amount,
+          };
+
+          setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+          return;
+        }
+
+        // If user manually edits batchExpiryDate or batchManufacturingDate, just update that field
         updatedEntries[index] = {
           ...entry,
           [name]: value,

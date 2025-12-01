@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import { useNavigate, useParams } from "react-router-dom";
+import { useAuth } from '../../../home/context/AuthContext';
 import { ArrowLeft, Save } from "lucide-react";
 import type {
   LedgerGroup,
@@ -43,11 +44,21 @@ const GroupForm: React.FC = () => {
   const isEditMode = Boolean(id);
   const [ledgerGroups] = useState<LedgerGroup[]>([]);
   const [gstClassifications] = useState<GstClassification[]>([]);
-  const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("userType"); // 'employee' or 'user'
-  const ownerId = localStorage.getItem(
+  const { user, companyId: authCompanyId } = useAuth();
+
+  // Prefer values from AuthContext, fall back to localStorage for backward compatibility
+  const companyId = authCompanyId ?? localStorage.getItem("company_id");
+  let ownerType = localStorage.getItem("supplier"); // 'employee' or 'user'
+  // If userType not present, infer from presence of employee_id in localStorage
+  if (!ownerType) {
+    ownerType = localStorage.getItem("employee_id") ? "employee" : "user";
+  }
+
+  const ownerIdRaw = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
+  // Prefer explicit owner id from localStorage, fall back to authenticated user's id
+  const ownerId = ownerIdRaw ?? user?.id ?? null;
   console.log("componeyId", companyId);
   console.log("ownerType", ownerType);
   console.log("ownerId", ownerId);

@@ -55,7 +55,7 @@ const StockSummary: React.FC = () => {
       setLoading(true);
       setError(null);
 
-      const owner_type = localStorage.getItem("userType") || "";
+      const owner_type = localStorage.getItem("supplier") || "";
       const owner_id =
         localStorage.getItem(
           owner_type === "employee" ? "employee_id" : "user_id"

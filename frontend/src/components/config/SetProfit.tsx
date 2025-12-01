@@ -72,7 +72,7 @@ const SetProfit: React.FC = () => {
 
   const handleSave = async () => {
     const ownerId = localStorage.getItem("employee_id") || 1;
-    const ownerType = localStorage.getItem("userType") || "admin";
+    const ownerType = localStorage.getItem("supplier") || "admin";
 
     try {
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/set-profit`, {

@@ -58,14 +58,49 @@ const SalesVoucher: React.FC = () => {
   const [searchParams] = useSearchParams();
   const isEditMode = !!id;
   const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("userType");
+  const ownerType = localStorage.getItem("supplier");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
-  const partyLedgers = ledgers.filter(
-    (l) => l.groupName === "Sundry Debtors" || l.groupName === "Cash"
-  );
+
+  // Robust detection for party ledgers — backend may return different field names
+  const isPartyLedger = (l: any) => {
+    const groupName =
+      l.groupName || l.group_name || (l.group && l.group.name) || "";
+    const groupId = l.groupId ?? l.group_id ?? (l.group && l.group.id);
+
+    if (!groupName && !groupId && !l.type) {
+      const lower = (l.name || "").toLowerCase();
+      return (
+        lower.includes("cash") ||
+        lower.includes("debtor") ||
+        lower.includes("customer") ||
+        lower.includes("party")
+      );
+    }
+
+    if (groupName) {
+      const gn = groupName.toString().toLowerCase();
+      if (
+        gn.includes("sundry") ||
+        gn.includes("debtor") ||
+        gn.includes("cash") ||
+        gn.includes("customer")
+      )
+        return true;
+    }
+
+    if (groupId === 7 || groupId === "7" || groupId === 8 || groupId === "8")
+      return true;
+
+    if (l.type && (l.type === "customer" || l.type === "cash" || l.type === "party"))
+      return true;
+
+    return false;
+  };
+
+  const partyLedgers = ledgers.filter((l) => isPartyLedger(l));
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
 
   // Check if quotation mode is requested via URL
@@ -164,6 +199,13 @@ const SalesVoucher: React.FC = () => {
     value: "",
   });
 
+  // Pricing selection state (missing before) — keeps which pricing mode is active
+  const [pricingSelection, setPricingSelection] = useState({
+    main: "",
+    wholesale: "",
+    retailer: "",
+  });
+
   // Add these states at top of your component:
   const [statusMsg, setStatusMsg] = useState("");
   const [statusColor, setStatusColor] = useState("");
@@ -171,7 +213,7 @@ const SalesVoucher: React.FC = () => {
   // Add this useEffect() in component (below states)
   useEffect(() => {
     const ownerId = localStorage.getItem("employee_id") || 1;
-    const ownerType = localStorage.getItem("userType") || "admin";
+    const ownerType = localStorage.getItem("supplier") || "admin";
 
     // nothing selected → no message, no API call
     if (!profitConfig.customerType || !profitConfig.method) {
@@ -179,7 +221,9 @@ const SalesVoucher: React.FC = () => {
       return;
     }
 
-    fetch(`${import.meta.env.VITE_API_URL}/api/set-profit/${ownerId}/${ownerType}`)
+    fetch(
+      `${import.meta.env.VITE_API_URL}/api/set-profit/${ownerId}/${ownerType}`
+    )
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.data) {
@@ -194,7 +238,9 @@ const SalesVoucher: React.FC = () => {
               value: saved.value,
             });
 
-            setStatusMsg(`Value: ${saved.customer_type } ${saved.method} ${saved.value}%`);
+            setStatusMsg(
+              `Value: ${saved.customer_type} ${saved.method} ${saved.value}%`
+            );
             setStatusColor("text-green-600 font-semibold");
           } else {
             setStatusMsg("Not Set");
@@ -207,7 +253,6 @@ const SalesVoucher: React.FC = () => {
       })
       .catch((error) => console.error("❌ Fetch failed:", error));
   }, [profitConfig.customerType, profitConfig.method]);
-  
 
   // Regenerate voucher number when quotation mode changes
   useEffect(() => {
@@ -297,7 +342,7 @@ const SalesVoucher: React.FC = () => {
     const fetchGodowns = async () => {
       try {
         const companyId = localStorage.getItem("company_id");
-        const ownerType = localStorage.getItem("userType");
+        const ownerType = localStorage.getItem("supplier");
         const ownerId = localStorage.getItem(
           ownerType === "employee" ? "employee_id" : "user_id"
         );
@@ -307,7 +352,9 @@ const SalesVoucher: React.FC = () => {
           return;
         }
 
-        const url = `${import.meta.env.VITE_API_URL}/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        const url = `${
+          import.meta.env.VITE_API_URL
+        }/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
         const res = await fetch(url);
         const data = await res.json();
@@ -323,7 +370,7 @@ const SalesVoucher: React.FC = () => {
   // Keyboard shortcuts
   useEffect(() => {
     const companyId = localStorage.getItem("company_id");
-    const ownerType = localStorage.getItem("userType");
+    const ownerType = localStorage.getItem("supplier");
     const ownerId = localStorage.getItem(
       ownerType === "employee" ? "employee_id" : "user_id"
     );
@@ -335,7 +382,9 @@ const SalesVoucher: React.FC = () => {
       owner_id: ownerId,
     });
 
-    fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`)
+    fetch(
+      `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
+    )
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -572,21 +621,23 @@ const SalesVoucher: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  useEffect(() => {
-    const fetchLedgers = async () => {
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-        );
-        const data = await res.json();
-        setLedgers(data);
-      } catch (error) {
-        console.error("Failed to fetch ledgers:", error);
-      }
-    };
+useEffect(() => {
+  const fetchLedgers = async () => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      );
+      const data = await res.json();
+      console.log('data', data)
+      setLedgers(data);
+    } catch (error) {
+      console.error("Failed to fetch ledgers:", error);
+    }
+  };
 
-    fetchLedgers();
-  }, [companyId, ownerType, ownerId]);
+  fetchLedgers();
+}, [companyId, ownerType, ownerId]);
+
 
   const calculateTotals = () => {
     let subtotal = 0;
@@ -691,11 +742,14 @@ const SalesVoucher: React.FC = () => {
       // -------------------------
       // CREATE MODE → POST REQUEST
       // -------------------------
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/sales-vouchers`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await res.json();
 
@@ -810,7 +864,16 @@ const SalesVoucher: React.FC = () => {
         parseFloat(item.sellingPrice) ||
         0,
 
-      batches: item.batches ? JSON.parse(item.batches) : [],
+      batches: (() => {
+        if (!item.batches) return [];
+        try {
+          return typeof item.batches === "string"
+            ? JSON.parse(item.batches)
+            : item.batches;
+        } catch {
+          return [];
+        }
+      })(),
     };
   };
 
@@ -1143,7 +1206,7 @@ const SalesVoucher: React.FC = () => {
                     {ledgers
                       .filter(
                         (l) =>
-                          l.type === "sales" ||
+                          
                           l.name.toLowerCase().includes("sales")
                       )
                       .map((ledger) => (
@@ -1575,7 +1638,7 @@ const SalesVoucher: React.FC = () => {
                         <td></td>
                       </tr>
 
-                       {/* Profit */}
+                      {/* Profit */}
                       <tr
                         className={`font-semibold ${
                           theme === "dark"

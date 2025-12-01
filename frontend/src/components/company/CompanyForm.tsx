@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
+import { useAuth } from "../../home/context/AuthContext";
 import type { CompanyInfo } from "../../types";
 import Swal from "sweetalert2";
 import { 
@@ -167,9 +168,8 @@ const CompanyForm: React.FC = () => {
 
 
   const { theme, setCompanyInfo } = useAppContext();
+  const { updateCompany } = useAuth();
   const navigate = useNavigate();
-
-  // Basic company information
   const [company, setCompany] = useState<CompanyInfo>({
     name: "",
     financialYear: "",
@@ -187,7 +187,6 @@ const CompanyForm: React.FC = () => {
     taxType: "GST",
     maintainBy: "self",
     accountantName: "",
-    
   });
 
   // Security & Access Control States
@@ -487,6 +486,30 @@ const CompanyForm: React.FC = () => {
           confirmButtonColor: "#3085d6",
           confirmButtonText: "Continue to Dashboard",
         });
+
+        // Persist company id and update auth context
+        try {
+          console.log('Backend response data:', data);
+          console.log('companyId value:', data.companyId, 'Type:', typeof data.companyId);
+          
+          // Always attempt to persist to localStorage as fallback
+          if (data.companyId !== null && data.companyId !== undefined) {
+            console.log('Setting company_id to:', String(data.companyId));
+            localStorage.setItem('company_id', String(data.companyId));
+            localStorage.setItem('company', 'true');
+            if (data.companyInfo) localStorage.setItem('companyInfo', JSON.stringify(data.companyInfo));
+            
+            // Also call updateCompany if available
+            if (typeof updateCompany === 'function') {
+              console.log('Calling updateCompany with:', String(data.companyId));
+              updateCompany(String(data.companyId), data.companyInfo ?? company);
+            }
+          } else {
+            console.error('No companyId in response:', data);
+          }
+        } catch (e) {
+          console.warn('Could not update company info', e);
+        }
 
         // Store company info with CIN number for frontend display
         setCompanyInfo(company);
