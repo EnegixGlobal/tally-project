@@ -10,23 +10,24 @@ import { validateGSTIN } from "../../../utils/ledgerUtils";
 const LedgerForm: React.FC = () => {
   const { theme, ledgers } = useAppContext();
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);
+  const [chekStock, setChekStock] = useState("");
 
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  
+
   const isEditMode = Boolean(id);
 
   const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("supplier"); 
+  const ownerType = localStorage.getItem("supplier");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
 
-  
   const [formData, setFormData] = useState<Omit<Ledger, "id">>({
     name: "",
     groupId: "",
     openingBalance: 0,
+    closingBalance: 0,
     balanceType: "debit",
     address: "",
     email: "",
@@ -35,6 +36,8 @@ const LedgerForm: React.FC = () => {
     panNumber: "",
   });
 
+  console.log("groupoid", formData.groupId);
+
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   // Fetch ledger groups
@@ -42,7 +45,9 @@ const LedgerForm: React.FC = () => {
     const fetchLedgerGroups = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
         setLedgerGroups(data);
@@ -61,16 +66,18 @@ const LedgerForm: React.FC = () => {
     const fetchLedgerById = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
-
 
         if (res.ok) {
           setFormData({
             name: data.name || "",
             groupId: data.groupId || "",
             openingBalance: data.opening_balance || 0,
+            closingBalance: data.closing_balance || 0,
             balanceType: data.balance_type || "debit",
             address: data.address || "",
             email: data.email || "",
@@ -78,6 +85,10 @@ const LedgerForm: React.FC = () => {
             gstNumber: data.gst_number || "",
             panNumber: data.pan_number || "",
           });
+
+          if (data.groupName) {
+            setChekStock(data.groupName);
+          }
         } else {
           console.error("Failed to fetch ledger by ID:", data.message);
         }
@@ -98,6 +109,7 @@ const LedgerForm: React.FC = () => {
           name: ledger.name,
           groupId: ledger.groupId,
           openingBalance: ledger.openingBalance,
+          closingBalance: ledger.closingBalance,
           balanceType: ledger.balanceType,
           address: ledger.address || "",
           email: ledger.email || "",
@@ -115,7 +127,7 @@ const LedgerForm: React.FC = () => {
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
     >
   ) => {
-    const { name, value, type } = e.target as HTMLInputElement;
+    const { name, value, type } = e.target;
 
     let processedValue = value;
     if (name === "gstNumber") {
@@ -131,13 +143,10 @@ const LedgerForm: React.FC = () => {
       setErrors((prev) => ({ ...prev, [name]: "" }));
     }
 
-    if (name === "gstNumber" && processedValue) {
-      if (!validateGSTIN(processedValue)) {
-        setErrors((prev) => ({
-          ...prev,
-          gstNumber:
-            "Invalid GSTIN/UIN format. GSTIN: A22AAAA0000A1Z5 or UIN: 4 digits + 7 chars + 4 digits",
-        }));
+    if (name === "groupId") {
+      const findGroup = ledgerGroups.find((g) => g.id.toString() === value);
+      if (findGroup) {
+        setChekStock(findGroup.name);
       }
     }
   };
@@ -189,7 +198,9 @@ const LedgerForm: React.FC = () => {
       const payload = { ...formData, companyId, ownerType, ownerId };
 
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
         {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
@@ -314,7 +325,7 @@ const LedgerForm: React.FC = () => {
                 className="block text-sm font-medium mb-1"
                 htmlFor="openingBalance"
               >
-                Opening Balance
+                Opening Stock
               </label>
               <input
                 type="number"
@@ -363,6 +374,22 @@ const LedgerForm: React.FC = () => {
                 </label>
               </div>
             </div>
+
+            {chekStock === "Stock-in-hand" && (
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Closing Stock
+                </label>
+                <input
+                  type="number"
+                  name="closingBalance"
+                  value={formData.closingBalance}
+                  onChange={handleChange}
+                  step="0.01"
+                  className="w-full p-2 rounded border"
+                />
+              </div>
+            )}
           </div>
 
           {/* Additional Info */}

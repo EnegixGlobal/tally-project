@@ -5,7 +5,6 @@ const db = require("../db");
 // GET all stock items (scoped)
 router.get("/", async (req, res) => {
   const { company_id, owner_type, owner_id } = req.query;
-  console.log(company_id, owner_type, owner_id ,'asdf');
 
   const connection = await db.getConnection();
   try {
@@ -58,6 +57,8 @@ router.get("/", async (req, res) => {
       ...item,
       batches: item.batches ? JSON.parse(item.batches) : [],
     }));
+
+    // console.log(formattedRows);
 
     return res.json({
       success: true,

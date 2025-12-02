@@ -37,7 +37,7 @@ const StockItemList = () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
         const json = await res.json();
-
+        console.log('jsondata', json)
         if (json.success) {
           setStockItems(json.data);
         } else {

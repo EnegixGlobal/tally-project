@@ -51,11 +51,11 @@ router.get("/", async (req, res) => {
 
 // Create a new ledger scoped by company and owner
 router.post("/", async (req, res) => {
-
   const {
     name,
     groupId,
     openingBalance,
+    closingBalance,
     balanceType,
     address,
     email,
@@ -74,14 +74,27 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    const sql = `INSERT INTO ledgers 
-      (name, group_id, opening_balance, balance_type, address, email, phone, gst_number, pan_number, company_id, owner_type, owner_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`;
+    // 🔍 Check & Create closing_balance column if missing
+    await db.execute(`
+      ALTER TABLE ledgers 
+      ADD COLUMN IF NOT EXISTS closing_balance DECIMAL(15,2) DEFAULT 0
+    `);
+
+    // 🔁 Auto handle missing closingBalance
+    const finalClosingBalance =
+      closingBalance !== undefined ? closingBalance : openingBalance || 0;
+
+    const sql = `
+      INSERT INTO ledgers 
+      (name, group_id, opening_balance, closing_balance, balance_type, address, email, phone, gst_number, pan_number, company_id, owner_type, owner_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
 
     await db.execute(sql, [
       name,
       groupId,
       openingBalance || 0,
+      finalClosingBalance,
       balanceType || "debit",
       address || "",
       email || "",
@@ -100,7 +113,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Other Ledger routes (PUT for update, DELETE for remove) also need to include similar scoping checks.
+
 // Get only Cash/Bank Ledgers (for Contra Voucher)
 router.get("/cash-bank", async (req, res) => {
  
@@ -219,34 +232,38 @@ router.post("/bulk", async (req, res) => {
 // Get ledger by ID
 router.get("/:id", async (req, res) => {
   const ledgerId = parseInt(req.params.id, 10);
-  const { owner_type } = req.query;
-
-
+  const { owner_type, owner_id, company_id } = req.query;
 
   if (isNaN(ledgerId)) {
     return res.status(400).json({ message: "Invalid ledger ID" });
   }
 
-  if (!owner_type) {
-    return res
-      .status(400)
-      .json({ message: "Missing required query param: owner_type" });
+  if (!owner_type || !owner_id || !company_id) {
+    return res.status(400).json({
+      message: "Missing required query params: owner_type, owner_id, company_id",
+    });
   }
 
   try {
     const [rows] = await db.execute(
-      `SELECT l.*, g.id AS groupId, g.name AS groupName
+      `SELECT 
+        l.*, 
+        g.id AS groupId, 
+        g.name AS groupName
        FROM ledgers l
        LEFT JOIN ledger_groups g ON l.group_id = g.id
-       WHERE l.id = ? AND l.owner_type = ?`,
-      [ledgerId, owner_type]
+       WHERE l.id = ? 
+       AND l.owner_type = ?
+       AND l.owner_id = ?
+       AND l.company_id = ?`,
+      [ledgerId, owner_type, owner_id, company_id]
     );
 
     if (rows.length === 0) {
       return res.status(404).json({ message: "Ledger not found" });
     }
 
-    console.log(rows[0])
+    console.log("Fetched Ledger:", rows[0]);
 
     res.json(rows[0]);
   } catch (err) {
@@ -255,9 +272,11 @@ router.get("/:id", async (req, res) => {
   }
 });
 
+
 // Update a ledger by ID
 router.put("/:id", async (req, res) => {
   const ledgerId = parseInt(req.params.id, 10);
+  const { owner_type, owner_id, company_id } = req.query;
 
   const {
     name,
@@ -271,8 +290,15 @@ router.put("/:id", async (req, res) => {
     panNumber,
   } = req.body;
 
-  if (isNaN(ledgerId))
+  if (isNaN(ledgerId)) {
     return res.status(400).json({ message: "Invalid ledger ID" });
+  }
+
+  if (!owner_type || !owner_id || !company_id) {
+    return res.status(400).json({
+      message: "Missing required query params: owner_type, owner_id, company_id",
+    });
+  }
 
   try {
     const sql = `
@@ -286,7 +312,10 @@ router.put("/:id", async (req, res) => {
           phone = ?, 
           gst_number = ?, 
           pan_number = ?
-      WHERE id = ?
+      WHERE id = ? 
+      AND owner_type = ?
+      AND owner_id = ? 
+      AND company_id = ?
     `;
 
     const [result] = await db.execute(sql, [
@@ -300,10 +329,13 @@ router.put("/:id", async (req, res) => {
       gstNumber || "",
       panNumber || "",
       ledgerId,
+      owner_type,
+      owner_id,
+      company_id,
     ]);
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Ledger not found" });
+      return res.status(404).json({ message: "Ledger not found or unauthorized" });
     }
 
     res.json({ message: "Ledger updated successfully" });
@@ -312,6 +344,7 @@ router.put("/:id", async (req, res) => {
     res.status(500).json({ message: "Failed to update ledger" });
   }
 });
+
 
 // Delete a ledger by ID
 router.delete("/:id", async (req, res) => {

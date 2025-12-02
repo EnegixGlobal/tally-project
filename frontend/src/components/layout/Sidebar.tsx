@@ -100,10 +100,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
       </nav>
 
       {/* 🔥 Logout Button - Bottom Fixed */}
-      <div className="absolute bottom-15 left-0 w-full px-2">
+      <div className="absolute  bottom-15 left-0 w-full px-2">
         <button
           onClick={logout}
-          className="w-full flex items-center justify-center space-x-2 bg-red-600 hover:bg-red-700 text-white p-2 rounded-md transition-colors"
+          className="w-full flex items-center justify-center space-x-2 cursor-pointer bg-black  text-white p-2 rounded-md transition-colors"
         >
           <LogOut size={18} />
           {isOpen && <span className="text-sm font-medium">Logout</span>}

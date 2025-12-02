@@ -28,6 +28,7 @@ interface SalesOrderItem {
   cgstRate?: number;
   sgstRate?: number;
   igstRate?: number;
+  
 }
 
 interface SalesOrderData {
@@ -73,70 +74,71 @@ interface Ledger {
 //   gstRate?: number;
 // }
 
-
-
 const SalesOrder: React.FC = () => {
   const { theme, companyInfo } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  console.log('this is id', id)
+  console.log("this is id", id);
   const isEditMode = !!id;
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
 
   useEffect(() => {
-  if (!isEditMode || !id) return;
+    if (!isEditMode || !id) return;
 
-  const fetchOrder = async () => {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-orders/${id}`);
-      const data = await res.json();
-      console.log('ye data hai single ka', data)
+    const fetchOrder = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/sales-orders/${id}`
+        );
+        const data = await res.json();
+        console.log("ye data hai single ka", data);
 
-      if (data.success) {
-        const order = data.data;
+        if (data.success) {
+          const order = data.data;
 
-        setFormData({
-          id: order.id,
-          date: order.date?.split("T")[0] || "",
-          number: order.number || "",
-          partyId: order.partyId || "",
-          salesLedgerId: order.salesLedgerId || "",
-          referenceNo: order.referenceNo || "",
-          narration: order.narration || "",
-          orderRef: order.orderRef || "",
-          termsOfDelivery: order.termsOfDelivery || "",
-          expectedDeliveryDate: order.expectedDeliveryDate?.split("T")[0] || "",
-          status: order.status || "pending",
-          dispatchDetails: {
-            destination: order.destination || "",
-            through: order.through || "",
-            docNo: order.docNo || "",
-          },
+          setFormData({
+            id: order.id,
+            date: order.date?.split("T")[0] || "",
+            number: order.number || "",
+            partyId: order.partyId || "",
+            salesLedgerId: order.salesLedgerId || "",
+            referenceNo: order.referenceNo || "",
+            narration: order.narration || "",
+            orderRef: order.orderRef || "",
+            termsOfDelivery: order.termsOfDelivery || "",
+            expectedDeliveryDate:
+              order.expectedDeliveryDate?.split("T")[0] || "",
+            status: order.status || "pending",
+            dispatchDetails: {
+              destination: order.destination || "",
+              through: order.through || "",
+              docNo: order.docNo || "",
+            },
 
-          // IMPORTANT: Backend items → frontend items format conversion
-          items: order.items.map((it: any, idx: number) => ({
-            id: String(idx + 1),
-            itemId: it.itemId,
-            itemName: it.itemName,
-            hsnCode: it.hsnCode || "",
-            unit: it.unit || "",
-            quantity: Number(it.quantity),
-            rate: Number(it.rate),
-            discount: Number(it.discount || 0),
-            cgstRate: Number(it.cgstRate || 0),
-            sgstRate: Number(it.sgstRate || 0),
-            igstRate: Number(it.igstRate || 0),
-            amount: Number(it.amount),
-          })),
-        });
+            // IMPORTANT: Backend items → frontend items format conversion
+            items: order.items.map((it: any, idx: number) => ({
+              id: String(idx + 1),
+              itemId: it.itemId,
+              itemName: it.itemName,
+              hsnCode: it.hsnCode || "",
+              unit: it.unit || "",
+              quantity: Number(it.quantity),
+              rate: Number(it.rate),
+              discount: Number(it.discount || 0),
+              cgstRate: Number(it.cgstRate || 0),
+              sgstRate: Number(it.sgstRate || 0),
+              igstRate: Number(it.igstRate || 0),
+              amount: Number(it.amount),
+            })),
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching sales order", err);
       }
-    } catch (err) {
-      console.error("Error fetching sales order", err);
-    }
-  };
+    };
 
-  fetchOrder();
-}, [id, isEditMode]);
+    fetchOrder();
+  }, [id, isEditMode]);
 
   useEffect(() => {
     const companyId = localStorage.getItem("company_id");
@@ -152,7 +154,9 @@ const SalesOrder: React.FC = () => {
       owner_id: ownerId,
     });
 
-    fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`)
+    fetch(
+      `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
+    )
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
@@ -196,8 +200,6 @@ const SalesOrder: React.FC = () => {
       gstNumber: "29LMNOP6789K4L5",
     },
   ]);
-
- ;
 
   const generateOrderNumber = () => {
     const prefix = "SO";
@@ -291,90 +293,115 @@ const SalesOrder: React.FC = () => {
     }
   };
   const handleItemChange = (
-    index: number,
-    field: keyof SalesOrderItem,
-    value: string | number
-  ) => {
-    const updatedItems = [...formData.items];
-    let item = { ...updatedItems[index] };
+  index: number,
+  field: keyof SalesOrderItem | "batchNumber",
+  value: string | number
+) => {
+  const updatedItems = [...formData.items];
+  let item = { ...updatedItems[index] };
 
-    // -------------------------------
-    // WHEN ITEM SELECTED (AUTO-FILL)
-    // -------------------------------
-    if (field === "itemId") {
-      const selectedItem = stockItems.find(
-        (itm) => String(itm.id) === String(value)
-      );
+  // ============================
+  // WHEN ITEM SELECTED → AUTO-FILL
+  // ============================
+  if (field === "itemId") {
+    const selectedItem = stockItems.find(
+      (itm) => String(itm.id) === String(value)
+    );
 
+    const rawGST = Number(selectedItem?.gstRate) || 0;
 
-      // FIX GST — your API returns gstRate as string, ex: "17.00"
-      const rawGST = Number(selectedItem?.gstRate) || 0;
+    const unitValue =
+      (selectedItem as any)?.unitName || selectedItem?.unit || "";
 
-      // FIX UNIT — API gives unitName (ex: "Kilogram")
-      const unitValue = (selectedItem as any)?.unitName || selectedItem?.unit || "";
+    updatedItems[index] = {
+      ...item,
+      itemId: value,
+      itemName: selectedItem?.name || "",
+      hsnCode: selectedItem?.hsnCode || "",
+      unit: unitValue,
+      rate: Number(selectedItem?.standardSaleRate) || 0,
+      cgstRate: isIntrastate ? rawGST / 2 : 0,
+      sgstRate: isIntrastate ? rawGST / 2 : 0,
+      igstRate: isIntrastate ? 0 : rawGST,
 
+      // Batch list load (if exists)
+      batches: selectedItem?.batches || [],
+      batchNumber: "",
+    };
 
-      // FIX RATE — your API may not have standardSaleRate
-      const rateValue = Number(selectedItem?.standardSaleRate) || 0;
+    item = updatedItems[index];
+  }
 
-      // UPDATE ALL AUTO-FILLED FIELDS
-      updatedItems[index] = {
-        ...item,
-        itemId: value,
-        hsnCode: selectedItem?.hsnCode || "",
-        unit: unitValue,
-        rate: rateValue,
-        cgstRate: rawGST / 2,
-        sgstRate: rawGST / 2,
-        igstRate: 0,
-      };
+  // ============================
+  // WHEN BATCH SELECTED → AUTO-FILL QTY & RATE
+  // ============================
+ if (field === "batchNumber") {
+  const selectedBatch = item.batches?.find((b: any) => {
+    const name = b.batchName || b.name || b.id;
+    return String(name) === String(value);
+  });
 
-      item = updatedItems[index]; // refresh reference
-    }
+  const qty = Number(selectedBatch?.quantity || item.quantity || 1);
+  const rate = Number(selectedBatch?.rate || item.rate || 0);
 
-    // --------------------------------------
-    // UPDATE ITEM FIELDS LIKE QTY, RATE, ETC
-    // --------------------------------------
-    if (
-      field === "quantity" ||
-      field === "rate" ||
-      field === "discount" ||
-      field === "cgstRate" ||
-      field === "sgstRate" ||
-      field === "igstRate"
-    ) {
-      item[field] =
-        typeof value === "number" ? value : parseFloat(value as string) || 0;
-    } else if (
-      field === "itemId" ||
-      field === "itemName" ||
-      field === "hsnCode" ||
-      field === "unit" ||
-      field === "id"
-    ) {
-      item[field] = value as any;
-    }
+  const totalGST =
+    (item.cgstRate || 0) +
+    (item.sgstRate || 0) +
+    (item.igstRate || 0);
 
-    // --------------------------------------
-    // RECALCULATE AMOUNT
-    // --------------------------------------
-    const qty = Number(item.quantity) || 0;
-    const rate = Number(item.rate) || 0;
-    const discount = Number(item.discount) || 0;
+  const baseAmount = qty * rate;
+  const gstAmount = (baseAmount * totalGST) / 100;
+  const amount = baseAmount + gstAmount - (item.discount || 0);
 
-    const baseAmount = qty * rate;
-    const gstRate =
-      (item.cgstRate || 0) + (item.sgstRate || 0) + (item.igstRate || 0);
-
-    const gstAmount = (baseAmount * gstRate) / 100;
-
-    item.amount = baseAmount + gstAmount - discount;
-
-    updatedItems[index] = item;
-
-    setFormData((prev) => ({ ...prev, items: updatedItems }));
-    setErrors((prev) => ({ ...prev, [`item${index}_${field}`]: "" }));
+  updatedItems[index] = {
+    ...item,
+    batchNumber: value,
+    quantity: qty,
+    rate: rate,
+    amount,
   };
+
+  setFormData((p) => ({ ...p, items: updatedItems }));
+  return;
+}
+
+  // ============================
+  // USER-EDITED FIELDS
+  // ============================
+  if (
+    ["quantity", "rate", "discount", "cgstRate", "sgstRate", "igstRate"].includes(
+      field
+    )
+  ) {
+    item[field] =
+      typeof value === "number" ? value : parseFloat(value as string) || 0;
+  } else {
+    item[field] = value;
+  }
+
+  // ============================
+  // RECALCULATE AMOUNT
+  // ============================
+  const qty = Number(item.quantity) || 0;
+  const rate = Number(item.rate) || 0;
+  const discount = Number(item.discount) || 0;
+
+  const totalGST =
+    (item.cgstRate || 0) +
+    (item.sgstRate || 0) +
+    (item.igstRate || 0);
+
+  const baseAmount = qty * rate;
+  const gstAmount = (baseAmount * totalGST) / 100;
+
+  item.amount = baseAmount + gstAmount - discount;
+
+  updatedItems[index] = item;
+
+  setFormData((prev) => ({ ...prev, items: updatedItems }));
+  setErrors((prev) => ({ ...prev, [`item${index}_${field}`]: "" }));
+};
+
 
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
 
@@ -386,7 +413,9 @@ const SalesOrder: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
         setLedgers(data);
@@ -445,60 +474,60 @@ const SalesOrder: React.FC = () => {
   }, [formData.date, formData.partyId, formData.salesLedgerId, formData.items]);
 
   const handleSubmit = useCallback(
-  async (e: React.FormEvent) => {
-    e.preventDefault();
+    async (e: React.FormEvent) => {
+      e.preventDefault();
 
-    if (!validateForm()) {
-      Swal.fire(
-        "Validation Error",
-        "Please fix the errors before submitting.",
-        "warning"
-      );
-      return;
-    }
-
-    try {
-      const payload = {
-        ...formData,
-        companyId,
-        ownerType,
-        ownerId,
-      };
-
-      const url = isEditMode
-        ? `${import.meta.env.VITE_API_URL}/api/sales-orders/${id}`
-        : `${import.meta.env.VITE_API_URL}/api/sales-orders`;
-
-      const response = await fetch(url, {
-        method: isEditMode ? "PUT" : "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      });
-
-      const data = await response.json();
-
-      if (response.ok) {
-        Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: `Sales Order ${
-            isEditMode ? "updated" : "created"
-          } successfully`,
-        }).then(() => {
-          navigate("/app/vouchers");
-        });
-      } else {
-        Swal.fire("Error", data.message || "Something went wrong", "error");
+      if (!validateForm()) {
+        Swal.fire(
+          "Validation Error",
+          "Please fix the errors before submitting.",
+          "warning"
+        );
+        return;
       }
-    } catch (error) {
-      console.error("Error:", error);
-      Swal.fire("Network Error", "Failed to connect to the server.", "error");
-    }
-  },
-  [formData, navigate, isEditMode, validateForm]
-);
+
+      try {
+        const payload = {
+          ...formData,
+          companyId,
+          ownerType,
+          ownerId,
+        };
+
+        const url = isEditMode
+          ? `${import.meta.env.VITE_API_URL}/api/sales-orders/${id}`
+          : `${import.meta.env.VITE_API_URL}/api/sales-orders`;
+
+        const response = await fetch(url, {
+          method: isEditMode ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
+
+        const data = await response.json();
+
+        if (response.ok) {
+          Swal.fire({
+            icon: "success",
+            title: "Success",
+            text: `Sales Order ${
+              isEditMode ? "updated" : "created"
+            } successfully`,
+          }).then(() => {
+            navigate("/app/vouchers");
+          });
+        } else {
+          Swal.fire("Error", data.message || "Something went wrong", "error");
+        }
+      } catch (error) {
+        console.error("Error:", error);
+        Swal.fire("Network Error", "Failed to connect to the server.", "error");
+      }
+    },
+    [formData, navigate, isEditMode, validateForm]
+  );
 
   const handlePrint = useCallback(() => {
     const printWindow = window.open("", "_blank");
@@ -988,6 +1017,8 @@ const SalesOrder: React.FC = () => {
                     {config.showHSN && (
                       <th className="px-2 py-2 text-left">HSN Code</th>
                     )}
+                    <th className="px-2 py-2 text-left">Batch</th>
+
                     <th className="px-2 py-2 text-center">Quantity</th>
                     <th className="px-2 py-2 text-center">Rate per</th>
                     {config.showDiscount && (
@@ -997,7 +1028,7 @@ const SalesOrder: React.FC = () => {
                       <th className="px-2 py-2 text-center">GST %</th>
                     )}
                     <th className="px-2 py-2 text-right">Amount</th>
-                   
+
                     <th className="px-2 py-2 text-center">Action</th>
                   </tr>
                 </thead>
@@ -1057,6 +1088,34 @@ const SalesOrder: React.FC = () => {
                           />
                         </td>
                       )}
+
+                      <td className="px-2 py-2">
+                        <select
+                          value={(item as any).batchNumber || ""}
+                          onChange={(e) =>
+                            handleItemChange(
+                              index,
+                              "batchNumber",
+                              e.target.value
+                            )
+                          }
+                          className={`w-full p-1 rounded border text-sm ${
+                            theme === "dark"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
+                          } focus:border-blue-500`}
+                        >
+                          <option value="">Select Batch</option>
+                          {(item as any).batches?.map((batch: any) => (
+                            <option
+                              key={batch.id}
+                              value={batch.batchName || batch.name}
+                            >
+                              {batch.batchName || batch.name}
+                            </option>
+                          ))}
+                        </select>
+                      </td>
 
                       <td className="px-2 py-2">
                         <input

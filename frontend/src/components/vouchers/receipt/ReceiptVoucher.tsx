@@ -16,6 +16,7 @@ const ReceiptVoucher: React.FC = () => {
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
+  console.log(companyId, ownerType, ownerId);
 
   const [cashBankLedgers, setCashBankLedgers] = useState<Ledger[]>([]);
   const [allLedgers, setAllLedgers] = useState<Ledger[]>([]);
@@ -191,7 +192,9 @@ const ReceiptVoucher: React.FC = () => {
     const fetchSingleVoucher = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/vouchers/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/vouchers/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
         const resJson = await res.json();
@@ -344,11 +347,13 @@ const ReceiptVoucher: React.FC = () => {
       try {
         // 1) Cash / Bank Ledgers
         const cashRes = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger/cash-bank?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger/cash-bank?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         let cashData = await cashRes.json();
 
-        cashData = cashData.map((item :any) => ({
+        cashData = cashData.map((item: any) => ({
           ...item,
           type: item.groupType?.toLowerCase(),
         }));
@@ -357,11 +362,13 @@ const ReceiptVoucher: React.FC = () => {
 
         // 2) All Ledgers
         const allRes = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         let allData = await allRes.json();
 
-        allData = allData.map((l:any) => ({
+        allData = allData.map((l: any) => ({
           ...l,
           type: l.type?.toLowerCase() || l.groupType?.toLowerCase() || "",
         }));
@@ -379,29 +386,26 @@ const ReceiptVoucher: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) {
-      Swal.fire(
-        "Validation Error",
-        "Please fix the errors before submitting.",
-        "warning"
-      );
-      return;
-    }
+    
 
     try {
       const payload = {
         ...formData,
-        companyId,
-        ownerType,
-        ownerId,
+        companyId: companyId,
+        owner_type: ownerType,
+        owner_id: ownerId,
       };
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload), // your state
-      });
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/vouchers`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload), // your state
+        }
+      );
 
       const data = await response.json();
 
@@ -836,7 +840,7 @@ const ReceiptVoucher: React.FC = () => {
                   >
                     <option value="">Select Cash/Bank Ledger</option>
 
-                    {cashBankLedgers.map((l:Ledger) => (
+                    {cashBankLedgers.map((l: Ledger) => (
                       <option key={l.id} value={String(l.id)}>
                         {l.name}
                       </option>
@@ -875,7 +879,7 @@ const ReceiptVoucher: React.FC = () => {
                     >
                       <th className="px-4 py-2 text-left">
                         Party Ledger{" "}
-                        <span className="text-green-500 italic">(Debit)</span>
+                        <span className="text-green-500 italic">(Cradit)</span>
                       </th>
                       <th className="px-4 py-2 text-right">Amount</th>
                       <th className="px-4 py-2 text-center">Action</th>

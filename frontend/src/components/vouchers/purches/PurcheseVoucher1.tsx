@@ -60,7 +60,7 @@ const getSelectClasses = (theme: string, hasError: boolean = false) => {
 };
 
 const PurchaseVoucher: React.FC = () => {
-  const { theme, godowns = [], companyInfo } = useAppContext();
+  const { theme, godowns = [], companyInfo, units = [] } = useAppContext();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   const companyId = localStorage.getItem("company_id");
@@ -72,22 +72,18 @@ const PurchaseVoucher: React.FC = () => {
       ? null
       : _rawOwnerType;
   const ownerId =
-    localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id") ||
+    localStorage.getItem(
+      ownerType === "employee" ? "employee_id" : "user_id"
+    ) ||
     localStorage.getItem("user_id") ||
     localStorage.getItem("employee_id");
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
-  const partyLedgers = ledgers.filter(
-    (l) =>
-      l.groupName === "Sundry Creditors" ||
-      l.groupName === "Cash" ||
-      l.groupName === "Current Assets"
+  const partyLedgers = ledgers;
+
+  const purchaseLedgers = ledgers.filter((l) =>
+    String(l.name).toLowerCase().includes("purchase")
   );
-  const purchaseLedgers = ledgers.filter(
-    (l) =>
-      l.groupName === "Purchase" ||
-      l.groupName === "Direct Expenses" ||
-      l.groupName === "Expense"
-  );
+
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const { id } = useParams();
   const isEditMode = Boolean(id);
@@ -109,7 +105,6 @@ const PurchaseVoucher: React.FC = () => {
     fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${id}`)
       .then((res) => res.json())
       .then((data) => {
-        console.log("Fetched Voucher For Edit:", data);
 
         setFormData((prev) => ({
           ...prev,
@@ -180,7 +175,11 @@ const PurchaseVoucher: React.FC = () => {
     const fetchStockItems = async () => {
       try {
         if (!companyId || !ownerType || !ownerId) {
-          console.error("Missing auth params for stock-items", { companyId, ownerType, ownerId });
+          console.error("Missing auth params for stock-items", {
+            companyId,
+            ownerType,
+            ownerId,
+          });
           setStockItems([]);
           return;
         }
@@ -195,12 +194,12 @@ const PurchaseVoucher: React.FC = () => {
           `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
         );
         const data = await res.json();
-        console.log('data', data)
 
         // Accept multiple response shapes: array, { success, data }, or nested
         let items: any[] = [];
         if (Array.isArray(data)) items = data;
-        else if (data && Array.isArray((data as any).data)) items = (data as any).data;
+        else if (data && Array.isArray((data as any).data))
+          items = (data as any).data;
         else {
           const arr = Object.values(data || {}).find((v) => Array.isArray(v));
           if (Array.isArray(arr)) items = arr as any[];
@@ -211,8 +210,12 @@ const PurchaseVoucher: React.FC = () => {
           // Normalize batches: accept stringified JSON, array of strings or objects
           batches: (() => {
             try {
-              if (!item || item.batches === undefined || item.batches === null) return [];
-              const raw = typeof item.batches === "string" ? JSON.parse(item.batches) : item.batches;
+              if (!item || item.batches === undefined || item.batches === null)
+                return [];
+              const raw =
+                typeof item.batches === "string"
+                  ? JSON.parse(item.batches)
+                  : item.batches;
               const arr = Array.isArray(raw) ? raw : [];
               return arr.map((b: any) => {
                 if (!b) return { batchName: "" };
@@ -220,7 +223,12 @@ const PurchaseVoucher: React.FC = () => {
                 return {
                   ...b,
                   batchName:
-                    b.batchName ?? b.name ?? b.batch_name ?? b.batch_no ?? b.batchNo ?? String(b.id ?? ""),
+                    b.batchName ??
+                    b.name ??
+                    b.batch_name ??
+                    b.batch_no ??
+                    b.batchNo ??
+                    String(b.id ?? ""),
                 };
               });
             } catch (e) {
@@ -243,7 +251,9 @@ const PurchaseVoucher: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
 
@@ -696,8 +706,6 @@ const PurchaseVoucher: React.FC = () => {
   };
   // Debug: Check what's in the filtered ledgers for party dropdown
   // const partyLedgers = safeLedgers.filter(l => l.type && ['sundry-creditors', 'cash', 'current-assets'].includes(l.type));
-  console.log("Purchase Voucher - Party ledgers:", partyLedgers);
-  console.log("Purchase Voucher - All safeLedgers:", safeLedgers);
   const handleChange = (
     e: React.ChangeEvent<
       HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
@@ -706,7 +714,6 @@ const PurchaseVoucher: React.FC = () => {
     const { name, value } = e.target;
 
     // Debug: Log form changes
-    console.log("Purchase Voucher - Form change:", name, value);
 
     if (name.startsWith("dispatchDetails.")) {
       const field = name.split(".")[1] as keyof typeof formData.dispatchDetails;
@@ -755,158 +762,142 @@ const PurchaseVoucher: React.FC = () => {
     const updatedEntries = [...formData.entries];
     const entry = updatedEntries[index];
 
-    // ------------------------------------------
-    // MODE: ITEM-INVOICE
-    // ------------------------------------------
+    const recalcAmount = (ent: any) => {
+      const qty = Number(ent.quantity || 0);
+      const rate = Number(ent.rate || 0);
+      const discount = Number(ent.discount || 0);
+      const gstTotal =
+        Number(ent.cgstRate || 0) +
+        Number(ent.sgstRate || 0) +
+        Number(ent.igstRate || 0);
+
+      const base = qty * rate;
+      const gstAmt = (base * gstTotal) / 100;
+      return base + gstAmt - discount;
+    };
+
+    // ITEM INVOICE MODE
     if (formData.mode === "item-invoice") {
-      // 1️⃣ WHEN ITEM IS SELECTED → AUTO FILL ALL
+      // 1️⃣ AUTO-FILL WHEN ITEM CHANGES
       if (name === "itemId") {
-        const selectedItem = stockItems.find(
+        const selected = stockItems.find(
           (item) => String(item.id) === String(value)
         );
 
         updatedEntries[index] = {
           ...entry,
           itemId: value,
+          hsnCode: selected?.hsnCode || "",
+          unitName: selected?.unit || "",
+          rate: Number(selected?.standardPurchaseRate || selected?.rate || 0),
 
-          // AUTO FILL
-          hsnCode: selectedItem?.hsnCode || "",
-
-          unitName: selectedItem?.unitName || selectedItem?.unit || "",
-
-          rate: Number(selectedItem?.rate) || 0,
-
-          gstRate: Number(selectedItem?.gstRate) || 0,
-          cgstRate: Number(selectedItem?.gstRate) / 2 || 0,
-          sgstRate: Number(selectedItem?.gstRate) / 2 || 0,
+          gstRate: Number(selected?.gstRate) || 0,
+          cgstRate: Number(selected?.gstRate) / 2 || 0,
+          sgstRate: Number(selected?.gstRate) / 2 || 0,
           igstRate: 0,
 
-          // LOAD BATCHES
-          batches: selectedItem?.batches || [],
+          // Reset & load batches
+          batches: selected?.batches || [],
           batchNumber: "",
           batchExpiryDate: "",
           batchManufacturingDate: "",
+
+          amount: 0,
         };
 
         setFormData((prev) => ({ ...prev, entries: updatedEntries }));
         return;
       }
 
-      // 2️⃣ BATCH FIELDS (DO NOT RESET)
-      if (
-        name === "batchNumber" ||
-        name === "batchExpiryDate" ||
-        name === "batchManufacturingDate"
-      ) {
-        // If user selected a batch number, look up the batch object and
-        // auto-fill quantity, rate, expiry/manufacturing and recompute amount
-        if (name === "batchNumber") {
-          const selectedBatch = (entry.batches || []).find((b: any) =>
-            b == null
-              ? false
-              : String(b.batchName ?? b.name ?? b.batch_no ?? b.batchNo ?? b.id) ===
-                String(value)
-          );
+      // 2️⃣ BATCH AUTO-FILL
+      if (name === "batchNumber") {
+        const selectedBatch = (entry.batches || []).find(
+          (b: any) =>
+            b &&
+            String(b.batchName ?? b.name ?? b.batch_no ?? b.batchNo ?? b.id) ===
+              String(value)
+        );
 
-          const batchExpiryDate =
-            selectedBatch?.batchExpiryDate || selectedBatch?.expiryDate || "";
-          const batchManufacturingDate =
-            selectedBatch?.batchManufacturingDate || selectedBatch?.manufacturingDate || "";
+        const quantity = Number(
+          selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
+        );
 
-          const quantity = Number(
-            selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? entry.quantity ?? 0
-          );
-          const rate = Number(
-            selectedBatch?.batchRate ?? selectedBatch?.rate ?? entry.rate ?? 0
-          );
-
-          const discount = Number(entry.discount ?? 0);
-          const gstRateTotal =
-            Number(entry.cgstRate ?? 0) + Number(entry.sgstRate ?? 0) + Number(entry.igstRate ?? 0);
-
-          const baseAmount = quantity * rate;
-          const gstAmount = (baseAmount * gstRateTotal) / 100;
-          const amount = baseAmount + gstAmount - discount;
-
-          updatedEntries[index] = {
-            ...entry,
-            batchNumber: value,
-            batchExpiryDate,
-            batchManufacturingDate,
-            quantity,
-            rate,
-            amount,
-          };
-
-          setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-          return;
-        }
-
-        // If user manually edits batchExpiryDate or batchManufacturingDate, just update that field
-        updatedEntries[index] = {
-          ...entry,
-          [name]: value,
-        };
-
-        setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-        return;
-      }
-
-      // 3️⃣ QUANTITY / RATE / DISCOUNT → RECALCULATE
-      if (name === "quantity" || name === "rate" || name === "discount") {
-        const quantity =
-          name === "quantity" ? parseFloat(value) || 0 : entry.quantity ?? 0;
-        const rate = name === "rate" ? parseFloat(value) || 0 : entry.rate ?? 0;
-        const discount =
-          name === "discount" ? parseFloat(value) || 0 : entry.discount ?? 0;
-
-        const baseAmount = quantity * rate;
+        const rate = Number(
+          selectedBatch?.batchRate ?? selectedBatch?.rate ?? entry.rate ?? 0
+        );
 
         const gstRateTotal =
-          (entry.cgstRate ?? 0) + (entry.sgstRate ?? 0) + (entry.igstRate ?? 0);
+          Number(entry.cgstRate || 0) +
+          Number(entry.sgstRate || 0) +
+          Number(entry.igstRate || 0);
 
+        const baseAmount = quantity * rate;
         const gstAmount = (baseAmount * gstRateTotal) / 100;
 
         updatedEntries[index] = {
           ...entry,
-          [name]: parseFloat(value) || 0,
-          amount: baseAmount + gstAmount - discount,
+          batchNumber: value,
+
+          // Auto Dates
+          batchExpiryDate:
+            selectedBatch?.expiryDate ?? selectedBatch?.batchExpiryDate ?? "",
+
+          batchManufacturingDate:
+            selectedBatch?.manufacturingDate ??
+            selectedBatch?.batchManufacturingDate ??
+            "",
+
+          // Auto Quantity + Rate
+          quantity,
+          rate,
+
+          // Auto Amount
+          amount: baseAmount + gstAmount - Number(entry.discount || 0),
         };
 
         setFormData((prev) => ({ ...prev, entries: updatedEntries }));
         return;
       }
 
-      // 4️⃣ ANY OTHER INPUT
+      // 3️⃣ NUMBERS: qty / rate / discount
+      if (["quantity", "rate", "discount"].includes(name)) {
+        updatedEntries[index] = {
+          ...entry,
+          [name]: Number(value) || 0,
+        };
+        updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+
+        setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+        return;
+      }
+
+      // 4️⃣ Default
       updatedEntries[index] = {
         ...entry,
-        [name]: type === "number" ? parseFloat(value) || 0 : value,
+        [name]: type === "number" ? Number(value) || 0 : value,
       };
-
       setFormData((prev) => ({ ...prev, entries: updatedEntries }));
       return;
     }
 
-    // ------------------------------------------
-    // MODE: ACCOUNTING / VOUCHER
-    // ------------------------------------------
+    // ACCOUNTING / AS VOUCHER MODES
     if (name === "ledgerId") {
       updatedEntries[index] = {
         ...entry,
         ledgerId: value,
         itemId: undefined,
+        unitName: undefined,
         quantity: undefined,
         rate: undefined,
         cgstRate: undefined,
         sgstRate: undefined,
         igstRate: undefined,
-        godownId: undefined,
         discount: undefined,
       };
     } else if (name === "amount") {
       updatedEntries[index] = {
         ...entry,
-        amount: parseFloat(value) || 0,
+        amount: Number(value) || 0,
       };
     } else {
       updatedEntries[index] = {
@@ -1080,7 +1071,6 @@ const PurchaseVoucher: React.FC = () => {
       });
 
       const data = await res.json();
-      console.log("Server response:", data);
 
       if (res.ok) {
         // SUCCESS MODAL
@@ -1642,7 +1632,11 @@ const PurchaseVoucher: React.FC = () => {
 
                           {/* UNIT */}
                           <td className="px-1 py-2 min-w-[45px] text-center text-xs">
-                            {itemDetails.unit || "-"}
+                            {units.find(
+                              (u) =>
+                                String(u.id) ===
+                                String(entry.unitName || entry.unitId)
+                            )?.name || "-"}
                           </td>
 
                           {/* RATE */}
@@ -1757,7 +1751,7 @@ const PurchaseVoucher: React.FC = () => {
                         GST Total:
                       </td>
                       <td className="px-4 py-2 text-right">
-                       {gstTotal.toLocaleString()}
+                        {gstTotal.toLocaleString()}
                       </td>
 
                       <td className="px-4 py-2"></td>

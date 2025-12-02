@@ -23,6 +23,8 @@ const ContraVoucher: React.FC = () => {
     ownerType === "employee" ? "employee_id" : "user_id"
   );
 
+  console.log(companyId, ownerType, ownerId);
+
   const generateVoucherNumber = () => {
     const prefix = "CV";
     const randomNumber = Math.floor(100000 + Math.random() * 900000);
@@ -115,7 +117,9 @@ const ContraVoucher: React.FC = () => {
 
     const fetchVoucher = async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers/${id}`);
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`
+        );
         const json = await res.json();
 
         if (!json.data) return;
@@ -185,7 +189,9 @@ const ContraVoucher: React.FC = () => {
   };
   useEffect(() => {
     fetch(
-      `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      `${
+        import.meta.env.VITE_API_URL
+      }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((res) => res.json())
       .then((data) => setCashBankLedgers(data))
@@ -207,17 +213,20 @@ const ContraVoucher: React.FC = () => {
       try {
         const payload = {
           ...formData,
-          companyId,
-          ownerType,
-          ownerId,
+          companyId: companyId,
+          owner_type: ownerType,
+          owner_id: ownerId,
         };
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers`, {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload), // your state
-        });
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/vouchers`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(payload), // your state
+          }
+        );
 
         const data = await response.json();
 

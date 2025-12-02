@@ -5,42 +5,49 @@ const db = require('../db');
 // Create new stock group (multi-tenant, role-scoped)
 router.post('/', async (req, res) => {
   const s = req.body;
-  const { companyId, ownerType, ownerId } = s;
+  const { company_id, owner_type, owner_id } = req.query;
 
 
-  if (!companyId || !ownerType || !ownerId) {
-    return res.status(400).json({ message: 'companyId, ownerType, and ownerId are required.' });
+  if (!company_id || !owner_type || !owner_id) {
+    return res.status(400).json({
+      message: "company_id, owner_type, and owner_id are required."
+    });
   }
 
   try {
     const sql = `
       INSERT INTO stock_groups 
-      (id, name, parent, should_quantities_be_added, set_alter_hsn, hsn_sac_classification_id, hsn_code, hsn_description, 
-      set_alter_gst, gst_classification_id, taxability, gst_rate, cess,
-      company_id, owner_type, owner_id, created_at) 
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+      (name, parent, should_quantities_be_added, set_alter_hsn, 
+       hsn_sac_classification_id, hsn_code, hsn_description,
+       set_alter_gst, gst_classification_id, taxability, gst_rate, cess,
+       company_id, owner_type, owner_id, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
     `;
 
     const values = [
-      s.id, s.name, s.parent || null, s.shouldQuantitiesBeAdded,
-      s.hsnSacDetails?.setAlterHSNSAC || false,
+      s.name,
+      s.parent || null,
+      s.shouldQuantitiesBeAdded ? 1 : 0,
+      s.hsnSacDetails?.setAlterHSNSAC ? 1 : 0,
       s.hsnSacDetails?.hsnSacClassificationId || null,
       s.hsnSacDetails?.hsnCode || null,
       s.hsnSacDetails?.description || null,
-      s.gstDetails?.setAlterGST || false,
+      s.gstDetails?.setAlterGST ? 1 : 0,
       s.gstDetails?.gstClassificationId || null,
       s.gstDetails?.taxability || null,
       s.gstDetails?.integratedTaxRate || 0,
       s.gstDetails?.cess || 0,
-      companyId,
-      ownerType,
-      ownerId
+      company_id,
+      owner_type,
+      owner_id
     ];
 
     await db.execute(sql, values);
-    res.json({ message: 'Stock Group added successfully' });
+
+    res.json({ success: true, message: "Stock Group added successfully" });
   } catch (err) {
-    res.status(500).json({ error: 'Failed to insert', details: err.message });
+    console.error("❌ Insert Error:", err);
+    res.status(500).json({ message: "Failed to insert", error: err.message });
   }
 });
 

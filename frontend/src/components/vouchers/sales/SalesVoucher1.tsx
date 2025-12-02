@@ -48,6 +48,7 @@ const SalesVoucher: React.FC = () => {
     theme,
     godowns = [],
     vouchers = [],
+    units = [],
     companyInfo,
     addVoucher,
     updateVoucher,
@@ -94,7 +95,10 @@ const SalesVoucher: React.FC = () => {
     if (groupId === 7 || groupId === "7" || groupId === 8 || groupId === "8")
       return true;
 
-    if (l.type && (l.type === "customer" || l.type === "cash" || l.type === "party"))
+    if (
+      l.type &&
+      (l.type === "customer" || l.type === "cash" || l.type === "party")
+    )
       return true;
 
     return false;
@@ -450,88 +454,135 @@ const SalesVoucher: React.FC = () => {
     const updatedEntries = [...formData.entries];
     const entry = updatedEntries[index];
 
+    const itemDetails = getItemDetails(entry.itemId || "");
+
+    const recalcAmount = (ent: any) => {
+      const qty = Number(ent.quantity || 0);
+      const rate = Number(ent.rate || 0);
+      const discount = Number(ent.discount || 0);
+      const gstTotal =
+        Number(ent.cgstRate || 0) +
+        Number(ent.sgstRate || 0) +
+        Number(ent.igstRate || 0);
+
+      const base = qty * rate;
+      const gstAmt = (base * gstTotal) / 100;
+      return base + gstAmt - discount;
+    };
+
     const partyLedger = safeLedgers.find((l) => l.id === formData.partyId);
     const isIntrastate =
       partyLedger?.state && safeCompanyInfo.state
         ? partyLedger.state === safeCompanyInfo.state
         : true;
 
+    // ITEM MODE
     if (formData.mode === "item-invoice") {
+      // 1️⃣ ITEM SELECTED → AUTO DATA
       if (name === "itemId") {
         const details = getItemDetails(value);
-        const gstRate = details.gstRate || 0;
+        const gst = details.gstRate || 0;
 
         updatedEntries[index] = {
           ...entry,
           itemId: value,
-          hsnCode: details.hsnCode,
+          hsnCode: details.hsnCode || "",
+
+          // 🔥 yahan DONO store kar rahe hain
+          unitId: details.unitId || "",
+          unitLabel: details.unitLabel || "",
+
           quantity: entry.quantity || 1,
-          unit: details.unit,
-          batches: details.batches,
+          rate: details.rate || 0,
+          batches: details.batches || [],
           batchNumber: "",
-          gstRate,
-          cgstRate: isIntrastate ? gstRate / 2 : 0,
-          sgstRate: isIntrastate ? gstRate / 2 : 0,
-          igstRate: isIntrastate ? 0 : gstRate,
-        };
-      } else if (
-        name === "quantity" ||
-        name === "rate" ||
-        name === "discount"
-      ) {
-        const quantity =
-          name === "quantity" ? parseFloat(value) || 0 : entry.quantity ?? 0;
-        const rate = name === "rate" ? parseFloat(value) || 0 : entry.rate ?? 0;
-        const discount =
-          name === "discount" ? parseFloat(value) || 0 : entry.discount ?? 0;
 
-        const baseAmount = quantity * rate;
-        const gstRate =
-          (entry.cgstRate ?? 0) + (entry.sgstRate ?? 0) + (entry.igstRate ?? 0);
-        const gstAmount = (baseAmount * gstRate) / 100;
+          gstRate: gst,
+          cgstRate: isIntrastate ? gst / 2 : 0,
+          sgstRate: isIntrastate ? gst / 2 : 0,
+          igstRate: isIntrastate ? 0 : gst,
+        };
+
+        updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+        setFormData((p) => ({ ...p, entries: updatedEntries }));
+        return;
+      }
+
+      // 2️⃣ BATCH SELECTED → AUTO QTY + RATE + DATES
+      if (name === "batchNumber") {
+        const selectedBatch = (entry.batches || []).find(
+          (b: any) =>
+            b &&
+            String(b.batchName ?? b.name ?? b.batch_no ?? b.batchNo ?? b.id) ===
+              String(value)
+        );
 
         updatedEntries[index] = {
           ...entry,
-          [name]: parseFloat(value) || 0,
-          rate,
-          amount: baseAmount + gstAmount - discount,
+          batchNumber: value,
+          batchExpiryDate:
+            selectedBatch?.expiryDate ?? selectedBatch?.batchExpiryDate ?? "",
+          batchManufacturingDate:
+            selectedBatch?.manufacturingDate ??
+            selectedBatch?.batchManufacturingDate ??
+            "",
+          quantity: Number(
+            selectedBatch?.quantity ??
+              selectedBatch?.batchQuantity ??
+              entry.quantity ??
+              1
+          ),
+          rate: Number(
+            selectedBatch?.rate ?? selectedBatch?.batchRate ?? entry.rate ?? 0
+          ),
         };
-      } else {
-        updatedEntries[index] = {
-          ...entry,
-          [name]: type === "number" ? parseFloat(value) || 0 : value,
-        };
+
+        updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+        setFormData((p) => ({ ...p, entries: updatedEntries }));
+        return;
       }
-    } else {
-      // Ledger Mode
-      if (name === "ledgerId") {
+
+      // 3️⃣ CHANGE QTY / RATE / DISCOUNT → RECALC
+      if (["quantity", "rate", "discount"].includes(name)) {
         updatedEntries[index] = {
           ...entry,
-          ledgerId: value,
-          itemId: undefined,
-          quantity: undefined,
-          rate: undefined,
-          cgstRate: undefined,
-          sgstRate: undefined,
-          igstRate: undefined,
-          godownId: undefined,
-          discount: undefined,
+          [name]: Number(value) || 0,
         };
-      } else if (name === "amount") {
-        updatedEntries[index] = {
-          ...entry,
-          amount: parseFloat(value) || 0,
-        };
-      } else {
-        updatedEntries[index] = {
-          ...entry,
-          [name]: value,
-        };
+        updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+        setFormData((p) => ({ ...p, entries: updatedEntries }));
+        return;
       }
+
+      // 4️⃣ Other fields
+      updatedEntries[index] = {
+        ...entry,
+        [name]: type === "number" ? Number(value) || 0 : value,
+      };
+      setFormData((p) => ({ ...p, entries: updatedEntries }));
+      return;
     }
 
-    setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-    setErrors((prev) => ({ ...prev, [`entry${index}.${name}`]: "" }));
+    // LEDGER MODE
+    if (name === "ledgerId") {
+      updatedEntries[index] = {
+        ...entry,
+        ledgerId: value,
+        itemId: undefined,
+        quantity: undefined,
+        rate: undefined,
+        cgstRate: undefined,
+        sgstRate: undefined,
+        igstRate: undefined,
+        discount: undefined,
+      };
+    } else {
+      updatedEntries[index] = {
+        ...entry,
+        [name]: type === "number" ? Number(value) || 0 : value,
+      };
+    }
+
+    setFormData((p) => ({ ...p, entries: updatedEntries }));
   };
 
   const addEntry = () => {
@@ -621,23 +672,24 @@ const SalesVoucher: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-useEffect(() => {
-  const fetchLedgers = async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-      );
-      const data = await res.json();
-      console.log('data', data)
-      setLedgers(data);
-    } catch (error) {
-      console.error("Failed to fetch ledgers:", error);
-    }
-  };
+  useEffect(() => {
+    const fetchLedgers = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const data = await res.json();
+        console.log("data", data);
+        setLedgers(data);
+      } catch (error) {
+        console.error("Failed to fetch ledgers:", error);
+      }
+    };
 
-  fetchLedgers();
-}, [companyId, ownerType, ownerId]);
-
+    fetchLedgers();
+  }, [companyId, ownerType, ownerId]);
 
   const calculateTotals = () => {
     let subtotal = 0;
@@ -836,26 +888,44 @@ useEffect(() => {
       return {
         name: "-",
         hsnCode: "",
-        unit: "-",
+        unitId: "",
+        unitLabel: "",
         gstRate: 0,
         rate: 0,
         batches: [],
       };
 
+    // 👇 yahan se unit ka id aur label dono nikal rahe hain
+    const rawUnit =
+      item.unitId ?? item.unit_id ?? item.unit ?? item.unitName ?? null;
+
+    // try to map rawUnit to units list
+    const matchedUnit =
+      units.find((u) => String(u.id) === String(rawUnit)) ||
+      units.find(
+        (u) =>
+          u.name?.toLowerCase() === String(rawUnit).toLowerCase() ||
+          u.symbol?.toLowerCase() === String(rawUnit).toLowerCase()
+      );
+
+    const unitId = matchedUnit?.id ?? rawUnit ?? "";
+    const unitLabel =
+      matchedUnit?.symbol || matchedUnit?.name || String(rawUnit || "");
+
     return {
       name: item.name,
       hsnCode: item.hsnCode || "",
-      unit: item.unitName || "",
+      unitId, // id (1,2,3…)
+      unitLabel, // "Nos" / "Kg" / "Mtr"
       gstRate: parseFloat(item.gstRate) || 0,
 
-      // 🔥 Corrected: Try all possible sale rate keys
       rate:
         parseFloat(item.standardSaleRate) ||
         parseFloat(item.sellingRate) ||
         parseFloat(item.sellingPrice) ||
         parseFloat(item.saleRate) ||
         parseFloat(item.rate) ||
-        parseFloat(item.mrp) || // fallback to MRP
+        parseFloat(item.mrp) ||
         0,
 
       mrp:
@@ -1204,11 +1274,7 @@ useEffect(() => {
                   >
                     <option value="">-- Select Sales Ledger --</option>
                     {ledgers
-                      .filter(
-                        (l) =>
-                          
-                          l.name.toLowerCase().includes("sales")
-                      )
+                      .filter((l) => l.name.toLowerCase().includes("sales"))
                       .map((ledger) => (
                         <option key={ledger.id} value={ledger.id}>
                           {ledger.name}
@@ -1540,7 +1606,28 @@ useEffect(() => {
 
                             {/* UNIT */}
                             <td className="px-1 py-2 text-center min-w-[45px] text-xs">
-                              {itemDetails.unit || "-"}
+                              {(() => {
+                                // Match by stored unitId
+                                if (entry.unitId) {
+                                  const found = units.find(
+                                    (u) => String(u.id) === String(entry.unitId)
+                                  );
+                                  if (found) return found.name;
+                                }
+
+                                // Match by label fallback
+                                if (entry.unitLabel) {
+                                  const found = units.find(
+                                    (u) =>
+                                      u.name?.toLowerCase() ===
+                                      entry.unitLabel?.toLowerCase()
+                                  );
+                                  if (found) return found.name;
+                                  return entry.unitLabel;
+                                }
+
+                                return "-";
+                              })()}
                             </td>
 
                             {/* RATE */}

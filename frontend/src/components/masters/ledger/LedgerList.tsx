@@ -4,6 +4,7 @@ import { Edit, Trash2, Plus, Search, ArrowLeft } from "lucide-react";
 import { useAppContext } from "../../../context/AppContext";
 import type { Ledger, LedgerGroup } from "../../../types";
 import { formatGSTNumber } from "../../../utils/ledgerUtils";
+import Swal from "sweetalert2";
 
 const LedgerList: React.FC = () => {
   const { theme } = useAppContext();
@@ -90,44 +91,53 @@ const LedgerList: React.FC = () => {
       })
     : [];
 
-  const handleDelete = async (ledgerId: string) => {
-    if (!window.confirm("Are you sure you want to delete this ledger?")) return;
+  const handleDelete = async (id: string | number) => {
+  const result = await Swal.fire({
+    title: "Are you sure?",
+    text: "This ledger will be permanently deleted!",
+    icon: "warning",
+    showCancelButton: true,
+    confirmButtonColor: "#d33",
+    cancelButtonColor: "#3085d6",
+    confirmButtonText: "Yes, Delete",
+  });
 
-    try {
-      const companyId = localStorage.getItem("company_id");
-      const ownerType = localStorage.getItem("supplier");
-      // console.log('ownerType', ownerType)
-      const ownerId =
-        ownerType === "employee"
-          ? localStorage.getItem("employee_id")
-          : localStorage.getItem("user_id");
+  if (!result.isConfirmed) return;
 
-      if (!companyId || !ownerType || !ownerId) {
-        console.error("Missing required identifiers for ledger DELETE");
-        return;
-      }
+  try {
+    const companyId = localStorage.getItem("company_id");
+    const ownerType = localStorage.getItem("supplier");
+    const ownerId = localStorage.getItem(
+      ownerType === "employee" ? "employee_id" : "user_id"
+    );
 
-      const res = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
-        }/api/ledger/${ledgerId}?owner_type=${ownerType}&owner_id=${ownerId}`,
-        { method: "DELETE" }
-      );
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+      { method: "DELETE" }
+    );
 
-      const data = await res.json();
+    const data = await res.json();
 
-      if (res.ok) {
-        // Remove deleted ledger from state
-        setLedgers((prev) => prev.filter((l) => l.id !== ledgerId));
-        alert("Ledger deleted successfully");
-      } else {
-        alert(data.message || "Failed to delete ledger");
-      }
-    } catch (err) {
-      console.error("Error deleting ledger:", err);
-      alert("An error occurred while deleting the ledger");
+    if (res.ok) {
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        text: data.message,
+        timer: 1600,
+        showConfirmButton: false,
+      });
+
+      // Refresh list (agar list page pe ho)
+      setTimeout(() => window.location.reload(), 1000);
+    } else {
+      Swal.fire("Error", data.message || "Failed to delete ledger!", "error");
     }
-  };
+  } catch (err) {
+    Swal.fire("Network Error", "Unable to connect to server", "error");
+    console.error("Delete error:", err);
+  }
+};
+
 
   return (
     <>
