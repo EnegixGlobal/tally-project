@@ -17,9 +17,8 @@ const StockCategoryForm: React.FC = () => {
 
   // Mock stockCategories and functions since they're not in context
   const stockCategories: StockCategory[] = [
-  { id: "SC-001", name: "Electronics", parent: "", description: "Electronic devices" },
-  { id: "SC-002", name: "Furniture", parent: "", description: "Home and office furniture" },
-  { id: "SC-003", name: "Groceries", parent: "", description: "Food and daily items" }
+  { id: "SC-001", name: "Primary", parent: "", description: "Primary " },
+ 
 ];
 
   // const addStockCategory = useCallback((category: StockCategory) => {

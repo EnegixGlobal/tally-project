@@ -55,13 +55,14 @@ const StockSummary: React.FC = () => {
       setLoading(true);
       setError(null);
 
+      const company_id = localStorage.getItem("company_id") || "";
       const owner_type = localStorage.getItem("supplier") || "";
       const owner_id =
         localStorage.getItem(
           owner_type === "employee" ? "employee_id" : "user_id"
         ) || "";
 
-      if (!owner_type || !owner_id) {
+      if (!company_id || !owner_type || !owner_id) {
         setError("Missing tenant information.");
         setLoading(false);
         return;
@@ -69,6 +70,7 @@ const StockSummary: React.FC = () => {
 
       try {
         const params = new URLSearchParams();
+        params.append("company_id", company_id);
         params.append("owner_type", owner_type);
         params.append("owner_id", owner_id);
 
@@ -84,9 +86,11 @@ const StockSummary: React.FC = () => {
         if (filters.basis) params.append("basis", filters.basis);
         if (filters.show) params.append("show", String(filters.show));
 
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
-        );
+        const url = `${
+          import.meta.env.VITE_API_URL
+        }/api/stock-items?${params.toString()}`;
+
+        const response = await fetch(url);
 
         if (!response.ok) {
           const text = await response.text();
@@ -95,7 +99,6 @@ const StockSummary: React.FC = () => {
 
         const json = await response.json();
 
-        // 🆕 Convert API data into Stock Summary Format
         const formatted = json.data.map((item: any) => {
           const openingQty = Number(item.openingBalance || 0);
           const inwardQty = 0;
@@ -115,12 +118,8 @@ const StockSummary: React.FC = () => {
               gstRate: Number(item.gstRate || 0),
               barcode: item.barcode,
               taxType: item.taxType,
-              batchNumber: item.batchNumber,
-              batchExpiryDate: item.batchExpiryDate,
-              batchManufacturingDate: item.batchManufacturingDate,
-              batches: item.batches ? JSON.parse(item.batches) : [],
+              batches: item.batches ?? [],
             },
-
             inwardQty,
             outwardQty,
             closingQty,
@@ -140,7 +139,6 @@ const StockSummary: React.FC = () => {
 
     fetchSummary();
   }, [filters]);
-
 
   // Compute grouped data if view is Group, else use data directly
   const groupedData = useMemo(() => {

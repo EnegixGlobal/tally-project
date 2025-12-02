@@ -12,57 +12,49 @@ router.post("/", async (req, res) => {
     referenceNo,
     supplierInvoiceDate,
     entries = [],
-    ownerType,
-    ownerId,
+    owner_type,
+    owner_id,
+    companyId,
   } = req.body;
 
-  // 🔸 Required field validation
-  if (!type || !date || !entries.length || !ownerType || !ownerId) {
-    console.warn("⚠️ Missing required fields:", {
+  // REQUIRED validation
+  if (!type || !date || !entries.length || !owner_type || !owner_id || !companyId) {
+    console.warn("⚠ Missing required fields:", {
       type,
       date,
       entries: entries.length,
-      ownerType,
-      ownerId,
+      owner_type,
+      owner_id,
+      companyId,
     });
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // 🧩 Auto-fix for single-entry mode
+  // 🔹 Fix single-entry mode (ensure debit + credit exist)
   if (mode === "single-entry" && entries.length === 1) {
-    const debitEntry = entries[0];
-
-    // ✅ Prevent same ledger for both sides (credit side alag hona chahiye)
-    const oppositeLedgerId =
-      debitEntry.ledgerId === req.body.ledgerId
-        ? null
-        : req.body.ledgerId || debitEntry.ledgerId;
-
-    const balancingEntry = {
-      id: "auto",
-      ledgerId: oppositeLedgerId,
-      amount: debitEntry.amount,
-      type: debitEntry.type === "debit" ? "credit" : "debit",
-      narration: debitEntry.narration || null,
-      bankName: debitEntry.bankName || null,
-      chequeNumber: debitEntry.chequeNumber || null,
-      costCentreId: debitEntry.costCentreId || null,
-    };
-
-    entries.push(balancingEntry);
+    const e0 = entries[0];
+    entries.push({
+      id: "AUTO",
+      ledgerId: e0.ledgerId,
+      amount: e0.amount,
+      type: e0.type === "debit" ? "credit" : "debit",
+      narration: e0.narration || null,
+      bankName: e0.bankName || null,
+      chequeNumber: e0.chequeNumber || null,
+      costCentreId: e0.costCentreId || null,
+    });
   }
 
-  // 🧠 Database transaction start
   const conn = await db.getConnection();
   await conn.beginTransaction();
 
   try {
-    // ✅ Insert voucher main record
-    const [voucherResult] = await conn.execute(
+    // 1️⃣ INSERT voucher main
+    const [mainResult] = await conn.execute(
       `
       INSERT INTO voucher_main 
-      (voucher_type, voucher_number, date, narration, reference_no, supplier_invoice_date, owner_type, owner_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      (voucher_type, voucher_number, date, narration, reference_no, supplier_invoice_date, owner_type, owner_id, company_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         type,
@@ -71,27 +63,27 @@ router.post("/", async (req, res) => {
         narration || null,
         referenceNo || null,
         supplierInvoiceDate || null,
-        ownerType,
-        ownerId,
+        owner_type,
+        owner_id,
+        companyId,
       ]
     );
 
-    const voucherId = voucherResult.insertId;
+    const voucherId = mainResult.insertId;
 
-    // ✅ Prepare entry values
-    const entryValues = entries.map((entry) => [
+    // 2️⃣ Insert entries
+    const entryValues = entries.map((e) => [
       voucherId,
-      Number(entry.ledgerId),
-      parseFloat(entry.amount || 0),
-      entry.type || "debit",
-      entry.narration || null,
-      entry.bankName || null,
-      entry.chequeNumber || null,
-      entry.costCentreId || null,
+      Number(e.ledgerId),
+      parseFloat(e.amount || 0),
+      e.type || "debit",
+      e.narration || null,
+      e.bankName || null,
+      e.chequeNumber || null,
+      e.costCentreId || null,
     ]);
 
-    // ✅ Insert into voucher_entries
-    const [entryResult] = await conn.query(
+    await conn.query(
       `
       INSERT INTO voucher_entries 
       (voucher_id, ledger_id, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id)
@@ -100,32 +92,27 @@ router.post("/", async (req, res) => {
       [entryValues]
     );
 
-    // ✅ Commit transaction
     await conn.commit();
     conn.release();
 
-    // ✅ Response
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
-      message: `${
-        type.charAt(0).toUpperCase() + type.slice(1)
-      } voucher saved successfully`,
+      message: "Voucher saved successfully",
       voucherId,
-      entriesInserted: entryResult.affectedRows,
     });
   } catch (err) {
-    // ❌ Rollback on error
     await conn.rollback();
     conn.release();
-    console.error("❌ Database insert failed:", err);
+    console.error("❌ Insert Failed:", err);
 
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: "Failed to save voucher",
       error: err.message,
     });
   }
 });
+
 
 router.get("/", async (req, res) => {
   const { ownerType, ownerId, voucherType } = req.query;
