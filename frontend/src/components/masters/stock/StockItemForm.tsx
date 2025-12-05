@@ -6,7 +6,6 @@ import type {
   GodownAllocation,
   Godown,
   UnitOfMeasurement,
-
   GstClassification,
 } from "../../../types";
 import Swal from "sweetalert2";
@@ -228,13 +227,13 @@ const GodownAllocationField: React.FC<GodownAllocationFieldProps> = ({
 };
 
 const StockItemForm = () => {
- const {
-  theme,
-  gstClassifications = [],
-  units = [],
-  godowns = [],
-  companyInfo,
-} = useAppContext();
+  const {
+    theme,
+    gstClassifications = [],
+    units = [],
+    godowns = [],
+    companyInfo,
+  } = useAppContext();
 
   const navigate = useNavigate();
   const companyId = localStorage.getItem("company_id");
@@ -261,7 +260,9 @@ const StockItemForm = () => {
           owner_id: ownerId,
         });
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-categories?${params.toString()}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-categories?${params.toString()}`
         );
         const data = await res.json();
 
@@ -284,13 +285,15 @@ const StockItemForm = () => {
     fetchCategories();
   }, [companyId, ownerType, ownerId]);
 
-useEffect(() => {
+  useEffect(() => {
   async function fetchStockItem() {
     if (!id) return;
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stock-items/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/stock-items/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
       );
 
       const data = await res.json();
@@ -326,9 +329,17 @@ useEffect(() => {
         setBarcode(item.barcode || "");
 
         if (Array.isArray(item.batches) && item.batches.length > 0) {
-          setBatchRows(item.batches);
+          setBatchRows(
+            item.batches.map((b: any) => ({
+              batchName: b.batchName || "",
+              batchQuantity: Number(b.batchQuantity) || 0,
+              batchRate: Number(b.openingRate) || 0, // correct mapping
+              openingRate: Number(b.openingValue) || 0, // UI readonly
+              batchExpiryDate: b.batchExpiryDate || "",
+              batchManufacturingDate: b.batchManufacturingDate || "",
+            }))
+          );
         }
-
       } else {
         Swal.fire(
           "Error",
@@ -336,7 +347,6 @@ useEffect(() => {
           "error"
         );
       }
-
     } catch (err) {
       console.error("🔥 Error fetching stock item:", err);
       Swal.fire("Error", "Unable to fetch stock item", "error");
@@ -414,6 +424,7 @@ useEffect(() => {
       batchManufacturingDate: "",
       batchQuantity: "",
       batchRate: "",
+      openingRate: 0,
     },
   ]);
   const [errors, setErrors] = useState<Errors>({});
@@ -448,21 +459,28 @@ useEffect(() => {
     setBatchRows(batchRows.filter((_, i) => i !== index));
   };
 
- const updateBatchRow = (index: number, field: string, value: string) => {
+  const updateBatchRow = (index: number, field: string, value: string) => {
   setBatchRows((prev) =>
-    prev.map((row, i) =>
-      i === index
-        ? {
-            ...row,
-            [field]:
-              field === "batchQuantity" || field === "batchRate"
-                ? Number(value)
-                : value,
-          }
-        : row
-    )
+    prev.map((row, i) => {
+      if (i !== index) return row;
+
+      const updated = {
+        ...row,
+        [field]: field === "batchQuantity" || field === "batchRate"
+          ? Number(value)
+          : value,
+      };
+
+      // Auto calculate Opening Rate
+      const qty = Number(updated.batchQuantity) || 0;
+      const rate = Number(updated.batchRate) || 0;
+      updated.openingRate = qty * rate;
+
+      return updated;
+    })
   );
 };
+
 
   // --- End batch rows ---
 
@@ -474,9 +492,6 @@ useEffect(() => {
     if (!formData.unit) newErrors.unit = "Unit is required";
     if (!formData.taxType) newErrors.taxType = "Tax Type is required";
 
-    if (formData.openingBalance < 0 && !formData.allowNegativeStock) {
-      newErrors.openingBalance = "Opening Balance cannot be negative";
-    }
     if (formData.openingValue < 0)
       newErrors.openingValue = "Opening Value cannot be negative";
     if (formData.standardPurchaseRate < 0)
@@ -545,16 +560,15 @@ useEffect(() => {
     }
 
     // Construct stockItem object
-   const stockItem = {
-  ...formData,
-  batches: batchRows,
-  godownAllocations,
-  company_id: companyId,
-  owner_type: ownerType, 
-  owner_id: ownerId,     
-  barcode,
-};
-
+    const stockItem = {
+      ...formData,
+      batches: batchRows,
+      godownAllocations,
+      company_id: companyId,
+      owner_type: ownerType,
+      owner_id: ownerId,
+      barcode,
+    };
 
     // Determine if we're updating or creating a new record
     const method = id ? "PUT" : "POST"; // Use PUT for update, POST for new
@@ -708,24 +722,7 @@ useEffect(() => {
               required
               error={errors.unit}
             />
-            <InputField
-              id="openingBalance"
-              name="openingBalance"
-              label="Opening Balance"
-              type="number"
-              value={formData.openingBalance}
-              onChange={handleChange}
-              error={errors.openingBalance}
-            />
-            <InputField
-              id="openingValue"
-              name="openingValue"
-              label="Opening Value"
-              type="number"
-              value={formData.openingValue}
-              onChange={handleChange}
-              error={errors.openingValue}
-            />
+
             <SelectField
               id="taxType"
               name="taxType"
@@ -850,7 +847,7 @@ useEffect(() => {
               )}
             </div>
 
-             {formData.enableBatchTracking && (
+            {formData.enableBatchTracking && (
               <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
                 {batchRows.map((row, index) => (
                   <div
@@ -893,6 +890,17 @@ useEffect(() => {
                           updateBatchRow(index, "batchRate", e.target.value)
                         }
                         error={errors[`batchRate-${index}`]}
+                      />
+                    </div>
+
+                    <div className="flex-1 min-w-[120px]">
+                      <InputField
+                        id={`openingRate-${index}`}
+                        name={`openingRate-${index}`}
+                        label="Opening Rate"
+                        type="number"
+                        value={row.openingRate}
+                        error={errors[`openingRate-${index}`]}
                       />
                     </div>
 

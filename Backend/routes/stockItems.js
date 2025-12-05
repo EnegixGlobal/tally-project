@@ -148,7 +148,6 @@ router.post("/", async (req, res) => {
       categoryId,
       unit,
       openingBalance,
-      openingValue,
       hsnCode,
       gstRate,
       taxType,
@@ -174,18 +173,51 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Convert batch fields properly
+    // ✔ Ensure openingValue column exists dynamically
+    const [colCheck] = await connection.execute(`
+      SELECT COUNT(*) AS count 
+      FROM information_schema.COLUMNS 
+      WHERE TABLE_NAME = 'stock_items' 
+      AND COLUMN_NAME = 'openingValue'
+    `);
+
+    if (colCheck[0].count === 0) {
+      await connection.execute(`
+        ALTER TABLE stock_items 
+        ADD COLUMN openingValue DECIMAL(15,2) DEFAULT 0
+      `);
+      console.log("📌 Column openingValue created successfully!");
+    }
+
+
+    // ✔ Correct Batch Mapping (OpeningRate = Rate)
+    let totalOpeningValue = 0;
+
     const batchData = enableBatchTracking
-      ? batches.map((batch) => ({
-          batchName: batch.batchName || "",
-          batchQuantity: Number(batch.batchQuantity) || 0,
-          batchRate: Number(batch.batchRate) || 0,
-          batchExpiryDate: batch.batchExpiryDate || null,
-          batchManufacturingDate: batch.batchManufacturingDate || null,
-        }))
+      ? batches.map((batch) => {
+          const qty = Number(batch.batchQuantity) || 0;
+          const rate = Number(batch.batchRate) || 0;
+          const openingRate = rate; // Correct mapping
+          const openingValue = qty * rate; // Correct calculation
+
+          totalOpeningValue += openingValue;
+
+          return {
+            batchName: batch.batchName || "",
+            batchQuantity: qty,
+            openingRate,
+            openingValue,
+            batchExpiryDate: batch.batchExpiryDate || null,
+            batchManufacturingDate: batch.batchManufacturingDate || null,
+          };
+        })
       : [];
 
-    // Get stock_items table columns
+
+    const finalOpeningValue = totalOpeningValue;
+
+
+    // Fetch stock_items table columns dynamically
     const [columnsResult] = await connection.execute(`
       SHOW COLUMNS FROM stock_items
     `);
@@ -207,7 +239,7 @@ router.post("/", async (req, res) => {
         case "openingBalance":
           return openingBalance ?? 0;
         case "openingValue":
-          return openingValue ?? 0;
+          return finalOpeningValue ?? 0;
         case "hsnCode":
           return hsnCode ?? null;
         case "gstRate":
@@ -241,6 +273,7 @@ router.post("/", async (req, res) => {
       }
     });
 
+
     const placeholders = columnNames.map(() => "?").join(", ");
     const insertQuery = `
       INSERT INTO stock_items (${columnNames.join(", ")})
@@ -250,7 +283,8 @@ router.post("/", async (req, res) => {
     const [result] = await connection.execute(insertQuery, values);
     const stockItemId = result.insertId;
 
-    // 🔹 Insert Godown Allocations
+
+    // Insert Godown Allocations
     for (const alloc of godownAllocations) {
       await connection.execute(
         `
@@ -268,6 +302,7 @@ router.post("/", async (req, res) => {
       message: "Stock item saved successfully",
       stockItemId,
       batchesInserted: batchData.length,
+      openingValue: finalOpeningValue,
     });
   } catch (err) {
     console.error("🔥 Error saving stock item:", err);
@@ -281,6 +316,8 @@ router.post("/", async (req, res) => {
     connection.release();
   }
 });
+
+
 
 // GET item details by barcode
 router.get("/barcode/:barcode", async (req, res) => {
@@ -552,6 +589,104 @@ router.get("/:id", async (req, res) => {
     connection.release();
   }
 });
+
+
+//  UPDATE ONLY BATCHES for a Stock Item
+router.patch("/:id/batches", async (req, res) => {
+  const { id } = req.params;
+  const { company_id, owner_type, owner_id } = req.query;
+  const { batchName, quantity, rate } = req.body;
+
+  if (!batchName || quantity === undefined) {
+    return res.status(400).json({
+      success: false,
+      message: "batchName & quantity required",
+    });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    const [rows] = await connection.execute(
+      `SELECT batches FROM stock_items WHERE id=? AND company_id=? AND owner_type=? AND owner_id=?`,
+      [id, company_id, owner_type, owner_id]
+    );
+
+    if (!rows.length) {
+      return res.status(404).json({ success: false, message: "Item not found" });
+    }
+
+    let batches = JSON.parse(rows[0].batches || "[]");
+    const diffQty = Number(quantity); // +ve Purchase, -ve Sales
+
+    // 🔍 Find batch
+    const index = batches.findIndex(b => b.batchName === batchName);
+
+    if (index >= 0) {
+      let currentQty = Number(batches[index].batchQuantity || 0);
+      let updatedQty = currentQty + diffQty;
+
+      // ❌ Prevent Negative Stock
+      if (updatedQty < 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Not enough stock in batch! Available: ${currentQty}`,
+        });
+      }
+
+      // 🔥 Update quantity
+      batches[index].batchQuantity = updatedQty;
+
+      // 🔥 Update rate only if positive showing purchase
+      if (Number(diffQty) > 0 && Number(rate) > 0) {
+        batches[index].batchRate = Number(rate);
+      }
+
+    } else {
+      // 🆕 New batch creation only if purchase / positive qty
+      if (diffQty < 0) {
+        return res.status(404).json({
+          success: false,
+          message: "Batch not found for Sales",
+        });
+      }
+
+      batches.push({
+        batchName,
+        batchQuantity: diffQty,
+        batchRate: Number(rate) || 0,
+        batchExpiryDate: null,
+        batchManufacturingDate: null,
+      });
+    }
+
+    await connection.execute(
+      `UPDATE stock_items SET batches=? WHERE id=?`,
+      [JSON.stringify(batches), id]
+    );
+
+    return res.json({
+      success: true,
+      message: "Batch updated successfully",
+      updatedBatches: batches,
+    });
+
+  } catch (err) {
+    console.error("🔥 Batch Update Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: "Failed to update batch stock",
+      error: err.message,
+    });
+  } finally {
+    connection.release();
+  }
+});
+
+
+
+
+
+
 
 
 module.exports = router;

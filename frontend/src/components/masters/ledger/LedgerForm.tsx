@@ -11,6 +11,7 @@ const LedgerForm: React.FC = () => {
   const { theme, ledgers } = useAppContext();
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);
   const [chekStock, setChekStock] = useState("");
+  console.log('chekStock', chekStock)
 
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -375,21 +376,20 @@ const LedgerForm: React.FC = () => {
               </div>
             </div>
 
-            {chekStock === "Stock-in-hand" && (
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Closing Stock
-                </label>
-                <input
-                  type="number"
-                  name="closingBalance"
-                  value={formData.closingBalance}
-                  onChange={handleChange}
-                  step="0.01"
-                  className="w-full p-2 rounded border"
-                />
-              </div>
-            )}
+           {["cash-in-hand"].includes(chekStock.toLowerCase()) && (
+  <div>
+    <label className="block text-sm font-medium mb-1">Closing Balance</label>
+    <input
+      type="number"
+      name="closingBalance"
+      value={formData.closingBalance}
+      onChange={handleChange}
+      step="0.01"
+      className="w-full p-2 rounded border"
+    />
+  </div>
+)}
+
           </div>
 
           {/* Additional Info */}
