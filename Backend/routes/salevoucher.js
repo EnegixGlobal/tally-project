@@ -190,6 +190,45 @@ router.post('/', async (req, res) => {
   }
 });
 
+// GET Sale History (Only fetch existing data, no table creation)
+router.get("/sale-history", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id } = req.query;
+    console.log('query', company_id, owner_type, owner_id)
+
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required params",
+      });
+    }
+
+    const fetchSql = `
+      SELECT * FROM sale_history
+      WHERE companyId = ? AND ownerType = ? AND ownerId = ?
+      ORDER BY movementDate DESC, id DESC
+    `;
+
+    const [rows] = await db.execute(fetchSql, [
+      company_id,
+      owner_type,
+      owner_id,
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: rows,
+    });
+
+  } catch (error) {
+    console.error("🔥 Sale History Fetch Error:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
+  }
+});
+
 
 // get ourchase vouncher
 router.get('/', async (req, res) => {
@@ -433,6 +472,83 @@ router.put('/:id', async (req, res) => {
     return res.status(500).json({ message: err.message || "Update failed" });
   }
 });
+
+
+//history maintain
+
+router.post("/sale-history", async (req, res) => {
+  try {
+    const movementData = Array.isArray(req.body) ? req.body : [req.body];
+
+  
+
+    // 🛠 Step 1: Table create if not exists
+    const createTableSql = `
+      CREATE TABLE IF NOT EXISTS sale_history (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        itemName VARCHAR(255),
+        hsnCode VARCHAR(50),
+        batchNumber VARCHAR(255),
+        qtyChange INT,
+        movementDate DATE,
+        companyId VARCHAR(100),
+        ownerType VARCHAR(50),
+        ownerId VARCHAR(100)
+      )
+    `;
+    await db.execute(createTableSql);
+
+    // 🔄 Step 2: Insert data bulk
+    const insertSql = `
+      INSERT INTO sale_history 
+      (itemName, hsnCode, batchNumber, qtyChange, movementDate, companyId, ownerType, ownerId)
+      VALUES ?
+    `;
+
+    const values = movementData.map((e) => [
+      e.itemName,
+      e.hsnCode || "",
+      e.batchNumber || null,
+      e.qtyChange || 0,
+      e.movementDate,
+      e.companyId,
+      e.ownerType,
+      e.ownerId,
+    ]);
+
+    console.log('value', values)
+
+    // ❌ Security check: values must have company + owner
+    if (values.some((v) => !v[5] || !v[6] || !v[7])) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized: company or owner missing",
+      });
+    }
+
+    await db.query(insertSql, [values]);
+
+    return res.status(200).json({
+      success: true,
+      message: "Sale  history saved successfully",
+    });
+
+  } catch (error) {
+    console.error("🔥 Sale  history save failed:", error);
+    return res.status(500).json({
+      success: false,
+      error: error.message
+    });
+  }
+});
+
+
+// GET Sale History (Scoped by Company + Owner)
+
+
+
+
+
 
 
 

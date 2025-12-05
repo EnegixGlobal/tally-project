@@ -265,7 +265,24 @@ router.get("/:id", async (req, res) => {
 
     console.log("Fetched Ledger:", rows[0]);
 
-    res.json(rows[0]);
+    // res.json(rows[0]);
+    const ledger = rows[0];
+
+res.json({
+  id: ledger.id,
+  name: ledger.name,
+  groupId: ledger.group_id,   // FIXED
+  openingBalance: ledger.opening_balance,
+  closingBalance: ledger.closing_balance,
+  balanceType: ledger.balance_type,
+  address: ledger.address,
+  email: ledger.email,
+  phone: ledger.phone,
+  gstNumber: ledger.gst_number,
+  panNumber: ledger.pan_number,
+  groupName: ledger.groupName
+});
+
   } catch (err) {
     console.error("Error fetching ledger by ID:", err);
     res.status(500).json({ message: "Internal server error" });

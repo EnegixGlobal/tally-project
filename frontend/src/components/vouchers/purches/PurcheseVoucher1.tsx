@@ -63,20 +63,13 @@ const PurchaseVoucher: React.FC = () => {
   const { theme, godowns = [], companyInfo, units = [] } = useAppContext();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
-  const companyId = localStorage.getItem("company_id");
   // Prefer `userType` (set at login) but fall back to legacy `supplier` key
-  const _rawOwnerType =
-    localStorage.getItem("userType") || localStorage.getItem("supplier");
-  const ownerType =
-    _rawOwnerType === "null" || _rawOwnerType === "undefined"
-      ? null
-      : _rawOwnerType;
-  const ownerId =
-    localStorage.getItem(
-      ownerType === "employee" ? "employee_id" : "user_id"
-    ) ||
-    localStorage.getItem("user_id") ||
-    localStorage.getItem("employee_id");
+  const companyId = localStorage.getItem("company_id");
+  const ownerType = localStorage.getItem("supplier");
+  const ownerId = localStorage.getItem(
+    ownerType === "employee" ? "employee_id" : "user_id"
+  );
+
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
   const partyLedgers = ledgers;
 
@@ -105,7 +98,6 @@ const PurchaseVoucher: React.FC = () => {
     fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${id}`)
       .then((res) => res.json())
       .then((data) => {
-
         setFormData((prev) => ({
           ...prev,
 
@@ -776,9 +768,9 @@ const PurchaseVoucher: React.FC = () => {
       return base + gstAmt - discount;
     };
 
-    // ITEM INVOICE MODE
+    // ⭐ ITEM INVOICE MODE
     if (formData.mode === "item-invoice") {
-      // 1️⃣ AUTO-FILL WHEN ITEM CHANGES
+      // 1️⃣ ITEM CHANGE → auto fill from stock master
       if (name === "itemId") {
         const selected = stockItems.find(
           (item) => String(item.id) === String(value)
@@ -789,19 +781,20 @@ const PurchaseVoucher: React.FC = () => {
           itemId: value,
           hsnCode: selected?.hsnCode || "",
           unitName: selected?.unit || "",
-          rate: Number(selected?.standardPurchaseRate || selected?.rate || 0),
-
+          // rate ko item master se le sakte ho:
+          rate: Number(
+            selected?.standardPurchaseRate ?? selected?.rate ?? entry.rate ?? 0
+          ),
           gstRate: Number(selected?.gstRate) || 0,
           cgstRate: Number(selected?.gstRate) / 2 || 0,
           sgstRate: Number(selected?.gstRate) / 2 || 0,
           igstRate: 0,
 
-          // Reset & load batches
+          // Batch list load karo, lekin quantity mat छेड़ो
           batches: selected?.batches || [],
           batchNumber: "",
           batchExpiryDate: "",
           batchManufacturingDate: "",
-
           amount: 0,
         };
 
@@ -809,7 +802,7 @@ const PurchaseVoucher: React.FC = () => {
         return;
       }
 
-      // 2️⃣ BATCH AUTO-FILL
+      // 2️⃣ BATCH CHANGE → sirf meta info (expiry, mfg), quantity ko mat touch karo
       if (name === "batchNumber") {
         const selectedBatch = (entry.batches || []).find(
           (b: any) =>
@@ -818,60 +811,74 @@ const PurchaseVoucher: React.FC = () => {
               String(value)
         );
 
-        const quantity = Number(
+        // available quantity agar dikhani ho to ek alag field me rakho
+        const availableQty = Number(
           selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
         );
-
-        const rate = Number(
-          selectedBatch?.batchRate ?? selectedBatch?.rate ?? entry.rate ?? 0
-        );
-
-        const gstRateTotal =
-          Number(entry.cgstRate || 0) +
-          Number(entry.sgstRate || 0) +
-          Number(entry.igstRate || 0);
-
-        const baseAmount = quantity * rate;
-        const gstAmount = (baseAmount * gstRateTotal) / 100;
 
         updatedEntries[index] = {
           ...entry,
           batchNumber: value,
-
-          // Auto Dates
+          // sirf dates set
           batchExpiryDate:
             selectedBatch?.expiryDate ?? selectedBatch?.batchExpiryDate ?? "",
-
           batchManufacturingDate:
             selectedBatch?.manufacturingDate ??
             selectedBatch?.batchManufacturingDate ??
             "",
-
-          // Auto Quantity + Rate
-          quantity,
-          rate,
-
-          // Auto Amount
-          amount: baseAmount + gstAmount - Number(entry.discount || 0),
+          // optional: UI ke liye show karne ko
+          availableBatchQuantity: availableQty,
         };
 
         setFormData((prev) => ({ ...prev, entries: updatedEntries }));
         return;
       }
 
-      // 3️⃣ NUMBERS: qty / rate / discount
+      // 3️⃣ QUANTITY / RATE / DISCOUNT CHANGE
       if (["quantity", "rate", "discount"].includes(name)) {
+        const oldQty = Number(entry.quantity || 0);
+        const newVal = Number(value || 0);
+
         updatedEntries[index] = {
           ...entry,
-          [name]: Number(value) || 0,
+          [name]: newVal,
         };
         updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
 
         setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+
+        // 🧠 YAHI PAR DB KO UPDATE KARNA HAI (sirf PURCHASE QTY add karni hai)
+        // quantity ka DIFF nikal ke bhejte hain, taaki 50 → 60 karoge to sirf +10 ho
+        if (name === "quantity") {
+          const diffQty = newVal - oldQty; // yahi actual add qty hai
+
+          const itemId = entry.itemId;
+          const batchName = entry.batchNumber;
+
+          if (itemId && batchName && diffQty !== 0) {
+            fetch(
+              `${
+                import.meta.env.VITE_API_URL
+              }/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  batchName,
+                  quantity: diffQty, // sirf diff jaa raha hai (e.g. +50, +10, -5)
+                }),
+              }
+            )
+              .then((res) => res.json())
+              .then((d) => console.log("Batch qty synced:", d))
+              .catch((err) => console.error("Batch qty sync error:", err));
+          }
+        }
+
         return;
       }
 
-      // 4️⃣ Default
+      // 4️⃣ Default (baaki fields)
       updatedEntries[index] = {
         ...entry,
         [name]: type === "number" ? Number(value) || 0 : value,
@@ -880,7 +887,7 @@ const PurchaseVoucher: React.FC = () => {
       return;
     }
 
-    // ACCOUNTING / AS VOUCHER MODES
+    // ⭐ ACCOUNTING / AS-VOUCHER MODES
     if (name === "ledgerId") {
       updatedEntries[index] = {
         ...entry,
@@ -1058,8 +1065,12 @@ const PurchaseVoucher: React.FC = () => {
 
       // ⭐ Auto Detect Add or Update Mode
       const url = isEditMode
-        ? `${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${id}`
-        : `${import.meta.env.VITE_API_URL}/api/purchase-vouchers`;
+        ? `${
+            import.meta.env.VITE_API_URL
+          }/api/purchase-vouchers/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        : `${
+            import.meta.env.VITE_API_URL
+          }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
       const method = isEditMode ? "PUT" : "POST";
 
@@ -1070,10 +1081,41 @@ const PurchaseVoucher: React.FC = () => {
         body: JSON.stringify(payload),
       });
 
+      //  Save Purchase History for Each Item (only item-invoice mode)
+      if (formData.mode === "item-invoice") {
+        const historyData = formData.entries
+          .filter((e) => e.itemId && e.quantity > 0)
+          .map((e) => ({
+            itemName:
+              stockItems.find((i) => String(i.id) === String(e.itemId))?.name ||
+              "",
+            hsnCode: e.hsnCode || "",
+            batchNumber: e.batchNumber || null,
+            purchaseQuantity: Number(e.quantity) || 0,
+            purchaseDate: formData.date,
+
+            companyId,
+            ownerType,
+            ownerId,
+          }));
+
+        console.log("Purchase History Sent:", historyData);
+
+        await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/purchase-vouchers/purchase-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(historyData),
+          }
+        );
+      }
+
       const data = await res.json();
 
       if (res.ok) {
-        // SUCCESS MODAL
         await Swal.fire({
           title: isEditMode ? "Updated!" : "Success",
           text: isEditMode
@@ -1083,7 +1125,7 @@ const PurchaseVoucher: React.FC = () => {
           confirmButtonText: "OK",
         });
 
-        navigate("/app/vouchers/purchase");
+        navigate("/app/vouchers/purchase/create");
       } else {
         Swal.fire("Error", data.message || "Something went wrong", "error");
       }
@@ -2204,7 +2246,6 @@ const PurchaseVoucher: React.FC = () => {
             <table className={PRINT_STYLES.table}>
               <thead>
                 <tr className="bg-gray-100">
-                  {" "}
                   <th className={`${PRINT_STYLES.headerCell} w-12 text-center`}>
                     Sr No
                   </th>

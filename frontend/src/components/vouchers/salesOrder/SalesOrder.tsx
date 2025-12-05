@@ -78,9 +78,9 @@ const SalesOrder: React.FC = () => {
   const { theme, companyInfo } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  console.log("this is id", id);
   const isEditMode = !!id;
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+
 
   useEffect(() => {
     if (!isEditMode || !id) return;
@@ -292,7 +292,7 @@ const SalesOrder: React.FC = () => {
       handleChange(e);
     }
   };
-  const handleItemChange = (
+ const handleItemChange = (
   index: number,
   field: keyof SalesOrderItem | "batchNumber",
   value: string | number
@@ -300,9 +300,9 @@ const SalesOrder: React.FC = () => {
   const updatedItems = [...formData.items];
   let item = { ...updatedItems[index] };
 
-  // ============================
-  // WHEN ITEM SELECTED → AUTO-FILL
-  // ============================
+  // ==============================
+  // WHEN ITEM SELECTED → AUTO FILL
+  // ==============================
   if (field === "itemId") {
     const selectedItem = stockItems.find(
       (itm) => String(itm.id) === String(value)
@@ -310,98 +310,109 @@ const SalesOrder: React.FC = () => {
 
     const rawGST = Number(selectedItem?.gstRate) || 0;
 
-    const unitValue =
-      (selectedItem as any)?.unitName || selectedItem?.unit || "";
-
     updatedItems[index] = {
       ...item,
       itemId: value,
       itemName: selectedItem?.name || "",
       hsnCode: selectedItem?.hsnCode || "",
-      unit: unitValue,
+      unit: selectedItem?.unit || "",
       rate: Number(selectedItem?.standardSaleRate) || 0,
+      discount: 0,
+
       cgstRate: isIntrastate ? rawGST / 2 : 0,
       sgstRate: isIntrastate ? rawGST / 2 : 0,
       igstRate: isIntrastate ? 0 : rawGST,
 
-      // Batch list load (if exists)
       batches: selectedItem?.batches || [],
       batchNumber: "",
+      quantity: 0,
+      amount: 0,
     };
 
-    item = updatedItems[index];
+    setFormData((p) => ({ ...p, items: updatedItems }));
+    return;
   }
 
-  // ============================
-  // WHEN BATCH SELECTED → AUTO-FILL QTY & RATE
-  // ============================
- if (field === "batchNumber") {
-  const selectedBatch = item.batches?.find((b: any) => {
-    const name = b.batchName || b.name || b.id;
-    return String(name) === String(value);
-  });
+  // ==============================
+  // WHEN BATCH SELECTED
+  // ==============================
+  if (field === "batchNumber") {
+  const selectedBatch = item.batches?.find(
+    (b: any) =>
+      String(b.batchName || b.name) === String(value)
+  );
 
-  const qty = Number(selectedBatch?.quantity || item.quantity || 1);
-  const rate = Number(selectedBatch?.rate || item.rate || 0);
+  if (!selectedBatch) return;
 
-  const totalGST =
-    (item.cgstRate || 0) +
-    (item.sgstRate || 0) +
-    (item.igstRate || 0);
+  const availableQty =
+    Number(selectedBatch.batchQuantity ?? selectedBatch.quantity ?? 0);
 
-  const baseAmount = qty * rate;
-  const gstAmount = (baseAmount * totalGST) / 100;
-  const amount = baseAmount + gstAmount - (item.discount || 0);
+  const rate = Number(selectedBatch.batchRate ?? selectedBatch.rate ?? item.rate ?? 0);
+
+  const saleQty =
+    item.quantity && item.quantity > 0 ? item.quantity : availableQty;
+
+  const gst =
+    Number(item.cgstRate || 0) +
+    Number(item.sgstRate || 0) +
+    Number(item.igstRate || 0);
+
+  const base = saleQty * rate;
+  const gstAmt = (base * gst) / 100;
 
   updatedItems[index] = {
     ...item,
     batchNumber: value,
-    quantity: qty,
-    rate: rate,
-    amount,
+    quantity: saleQty, // ⭐ auto fill batch qty
+    rate,
+    amount: base + gstAmt - (item.discount || 0),
+    availableQty: availableQty - saleQty
   };
 
   setFormData((p) => ({ ...p, items: updatedItems }));
   return;
 }
 
-  // ============================
-  // USER-EDITED FIELDS
-  // ============================
+
+  // ==============================
+  // USER CHANGES QTY / RATE / DISCOUNT → AUTO UPDATE
+  // ==============================
   if (
-    ["quantity", "rate", "discount", "cgstRate", "sgstRate", "igstRate"].includes(
-      field
-    )
+    ["quantity", "rate", "discount"].includes(field)
   ) {
     item[field] =
       typeof value === "number" ? value : parseFloat(value as string) || 0;
+
+    const selectedBatch = item.batches?.find(
+      (b: any) => String(b.batchName) === String(item.batchNumber)
+    );
+
+    const availableQty =
+      Number(selectedBatch?.batchQuantity || 0);
+
+    if (item.quantity > availableQty) {
+      alert(
+        `Stock not available! Only ${availableQty} Qty available in batch: ${item.batchNumber}`
+      );
+      return;
+    }
+
+    const gst =
+      Number(item.cgstRate || 0) +
+      Number(item.sgstRate || 0) +
+      Number(item.igstRate || 0);
+
+    const baseAmount = item.quantity * item.rate;
+    const gstAmount = (baseAmount * gst) / 100;
+
+    item.amount = baseAmount + gstAmount - (item.discount || 0);
   } else {
     item[field] = value;
   }
 
-  // ============================
-  // RECALCULATE AMOUNT
-  // ============================
-  const qty = Number(item.quantity) || 0;
-  const rate = Number(item.rate) || 0;
-  const discount = Number(item.discount) || 0;
-
-  const totalGST =
-    (item.cgstRate || 0) +
-    (item.sgstRate || 0) +
-    (item.igstRate || 0);
-
-  const baseAmount = qty * rate;
-  const gstAmount = (baseAmount * totalGST) / 100;
-
-  item.amount = baseAmount + gstAmount - discount;
-
   updatedItems[index] = item;
-
   setFormData((prev) => ({ ...prev, items: updatedItems }));
-  setErrors((prev) => ({ ...prev, [`item${index}_${field}`]: "" }));
 };
-
 
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
 
