@@ -23,6 +23,31 @@ router.post('/', async (req, res) => {
       return res.status(400).json({ message: "companyId, ownerType, ownerId and name are required" });
     }
 
+    // 🔹 Resolve parent: if parent is a string (name), look up the ID; if it's a number, use it directly
+    let parentId = null;
+    if (parent) {
+      // Check if it's already a number
+      const parsedParent = parseInt(parent, 10);
+      if (!isNaN(parsedParent)) {
+        parentId = parsedParent;
+      } else {
+        // It's a string (name), look up the parent group by name
+        const [parentGroups] = await db.execute(
+          `SELECT id FROM ledger_groups 
+           WHERE name = ? AND company_id = ? AND owner_type = ? AND owner_id = ?
+           LIMIT 1`,
+          [parent, companyId, ownerType, ownerId]
+        );
+        if (parentGroups.length > 0) {
+          parentId = parentGroups[0].id;
+        } else {
+          return res.status(400).json({ 
+            message: `Parent group "${parent}" not found` 
+          });
+        }
+      }
+    }
+
     await db.execute(
       `INSERT INTO ledger_groups (
         name, alias, parent, type, nature,
@@ -33,7 +58,7 @@ router.post('/', async (req, res) => {
         company_id, owner_type, owner_id
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
-        name, alias || null, parent || null, type || null, nature || null,
+        name, alias || null, parentId, type || null, nature || null,
         behavesLikeSubLedger ? 1 : 0,
         nettBalancesForReporting ? 1 : 0,
         usedForCalculation ? 1 : 0,
@@ -102,8 +127,31 @@ router.post('/bulk', async (req, res) => {
         throw new Error(`Group name required for one of the records`);
       }
 
+      // 🔹 Resolve parent: if parent is a string (name), look up the ID; if it's a number, use it directly
+      let parentId = null;
+      if (parent) {
+        // Check if it's already a number
+        const parsedParent = parseInt(parent, 10);
+        if (!isNaN(parsedParent)) {
+          parentId = parsedParent;
+        } else {
+          // It's a string (name), look up the parent group by name
+          const [parentGroups] = await conn.execute(
+            `SELECT id FROM ledger_groups 
+             WHERE name = ? AND company_id = ? AND owner_type = ? AND owner_id = ?
+             LIMIT 1`,
+            [parent, companyId, ownerType, ownerId]
+          );
+          if (parentGroups.length > 0) {
+            parentId = parentGroups[0].id;
+          } else {
+            throw new Error(`Parent group "${parent}" not found for group "${name}"`);
+          }
+        }
+      }
+
       await conn.execute(sql, [
-        name, alias || null, parent || null, type || null, nature || null,
+        name, alias || null, parentId, type || null, nature || null,
         behavesLikeSubLedger ? 1 : 0,
         nettBalancesForReporting ? 1 : 0,
         usedForCalculation ? 1 : 0,
