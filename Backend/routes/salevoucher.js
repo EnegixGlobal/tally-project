@@ -191,10 +191,48 @@ router.post('/', async (req, res) => {
 });
 
 // GET Sale History (Only fetch existing data, no table creation)
+// router.get("/sale-history", async (req, res) => {
+//   try {
+//     const { company_id, owner_type, owner_id } = req.query;
+//     console.log('query', company_id, owner_type, owner_id)
+
+//     if (!company_id || !owner_type || !owner_id) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "Missing required params",
+//       });
+//     }
+
+//     const fetchSql = `
+//       SELECT * FROM sale_history
+//       WHERE companyId = ? AND ownerType = ? AND ownerId = ?
+//       ORDER BY movementDate DESC, id DESC
+//     `;
+
+//     const [rows] = await db.execute(fetchSql, [
+//       company_id,
+//       owner_type,
+//       owner_id,
+//     ]);
+
+//     return res.status(200).json({
+//       success: true,
+//       data: rows,
+//     });
+
+//   } catch (error) {
+//     console.error("🔥 Sale History Fetch Error:", error);
+//     return res.status(500).json({
+//       success: false,
+//       error: error.message,
+//     });
+//   }
+// });
+
 router.get("/sale-history", async (req, res) => {
   try {
     const { company_id, owner_type, owner_id } = req.query;
-    console.log('query', company_id, owner_type, owner_id)
+    console.log('query', company_id, owner_type, owner_id);
 
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
@@ -202,6 +240,25 @@ router.get("/sale-history", async (req, res) => {
         message: "Missing required params",
       });
     }
+
+    // 🛠️ Auto Create Table if Missing
+    const createTableSql = `
+      CREATE TABLE IF NOT EXISTS sale_history (
+        id INT PRIMARY KEY AUTO_INCREMENT,
+        companyId INT NOT NULL,
+        ownerType VARCHAR(50) NOT NULL,
+        ownerId INT NOT NULL,
+        itemId INT DEFAULT NULL,
+        quantity DECIMAL(15,2) DEFAULT 0,
+        rate DECIMAL(15,2) DEFAULT 0,
+        value DECIMAL(15,2) DEFAULT 0,
+        movementType VARCHAR(50) DEFAULT NULL,
+        movementDate DATETIME DEFAULT CURRENT_TIMESTAMP,
+        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
+      );
+    `;
+    await db.execute(createTableSql);
+
 
     const fetchSql = `
       SELECT * FROM sale_history
@@ -228,6 +285,7 @@ router.get("/sale-history", async (req, res) => {
     });
   }
 });
+
 
 
 // get ourchase vouncher
