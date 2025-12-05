@@ -1,16 +1,18 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer, Download } from "lucide-react";
+import { ArrowLeft, Printer, Download, ChevronDown, ChevronRight } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import ReportTable from "./ReportTable";
 
 const StockSummary: React.FC = () => {
-  const { theme } = useAppContext();
+  const { theme, units } = useAppContext();
+
   const navigate = useNavigate();
 
   const [data, setData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
 
   const [integrate, setIntegrate] = useState<"integrated" | "new">("new");
   const [reportView, setReportView] = useState<
@@ -42,7 +44,7 @@ const StockSummary: React.FC = () => {
           item: {
             id: item.id,
             name: item.name,
-            unitName: item.unitName ?? "",
+            unitName: units.find(u => u.id === item.unit)?.name ?? "",
             openingBalance: Number(item.openingBalance || 0),
             hsnCode: item.hsnCode ?? "",
             gstRate: Number(item.gstRate || 0),
@@ -141,14 +143,15 @@ const StockSummary: React.FC = () => {
     }
   };
 
-  const loadAllData = async () => {
+  // CLOSING STOCK (Only Purchase - Sales, excluding Opening)
+  const loadClosingData = async () => {
     setLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams({ company_id, owner_type, owner_id });
 
-      const [openingRes, purchaseRes, salesRes] = await Promise.all([
+      const [stockItemsRes, purchaseRes, salesRes] = await Promise.all([
         fetch(
           `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
         ),
@@ -162,40 +165,122 @@ const StockSummary: React.FC = () => {
         ),
       ]);
 
-      const openingData = await openingRes.json();
+      const stockItemsData = await stockItemsRes.json();
+      const purchaseData = await purchaseRes.json();
+      const salesData = await salesRes.json();
+
+      // Create a map of item names to their unit info
+      const itemUnitMap: Record<string, { hsnCode: string; unitName: string }> = {};
+      if (Array.isArray(stockItemsData.data)) {
+        stockItemsData.data.forEach((item: any) => {
+          itemUnitMap[item.name] = {
+            hsnCode: item.hsnCode || "",
+            unitName: units.find((u) => u.id === item.unit)?.name ?? "",
+          };
+        });
+      }
+
+      // Track closing balance for each item and batch (only Purchase - Sales)
+      const closingMap: Record<string, Record<string, number>> = {}; // itemName -> batchNumber -> qty
+      const itemInfo: Record<string, { hsnCode: string; unitName: string }> = {}; // itemName -> info
+
+      // Process Purchase (add to closing)
+      if (Array.isArray(purchaseData.data)) {
+        purchaseData.data.forEach((v: any) => {
+          const itemName = v.itemName;
+          const batchName = v.batchNumber || "";
+          const purchaseQty = Number(v.purchaseQuantity || 0);
+
+          if (!closingMap[itemName]) {
+            closingMap[itemName] = {};
+          }
+
+          // Get item info from stock items or use purchase data
+          if (!itemInfo[itemName]) {
+            itemInfo[itemName] = itemUnitMap[itemName] || {
+              hsnCode: v.hsnCode || "",
+              unitName: "",
+            };
+          }
+
+          closingMap[itemName][batchName] = (closingMap[itemName][batchName] || 0) + purchaseQty;
+        });
+      }
+
+      // Process Sales (subtract from closing)
+      if (Array.isArray(salesData.data)) {
+        salesData.data.forEach((v: any) => {
+          const itemName = v.itemName;
+          const batchName = v.batchNumber || "";
+          const salesQty = Math.abs(Number(v.qtyChange || 0));
+
+          // Initialize item if it doesn't exist
+          if (!closingMap[itemName]) {
+            closingMap[itemName] = {};
+          }
+
+          // Get item info from stock items or use sales data
+          if (!itemInfo[itemName]) {
+            itemInfo[itemName] = itemUnitMap[itemName] || {
+              hsnCode: v.hsnCode || "",
+              unitName: "",
+            };
+          }
+
+          // Subtract sales quantity (can go negative, but we filter out <= 0 later)
+          closingMap[itemName][batchName] = (closingMap[itemName][batchName] || 0) - salesQty;
+        });
+      }
+
+      // Format closing data - group by item, show batches as transactions
+      const closingFormatted: any[] = [];
+      Object.entries(closingMap).forEach(([itemName, batches]) => {
+        Object.entries(batches).forEach(([batchName, qty]) => {
+          if (qty > 0) {
+            closingFormatted.push({
+              itemName: itemName,
+              hsnCode: itemInfo[itemName]?.hsnCode || "",
+              unitName: itemInfo[itemName]?.unitName || "",
+              batchNumber: batchName || "-",
+              qty: qty, // This will be used for grouping
+              closingQty: qty,
+            });
+          }
+        });
+      });
+
+      console.log("Closing data:", closingFormatted);
+      setData(closingFormatted);
+    } catch (err: any) {
+      setError(err.message);
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAllData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({ company_id, owner_type, owner_id });
+
+      const [purchaseRes, salesRes] = await Promise.all([
+        fetch(
+          `${import.meta.env.VITE_API_URL
+          }/api/purchase-vouchers/purchase-history?${params.toString()}`
+        ),
+        fetch(
+          `${import.meta.env.VITE_API_URL
+          }/api/sales-vouchers/sale-history?${params.toString()}`
+        ),
+      ]);
+
       const purchaseData = await purchaseRes.json();
       const salesData = await salesRes.json();
 
       const allFormatted: any[] = [];
-
-      // Opening
-      if (Array.isArray(openingData.data)) {
-        openingData.data.forEach((item: any) => {
-          // If item has batches, create a row for each batch
-          if (Array.isArray(item.batches) && item.batches.length > 0) {
-            item.batches.forEach((batch: any) => {
-              allFormatted.push({
-                type: "Opening",
-                name: item.name,
-                hsnCode: item.hsnCode,
-                batchNumber: batch.batchName || "",
-                qty: batch.batchQuantity || 0,
-                date: "-",
-              });
-            });
-          } else {
-            // If no batches, create a single row with total opening balance
-            allFormatted.push({
-              type: "Opening",
-              name: item.name,
-              hsnCode: item.hsnCode,
-              batchNumber: "",
-              qty: Number(item.openingBalance || 0),
-              date: "-",
-            });
-          }
-        });
-      }
 
       // Purchase
       if (Array.isArray(purchaseData.data)) {
@@ -236,86 +321,193 @@ const StockSummary: React.FC = () => {
 
   useEffect(() => {
     if (integrate === "new") return;
+    setExpandedItems(new Set()); // Reset expanded items when view changes
     if (reportView === "Opening") loadOpeningStock();
     else if (reportView === "Purchase") loadPurchaseData();
     else if (reportView === "Sales") loadSalesData();
+    else if (reportView === "Closing") loadClosingData();
     else if (reportView === "All") loadAllData();
   }, [reportView, integrate]);
+
+  // Group data by item name for Purchase, Sales, Closing, and All views
+  const groupedData = useMemo(() => {
+    if (reportView === "Opening") return data; // Opening doesn't need grouping
+
+    const groups: Record<string, any[]> = {};
+    
+    data.forEach((item) => {
+      const key = item.itemName || item.name || "";
+      if (!groups[key]) {
+        groups[key] = [];
+      }
+      groups[key].push(item);
+    });
+
+    return Object.entries(groups).map(([itemName, transactions]) => {
+      // Calculate totals
+      let totalQty = 0;
+      const firstItem = transactions[0];
+      const hsnCode = firstItem.hsnCode || "";
+      const unitName = firstItem.unitName || "";
+      
+      transactions.forEach((t) => {
+        let qty = 0;
+        if (reportView === "Closing") {
+          // For closing, use closingQty
+          qty = Number(t.closingQty || t.qty || 0);
+        } else {
+          // For Purchase/Sales/All, parse qty string or number
+          qty = typeof t.qty === "string" 
+            ? parseFloat(t.qty.replace(/[+-]/g, "")) || 0
+            : Number(t.qty) || 0;
+        }
+        totalQty += qty;
+      });
+
+      return {
+        itemName,
+        hsnCode,
+        unitName,
+        transactions,
+        totalQty,
+        transactionCount: transactions.length,
+        isGroup: true,
+      };
+    });
+  }, [data, reportView]);
+
+  const toggleItem = (itemName: string) => {
+    setExpandedItems((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(itemName)) {
+        newSet.delete(itemName);
+      } else {
+        newSet.add(itemName);
+      }
+      return newSet;
+    });
+  };
+
+  // Helper function to format date
+  const formatDate = (dateValue: any): string => {
+    if (!dateValue || dateValue === "-" || dateValue === null || dateValue === undefined) {
+      return "-";
+    }
+    
+    try {
+      // If it's already a string in YYYY-MM-DD format
+      if (typeof dateValue === "string") {
+        // Check if it's a valid date string
+        const date = new Date(dateValue);
+        if (isNaN(date.getTime())) {
+          return dateValue; // Return as is if invalid
+        }
+        // Format as DD/MM/YYYY
+        return date.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric"
+        });
+      }
+      
+      // If it's a Date object
+      if (dateValue instanceof Date) {
+        return dateValue.toLocaleDateString("en-GB", {
+          day: "2-digit",
+          month: "2-digit",
+          year: "numeric"
+        });
+      }
+      
+      return "-";
+    } catch (error) {
+      console.error("Date formatting error:", error, dateValue);
+      return "-";
+    }
+  };
 
   // TABLE COLUMNS
   const columns = useMemo(() => {
     if (reportView === "All") {
       return [
-        { header: "Type", accessor: "type", align: "center" },
-        { header: "Item", accessor: "name", align: "center" },
-        { header: "HSN", accessor: "hsnCode", align: "center" },
+        { header: "S.No", accessor: "sno", align: "center" as const },
+        { header: "Type", accessor: "type", align: "center" as const },
+        { header: "Item", accessor: "name", align: "center" as const },
+        { header: "HSN", accessor: "hsnCode", align: "center" as const },
         {
           header: "Batch",
           accessor: "batchNumber",
-          align: "center",
+          align: "center" as const,
           render: (r: any) => r.batchNumber || "-",
         },
         {
           header: "Qty",
           accessor: "qty",
-          align: "center",
+          align: "center" as const,
         },
         {
           header: "Date",
           accessor: "date",
-          align: "center",
-          render: (r: any) =>
-            r.date && r.date !== "-"
-              ? new Date(r.date).toLocaleDateString("en-GB")
-              : "-",
+          align: "center" as const,
+          render: (r: any) => formatDate(r.date),
         },
       ];
     }
 
     if (reportView === "Purchase") {
       return [
-        { header: "Item", accessor: "itemName", align: "center" },
-        { header: "HSN", accessor: "hsnCode", align: "center" },
-        { header: "Batch", accessor: "batchNumber", align: "center" },
-
+        { header: "S.No", accessor: "sno", align: "center" as const },
+        { header: "Item", accessor: "itemName", align: "center" as const },
+        { header: "HSN", accessor: "hsnCode", align: "center" as const },
+        { header: "Batch", accessor: "batchNumber", align: "center" as const },
         {
           header: "Qty (+)",
           accessor: "qty",
-          align: "center",
+          align: "center" as const,
           render: (r: any) => `+${r.qty}`,
         },
-
         {
           header: "Date",
           accessor: "date",
-          align: "center",
-          render: (r: any) =>
-            r.date ? new Date(r.date).toLocaleDateString("en-GB") : "-",
+          align: "center" as const,
+          render: (r: any) => formatDate(r.date),
         },
       ];
     }
 
     if (reportView === "Sales") {
       return [
-        { header: "Item", accessor: "itemName", align: "center" },
-        { header: "HSN", accessor: "hsnCode", align: "center" },
-        { header: "Batch", accessor: "batchNumber", align: "center" },
-
-        // Qty with -
+        { header: "S.No", accessor: "sno", align: "center" as const },
+        { header: "Item", accessor: "itemName", align: "center" as const },
+        { header: "HSN", accessor: "hsnCode", align: "center" as const },
+        { header: "Batch", accessor: "batchNumber", align: "center" as const },
         {
           header: "Sale Qty (-)",
           accessor: "qty",
-          align: "center",
+          align: "center" as const,
           render: (r: any) => `-${r.qty}`,
         },
-
-        // Beautiful date formatting
         {
           header: "Sale Date",
           accessor: "date",
-          align: "center",
-          render: (r: any) =>
-            r.date ? new Date(r.date).toLocaleDateString("en-GB") : "-",
+          align: "center" as const,
+          render: (r: any) => formatDate(r.date),
+        },
+      ];
+    }
+
+    if (reportView === "Closing") {
+      return [
+        { header: "S.No", accessor: "sno", align: "center" as const },
+        { header: "Item", accessor: "itemName", align: "center" as const },
+        { header: "Unit", accessor: "unitName", align: "center" as const },
+        { header: "HSN", accessor: "hsnCode", align: "center" as const },
+        { header: "Batch", accessor: "batchNumber", align: "center" as const },
+        {
+          header: "Closing Qty",
+          accessor: "closingQty",
+          align: "center" as const,
+          render: (r: any) => r.closingQty ?? r.qty ?? 0,
         },
       ];
     }
@@ -325,31 +517,31 @@ const StockSummary: React.FC = () => {
       {
         header: "Stock Item",
         accessor: "name",
-        align: "center",
+        align: "center" as const,
         render: (r: any) => r.item?.name ?? "",
       },
       {
         header: "Unit",
         accessor: "unitName",
-        align: "center",
+        align: "center" as const,
         render: (r: any) => r.item?.unitName ?? "",
       },
       {
         header: "HSN",
         accessor: "hsnCode",
-        align: "center",
+        align: "center" as const,
         render: (r: any) => r.item?.hsnCode ?? "",
       },
       {
         header: "GST",
         accessor: "gstRate",
-        align: "center",
+        align: "center" as const,
         render: (r: any) => (r.item?.gstRate ?? 0) + "%",
       },
       {
         header: "Tax Type",
         accessor: "taxType",
-        align: "center",
+        align: "center" as const,
         render: (r: any) => r.item?.taxType ?? "",
       },
     ];
@@ -357,11 +549,25 @@ const StockSummary: React.FC = () => {
 
   const handleExport = () => {
     if (!data.length) return;
+    
+    // For grouped views, export all transactions/batches
+    const exportData = reportView === "Opening"
+      ? data 
+      : reportView === "Closing"
+      ? groupedData.flatMap((group) => group.transactions)
+      : groupedData.flatMap((group) => group.transactions);
+    
     const csv = [
       columns.map((c) => c.header).join(","),
-      ...data.map((row: any) =>
+      ...exportData.map((row: any) =>
         columns
-          .map((c: any) => (c.render ? c.render(row) : row[c.accessor] ?? ""))
+          .map((c: any) => {
+            if (c.render) {
+              return c.render(row);
+            }
+            const value = row[c.accessor] ?? "";
+            return typeof value === "string" ? value : String(value);
+          })
           .join(",")
       ),
     ].join("\n");
@@ -451,16 +657,277 @@ const StockSummary: React.FC = () => {
         {!loading &&
           !error &&
           integrate === "integrated" &&
+          data.length === 0 && (
+            <div className="text-center py-8">
+              <p className="text-gray-500">No data available for {reportView} view</p>
+            </div>
+          )}
+
+        {!loading &&
+          !error &&
+          integrate === "integrated" &&
           data.length > 0 && (
-            <ReportTable
-              theme={theme}
-              columns={columns}
-              data={data}
-              onRowClick={(row: any) => {
-                let itemId = row.item?.id ?? row.id ?? "";
-                navigate(`/app/reports/movement-analysis?itemId=${itemId}`);
-              }}
-            />
+            <>
+              {reportView === "Opening" ? (
+                <ReportTable
+                  theme={theme}
+                  columns={columns}
+                  data={data}
+                  onRowClick={(row: any) => {
+                    let itemId = row.item?.id ?? row.id ?? "";
+                    navigate(`/app/reports/movement-analysis?itemId=${itemId}`);
+                  }}
+                />
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className={`w-full border-collapse`}>
+                    <thead>
+                      <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200 text-black"}>
+                        {columns.map((col) => (
+                          <th
+                            key={col.accessor}
+                            className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-${col.align || "left"} font-semibold`}
+                          >
+                            {col.header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {groupedData.map((group, idx) => {
+                        const isExpanded = expandedItems.has(group.itemName);
+                        return (
+                          <React.Fragment key={idx}>
+                            {/* Group Header Row */}
+                            <tr
+                              className={`cursor-pointer ${
+                                theme === "dark"
+                                  ? "hover:bg-gray-600 text-white"
+                                  : "hover:bg-gray-100 text-black"
+                              } ${theme === "dark" ? "bg-gray-800" : "bg-gray-50"}`}
+                              onClick={() => toggleItem(group.itemName)}
+                            >
+                              <td
+                                className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                              >
+                                -
+                              </td>
+                              <td
+                                className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"}`}
+                              >
+                                <div className="flex items-center gap-2">
+                                  {isExpanded ? (
+                                    <ChevronDown size={16} />
+                                  ) : (
+                                    <ChevronRight size={16} />
+                                  )}
+                                  <span className="font-semibold">{group.itemName}</span>
+                                  <span className="text-xs opacity-70">
+                                    ({group.transactionCount} transactions)
+                                  </span>
+                                </div>
+                              </td>
+                              {reportView === "All" && (
+                                <td
+                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                >
+                                  -
+                                </td>
+                              )}
+                              {reportView === "Closing" && (
+                                <td
+                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                >
+                                  {group.unitName || "-"}
+                                </td>
+                              )}
+                              <td
+                                className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                              >
+                                {group.hsnCode || "-"}
+                              </td>
+                              {(reportView !== "All" && reportView !== "Closing") && (
+                                <td
+                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                >
+                                  -
+                                </td>
+                              )}
+                              {reportView === "All" && (
+                                <td
+                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                >
+                                  -
+                                </td>
+                              )}
+                              {reportView === "Closing" && (
+                                <td
+                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                >
+                                  -
+                                </td>
+                              )}
+                              <td
+                                className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center font-semibold`}
+                              >
+                                {reportView === "Purchase"
+                                  ? `+${group.totalQty}`
+                                  : reportView === "Sales"
+                                  ? `-${group.totalQty}`
+                                  : reportView === "Closing"
+                                  ? group.totalQty
+                                  : group.totalQty}
+                              </td>
+                              {reportView === "All" && (
+                                <td
+                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                >
+                                  -
+                                </td>
+                              )}
+                              {(reportView === "Purchase" || reportView === "Sales") && (
+                                <td
+                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                >
+                                  -
+                                </td>
+                              )}
+                            </tr>
+                            {/* Expanded Transaction Rows */}
+                            {isExpanded &&
+                              group.transactions.map((transaction: any, tIdx: number) => (
+                                <tr
+                                  key={`${idx}-${tIdx}`}
+                                  className={`${
+                                    theme === "dark"
+                                      ? "bg-gray-900 text-white"
+                                      : "bg-white text-black"
+                                  }`}
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    let itemId = transaction.id || "";
+                                    if (itemId) {
+                                      navigate(`/app/reports/movement-analysis?itemId=${itemId}`);
+                                    }
+                                  }}
+                                >
+                                  {reportView === "All" ? (
+                                    <>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {tIdx + 1}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center pl-8`}
+                                      >
+                                        {transaction.type}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {transaction.name}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {transaction.hsnCode || "-"}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {transaction.batchNumber || "-"}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {transaction.qty}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {formatDate(transaction.date)}
+                                      </td>
+                                    </>
+                                  ) : reportView === "Closing" ? (
+                                    <>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {tIdx + 1}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center pl-8`}
+                                      >
+                                        {transaction.itemName}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {transaction.unitName || "-"}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {transaction.hsnCode || "-"}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {transaction.batchNumber || "-"}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {transaction.closingQty ?? transaction.qty ?? 0}
+                                      </td>
+                                    </>
+                                  ) : (
+                                    <>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {tIdx + 1}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center pl-8`}
+                                      >
+                                        {transaction.itemName}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {transaction.hsnCode || "-"}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {transaction.batchNumber || "-"}
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {reportView === "Purchase"
+                                          ? `+${transaction.qty}`
+                                          : `-${transaction.qty}`}                                            
+                                      </td>
+                                      <td
+                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                      >
+                                        {formatDate(transaction.date)}
+                                      </td>
+                                    </>
+                                  )}
+                                </tr>
+                              ))}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
           )}
       </div>
     </div>
