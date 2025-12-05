@@ -53,6 +53,31 @@ router.post("/", async (req, res) => {
   }
 
   try {
+    // 🔹 Resolve parent: if payload.under is a string (name), look up the ID; if it's a number, use it directly
+    let parentId = null;
+    if (payload.under) {
+      // Check if it's already a number
+      const parsedUnder = parseInt(payload.under, 10);
+      if (!isNaN(parsedUnder)) {
+        parentId = parsedUnder;
+      } else {
+        // It's a string (name), look up the parent group by name
+        const [parentGroups] = await db.execute(
+          `SELECT id FROM ledger_groups 
+           WHERE name = ? AND company_id = ? AND owner_type = ? AND owner_id = ?
+           LIMIT 1`,
+          [payload.under, companyId, ownerType, ownerId]
+        );
+        if (parentGroups.length > 0) {
+          parentId = parentGroups[0].id;
+        } else {
+          return res.status(400).json({ 
+            message: `Parent group "${payload.under}" not found` 
+          });
+        }
+      }
+    }
+
     // 🔹 Insert into DB
     const [result] = await db.execute(
       `INSERT INTO ledger_groups
@@ -66,7 +91,7 @@ router.post("/", async (req, res) => {
         companyId,
         payload.name,
         payload.alias || null,
-        payload.under || null,
+        parentId,
         payload.type || null,
         payload.nature || null,
         payload.behavesLikeSubLedger === "yes" ? 1 : 0,
@@ -172,6 +197,32 @@ router.put("/:id", async (req, res) => {
         .json({ message: "Ledger group not found or unauthorized" });
     }
 
+    // 🔹 Resolve parent: if payload.under is a string (name), look up the ID; if it's a number, use it directly
+    let parentId = null;
+    if (payload.under) {
+      // Check if it's already a number
+      const parsedUnder = parseInt(payload.under, 10);
+      if (!isNaN(parsedUnder)) {
+        parentId = parsedUnder;
+      } else {
+        // It's a string (name), look up the parent group by name
+        const companyId = existing[0].company_id;
+        const [parentGroups] = await db.execute(
+          `SELECT id FROM ledger_groups 
+           WHERE name = ? AND company_id = ? AND owner_type = ? AND owner_id = ?
+           LIMIT 1`,
+          [payload.under, companyId, ownerType, ownerId]
+        );
+        if (parentGroups.length > 0) {
+          parentId = parentGroups[0].id;
+        } else {
+          return res.status(400).json({ 
+            message: `Parent group "${payload.under}" not found` 
+          });
+        }
+      }
+    }
+
     // 🔹 Update DB
     await db.execute(
       `UPDATE ledger_groups
@@ -197,7 +248,7 @@ router.put("/:id", async (req, res) => {
       [
         payload.name,
         payload.alias || null,
-        payload.under || null,
+        parentId,
         payload.type || null,
         payload.nature || null,
         payload.behavesLikeSubLedger === "yes" ? 1 : 0,
