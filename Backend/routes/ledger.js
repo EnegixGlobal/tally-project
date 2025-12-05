@@ -74,43 +74,54 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    // 🔍 Check & Create closing_balance column if missing
+  // 🔍 Check if column exists
+  const [col] = await db.execute(`
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'ledgers'
+    AND COLUMN_NAME = 'closing_balance';
+  `);
+
+  // ➕ Add column only if missing
+  if (col.length === 0) {
     await db.execute(`
-      ALTER TABLE ledgers 
-      ADD COLUMN IF NOT EXISTS closing_balance DECIMAL(15,2) DEFAULT 0
+      ALTER TABLE ledgers
+      ADD COLUMN closing_balance DECIMAL(15,2) DEFAULT 0;
     `);
-
-    // 🔁 Auto handle missing closingBalance
-    const finalClosingBalance =
-      closingBalance !== undefined ? closingBalance : openingBalance || 0;
-
-    const sql = `
-      INSERT INTO ledgers 
-      (name, group_id, opening_balance, closing_balance, balance_type, address, email, phone, gst_number, pan_number, company_id, owner_type, owner_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `;
-
-    await db.execute(sql, [
-      name,
-      groupId,
-      openingBalance || 0,
-      finalClosingBalance,
-      balanceType || "debit",
-      address || "",
-      email || "",
-      phone || "",
-      gstNumber || "",
-      panNumber || "",
-      companyId,
-      ownerType,
-      ownerId,
-    ]);
-
-    res.status(201).json({ message: "Ledger created successfully" });
-  } catch (err) {
-    console.error("Error creating ledger:", err);
-    res.status(500).json({ message: "Failed to create ledger" });
   }
+
+  // 🔁 Auto handle missing closingBalance
+  const finalClosingBalance =
+    closingBalance !== undefined ? closingBalance : openingBalance || 0;
+
+  const sql = `
+    INSERT INTO ledgers 
+    (name, group_id, opening_balance, closing_balance, balance_type, address, email, phone, gst_number, pan_number, company_id, owner_type, owner_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `;
+
+  await db.execute(sql, [
+    name,
+    groupId,
+    openingBalance || 0,
+    finalClosingBalance,
+    balanceType || "debit",
+    address || "",
+    email || "",
+    phone || "",
+    gstNumber || "",
+    panNumber || "",
+    companyId,
+    ownerType,
+    ownerId,
+  ]);
+
+  res.status(201).json({ message: "Ledger created successfully" });
+} catch (err) {
+  console.error("Error creating ledger:", err);
+  res.status(500).json({ message: "Failed to create ledger" });
+}
+
 });
 
 
