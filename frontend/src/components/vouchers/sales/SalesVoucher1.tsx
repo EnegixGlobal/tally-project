@@ -610,62 +610,74 @@ const SalesVoucher: React.FC = () => {
     updatedEntries.splice(index, 1);
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
   };
-  const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-    if (!formData.date) newErrors.date = "Date is required";
-    if (!formData.partyId) newErrors.partyId = "Party is required";
-    if (!formData.number) newErrors.number = "Voucher number is required";
+ const validateForm = () => {
+  const newErrors: { [key: string]: string } = {};
+  if (!formData.date) newErrors.date = "Date is required";
+  if (!formData.partyId) newErrors.partyId = "Party is required";
+  if (!formData.number) newErrors.number = "Voucher number is required";
 
-    if (formData.mode === "item-invoice") {
-      if (!formData.salesLedgerId)
-        newErrors.salesLedgerId = "Sales Ledger is required";
+  if (formData.mode === "item-invoice") {
+    if (!formData.salesLedgerId)
+      newErrors.salesLedgerId = "Sales Ledger is required";
 
-      formData.entries.forEach((entry, index) => {
-        if (!entry.itemId)
-          newErrors[`entry${index}.itemId`] = "Item is required";
-        if ((entry.quantity ?? 0) <= 0)
-          newErrors[`entry${index}.quantity`] =
-            "Quantity must be greater than 0";
-        if (godownEnabled === "yes" && godowns.length > 0 && !entry.godownId)
-          newErrors[`entry${index}.godownId`] = "Godown is required";
+    formData.entries.forEach((entry, index) => {
+      if (!entry.itemId)
+        newErrors[`entry${index}.itemId`] = "Item is required";
 
-        if (entry.itemId) {
-          const stockItem = safeStockItems.find(
-            (item) => item.id === entry.itemId
-          );
-          if (stockItem && (entry.quantity ?? 0) > stockItem.openingBalance) {
-            newErrors[
-              `entry${index}.quantity`
-            ] = `Quantity exceeds available stock (${stockItem.openingBalance})`;
-          }
-        }
-      });
-    } else {
-      formData.entries.forEach((entry, index) => {
-        if (!entry.ledgerId)
-          newErrors[`entry${index}.ledgerId`] = "Ledger is required";
-        if ((entry.amount ?? 0) <= 0)
-          newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
-      });
+      if ((entry.quantity ?? 0) <= 0)
+        newErrors[`entry${index}.quantity`] = "Quantity must be greater than 0";
 
-      const debitTotal = formData.entries
-        .filter((e) => e.type === "debit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
-      const creditTotal = formData.entries
-        .filter((e) => e.type === "credit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
-      if (Math.abs(debitTotal - creditTotal) > 0.01) {
-        newErrors.entries = "Debit and credit amounts must balance";
+      // ✅ Godown only required IF:
+      // - Enabled by user (YES)
+      // - Column visible in settings
+      // - Godowns exist in database
+      if (
+        formData.mode === "item-invoice" &&
+        godownEnabled === "yes" &&
+        columnSettings.showGodown === true &&
+        godownList.length > 0 &&
+        !entry.godownId
+      ) {
+        newErrors[`entry${index}.godownId`] = "Please select Godown";
       }
-    }
 
-    if (!formData.entries.length) {
-      newErrors.entries = "At least one entry is required";
-    }
+      if (entry.itemId) {
+        const stockItem = safeStockItems.find(
+          (item) => item.id === entry.itemId
+        );
+        if (stockItem && (entry.quantity ?? 0) > stockItem.openingBalance) {
+          newErrors[`entry${index}.quantity`] =
+            `Quantity exceeds available stock (${stockItem.openingBalance})`;
+        }
+      }
+    });
+  } else {
+    formData.entries.forEach((entry, index) => {
+      if (!entry.ledgerId)
+        newErrors[`entry${index}.ledgerId`] = "Ledger is required";
+      if ((entry.amount ?? 0) <= 0)
+        newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
+    });
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    const debitTotal = formData.entries
+      .filter((e) => e.type === "debit")
+      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+    const creditTotal = formData.entries
+      .filter((e) => e.type === "credit")
+      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+    if (Math.abs(debitTotal - creditTotal) > 0.01) {
+      newErrors.entries = "Debit and credit amounts must balance";
+    }
+  }
+
+  if (!formData.entries.length) {
+    newErrors.entries = "At least one entry is required";
+  }
+
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+
 
   useEffect(() => {
     const fetchLedgers = async () => {
