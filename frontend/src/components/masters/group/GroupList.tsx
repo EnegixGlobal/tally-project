@@ -38,6 +38,8 @@ const GroupList: React.FC = () => {
       const data = await apiFetch(
         `${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
       );
+
+      console.log('data', data)
       setGroups(data);
     } catch (err) {
       console.error("Failed to load ledger groups", err);
@@ -175,19 +177,20 @@ const GroupList: React.FC = () => {
                 >
                   Name
                 </th>
-                <th
-                  className={`px-4 py-3 text-left ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Type
-                </th>
+               
                 <th
                   className={`px-4 py-3 text-left ${
                     theme === "dark" ? "text-gray-300" : "text-gray-700"
                   }`}
                 >
                   Parent Group
+                </th>
+                <th
+                  className={`px-4 py-3 text-left ${
+                    theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
+                >
+                  Nature
                 </th>
                 <th
                   className={`px-4 py-3 text-left ${
@@ -241,13 +244,7 @@ const GroupList: React.FC = () => {
                   >
                     {group.name}
                   </td>
-                  <td
-                    className={`px-4 py-3 ${
-                      theme === "dark" ? "text-gray-100" : "text-gray-900"
-                    }`}
-                  >
-                    {group.type?.replace(/-/g, " ").toUpperCase()}
-                  </td>
+                 
                   <td
                     className={`px-4 py-3 ${
                       theme === "dark" ? "text-gray-100" : "text-gray-900"
@@ -262,6 +259,13 @@ const GroupList: React.FC = () => {
                       theme === "dark" ? "text-gray-100" : "text-gray-900"
                     }`}
                   >
+                    {group.nature || "-"}
+                  </td>
+                  <td
+                    className={`px-4 py-3 ${
+                      theme === "dark" ? "text-gray-100" : "text-gray-900"
+                    }`}
+                  >
                     {group.allocationMethod || "-"}
                   </td>
                   <td
@@ -269,25 +273,21 @@ const GroupList: React.FC = () => {
                       theme === "dark" ? "text-gray-100" : "text-gray-900"
                     }`}
                   >
-                    {group.gstDetails?.gstClassificationId
-                      ? gstClassifications.find(
-                          (c) => c.id === group.gstDetails?.gstClassificationId
-                        )?.name || "-"
-                      : "-"}
+                   {group.gstClassificationId}
                   </td>
                   <td
                     className={`px-4 py-3 ${
                       theme === "dark" ? "text-gray-100" : "text-gray-900"
                     }`}
                   >
-                    {group.gstDetails?.hsnCode || "-"}
+                    {group.hsnCode || "-"}
                   </td>
                   <td
                     className={`px-4 py-3 ${
                       theme === "dark" ? "text-gray-100" : "text-gray-900"
                     }`}
                   >
-                    {group.gstDetails?.taxability || "-"}
+                    {group.taxability || "-"}
                   </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-center space-x-2">

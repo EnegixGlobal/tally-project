@@ -1,10 +1,11 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import { ArrowLeft, Printer, Download, Filter } from 'lucide-react';
 
 const ProfitLoss: React.FC = () => {
   const { theme, ledgers, ledgerGroups } = useAppContext();
+
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
 
@@ -12,6 +13,15 @@ const ProfitLoss: React.FC = () => {
   const handleStockClick = () => {
     navigate('/app/reports/stock-summary');
   };
+
+  //get ledger data 
+
+  // useEffect(()=>{
+  //  const fetchData = async 
+
+  
+
+  // },[])
 
   // Stock calculations
   const getOpeningStock = () => {

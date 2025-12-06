@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import { useNavigate, useParams } from "react-router-dom";
-import { useAuth } from '../../../home/context/AuthContext';
+import { useAuth } from "../../../home/context/AuthContext";
 import { ArrowLeft, Save } from "lucide-react";
 import type {
   LedgerGroup,
@@ -63,14 +63,14 @@ const GroupForm: React.FC = () => {
   console.log("ownerType", ownerType);
   console.log("ownerId", ownerId);
 
-  const [formData, setFormData] = useState<FormData>({
+  const [formData, setFormData] = useState({
     name: "",
     alias: "",
-    under: "",
+    under: "", // parent id
     type: "",
     nature: "",
     behavesLikeSubLedger: "no",
-    nettBalancesForReporting: "yes",
+    nettBalancesForReporting: "no",
     usedForCalculation: "no",
     allocationMethod: "No Appropriation",
     setAlterHSNSAC: "no",
@@ -84,67 +84,53 @@ const GroupForm: React.FC = () => {
     integratedTaxRate: "",
     cess: "",
   });
+
   const [errors, setErrors] = useState<Partial<Record<keyof FormData, string>>>(
     {}
   );
-
-  // useEffect(() => {
-  //   const fetchData = async () => {
-  //     try {
-  //       const [groupsRes, classificationsRes] = await Promise.all([
-  //         fetch('${import.meta.env.VITE_API_URL}/api/ledger-groups'),
-  //         fetch('${import.meta.env.VITE_API_URL}/api/gst-classifications'),
-  //       ]);
-  //       if (!groupsRes.ok || !classificationsRes.ok) {
-  //         throw new Error('Failed to fetch data');
-  //       }
-  //       const groups = await groupsRes.json();
-  //       const classifications = await classificationsRes.json();
-  //       setLedgerGroups(groups);
-  //       setGstClassifications(classifications);
-  //     } catch (err) {
-  //       console.error('Failed to load data', err);
-  //       alert('Failed to load groups or classifications');
-  //     }
-  //   };
-
-  //   fetchData();
-  // }, []);
 
   useEffect(() => {
     if (isEditMode && id) {
       const fetchGroup = async () => {
         try {
           const res = await fetch(
-            `${import.meta.env.VITE_API_URL}/api/ledger-groups/${id}?ownerType=${ownerType}&ownerId=${ownerId}`
+            `${
+              import.meta.env.VITE_API_URL
+            }/api/ledger-groups/${id}?ownerType=${ownerType}&ownerId=${ownerId}`
           );
           const data = await res.json();
           console.log("this is data", data);
 
           if (res.ok) {
             setFormData({
-              ...formData,
-              name: data.name || "",
-              alias: data.alias || "",
-              under: data.under || "",
-              type: data.type || "",
-              nature: data.nature || "",
-              behavesLikeSubLedger: data.behavesLikeSubLedger ? "yes" : "no",
-              nettBalancesForReporting: data.nettBalancesForReporting
-                ? "yes"
-                : "no",
-              usedForCalculation: data.usedForCalculation ? "yes" : "no",
-              allocationMethod: data.allocationMethod || "No Appropriation",
-              setAlterHSNSAC: data.setAlterHSNSAC ? "yes" : "no",
-              hsnSacClassificationId: data.hsnSacClassificationId || "",
-              hsnCode: data.hsnCode || "",
-              hsnSacDescription: data.hsnSacDescription || "",
-              setAlterGST: data.setAlterGST ? "yes" : "no",
-              gstClassificationId: data.gstClassificationId || "",
-              typeOfSupply: data.typeOfSupply || "",
-              taxability: data.taxability || "",
-              integratedTaxRate: data.integratedTaxRate?.toString() || "",
-              cess: data.cess?.toString() || "",
+              name: data.name ?? "",
+              alias: data.alias ?? "",
+              under: data.parent?.toString() ?? "",
+
+              type: data.type ?? "",
+              nature: data.nature ?? "",
+
+              behavesLikeSubLedger:
+                data.behavesLikeSubLedger == 1 ? "yes" : "no",
+              nettBalancesForReporting:
+                data.nettBalancesForReporting == 1 ? "yes" : "no",
+              usedForCalculation: data.usedForCalculation == 1 ? "yes" : "no",
+
+              allocationMethod: data.allocationMethod ?? "No Appropriation",
+
+              setAlterHSNSAC: data.setAlterHSNSAC == 1 ? "yes" : "no",
+              hsnSacClassificationId: data.hsnSacClassificationId ?? "",
+              hsnCode: data.hsnCode ?? "",
+              hsnSacDescription: data.hsnSacDescription ?? "",
+
+              setAlterGST: data.setAlterGST == 1 ? "yes" : "no",
+              gstClassificationId: data.gstClassificationId ?? "",
+
+              typeOfSupply: data.typeOfSupply ?? "",
+              taxability: data.taxability ?? "",
+
+              integratedTaxRate: data.integratedTaxRate?.toString() ?? "",
+              cess: data.cess?.toString() ?? "",
             });
           } else {
             Swal.fire(
@@ -243,8 +229,6 @@ const GroupForm: React.FC = () => {
     }));
   };
 
-  // const handleSubmit = async (e: React.FormEvent) => {
-  //   e.preventDefault();
   //   if (!validateForm()) {
   //     alert('Please fix the errors before submitting.');
   //     return;

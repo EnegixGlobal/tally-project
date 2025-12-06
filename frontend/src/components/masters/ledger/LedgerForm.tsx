@@ -326,7 +326,7 @@ const LedgerForm: React.FC = () => {
                 className="block text-sm font-medium mb-1"
                 htmlFor="openingBalance"
               >
-                Opening Stock
+                Opening Balance
               </label>
               <input
                 type="number"
