@@ -36,6 +36,24 @@ interface FormData {
   cess: string;
 }
 
+const baseGroups = [
+  { name: "Branch/Division", nature: "Assets" },
+  { name: "Capital Account", nature: "Liabilities" },
+  { name: "Current Assets", nature: "Assets" },
+  { name: "Current Liabilities", nature: "Liabilities" },
+  { name: "Direct Expenses", nature: "Expenses" },
+  { name: "Direct Income", nature: "Income" },
+  { name: "Fixed Assets", nature: "Assets" },
+  { name: "Indirect Expenses", nature: "Expenses" },
+  { name: "Indirect Income", nature: "Income" },
+  { name: "Investments", nature: "Assets" },
+  { name: "Loan(Liability)", nature: "Liabilities" },
+  { name: "Misc expenses (Assets)", nature: "Assets" },
+  { name: "Purchase Accounts", nature: "Expenses" },
+  { name: "Sales Accounts", nature: "Income" },
+  { name: "Suspense A/c", nature: "Assets" },
+];
+
 const GroupForm: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
@@ -210,76 +228,30 @@ const GroupForm: React.FC = () => {
   ) => {
     const { name, value } = e.target;
 
-    setFormData((prev) => ({
-      ...prev,
-      [name]: value,
-      ...(name === "under" && value !== "Primary" ? { nature: "" } : {}),
-      ...(name === "setAlterHSNSAC" && value === "no"
-        ? { hsnSacClassificationId: "", hsnCode: "", hsnSacDescription: "" }
-        : {}),
-      ...(name === "setAlterGST" && value === "no"
-        ? {
-            gstClassificationId: "",
-            typeOfSupply: "",
-            taxability: "",
-            integratedTaxRate: "",
-            cess: "",
-          }
-        : {}),
-    }));
+    if (name === "under") {
+      if (value.startsWith("base:")) {
+        const baseName = value.replace("base:", "");
+        const group = baseGroups.find((b) => b.name === baseName);
+
+        setFormData((prev) => ({
+          ...prev,
+          under: value,
+          nature: group?.nature ?? "",
+          behavesLikeSubLedger: "no", // base group default
+        }));
+      } else {
+        setFormData((prev) => ({
+          ...prev,
+          under: value,
+          nature: "",
+          behavesLikeSubLedger: "no",
+        }));
+      }
+      return;
+    }
+
+    setFormData((prev) => ({ ...prev, [name]: value }));
   };
-
-  //   if (!validateForm()) {
-  //     alert('Please fix the errors before submitting.');
-  //     return;
-  //   }
-
-  //   const groupData: LedgerGroup = {
-  //     id: isEditMode && id ? id : (ledgerGroups.length + 1).toString(),
-  //     name: formData.name,
-  //     alias: formData.alias || undefined,
-  //     parent: formData.under === 'Primary' ? undefined : formData.under,
-  //     type: formData.under === 'Primary' ? formData.type as LedgerType : ledgerGroups.find(g => g.id === formData.under)?.type || 'current-assets',
-  //     behavesLikeSubLedger: formData.behavesLikeSubLedger === 'yes',
-  //     nettBalancesForReporting: formData.nettBalancesForReporting === 'yes',
-  //     usedForCalculation: formData.usedForCalculation === 'yes',
-  //     allocationMethod: formData.allocationMethod || undefined,
-  //     gstDetails: {
-  //       setAlterHSNSAC: formData.setAlterHSNSAC === 'yes',
-  //       hsnSacClassificationId: formData.setAlterHSNSAC === 'yes' ? formData.hsnSacClassificationId : undefined,
-  //       hsnCode: formData.setAlterHSNSAC === 'yes' ? formData.hsnCode : undefined,
-  //       setAlterGST: formData.setAlterGST === 'yes',
-  //       gstClassificationId: formData.setAlterGST === 'yes' ? formData.gstClassificationId : undefined,
-  //       typeOfSupply: formData.setAlterGST === 'yes' ? formData.typeOfSupply as 'Goods' | 'Services' : undefined,
-  //       taxability: formData.setAlterGST === 'yes' ? formData.taxability as 'Taxable' | 'Exempt' | 'Nil-rated' : undefined,
-  //       integratedTaxRate: formData.setAlterGST === 'yes' && formData.integratedTaxRate ? parseFloat(formData.integratedTaxRate) : undefined,
-  //       cess: formData.setAlterGST === 'yes' && formData.cess ? parseFloat(formData.cess) : undefined,
-  //     },
-  //   };
-
-  //   try {
-  //     const url = isEditMode && id ? `${import.meta.env.VITE_API_URL}/api/ledger-groups/${id}` : '${import.meta.env.VITE_API_URL}/api/ledger-groups';
-  //     const method = isEditMode ? 'PUT' : 'POST';
-  //     const res = await fetch(url, {
-  //       method,
-  //       headers: { 'Content-Type': 'application/json' },
-  //       body: JSON.stringify(groupData),
-  //     });
-
-  //     const data = await res.json();
-
-  //     if (res.ok) {
-  //       if (!isEditMode) addLedgerGroup(groupData);
-  //       alert(data.message || `Group ${isEditMode ? 'updated' : 'created'} successfully!`);
-  //       navigate('/app/masters/group');
-  //     } else {
-  //       alert(data.message || `Failed to ${isEditMode ? 'update' : 'create'} group`);
-  //     }
-  //   } catch (err) {
-  //     console.error(`Group ${isEditMode ? 'update' : 'create'} error:`, err);
-  //     alert('Something went wrong!');
-  //   }
-  // };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -495,54 +467,68 @@ const GroupForm: React.FC = () => {
                 } outline-none transition-colors`}
               >
                 <option value="">Select Group</option>
-                <option value="Primary">Primary</option>
+
+                {/* Base Groups — always top */}
+                {baseGroups.map((g) => (
+                  <option key={g.name} value={`base:${g.name}`}>
+                    {g.name}
+                  </option>
+                ))}
+
+                {/* Custom User Groups */}
                 {ledgerGroups.map((group) => (
                   <option key={group.id} value={group.id}>
                     {group.name}
                   </option>
                 ))}
               </select>
+
               {errors.under && (
                 <p className="text-red-500 text-xs mt-1">{errors.under}</p>
               )}
             </div>
 
-            {formData.under === "Primary" && (
-              <div>
-                <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                  htmlFor="nature"
-                >
-                  Nature of Group *
-                </label>
-                <select
-                  id="nature"
-                  name="nature"
-                  value={formData.nature}
-                  onChange={handleChange}
-                  required
-                  className={`w-full p-2 rounded border ${
-                    errors.under
-                      ? "border-red-500"
-                      : theme === "dark"
-                      ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
-                      : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
-                  } outline-none transition-colors`}
-                >
-                  <option value="">Select Nature</option>
-                  <option value="Assets">Assets</option>
-                  <option value="Liabilities">Liabilities</option>
-                  <option value="Income">Income</option>
-                  <option value="Expenses">Expenses</option>
-                </select>
-                {errors.nature && (
-                  <p className="text-red-500 text-xs mt-1">{errors.nature}</p>
-                )}
-              </div>
-            )}
+            {/* 🔹 Nature of Group field always visible */}
+            <div>
+              <label
+                className={`block text-sm font-medium mb-1 ${
+                  theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
+                htmlFor="nature"
+              >
+                Nature of Group *
+              </label>
 
+              <select
+                id="nature"
+                name="nature"
+                value={formData.nature}
+                onChange={handleChange}
+                required
+                disabled={formData.under.startsWith("base:")}
+                className={`w-full p-2 rounded border ${
+                  theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                } ${
+                  formData.under.startsWith("base:")
+                    ? "cursor-not-allowed text-gray-400"
+                    : ""
+                }`}
+              >
+                <option value="">Select Nature</option>
+                <option value="Assets">Assets</option>
+                <option value="Liabilities">Liabilities</option>
+                <option value="Income">Income</option>
+                <option value="Expenses">Expenses</option>
+              </select>
+
+              {errors.nature && (
+                <p className="text-red-500 text-xs mt-1">{errors.nature}</p>
+              )}
+            </div>
+
+            {/* 🔹 Base Group Selected — Auto Behavior */}
             <div>
               <label
                 className={`block text-sm font-medium mb-1 ${
@@ -552,15 +538,14 @@ const GroupForm: React.FC = () => {
               >
                 Group Behaves Like a Sub-Ledger
               </label>
+
               <select
                 id="behavesLikeSubLedger"
                 name="behavesLikeSubLedger"
                 value={formData.behavesLikeSubLedger}
                 onChange={handleChange}
                 className={`w-full p-2 rounded border ${
-                  errors.under
-                    ? "border-red-500"
-                    : theme === "dark"
+                  theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
                     : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
                 } outline-none transition-colors`}
@@ -572,6 +557,8 @@ const GroupForm: React.FC = () => {
                 ))}
               </select>
             </div>
+
+            {/* 🔹 Custom Group — Normal Editable Option */}
 
             <div>
               <label
