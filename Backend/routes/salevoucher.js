@@ -232,7 +232,6 @@ router.post('/', async (req, res) => {
 router.get("/sale-history", async (req, res) => {
   try {
     const { company_id, owner_type, owner_id } = req.query;
-    console.log('query', company_id, owner_type, owner_id);
 
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
@@ -241,27 +240,18 @@ router.get("/sale-history", async (req, res) => {
       });
     }
 
-    // 🛠️ Auto Create Table if Missing
-    const createTableSql = `
-      CREATE TABLE IF NOT EXISTS sale_history (
-        id INT PRIMARY KEY AUTO_INCREMENT,
-        companyId INT NOT NULL,
-        ownerType VARCHAR(50) NOT NULL,
-        ownerId INT NOT NULL,
-        itemId INT DEFAULT NULL,
-        quantity DECIMAL(15,2) DEFAULT 0,
-        rate DECIMAL(15,2) DEFAULT 0,
-        value DECIMAL(15,2) DEFAULT 0,
-        movementType VARCHAR(50) DEFAULT NULL,
-        movementDate DATETIME DEFAULT CURRENT_TIMESTAMP,
-        createdAt DATETIME DEFAULT CURRENT_TIMESTAMP
-      );
-    `;
-    await db.execute(createTableSql);
-
-
     const fetchSql = `
-      SELECT * FROM sale_history
+      SELECT 
+        id,
+        itemName,
+        hsnCode,
+        batchNumber,
+        qtyChange,
+        movementDate,
+        companyId,
+        ownerType,
+        ownerId
+      FROM sale_history
       WHERE companyId = ? AND ownerType = ? AND ownerId = ?
       ORDER BY movementDate DESC, id DESC
     `;
@@ -285,6 +275,7 @@ router.get("/sale-history", async (req, res) => {
     });
   }
 });
+
 
 
 
@@ -538,25 +529,41 @@ router.post("/sale-history", async (req, res) => {
   try {
     const movementData = Array.isArray(req.body) ? req.body : [req.body];
 
-  
-
-    // 🛠 Step 1: Table create if not exists
+    // 1️⃣ Create main table if missing
     const createTableSql = `
       CREATE TABLE IF NOT EXISTS sale_history (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        itemName VARCHAR(255),
-        hsnCode VARCHAR(50),
-        batchNumber VARCHAR(255),
-        qtyChange INT,
-        movementDate DATE,
-        companyId VARCHAR(100),
-        ownerType VARCHAR(50),
-        ownerId VARCHAR(100)
+        id INT AUTO_INCREMENT PRIMARY KEY
       )
     `;
     await db.execute(createTableSql);
 
-    // 🔄 Step 2: Insert data bulk
+    // 2️⃣ Ensure required columns exist — auto add missing columns
+    const requiredColumns = [
+      "itemName VARCHAR(255)",
+      "hsnCode VARCHAR(50)",
+      "batchNumber VARCHAR(255)",
+      "qtyChange INT",
+      "movementDate DATE",
+      "companyId VARCHAR(100)",
+      "ownerType VARCHAR(50)",
+      "ownerId VARCHAR(100)"
+    ];
+
+    for (const col of requiredColumns) {
+      const columnName = col.split(" ")[0];
+
+      const [rows] = await db.execute(`
+        SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS 
+        WHERE TABLE_NAME = 'sale_history' AND COLUMN_NAME = ?
+      `, [columnName]);
+
+      if (rows.length === 0) {
+        await db.execute(`ALTER TABLE sale_history ADD COLUMN ${col}`);
+        console.log(`🆕 Added missing column: ${columnName}`);
+      }
+    }
+
+    // 3️⃣ Insert data
     const insertSql = `
       INSERT INTO sale_history 
       (itemName, hsnCode, batchNumber, qtyChange, movementDate, companyId, ownerType, ownerId)
@@ -574,9 +581,6 @@ router.post("/sale-history", async (req, res) => {
       e.ownerId,
     ]);
 
-    console.log('value', values)
-
-    // ❌ Security check: values must have company + owner
     if (values.some((v) => !v[5] || !v[6] || !v[7])) {
       return res.status(401).json({
         success: false,
@@ -588,24 +592,17 @@ router.post("/sale-history", async (req, res) => {
 
     return res.status(200).json({
       success: true,
-      message: "Sale  history saved successfully",
+      message: "Sale history saved successfully",
     });
 
   } catch (error) {
-    console.error("🔥 Sale  history save failed:", error);
+    console.error("🔥 Sale history save failed:", error);
     return res.status(500).json({
       success: false,
       error: error.message
     });
   }
 });
-
-
-// GET Sale History (Scoped by Company + Owner)
-
-
-
-
 
 
 

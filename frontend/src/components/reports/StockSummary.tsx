@@ -1,6 +1,12 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer, Download, ChevronDown, ChevronRight } from "lucide-react";
+import {
+  ArrowLeft,
+  Printer,
+  Download,
+  ChevronDown,
+  ChevronRight,
+} from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import ReportTable from "./ReportTable";
 
@@ -38,19 +44,19 @@ const StockSummary: React.FC = () => {
       if (!response.ok) throw new Error("Failed to load opening stock");
 
       const json = await response.json();
-      console.log('json', json.data);
+      console.log("json", json.data);
       const formatted = Array.isArray(json.data)
         ? json.data.map((item: any) => ({
-          item: {
-            id: item.id,
-            name: item.name,
-            unitName: units.find(u => u.id === item.unit)?.name ?? "",
-            openingBalance: Number(item.openingBalance || 0),
-            hsnCode: item.hsnCode ?? "",
-            gstRate: Number(item.gstRate || 0),
-            taxType: item.taxType ?? "",
-          },
-        }))
+            item: {
+              id: item.id,
+              name: item.name,
+              unitName: units.find((u) => u.id === item.unit)?.name ?? "",
+              openingBalance: Number(item.openingBalance || 0),
+              hsnCode: item.hsnCode ?? "",
+              gstRate: Number(item.gstRate || 0),
+              taxType: item.taxType ?? "",
+            },
+          }))
         : [];
 
       setData(formatted);
@@ -75,7 +81,8 @@ const StockSummary: React.FC = () => {
       });
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL
+        `${
+          import.meta.env.VITE_API_URL
         }/api/purchase-vouchers/purchase-history?${params.toString()}`
       );
 
@@ -85,13 +92,13 @@ const StockSummary: React.FC = () => {
 
       const formatted = Array.isArray(json.data)
         ? json.data.map((v: any) => ({
-          id: v.id,
-          itemName: v.itemName,
-          hsnCode: v.hsnCode,
-          batchNumber: v.batchNumber,
-          qty: v.purchaseQuantity,
-          date: v.purchaseDate,
-        }))
+            id: v.id,
+            itemName: v.itemName,
+            hsnCode: v.hsnCode,
+            batchNumber: v.batchNumber,
+            qty: v.purchaseQuantity,
+            date: v.purchaseDate,
+          }))
         : [];
 
       setData(formatted);
@@ -116,7 +123,8 @@ const StockSummary: React.FC = () => {
       });
 
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL
+        `${
+          import.meta.env.VITE_API_URL
         }/api/sales-vouchers/sale-history?${params.toString()}`
       );
 
@@ -126,12 +134,12 @@ const StockSummary: React.FC = () => {
 
       const formatted = Array.isArray(json.data)
         ? json.data.map((v: any) => ({
-          itemName: v.itemName,
-          hsnCode: v.hsnCode,
-          batchNumber: v.batchNumber,
-          qty: Math.abs(v.qtyChange),
-          date: v.movementDate,
-        }))
+            itemName: v.itemName,
+            hsnCode: v.hsnCode,
+            batchNumber: v.batchNumber,
+            qty: Math.abs(v.qtyChange),
+            date: v.movementDate,
+          }))
         : [];
 
       setData(formatted);
@@ -156,11 +164,13 @@ const StockSummary: React.FC = () => {
           `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
         ),
         fetch(
-          `${import.meta.env.VITE_API_URL
+          `${
+            import.meta.env.VITE_API_URL
           }/api/purchase-vouchers/purchase-history?${params.toString()}`
         ),
         fetch(
-          `${import.meta.env.VITE_API_URL
+          `${
+            import.meta.env.VITE_API_URL
           }/api/sales-vouchers/sale-history?${params.toString()}`
         ),
       ]);
@@ -170,7 +180,8 @@ const StockSummary: React.FC = () => {
       const salesData = await salesRes.json();
 
       // Create a map of item names to their unit info
-      const itemUnitMap: Record<string, { hsnCode: string; unitName: string }> = {};
+      const itemUnitMap: Record<string, { hsnCode: string; unitName: string }> =
+        {};
       if (Array.isArray(stockItemsData.data)) {
         stockItemsData.data.forEach((item: any) => {
           itemUnitMap[item.name] = {
@@ -181,76 +192,82 @@ const StockSummary: React.FC = () => {
       }
 
       // Track closing balance for each item and batch (only Purchase - Sales)
-      const closingMap: Record<string, Record<string, number>> = {}; // itemName -> batchNumber -> qty
-      const itemInfo: Record<string, { hsnCode: string; unitName: string }> = {}; // itemName -> info
+      // Batch-wise closing only for items with opening stock
+      const closingMap: Record<string, Record<string, number>> = {};
+      const itemInfo: Record<string, { hsnCode: string; unitName: string }> =
+        {};
+      const movementCheck: Record<string, boolean> = {}; // Track movement
 
-      // Process Purchase (add to closing)
+      // 1️⃣ Opening stock => default batch
+      if (Array.isArray(stockItemsData.data)) {
+        stockItemsData.data.forEach((item: any) => {
+          const itemName = item.name;
+
+          closingMap[itemName] = {
+            default: Number(item.openingBalance || 0),
+          };
+
+          itemInfo[itemName] = {
+            hsnCode: item.hsnCode || "",
+            unitName: units.find((u) => u.id === item.unit)?.name ?? "",
+          };
+
+          movementCheck[itemName] = false; // initially no movement
+        });
+      }
+
+      // 2️⃣ Purchase
       if (Array.isArray(purchaseData.data)) {
         purchaseData.data.forEach((v: any) => {
           const itemName = v.itemName;
-          const batchName = v.batchNumber || "";
-          const purchaseQty = Number(v.purchaseQuantity || 0);
+          const batch = v.batchNumber || "default";
+          const qty = Number(v.purchaseQuantity || 0);
 
-          if (!closingMap[itemName]) {
-            closingMap[itemName] = {};
-          }
+          if (!closingMap[itemName]) return; // no opening => skip
 
-          // Get item info from stock items or use purchase data
-          if (!itemInfo[itemName]) {
-            itemInfo[itemName] = itemUnitMap[itemName] || {
-              hsnCode: v.hsnCode || "",
-              unitName: "",
-            };
-          }
+          closingMap[itemName][batch] =
+            (closingMap[itemName][batch] || 0) + qty;
 
-          closingMap[itemName][batchName] = (closingMap[itemName][batchName] || 0) + purchaseQty;
+          movementCheck[itemName] = true;
         });
       }
 
-      // Process Sales (subtract from closing)
+      // 3️⃣ Sales
       if (Array.isArray(salesData.data)) {
         salesData.data.forEach((v: any) => {
           const itemName = v.itemName;
-          const batchName = v.batchNumber || "";
-          const salesQty = Math.abs(Number(v.qtyChange || 0));
+          const batch = v.batchNumber || "default";
+          const qty = Math.abs(Number(v.qtyChange || 0));
 
-          // Initialize item if it doesn't exist
-          if (!closingMap[itemName]) {
-            closingMap[itemName] = {};
-          }
+          if (!closingMap[itemName]) return;
 
-          // Get item info from stock items or use sales data
-          if (!itemInfo[itemName]) {
-            itemInfo[itemName] = itemUnitMap[itemName] || {
-              hsnCode: v.hsnCode || "",
-              unitName: "",
-            };
-          }
+          closingMap[itemName][batch] =
+            (closingMap[itemName][batch] || 0) - qty;
 
-          // Subtract sales quantity (can go negative, but we filter out <= 0 later)
-          closingMap[itemName][batchName] = (closingMap[itemName][batchName] || 0) - salesQty;
+          movementCheck[itemName] = true;
         });
       }
 
-      // Format closing data - group by item, show batches as transactions
-      const closingFormatted: any[] = [];
-      Object.entries(closingMap).forEach(([itemName, batches]) => {
-        Object.entries(batches).forEach(([batchName, qty]) => {
-          if (qty > 0) {
-            closingFormatted.push({
-              itemName: itemName,
-              hsnCode: itemInfo[itemName]?.hsnCode || "",
-              unitName: itemInfo[itemName]?.unitName || "",
-              batchNumber: batchName || "-",
-              qty: qty, // This will be used for grouping
-              closingQty: qty,
-            });
-          }
-        });
-      });
+      // 4️⃣ Final formatting — only movement items
+      // const closingFormatted: any[] = [];
+      // Object.entries(closingMap).forEach(([itemName, batches]) => {
+      //   if (!movementCheck[itemName]) return; // ❌ No movement → skip
+      //       console.log('batches', batches)
+      //   Object.entries(batches).forEach(([batch, qty]) => {
+      //     if (qty >= 0) {
+      //       closingFormatted.push({
+      //         itemName,
+      //         hsnCode: itemInfo[itemName]?.hsnCode || "",
+      //         unitName: itemInfo[itemName]?.unitName || "",
+      //         batchNumber: batch === "default" ? "-" : batch,
+      //         closingQty: qty,
+      //       });
+      //     }
+      //   });
+      // });
 
-      console.log("Closing data:", closingFormatted);
-      setData(closingFormatted);
+      // setData(closingFormatted);
+      // console.log("Final Closing:", closingFormatted);
     } catch (err: any) {
       setError(err.message);
       setData([]);
@@ -268,11 +285,13 @@ const StockSummary: React.FC = () => {
 
       const [purchaseRes, salesRes] = await Promise.all([
         fetch(
-          `${import.meta.env.VITE_API_URL
+          `${
+            import.meta.env.VITE_API_URL
           }/api/purchase-vouchers/purchase-history?${params.toString()}`
         ),
         fetch(
-          `${import.meta.env.VITE_API_URL
+          `${
+            import.meta.env.VITE_API_URL
           }/api/sales-vouchers/sale-history?${params.toString()}`
         ),
       ]);
@@ -334,7 +353,7 @@ const StockSummary: React.FC = () => {
     if (reportView === "Opening") return data; // Opening doesn't need grouping
 
     const groups: Record<string, any[]> = {};
-    
+
     data.forEach((item) => {
       const key = item.itemName || item.name || "";
       if (!groups[key]) {
@@ -349,7 +368,7 @@ const StockSummary: React.FC = () => {
       const firstItem = transactions[0];
       const hsnCode = firstItem.hsnCode || "";
       const unitName = firstItem.unitName || "";
-      
+
       transactions.forEach((t) => {
         let qty = 0;
         if (reportView === "Closing") {
@@ -357,9 +376,10 @@ const StockSummary: React.FC = () => {
           qty = Number(t.closingQty || t.qty || 0);
         } else {
           // For Purchase/Sales/All, parse qty string or number
-          qty = typeof t.qty === "string" 
-            ? parseFloat(t.qty.replace(/[+-]/g, "")) || 0
-            : Number(t.qty) || 0;
+          qty =
+            typeof t.qty === "string"
+              ? parseFloat(t.qty.replace(/[+-]/g, "")) || 0
+              : Number(t.qty) || 0;
         }
         totalQty += qty;
       });
@@ -390,10 +410,15 @@ const StockSummary: React.FC = () => {
 
   // Helper function to format date
   const formatDate = (dateValue: any): string => {
-    if (!dateValue || dateValue === "-" || dateValue === null || dateValue === undefined) {
+    if (
+      !dateValue ||
+      dateValue === "-" ||
+      dateValue === null ||
+      dateValue === undefined
+    ) {
       return "-";
     }
-    
+
     try {
       // If it's already a string in YYYY-MM-DD format
       if (typeof dateValue === "string") {
@@ -406,19 +431,19 @@ const StockSummary: React.FC = () => {
         return date.toLocaleDateString("en-GB", {
           day: "2-digit",
           month: "2-digit",
-          year: "numeric"
+          year: "numeric",
         });
       }
-      
+
       // If it's a Date object
       if (dateValue instanceof Date) {
         return dateValue.toLocaleDateString("en-GB", {
           day: "2-digit",
           month: "2-digit",
-          year: "numeric"
+          year: "numeric",
         });
       }
-      
+
       return "-";
     } catch (error) {
       console.error("Date formatting error:", error, dateValue);
@@ -549,14 +574,15 @@ const StockSummary: React.FC = () => {
 
   const handleExport = () => {
     if (!data.length) return;
-    
+
     // For grouped views, export all transactions/batches
-    const exportData = reportView === "Opening"
-      ? data 
-      : reportView === "Closing"
-      ? groupedData.flatMap((group) => group.transactions)
-      : groupedData.flatMap((group) => group.transactions);
-    
+    const exportData =
+      reportView === "Opening"
+        ? data
+        : reportView === "Closing"
+        ? groupedData.flatMap((group) => group.transactions)
+        : groupedData.flatMap((group) => group.transactions);
+
     const csv = [
       columns.map((c) => c.header).join(","),
       ...exportData.map((row: any) =>
@@ -659,7 +685,9 @@ const StockSummary: React.FC = () => {
           integrate === "integrated" &&
           data.length === 0 && (
             <div className="text-center py-8">
-              <p className="text-gray-500">No data available for {reportView} view</p>
+              <p className="text-gray-500">
+                No data available for {reportView} view
+              </p>
             </div>
           )}
 
@@ -682,11 +710,21 @@ const StockSummary: React.FC = () => {
                 <div className="overflow-x-auto">
                   <table className={`w-full border-collapse`}>
                     <thead>
-                      <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200 text-black"}>
+                      <tr
+                        className={
+                          theme === "dark"
+                            ? "bg-gray-700 text-white"
+                            : "bg-gray-200 text-black"
+                        }
+                      >
                         {columns.map((col) => (
                           <th
                             key={col.accessor}
-                            className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-${col.align || "left"} font-semibold`}
+                            className={`p-2 border ${
+                              theme === "dark"
+                                ? "border-gray-500"
+                                : "border-gray-400"
+                            } text-${col.align || "left"} font-semibold`}
                           >
                             {col.header}
                           </th>
@@ -704,16 +742,26 @@ const StockSummary: React.FC = () => {
                                 theme === "dark"
                                   ? "hover:bg-gray-600 text-white"
                                   : "hover:bg-gray-100 text-black"
-                              } ${theme === "dark" ? "bg-gray-800" : "bg-gray-50"}`}
+                              } ${
+                                theme === "dark" ? "bg-gray-800" : "bg-gray-50"
+                              }`}
                               onClick={() => toggleItem(group.itemName)}
                             >
                               <td
-                                className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                className={`p-2 border ${
+                                  theme === "dark"
+                                    ? "border-gray-500"
+                                    : "border-gray-400"
+                                } text-center`}
                               >
                                 -
                               </td>
                               <td
-                                className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"}`}
+                                className={`p-2 border ${
+                                  theme === "dark"
+                                    ? "border-gray-500"
+                                    : "border-gray-400"
+                                }`}
                               >
                                 <div className="flex items-center gap-2">
                                   {isExpanded ? (
@@ -721,7 +769,9 @@ const StockSummary: React.FC = () => {
                                   ) : (
                                     <ChevronRight size={16} />
                                   )}
-                                  <span className="font-semibold">{group.itemName}</span>
+                                  <span className="font-semibold">
+                                    {group.itemName}
+                                  </span>
                                   <span className="text-xs opacity-70">
                                     ({group.transactionCount} transactions)
                                   </span>
@@ -729,46 +779,75 @@ const StockSummary: React.FC = () => {
                               </td>
                               {reportView === "All" && (
                                 <td
-                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                  className={`p-2 border ${
+                                    theme === "dark"
+                                      ? "border-gray-500"
+                                      : "border-gray-400"
+                                  } text-center`}
                                 >
                                   -
                                 </td>
                               )}
                               {reportView === "Closing" && (
                                 <td
-                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                  className={`p-2 border ${
+                                    theme === "dark"
+                                      ? "border-gray-500"
+                                      : "border-gray-400"
+                                  } text-center`}
                                 >
                                   {group.unitName || "-"}
                                 </td>
                               )}
                               <td
-                                className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                className={`p-2 border ${
+                                  theme === "dark"
+                                    ? "border-gray-500"
+                                    : "border-gray-400"
+                                } text-center`}
                               >
                                 {group.hsnCode || "-"}
                               </td>
-                              {(reportView !== "All" && reportView !== "Closing") && (
-                                <td
-                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                >
-                                  -
-                                </td>
-                              )}
+                              {reportView !== "All" &&
+                                reportView !== "Closing" && (
+                                  <td
+                                    className={`p-2 border ${
+                                      theme === "dark"
+                                        ? "border-gray-500"
+                                        : "border-gray-400"
+                                    } text-center`}
+                                  >
+                                    -
+                                  </td>
+                                )}
                               {reportView === "All" && (
                                 <td
-                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                  className={`p-2 border ${
+                                    theme === "dark"
+                                      ? "border-gray-500"
+                                      : "border-gray-400"
+                                  } text-center`}
                                 >
                                   -
                                 </td>
                               )}
                               {reportView === "Closing" && (
                                 <td
-                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                  className={`p-2 border ${
+                                    theme === "dark"
+                                      ? "border-gray-500"
+                                      : "border-gray-400"
+                                  } text-center`}
                                 >
                                   -
                                 </td>
                               )}
                               <td
-                                className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center font-semibold`}
+                                className={`p-2 border ${
+                                  theme === "dark"
+                                    ? "border-gray-500"
+                                    : "border-gray-400"
+                                } text-center font-semibold`}
                               >
                                 {reportView === "Purchase"
                                   ? `+${group.totalQty}`
@@ -780,14 +859,23 @@ const StockSummary: React.FC = () => {
                               </td>
                               {reportView === "All" && (
                                 <td
-                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                  className={`p-2 border ${
+                                    theme === "dark"
+                                      ? "border-gray-500"
+                                      : "border-gray-400"
+                                  } text-center`}
                                 >
                                   -
                                 </td>
                               )}
-                              {(reportView === "Purchase" || reportView === "Sales") && (
+                              {(reportView === "Purchase" ||
+                                reportView === "Sales") && (
                                 <td
-                                  className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
+                                  className={`p-2 border ${
+                                    theme === "dark"
+                                      ? "border-gray-500"
+                                      : "border-gray-400"
+                                  } text-center`}
                                 >
                                   -
                                 </td>
@@ -795,131 +883,213 @@ const StockSummary: React.FC = () => {
                             </tr>
                             {/* Expanded Transaction Rows */}
                             {isExpanded &&
-                              group.transactions.map((transaction: any, tIdx: number) => (
-                                <tr
-                                  key={`${idx}-${tIdx}`}
-                                  className={`${
-                                    theme === "dark"
-                                      ? "bg-gray-900 text-white"
-                                      : "bg-white text-black"
-                                  }`}
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    let itemId = transaction.id || "";
-                                    if (itemId) {
-                                      navigate(`/app/reports/movement-analysis?itemId=${itemId}`);
-                                    }
-                                  }}
-                                >
-                                  {reportView === "All" ? (
-                                    <>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {tIdx + 1}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center pl-8`}
-                                      >
-                                        {transaction.type}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {transaction.name}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {transaction.hsnCode || "-"}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {transaction.batchNumber || "-"}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {transaction.qty}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {formatDate(transaction.date)}
-                                      </td>
-                                    </>
-                                  ) : reportView === "Closing" ? (
-                                    <>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {tIdx + 1}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center pl-8`}
-                                      >
-                                        {transaction.itemName}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {transaction.unitName || "-"}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {transaction.hsnCode || "-"}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {transaction.batchNumber || "-"}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {transaction.closingQty ?? transaction.qty ?? 0}
-                                      </td>
-                                    </>
-                                  ) : (
-                                    <>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {tIdx + 1}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center pl-8`}
-                                      >
-                                        {transaction.itemName}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {transaction.hsnCode || "-"}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {transaction.batchNumber || "-"}
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {reportView === "Purchase"
-                                          ? `+${transaction.qty}`
-                                          : `-${transaction.qty}`}                                            
-                                      </td>
-                                      <td
-                                        className={`p-2 border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} text-center`}
-                                      >
-                                        {formatDate(transaction.date)}
-                                      </td>
-                                    </>
-                                  )}
-                                </tr>
-                              ))}
+                              group.transactions.map(
+                                (transaction: any, tIdx: number) => (
+                                  <tr
+                                    key={`${idx}-${tIdx}`}
+                                    className={`${
+                                      theme === "dark"
+                                        ? "bg-gray-900 text-white"
+                                        : "bg-white text-black"
+                                    }`}
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      let itemId = transaction.id || "";
+                                      if (itemId) {
+                                        navigate(
+                                          `/app/reports/movement-analysis?itemId=${itemId}`
+                                        );
+                                      }
+                                    }}
+                                  >
+                                    {reportView === "All" ? (
+                                      <>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {tIdx + 1}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center pl-8`}
+                                        >
+                                          {transaction.type}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.name}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.hsnCode || "-"}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.batchNumber || "-"}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.qty}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {formatDate(transaction.date)}
+                                        </td>
+                                      </>
+                                    ) : reportView === "Closing" ? (
+                                      <>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {tIdx + 1}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center pl-8`}
+                                        >
+                                          {transaction.itemName}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.unitName || "-"}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.hsnCode || "-"}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.batchNumber || "-"}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.closingQty ??
+                                            transaction.qty ??
+                                            0}
+                                        </td>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {tIdx + 1}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center pl-8`}
+                                        >
+                                          {transaction.itemName}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.hsnCode || "-"}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.batchNumber || "-"}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {reportView === "Purchase"
+                                            ? `+${transaction.qty}`
+                                            : `-${transaction.qty}`}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {formatDate(transaction.date)}
+                                        </td>
+                                      </>
+                                    )}
+                                  </tr>
+                                )
+                              )}
                           </React.Fragment>
                         );
                       })}
