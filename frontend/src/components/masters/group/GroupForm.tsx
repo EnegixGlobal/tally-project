@@ -51,7 +51,7 @@ const baseGroups = [
   { name: "Misc expenses (Assets)", nature: "Assets" },
   { name: "Purchase Accounts", nature: "Expenses" },
   { name: "Sales Accounts", nature: "Income" },
-  { name: "Suspense A/c", nature: "Assets" },
+  { name: "Suspense A/C", nature: "Assets" },
 ];
 
 const GroupForm: React.FC = () => {
