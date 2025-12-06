@@ -219,11 +219,7 @@ const handleDelete = async (id: string) => {
                     }`}>
                       Unit
                     </th>
-                    <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                      theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                    }`}>
-                      Opening Balance
-                    </th>
+                    
                     <th scope="col" className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
                       theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
                     }`}>
@@ -280,9 +276,7 @@ const handleDelete = async (id: string) => {
                         }`}>
                           {units.find(u => u.id === item.unit)?.name || 'N/A'}
                         </td>
-                        <td className={`px-6 py-4 whitespace-nowrap text-sm ${
-                          theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                        }`}>{item.openingBalance}</td>
+                       
                         <td className={`px-6 py-4 whitespace-nowrap text-sm ${
                           theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
                         }`}>{item.hsnCode || 'N/A'}</td>
