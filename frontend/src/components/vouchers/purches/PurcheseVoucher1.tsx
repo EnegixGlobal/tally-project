@@ -950,57 +950,65 @@ const PurchaseVoucher: React.FC = () => {
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
   };
   const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-    if (!formData.date) newErrors.date = "Date is required";
-    if (!formData.partyId) newErrors.partyId = "Party is required";
-    if (!formData.number) newErrors.number = "Voucher number is required";
-    if (!formData.referenceNo)
-      newErrors.referenceNo = "Supplier Invoice number is required";
-    if (!formData.supplierInvoiceDate)
-      newErrors.supplierInvoiceDate = "Supplier Invoice date is required";
-    if (!formData.purchaseLedgerId)
-      newErrors.purchaseLedgerId = "Purchase Ledger is required";
+  const newErrors: { [key: string]: string } = {};
 
-    if (formData.mode === "item-invoice") {
-      formData.entries.forEach((entry, index) => {
-        if (!entry.itemId)
-          newErrors[`entry${index}.itemId`] = "Item is required";
-        if ((entry.quantity ?? 0) <= 0)
-          newErrors[`entry${index}.quantity`] =
-            "Quantity must be greater than 0";
-        if (
-          godownEnabled === "yes" &&
-          safeGodowns.length > 0 &&
-          !entry.godownId
-        )
-          newErrors[`entry${index}.godownId`] = "Godown is required";
-      });
-    } else {
-      formData.entries.forEach((entry, index) => {
-        if (!entry.ledgerId)
-          newErrors[`entry${index}.ledgerId`] = "Ledger is required";
-        if ((entry.amount ?? 0) <= 0)
-          newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
-      });
+  if (!formData.date) newErrors.date = "Date is required";
+  if (!formData.partyId) newErrors.partyId = "Party is required";
+  if (!formData.number) newErrors.number = "Voucher number is required";
+  if (!formData.referenceNo)
+    newErrors.referenceNo = "Supplier Invoice number is required";
+  if (!formData.supplierInvoiceDate)
+    newErrors.supplierInvoiceDate = "Supplier Invoice date is required";
+  if (!formData.purchaseLedgerId)
+    newErrors.purchaseLedgerId = "Purchase Ledger is required";
 
-      const debitTotal = formData.entries
-        .filter((e) => e.type === "debit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
-      const creditTotal = formData.entries
-        .filter((e) => e.type === "credit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
-      if (Math.abs(debitTotal - creditTotal) > 0.01) {
-        newErrors.entries = "Debit and credit amounts must balance";
+  if (formData.mode === "item-invoice") {
+    formData.entries.forEach((entry, index) => {
+      if (!entry.itemId)
+        newErrors[`entry${index}.itemId`] = "Item is required";
+
+      if ((entry.quantity ?? 0) <= 0)
+        newErrors[`entry${index}.quantity`] =
+          "Quantity must be greater than 0";
+
+      // 🚨 Godown missing → only soft warning, NOT blocking submit
+      if (
+        godownEnabled === "yes" &&
+        safeGodowns.length > 0 &&
+        !entry.godownId
+      ) {
+        newErrors[`entry${index}.godownId`] = ""; 
       }
-    }
+    });
+  } else {
+    formData.entries.forEach((entry, index) => {
+      if (!entry.ledgerId)
+        newErrors[`entry${index}.ledgerId`] = "Ledger is required";
+      if ((entry.amount ?? 0) <= 0)
+        newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
+    });
 
-    if (!formData.entries.length) {
-      newErrors.entries = "At least one entry is required";
-    }
+    const debitTotal = formData.entries
+      .filter((e) => e.type === "debit")
+      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+    const creditTotal = formData.entries
+      .filter((e) => e.type === "credit")
+      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+
+    if (Math.abs(debitTotal - creditTotal) > 0.01) {
+      newErrors.entries = "Debit and credit amounts must balance";
+    }
+  }
+
+  if (!formData.entries.length) {
+    newErrors.entries = "At least one entry is required";
+  }
+
+  setErrors(newErrors);
+  return Object.keys(newErrors).filter((k) => newErrors[k]).length === 0;
+};
+
   const calculateTotals = () => {
     if (formData.mode === "item-invoice") {
       const subtotal = formData.entries.reduce(
