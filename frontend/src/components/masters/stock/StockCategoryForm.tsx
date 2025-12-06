@@ -17,9 +17,8 @@ const StockCategoryForm: React.FC = () => {
 
   // Mock stockCategories and functions since they're not in context
   const stockCategories: StockCategory[] = [
-  { id: "SC-001", name: "Primary", parent: "", description: "Primary " },
- 
-];
+    { id: "SC-001", name: "Primary", parent: "", description: "Primary " },
+  ];
 
   // const addStockCategory = useCallback((category: StockCategory) => {
   //   alert("Stock category added successfully!");
@@ -42,13 +41,46 @@ const StockCategoryForm: React.FC = () => {
       : initialFormData
   );
 
+  //get stockgroup
+  const [stockGroup, setStockGroup] = useState();
+  useEffect(() => {
+    const companyId = localStorage.getItem("company_id");
+    const ownerType = localStorage.getItem("supplier");
+    const ownerId = localStorage.getItem(
+      ownerType === "employee" ? "employee_id" : "user_id"
+    );
+
+    if (!companyId || !ownerType || !ownerId) return;
+
+    const fetchData = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-groups/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const data = await res.json();
+        console.log("this is list data", data);
+        setStockGroup(data);
+      } catch (err) {
+        console.error("Failed to fetch stock groups:", err);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  console.log("this is stock group", stockGroup);
+
   // 🟢 Add this here:
   useEffect(() => {
     const fetchSingleCategory = async () => {
       if (!isEditMode || !id) return;
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-categories/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-categories/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
         const data = await res.json();
@@ -102,7 +134,7 @@ const StockCategoryForm: React.FC = () => {
       ...formData,
       ownerType,
       ownerId,
-      companyId: localStorage.getItem("company_id"),  
+      companyId: localStorage.getItem("company_id"),
     };
 
     try {
@@ -110,19 +142,25 @@ const StockCategoryForm: React.FC = () => {
 
       if (isEditMode) {
         // 🟢 PUT request (Edit Mode)
-        res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-categories/${id}`, {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-categories/${id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        );
       } else {
         // 🟢 POST request (Create Mode)
         payload.id = `SC-${Date.now()}`;
-        res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-categories`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
+        res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-categories`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        );
       }
 
       const data = await res.json();
@@ -291,12 +329,14 @@ const StockCategoryForm: React.FC = () => {
                   : "bg-white border-gray-300 text-gray-900"
               } focus:border-blue-500 focus:ring-blue-500`}
             >
+              {/* Default option */}
               <option value="">None</option>
-              {stockCategories
-                .filter((c: StockCategory) => c.id !== formData.id)
-                .map((category: StockCategory) => (
-                  <option key={category.id} value={category.id}>
-                    {category.name}
+
+              {/* API se aayi stock groups */}
+              {Array.isArray(stockGroup) &&
+                stockGroup.map((g: any) => (
+                  <option key={g.id} value={g.id.toString()}>
+                    {g.name}
                   </option>
                 ))}
             </select>

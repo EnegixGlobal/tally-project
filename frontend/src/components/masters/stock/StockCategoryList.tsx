@@ -24,6 +24,8 @@ const StockCategoryList: React.FC = () => {
           `${import.meta.env.VITE_API_URL}/api/stock-categories?${queryParams}`
         );
         const data = await res.json();
+
+        console.log('data', data)
         setCategories(data);
       } catch (err) {
         console.error("Failed to fetch stock categories:", err);

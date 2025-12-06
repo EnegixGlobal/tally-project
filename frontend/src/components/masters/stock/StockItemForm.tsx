@@ -249,6 +249,37 @@ const StockItemForm = () => {
     { value: string; label: string }[]
   >([]);
 
+ // fetch units from database
+const [unitsData, setUnitsData] = useState([]);
+
+useEffect(() => {
+  const fetchUnits = async () => {
+    if (!companyId || !ownerType || !ownerId) return;
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      );
+
+      const data = await res.json();
+
+      if (Array.isArray(data)) {
+        setUnitsData(data);
+      } else {
+        setUnitsData([]);
+        console.warn("Units data format incorrect:", data);
+      }
+
+
+    } catch (error) {
+      console.error("Failed to fetch units:", error);
+    }
+  };
+
+  fetchUnits();
+}, [companyId, ownerType, ownerId]);
+
+
   useEffect(() => {
     async function fetchCategories() {
       if (!companyId || !ownerType || !ownerId) return;
@@ -286,76 +317,75 @@ const StockItemForm = () => {
   }, [companyId, ownerType, ownerId]);
 
   useEffect(() => {
-  async function fetchStockItem() {
-    if (!id) return;
+    async function fetchStockItem() {
+      if (!id) return;
 
-    try {
-      const res = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
-        }/api/stock-items/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-      );
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-items/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (res.ok && data.success) {
-        const item = data.data;
+        if (res.ok && data.success) {
+          const item = data.data;
 
-        setFormData({
-          name: item.name || "",
-          stockGroupId: item.stockGroupId?.toString() || "",
-          categoryId: item.categoryId?.toString() || "",
-          unit: item.unit?.toString() || "",
-          openingBalance: item.openingBalance || 0,
-          openingValue: item.openingValue || 0,
-          hsnSacOption: "specify-details",
-          hsnCode: item.hsnCode || "",
-          gstRateOption: "specify-details",
-          gstRate: item.gstRate?.toString() || "",
-          gstClassification: "",
-          taxType: item.taxType || "Taxable",
-          standardPurchaseRate: item.standardPurchaseRate || 0,
-          standardSaleRate: item.standardSaleRate || 0,
-          enableBatchTracking: !!item.enableBatchTracking,
-          batchName: item.batchNumber || "",
-          batchExpiryDate: item.batchExpiryDate || "",
-          batchManufacturingDate: item.batchManufacturingDate || "",
-          allowNegativeStock: !!item.allowNegativeStock,
-          maintainInPieces: !!item.maintainInPieces,
-          secondaryUnit: item.secondaryUnit || "",
-        });
+          setFormData({
+            name: item.name || "",
+            stockGroupId: item.stockGroupId?.toString() || "",
+            categoryId: item.categoryId?.toString() || "",
+            unit: item.unit?.toString() || "",
+            openingBalance: item.openingBalance || 0,
+            openingValue: item.openingValue || 0,
+            hsnSacOption: "specify-details",
+            hsnCode: item.hsnCode || "",
+            gstRateOption: "specify-details",
+            gstRate: item.gstRate?.toString() || "",
+            gstClassification: "",
+            taxType: item.taxType || "Taxable",
+            standardPurchaseRate: item.standardPurchaseRate || 0,
+            standardSaleRate: item.standardSaleRate || 0,
+            enableBatchTracking: !!item.enableBatchTracking,
+            batchName: item.batchNumber || "",
+            batchExpiryDate: item.batchExpiryDate || "",
+            batchManufacturingDate: item.batchManufacturingDate || "",
+            allowNegativeStock: !!item.allowNegativeStock,
+            maintainInPieces: !!item.maintainInPieces,
+            secondaryUnit: item.secondaryUnit || "",
+          });
 
-        setGodownAllocations(item.godownAllocations || []);
-        setBarcode(item.barcode || "");
+          setGodownAllocations(item.godownAllocations || []);
+          setBarcode(item.barcode || "");
 
-        if (Array.isArray(item.batches) && item.batches.length > 0) {
-          setBatchRows(
-            item.batches.map((b: any) => ({
-              batchName: b.batchName || "",
-              batchQuantity: Number(b.batchQuantity) || 0,
-              batchRate: Number(b.openingRate) || 0, // correct mapping
-              openingRate: Number(b.openingValue) || 0, // UI readonly
-              batchExpiryDate: b.batchExpiryDate || "",
-              batchManufacturingDate: b.batchManufacturingDate || "",
-            }))
+          if (Array.isArray(item.batches) && item.batches.length > 0) {
+            setBatchRows(
+              item.batches.map((b: any) => ({
+                batchName: b.batchName || "",
+                batchQuantity: Number(b.batchQuantity) || 0,
+                batchRate: Number(b.openingRate) || 0, // correct mapping
+                openingRate: Number(b.openingValue) || 0, // UI readonly
+                batchExpiryDate: b.batchExpiryDate || "",
+                batchManufacturingDate: b.batchManufacturingDate || "",
+              }))
+            );
+          }
+        } else {
+          Swal.fire(
+            "Error",
+            data.message || "Failed to fetch stock item",
+            "error"
           );
         }
-      } else {
-        Swal.fire(
-          "Error",
-          data.message || "Failed to fetch stock item",
-          "error"
-        );
+      } catch (err) {
+        console.error("🔥 Error fetching stock item:", err);
+        Swal.fire("Error", "Unable to fetch stock item", "error");
       }
-    } catch (err) {
-      console.error("🔥 Error fetching stock item:", err);
-      Swal.fire("Error", "Unable to fetch stock item", "error");
     }
-  }
 
-  fetchStockItem();
-}, [id, companyId, ownerType, ownerId]);
-
+    fetchStockItem();
+  }, [id, companyId, ownerType, ownerId]);
 
   // Generate barcode on first load or on form reset
   useEffect(() => {
@@ -460,27 +490,27 @@ const StockItemForm = () => {
   };
 
   const updateBatchRow = (index: number, field: string, value: string) => {
-  setBatchRows((prev) =>
-    prev.map((row, i) => {
-      if (i !== index) return row;
+    setBatchRows((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
 
-      const updated = {
-        ...row,
-        [field]: field === "batchQuantity" || field === "batchRate"
-          ? Number(value)
-          : value,
-      };
+        const updated = {
+          ...row,
+          [field]:
+            field === "batchQuantity" || field === "batchRate"
+              ? Number(value)
+              : value,
+        };
 
-      // Auto calculate Opening Rate
-      const qty = Number(updated.batchQuantity) || 0;
-      const rate = Number(updated.batchRate) || 0;
-      updated.openingRate = qty * rate;
+        // Auto calculate Opening Rate
+        const qty = Number(updated.batchQuantity) || 0;
+        const rate = Number(updated.batchRate) || 0;
+        updated.openingRate = qty * rate;
 
-      return updated;
-    })
-  );
-};
-
+        return updated;
+      })
+    );
+  };
 
   // --- End batch rows ---
 
@@ -536,10 +566,6 @@ const StockItemForm = () => {
         if (!batch.batchName)
           newErrors[`batchName-${index}`] = "Batch Name is required";
       });
-    }
-
-    if (formData.maintainInPieces && !formData.secondaryUnit) {
-      newErrors.secondaryUnit = "Secondary Unit is required";
     }
 
     setErrors(newErrors);
@@ -655,12 +681,13 @@ const StockItemForm = () => {
   ];
 
   const unitOptions =
-    units.length > 0
-      ? units.map((unit: UnitOfMeasurement) => ({
-          value: unit.id,
-          label: unit.name,
-        }))
-      : [{ value: "", label: "No units available" }];
+  unitsData.length > 0
+    ? unitsData.map((unit: any) => ({
+        value: unit.id.toString(),
+        label: unit.name,
+      }))
+    : [{ value: "", label: "No units available" }];
+
 
   const gstClassificationOptions =
     gstClassifications.length > 0
@@ -964,42 +991,13 @@ const StockItemForm = () => {
                 Allow Negative Stock
               </label>
             </div>
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  name="maintainInPieces"
-                  checked={formData.maintainInPieces}
-                  onChange={handleChange}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                Maintain in Pieces
-              </label>
-            </div>
+            <div></div>
             {barcode && (
               <div className="mb-4">
                 <h3>Generated Barcode</h3>
                 <Barcode value={barcode} width={1} height={40} fontSize={16} />
               </div>
             )}
-            {formData.maintainInPieces && (
-              <SelectField
-                id="secondaryUnit"
-                name="secondaryUnit"
-                label="Secondary Unit"
-                value={formData.secondaryUnit}
-                onChange={handleChange}
-                options={unitOptions}
-                required
-                error={errors.secondaryUnit}
-              />
-            )}
-            <GodownAllocationField
-              allocations={godownAllocations}
-              setAllocations={setGodownAllocations}
-              godowns={godowns}
-              errors={errors}
-            />
           </div>
 
           <div className="mt-6 flex justify-end gap-3">
