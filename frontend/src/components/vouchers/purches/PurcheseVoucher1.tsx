@@ -562,15 +562,35 @@ const PurchaseVoucher: React.FC = () => {
     },
   ];
 
-  const safeGodowns =
-    godowns.length > 0
-      ? godowns
-      : [
-          { id: "1", name: "Main Warehouse", location: "Ground Floor" },
-          { id: "2", name: "Electronics Storage", location: "First Floor" },
-          { id: "3", name: "Accessories Store", location: "Second Floor" },
-          { id: "4", name: "Damaged Goods", location: "Basement" },
-        ];
+  // 🟢 Backend se aaye final formatted godown list
+  // 🟢 Godowns state — backend se aaye data store karega
+
+  const [godowndata, setGodownData] = useState([]);
+
+  useEffect(() => {
+    const companyId = localStorage.getItem("company_id");
+    const ownerType = localStorage.getItem("supplier");
+    const ownerId = localStorage.getItem(
+      ownerType === "employee" ? "employee_id" : "user_id"
+    );
+
+    if (!companyId || !ownerType || !ownerId) return;
+
+    fetch(
+      `${
+        import.meta.env.VITE_API_URL
+      }/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+    )
+      .then((res) => res.json())
+      .then((result) => {
+        if (result.success && Array.isArray(result.data)) {
+          setGodownData(result.data);
+        } else {
+          setGodownData([]);
+        }
+      })
+      .catch(() => setGodownData([]));
+  }, []);
 
   const safeCompanyInfo = companyInfo || {
     name: "Your Company Name",
@@ -950,64 +970,57 @@ const PurchaseVoucher: React.FC = () => {
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
   };
   const validateForm = () => {
-  const newErrors: { [key: string]: string } = {};
+    const newErrors: { [key: string]: string } = {};
 
-  if (!formData.date) newErrors.date = "Date is required";
-  if (!formData.partyId) newErrors.partyId = "Party is required";
-  if (!formData.number) newErrors.number = "Voucher number is required";
-  if (!formData.referenceNo)
-    newErrors.referenceNo = "Supplier Invoice number is required";
-  if (!formData.supplierInvoiceDate)
-    newErrors.supplierInvoiceDate = "Supplier Invoice date is required";
-  if (!formData.purchaseLedgerId)
-    newErrors.purchaseLedgerId = "Purchase Ledger is required";
+    if (!formData.date) newErrors.date = "Date is required";
+    if (!formData.partyId) newErrors.partyId = "Party is required";
+    if (!formData.number) newErrors.number = "Voucher number is required";
+    if (!formData.referenceNo)
+      newErrors.referenceNo = "Supplier Invoice number is required";
+    if (!formData.supplierInvoiceDate)
+      newErrors.supplierInvoiceDate = "Supplier Invoice date is required";
+    if (!formData.purchaseLedgerId)
+      newErrors.purchaseLedgerId = "Purchase Ledger is required";
 
-  if (formData.mode === "item-invoice") {
-    formData.entries.forEach((entry, index) => {
-      if (!entry.itemId)
-        newErrors[`entry${index}.itemId`] = "Item is required";
+    if (formData.mode === "item-invoice") {
+      formData.entries.forEach((entry, index) => {
+        if (!entry.itemId)
+          newErrors[`entry${index}.itemId`] = "Item is required";
 
-      if ((entry.quantity ?? 0) <= 0)
-        newErrors[`entry${index}.quantity`] =
-          "Quantity must be greater than 0";
+        if ((entry.quantity ?? 0) <= 0)
+          newErrors[`entry${index}.quantity`] =
+            "Quantity must be greater than 0";
 
-      // 🚨 Godown missing → only soft warning, NOT blocking submit
-      if (
-        godownEnabled === "yes" &&
-        safeGodowns.length > 0 &&
-        !entry.godownId
-      ) {
-        newErrors[`entry${index}.godownId`] = ""; 
+        // 🚨 Godown missing → only soft warning, NOT blocking submit
+      });
+    } else {
+      formData.entries.forEach((entry, index) => {
+        if (!entry.ledgerId)
+          newErrors[`entry${index}.ledgerId`] = "Ledger is required";
+        if ((entry.amount ?? 0) <= 0)
+          newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
+      });
+
+      const debitTotal = formData.entries
+        .filter((e) => e.type === "debit")
+        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+
+      const creditTotal = formData.entries
+        .filter((e) => e.type === "credit")
+        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+
+      if (Math.abs(debitTotal - creditTotal) > 0.01) {
+        newErrors.entries = "Debit and credit amounts must balance";
       }
-    });
-  } else {
-    formData.entries.forEach((entry, index) => {
-      if (!entry.ledgerId)
-        newErrors[`entry${index}.ledgerId`] = "Ledger is required";
-      if ((entry.amount ?? 0) <= 0)
-        newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
-    });
-
-    const debitTotal = formData.entries
-      .filter((e) => e.type === "debit")
-      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
-
-    const creditTotal = formData.entries
-      .filter((e) => e.type === "credit")
-      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
-
-    if (Math.abs(debitTotal - creditTotal) > 0.01) {
-      newErrors.entries = "Debit and credit amounts must balance";
     }
-  }
 
-  if (!formData.entries.length) {
-    newErrors.entries = "At least one entry is required";
-  }
+    if (!formData.entries.length) {
+      newErrors.entries = "At least one entry is required";
+    }
 
-  setErrors(newErrors);
-  return Object.keys(newErrors).filter((k) => newErrors[k]).length === 0;
-};
+    setErrors(newErrors);
+    return Object.keys(newErrors).filter((k) => newErrors[k]).length === 0;
+  };
 
   const calculateTotals = () => {
     if (formData.mode === "item-invoice") {
@@ -1456,25 +1469,25 @@ const PurchaseVoucher: React.FC = () => {
             </div>
 
             {/* Godown Enable/Disable dropdown */}
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="godownEnabled"
-              >
-                Enable Godown Selection
-              </label>
-              <select
-                id="godownEnabled"
-                value={godownEnabled}
-                onChange={(e) =>
-                  setGodownEnabled(e.target.value as "yes" | "no")
-                }
-                className={getSelectClasses(theme)}
-              >
-                <option value="yes">Yes</option>
-                <option value="no">No</option>
-              </select>
-            </div>
+           {visibleColumns.godown && (
+  <div>
+    <label className="block text-sm font-medium mb-1" htmlFor="godownEnabled">
+      Enable Godown Selection
+    </label>
+    <select
+      id="godownEnabled"
+      value={godownEnabled}
+      onChange={(e) =>
+        setGodownEnabled(e.target.value as "yes" | "no")
+      }
+      className={getSelectClasses(theme)}
+    >
+      <option value="yes">Yes</option>
+      <option value="no">No</option>
+    </select>
+  </div>
+)}
+
             <div>
               <label
                 className="block text-sm font-medium mb-1"
@@ -1595,7 +1608,7 @@ const PurchaseVoucher: React.FC = () => {
                       )}
                       <th className={TABLE_STYLES.headerRight}>Discount</th>
                       <th className={TABLE_STYLES.headerRight}>Amount</th>
-                      {godownEnabled === "yes" && (
+                      {godownEnabled === "yes" && visibleColumns.godown && (
                         <th className={TABLE_STYLES.header}>Godown</th>
                       )}
                       <th className={TABLE_STYLES.headerCenter}>Action</th>
@@ -1734,7 +1747,7 @@ const PurchaseVoucher: React.FC = () => {
                           </td>
 
                           {/* GODOWN (Show only if Enabled) */}
-                          {godownEnabled === "yes" && (
+                          {godownEnabled === "yes" && visibleColumns.godown && (
                             <td className="px-1 py-2 min-w-[95px]">
                               <select
                                 name="godownId"
@@ -1743,7 +1756,7 @@ const PurchaseVoucher: React.FC = () => {
                                 className={`${TABLE_STYLES.select} min-w-[95px] text-xs`}
                               >
                                 <option value="">Gdn</option>
-                                {safeGodowns.map((g) => (
+                                {godowndata.map((g) => (
                                   <option key={g.id} value={g.id}>
                                     {g.name}
                                   </option>
@@ -2236,19 +2249,19 @@ const PurchaseVoucher: React.FC = () => {
                 )}
                 {formData.purchaseLedgerId && (
                   <div className="mt-1.5">
-                    <strong>Purchase Ledger:</strong>{" "}
+                    <strong>Purchase Ledger:</strong>
                     {getPurchaseLedgerName(formData.purchaseLedgerId)}
                   </div>
                 )}
                 {formData.dispatchDetails?.destination && (
                   <div>
-                    <strong>Origin:</strong>{" "}
+                    <strong>Origin:</strong>
                     {formData.dispatchDetails.destination}
                   </div>
                 )}
               </div>
             </div>
-          </div>{" "}
+          </div>
           {/* Particulars Table */}
           {formData.mode === "item-invoice" ? (
             <table className={PRINT_STYLES.table}>
@@ -2293,7 +2306,6 @@ const PurchaseVoucher: React.FC = () => {
 
                     return (
                       <tr key={entry.id}>
-                        {" "}
                         <td className={`${PRINT_STYLES.cellCenter} font-bold`}>
                           {index + 1}
                         </td>
@@ -2530,7 +2542,7 @@ const PurchaseVoucher: React.FC = () => {
                 </tr>
               </tfoot>
             </table>
-          )}{" "}
+          )}
           {/* Amount in Words */}
           <div className="border border-black p-2.5 mb-4">
             <strong className="text-[11pt]">
@@ -2540,7 +2552,7 @@ const PurchaseVoucher: React.FC = () => {
               Rupees {total > 0 ? total.toLocaleString() : "Zero"} Only
               {total > 0 && ` (₹${total.toLocaleString()})`}
             </div>
-          </div>{" "}
+          </div>
           {/* GST Calculation Summary */}
           {formData.entries.filter(
             (entry) =>
@@ -2562,7 +2574,7 @@ const PurchaseVoucher: React.FC = () => {
                         </span>
                       </div>
                       <div className="text-[9pt] mb-2">
-                        <strong>GST Rates Used:</strong>{" "}
+                        <strong>GST Rates Used:</strong>
                         {gstInfo.gstRatesUsed.join("%, ")}%
                       </div>
                       {Object.entries(gstInfo.breakdown).map(([rate, data]) => (
@@ -2578,7 +2590,7 @@ const PurchaseVoucher: React.FC = () => {
                         </div>
                       ))}
                       <div className="mt-2 text-center text-[9pt] italic text-gray-600">
-                        This invoice includes {gstInfo.uniqueGstRatesCount}{" "}
+                        This invoice includes {gstInfo.uniqueGstRatesCount}
                         different GST rate
                         {gstInfo.uniqueGstRatesCount > 1 ? "s" : ""} as per item
                         specifications
@@ -2588,7 +2600,7 @@ const PurchaseVoucher: React.FC = () => {
                 })()}
               </div>
             </div>
-          )}{" "}
+          )}
           {/* Footer Section */}
           <div className="flex justify-between mt-12 pt-4 border-t border-gray-300">
             <div className="flex-1">

@@ -386,8 +386,6 @@ const ReceiptVoucher: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    
-
     try {
       const payload = {
         ...formData,
@@ -829,19 +827,28 @@ const ReceiptVoucher: React.FC = () => {
                     value={String(formData.entries[0].ledgerId || "")}
                     onChange={(e) => {
                       const updated = [...formData.entries];
-                      updated[0].ledgerId = String(e.target.value); // FIXED
+                      updated[0].ledgerId = String(e.target.value);
+
+                      // 🔄 Single entry me type always Credit
+                      updated[0].type = "credit";
+
                       setFormData({ ...formData, entries: updated });
                     }}
+                    required
                     className={`w-full p-2 rounded border ${
                       theme === "dark"
                         ? "bg-gray-700 border-gray-600 text-gray-100"
                         : "bg-white border-gray-300 text-gray-900"
-                    }`}
+                    } focus:border-blue-500 focus:ring-blue-500`}
                   >
                     <option value="">Select Cash/Bank Ledger</option>
 
-                    {cashBankLedgers.map((l: Ledger) => (
-                      <option key={l.id} value={String(l.id)}>
+                    {/* 💥 Hard-coded Cash/Bank with map */}
+                    {[
+                      { id: "cash", name: "Cash" },
+                      { id: "bank", name: "Bank" },
+                    ].map((l) => (
+                      <option key={l.id} value={l.id}>
                         {l.name}
                       </option>
                     ))}

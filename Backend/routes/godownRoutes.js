@@ -99,6 +99,8 @@ router.get('/', async (req, res) => {
         `SELECT * FROM godowns WHERE company_id = ? OR (company_id = 0 AND owner_type = 'employee' AND owner_id = 0) ORDER BY name`,
         [company_id]
       );
+
+      
     } else {
       return res.status(400).json({ success: false, message: 'company_id, owner_type, or owner_id are required' });
     }

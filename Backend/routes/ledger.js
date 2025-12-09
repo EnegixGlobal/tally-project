@@ -127,36 +127,41 @@ router.post("/", async (req, res) => {
 
 // Get only Cash/Bank Ledgers (for Contra Voucher)
 router.get("/cash-bank", async (req, res) => {
- 
   const { company_id, owner_type, owner_id } = req.query;
 
   try {
-    // Validate top-level tenant ownership required
     if (!company_id || !owner_type || !owner_id) {
-      return res
-        .status(400)
-        .json({ message: "companyId, ownerType, and ownerId are required" });
+      return res.status(400).json({ message: "companyId, ownerType, and ownerId are required" });
     }
+
     const [rows] = await db.execute(
       `
       SELECT 
-        l.id, 
-        l.name, 
-        g.name AS groupName, 
-        g.type AS groupType
+        l.id,
+        l.name,
+        g.name AS groupName
       FROM ledgers l
       INNER JOIN ledger_groups g ON l.group_id = g.id
-      WHERE g.type IN ('Cash', 'Bank') AND l.company_id = ? AND l.owner_type = ? AND l.owner_id = ?
-    `,
+      WHERE 
+        g.name IN ('Cash', 'Bank')  -- ✔ FIXED
+        AND l.company_id = ?
+        AND l.owner_type = ?
+        AND l.owner_id = ?
+      ORDER BY l.name ASC
+      `,
       [company_id, owner_type, owner_id]
     );
 
     res.json(rows);
+    
   } catch (err) {
     console.error("Error fetching cash/bank ledgers:", err);
     res.status(500).json({ message: "Failed to fetch cash/bank ledgers" });
   }
 });
+
+
+
 // Create multiple ledgers in bulk
 router.post("/bulk", async (req, res) => {
   const { ledgers, companyId, ownerType, ownerId } = req.body;

@@ -13,10 +13,10 @@ const CreditNoteVoucher: React.FC = () => {
   const navigate = useNavigate();
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
     const companyId = localStorage.getItem('company_id');
-    const ownerType = localStorage.getItem('userType');
+    const ownerType = localStorage.getItem('supplier');
     const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
     // Purchase Ledger dropdown should show ledgers with group indicating purchase ledgers or expense ledgers
-    const partyLedgers = ledgers.filter(l => l.groupName === 'Sundry Creditors' || l.groupName === 'Sundry Debtors');
+    const partyLedgers = ledgers
     // const salesLedgers = ledgers.filter(l => l.groupName === 'Sales');
   
       useEffect(() => {
