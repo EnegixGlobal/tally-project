@@ -10,8 +10,7 @@ interface Ledgers {
   groupName: string;
 }
 const PaymentVoucher: React.FC = () => {
-  const { theme, vouchers, companyInfo } =
-    useAppContext();
+  const { theme, vouchers, companyInfo } = useAppContext();
 
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -81,12 +80,13 @@ const PaymentVoucher: React.FC = () => {
 
     const fetchVoucher = async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers/${id}`);
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`
+        );
         const json = await res.json();
 
         // Backend returns { data: {...} }
         const v = json.data;
-  
 
         if (!v) {
           console.error("Invalid response format", json);
@@ -96,7 +96,7 @@ const PaymentVoucher: React.FC = () => {
         // -----------------------------
         // FIX: Convert backend entries
         // -----------------------------
-        const mappedEntries = (v.entries || []).map((e:any) => ({
+        const mappedEntries = (v.entries || []).map((e: any) => ({
           id: e.id?.toString() || "",
           ledgerId: e.ledger_id?.toString() || "",
           amount: Number(e.amount) || 0,
@@ -222,32 +222,45 @@ const PaymentVoucher: React.FC = () => {
 
   const handleEntryChange = (
     index: number,
-    e: React.ChangeEvent<
-      HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement
-    >
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
     const updatedEntries = [...formData.entries];
+
     updatedEntries[index] = {
       ...updatedEntries[index],
       [name]:
-        type === "number"
-          ? value === "" // agar user ne field blank kar diya
-            ? "" // blank rakho (string)
-            : parseFloat(value) // otherwise number bana do
-          : value,
+        type === "number" ? (value === "" ? "" : parseFloat(value)) : value,
     };
-    // if (formData.mode === "single-entry") {
-    //   if (index === 0) updatedEntries[0].type = "debit";
-    //   if (index === 1) updatedEntries[1].type = "credit";
-    // }
+
+    // SINGLE ENTRY FIXED LOGIC
+    if (formData.mode === "single-entry") {
+      // Entry[0] → Credit (Cash/Bank)
+      updatedEntries[0].type = "credit";
+
+      // Ensure Entry[1] always exists
+      if (!updatedEntries[1]) {
+        updatedEntries.push({
+          id: "2",
+          ledgerId: "",
+          amount: 0,
+          type: "debit",
+          narration: "",
+        });
+      }
+
+      // Entry[1] → Debit (Party Ledger)
+      updatedEntries[1].type = "debit";
+
+      // Auto balance
+      updatedEntries[0].amount = Number(updatedEntries[1].amount) || 0;
+    }
+
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
     setErrors((prev) => ({ ...prev, [`${name}${index}`]: "" }));
 
     if (e.target.value === "add-new") {
-      navigate("/app/masters/ledger/create"); // Redirect to ledger creation page
-    } else {
-      handleChange(e); // normal update
+      navigate("/app/masters/ledger/create");
     }
   };
 
@@ -296,7 +309,9 @@ const PaymentVoucher: React.FC = () => {
 
   useEffect(() => {
     fetch(
-      `${import.meta.env.VITE_API_URL}/api/ledger/cash-bank?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      `${
+        import.meta.env.VITE_API_URL
+      }/api/ledger/cash-bank?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((res) => res.json())
       .then((data) => {
@@ -304,11 +319,14 @@ const PaymentVoucher: React.FC = () => {
       })
       .catch((err) => console.error("Ledger fetch error:", err));
   }, []);
+
   useEffect(() => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
         setLedgers(data);
@@ -341,8 +359,9 @@ const PaymentVoucher: React.FC = () => {
       referenceNo: formData.referenceNo,
       supplierInvoiceDate: formData.supplierInvoiceDate || null,
       entries: formData.entries,
-      ownerType,
-      ownerId,
+      owner_type: ownerType,
+      owner_id: ownerId,
+      companyId: companyId,
     };
 
     try {
@@ -368,9 +387,7 @@ const PaymentVoucher: React.FC = () => {
         icon: "success",
         title: "Success",
         text: data.message || "Voucher saved successfully!",
-      }).then(
-        () => navigate("/app/voucher-register/payment") 
-      );
+      }).then(() => navigate("/app/voucher-register/payment"));
     } catch (error: any) {
       console.error("Error submitting voucher:", error);
       Swal.fire("Error", error.message || "Failed to save voucher.", "error");
@@ -656,7 +673,14 @@ const PaymentVoucher: React.FC = () => {
                         ? [
                             {
                               id: "1",
-                              ledgerId: "",
+                              ledgerId: "", // CASH/BANK Ledger
+                              amount: 0,
+                              type: "credit",
+                              narration: "",
+                            },
+                            {
+                              id: "2",
+                              ledgerId: "", // Party Ledger
                               amount: 0,
                               type: "debit",
                               narration: "",
@@ -677,7 +701,7 @@ const PaymentVoucher: React.FC = () => {
                               type: "credit",
                               narration: "",
                             },
-                          ], // 👈 double-entry me 2 line by default
+                          ],
                   }));
                 }}
                 className={`w-full p-2 rounded border ${
@@ -758,8 +782,8 @@ const PaymentVoucher: React.FC = () => {
 
                   <select
                     name="ledgerId"
-                    value={formData.entries[1]?.ledgerId || ""}
-                    onChange={(e) => handleEntryChange(1, e)}
+                    value={formData.entries[0]?.ledgerId || ""}
+                    onChange={(e) => handleEntryChange(0, e)}
                     required
                     className={`w-full p-2 rounded border ${
                       theme === "dark"
@@ -768,9 +792,11 @@ const PaymentVoucher: React.FC = () => {
                     } focus:border-blue-500 focus:ring-blue-500`}
                   >
                     <option value="">Select Cash/Bank Ledger</option>
+
+                    {/* 💥 Hardcoded Cash/Bank List inside map */}
                     {cashBankLedgers.map((ledger) => (
                       <option key={ledger.id} value={ledger.id}>
-                        {ledger.name} ({ledger.groupName})
+                        {ledger.groupName}
                       </option>
                     ))}
                   </select>
@@ -816,78 +842,83 @@ const PaymentVoucher: React.FC = () => {
                   </thead>
 
                   <tbody>
-                    {formData.entries.map((entry, index) => (
-                      <tr
-                        key={index}
-                        className={`${
-                          theme === "dark"
-                            ? "border-b border-gray-600"
-                            : "border-b border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2">
-                          <select
-                            name="ledgerId"
-                            value={entry.ledgerId}
-                            onChange={(e) => handleEntryChange(index, e)}
-                            required
-                            className={`w-full p-2 rounded border ${
-                              theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
-                            } focus:border-blue-500 focus:ring-blue-500`}
-                          >
-                            <option value="">Select Party Ledger</option>
-                            {ledgers
-                              .filter(
-                                (l) => l.type !== "cash" && l.type !== "bank"
-                              )
-                              .map((ledger) => (
-                                <option key={ledger.id} value={ledger.id}>
-                                  {ledger.name}
-                                </option>
-                              ))}
-                          </select>
-                        </td>
+                    {/* 👉 Entry[0] = Cash/Bank (Credit) — UI me show nahi karenge */}
+                    {formData.entries.slice(1).map((entry, i) => {
+                      const index = i + 1; // Actual index in full entries array
 
-                        {/* ❌ DR/CR SELECT REMOVED */}
+                      return (
+                        <tr
+                          key={index}
+                          className={`${
+                            theme === "dark"
+                              ? "border-b border-gray-600"
+                              : "border-b border-gray-300"
+                          }`}
+                        >
+                          <td className="px-4 py-2">
+                            <select
+                              name="ledgerId"
+                              value={entry.ledgerId}
+                              onChange={(e) => handleEntryChange(index, e)}
+                              required
+                              className={`w-full p-2 rounded border ${
+                                theme === "dark"
+                                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                                  : "bg-white border-gray-300 text-gray-900"
+                              } focus:border-blue-500 focus:ring-blue-500`}
+                            >
+                              <option value="">Select Party Ledger</option>
+                              {ledgers
+                                .filter(
+                                  (l) =>
+                                    l.groupName !== "Bank Accounts" &&
+                                    l.groupName !== "Cash-in-Hand"
+                                )
+                                .map((ledger) => (
+                                  <option key={ledger.id} value={ledger.id}>
+                                    {ledger.name}
+                                  </option>
+                                ))}
+                            </select>
+                          </td>
 
-                        <td className="px-4 py-2">
-                          <input
-                            type="number"
-                            name="amount"
-                            value={entry.amount}
-                            onChange={(e) => handleEntryChange(index, e)}
-                            required
-                            min="0"
-                            step="0.01"
-                            placeholder="0.00"
-                            className={`w-full p-2 rounded border text-right ${
-                              theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
-                            } focus:border-blue-500 focus:ring-blue-500`}
-                          />
-                        </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="number"
+                              name="amount"
+                              value={entry.amount}
+                              onChange={(e) => handleEntryChange(index, e)}
+                              required
+                              min="0"
+                              step="0.01"
+                              placeholder="0.00"
+                              className={`w-full p-2 rounded border text-right ${
+                                theme === "dark"
+                                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                                  : "bg-white border-gray-300 text-gray-900"
+                              } focus:border-blue-500 focus:ring-blue-500`}
+                            />
+                          </td>
 
-                        <td className="px-4 py-2 text-center">
-                          <button
-                            type="button"
-                            onClick={() => removeEntry(index)}
-                            disabled={formData.entries.length <= 1}
-                            className={`p-1 rounded ${
-                              formData.entries.length <= 1
-                                ? "opacity-50 cursor-not-allowed"
-                                : theme === "dark"
-                                ? "hover:bg-gray-600"
-                                : "hover:bg-gray-300"
-                            }`}
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </td>
-                      </tr>
-                    ))}
+                          <td className="px-4 py-2 text-center">
+                            <button
+                              type="button"
+                              onClick={() => removeEntry(index)}
+                              disabled={formData.entries.length <= 2}
+                              className={`p-1 rounded ${
+                                formData.entries.length <= 2
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : theme === "dark"
+                                  ? "hover:bg-gray-600"
+                                  : "hover:bg-gray-300"
+                              }`}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
 
                   <tfoot>
@@ -1020,15 +1051,22 @@ const PaymentVoucher: React.FC = () => {
                             value={entry.type}
                             onChange={(e) => handleEntryChange(index, e)}
                             required
-                            title="Select debit or credit"
+                            disabled={index === 0} // First entry always Dr
+                            title={
+                              index === 0
+                                ? "Debit is fixed for first entry"
+                                : "Select debit or credit"
+                            }
                             className={`w-full p-2 rounded border ${
                               theme === "dark"
                                 ? "bg-gray-700 border-gray-600 text-gray-100"
                                 : "bg-white border-gray-300 text-gray-900"
+                            } ${
+                              index === 0 ? "opacity-60 cursor-not-allowed" : ""
                             } focus:border-blue-500 focus:ring-blue-500`}
                           >
                             <option value="debit">Dr</option>
-                            <option value="credit">Cr</option>
+                            {index !== 0 && <option value="credit">Cr</option>}
                           </select>
                         </td>
                         <td className="px-4 py-2">
