@@ -446,139 +446,152 @@ const SalesVoucher: React.FC = () => {
     }
   };
 
- const handleEntryChange = async (
-  index: number,
-  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-) => {
-  const { name, value, type } = e.target;
-  const updatedEntries = [...formData.entries];
-  const entry = updatedEntries[index];
+  const handleEntryChange = async (
+    index: number,
+    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+  ) => {
+    const { name, value, type } = e.target;
+    const updatedEntries = [...formData.entries];
+    const entry = updatedEntries[index];
 
-  const recalcAmount = (ent: any) => {
-    const qty = Number(ent.quantity || 0);
-    const rate = Number(ent.rate || 0);
-    const discount = Number(ent.discount || 0);
-    const gstTotal =
-      Number(ent.cgstRate || 0) +
-      Number(ent.sgstRate || 0) +
-      Number(ent.igstRate || 0);
+    const recalcAmount = (ent: any) => {
+      const qty = Number(ent.quantity || 0);
+      const rate = Number(ent.rate || 0);
+      const discount = Number(ent.discount || 0);
+      const gstTotal =
+        Number(ent.cgstRate || 0) +
+        Number(ent.sgstRate || 0) +
+        Number(ent.igstRate || 0);
 
-    return qty * rate + (qty * rate * gstTotal) / 100 - discount;
-  };
+      return qty * rate + (qty * rate * gstTotal) / 100 - discount;
+    };
 
-  if (formData.mode === "item-invoice") {
-    // 1️⃣ ITEM SELECT
-    if (name === "itemId") {
-      const details = getItemDetails(value);
-      const gst = details.gstRate || 0;
+    if (formData.mode === "item-invoice") {
+      // 1️⃣ ITEM SELECT
+      if (name === "itemId") {
+        const details = getItemDetails(value);
+        const gst = details.gstRate || 0;
 
-      updatedEntries[index] = {
-        ...entry,
-        itemId: value,
-        hsnCode: details.hsnCode || "",
-        unitId: details.unitId || "",
-        unitLabel: details.unitLabel || "",
-        batches: details.batches || [],
-        batchNumber: "",
-        rate: details.rate || 0,
-        quantity: 0,
-        gstRate: gst,
-        cgstRate: gst / 2,
-        sgstRate: gst / 2,
-        igstRate: 0,
-      };
+        updatedEntries[index] = {
+          ...entry,
+          itemId: value,
+          hsnCode: details.hsnCode || "",
+          unitId: details.unitId || "",
+          unitLabel: details.unitLabel || "",
+          batches: details.batches || [],
+          batchNumber: "",
+          rate: details.rate || 0,
+          quantity: 0,
+          gstRate: gst,
+          cgstRate: gst / 2,
+          sgstRate: gst / 2,
+          igstRate: 0,
+        };
 
-      updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-      setFormData((p) => ({ ...p, entries: updatedEntries }));
-      return;
-    }
-
-    // 2️⃣ BATCH SELECT
-    if (name === "batchNumber") {
-      const selected = (entry.batches || []).find(
-        (b: any) => String(b.batchName) === String(value)
-      );
-
-      updatedEntries[index] = {
-        ...entry,
-        batchNumber: value,
-        availableQty: Number(
-          selected?.batchQuantity ?? selected?.quantity ?? 0
-        ),
-      };
-
-      setFormData((p) => ({ ...p, entries: updatedEntries }));
-      return;
-    }
-
-    // 3️⃣ QUANTITY UPDATE
-    if (name === "quantity") {
-      const oldQty = Number(entry.quantity || 0);
-      const newQty = Number(value || 0);
-
-      const selectedBatch = (entry.batches || []).find(
-        (b: any) => String(b.batchName) === String(entry.batchNumber)
-      );
-
-      const availableQty = Number(
-        selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
-      );
-
-      if (!availableQty || availableQty <= 0) {
-        Swal.fire({
-          icon: "error",
-          title: "Stock Not Available",
-        });
+        updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+        setFormData((p) => ({ ...p, entries: updatedEntries }));
         return;
       }
 
-      updatedEntries[index].quantity =
-        newQty > availableQty ? availableQty : newQty;
+      // 2️⃣ BATCH SELECT
+      if (name === "batchNumber") {
+        const selected = (entry.batches || []).find(
+          (b: any) => String(b.batchName) === String(value)
+        );
 
-      updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-      setFormData((p) => ({ ...p, entries: updatedEntries }));
+        updatedEntries[index] = {
+          ...entry,
+          batchNumber: value,
+          availableQty: Number(
+            selected?.batchQuantity ?? selected?.quantity ?? 0
+          ),
+        };
 
-      const diffQty = newQty - oldQty;
-      if (entry.itemId && entry.batchNumber && diffQty !== 0) {
-        try {
-          // 🔹 Update Stock Live
-          await fetch(
-            `${import.meta.env.VITE_API_URL}/api/stock-items/${
-              entry.itemId
-            }/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-            {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                batchName: entry.batchNumber,
-                quantity: -diffQty,
-              }),
-            }
-          );
-
-        
-        } catch (err) {
-          console.error("❌ Stock history upload failed:", err);
-        }
+        setFormData((p) => ({ ...p, entries: updatedEntries }));
+        return;
       }
 
-      return;
-    }
+      // 3️⃣ QUANTITY UPDATE
+      if (name === "quantity") {
+  const oldQty = Number(entry.quantity || 0);
+  const newQty = Number(value || 0);
 
-    // 4️⃣ Rate / Discount
-    if (["rate", "discount"].includes(name)) {
-      updatedEntries[index][name] = Number(value) || 0;
-      updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-      setFormData((p) => ({ ...p, entries: updatedEntries }));
-      return;
+  const selectedBatch = (entry.batches || []).find(
+    (b: any) => String(b.batchName) === String(entry.batchNumber)
+  );
+
+  const availableQty = Number(
+    selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
+  );
+
+  // 🟡 No stock at all
+  if (availableQty <= 0) {
+    Swal.fire({
+      icon: "warning",
+      title: "Stock Not Available in the Selected Batch",
+    });
+
+    updatedEntries[index].quantity = 0;
+    updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+    setFormData((p) => ({ ...p, entries: updatedEntries }));
+    return;
+  }
+
+  let finalQty = newQty;
+
+  // 🔴 User enters more than available
+  if (newQty > availableQty) {
+    Swal.fire({
+      icon: "warning",
+      title: "Stock Not Available",
+      text: `Only ${availableQty} available`,
+    });
+
+    finalQty = availableQty; // 👈 FIX: force correct qty
+  }
+
+  updatedEntries[index].quantity = finalQty;
+  updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+  setFormData((p) => ({ ...p, entries: updatedEntries }));
+
+  // ⭐ DATABASE PATCH MUST ALWAYS RUN for correct qty update
+  const diffQty = finalQty - oldQty;
+
+  if (entry.itemId && entry.batchNumber && diffQty !== 0) {
+    try {
+      await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            batchName: entry.batchNumber,
+            quantity: -diffQty, // reduce stock
+          }),
+        }
+      );
+    } catch (err) {
+      console.error("❌ Stock update failed:", err);
     }
   }
 
-  updatedEntries[index][name] =
-    type === "number" ? Number(value) || 0 : value;
-  setFormData((p) => ({ ...p, entries: updatedEntries }));
-};
+  return;
+}
 
+
+      // 4️⃣ Rate / Discount
+      if (["rate", "discount"].includes(name)) {
+        updatedEntries[index][name] = Number(value) || 0;
+        updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+        setFormData((p) => ({ ...p, entries: updatedEntries }));
+        return;
+      }
+    }
+
+    updatedEntries[index][name] =
+      type === "number" ? Number(value) || 0 : value;
+    setFormData((p) => ({ ...p, entries: updatedEntries }));
+  };
 
   const addEntry = () => {
     setFormData((prev) => ({
@@ -610,74 +623,75 @@ const SalesVoucher: React.FC = () => {
     updatedEntries.splice(index, 1);
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
   };
- const validateForm = () => {
-  const newErrors: { [key: string]: string } = {};
-  if (!formData.date) newErrors.date = "Date is required";
-  if (!formData.partyId) newErrors.partyId = "Party is required";
-  if (!formData.number) newErrors.number = "Voucher number is required";
+  const validateForm = () => {
+    const newErrors: { [key: string]: string } = {};
+    if (!formData.date) newErrors.date = "Date is required";
+    if (!formData.partyId) newErrors.partyId = "Party is required";
+    if (!formData.number) newErrors.number = "Voucher number is required";
 
-  if (formData.mode === "item-invoice") {
-    if (!formData.salesLedgerId)
-      newErrors.salesLedgerId = "Sales Ledger is required";
+    if (formData.mode === "item-invoice") {
+      if (!formData.salesLedgerId)
+        newErrors.salesLedgerId = "Sales Ledger is required";
 
-    formData.entries.forEach((entry, index) => {
-      if (!entry.itemId)
-        newErrors[`entry${index}.itemId`] = "Item is required";
+      formData.entries.forEach((entry, index) => {
+        if (!entry.itemId)
+          newErrors[`entry${index}.itemId`] = "Item is required";
 
-      if ((entry.quantity ?? 0) <= 0)
-        newErrors[`entry${index}.quantity`] = "Quantity must be greater than 0";
-
-      // ✅ Godown only required IF:
-      // - Enabled by user (YES)
-      // - Column visible in settings
-      // - Godowns exist in database
-      if (
-        formData.mode === "item-invoice" &&
-        godownEnabled === "yes" &&
-        columnSettings.showGodown === true &&
-        godownList.length > 0 &&
-        !entry.godownId
-      ) {
-        newErrors[`entry${index}.godownId`] = "Please select Godown";
-      }
-
-      if (entry.itemId) {
-        const stockItem = safeStockItems.find(
-          (item) => item.id === entry.itemId
-        );
-        if (stockItem && (entry.quantity ?? 0) > stockItem.openingBalance) {
+        if ((entry.quantity ?? 0) <= 0)
           newErrors[`entry${index}.quantity`] =
-            `Quantity exceeds available stock (${stockItem.openingBalance})`;
+            "Quantity must be greater than 0";
+
+        // ✅ Godown only required IF:
+        // - Enabled by user (YES)
+        // - Column visible in settings
+        // - Godowns exist in database
+        if (
+          formData.mode === "item-invoice" &&
+          godownEnabled === "yes" &&
+          columnSettings.showGodown === true &&
+          godownList.length > 0 &&
+          !entry.godownId
+        ) {
+          newErrors[`entry${index}.godownId`] = "Please select Godown";
         }
+
+        if (entry.itemId) {
+          const stockItem = safeStockItems.find(
+            (item) => item.id === entry.itemId
+          );
+          if (stockItem && (entry.quantity ?? 0) > stockItem.openingBalance) {
+            newErrors[
+              `entry${index}.quantity`
+            ] = `Quantity exceeds available stock (${stockItem.openingBalance})`;
+          }
+        }
+      });
+    } else {
+      formData.entries.forEach((entry, index) => {
+        if (!entry.ledgerId)
+          newErrors[`entry${index}.ledgerId`] = "Ledger is required";
+        if ((entry.amount ?? 0) <= 0)
+          newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
+      });
+
+      const debitTotal = formData.entries
+        .filter((e) => e.type === "debit")
+        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+      const creditTotal = formData.entries
+        .filter((e) => e.type === "credit")
+        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+      if (Math.abs(debitTotal - creditTotal) > 0.01) {
+        newErrors.entries = "Debit and credit amounts must balance";
       }
-    });
-  } else {
-    formData.entries.forEach((entry, index) => {
-      if (!entry.ledgerId)
-        newErrors[`entry${index}.ledgerId`] = "Ledger is required";
-      if ((entry.amount ?? 0) <= 0)
-        newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
-    });
-
-    const debitTotal = formData.entries
-      .filter((e) => e.type === "debit")
-      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
-    const creditTotal = formData.entries
-      .filter((e) => e.type === "credit")
-      .reduce((sum, e) => sum + (e.amount ?? 0), 0);
-    if (Math.abs(debitTotal - creditTotal) > 0.01) {
-      newErrors.entries = "Debit and credit amounts must balance";
     }
-  }
 
-  if (!formData.entries.length) {
-    newErrors.entries = "At least one entry is required";
-  }
+    if (!formData.entries.length) {
+      newErrors.entries = "At least one entry is required";
+    }
 
-  setErrors(newErrors);
-  return Object.keys(newErrors).length === 0;
-};
-
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   useEffect(() => {
     const fetchLedgers = async () => {
@@ -735,115 +749,112 @@ const SalesVoucher: React.FC = () => {
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+    e.preventDefault();
 
-  if (!validateForm()) {
-    alert("Please fix the errors before submitting");
-    return;
-  }
-
-  const totals = calculateTotals();
-
-  const payload = {
-    date: formData.date,
-    number: formData.number,
-    referenceNo: formData.referenceNo,
-    partyId: formData.partyId,
-    salesLedgerId: formData.salesLedgerId,
-    narration: formData.narration,
-
-    companyId,
-    ownerType,
-    ownerId,
-
-    dispatchDetails: {
-      docNo: formData.dispatchDetails.docNo,
-      through: formData.dispatchDetails.through,
-      destination: formData.dispatchDetails.destination,
-    },
-
-    entries: formData.entries,
-
-    subtotal: totals.subtotal,
-    cgstTotal: totals.cgstTotal,
-    sgstTotal: totals.sgstTotal,
-    igstTotal: totals.igstTotal,
-    discountTotal: totals.discountTotal,
-    total: totals.total,
-  };
-
-  try {
-    let voucherSaved = false;
-
-    // ********** UPDATE MODE **********
-    if (id) {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/sales-vouchers/${id}`,
-        {
-          method: "PUT",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
-      const data = await res.json();
-      voucherSaved = data.success;
-    }
-
-    // ********** CREATE MODE **********
-    if (!id) {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/sales-vouchers`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
-      );
-      const data = await res.json();
-      voucherSaved = !!data.id;
-    }
-
-    // Continue only if voucher saved correctly
-    if (!voucherSaved) {
-      Swal.fire("Error", "Save failed", "error");
+    if (!validateForm()) {
+      alert("Please fix the errors before submitting");
       return;
     }
 
-    // ********** SALE HISTORY SAVE **********
-    const historyPayload = formData.entries.map((entry) => {
-      const item = getItemDetails(entry.itemId);
+    const totals = calculateTotals();
 
-      return {
-        itemName: item.name,
-        hsnCode: entry.hsnCode || item.hsnCode || "",
-        batchNumber: entry.batchNumber || null,
-        qtyChange: -Number(entry.quantity || 0), // Negative because SALE
-        movementDate: formData.date,
-        companyId,
-        ownerType,
-        ownerId,
-      };
-    });
+    const payload = {
+      date: formData.date,
+      number: formData.number,
+      referenceNo: formData.referenceNo,
+      partyId: formData.partyId,
+      salesLedgerId: formData.salesLedgerId,
+      narration: formData.narration,
 
+      companyId,
+      ownerType,
+      ownerId,
 
-    await fetch(
-      `${import.meta.env.VITE_API_URL}/api/sales-vouchers/sale-history`,
-      {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(historyPayload),
+      dispatchDetails: {
+        docNo: formData.dispatchDetails.docNo,
+        through: formData.dispatchDetails.through,
+        destination: formData.dispatchDetails.destination,
+      },
+
+      entries: formData.entries,
+
+      subtotal: totals.subtotal,
+      cgstTotal: totals.cgstTotal,
+      sgstTotal: totals.sgstTotal,
+      igstTotal: totals.igstTotal,
+      discountTotal: totals.discountTotal,
+      total: totals.total,
+    };
+
+    try {
+      let voucherSaved = false;
+
+      // ********** UPDATE MODE **********
+      if (id) {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/sales-vouchers/${id}`,
+          {
+            method: "PUT",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        );
+        const data = await res.json();
+        voucherSaved = data.success;
       }
-    );
 
-    Swal.fire("Success", "Voucher saved successfully!", "success");
-    navigate("/app/vouchers");
+      // ********** CREATE MODE **********
+      if (!id) {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/sales-vouchers`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }
+        );
+        const data = await res.json();
+        voucherSaved = !!data.id;
+      }
 
-  } catch (err) {
-    console.error("Save error:", err);
-    Swal.fire("Error", "Server or network error", "error");
-  }
-};
+      // Continue only if voucher saved correctly
+      if (!voucherSaved) {
+        Swal.fire("Error", "Save failed", "error");
+        return;
+      }
 
+      // ********** SALE HISTORY SAVE **********
+      const historyPayload = formData.entries.map((entry) => {
+        const item = getItemDetails(entry.itemId);
+
+        return {
+          itemName: item.name,
+          hsnCode: entry.hsnCode || item.hsnCode || "",
+          batchNumber: entry.batchNumber || null,
+          qtyChange: -Number(entry.quantity || 0), // Negative because SALE
+          movementDate: formData.date,
+          companyId,
+          ownerType,
+          ownerId,
+        };
+      });
+
+      await fetch(
+        `${import.meta.env.VITE_API_URL}/api/sales-vouchers/sale-history`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(historyPayload),
+        }
+      );
+
+      Swal.fire("Success", "Voucher saved successfully!", "success");
+      navigate("/app/vouchers");
+    } catch (err) {
+      console.error("Save error:", err);
+      Swal.fire("Error", "Server or network error", "error");
+    }
+  };
 
   // Print Options Handlers
   const handlePrintClick = () => {

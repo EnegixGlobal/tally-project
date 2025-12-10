@@ -91,7 +91,7 @@ const LedgerList: React.FC = () => {
       })
     : [];
 
-  const handleDelete = async (id: string | number) => {
+ const handleDelete = async (id: string | number) => {
   const result = await Swal.fire({
     title: "Are you sure?",
     text: "This ledger will be permanently deleted!",
@@ -127,8 +127,8 @@ const LedgerList: React.FC = () => {
         showConfirmButton: false,
       });
 
-      // Refresh list (agar list page pe ho)
-      setTimeout(() => window.location.reload(), 1000);
+      // 🟢 FIX: Remove deleted ledger from list without refresh
+      setLedgers((prev) => prev.filter((l) => l.id !== id));
     } else {
       Swal.fire("Error", data.message || "Failed to delete ledger!", "error");
     }
@@ -137,6 +137,7 @@ const LedgerList: React.FC = () => {
     console.error("Delete error:", err);
   }
 };
+
 
 
   return (

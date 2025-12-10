@@ -249,36 +249,35 @@ const StockItemForm = () => {
     { value: string; label: string }[]
   >([]);
 
- // fetch units from database
-const [unitsData, setUnitsData] = useState([]);
+  // fetch units from database
+  const [unitsData, setUnitsData] = useState([]);
 
-useEffect(() => {
-  const fetchUnits = async () => {
-    if (!companyId || !ownerType || !ownerId) return;
+  useEffect(() => {
+    const fetchUnits = async () => {
+      if (!companyId || !ownerType || !ownerId) return;
 
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-      );
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
 
-      const data = await res.json();
+        const data = await res.json();
 
-      if (Array.isArray(data)) {
-        setUnitsData(data);
-      } else {
-        setUnitsData([]);
-        console.warn("Units data format incorrect:", data);
+        if (Array.isArray(data)) {
+          setUnitsData(data);
+        } else {
+          setUnitsData([]);
+          console.warn("Units data format incorrect:", data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch units:", error);
       }
+    };
 
-
-    } catch (error) {
-      console.error("Failed to fetch units:", error);
-    }
-  };
-
-  fetchUnits();
-}, [companyId, ownerType, ownerId]);
-
+    fetchUnits();
+  }, [companyId, ownerType, ownerId]);
 
   useEffect(() => {
     async function fetchCategories() {
@@ -347,7 +346,7 @@ useEffect(() => {
             taxType: item.taxType || "Taxable",
             standardPurchaseRate: item.standardPurchaseRate || 0,
             standardSaleRate: item.standardSaleRate || 0,
-            enableBatchTracking: !!item.enableBatchTracking,
+            enableBatchTracking: true,
             batchName: item.batchNumber || "",
             batchExpiryDate: item.batchExpiryDate || "",
             batchManufacturingDate: item.batchManufacturingDate || "",
@@ -364,8 +363,8 @@ useEffect(() => {
               item.batches.map((b: any) => ({
                 batchName: b.batchName || "",
                 batchQuantity: Number(b.batchQuantity) || 0,
-                batchRate: Number(b.openingRate) || 0, // correct mapping
-                openingRate: Number(b.openingValue) || 0, // UI readonly
+                batchRate: Number(b.batchRate) || 0, // RATE
+                openingRate: Number(b.openingRate) || 0,
                 batchExpiryDate: b.batchExpiryDate || "",
                 batchManufacturingDate: b.batchManufacturingDate || "",
               }))
@@ -435,7 +434,7 @@ useEffect(() => {
     taxType: "Taxable",
     standardPurchaseRate: 0,
     standardSaleRate: 0,
-    enableBatchTracking: false,
+    enableBatchTracking: true,
     batchName: "",
     batchExpiryDate: "",
     batchManufacturingDate: "",
@@ -681,13 +680,12 @@ useEffect(() => {
   ];
 
   const unitOptions =
-  unitsData.length > 0
-    ? unitsData.map((unit: any) => ({
-        value: unit.id.toString(),
-        label: unit.name,
-      }))
-    : [{ value: "", label: "No units available" }];
-
+    unitsData.length > 0
+      ? unitsData.map((unit: any) => ({
+          value: unit.id.toString(),
+          label: unit.name,
+        }))
+      : [{ value: "", label: "No units available" }];
 
   const gstClassificationOptions =
     gstClassifications.length > 0
@@ -926,8 +924,10 @@ useEffect(() => {
                         name={`openingRate-${index}`}
                         label="Opening Rate"
                         type="number"
-                        value={row.openingRate}
+                         value={Number(row.batchRate) * Number(row.batchQuantity)}
+                        onChange={() => {}}
                         error={errors[`openingRate-${index}`]}
+                        disabled
                       />
                     </div>
 
