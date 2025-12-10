@@ -88,11 +88,14 @@ const DayBook: React.FC = () => {
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherGroup | null>(
     null
   );
+
+  console.log("sell", selectedVoucher);
   const [groupedVouchers, setGroupedVouchers] = useState<VoucherGroup[]>([]);
   const [processedEntries, setProcessedEntries] = useState<DayBookEntry[]>([]);
 
   //  const [entries, setEntries] = useState([]);
   //  const [entries, setEntries] = useState<DayBookEntry[]>([]);
+
   useEffect(() => {
     const company_id = localStorage.getItem("company_id");
     const owner_type = localStorage.getItem("supplier");
@@ -107,55 +110,62 @@ const DayBook: React.FC = () => {
     )
       .then((res) => res.json())
       .then((data) => {
+        console.log("data", data);
+
         const grouped: Record<string, VoucherGroup> = {};
 
-        data.forEach((d: any) => {
-          const id = d.id;
+        data.forEach((voucher: any) => {
+          const id = voucher.id;
 
+          // Create base group if not exists
           if (!grouped[id]) {
             grouped[id] = {
               voucherId: id,
-              voucherNo: d.voucher_number,
-              voucherType: d.voucher_type,
-              date: d.date,
+              voucherNo: voucher.voucher_number,
+              voucherType: voucher.voucher_type,
+              date: voucher.date,
               totalDebit: 0,
               totalCredit: 0,
               entries: [],
-              narration: d.narration,
+              narration: voucher.narration,
               entriesCount: 0,
-              supplier_invoice_date: d.supplier_invoice_date,
+              supplier_invoice_date: voucher.supplier_invoice_date,
             };
           }
 
-          const amount = parseFloat(d.amount || 0);
-          const isDebit = d.entry_type === "debit";
-          const isCredit = d.entry_type === "credit";
+          // 🔥 LOOP actual entries inside voucher
+          voucher.entries.forEach((entry: any) => {
+            const amount = parseFloat(entry.amount || 0);
+            const isDebit = entry.entry_type === "debit";
+            const isCredit = entry.entry_type === "credit";
 
-          // 🔥 Correct totals before pushing
-          if (isDebit) grouped[id].totalDebit += amount;
-          if (isCredit) grouped[id].totalCredit += amount;
+            // Add totals properly
+            if (isDebit) grouped[id].totalDebit += amount;
+            if (isCredit) grouped[id].totalCredit += amount;
 
-          grouped[id].entriesCount++;
+            grouped[id].entries.push({
+              id: entry.id,
+              date: voucher.date,
+              voucherType: voucher.voucher_type,
+              voucherNo: voucher.voucher_number,
+              particulars: voucher.reference_no || "—",
+              ledgerName: entry.ledger_name || "",
+              debit: isDebit ? amount : 0,
+              credit: isCredit ? amount : 0,
+              voucherId: id,
+              narration: entry.entry_narration,
+              itemId: entry.item_id,
+            });
 
-          grouped[id].entries.push({
-            id: `${id}-${grouped[id].entriesCount}`,
-            date: d.date,
-            voucherType: d.voucher_type,
-            voucherNo: d.voucher_number,
-            particulars: d.reference_no || "—",
-            ledgerName: "",
-            debit: isDebit ? amount : 0,
-            credit: isCredit ? amount : 0,
-            voucherId: id,
-            narration: d.entry_narration,
-            itemId: d.item_id,
+            grouped[id].entriesCount++;
           });
         });
 
+        // Convert object → array
         const groupedArray = Object.values(grouped);
         setGroupedVouchers(groupedArray);
 
-        // 🌟 Detailed view data
+        // Create detailed entries list
         const detailedEntries = groupedArray.flatMap((v) =>
           v.entries.map((e) => ({
             ...e,
@@ -164,9 +174,10 @@ const DayBook: React.FC = () => {
             voucherNo: v.voucherNo,
           }))
         );
+
         setProcessedEntries(detailedEntries);
 
-        // 🌟 Summary totals
+        // Summary totals
         const totalDebit = groupedArray.reduce(
           (sum, v) => sum + v.totalDebit,
           0
@@ -185,8 +196,6 @@ const DayBook: React.FC = () => {
       })
       .catch((err) => console.error("DayBook Fetch Error:", err));
   }, []);
-
-
 
   // const processedEntries = useMemo((): DayBookEntry[] => {
 
@@ -385,6 +394,7 @@ const DayBook: React.FC = () => {
   };
 
   const handleVoucherClick = (voucher: VoucherGroup) => {
+    console.log("vchar", voucher);
     setSelectedVoucher(voucher);
   };
 
@@ -672,15 +682,11 @@ const DayBook: React.FC = () => {
                       onClick={() => handleVoucherClick(voucher)}
                     >
                       <td className="px-4 py-3">
-                        {voucher.supplier_invoice_date
-                          ? formatDate(
-                              typeof voucher.supplier_invoice_date === "string"
-                                ? voucher.supplier_invoice_date
-                                : voucher.supplier_invoice_date
-                                    .toISOString()
-                                    .slice(0, 10)
-                            )
-                          : "-"}
+                        {formatDate(
+                          typeof voucher.date === "string"
+                            ? voucher.date
+                            : voucher.date.toISOString().slice(0, 10)
+                        )}
                       </td>
 
                       <td className="px-4 py-3">
@@ -930,15 +936,14 @@ const DayBook: React.FC = () => {
                     >
                       <tr>
                         <th className="px-3 py-2 text-left">Item/Ledger</th>
-                        <th className="px-3 py-2 text-left">HSN/SAC</th>
-                        <th className="px-3 py-2 text-right">Qty</th>
-                        <th className="px-3 py-2 text-right">Rate</th>
+                        <th className="px-3 py-2 text-right">Voucher No.</th>
+                        <th className="px-3 py-2 text-right">Voucher Type</th>
                         <th className="px-3 py-2 text-right">Debit</th>
                         <th className="px-3 py-2 text-right">Credit</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {(selectedVoucher?.entries ?? []).map((entry, index) => (
+                      {(selectedVoucher.entries ?? []).map((entry, index) => (
                         <tr
                           key={index}
                           className={`border-t ${
@@ -947,6 +952,7 @@ const DayBook: React.FC = () => {
                               : "border-gray-200"
                           }`}
                         >
+                          {/* ITEM / LEDGER NAME */}
                           <td className="px-3 py-2">
                             {entry.itemId ? (
                               <div>
@@ -960,38 +966,39 @@ const DayBook: React.FC = () => {
                             ) : (
                               <div>
                                 <div className="font-medium">
-                                  {entry.particulars}
+                                  {entry.ledgerName}
                                 </div>
                                 <div className="text-xs text-gray-500">
                                   Ledger
                                 </div>
                               </div>
                             )}
+
                             {entry.narration && (
                               <div className="text-xs text-gray-500 mt-1">
                                 {entry.narration}
                               </div>
                             )}
                           </td>
-                          <td className="px-3 py-2 text-xs">
-                            {entry.hsnCode ||
-                              (entry.itemId ? getItemHSN(entry.itemId) : "-")}
-                          </td>
+
+                          {/* VOUCHER NO */}
                           <td className="px-3 py-2 text-right font-mono">
-                            {entry.quantity && entry.quantity > 0
-                              ? entry.quantity
-                              : "-"}
+                            {entry.voucherNo}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono">
-                            {entry.rate && entry.rate > 0
-                              ? formatCurrency(entry.rate)
-                              : "-"}
+
+                          {/* VOUCHER TYPE */}
+                          <td className="px-3 py-2 text-right capitalize">
+                            {entry.voucherType}
                           </td>
+
+                          {/* DEBIT */}
                           <td className="px-3 py-2 text-right font-mono">
                             {entry.debit > 0
                               ? formatCurrency(entry.debit)
                               : "-"}
                           </td>
+
+                          {/* CREDIT */}
                           <td className="px-3 py-2 text-right font-mono">
                             {entry.credit > 0
                               ? formatCurrency(entry.credit)
@@ -999,6 +1006,8 @@ const DayBook: React.FC = () => {
                           </td>
                         </tr>
                       ))}
+
+                      {/* TOTAL ROW */}
                       <tr
                         className={`border-t-2 font-bold ${
                           theme === "dark"
@@ -1006,7 +1015,7 @@ const DayBook: React.FC = () => {
                             : "border-gray-400"
                         }`}
                       >
-                        <td colSpan={4} className="px-3 py-2">
+                        <td colSpan={3} className="px-3 py-2">
                           Total:
                         </td>
                         <td className="px-3 py-2 text-right font-mono">

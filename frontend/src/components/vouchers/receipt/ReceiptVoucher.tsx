@@ -163,22 +163,32 @@ const ReceiptVoucher: React.FC = () => {
     const { name, value, type } = e.target;
 
     const updatedEntries = [...formData.entries];
-    updatedEntries[index] = {
-      ...updatedEntries[index],
-      [name]: type === "number" ? parseFloat(value) || 0 : value,
-    };
 
-    // Single-entry mode special rules
-    if (formData.mode === "single-entry") {
-      if (index === 0) updatedEntries[0].type = "debit";
-      if (index === 1) updatedEntries[1].type = "credit";
+    // 🟢 If ledgerId changed → ledgerName bhi set karo
+    if (name === "ledgerId") {
+      // Ledger find from both cashBankLedgers + allLedgers
+      const combinedLedgers = [...cashBankLedgers, ...allLedgers];
 
-      if (name === "amount") {
-        updatedEntries[0].amount = updatedEntries[1].amount;
-        updatedEntries[1].amount = updatedEntries[0].amount;
-      }
+      const ledger = combinedLedgers.find((l) => String(l.id) === value);
+
+      updatedEntries[index].ledgerId = value;
+      updatedEntries[index].ledgerName = ledger?.name || "";
+    } else {
+      // Normal update (amount, type, narration, costCentre, etc.)
+      updatedEntries[index][name] =
+        type === "number" ? parseFloat(value) || 0 : value;
     }
 
+    // 🟡 FIRST ENTRY ALWAYS CREDIT — Both modes
+    updatedEntries[0].type = "credit";
+
+    // 🟣 SINGLE ENTRY MODE → Only one row allowed (always credit)
+    if (formData.mode === "single-entry") {
+      updatedEntries.length = 1; // only 1 row allowed
+      updatedEntries[0].type = "credit";
+    }
+
+    // Update State
     setFormData((prev) => ({
       ...prev,
       entries: updatedEntries,
@@ -219,15 +229,21 @@ const ReceiptVoucher: React.FC = () => {
         // Map entries to your form shape and ensure ledgerId is string
         const mappedEntries = entriesFromApi.map((e: any, idx: number) => ({
           id: String(idx + 1),
+
           ledgerId:
             e.ledger_id !== undefined
               ? String(e.ledger_id ?? e.ledgerId ?? "")
               : String(e.ledgerId ?? ""),
+
+          ledgerName: e.ledger_name ?? e.ledgerName ?? "", // ⭐ FIX HERE
+
           amount: Number(e.amount ?? 0),
           type: e.type ?? e.entry_type ?? "credit",
           narration: e.narration ?? "",
+
           bankName: e.bank_name ?? e.bankName ?? "",
           chequeNumber: e.cheque_number ?? e.chequeNumber ?? "",
+
           costCentreId: e.cost_centre_id
             ? String(e.cost_centre_id)
             : e.costCentreId
@@ -721,6 +737,7 @@ const ReceiptVoucher: React.FC = () => {
                   const mode = e.target.value as
                     | "double-entry"
                     | "single-entry";
+
                   setFormData((prev) => ({
                     ...prev,
                     mode,
@@ -731,18 +748,27 @@ const ReceiptVoucher: React.FC = () => {
                               id: "1",
                               ledgerId: "",
                               amount: 0,
-                              type: "debit",
+                              type: "credit", // SINGLE ENTRY ALWAYS CREDIT
+                              narration: "",
+                            },
+                          ]
+                        : [
+                            // DOUBLE ENTRY DEFAULT
+                            {
+                              id: "1",
+                              ledgerId: "",
+                              amount: 0,
+                              type: "credit",
                               narration: "",
                             },
                             {
                               id: "2",
                               ledgerId: "",
                               amount: 0,
-                              type: "credit",
+                              type: "debit",
                               narration: "",
                             },
-                          ]
-                        : prev.entries,
+                          ],
                   }));
                 }}
                 className={`w-full p-2 rounded border ${

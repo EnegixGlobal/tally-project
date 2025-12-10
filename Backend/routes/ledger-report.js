@@ -1,6 +1,6 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../db"); // your mysql2/promise connection pool
+const db = require("../db");
 
 router.get("/report", async (req, res) => {
   const { ledgerId, fromDate, toDate, includeOpening, includeClosing } =
@@ -16,20 +16,18 @@ router.get("/report", async (req, res) => {
   );
 
   if (!ledgerId || !fromDate || !toDate) {
-    return res
-      .status(400)
-      .json({
-        success: false,
-        message: "Missing ledgerId, fromDate, or toDate",
-      });
+    return res.status(400).json({
+      success: false,
+      message: "Missing ledgerId, fromDate, or toDate",
+    });
   }
 
   const connection = await db.getConnection();
 
   try {
-    // Get ledger master
+    // 📌 1️⃣ Fetch Ledger Master
     const [ledRows] = await connection.execute(
-      `SELECT l.*, g.name as groupName 
+      `SELECT l.*, g.name AS groupName 
        FROM ledgers l 
        LEFT JOIN ledger_groups g ON l.group_id = g.id 
        WHERE l.id = ?`,
@@ -44,16 +42,15 @@ router.get("/report", async (req, res) => {
 
     const ledger = ledRows[0];
 
-    // AUTO DETECT REAL DATE RANGE FOR THIS LEDGER
+    // 📌 2️⃣ Find real date range of ledger
     const [[dateRange]] = await connection.execute(
-      `SELECT MIN(vm.date) as minDate, MAX(vm.date) as maxDate
-         FROM voucher_entries ve
-         JOIN voucher_main vm ON ve.voucher_id = vm.id
-         WHERE ve.ledger_id = ?`,
+      `SELECT MIN(vm.date) AS minDate, MAX(vm.date) AS maxDate
+       FROM voucher_entries ve
+       JOIN voucher_main vm ON ve.voucher_id = vm.id
+       WHERE ve.ledger_id = ?`,
       [ledgerId]
     );
 
-    // If no entry found → empty data
     if (!dateRange.minDate) {
       return res.json({
         success: true,
@@ -72,8 +69,7 @@ router.get("/report", async (req, res) => {
     const effectiveFromDate = dateRange.minDate;
     const effectiveToDate = dateRange.maxDate;
 
-
-    // Opening balance BEFORE actual min date
+    // 📌 3️⃣ Calculate Opening Balance
     const [opRows] = await connection.execute(
       `SELECT 
         SUM(CASE WHEN ve.entry_type='debit' THEN ve.amount ELSE 0 END) AS totalDebit,
@@ -94,7 +90,7 @@ router.get("/report", async (req, res) => {
         ? totalPreDebit - totalPreCredit
         : totalPreCredit - totalPreDebit);
 
-    // Fetch ACTUAL PERIOD transactions
+    // 📌 4️⃣ Fetch all transactions (ledger_name added)
     const [txns] = await connection.execute(
       `SELECT 
          vm.id AS voucher_id,
@@ -105,6 +101,7 @@ router.get("/report", async (req, res) => {
          ve.entry_type,
          ve.amount,
          ve.narration,
+         ve.ledger_name,      -- ⭐️ ledger_name added
          ve.cheque_number,
          ve.bank_name
        FROM voucher_entries ve
@@ -118,33 +115,25 @@ router.get("/report", async (req, res) => {
     const transactions = [];
     let balance = runningBalance;
 
-    // Add real opening ONLY when needed
-    if (includeOpening === "true") {
-      transactions.push({
-        id: "opening",
-        date: effectiveFromDate,
-        particulars: "Opening Balance",
-        voucherType: "",
-        voucherNo: "",
-        debit: ledger.balance_type === "debit" ? runningBalance : 0,
-        credit: ledger.balance_type === "credit" ? Math.abs(runningBalance) : 0,
-        balance,
-        isOpening: true,
-        isClosing: false,
-      });
-    }
+    // 📌 5️⃣ Add Opening Row if required
+  
 
+    // 📌 6️⃣ Add all transactions
     txns.forEach((row) => {
       const debit = row.entry_type === "debit" ? +row.amount : 0;
       const credit = row.entry_type === "credit" ? +row.amount : 0;
 
       balance += debit - credit;
+
       transactions.push({
         id: row.entry_id,
         date: row.date,
         voucherType: row.voucher_type,
         voucherNo: row.voucher_number,
-        particulars: row.narration || "-",
+
+        // ⭐️ FINAL FIX: Particulars = ledger_name (NOT narration)
+        particulars: row.ledger_name || "-",
+
         debit,
         credit,
         balance,
@@ -154,22 +143,10 @@ router.get("/report", async (req, res) => {
       });
     });
 
-    // Add real closing
-    if (includeClosing === "true") {
-      transactions.push({
-        id: "closing",
-        date: effectiveToDate,
-        particulars: "Closing Balance",
-        voucherType: "",
-        voucherNo: "",
-        debit: balance < 0 ? Math.abs(balance) : 0,
-        credit: balance > 0 ? balance : 0,
-        balance: 0,
-        isOpening: false,
-        isClosing: true,
-      });
-    }
+    // 📌 7️⃣ Add Closing Row if required
 
+
+    // 📌 8️⃣ Final Response
     return res.json({
       success: true,
       ledger,
@@ -194,7 +171,9 @@ router.get("/report", async (req, res) => {
     });
   } catch (err) {
     console.error("ERROR:", err);
-    return res.status(500).json({ success: false, message: "Internal error" });
+    return res
+      .status(500)
+      .json({ success: false, message: "Internal server error" });
   } finally {
     connection.release();
   }
