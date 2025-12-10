@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require("../db"); // mysql2/promise pool
 
 router.post("/", async (req, res) => {
-  const {
+  let {
     type,
     mode,
     date,
@@ -17,8 +17,16 @@ router.post("/", async (req, res) => {
     companyId,
   } = req.body;
 
+
   // REQUIRED validation
-  if (!type || !date || !entries.length || !owner_type || !owner_id || !companyId) {
+  if (
+    !type ||
+    !date ||
+    !entries.length ||
+    !owner_type ||
+    !owner_id ||
+    !companyId
+  ) {
     console.warn("⚠ Missing required fields:", {
       type,
       date,
@@ -30,14 +38,16 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // 🔹 Fix single-entry mode (ensure debit + credit exist)
+  // 🔹 SINGLE ENTRY MODE: If only one entry, create balancing entry
   if (mode === "single-entry" && entries.length === 1) {
     const e0 = entries[0];
+
     entries.push({
       id: "AUTO",
       ledgerId: e0.ledgerId,
+      ledgerName: e0.ledgerName || null,
       amount: e0.amount,
-      type: e0.type === "debit" ? "credit" : "debit",
+      type: e0.type === "credit" ? "debit" : "credit",
       narration: e0.narration || null,
       bankName: e0.bankName || null,
       chequeNumber: e0.chequeNumber || null,
@@ -49,7 +59,13 @@ router.post("/", async (req, res) => {
   await conn.beginTransaction();
 
   try {
-    // 1️⃣ INSERT voucher main
+    // 🔥 Auto-create ledger_name column if not exists
+    await conn.query(`
+      ALTER TABLE voucher_entries 
+      ADD COLUMN IF NOT EXISTS ledger_name VARCHAR(255) NULL;
+    `);
+
+    // 1️⃣ INSERT INTO voucher_main
     const [mainResult] = await conn.execute(
       `
       INSERT INTO voucher_main 
@@ -71,12 +87,13 @@ router.post("/", async (req, res) => {
 
     const voucherId = mainResult.insertId;
 
-    // 2️⃣ Insert entries
+    // 2️⃣ Insert entries WITH ledgerName
     const entryValues = entries.map((e) => [
       voucherId,
       Number(e.ledgerId),
-      parseFloat(e.amount || 0),
-      e.type || "debit",
+      e.ledgerName || null, // NEW FIELD
+      Number(e.amount) || 0,
+      e.type || "credit",
       e.narration || null,
       e.bankName || null,
       e.chequeNumber || null,
@@ -86,7 +103,7 @@ router.post("/", async (req, res) => {
     await conn.query(
       `
       INSERT INTO voucher_entries 
-      (voucher_id, ledger_id, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id)
+      (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id)
       VALUES ?
       `,
       [entryValues]
@@ -113,19 +130,28 @@ router.post("/", async (req, res) => {
   }
 });
 
-
 router.get("/", async (req, res) => {
   const { ownerType, ownerId, voucherType } = req.query;
 
-  // Validate query parameters
   if (!ownerType || !ownerId || !voucherType) {
     return res
       .status(400)
       .json({ message: "ownerType, ownerId, voucherType required" });
   }
 
+
   try {
-    // Fetch vouchers
+    // Create ledger_name column if missing (without IF NOT EXISTS for full support)
+    await db
+      .query(
+        `
+      ALTER TABLE voucher_entries 
+      ADD COLUMN ledger_name VARCHAR(255) NULL;
+    `
+      )
+      .catch(() => {}); // ignore error if column already exists
+
+    // 1️⃣ Fetch vouchers
     const [vouchers] = await db.execute(
       `SELECT v.id, v.voucher_number AS number, v.voucher_type AS type, 
               v.date, v.reference_no, v.narration
@@ -135,39 +161,48 @@ router.get("/", async (req, res) => {
       [ownerType, ownerId, voucherType]
     );
 
-    // Extract voucher IDs
     const voucherIds = vouchers.map((v) => v.id);
-
     let entries = [];
 
-    // Fetch voucher entries
+    // 2️⃣ Fetch entries including ledgerName
     if (voucherIds.length > 0) {
+      const placeholders = voucherIds.map(() => "?").join(",");
+
       const [entryRows] = await db.query(
-        `SELECT e.id, e.voucher_id, e.ledger_id, e.amount, 
-                e.entry_type AS type, e.narration
-         FROM voucher_entries e
-         WHERE e.voucher_id IN (${voucherIds.map(() => "?").join(",")})
-         ORDER BY e.id`,
+        `
+        SELECT 
+          e.id,
+          e.voucher_id,
+          e.ledger_id,
+          e.ledger_name,  
+          e.amount,
+          e.entry_type AS type,
+          e.narration,
+          e.bank_name,
+          e.cheque_number,
+          e.cost_centre_id
+        FROM voucher_entries e
+        WHERE e.voucher_id IN (${placeholders})
+        ORDER BY e.id
+        `,
         voucherIds
       );
 
       entries = entryRows;
     }
 
-    // Attach entries to vouchers
+    // 3️⃣ Attach entries to vouchers
     const result = vouchers.map((voucher) => ({
       ...voucher,
       entries: entries
         .filter((e) => e.voucher_id === voucher.id)
-        .map(({ voucher_id, ...rest }) => rest), // Remove voucher_id
+        .map(({ voucher_id, ...rest }) => rest),
     }));
 
-
-    // Send response
-    res.json({ data: result });
+    return res.json({ data: result });
   } catch (error) {
     console.error("Error fetching vouchers:", error);
-    res
+    return res
       .status(500)
       .json({ message: "Failed to fetch vouchers", error: error.message });
   }
@@ -185,10 +220,9 @@ router.delete("/:id", async (req, res) => {
     await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
 
     // delete main
-    const [result] = await db.execute(
-      "DELETE FROM voucher_main WHERE id = ?",
-      [id]
-    );
+    const [result] = await db.execute("DELETE FROM voucher_main WHERE id = ?", [
+      id,
+    ]);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ message: "Voucher not found" });
@@ -198,7 +232,6 @@ router.delete("/:id", async (req, res) => {
       success: true,
       message: "Voucher deleted successfully",
     });
-
   } catch (error) {
     console.error("Error deleting voucher:", error);
     res.status(500).json({
@@ -208,8 +241,6 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-
-
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
 
@@ -217,6 +248,9 @@ router.put("/:id", async (req, res) => {
     return res.status(400).json({ message: "Voucher ID is required" });
   }
 
+  // FRONTEND → owner_type + owner_id भेज रहा है
+  // BACKEND → ownerType + ownerId expect कर रहा था
+  // इसलिए दोनों को सपोर्ट करने के लिए merge किया गया
   const {
     type,
     mode,
@@ -228,25 +262,28 @@ router.put("/:id", async (req, res) => {
     entries = [],
     ownerType,
     ownerId,
+    owner_type,
+    owner_id,
   } = req.body;
 
-  // 🔸 Validation
-  if (!type || !date || !entries.length || !ownerType || !ownerId) {
-    return res.status(400).json({ message: "Missing required fields" });
+  // FINAL merged owner values (जो भी आए use करो)
+  const finalOwnerType = ownerType || owner_type;
+  const finalOwnerId = ownerId || owner_id;
+
+  // VALIDATION FIXED
+  if (!type || !date || !entries.length || !finalOwnerType || !finalOwnerId) {
+    return res.status(400).json({
+      message: "Missing required fields (ownerType or ownerId is missing)",
+    });
   }
 
-  // 🧩 Auto-fix for single-entry mode
+  // Auto-fix for single-entry mode
   if (mode === "single-entry" && entries.length === 1) {
     const debitEntry = entries[0];
 
-    const oppositeLedgerId =
-      debitEntry.ledgerId === req.body.ledgerId
-        ? null
-        : req.body.ledgerId || debitEntry.ledgerId;
-
     const balancingEntry = {
       id: "auto",
-      ledgerId: oppositeLedgerId,
+      ledgerId: debitEntry.ledgerId,
       amount: debitEntry.amount,
       type: debitEntry.type === "debit" ? "credit" : "debit",
       narration: debitEntry.narration || null,
@@ -279,8 +316,8 @@ router.put("/:id", async (req, res) => {
         narration || null,
         referenceNo || null,
         supplierInvoiceDate || null,
-        ownerType,
-        ownerId,
+        finalOwnerType, // FIXED
+        finalOwnerId, // FIXED
         id,
       ]
     );
@@ -293,7 +330,7 @@ router.put("/:id", async (req, res) => {
     ]);
 
     // ---------------------------------------
-    // 3️⃣ INSERT new entries
+    // 3️⃣ INSERT updated entries
     // ---------------------------------------
     const entryValues = entries.map((entry) => [
       id,
@@ -315,9 +352,6 @@ router.put("/:id", async (req, res) => {
       [entryValues]
     );
 
-    // ---------------------------------------
-    // 4️⃣ COMMIT TRANSACTION
-    // ---------------------------------------
     await conn.commit();
     conn.release();
 
@@ -338,6 +372,7 @@ router.put("/:id", async (req, res) => {
     });
   }
 });
+
 
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
