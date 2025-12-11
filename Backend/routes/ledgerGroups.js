@@ -40,6 +40,8 @@ router.post("/", async (req, res) => {
   const ownerType = payload.ownerType;
   const companyId = parseInt(payload.companyId, 10);
 
+  console.log("form", req.body);
+
   if (!ownerType || isNaN(ownerId) || isNaN(companyId)) {
     return res
       .status(400)
@@ -53,7 +55,51 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    // 🔹 Insert into DB
+    // -----------------------------------------
+    // 1️⃣ Extract actual parent name
+    // -----------------------------------------
+    let parentName = null;
+    let parentId = null;
+
+    if (payload.under.includes(":")) {
+      parentName = payload.under.split(":")[1].trim(); // "Branch/Division"
+    } else {
+      parentName = payload.under.trim();
+    }
+
+    // -----------------------------------------
+    // 2️⃣ Check if parent group already exists
+    // -----------------------------------------
+    const [existingParent] = await db.execute(
+      `SELECT id FROM ledger_groups
+       WHERE name = ? AND company_id = ? LIMIT 1`,
+      [parentName, companyId]
+    );
+
+    if (existingParent.length > 0) {
+      parentId = existingParent[0].id;
+    } else {
+      // -----------------------------------------
+      // 3️⃣ Parent DOES NOT EXIST → AUTO CREATE
+      // -----------------------------------------
+      const [insertParent] = await db.execute(
+        `INSERT INTO ledger_groups
+        (company_id, name, alias, parent, type, nature,
+         behavesLikeSubLedger, nettBalancesForReporting, usedForCalculation,
+         allocationMethod, setAlterHSNSAC, hsnSacClassificationId, hsnCode,
+         setAlterGST, gstClassificationId, typeOfSupply, taxability,
+         integratedTaxRate, cess, owner_type, owner_id)
+        VALUES (?, ?, NULL, NULL, NULL, NULL, 0, 1, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, ?, ?)`,
+        [companyId, parentName, ownerType, ownerId]
+      );
+
+      parentId = insertParent.insertId;
+      console.log("AUTO CREATED PARENT GROUP:", parentId, parentName);
+    }
+
+    // -----------------------------------------
+    // 4️⃣ Now insert NEW ledger group with parentId
+    // -----------------------------------------
     const [result] = await db.execute(
       `INSERT INTO ledger_groups
        (company_id, name, alias, parent, type, nature, behavesLikeSubLedger, 
@@ -66,7 +112,7 @@ router.post("/", async (req, res) => {
         companyId,
         payload.name,
         payload.alias || null,
-        payload.under || null,
+        parentId, // ✔ FIXED: Now parentId will be correctly saved
         payload.type || null,
         payload.nature || null,
         payload.behavesLikeSubLedger === "yes" ? 1 : 0,
@@ -109,7 +155,7 @@ router.get("/:id", async (req, res) => {
   try {
     let rows;
 
-    // 🔹 If ownerType and ownerId are provided, try strict match
+    // strict match
     if (ownerType && !isNaN(ownerId)) {
       [rows] = await db.execute(
         `SELECT * FROM ledger_groups WHERE id = ? AND owner_type = ? AND owner_id = ?`,
@@ -117,31 +163,51 @@ router.get("/:id", async (req, res) => {
       );
     }
 
-    // 🔹 If no result (old record without owner info), try fallback query
+    // fallback
     if (!rows || rows.length === 0) {
-      [rows] = await db.execute(
-        `SELECT * FROM ledger_groups WHERE id = ?`,
-        [ledgerId]
-      );
+      [rows] = await db.execute(`SELECT * FROM ledger_groups WHERE id = ?`, [
+        ledgerId,
+      ]);
     }
 
     if (rows.length === 0) {
       return res.status(404).json({ message: "Ledger not found" });
     }
 
-    res.json(rows[0]);
+    let ledger = rows[0];
+
+    // -----------------------------------------------------
+    // Get parent name instead of parent id
+    // -----------------------------------------------------
+    let under = null;
+
+    if (ledger.parent) {
+      const [parentRow] = await db.execute(
+        `SELECT name FROM ledger_groups WHERE id = ?`,
+        [ledger.parent]
+      );
+
+      if (parentRow.length > 0) {
+        under = parentRow[0].name; // <-- 🎉 Only name, NO "base:"
+      }
+    }
+
+    // Return final object
+    res.json({
+      ...ledger,
+      under, // final clean field
+    });
   } catch (error) {
     console.error("❌ Error fetching ledger group:", error);
     res.status(500).json({ message: "Internal server error" });
   }
 });
 
+
+
 router.put("/:id", async (req, res) => {
   const ledgerId = parseInt(req.params.id, 10);
   const payload = req.body;
-
-
-  // console.log("Payload received in body:", payload);
 
   if (isNaN(ledgerId)) {
     return res.status(400).json({ message: "Invalid ledger group ID" });
@@ -157,14 +223,11 @@ router.put("/:id", async (req, res) => {
   }
 
   try {
-    // 🔹 Check if ledger exists
+    // Check if ledger exists
     const [existing] = await db.execute(
-      `SELECT * FROM ledger_groups WHERE id = ? AND owner_type = ? `,
+      `SELECT * FROM ledger_groups WHERE id = ? AND owner_type = ?`,
       [ledgerId, ownerType]
     );
-
-    // console.log(ledgerId, ownerType, ownerId);
-    // console.log("Existing ledger group:", [existing]);
 
     if (existing.length === 0) {
       return res
@@ -172,7 +235,45 @@ router.put("/:id", async (req, res) => {
         .json({ message: "Ledger group not found or unauthorized" });
     }
 
-    // 🔹 Update DB
+ 
+    let parentName = null;
+    let parentId = null;
+
+    if (payload.under) {
+      if (payload.under.includes(":")) {
+        parentName = payload.under.split(":")[1].trim();
+      } else {
+        parentName = payload.under.trim();
+      }
+
+     
+      const [existingParent] = await db.execute(
+        `SELECT id FROM ledger_groups WHERE name = ? AND company_id = ? LIMIT 1`,
+        [parentName, existing[0].company_id]
+      );
+
+      if (existingParent.length > 0) {
+        parentId = existingParent[0].id;
+      } else {
+     
+        const [insertParent] = await db.execute(
+          `INSERT INTO ledger_groups
+            (company_id, name, alias, parent, type, nature,
+             behavesLikeSubLedger, nettBalancesForReporting, usedForCalculation,
+             allocationMethod, setAlterHSNSAC, hsnSacClassificationId, hsnCode,
+             setAlterGST, gstClassificationId, typeOfSupply, taxability,
+             integratedTaxRate, cess, owner_type, owner_id)
+           VALUES (?, ?, NULL, NULL, NULL, NULL, 0, 1, 0, NULL, 0, NULL, NULL,
+                   0, NULL, NULL, NULL, NULL, NULL, ?, ?)`,
+          [existing[0].company_id, parentName, ownerType, ownerId]
+        );
+
+        parentId = insertParent.insertId;
+        console.log("AUTO CREATED PARENT GROUP (PUT):", parentId, parentName);
+      }
+    }
+
+ 
     await db.execute(
       `UPDATE ledger_groups
        SET name = ?, 
@@ -197,7 +298,7 @@ router.put("/:id", async (req, res) => {
       [
         payload.name,
         payload.alias || null,
-        payload.under || null,
+        parentId || null, // ✔ FIXED: actual INT parent ID saved
         payload.type || null,
         payload.nature || null,
         payload.behavesLikeSubLedger === "yes" ? 1 : 0,

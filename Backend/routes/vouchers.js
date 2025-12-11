@@ -149,7 +149,6 @@ router.post("/", async (req, res) => {
   }
 });
 
-
 router.get("/", async (req, res) => {
   const { ownerType, ownerId, voucherType } = req.query;
 
@@ -158,7 +157,6 @@ router.get("/", async (req, res) => {
       .status(400)
       .json({ message: "ownerType, ownerId, voucherType required" });
   }
-
 
   try {
     // Create ledger_name column if missing (without IF NOT EXISTS for full support)
@@ -173,11 +171,23 @@ router.get("/", async (req, res) => {
 
     // 1️⃣ Fetch vouchers
     const [vouchers] = await db.execute(
-      `SELECT v.id, v.voucher_number AS number, v.voucher_type AS type, 
-              v.date, v.reference_no, v.narration
-       FROM voucher_main v
-       WHERE v.owner_type = ? AND v.owner_id = ? AND v.voucher_type = ?
-       ORDER BY v.date DESC, v.id DESC`,
+      `SELECT 
+        v.id, 
+        v.voucher_number AS number, 
+        v.voucher_type AS type, 
+        v.date, 
+        v.reference_no, 
+        v.narration,
+        v.supplier_invoice_date,
+        v.due_date,
+        v.company_id,
+        v.owner_type,
+        v.owner_id
+   FROM voucher_main v
+   WHERE v.owner_type = ? 
+     AND v.owner_id = ? 
+     AND v.voucher_type = ?
+   ORDER BY v.date DESC, v.id DESC`,
       [ownerType, ownerId, voucherType]
     );
 
@@ -218,6 +228,7 @@ router.get("/", async (req, res) => {
         .filter((e) => e.voucher_id === voucher.id)
         .map(({ voucher_id, ...rest }) => rest),
     }));
+
 
     return res.json({ data: result });
   } catch (error) {
@@ -388,7 +399,6 @@ router.put("/:id", async (req, res) => {
     });
   }
 });
-
 
 router.get("/:id", async (req, res) => {
   const { id } = req.params;

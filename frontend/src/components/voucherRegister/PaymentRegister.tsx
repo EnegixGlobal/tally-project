@@ -163,7 +163,9 @@ const PaymentRegister: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
 
@@ -278,13 +280,15 @@ const PaymentRegister: React.FC = () => {
     }
 
     fetch(
-      `${import.meta.env.VITE_API_URL}/api/vouchers?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`
+      `${
+        import.meta.env.VITE_API_URL
+      }/api/vouchers?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`
     )
       .then((res) => res.json())
       .then((data) => {
         if (data.data) {
+         
           setVouchers(data.data);
-
         } else {
           setError("Invalid response from server");
         }
@@ -371,7 +375,9 @@ const PaymentRegister: React.FC = () => {
     try {
       // DELETE API call
       const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/vouchers/${id}?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`,
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/vouchers/${id}?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`,
         {
           method: "DELETE",
         }
@@ -411,8 +417,7 @@ const PaymentRegister: React.FC = () => {
       return;
     }
 
- navigate(`/app/vouchers/payment/edit/${id}`);
-
+    navigate(`/app/vouchers/payment/edit/${id}`);
   };
 
   const statusCounts = filteredVouchers.reduce((acc, voucher) => {
@@ -771,6 +776,10 @@ const PaymentRegister: React.FC = () => {
                   Voucher Type
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Voucher Supplier Date
+                </th>
+
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Particulars
                 </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -804,6 +813,9 @@ const PaymentRegister: React.FC = () => {
                       <span className="inline-flex px-2 py-1 text-xs font-semibold rounded-full bg-red-100 text-red-800">
                         PAYMENT
                       </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {formatDate(voucher.supplier_invoice_date)}
                     </td>
                     <td
                       className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate"

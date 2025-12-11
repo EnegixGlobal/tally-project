@@ -42,7 +42,6 @@ const GroupList: React.FC = () => {
         `${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
       );
 
-      console.log('data', data)
       setGroups(data);
     } catch (err) {
       console.error("Failed to load ledger groups", err);

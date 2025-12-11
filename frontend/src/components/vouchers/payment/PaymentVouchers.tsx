@@ -88,6 +88,7 @@ const PaymentVoucher: React.FC = () => {
         // Backend returns { data: {...} }
         const v = json.data;
 
+
         if (!v) {
           console.error("Invalid response format", json);
           return;
@@ -796,7 +797,7 @@ const PaymentVoucher: React.FC = () => {
                     {/* 💥 Hardcoded Cash/Bank List inside map */}
                     {cashBankLedgers.map((ledger) => (
                       <option key={ledger.id} value={ledger.id}>
-                        {ledger.groupName}
+                        {ledger.name}
                       </option>
                     ))}
                   </select>
