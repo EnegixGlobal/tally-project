@@ -17,7 +17,6 @@ router.post("/", async (req, res) => {
     companyId,
   } = req.body;
 
-
   // REQUIRED validation
   if (
     !type ||
@@ -38,20 +37,22 @@ router.post("/", async (req, res) => {
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // 🔹 SINGLE ENTRY MODE: If only one entry, create balancing entry
+  // ---------------------------------------------------------
+  // SINGLE ENTRY AUTO BALANCE FIX (if only one entry comes)
+  // ---------------------------------------------------------
   if (mode === "single-entry" && entries.length === 1) {
-    const e0 = entries[0];
+    const e = entries[0];
 
     entries.push({
       id: "AUTO",
-      ledgerId: e0.ledgerId,
-      ledgerName: e0.ledgerName || null,
-      amount: e0.amount,
-      type: e0.type === "credit" ? "debit" : "credit",
-      narration: e0.narration || null,
-      bankName: e0.bankName || null,
-      chequeNumber: e0.chequeNumber || null,
-      costCentreId: e0.costCentreId || null,
+      ledgerId: e.ledgerId,
+      ledgerName: e.ledgerName || null,
+      amount: e.amount,
+      type: e.type === "credit" ? "debit" : "credit",
+      narration: e.narration || null,
+      bankName: e.bankName || null,
+      chequeNumber: e.chequeNumber || null,
+      costCentreId: e.costCentreId || null,
     });
   }
 
@@ -59,13 +60,28 @@ router.post("/", async (req, res) => {
   await conn.beginTransaction();
 
   try {
-    // 🔥 Auto-create ledger_name column if not exists
-    await conn.query(`
-      ALTER TABLE voucher_entries 
-      ADD COLUMN IF NOT EXISTS ledger_name VARCHAR(255) NULL;
+    // ---------------------------------------------------------
+    // FIX: CHECK IF ledger_name COLUMN EXISTS (MySQL 5.7 SAFE)
+    // ---------------------------------------------------------
+    const [colCheck] = await conn.query(`
+      SELECT COUNT(*) AS count
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_NAME = 'voucher_entries'
+        AND COLUMN_NAME = 'ledger_name'
+        AND TABLE_SCHEMA = DATABASE();
     `);
 
-    // 1️⃣ INSERT INTO voucher_main
+    if (colCheck[0].count === 0) {
+      console.log("🔧 Adding column: ledger_name");
+      await conn.query(`
+        ALTER TABLE voucher_entries
+        ADD COLUMN ledger_name VARCHAR(255) NULL;
+      `);
+    }
+
+    // ---------------------------------------------------------
+    // INSERT INTO voucher_main
+    // ---------------------------------------------------------
     const [mainResult] = await conn.execute(
       `
       INSERT INTO voucher_main 
@@ -87,11 +103,13 @@ router.post("/", async (req, res) => {
 
     const voucherId = mainResult.insertId;
 
-    // 2️⃣ Insert entries WITH ledgerName
+    // ---------------------------------------------------------
+    // INSERT voucher entries
+    // ---------------------------------------------------------
     const entryValues = entries.map((e) => [
       voucherId,
       Number(e.ledgerId),
-      e.ledgerName || null, // NEW FIELD
+      e.ledgerName || null,
       Number(e.amount) || 0,
       e.type || "credit",
       e.narration || null,
@@ -120,6 +138,7 @@ router.post("/", async (req, res) => {
   } catch (err) {
     await conn.rollback();
     conn.release();
+
     console.error("❌ Insert Failed:", err);
 
     return res.status(500).json({
@@ -129,6 +148,7 @@ router.post("/", async (req, res) => {
     });
   }
 });
+
 
 router.get("/", async (req, res) => {
   const { ownerType, ownerId, voucherType } = req.query;
@@ -247,10 +267,6 @@ router.put("/:id", async (req, res) => {
   if (!id) {
     return res.status(400).json({ message: "Voucher ID is required" });
   }
-
-  // FRONTEND → owner_type + owner_id भेज रहा है
-  // BACKEND → ownerType + ownerId expect कर रहा था
-  // इसलिए दोनों को सपोर्ट करने के लिए merge किया गया
   const {
     type,
     mode,
