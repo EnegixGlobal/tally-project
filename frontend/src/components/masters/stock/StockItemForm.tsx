@@ -331,22 +331,23 @@ const StockItemForm = () => {
         if (res.ok && data.success) {
           const item = data.data;
 
+          // --- Set main form data ---
           setFormData({
             name: item.name || "",
             stockGroupId: item.stockGroupId?.toString() || "",
             categoryId: item.categoryId?.toString() || "",
             unit: item.unit?.toString() || "",
-            openingBalance: item.openingBalance || 0,
-            openingValue: item.openingValue || 0,
+            openingBalance: Number(item.openingBalance) || 0,
+            openingValue: Number(item.openingValue) || 0,
             hsnSacOption: "specify-details",
             hsnCode: item.hsnCode || "",
             gstRateOption: "specify-details",
             gstRate: item.gstRate?.toString() || "",
             gstClassification: "",
             taxType: item.taxType || "Taxable",
-            standardPurchaseRate: item.standardPurchaseRate || 0,
-            standardSaleRate: item.standardSaleRate || 0,
-            enableBatchTracking: true,
+            standardPurchaseRate: Number(item.standardPurchaseRate) || 0,
+            standardSaleRate: Number(item.standardSaleRate) || 0,
+            enableBatchTracking: !!item.enableBatchTracking,
             batchName: item.batchNumber || "",
             batchExpiryDate: item.batchExpiryDate || "",
             batchManufacturingDate: item.batchManufacturingDate || "",
@@ -355,20 +356,32 @@ const StockItemForm = () => {
             secondaryUnit: item.secondaryUnit || "",
           });
 
+          // --- Set godown allocations ---
           setGodownAllocations(item.godownAllocations || []);
+
+          // --- Set barcode ---
           setBarcode(item.barcode || "");
 
+          // --- Set batch rows safely ---
           if (Array.isArray(item.batches) && item.batches.length > 0) {
             setBatchRows(
-              item.batches.map((b: any) => ({
-                batchName: b.batchName || "",
-                batchQuantity: Number(b.batchQuantity) || 0,
-                batchRate: Number(b.batchRate) || 0, // RATE
-                openingRate: Number(b.openingRate) || 0,
-                batchExpiryDate: b.batchExpiryDate || "",
-                batchManufacturingDate: b.batchManufacturingDate || "",
-              }))
+              item.batches.map((b: any) => {
+                const rate = Number(b.batchRate ?? b.openingRate) || 0;
+                const qty = Number(b.batchQuantity) || 0;
+
+                return {
+                  batchName: b.batchName || "",
+                  batchQuantity: qty,
+                  batchRate: rate, // Always filled
+                  openingRate: Number(b.openingRate) || rate, // Fallback to rate
+                  batchExpiryDate: b.batchExpiryDate || "",
+                  batchManufacturingDate: b.batchManufacturingDate || "",
+                  openingValue: Number(b.openingValue) || rate * qty, // Always calculated
+                };
+              })
             );
+          } else {
+            setBatchRows([]);
           }
         } else {
           Swal.fire(
@@ -434,7 +447,7 @@ const StockItemForm = () => {
     taxType: "Taxable",
     standardPurchaseRate: 0,
     standardSaleRate: 0,
-    enableBatchTracking: true,
+    enableBatchTracking: false,
     batchName: "",
     batchExpiryDate: "",
     batchManufacturingDate: "",
@@ -861,24 +874,22 @@ const StockItemForm = () => {
               </label>
 
               {/* Right: Add Batch Button */}
-              {formData.enableBatchTracking && (
-                <button
-                  type="button"
-                  onClick={addBatchRow}
-                  className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  <Plus size={16} /> Add Batch
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={addBatchRow}
+                className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                <Plus size={16} /> Add Batch
+              </button>
             </div>
 
-            {formData.enableBatchTracking && (
-              <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
-                {batchRows.map((row, index) => (
-                  <div
-                    key={index}
-                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end w-full"
-                  >
+            <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
+              {batchRows.map((row, index) => (
+                <div
+                  key={index}
+                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end w-full"
+                >
+                  {formData.enableBatchTracking && (
                     <div className="flex-1 min-w-[120px]">
                       <InputField
                         id={`batchName-${index}`}
@@ -891,46 +902,48 @@ const StockItemForm = () => {
                         error={errors[`batchName-${index}`]}
                       />
                     </div>
+                  )}
 
-                    <div className="flex-1 min-w-[120px]">
-                      <InputField
-                        id={`batchQuantity-${index}`}
-                        name={`batchQuantity-${index}`}
-                        label="Qty"
-                        value={row.batchQuantity}
-                        onChange={(e) =>
-                          updateBatchRow(index, "batchQuantity", e.target.value)
-                        }
-                        error={errors[`batchQuantity-${index}`]}
-                      />
-                    </div>
+                  <div className="flex-1 min-w-[120px]">
+                    <InputField
+                      id={`batchQuantity-${index}`}
+                      name={`batchQuantity-${index}`}
+                      label="Qty"
+                      value={row.batchQuantity}
+                      onChange={(e) =>
+                        updateBatchRow(index, "batchQuantity", e.target.value)
+                      }
+                      error={errors[`batchQuantity-${index}`]}
+                    />
+                  </div>
 
-                    <div className="flex-1 min-w-[120px]">
-                      <InputField
-                        id={`batchRate-${index}`}
-                        name={`batchRate-${index}`}
-                        label="Rate"
-                        value={row.batchRate}
-                        onChange={(e) =>
-                          updateBatchRow(index, "batchRate", e.target.value)
-                        }
-                        error={errors[`batchRate-${index}`]}
-                      />
-                    </div>
+                  <div className="flex-1 min-w-[120px]">
+                    <InputField
+                      id={`batchRate-${index}`}
+                      name={`batchRate-${index}`}
+                      label="Rate"
+                      value={row.batchRate}
+                      onChange={(e) =>
+                        updateBatchRow(index, "batchRate", e.target.value)
+                      }
+                      error={errors[`batchRate-${index}`]}
+                    />
+                  </div>
 
-                    <div className="flex-1 min-w-[120px]">
-                      <InputField
-                        id={`openingRate-${index}`}
-                        name={`openingRate-${index}`}
-                        label="Opening Rate"
-                        type="number"
-                         value={Number(row.batchRate) * Number(row.batchQuantity)}
-                        onChange={() => {}}
-                        error={errors[`openingRate-${index}`]}
-                        disabled
-                      />
-                    </div>
+                  <div className="flex-1 min-w-[120px]">
+                    <InputField
+                      id={`openingRate-${index}`}
+                      name={`openingRate-${index}`}
+                      label="Opening Rate"
+                      type="number"
+                      value={Number(row.batchRate) * Number(row.batchQuantity)}
+                      onChange={() => {}}
+                      error={errors[`openingRate-${index}`]}
+                      disabled
+                    />
+                  </div>
 
+                  {formData.enableBatchTracking && (
                     <div className="flex-1 min-w-[120px]">
                       <InputField
                         id={`batchManufacturingDate-${index}`}
@@ -947,7 +960,9 @@ const StockItemForm = () => {
                         }
                       />
                     </div>
+                  )}
 
+                  {formData.enableBatchTracking && (
                     <div className="flex-1 min-w-[120px]">
                       <InputField
                         id={`batchExpiryDate-${index}`}
@@ -964,18 +979,18 @@ const StockItemForm = () => {
                         }
                       />
                     </div>
+                  )}
 
-                    <button
-                      type="button"
-                      onClick={() => removeBatchRow(index)}
-                      className="p-2 text-red-700 hover:text-red-900"
-                    >
-                      <Trash2 size={20} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-            )}
+                  <button
+                    type="button"
+                    onClick={() => removeBatchRow(index)}
+                    className="p-2 text-red-700 hover:text-red-900"
+                  >
+                    <Trash2 size={20} />
+                  </button>
+                </div>
+              ))}
+            </div>
 
             {/* ---------------------------------------------------------------- */}
 
