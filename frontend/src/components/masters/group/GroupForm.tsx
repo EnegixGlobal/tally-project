@@ -117,13 +117,14 @@ const GroupForm: React.FC = () => {
             }/api/ledger-groups/${id}?ownerType=${ownerType}&ownerId=${ownerId}`
           );
           const data = await res.json();
-          console.log("this is data", data);
 
           if (res.ok) {
             setFormData({
               name: data.name ?? "",
               alias: data.alias ?? "",
-              under: data.parent?.toString() ?? "",
+              under: data.under
+                ? `base:${data.under}` 
+                : data.parent?.toString() ?? "", 
 
               type: data.type ?? "",
               nature: data.nature ?? "",
@@ -170,6 +171,8 @@ const GroupForm: React.FC = () => {
       fetchGroup();
     }
   }, [id, isEditMode]);
+
+  console.log("formdata", formData);
 
   useEffect(() => {
     if (formData.setAlterHSNSAC === "yes" && formData.hsnSacClassificationId) {

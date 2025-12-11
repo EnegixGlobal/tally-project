@@ -388,7 +388,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         referenceNo: p.referenceNo || "",
         type: "sales_order",
 
-        supplierInvoiceDate: "",
+        supplierInvoiceDate: p.supplier_invoice_date || "",
         subtotal: Number(p.totalAmount || 0),
         cgstTotal: 0,
         sgstTotal: 0,
@@ -420,7 +420,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         narration: p.narration || "",
         type: "receipt",
 
-        supplierInvoiceDate: "",
+        supplierInvoiceDate: p.supplier_invoice_date || "",
         subtotal: 0,
         cgstTotal: 0,
         sgstTotal: 0,
@@ -450,7 +450,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         narration: p.narration || "",
         type: "contra",
 
-        supplierInvoiceDate: "",
+        supplierInvoiceDate: p.supplier_invoice_date || "",
         subtotal: 0,
         cgstTotal: 0,
         sgstTotal: 0,
@@ -480,7 +480,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         narration: p.narration || "",
         type: "journal",
 
-        supplierInvoiceDate: "",
+        supplierInvoiceDate: p.supplier_invoice_date || "",
         subtotal: 0,
         cgstTotal: 0,
         sgstTotal: 0,
@@ -802,22 +802,36 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
         // --- SALES VOUCHERS ---
         if (voucherType === "sales") {
-          url = `${import.meta.env.VITE_API_URL}/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          url = `${
+            import.meta.env.VITE_API_URL
+          }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         }
 
         // --- PURCHASE VOUCHERS ---
         else if (voucherType === "purchase") {
-          url = `${import.meta.env.VITE_API_URL}/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          url = `${
+            import.meta.env.VITE_API_URL
+          }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         } else if (voucherType === "sales_order") {
-          url = `${import.meta.env.VITE_API_URL}/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
+          url = `${
+            import.meta.env.VITE_API_URL
+          }/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
         } else if (voucherType === "purchase_order") {
-          url = `${import.meta.env.VITE_API_URL}/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
+          url = `${
+            import.meta.env.VITE_API_URL
+          }/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
         } else if (voucherType === "receipt") {
-          url = `${import.meta.env.VITE_API_URL}/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=receipt`;
+          url = `${
+            import.meta.env.VITE_API_URL
+          }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=receipt`;
         } else if (voucherType === "contra") {
-          url = `${import.meta.env.VITE_API_URL}/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=contra`;
+          url = `${
+            import.meta.env.VITE_API_URL
+          }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=contra`;
         } else if (voucherType === "journal") {
-          url = `${import.meta.env.VITE_API_URL}/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=journal`;
+          url = `${
+            import.meta.env.VITE_API_URL
+          }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=journal`;
         } else {
           console.warn("Unknown voucherType:", voucherType);
           return;
@@ -825,6 +839,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
         const res = await fetch(url);
         const json = await res.json();
+        console.log("data", json.data);
 
         // -- Handle different API response formats --
         if (json.data) setVouchers(json.data);

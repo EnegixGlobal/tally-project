@@ -303,11 +303,14 @@ const ReceiptVoucher: React.FC = () => {
 
   const addEntry = () => {
     if (formData.mode === "single-entry") {
-      // Add one more credit row
       setFormData((prev) => ({
         ...prev,
         entries: [
-          ...prev.entries,
+          {
+            ...prev.entries[0],
+            type: "debit",
+          },
+          ...prev.entries.slice(1),
           {
             id: (prev.entries.length + 1).toString(),
             ledgerId: "",
@@ -371,7 +374,7 @@ const ReceiptVoucher: React.FC = () => {
 
         cashData = cashData.map((item: any) => ({
           ...item,
-          type: item.groupType?.toLowerCase(),
+          type: item.name?.toLowerCase(),
         }));
 
         setCashBankLedgers(cashData);
@@ -398,6 +401,8 @@ const ReceiptVoucher: React.FC = () => {
 
     fetchData();
   }, []);
+
+  console.log("data", cashBankLedgers);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -854,10 +859,7 @@ const ReceiptVoucher: React.FC = () => {
                     onChange={(e) => {
                       const updated = [...formData.entries];
                       updated[0].ledgerId = String(e.target.value);
-
-                      // 🔄 Single entry me type always Credit
                       updated[0].type = "credit";
-
                       setFormData({ ...formData, entries: updated });
                     }}
                     required
@@ -865,16 +867,13 @@ const ReceiptVoucher: React.FC = () => {
                       theme === "dark"
                         ? "bg-gray-700 border-gray-600 text-gray-100"
                         : "bg-white border-gray-300 text-gray-900"
-                    } focus:border-blue-500 focus:ring-blue-500`}
+                    }`}
                   >
                     <option value="">Select Cash/Bank Ledger</option>
 
-                    {/* 💥 Hard-coded Cash/Bank with map */}
-                    {[
-                      { id: "cash", name: "Cash" },
-                      { id: "bank", name: "Bank" },
-                    ].map((l) => (
-                      <option key={l.id} value={l.id}>
+                    {/* 🔥 Real database cash/bank ledgers */}
+                    {cashBankLedgers.map((l) => (
+                      <option key={l.id} value={String(l.id)}>
                         {l.name}
                       </option>
                     ))}

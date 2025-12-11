@@ -131,7 +131,9 @@ router.get("/cash-bank", async (req, res) => {
 
   try {
     if (!company_id || !owner_type || !owner_id) {
-      return res.status(400).json({ message: "companyId, ownerType, and ownerId are required" });
+      return res.status(400).json({
+        message: "companyId, ownerType, and ownerId are required",
+      });
     }
 
     const [rows] = await db.execute(
@@ -143,7 +145,12 @@ router.get("/cash-bank", async (req, res) => {
       FROM ledgers l
       INNER JOIN ledger_groups g ON l.group_id = g.id
       WHERE 
-        g.name IN ('Cash', 'Bank')  -- ✔ FIXED
+        (
+          LOWER(l.name) LIKE '%cash%' OR 
+          LOWER(l.name) LIKE '%bank%' OR
+          LOWER(g.name) LIKE '%cash%' OR 
+          LOWER(g.name) LIKE '%bank%'
+        )
         AND l.company_id = ?
         AND l.owner_type = ?
         AND l.owner_id = ?
@@ -152,13 +159,15 @@ router.get("/cash-bank", async (req, res) => {
       [company_id, owner_type, owner_id]
     );
 
+
+
     res.json(rows);
-    
   } catch (err) {
     console.error("Error fetching cash/bank ledgers:", err);
     res.status(500).json({ message: "Failed to fetch cash/bank ledgers" });
   }
 });
+
 
 
 
