@@ -22,6 +22,7 @@ router.get("/", async (req, res) => {
         s.taxType,
         s.barcode,
         s.batches,
+        s.type,
         s.company_id,
         s.owner_type,
         s.owner_id
@@ -51,7 +52,6 @@ router.get("/", async (req, res) => {
     query += " ORDER BY s.id DESC";
 
     const [rows] = await connection.execute(query, params);
-
 
     const formattedRows = rows.map((item) => ({
       ...item,
@@ -165,7 +165,6 @@ router.get("/", async (req, res) => {
 //       owner_id,
 //     } = req.body;
 
-
 //     if (!name || !unit || !taxType) {
 //       return res.status(400).json({
 //         success: false,
@@ -175,20 +174,19 @@ router.get("/", async (req, res) => {
 
 //     // ✔ Ensure openingValue column exists dynamically
 //     const [colCheck] = await connection.execute(`
-//       SELECT COUNT(*) AS count 
-//       FROM information_schema.COLUMNS 
-//       WHERE TABLE_NAME = 'stock_items' 
+//       SELECT COUNT(*) AS count
+//       FROM information_schema.COLUMNS
+//       WHERE TABLE_NAME = 'stock_items'
 //       AND COLUMN_NAME = 'openingValue'
 //     `);
 
 //     if (colCheck[0].count === 0) {
 //       await connection.execute(`
-//         ALTER TABLE stock_items 
+//         ALTER TABLE stock_items
 //         ADD COLUMN openingValue DECIMAL(15,2) DEFAULT 0
 //       `);
 //       console.log("📌 Column openingValue created successfully!");
 //     }
-
 
 //     // ✔ Correct Batch Mapping (OpeningRate = Rate)
 //     let totalOpeningValue = 0;
@@ -213,9 +211,7 @@ router.get("/", async (req, res) => {
 //         })
 //       : [];
 
-
 //     const finalOpeningValue = totalOpeningValue;
-
 
 //     // Fetch stock_items table columns dynamically
 //     const [columnsResult] = await connection.execute(`
@@ -273,7 +269,6 @@ router.get("/", async (req, res) => {
 //       }
 //     });
 
-
 //     const placeholders = columnNames.map(() => "?").join(", ");
 //     const insertQuery = `
 //       INSERT INTO stock_items (${columnNames.join(", ")})
@@ -282,7 +277,6 @@ router.get("/", async (req, res) => {
 
 //     const [result] = await connection.execute(insertQuery, values);
 //     const stockItemId = result.insertId;
-
 
 //     // Insert Godown Allocations
 //     for (const alloc of godownAllocations) {
@@ -317,7 +311,6 @@ router.get("/", async (req, res) => {
 //   }
 // });
 
-
 router.post("/", async (req, res) => {
   const connection = await db.getConnection();
 
@@ -347,7 +340,6 @@ router.post("/", async (req, res) => {
       owner_id,
     } = req.body;
 
-
     if (!name || !unit || !taxType) {
       return res.status(400).json({
         success: false,
@@ -355,7 +347,7 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Ensure openingValue column exists dynamically
+    // Ensure openingValue column exists
     const [colCheck] = await connection.execute(`
       SELECT COUNT(*) AS count 
       FROM information_schema.COLUMNS 
@@ -370,16 +362,31 @@ router.post("/", async (req, res) => {
       `);
     }
 
+    // Ensure 'type' column exists
+    const [typeColCheck] = await connection.execute(`
+      SELECT COUNT(*) AS count 
+      FROM information_schema.COLUMNS 
+      WHERE TABLE_NAME = 'stock_items' 
+      AND COLUMN_NAME = 'type'
+    `);
+
+    if (typeColCheck[0].count === 0) {
+      await connection.execute(`
+        ALTER TABLE stock_items 
+        ADD COLUMN type VARCHAR(50) DEFAULT 'opening'
+      `);
+    }
+
     // Helper to convert empty strings to null
     const sanitize = (value) => {
       if (value === "" || value === undefined) return null;
       return value;
     };
 
-    // Batch handling - always map batches regardless of enableBatchTracking
+    // Batch handling
     let totalOpeningValue = 0;
 
-    const batchData = (batches || []).map(batch => {
+    const batchData = (batches || []).map((batch) => {
       const qty = Number(batch.batchQuantity) || 0;
       const rate = Number(batch.batchRate) || 0;
       const openingRate = rate;
@@ -400,36 +407,62 @@ router.post("/", async (req, res) => {
     const finalOpeningValue = totalOpeningValue;
 
     // Fetch stock_items table columns dynamically
-    const [columnsResult] = await connection.execute(`SHOW COLUMNS FROM stock_items`);
+    const [columnsResult] = await connection.execute(
+      `SHOW COLUMNS FROM stock_items`
+    );
 
     const columnNames = columnsResult
-      .filter(col => col.Field !== "id")
-      .map(col => col.Field);
+      .filter((col) => col.Field !== "id")
+      .map((col) => col.Field);
 
-    const values = columnNames.map(column => {
+    const values = columnNames.map((column) => {
       switch (column) {
-        case "name": return name;
-        case "stockGroupId": return sanitize(stockGroupId);
-        case "categoryId": return sanitize(categoryId);
-        case "unit": return sanitize(unit);
-        case "openingBalance": return openingBalance ?? 0;
-        case "openingValue": return finalOpeningValue ?? 0;
-        case "hsnCode": return sanitize(hsnCode);
-        case "gstRate": return gstRate ?? 0;
-        case "taxType": return taxType;
-        case "standardPurchaseRate": return standardPurchaseRate ?? 0;
-        case "standardSaleRate": return standardSaleRate ?? 0;
-        case "enableBatchTracking": return enableBatchTracking ? 1 : 0;
-        case "allowNegativeStock": return allowNegativeStock ? 1 : 0;
-        case "maintainInPieces": return maintainInPieces ? 1 : 0;
-        case "secondaryUnit": return sanitize(secondaryUnit);
-        case "barcode": return sanitize(barcode);
-        case "company_id": return sanitize(company_id);
-        case "owner_type": return sanitize(owner_type);
-        case "owner_id": return sanitize(owner_id);
-        case "batches": return JSON.stringify(batchData); // always save batch info
-        case "createdAt": return "CURRENT_TIMESTAMP";
-        default: return null;
+        case "name":
+          return name;
+        case "stockGroupId":
+          return sanitize(stockGroupId);
+        case "categoryId":
+          return sanitize(categoryId);
+        case "unit":
+          return sanitize(unit);
+        case "openingBalance":
+          return openingBalance ?? 0;
+        case "openingValue":
+          return finalOpeningValue ?? 0;
+        case "hsnCode":
+          return sanitize(hsnCode);
+        case "gstRate":
+          return gstRate ?? 0;
+        case "taxType":
+          return taxType;
+        case "standardPurchaseRate":
+          return standardPurchaseRate ?? 0;
+        case "standardSaleRate":
+          return standardSaleRate ?? 0;
+        case "enableBatchTracking":
+          return enableBatchTracking ? 1 : 0;
+        case "allowNegativeStock":
+          return allowNegativeStock ? 1 : 0;
+        case "maintainInPieces":
+          return maintainInPieces ? 1 : 0;
+        case "secondaryUnit":
+          return sanitize(secondaryUnit);
+        case "barcode":
+          return sanitize(barcode);
+        case "company_id":
+          return sanitize(company_id);
+        case "owner_type":
+          return sanitize(owner_type);
+        case "owner_id":
+          return sanitize(owner_id);
+        case "batches":
+          return JSON.stringify(batchData);
+        case "type":
+          return "opening"; // always "opening"
+        case "createdAt":
+          return "CURRENT_TIMESTAMP";
+        default:
+          return null;
       }
     });
 
@@ -442,17 +475,20 @@ router.post("/", async (req, res) => {
     const [result] = await connection.execute(insertQuery, values);
     const stockItemId = result.insertId;
 
-    // Insert Godown Allocations safely
+    // Insert Godown Allocations
     for (const alloc of godownAllocations || []) {
-      await connection.execute(`
+      await connection.execute(
+        `
         INSERT INTO godown_allocations (stockItemId, godownId, quantity, value)
         VALUES (?, ?, ?, ?)
-      `, [
-        stockItemId,
-        sanitize(alloc.godownId),
-        alloc.quantity ?? 0,
-        alloc.value ?? 0
-      ]);
+      `,
+        [
+          stockItemId,
+          sanitize(alloc.godownId),
+          alloc.quantity ?? 0,
+          alloc.value ?? 0,
+        ]
+      );
     }
 
     await connection.commit();
@@ -464,7 +500,6 @@ router.post("/", async (req, res) => {
       batchesInserted: batchData.length,
       openingValue: finalOpeningValue,
     });
-
   } catch (err) {
     console.error("🔥 Error saving stock item:", err);
     await connection.rollback();
@@ -479,9 +514,219 @@ router.post("/", async (req, res) => {
 });
 
 
+// stock purchase item
 
+router.post("/purchase-batch", async (req, res) => {
+  const connection = await db.getConnection();
 
+  try {
+    await connection.beginTransaction();
 
+    const {
+      name,
+      stockGroupId,
+      categoryId,
+      unit,
+      openingBalance,
+      hsnCode,
+      gstRate,
+      taxType,
+      standardPurchaseRate,
+      standardSaleRate,
+      enableBatchTracking,
+      allowNegativeStock,
+      maintainInPieces,
+      secondaryUnit,
+      batches = [],
+      godownAllocations = [],
+      barcode,
+      company_id,
+      owner_type,
+      owner_id,
+    } = req.body;
+
+    if (!name || !unit || !taxType) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields: name, unit, or taxType",
+      });
+    }
+
+    // 1️⃣ Create table if it doesn't exist
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS stock_purchase (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        name VARCHAR(255) NOT NULL,
+        stockGroupId INT,
+        categoryId INT,
+        unit VARCHAR(50) NOT NULL,
+        openingBalance DECIMAL(15,2) DEFAULT 0,
+        openingValue DECIMAL(15,2) DEFAULT 0,
+        hsnCode VARCHAR(50),
+        gstRate DECIMAL(5,2) DEFAULT 0,
+        taxType VARCHAR(50),
+        standardPurchaseRate DECIMAL(15,2) DEFAULT 0,
+        standardSaleRate DECIMAL(15,2) DEFAULT 0,
+        enableBatchTracking TINYINT(1) DEFAULT 0,
+        allowNegativeStock TINYINT(1) DEFAULT 0,
+        maintainInPieces TINYINT(1) DEFAULT 0,
+        secondaryUnit VARCHAR(50),
+        barcode VARCHAR(100),
+        company_id INT,
+        owner_type VARCHAR(50),
+        owner_id INT,
+        batches JSON,
+        type VARCHAR(50) DEFAULT 'purchase',
+        createdAt TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Helper to convert empty strings to null
+    const sanitize = (value) =>
+      value === "" || value === undefined ? null : value;
+
+    // 2️⃣ Prepare batch data
+    let totalOpeningValue = 0;
+
+    const batchData = (batches || []).map((batch) => {
+      const qty = Number(batch.batchQuantity) || 0;
+      const rate = Number(batch.batchRate) || 0;
+      const openingValue = qty * rate;
+      totalOpeningValue += openingValue;
+
+      return {
+        batchName: sanitize(batch.batchName),
+        batchQuantity: qty,
+        openingRate: rate,
+        openingValue,
+        batchExpiryDate: sanitize(batch.batchExpiryDate),
+        batchManufacturingDate: sanitize(batch.batchManufacturingDate),
+      };
+    });
+
+    // 3️⃣ Insert into stock_purchase
+    const insertQuery = `
+      INSERT INTO stock_purchase (
+        name, stockGroupId, categoryId, unit, openingBalance, openingValue,
+        hsnCode, gstRate, taxType, standardPurchaseRate, standardSaleRate,
+        enableBatchTracking, allowNegativeStock, maintainInPieces, secondaryUnit,
+        barcode, company_id, owner_type, owner_id, batches
+      )
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `;
+
+    const values = [
+      name,
+      sanitize(stockGroupId),
+      sanitize(categoryId),
+      unit,
+      openingBalance ?? 0,
+      totalOpeningValue ?? 0,
+      sanitize(hsnCode),
+      gstRate ?? 0,
+      taxType,
+      standardPurchaseRate ?? 0,
+      standardSaleRate ?? 0,
+      enableBatchTracking ? 1 : 0,
+      allowNegativeStock ? 1 : 0,
+      maintainInPieces ? 1 : 0,
+      sanitize(secondaryUnit),
+      sanitize(barcode),
+      sanitize(company_id),
+      sanitize(owner_type),
+      sanitize(owner_id),
+      JSON.stringify(batchData),
+    ];
+
+    const [result] = await connection.execute(insertQuery, values);
+    const stockItemId = result.insertId;
+
+    // 4️⃣ Insert Godown Allocations
+    for (const alloc of godownAllocations || []) {
+      await connection.execute(
+        `
+        INSERT INTO godown_allocations (stockItemId, godownId, quantity, value)
+        VALUES (?, ?, ?, ?)
+      `,
+        [
+          stockItemId,
+          sanitize(alloc.godownId),
+          alloc.quantity ?? 0,
+          alloc.value ?? 0,
+        ]
+      );
+    }
+
+    await connection.commit();
+
+    res.json({
+      success: true,
+      message: "Stock purchase saved successfully",
+      stockItemId,
+      batchesInserted: batchData.length,
+      openingValue: totalOpeningValue,
+    });
+  } catch (err) {
+    console.error("🔥 Error saving stock purchase:", err);
+    await connection.rollback();
+    res.status(500).json({
+      success: false,
+      message: "Error saving stock purchase",
+      error: err.message,
+    });
+  } finally {
+    connection.release();
+  }
+});
+
+// GET stock purchases with access control
+router.get("/purchase-batch", async (req, res) => {
+  const connection = await db.getConnection();
+
+  try {
+    const { company_id, owner_id, owner_type } = req.query;
+
+    if (!company_id || !owner_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id and owner_id are required to fetch data",
+      });
+    }
+
+    let query = `
+      SELECT * FROM stock_purchase
+      WHERE company_id = ? AND owner_id = ?
+    `;
+    const params = [company_id, owner_id];
+
+    if (owner_type) {
+      query += " AND owner_type = ?";
+      params.push(owner_type);
+    }
+
+    const [rows] = await connection.execute(query, params);
+
+    // Parse batches JSON
+    const formattedRows = rows.map((row) => ({
+      ...row,
+      batches: row.batches ? JSON.parse(row.batches) : [],
+    }));
+
+    res.json({
+      success: true,
+      data: formattedRows,
+    });
+  } catch (err) {
+    console.error("🔥 Error fetching stock purchases:", err);
+    res.status(500).json({
+      success: false,
+      message: "Error fetching stock purchases",
+      error: err.message,
+    });
+  } finally {
+    connection.release();
+  }
+});
 
 // GET item details by barcode
 router.get("/barcode/:barcode", async (req, res) => {
@@ -521,7 +766,7 @@ router.delete("/:id", async (req, res) => {
   if (!company_id || !owner_type || !owner_id) {
     return res.status(400).json({
       success: false,
-      message: "company_id, owner_type & owner_id are required"
+      message: "company_id, owner_type & owner_id are required",
     });
   }
 
@@ -543,7 +788,7 @@ router.delete("/:id", async (req, res) => {
       await connection.rollback();
       return res.status(404).json({
         success: false,
-        message: "Stock item not found or access denied"
+        message: "Stock item not found or access denied",
       });
     }
 
@@ -558,21 +803,19 @@ router.delete("/:id", async (req, res) => {
 
     return res.json({
       success: true,
-      message: "Stock item deleted successfully"
+      message: "Stock item deleted successfully",
     });
-
   } catch (err) {
     await connection.rollback();
     console.error("🔥 Error deleting stock item:", err);
     return res.status(500).json({
       success: false,
-      message: "Error deleting stock item"
+      message: "Error deleting stock item",
     });
   } finally {
     connection.release();
   }
 });
-
 
 //put item
 router.put("/:id", async (req, res) => {
@@ -605,7 +848,9 @@ router.put("/:id", async (req, res) => {
     } = req.body;
 
     if (!name || !unit || !taxType) {
-      return res.status(400).json({ success: false, message: "Missing fields" });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing fields" });
     }
 
     // Helper to sanitize empty strings
@@ -617,7 +862,7 @@ router.put("/:id", async (req, res) => {
     // Map batches and calculate total opening value
     let totalOpeningValue = 0;
 
-    const batchData = (batches || []).map(batch => {
+    const batchData = (batches || []).map((batch) => {
       const qty = Number(batch.batchQuantity) || 0;
       const rate = Number(batch.batchRate) || 0;
       const openingRate = rate;
@@ -679,7 +924,6 @@ router.put("/:id", async (req, res) => {
       batches: batchData,
       openingValue: finalOpeningValue,
     });
-
   } catch (err) {
     await connection.rollback();
     console.error("🔥 Update Error:", err);
@@ -693,16 +937,16 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-
 //single get
 
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
   const { company_id, owner_type, owner_id } = req.query;
 
-
   if (!id) {
-    return res.status(400).json({ success: false, message: "Stock item ID is required" });
+    return res
+      .status(400)
+      .json({ success: false, message: "Stock item ID is required" });
   }
 
   const connection = await db.getConnection();
@@ -748,7 +992,12 @@ router.get("/:id", async (req, res) => {
     const [rows] = await connection.execute(query, params);
 
     if (!rows.length) {
-      return res.status(404).json({ success: false, message: "No stock item found for this tenant" });
+      return res
+        .status(404)
+        .json({
+          success: false,
+          message: "No stock item found for this tenant",
+        });
     }
 
     const item = rows[0];
@@ -757,21 +1006,19 @@ router.get("/:id", async (req, res) => {
       success: true,
       data: {
         ...item,
-        batches: item.batches ? JSON.parse(item.batches) : []
-      }
+        batches: item.batches ? JSON.parse(item.batches) : [],
+      },
     });
-
   } catch (err) {
     console.error("🔥 Error fetching single stock item:", err);
     return res.status(500).json({
       success: false,
-      message: "Error fetching stock item"
+      message: "Error fetching stock item",
     });
   } finally {
     connection.release();
   }
 });
-
 
 //  UPDATE ONLY BATCHES for a Stock Item
 router.patch("/:id/batches", async (req, res) => {
@@ -794,14 +1041,16 @@ router.patch("/:id/batches", async (req, res) => {
     );
 
     if (!rows.length) {
-      return res.status(404).json({ success: false, message: "Item not found" });
+      return res
+        .status(404)
+        .json({ success: false, message: "Item not found" });
     }
 
     let batches = JSON.parse(rows[0].batches || "[]");
     const diffQty = Number(quantity); // +ve Purchase, -ve Sales
 
     // 🔍 Find batch
-    const index = batches.findIndex(b => b.batchName === batchName);
+    const index = batches.findIndex((b) => b.batchName === batchName);
 
     if (index >= 0) {
       let currentQty = Number(batches[index].batchQuantity || 0);
@@ -822,7 +1071,6 @@ router.patch("/:id/batches", async (req, res) => {
       if (Number(diffQty) > 0 && Number(rate) > 0) {
         batches[index].batchRate = Number(rate);
       }
-
     } else {
       // 🆕 New batch creation only if purchase / positive qty
       if (diffQty < 0) {
@@ -841,17 +1089,16 @@ router.patch("/:id/batches", async (req, res) => {
       });
     }
 
-    await connection.execute(
-      `UPDATE stock_items SET batches=? WHERE id=?`,
-      [JSON.stringify(batches), id]
-    );
+    await connection.execute(`UPDATE stock_items SET batches=? WHERE id=?`, [
+      JSON.stringify(batches),
+      id,
+    ]);
 
     return res.json({
       success: true,
       message: "Batch updated successfully",
       updatedBatches: batches,
     });
-
   } catch (err) {
     console.error("🔥 Batch Update Error:", err);
     return res.status(500).json({
@@ -863,12 +1110,5 @@ router.patch("/:id/batches", async (req, res) => {
     connection.release();
   }
 });
-
-
-
-
-
-
-
 
 module.exports = router;
