@@ -512,19 +512,36 @@ const SalesVoucher: React.FC = () => {
       }
 
       // 3️⃣ QUANTITY UPDATE
-      if (name === "quantity") {
+      // 3️⃣ QUANTITY UPDATE
+if (name === "quantity") {
   const oldQty = Number(entry.quantity || 0);
   const newQty = Number(value || 0);
 
-  const selectedBatch = (entry.batches || []).find(
-    (b: any) => String(b.batchName) === String(entry.batchNumber)
+  // 🟢 If NO batch system → allow free quantity, NO stock error
+  if (!entry.batches || entry.batches.length === 0) {
+    updatedEntries[index].quantity = newQty;
+    updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+    setFormData((p) => ({ ...p, entries: updatedEntries }));
+    return;
+  }
+
+  // 🟡 If batch exists but no batch selected
+  if (!entry.batchNumber) {
+    updatedEntries[index].quantity = newQty;
+    updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+    setFormData((p) => ({ ...p, entries: updatedEntries }));
+    return;
+  }
+
+  const selectedBatch = entry.batches.find(
+    (b) => String(b.batchName) === String(entry.batchNumber)
   );
 
   const availableQty = Number(
     selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
   );
 
-  // 🟡 No stock at all
+  // 🔴 If batch selected but NO STOCK
   if (availableQty <= 0) {
     Swal.fire({
       icon: "warning",
@@ -539,41 +556,19 @@ const SalesVoucher: React.FC = () => {
 
   let finalQty = newQty;
 
-  // 🔴 User enters more than available
+  // 🔴 User entered more quantity than available
   if (newQty > availableQty) {
     Swal.fire({
       icon: "warning",
       title: "Stock Not Available",
       text: `Only ${availableQty} available`,
     });
-
-    finalQty = availableQty; // 👈 FIX: force correct qty
+    finalQty = availableQty;
   }
 
   updatedEntries[index].quantity = finalQty;
   updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
   setFormData((p) => ({ ...p, entries: updatedEntries }));
-
-  // ⭐ DATABASE PATCH MUST ALWAYS RUN for correct qty update
-  const diffQty = finalQty - oldQty;
-
-  if (entry.itemId && entry.batchNumber && diffQty !== 0) {
-    try {
-      await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-        {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            batchName: entry.batchNumber,
-            quantity: -diffQty, // reduce stock
-          }),
-        }
-      );
-    } catch (err) {
-      console.error("❌ Stock update failed:", err);
-    }
-  }
 
   return;
 }

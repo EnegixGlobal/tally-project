@@ -44,57 +44,56 @@ const BatchList: React.FC = () => {
   const [filterStockItem, setFilterStockItem] = useState("");
 
   // Fetch stock items on mount
- useEffect(() => {
-  let isMounted = true;
-  setLoading(true);
+  useEffect(() => {
+    let isMounted = true;
+    setLoading(true);
 
-  const company_id = localStorage.getItem("company_id");
-  const owner_type = localStorage.getItem("supplier"); // supplier stored
-  const owner_id = localStorage.getItem(
-    owner_type === "employee" ? "employee_id" : "user_id"
-  );
+    const company_id = localStorage.getItem("company_id");
+    const owner_type = localStorage.getItem("supplier");
+    const owner_id = localStorage.getItem(
+      owner_type === "employee" ? "employee_id" : "user_id"
+    );
 
-  // Agar kuch missing hai → data load mat karo
-  if (!company_id || !owner_type || !owner_id) {
-    console.log("Missing auth params");
-    setLoading(false);
-    return;
-  }
-
-  const params = new URLSearchParams({
-    company_id,
-    owner_type,
-    owner_id,
-  });
-
-  const fetchData = async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
-      );
-      const json = await res.json();
-
-      if (isMounted) {
-        if (json.success) {
-          setStockItems(json.data); // Backend already JSON.parse batches
-        } else {
-          setStockItems([]);
-        }
-      }
-    } catch (error) {
-      if (isMounted) setStockItems([]);
-    } finally {
-      if (isMounted) setLoading(false);
+    // Agar kuch missing hai → data load mat karo
+    if (!company_id || !owner_type || !owner_id) {
+      console.log("Missing auth params");
+      setLoading(false);
+      return;
     }
-  };
 
-  fetchData();
+    const params = new URLSearchParams({
+      company_id,
+      owner_type,
+      owner_id,
+    });
 
-  return () => {
-    isMounted = false;
-  };
-}, []);
+    const fetchData = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
+        );
+        const json = await res.json();
 
+        if (isMounted) {
+          if (json.success) {
+            setStockItems(json.data); // Backend already JSON.parse batches
+          } else {
+            setStockItems([]);
+          }
+        }
+      } catch (error) {
+        if (isMounted) setStockItems([]);
+      } finally {
+        if (isMounted) setLoading(false);
+      }
+    };
+
+    fetchData();
+
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // NEW: overall status calculator
   const getOverallStatus = (batches: any[]) => {
@@ -327,13 +326,11 @@ const BatchList: React.FC = () => {
               } outline-none transition-colors`}
             >
               <option value="">All Items</option>
-              {stockItems
-                .filter((item) => item.enableBatchTracking)
-                .map((item) => (
-                  <option key={item.id} value={item.id}>
-                    {item.name}
-                  </option>
-                ))}
+              {stockItems.map((item) => (
+                <option key={item.id} value={item.id}>
+                  {item.name}
+                </option>
+              ))}
             </select>
           </div>
 
@@ -381,16 +378,21 @@ const BatchList: React.FC = () => {
                   Status
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  Batch Number
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Stock Item
                 </th>
+
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   HSN Code
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
-                  Current Stock
+                  Batch Number
+                </th>
+
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Quantity
+                </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Rate
                 </th>
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Manufacturing Date
@@ -449,17 +451,6 @@ const BatchList: React.FC = () => {
                         })()}
                       </td>
 
-                      {/* BATCH NUMBER — SCROLL */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b: any, i: number) => (
-                            <div key={i} className="font-medium">
-                              {b.batchName}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-
                       {/* ITEM NAME */}
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="font-medium">{item.name}</div>
@@ -475,9 +466,37 @@ const BatchList: React.FC = () => {
                         </div>
                       </td>
 
-                      {/* STOCK */}
+                      {/* BATCH NUMBER — SCROLL */}
                       <td className="px-4 py-4 whitespace-nowrap">
-                        {item.openingBalance}
+                        <div className="max-h-20 overflow-y-auto space-y-1">
+                          {batches.map((b: any, i: number) => (
+                            <div key={i} className="font-medium">
+                              {b.batchName}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+
+                      {/* Batch Qty  */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="max-h-20 overflow-y-auto space-y-1">
+                          {batches.map((b: any, i: number) => (
+                            <div key={i} className="flex items-center">
+                              {b.batchQuantity}
+                            </div>
+                          ))}
+                        </div>
+                      </td>
+
+                      {/* Batch Qty  */}
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="max-h-20 overflow-y-auto space-y-1">
+                          {batches.map((b: any, i: number) => (
+                            <div key={i} className="flex items-center">
+                              {b.batchRate}
+                            </div>
+                          ))}
+                        </div>
                       </td>
 
                       {/* MFG DATE — SCROLL */}
