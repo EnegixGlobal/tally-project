@@ -25,6 +25,7 @@ import StockItemList from "./components/masters/stock/StockItemList";
 import StockItemForm from "./components/masters/stock/StockItemForm";
 import StockItemEdit from "./components/masters/stock/StockItemEdit";
 import BulkStockItemCreate from "./components/masters/stock/BulkStockItemCreate";
+import StockPerchaseItem from "./components/masters/stock/StocPerchaseItem";
 import BatchList from "./components/masters/batch/BatchList";
 import BatchSelectionPage from "./components/masters/batch/BatchSelectionPage";
 import StockGroupList from "./components/masters/stock/StockGroupList";
@@ -284,6 +285,11 @@ function App() {
                 path="masters/stock-item/create"
                 element={<RequireCompany><StockItemForm /></RequireCompany>}
               />
+              <Route
+                path="masters/stock-item/purchase/create"
+                element={<RequireCompany><StockPerchaseItem /></RequireCompany>}
+              />
+              
               <Route
                 path="masters/stock-item/bulk-create"
                 element={<RequireCompany><BulkStockItemCreate /></RequireCompany>}

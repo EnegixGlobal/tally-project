@@ -42,6 +42,9 @@ const BatchList: React.FC = () => {
     "all" | "active" | "expiring" | "expired"
   >("all");
   const [filterStockItem, setFilterStockItem] = useState("");
+  const [showNewComponent, setShowNewComponent] = useState(false);
+
+  //fetch purchase stock
 
   // Fetch stock items on mount
   useEffect(() => {
@@ -54,32 +57,38 @@ const BatchList: React.FC = () => {
       owner_type === "employee" ? "employee_id" : "user_id"
     );
 
-    // Agar kuch missing hai → data load mat karo
     if (!company_id || !owner_type || !owner_id) {
       console.log("Missing auth params");
       setLoading(false);
       return;
     }
 
-    const params = new URLSearchParams({
-      company_id,
-      owner_type,
-      owner_id,
-    });
+    const params = new URLSearchParams({ company_id, owner_type, owner_id });
 
     const fetchData = async () => {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
-        );
-        const json = await res.json();
+        const [res1, res2] = await Promise.all([
+          fetch(
+            `${
+              import.meta.env.VITE_API_URL
+            }/api/stock-items/purchase-batch?${params.toString()}`
+          ),
+          fetch(
+            `${
+              import.meta.env.VITE_API_URL
+            }/api/stock-items?${params.toString()}`
+          ),
+        ]);
+
+        const data1 = await res1.json();
+        const data2 = await res2.json();
 
         if (isMounted) {
-          if (json.success) {
-            setStockItems(json.data); // Backend already JSON.parse batches
-          } else {
-            setStockItems([]);
-          }
+          const mergedData = [
+            ...(data1.success ? data1.data : []),
+            ...(data2.success ? data2.data : []),
+          ];
+          setStockItems(mergedData);
         }
       } catch (error) {
         if (isMounted) setStockItems([]);
@@ -186,17 +195,28 @@ const BatchList: React.FC = () => {
 
   return (
     <div className="pt-[56px] px-4">
-      <div className="flex items-center mb-6">
+      <div className="flex items-center justify-between mb-6">
+        {/* Left side: Back button and Heading */}
+        <div className="flex items-center">
+          <button
+            onClick={() => navigate("/app/masters/stock-item")}
+            className={`mr-4 p-2 rounded-full ${
+              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
+            aria-label="Back"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-2xl font-bold">Batch Management</h1>
+        </div>
+
+        {/* Right side: Add Batch button */}
         <button
-          onClick={() => navigate("/app/masters/stock-item")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
-          aria-label="Back"
+          onClick={() => navigate("/app/masters/stock-item/purchase/create")}
+          className={`px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700`}
         >
-          <ArrowLeft size={20} />
+          Add Purchase Batch
         </button>
-        <h1 className="text-2xl font-bold">Batch Management</h1>
       </div>
 
       {/* Statistics */}
@@ -377,6 +397,11 @@ const BatchList: React.FC = () => {
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Status
                 </th>
+
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Type
+                </th>
+
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Stock Item
                 </th>
@@ -403,6 +428,9 @@ const BatchList: React.FC = () => {
                 <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
                   Days to Expiry
                 </th>
+                <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                  Actioin
+                </th>
               </tr>
             </thead>
             <tbody
@@ -422,7 +450,7 @@ const BatchList: React.FC = () => {
               ) : (
                 filteredStockItems.map((item) => {
                   const batches = item.batches || [];
-
+                  console.log("item", item);
                   return (
                     <tr
                       key={item.id}
@@ -449,6 +477,20 @@ const BatchList: React.FC = () => {
                             </div>
                           );
                         })()}
+                      </td>
+
+                      {/* type */}
+
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <div className="font-medium">
+                          {item.type ? (
+                            <span className="inline-block px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
+                              {item.type}
+                            </span>
+                          ) : (
+                            "—"
+                          )}
+                        </div>
                       </td>
 
                       {/* ITEM NAME */}
@@ -493,7 +535,7 @@ const BatchList: React.FC = () => {
                         <div className="max-h-20 overflow-y-auto space-y-1">
                           {batches.map((b: any, i: number) => (
                             <div key={i} className="flex items-center">
-                              {b.batchRate}
+                              {b.batchRate || b.openingRate}
                             </div>
                           ))}
                         </div>
@@ -508,9 +550,11 @@ const BatchList: React.FC = () => {
                                 size={14}
                                 className="mr-1 text-gray-400"
                               />
-                              {new Date(
-                                b.batchManufacturingDate
-                              ).toLocaleDateString()}
+                              {b.batchManufacturingDate
+                                ? new Date(
+                                    b.batchManufacturingDate
+                                  ).toLocaleDateString()
+                                : "—"}
                             </div>
                           ))}
                         </div>
@@ -525,7 +569,11 @@ const BatchList: React.FC = () => {
                                 size={14}
                                 className="mr-1 text-gray-400"
                               />
-                              {new Date(b.batchExpiryDate).toLocaleDateString()}
+                              {b.batchExpiryDate
+                                ? new Date(
+                                    b.batchExpiryDate
+                                  ).toLocaleDateString()
+                                : "—"}
                             </div>
                           ))}
                         </div>
@@ -535,6 +583,16 @@ const BatchList: React.FC = () => {
                       <td className="px-4 py-4 whitespace-nowrap">
                         <div className="max-h-20 overflow-y-auto space-y-1">
                           {batches.map((b: any, i: number) => {
+                            // ❗ If expiry date is null, show "—"
+                            if (!b.batchExpiryDate) {
+                              return (
+                                <div key={i} className="text-gray-500">
+                                  —
+                                </div>
+                              );
+                            }
+
+                            // Calculate days only when expiry date exists
                             const days = Math.ceil(
                               (new Date(b.batchExpiryDate).getTime() -
                                 Date.now()) /
@@ -559,6 +617,17 @@ const BatchList: React.FC = () => {
                             );
                           })}
                         </div>
+                      </td>
+
+                      <td>
+                        <button
+                          onClick={() =>
+                            navigate("/app/masters/stock-item/purchase/create")
+                          }
+                          className={`px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700`}
+                        >
+                          Add Purchase Batch
+                        </button>
                       </td>
                     </tr>
                   );

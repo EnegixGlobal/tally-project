@@ -392,6 +392,7 @@ const SalesVoucher: React.FC = () => {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
+          console.log("this is data", data);
           setStockItems(data.data);
         } else setStockItems([]);
       })
@@ -513,66 +514,65 @@ const SalesVoucher: React.FC = () => {
 
       // 3️⃣ QUANTITY UPDATE
       // 3️⃣ QUANTITY UPDATE
-if (name === "quantity") {
-  const oldQty = Number(entry.quantity || 0);
-  const newQty = Number(value || 0);
+      if (name === "quantity") {
+        const oldQty = Number(entry.quantity || 0);
+        const newQty = Number(value || 0);
 
-  // 🟢 If NO batch system → allow free quantity, NO stock error
-  if (!entry.batches || entry.batches.length === 0) {
-    updatedEntries[index].quantity = newQty;
-    updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-    setFormData((p) => ({ ...p, entries: updatedEntries }));
-    return;
-  }
+        // 🟢 If NO batch system → allow free quantity, NO stock error
+        if (!entry.batches || entry.batches.length === 0) {
+          updatedEntries[index].quantity = newQty;
+          updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+          setFormData((p) => ({ ...p, entries: updatedEntries }));
+          return;
+        }
 
-  // 🟡 If batch exists but no batch selected
-  if (!entry.batchNumber) {
-    updatedEntries[index].quantity = newQty;
-    updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-    setFormData((p) => ({ ...p, entries: updatedEntries }));
-    return;
-  }
+        // 🟡 If batch exists but no batch selected
+        if (!entry.batchNumber) {
+          updatedEntries[index].quantity = newQty;
+          updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+          setFormData((p) => ({ ...p, entries: updatedEntries }));
+          return;
+        }
 
-  const selectedBatch = entry.batches.find(
-    (b) => String(b.batchName) === String(entry.batchNumber)
-  );
+        const selectedBatch = entry.batches.find(
+          (b) => String(b.batchName) === String(entry.batchNumber)
+        );
 
-  const availableQty = Number(
-    selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
-  );
+        const availableQty = Number(
+          selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
+        );
 
-  // 🔴 If batch selected but NO STOCK
-  if (availableQty <= 0) {
-    Swal.fire({
-      icon: "warning",
-      title: "Stock Not Available in the Selected Batch",
-    });
+        // 🔴 If batch selected but NO STOCK
+        if (availableQty <= 0) {
+          Swal.fire({
+            icon: "warning",
+            title: "Stock Not Available in the Selected Batch",
+          });
 
-    updatedEntries[index].quantity = 0;
-    updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-    setFormData((p) => ({ ...p, entries: updatedEntries }));
-    return;
-  }
+          updatedEntries[index].quantity = 0;
+          updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+          setFormData((p) => ({ ...p, entries: updatedEntries }));
+          return;
+        }
 
-  let finalQty = newQty;
+        let finalQty = newQty;
 
-  // 🔴 User entered more quantity than available
-  if (newQty > availableQty) {
-    Swal.fire({
-      icon: "warning",
-      title: "Stock Not Available",
-      text: `Only ${availableQty} available`,
-    });
-    finalQty = availableQty;
-  }
+        // 🔴 User entered more quantity than available
+        if (newQty > availableQty) {
+          Swal.fire({
+            icon: "warning",
+            title: "Stock Not Available",
+            text: `Only ${availableQty} available`,
+          });
+          finalQty = availableQty;
+        }
 
-  updatedEntries[index].quantity = finalQty;
-  updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-  setFormData((p) => ({ ...p, entries: updatedEntries }));
+        updatedEntries[index].quantity = finalQty;
+        updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+        setFormData((p) => ({ ...p, entries: updatedEntries }));
 
-  return;
-}
-
+        return;
+      }
 
       // 4️⃣ Rate / Discount
       if (["rate", "discount"].includes(name)) {
@@ -1559,6 +1559,9 @@ if (name === "quantity") {
                     <tbody>
                       {formData.entries.map((entry, index) => {
                         const itemDetails = getItemDetails(entry.itemId || "");
+
+                        // console.log('this is data', entry)
+
                         return (
                           <tr
                             key={entry.id}
@@ -1773,7 +1776,6 @@ if (name === "quantity") {
                         <td className="px-4 py-2 text-right">
                           ₹{subtotal.toLocaleString()}
                         </td>
-                        <td></td>
                       </tr>
 
                       {/* GST TOTAL */}
@@ -1791,8 +1793,6 @@ if (name === "quantity") {
                           ₹
                           {(cgstTotal + sgstTotal + igstTotal).toLocaleString()}
                         </td>
-                        <td></td>
-                        <td></td>
                       </tr>
 
                       {/* DISCOUNT */}

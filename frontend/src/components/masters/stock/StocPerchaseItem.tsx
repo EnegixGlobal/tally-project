@@ -226,7 +226,7 @@ const GodownAllocationField: React.FC<GodownAllocationFieldProps> = ({
   );
 };
 
-const StockItemForm = () => {
+const StockPerchaseItem = () => {
   const {
     theme,
     gstClassifications = [],
@@ -612,7 +612,7 @@ const StockItemForm = () => {
     const method = id ? "PUT" : "POST"; // Use PUT for update, POST for new
     const url = id
       ? `${import.meta.env.VITE_API_URL}/api/stock-items/${id}` // URL with ID for update
-      : `${import.meta.env.VITE_API_URL}/api/stock-items`; // URL for new record creation
+      : `${import.meta.env.VITE_API_URL}/api/stock-items/purchase-batch`; // URL for new record creation
 
     try {
       const res = await fetch(url, {
@@ -720,7 +720,7 @@ const StockItemForm = () => {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold">New Stock Item</h1>
+        <h1 className="text-2xl font-bold">Purchase Stock Item</h1>
       </div>
 
       <div
@@ -874,16 +874,13 @@ const StockItemForm = () => {
               </label>
 
               {/* Right: Add Batch Button */}
-
-              {formData.enableBatchTracking && (
-                <button
-                  type="button"
-                  onClick={addBatchRow}
-                  className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  <Plus size={16} /> Add Batch
-                </button>
-              )}
+              <button
+                type="button"
+                onClick={addBatchRow}
+                className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                <Plus size={16} /> Add Batch
+              </button>
             </div>
 
             <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
@@ -1049,4 +1046,4 @@ const StockItemForm = () => {
   );
 };
 
-export default StockItemForm;
+export default StockPerchaseItem;
