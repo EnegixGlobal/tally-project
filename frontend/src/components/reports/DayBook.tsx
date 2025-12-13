@@ -175,7 +175,34 @@ const DayBook: React.FC = () => {
           }))
         );
 
-        setProcessedEntries(detailedEntries);
+        // Group entries with same date, voucher type, voucher no, and particulars
+        const entryGroups: DayBookEntry[][] = [];
+        const groupMap = new Map<string, number>();
+
+        detailedEntries.forEach((entry) => {
+          // Create a key from common fields
+          const key = `${entry.date}|${entry.voucherType}|${entry.voucherNo}|${entry.particulars}`;
+          
+          if (!groupMap.has(key)) {
+            groupMap.set(key, entryGroups.length);
+            entryGroups.push([]);
+          }
+          entryGroups[groupMap.get(key)!].push(entry);
+        });
+
+        // Flatten with rowspan info
+        const processedWithRowspan: (DayBookEntry & { rowspan?: number; isFirstInGroup?: boolean })[] = [];
+        entryGroups.forEach((group) => {
+          group.forEach((entry, index) => {
+            processedWithRowspan.push({
+              ...entry,
+              rowspan: index === 0 ? group.length : 0, // 0 means don't render this cell
+              isFirstInGroup: index === 0,
+            });
+          });
+        });
+
+        setProcessedEntries(processedWithRowspan);
 
         // Summary totals
         const totalDebit = groupedArray.reduce(
@@ -685,7 +712,7 @@ const DayBook: React.FC = () => {
                         {formatDate(
                           typeof voucher.date === "string"
                             ? voucher.date
-                            : voucher.date.toISOString().slice(0, 10)
+                            : String(voucher.date)
                         )}
                       </td>
 
@@ -791,51 +818,92 @@ const DayBook: React.FC = () => {
                     </td>
                   </tr>
                 ) : (
-                  processedEntries.map((entry) => (
-                    <tr
-                      key={entry.id}
-                      className={`${
-                        theme === "dark"
-                          ? "border-b border-gray-700 hover:bg-gray-700"
-                          : "border-b border-gray-200 hover:bg-gray-50"
-                      }`}
-                    >
-                      <td className="px-4 py-3">{formatDate(entry.date)}</td>
-                      <td className="px-4 py-3">
-                        <span
-                          className={`px-2 py-1 rounded-full text-xs ${
-                            entry.voucherType === "sales"
-                              ? "bg-green-100 text-green-800"
-                              : entry.voucherType === "purchase"
-                              ? "bg-blue-100 text-blue-800"
-                              : entry.voucherType === "receipt"
-                              ? "bg-purple-100 text-purple-800"
-                              : entry.voucherType === "payment"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
-                        >
-                          {entry.voucherType.charAt(0).toUpperCase() +
-                            entry.voucherType.slice(1)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 font-mono">{entry.voucherNo}</td>
-                      <td className="px-4 py-3">
-                        {entry.particulars}
-                        {entry.narration && (
-                          <div className="text-xs text-gray-500 mt-1">
-                            {entry.narration}
-                          </div>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono">
-                        {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono">
-                        {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
-                      </td>
-                    </tr>
-                  ))
+                  processedEntries.map((entry, index) => {
+                    const entryWithRowspan = entry as DayBookEntry & { rowspan?: number; isFirstInGroup?: boolean };
+                    const showCommonFields = entryWithRowspan.isFirstInGroup === true;
+                    const rowspan = entryWithRowspan.rowspan && entryWithRowspan.rowspan > 1 ? entryWithRowspan.rowspan : undefined;
+                    
+                    return (
+                      <tr
+                        key={`${entry.id}-${index}`}
+                        className={`${
+                          theme === "dark"
+                            ? "border-b border-gray-700 hover:bg-gray-700"
+                            : "border-b border-gray-200 hover:bg-gray-50"
+                        }`}
+                      >
+                        {/* Date - only show for first entry in group */}
+                        {showCommonFields ? (
+                          <td 
+                            className="px-4 py-3" 
+                            rowSpan={rowspan}
+                          >
+                            {formatDate(entry.date)}
+                          </td>
+                        ) : null}
+                        
+                        {/* Voucher Type - only show for first entry in group */}
+                        {showCommonFields ? (
+                          <td 
+                            className="px-4 py-3" 
+                            rowSpan={rowspan}
+                          >
+                            <span
+                              className={`px-2 py-1 rounded-full text-xs ${
+                                entry.voucherType === "sales"
+                                  ? "bg-green-100 text-green-800"
+                                  : entry.voucherType === "purchase"
+                                  ? "bg-blue-100 text-blue-800"
+                                  : entry.voucherType === "receipt"
+                                  ? "bg-purple-100 text-purple-800"
+                                  : entry.voucherType === "payment"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
+                              }`}
+                            >
+                              {entry.voucherType.charAt(0).toUpperCase() +
+                                entry.voucherType.slice(1)}
+                            </span>
+                          </td>
+                        ) : null}
+                        
+                        {/* Voucher No - only show for first entry in group */}
+                        {showCommonFields ? (
+                          <td 
+                            className="px-4 py-3 font-mono" 
+                            rowSpan={rowspan}
+                          >
+                            {entry.voucherNo}
+                          </td>
+                        ) : null}
+                        
+                        {/* Particulars - only show for first entry in group */}
+                        {showCommonFields ? (
+                          <td 
+                            className="px-4 py-3" 
+                            rowSpan={rowspan}
+                          >
+                            {entry.particulars}
+                            {entry.narration && (
+                              <div className="text-xs text-gray-500 mt-1">
+                                {entry.narration}
+                              </div>
+                            )}
+                          </td>
+                        ) : null}
+                        
+                        {/* Debit - always show */}
+                        <td className="px-4 py-3 text-right font-mono">
+                          {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
+                        </td>
+                        
+                        {/* Credit - always show */}
+                        <td className="px-4 py-3 text-right font-mono">
+                          {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
+                        </td>
+                      </tr>
+                    );
+                  })
                 )}
               </tbody>
               {processedEntries.length > 0 && (
