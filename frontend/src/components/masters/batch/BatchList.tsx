@@ -42,9 +42,113 @@ const BatchList: React.FC = () => {
     "all" | "active" | "expiring" | "expired"
   >("all");
   const [filterStockItem, setFilterStockItem] = useState("");
-  const [showNewComponent, setShowNewComponent] = useState(false);
+  const [openFormItemId, setOpenFormItemId] = useState<string | null>(null);
 
-  //fetch purchase stock
+  const [batchForm, setBatchForm] = useState({
+    batchName: "",
+    batchQuantity: "",
+    batchRate: "",
+    batchManufacturingDate: "",
+    batchExpiryDate: "",
+  });
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setBatchForm({
+      ...batchForm,
+      [e.target.name]: e.target.value,
+    });
+  };
+
+  console.log('batch number', batchForm)
+
+  const handleSaveBatch = async (itemId: string) => {
+    const company_id = localStorage.getItem("company_id");
+    const owner_type = localStorage.getItem("supplier");
+    const owner_id = localStorage.getItem(
+      owner_type === "employee" ? "employee_id" : "user_id"
+    );
+
+    const payload = {
+      itemId,
+      ...batchForm,
+      company_id,
+      owner_type,
+      owner_id,
+    };
+
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/stock-items/purchase-batch`,
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      }
+    );
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("Batch Added Successfully!");
+
+      // Reset
+      setBatchForm({
+        batchName: "",
+        batchQuantity: "",
+        batchRate: "",
+        batchManufacturingDate: "",
+        batchExpiryDate: "",
+      });
+
+      // Close form
+      setOpenFormItemId(null);
+    }
+  };
+
+  // get purchase history
+
+  const [data, setData] = useState<any[]>([]);
+  
+
+  useEffect(() => {
+  const loadPurchaseData = async () => {
+    const company_id = localStorage.getItem("company_id");
+    const owner_type = localStorage.getItem("supplier");
+    const owner_id = localStorage.getItem(
+      owner_type === "employee" ? "employee_id" : "user_id"
+    );
+
+    if (!company_id || !owner_type || !owner_id) return;
+
+    const params = new URLSearchParams({
+      company_id,
+      owner_type,
+      owner_id,
+    });
+
+    const response = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?${params.toString()}`
+    );
+
+    const json = await response.json();
+
+    const formatted = Array.isArray(json.data)
+      ? json.data.map((v: any) => ({
+          id: v.id,
+          itemName: v.itemName,
+          hsnCode: v.hsnCode,
+          batchNumber: v.batchNumber,
+          qty: v.purchaseQuantity,
+          date: v.purchaseDate,
+        }))
+      : [];
+
+    setData(formatted);
+  };
+
+  loadPurchaseData();
+}, []);
+
+
 
   // Fetch stock items on mount
   useEffect(() => {
@@ -441,7 +545,7 @@ const BatchList: React.FC = () => {
               {filteredStockItems.length === 0 ? (
                 <tr>
                   <td
-                    colSpan={7}
+                    colSpan={11}
                     className="px-4 py-8 text-center text-gray-500"
                   >
                     No batches found matching your criteria
@@ -450,186 +554,244 @@ const BatchList: React.FC = () => {
               ) : (
                 filteredStockItems.map((item) => {
                   const batches = item.batches || [];
-                  console.log("item", item);
+
                   return (
-                    <tr
-                      key={item.id}
-                      className={`${
-                        theme === "dark"
-                          ? "hover:bg-gray-700"
-                          : "hover:bg-gray-50"
-                      }`}
-                    >
-                      {/* STATUS */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        {(() => {
-                          const status = getOverallStatus(batches);
-                          return (
-                            <div className="flex items-center">
-                              {getStatusIcon(status)}
-                              <span
-                                className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                                  status
-                                )}`}
-                              >
-                                {status.toUpperCase()}
-                              </span>
-                            </div>
-                          );
-                        })()}
-                      </td>
-
-                      {/* type */}
-
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="font-medium">
-                          {item.type ? (
-                            <span className="inline-block px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
-                              {item.type}
-                            </span>
-                          ) : (
-                            "—"
-                          )}
-                        </div>
-                      </td>
-
-                      {/* ITEM NAME */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="font-medium">{item.name}</div>
-                        <div className="text-sm text-gray-500">
-                          Unit: {item.unit}
-                        </div>
-                      </td>
-
-                      {/* HSN CODE */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="font-medium">
-                          {item.hsnCode ? item.hsnCode : "—"}
-                        </div>
-                      </td>
-
-                      {/* BATCH NUMBER — SCROLL */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b: any, i: number) => (
-                            <div key={i} className="font-medium">
-                              {b.batchName}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-
-                      {/* Batch Qty  */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b: any, i: number) => (
-                            <div key={i} className="flex items-center">
-                              {b.batchQuantity}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-
-                      {/* Batch Qty  */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b: any, i: number) => (
-                            <div key={i} className="flex items-center">
-                              {b.batchRate || b.openingRate}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-
-                      {/* MFG DATE — SCROLL */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b: any, i: number) => (
-                            <div key={i} className="flex items-center">
-                              <Calendar
-                                size={14}
-                                className="mr-1 text-gray-400"
-                              />
-                              {b.batchManufacturingDate
-                                ? new Date(
-                                    b.batchManufacturingDate
-                                  ).toLocaleDateString()
-                                : "—"}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-
-                      {/* EXP DATE — SCROLL */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b: any, i: number) => (
-                            <div key={i} className="flex items-center">
-                              <Calendar
-                                size={14}
-                                className="mr-1 text-gray-400"
-                              />
-                              {b.batchExpiryDate
-                                ? new Date(
-                                    b.batchExpiryDate
-                                  ).toLocaleDateString()
-                                : "—"}
-                            </div>
-                          ))}
-                        </div>
-                      </td>
-
-                      {/* DAYS — SCROLL */}
-                      <td className="px-4 py-4 whitespace-nowrap">
-                        <div className="max-h-20 overflow-y-auto space-y-1">
-                          {batches.map((b: any, i: number) => {
-                            // ❗ If expiry date is null, show "—"
-                            if (!b.batchExpiryDate) {
-                              return (
-                                <div key={i} className="text-gray-500">
-                                  —
-                                </div>
-                              );
-                            }
-
-                            // Calculate days only when expiry date exists
-                            const days = Math.ceil(
-                              (new Date(b.batchExpiryDate).getTime() -
-                                Date.now()) /
-                                (1000 * 60 * 60 * 24)
-                            );
-
+                    <React.Fragment key={item.id}>
+                      {/* ================= MAIN ROW ================= */}
+                      <tr
+                        className={`${
+                          theme === "dark"
+                            ? "hover:bg-gray-700"
+                            : "hover:bg-gray-50"
+                        }`}
+                      >
+                        {/* STATUS */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          {(() => {
+                            const status = getOverallStatus(batches);
                             return (
-                              <div
-                                key={i}
-                                className={`font-medium ${
-                                  days < 0
-                                    ? "text-red-600"
-                                    : days <= 30
-                                    ? "text-yellow-600"
-                                    : "text-green-600"
-                                }`}
-                              >
-                                {days < 0
-                                  ? `Expired ${Math.abs(days)} days ago`
-                                  : `${days} days`}
+                              <div className="flex items-center">
+                                {getStatusIcon(status)}
+                                <span
+                                  className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
+                                    status
+                                  )}`}
+                                >
+                                  {status.toUpperCase()}
+                                </span>
                               </div>
                             );
-                          })}
-                        </div>
-                      </td>
+                          })()}
+                        </td>
 
-                      <td>
-                        <button
-                          onClick={() =>
-                            navigate("/app/masters/stock-item/purchase/create")
-                          }
-                          className={`px-4 py-2 rounded-full bg-blue-600 text-white hover:bg-blue-700`}
-                        >
-                          Add Purchase Batch
-                        </button>
-                      </td>
-                    </tr>
+                        {/* TYPE */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="font-medium">
+                            {item.type ? (
+                              <span className="inline-block px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
+                                {item.type}
+                              </span>
+                            ) : (
+                              "—"
+                            )}
+                          </div>
+                        </td>
+
+                        {/* ITEM NAME */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="font-medium">{item.name}</div>
+                          <div className="text-sm text-gray-500">
+                            Unit: {item.unit}
+                          </div>
+                        </td>
+
+                        {/* HSN */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          {item.hsnCode || "—"}
+                        </td>
+
+                        {/* BATCH NAME LIST */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="max-h-20 overflow-y-auto space-y-1">
+                            {batches.map((b: any, i: number) => (
+                              <div key={i} className="font-medium">
+                                {b.batchName}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+
+                        {/* QTY LIST */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="max-h-20 overflow-y-auto space-y-1">
+                            {batches.map((b: any, i: number) => (
+                              <div key={i}>{b.batchQuantity}</div>
+                            ))}
+                          </div>
+                        </td>
+
+                        {/* RATE LIST */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="max-h-20 overflow-y-auto space-y-1">
+                            {batches.map((b: any, i: number) => (
+                              <div key={i}>{b.batchRate || b.openingRate}</div>
+                            ))}
+                          </div>
+                        </td>
+
+                        {/* MFG DATE LIST */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="max-h-20 overflow-y-auto space-y-1">
+                            {batches.map((b: any, i: number) => (
+                              <div key={i} className="flex items-center">
+                                <Calendar
+                                  size={14}
+                                  className="mr-1 text-gray-400"
+                                />
+                                {b.batchManufacturingDate
+                                  ? new Date(
+                                      b.batchManufacturingDate
+                                    ).toLocaleDateString()
+                                  : "—"}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+
+                        {/* EXP DATE LIST */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="max-h-20 overflow-y-auto space-y-1">
+                            {batches.map((b: any, i: number) => (
+                              <div key={i} className="flex items-center">
+                                <Calendar
+                                  size={14}
+                                  className="mr-1 text-gray-400"
+                                />
+                                {b.batchExpiryDate
+                                  ? new Date(
+                                      b.batchExpiryDate
+                                    ).toLocaleDateString()
+                                  : "—"}
+                              </div>
+                            ))}
+                          </div>
+                        </td>
+
+                        {/* DAYS LEFT */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <div className="max-h-20 overflow-y-auto space-y-1">
+                            {batches.map((b: any, i: number) => {
+                              if (!b.batchExpiryDate)
+                                return (
+                                  <div key={i} className="text-gray-500">
+                                    —
+                                  </div>
+                                );
+
+                              const days = Math.ceil(
+                                (new Date(b.batchExpiryDate).getTime() -
+                                  Date.now()) /
+                                  (1000 * 60 * 60 * 24)
+                              );
+
+                              return (
+                                <div
+                                  key={i}
+                                  className={`font-medium ${
+                                    days < 0
+                                      ? "text-red-600"
+                                      : days <= 30
+                                      ? "text-yellow-600"
+                                      : "text-green-600"
+                                  }`}
+                                >
+                                  {days < 0
+                                    ? `Expired ${Math.abs(days)} days ago`
+                                    : `${days} days`}
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </td>
+
+                        {/* ACTION BUTTON */}
+                        <td className="px-4 py-4 whitespace-nowrap">
+                          <button
+                            onClick={() =>
+                              setOpenFormItemId(
+                                openFormItemId === item.id ? null : item.id
+                              )
+                            }
+                            className="px-3 py-1 rounded-full bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                          >
+                            {openFormItemId === item.id
+                              ? "Close"
+                              : "Add Purchase"}
+                          </button>
+                        </td>
+                      </tr>
+
+                      {/* ================= FORM ROW (ONLY ONE PER ITEM) ================= */}
+                      {openFormItemId === item.id && (
+                        <tr>
+                          <td colSpan={11} className="bg-gray-100 p-4">
+                            <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                              <input
+                                type="text"
+                                name="batchName"
+                                value={batchForm.batchName}
+                                onChange={handleChange}
+                                placeholder="Batch Number"
+                                className="p-2 border rounded"
+                              />
+
+                              <input
+                                type="number"
+                                name="batchQuantity"
+                                value={batchForm.batchQuantity}
+                                onChange={handleChange}
+                                placeholder="Quantity"
+                                className="p-2 border rounded"
+                              />
+
+                              <input
+                                type="number"
+                                name="batchRate"
+                                value={batchForm.batchRate}
+                                onChange={handleChange}
+                                placeholder="Rate"
+                                className="p-2 border rounded"
+                              />
+
+                              <input
+                                type="date"
+                                name="batchManufacturingDate"
+                                value={batchForm.batchManufacturingDate}
+                                onChange={handleChange}
+                                className="p-2 border rounded"
+                              />
+
+                              <input
+                                type="date"
+                                name="batchExpiryDate"
+                                value={batchForm.batchExpiryDate}
+                                onChange={handleChange}
+                                className="p-2 border rounded"
+                              />
+                            </div>
+
+                            <div className="text-right mt-4">
+                              <button
+                                onClick={() => handleSaveBatch(item.id)}
+                                className="px-4 py-2 bg-green-600 text-white rounded"
+                              >
+                                Save Batch
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   );
                 })
               )}

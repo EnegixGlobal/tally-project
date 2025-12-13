@@ -563,7 +563,6 @@ const PurchaseVoucher: React.FC = () => {
   ];
 
   // 🟢 Backend se aaye final formatted godown list
-  // 🟢 Godowns state — backend se aaye data store karega
 
   const [godowndata, setGodownData] = useState([]);
 
@@ -875,16 +874,31 @@ const PurchaseVoucher: React.FC = () => {
           const itemId = entry.itemId;
           const batchName = entry.batchNumber;
 
-          if (itemId && batchName && diffQty !== 0) {
+          // If user didn't pick a batchName but the item entry already
+          // contains batches and one of them has an empty batchName
+          // (but has quantity/openingRate), treat that batch as the
+          // target and sync the purchased quantity into it.
+          const candidateBatch = (entry.batches || []).find((b: any) => {
+            const nameEmpty = !b?.batchName || String(b.batchName).trim() === "";
+            const hasQtyMeta =
+              (b?.batchQuantity && Number(b.batchQuantity) !== 0) ||
+              (b?.openingRate && Number(b.openingRate) !== 0) ||
+              (b?.openingValue && Number(b.openingValue) !== 0);
+            return nameEmpty && hasQtyMeta;
+          });
+
+          const shouldSync = itemId && diffQty !== 0 && (batchName || candidateBatch);
+
+          if (shouldSync) {
+            const batchToSend = batchName || (candidateBatch ? candidateBatch.batchName ?? "" : "");
+
             fetch(
-              `${
-                import.meta.env.VITE_API_URL
-              }/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+              `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
               {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
-                  batchName,
+                  batchName: batchToSend,
                   quantity: diffQty, // sirf diff jaa raha hai (e.g. +50, +10, -5)
                 }),
               }
@@ -1230,6 +1244,11 @@ const PurchaseVoucher: React.FC = () => {
       breakdown: gstBreakdown,
     };
   };
+
+  const hasAnyBatch = formData.entries?.some((entry) =>
+    entry?.batches?.some((b) => b?.batchName)
+  );
+
   return (
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
@@ -1390,42 +1409,52 @@ const PurchaseVoucher: React.FC = () => {
                   {errors.supplierInvoiceDate}
                 </p>
               )}
-            </div>{" "}
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="partyId"
-              >
-                Party Name
-              </label>
-              <select
-                id="partyId"
-                name="partyId"
-                value={formData.partyId}
-                onChange={handlePartyChange}
-                className={getSelectClasses(theme, !!errors.partyId)}
-              >
-                <option value="">-- Select Party --</option>
-                {partyLedgers.map((ledger) => (
-                  <option key={ledger.id} value={ledger.id}>
-                    {ledger.name}
-                  </option>
-                ))}
-                <option
-                  value="add-new"
-                  className={`flex items-center px-4 py-2 rounded ${
-                    theme === "dark"
-                      ? "bg-blue-600 hover:bg-green-700"
-                      : "bg-green-600 hover:bg-green-700 text-white"
-                  }`}
-                >
-                  + Add New Ledger
-                </option>
-              </select>
-              {errors.partyId && (
-                <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>
-              )}
             </div>
+
+           {formData.mode !== "accounting-invoice" &&
+ formData.mode !== "as-voucher" && (
+  <div>
+    <label
+      className="block text-sm font-medium mb-1"
+      htmlFor="partyId"
+    >
+      Party Name
+    </label>
+
+    <select
+      id="partyId"
+      name="partyId"
+      value={formData.partyId}
+      onChange={handlePartyChange}
+      className={getSelectClasses(theme, !!errors.partyId)}
+    >
+      <option value="">-- Select Party --</option>
+
+      {partyLedgers.map((ledger) => (
+        <option key={ledger.id} value={ledger.id}>
+          {ledger.name}
+        </option>
+      ))}
+
+      <option
+        value="add-new"
+        className={`flex items-center px-4 py-2 rounded ${
+          theme === "dark"
+            ? "bg-blue-600 hover:bg-green-700"
+            : "bg-green-600 hover:bg-green-700 text-white"
+        }`}
+      >
+        + Add New Ledger
+      </option>
+    </select>
+
+    {errors.partyId && (
+      <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>
+    )}
+  </div>
+)}
+
+            
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -1469,24 +1498,27 @@ const PurchaseVoucher: React.FC = () => {
             </div>
 
             {/* Godown Enable/Disable dropdown */}
-           {visibleColumns.godown && (
-  <div>
-    <label className="block text-sm font-medium mb-1" htmlFor="godownEnabled">
-      Enable Godown Selection
-    </label>
-    <select
-      id="godownEnabled"
-      value={godownEnabled}
-      onChange={(e) =>
-        setGodownEnabled(e.target.value as "yes" | "no")
-      }
-      className={getSelectClasses(theme)}
-    >
-      <option value="yes">Yes</option>
-      <option value="no">No</option>
-    </select>
-  </div>
-)}
+            {visibleColumns.godown && (
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="godownEnabled"
+                >
+                  Enable Godown Selection
+                </label>
+                <select
+                  id="godownEnabled"
+                  value={godownEnabled}
+                  onChange={(e) =>
+                    setGodownEnabled(e.target.value as "yes" | "no")
+                  }
+                  className={getSelectClasses(theme)}
+                >
+                  <option value="yes">Yes</option>
+                  <option value="no">No</option>
+                </select>
+              </div>
+            )}
 
             <div>
               <label
@@ -1597,9 +1629,10 @@ const PurchaseVoucher: React.FC = () => {
                       <th className={TABLE_STYLES.header}>Item</th>
                       {visibleColumns.hsn && <th>HSN/SAC</th>}
 
-                      {visibleColumns.batch && (
+                      {visibleColumns.batch && hasAnyBatch && (
                         <th className={TABLE_STYLES.header}>Batch</th>
                       )}
+
                       <th className={TABLE_STYLES.headerRight}>Quantity</th>
                       <th className={TABLE_STYLES.header}>Unit</th>
                       <th className={TABLE_STYLES.headerRight}>Rate</th>
@@ -1617,6 +1650,8 @@ const PurchaseVoucher: React.FC = () => {
                   <tbody>
                     {formData.entries.map((entry, index) => {
                       const itemDetails = getItemDetails(entry.itemId || "");
+
+                      console.log('entry', entry)
 
                       return (
                         <tr
@@ -1663,24 +1698,27 @@ const PurchaseVoucher: React.FC = () => {
                             </td>
                           )}
 
-                          {/* BATCH */}
-                          <td className="px-1 py-2 min-w-[100px]">
-                            <select
-                              name="batchNumber"
-                              value={entry.batchNumber || ""}
-                              onChange={(e) => handleEntryChange(index, e)}
-                              className={`${TABLE_STYLES.select} min-w-[100px] text-xs`}
-                            >
-                              <option value="">Batch</option>
-                              {(entry.batches || []).map(
-                                (batch: any, i: number) => (
-                                  <option key={i} value={batch.batchName}>
-                                    {batch.batchName}
-                                  </option>
-                                )
-                              )}
-                            </select>
-                          </td>
+                          {entry.batches &&
+                            entry.batches.some((b) => b.batchName) && (
+                              // BATCH
+                              <td className="px-1 py-2 min-w-[100px]">
+                                <select
+                                  name="batchNumber"
+                                  value={entry.batchNumber || ""}
+                                  onChange={(e) => handleEntryChange(index, e)}
+                                  className={`${TABLE_STYLES.select} min-w-[100px] text-xs`}
+                                >
+                                  <option value="">Batch</option>
+                                  {entry.batches.map(
+                                    (batch: any, i: number) => (
+                                      <option key={i} value={batch.batchName}>
+                                        {batch.batchName}
+                                      </option>
+                                    )
+                                  )}
+                                </select>
+                              </td>
+                            )}
 
                           {/* QUANTITY */}
                           <td className="px-1 py-2 min-w-[55px]">
@@ -1797,8 +1835,6 @@ const PurchaseVoucher: React.FC = () => {
                       <td className="px-4 py-2 text-right">
                         {subtotal.toLocaleString()}
                       </td>
-                      <td className="px-4 py-2"></td>
-                      <td className="px-4 py-2"></td>
                     </tr>
                     <tr
                       className={`font-semibold ${

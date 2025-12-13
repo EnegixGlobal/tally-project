@@ -213,6 +213,7 @@ const SalesVoucher: React.FC = () => {
   // Add these states at top of your component:
   const [statusMsg, setStatusMsg] = useState("");
   const [statusColor, setStatusColor] = useState("");
+  
 
   // Add this useEffect() in component (below states)
   useEffect(() => {
@@ -528,9 +529,85 @@ const SalesVoucher: React.FC = () => {
 
         // 🟡 If batch exists but no batch selected
         if (!entry.batchNumber) {
+          // update UI first
           updatedEntries[index].quantity = newQty;
           updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
           setFormData((p) => ({ ...p, entries: updatedEntries }));
+
+          // Try to find a candidate batch with empty name but quantity/meta present
+          const candidateBatch = (entry.batches || []).find((b: any) => {
+            const nameEmpty = !b?.batchName || String(b.batchName).trim() === "";
+            const hasQtyMeta =
+              (b?.batchQuantity && Number(b.batchQuantity) !== 0) ||
+              (b?.openingRate && Number(b.openingRate) !== 0) ||
+              (b?.openingValue && Number(b.openingValue) !== 0);
+            return nameEmpty && hasQtyMeta;
+          });
+
+          // Stock diff: positive = add to stock, negative = reduce stock
+          const stockDiff = Number(oldQty) - Number(newQty);
+
+          const itemId = entry.itemId;
+
+          // If candidate batch found, enforce available qty and sync to backend
+          if (itemId && candidateBatch && stockDiff !== 0) {
+            const availableQty = Number(
+              candidateBatch.batchQuantity ?? candidateBatch.quantity ?? 0
+            );
+
+            // If trying to reduce more than available -> cap and warn
+            if (stockDiff < 0 && Math.abs(stockDiff) > availableQty) {
+              Swal.fire({
+                icon: "warning",
+                title: "Stock Not Available",
+                text: `Only ${availableQty} available in batch`,
+              });
+
+              // adjust to max available reduction
+              const allowedReduction = availableQty;
+              const adjustedNewQty = Number(oldQty) - allowedReduction;
+              updatedEntries[index].quantity = adjustedNewQty;
+              updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+              setFormData((p) => ({ ...p, entries: updatedEntries }));
+
+              // recalc stockDiff to send
+              const adjustedStockDiff = oldQty - adjustedNewQty;
+
+              fetch(
+                `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+                {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    batchName: candidateBatch.batchName ?? "",
+                    quantity: adjustedStockDiff,
+                  }),
+                }
+              )
+                .then((res) => res.json())
+                .then((d) => console.log("Batch qty synced (adjusted):", d))
+                .catch((err) => console.error("Batch qty sync error:", err));
+
+              return;
+            }
+
+            // Send the actual stock diff (negative for sale)
+            fetch(
+              `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  batchName: candidateBatch.batchName ?? "",
+                  quantity: stockDiff,
+                }),
+              }
+            )
+              .then((res) => res.json())
+              .then((d) => console.log("Batch qty synced:", d))
+              .catch((err) => console.error("Batch qty sync error:", err));
+          }
+
           return;
         }
 
@@ -1043,6 +1120,11 @@ const SalesVoucher: React.FC = () => {
     };
   };
 
+  const hasAnyBatch = formData.entries?.some(
+  (entry) => entry?.batches?.some((b) => b?.batchName)
+);
+
+
   return (
     <React.Fragment>
       <div className="pt-[56px] px-4">
@@ -1121,46 +1203,49 @@ const SalesVoucher: React.FC = () => {
                   <p className="text-red-500 text-xs mt-1">{errors.number}</p>
                 )}
               </div>
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="partyId"
-                >
-                  Party Name
-                </label>
-                <select
-                  name="partyId"
-                  value={formData.partyId}
-                  onChange={handleChange}
-                  required
-                  className={`min-h-10 text-14 ${FORM_STYLES.select(
-                    theme,
-                    !!errors.partyId
-                  )}`}
-                >
-                  <option value="" disabled>
-                    -- Select Party --
-                  </option>
-                  {partyLedgers.map((ledger) => (
-                    <option key={ledger.id} value={ledger.id}>
-                      {ledger.name}
-                    </option>
-                  ))}
-                  <option
-                    value="add-new"
-                    className={`flex items-center px-4 py-2 rounded ${
-                      theme === "dark"
-                        ? "bg-blue-600 hover:bg-green-700"
-                        : "bg-green-600 hover:bg-green-700 text-white"
-                    }`}
-                  >
-                    + Add New Ledger
-                  </option>
-                </select>
-                {errors.partyId && (
-                  <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>
+              {formData.mode !== "accounting-invoice" &&
+                formData.mode !== "as-voucher" && (
+                  <div>
+                    <label
+                      className="block text-sm font-medium mb-1"
+                      htmlFor="partyId"
+                    >
+                      Party Name
+                    </label>
+                    <select
+                      name="partyId"
+                      value={formData.partyId}
+                      onChange={handleChange}
+                      required
+                      className={`min-h-10 text-14 ${FORM_STYLES.select(
+                        theme,
+                        !!errors.partyId
+                      )}`}
+                    >
+                      <option value="" disabled>
+                        -- Select Party --
+                      </option>
+                      {partyLedgers.map((ledger) => (
+                        <option key={ledger.id} value={ledger.id}>
+                          {ledger.name}
+                        </option>
+                      ))}
+                      <option
+                        value="add-new"
+                        className={`flex items-center px-4 py-2 rounded ${
+                          theme === "dark"
+                            ? "bg-blue-600 hover:bg-green-700"
+                            : "bg-green-600 hover:bg-green-700 text-white"
+                        }`}
+                      >
+                        + Add New Ledger
+                      </option>
+                    </select>
+                    {errors.partyId && (
+                      <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>
+                    )}
+                  </div>
                 )}
-              </div>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
               <div>
@@ -1540,7 +1625,8 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-left">S.No</th>
                         <th className="px-4 py-2 text-left">Item</th>
                         <th className="px-4 py-2 text-left">HSN/SAC</th>
-                        {columnSettings.showBatch && <th>Batch</th>}
+                        {columnSettings.showBatch && hasAnyBatch && <th>Batch</th>}
+
 
                         <th className="px-4 py-2 text-right">Quantity</th>
                         <th className="px-4 py-2 text-left">Unit</th>
@@ -1560,7 +1646,7 @@ const SalesVoucher: React.FC = () => {
                       {formData.entries.map((entry, index) => {
                         const itemDetails = getItemDetails(entry.itemId || "");
 
-                        // console.log('this is data', entry)
+                        console.log("this is data", entry);
 
                         return (
                           <tr
@@ -1610,23 +1696,28 @@ const SalesVoucher: React.FC = () => {
                             </td>
 
                             {/* BATCH */}
-                            <td className="px-1 py-2 min-w-[100px]">
-                              <select
-                                name="batchNumber"
-                                value={entry.batchNumber || ""}
-                                onChange={(e) => handleEntryChange(index, e)}
-                                className={`${FORM_STYLES.tableSelect(
-                                  theme
-                                )} min-w-[100px] text-xs`}
-                              >
-                                <option value="">Batch</option>
-                                {(entry.batches || []).map((b, i) => (
-                                  <option key={i} value={b.batchName}>
-                                    {b.batchName}
-                                  </option>
-                                ))}
-                              </select>
-                            </td>
+                           {columnSettings.showBatch &&
+  entry.batches?.some((b) => b.batchName) && (
+    <td className="px-1 py-2 min-w-[100px]">
+      <select
+        name="batchNumber"
+        value={entry.batchNumber || ""}
+        onChange={(e) => handleEntryChange(index, e)}
+        className={`${FORM_STYLES.tableSelect(theme)} min-w-[100px] text-xs`}
+      >
+        <option value="">Batch</option>
+
+        {entry.batches
+          .filter((b) => b.batchName)
+          .map((b, i) => (
+            <option key={i} value={b.batchName}>
+              {b.batchName}
+            </option>
+          ))}
+      </select>
+    </td>
+)}
+
 
                             {/* QTY */}
                             <td className="px-1 py-2 min-w-[55px]">
