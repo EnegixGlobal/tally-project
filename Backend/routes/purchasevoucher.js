@@ -14,6 +14,36 @@ router.get("/purchase-history", async (req, res) => {
       });
     }
 
+    // Ensure table and `type` column exist before selecting
+    const existingColsQuery = `
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_history'
+    `;
+    const [colsRows] = await db.execute(existingColsQuery);
+    const existingCols = colsRows.map((r) => r.COLUMN_NAME);
+
+    if (existingCols.length === 0) {
+      const createTableSql = `
+        CREATE TABLE IF NOT EXISTS purchase_history (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          itemName VARCHAR(255),
+          hsnCode VARCHAR(50),
+          batchNumber VARCHAR(255),
+          purchaseQuantity INT,
+          purchaseDate DATE,
+          companyId VARCHAR(100),
+          ownerType VARCHAR(50),
+          ownerId VARCHAR(100),
+          type VARCHAR(50) DEFAULT 'purchase'
+        )
+      `;
+      await db.execute(createTableSql);
+    } else if (!existingCols.includes("type")) {
+      await db.execute(
+        "ALTER TABLE purchase_history ADD COLUMN type VARCHAR(50) DEFAULT 'purchase'"
+      );
+    }
+
     const selectSql = `
       SELECT 
         id,
@@ -24,7 +54,8 @@ router.get("/purchase-history", async (req, res) => {
         purchaseDate,
         companyId,
         ownerType,
-        ownerId
+        ownerId,
+        type
       FROM purchase_history
       WHERE companyId = ? AND ownerType = ? AND ownerId = ?
       ORDER BY purchaseDate DESC, id DESC
@@ -36,10 +67,9 @@ router.get("/purchase-history", async (req, res) => {
       owner_id,
     ]);
 
-    return res.status(200).json({
-      success: true,
-      data: rows,
-    });
+    
+
+    return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("🔥 Fetch purchase history failed:", error);
     return res.status(500).json({ success: false, error: error.message });
@@ -328,11 +358,11 @@ router.put("/:id", async (req, res) => {
     });
   }
 
-  console.log("🔐 Update Auth →", {
-    companyId: finalCompanyId,
-    ownerType: finalOwnerType,
-    ownerId: finalOwnerId,
-  });
+  // console.log("🔐 Update Auth →", {
+  //   companyId: finalCompanyId,
+  //   ownerType: finalOwnerType,
+  //   ownerId: finalOwnerId,
+  // });
 
   try {
     // 🔍 Fetch voucher first
@@ -353,10 +383,10 @@ router.put("/:id", async (req, res) => {
         "UPDATE purchase_vouchers SET company_id = ?, owner_type = ?, owner_id = ? WHERE id = ?",
         [finalCompanyId, finalOwnerType, finalOwnerId, voucherId]
       );
-      console.log(
-        "⚡ Auto fixed missing company fields for voucher:",
-        voucherId
-      );
+      // console.log(
+      //   "⚡ Auto fixed missing company fields for voucher:",
+      //   voucherId
+      // );
     } else {
       // 🚫 Block other company's update attempt
       if (
@@ -439,38 +469,71 @@ router.post("/purchase-history", async (req, res) => {
   try {
     const historyData = Array.isArray(req.body) ? req.body : [req.body];
 
-    // 🔥 Step 1: Create table if not exists with HSN column
-    const createTableSql = `
-      CREATE TABLE IF NOT EXISTS purchase_history (
-        id INT AUTO_INCREMENT PRIMARY KEY,
-        itemName VARCHAR(255),
-        hsnCode VARCHAR(50),
-        batchNumber VARCHAR(255),
-        purchaseQuantity INT,
-        purchaseDate DATE,
-        companyId VARCHAR(100),
-        ownerType VARCHAR(50),
-        ownerId VARCHAR(100)
-      )
+    // Ensure table and required columns exist. If table missing, create with `type` defaulting to 'purchase'.
+    const existingColsQuery = `
+      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_history'
     `;
-    await db.execute(createTableSql);
+    const [colsRows] = await db.execute(existingColsQuery);
+    const existingCols = colsRows.map((r) => r.COLUMN_NAME);
 
-    // 🔎 Step 2: Insert multiple data rows safely
+    const requiredCols = {
+      id: "INT AUTO_INCREMENT PRIMARY KEY",
+      itemName: "VARCHAR(255)",
+      hsnCode: "VARCHAR(50)",
+      batchNumber: "VARCHAR(255)",
+      purchaseQuantity: "INT",
+      purchaseDate: "DATE",
+      companyId: "VARCHAR(100)",
+      ownerType: "VARCHAR(50)",
+      ownerId: "VARCHAR(100)",
+      type: "VARCHAR(50) DEFAULT 'purchase'"
+    };
+
+    // If table does not exist (no columns returned) -> create it
+    if (existingCols.length === 0) {
+      const createTableSql = `
+        CREATE TABLE IF NOT EXISTS purchase_history (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          itemName VARCHAR(255),
+          hsnCode VARCHAR(50),
+          batchNumber VARCHAR(255),
+          purchaseQuantity INT,
+          purchaseDate DATE,
+          companyId VARCHAR(100),
+          ownerType VARCHAR(50),
+          ownerId VARCHAR(100),
+          type VARCHAR(50) DEFAULT 'purchase'
+        )
+      `;
+      await db.execute(createTableSql);
+    } else {
+      // Add any missing columns to existing table
+      for (const [col, def] of Object.entries(requiredCols)) {
+        if (!existingCols.includes(col)) {
+          const alterSql = `ALTER TABLE purchase_history ADD COLUMN ${col} ${def}`;
+          await db.execute(alterSql);
+        }
+      }
+    }
+
+    // Insert multiple rows safely
     const insertSql = `
       INSERT INTO purchase_history 
-      (itemName, hsnCode, batchNumber, purchaseQuantity, purchaseDate, companyId, ownerType, ownerId)
+      (itemName, hsnCode, batchNumber, purchaseQuantity, purchaseDate, companyId, ownerType, ownerId, type)
       VALUES ?
     `;
 
     const values = historyData.map((e) => [
-      e.itemName,
+      e.itemName || null,
       e.hsnCode || "",
       e.batchNumber || null,
       e.purchaseQuantity || 0,
-      e.purchaseDate,
+      e.purchaseDate || null,
       e.companyId || null,
       e.ownerType || null,
       e.ownerId || null,
+      e.type || "purchase",
     ]);
 
     // ❌ Security Check: If anyone has missing company/owner → Block!

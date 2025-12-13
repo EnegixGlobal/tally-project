@@ -712,6 +712,8 @@ router.get("/purchase-batch", async (req, res) => {
       batches: row.batches ? JSON.parse(row.batches) : [],
     }));
 
+    console.log('formattedRow', formattedRows)
+
     res.json({
       success: true,
       data: formattedRows,
@@ -1026,10 +1028,11 @@ router.patch("/:id/batches", async (req, res) => {
   const { company_id, owner_type, owner_id } = req.query;
   const { batchName, quantity, rate } = req.body;
 
-  if (!batchName || quantity === undefined) {
+  // Accept empty string or null batchName — only quantity is strictly required
+  if (quantity === undefined) {
     return res.status(400).json({
       success: false,
-      message: "batchName & quantity required",
+      message: "quantity required",
     });
   }
 
@@ -1049,8 +1052,10 @@ router.patch("/:id/batches", async (req, res) => {
     let batches = JSON.parse(rows[0].batches || "[]");
     const diffQty = Number(quantity); // +ve Purchase, -ve Sales
 
-    // 🔍 Find batch
-    const index = batches.findIndex((b) => b.batchName === batchName);
+    // 🔍 Find batch — treat null and empty string as equivalent so
+    // frontend sending "" will match stored null/"" batches
+    const targetName = batchName == null ? "" : String(batchName);
+    const index = batches.findIndex((b) => String(b.batchName ?? "") === targetName);
 
     if (index >= 0) {
       let currentQty = Number(batches[index].batchQuantity || 0);
