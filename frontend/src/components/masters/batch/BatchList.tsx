@@ -805,7 +805,7 @@ const BatchList: React.FC = () => {
 
                         {/* BATCH NAME LIST */}
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 overflow-y-auto space-y-1">
+                          <div className="max-h-20 space-y-1">
                             {batches.map((b: any, i: number) => (
                               <div key={i} className="font-medium">
                                 {b.batchName}
@@ -816,7 +816,7 @@ const BatchList: React.FC = () => {
 
                         {/* QTY LIST */}
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 overflow-y-auto space-y-1">
+                          <div className="max-h-20 space-y-1">
                             {batches.map((b: any, i: number) => (
                               <div key={i}>{b.batchQuantity}</div>
                             ))}
@@ -825,7 +825,7 @@ const BatchList: React.FC = () => {
 
                         {/* RATE LIST */}
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 overflow-y-auto space-y-1">
+                          <div className="max-h-20 space-y-1">
                             {batches.map((b: any, i: number) => (
                               <div key={i}>
                                 {b.batchRate !== null && b.batchRate !== undefined
@@ -840,7 +840,7 @@ const BatchList: React.FC = () => {
 
                         {/* MFG DATE LIST */}
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 overflow-y-auto space-y-1">
+                          <div className="max-h-20 space-y-1">
                             {batches.map((b: any, i: number) => (
                               <div key={i} className="flex items-center">
                                 <Calendar
@@ -859,7 +859,7 @@ const BatchList: React.FC = () => {
 
                         {/* EXP DATE LIST */}
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 overflow-y-auto space-y-1">
+                          <div className="max-h-20 space-y-1">
                             {batches.map((b: any, i: number) => (
                               <div key={i} className="flex items-center">
                                 <Calendar
@@ -878,7 +878,7 @@ const BatchList: React.FC = () => {
 
                         {/* DAYS LEFT */}
                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 overflow-y-auto space-y-1">
+                          <div className="max-h-20 space-y-1">
                             {batches.map((b: any, i: number) => {
                               if (!b.batchExpiryDate)
                                 return (
