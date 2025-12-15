@@ -239,6 +239,8 @@ const handleSubmit = useCallback(async () => {
   }
 }, [formData, isEditMode, navigate, validateForm, companyId, ownerType, ownerId]);
 
+console.log('formdata', formData)
+
 
 
   const handlePrint = useCallback(() => {

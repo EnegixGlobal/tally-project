@@ -37,6 +37,8 @@ interface FormData {
 }
 
 const baseGroups = [
+  { name: "Branch Accounts", nature: "Assets" },
+  { name: "Branch OD A/c", nature: "Assets" },
   { name: "Branch/Division", nature: "Assets" },
   { name: "Capital Account", nature: "Liabilities" },
   { name: "Current Assets", nature: "Assets" },
@@ -123,8 +125,8 @@ const GroupForm: React.FC = () => {
               name: data.name ?? "",
               alias: data.alias ?? "",
               under: data.under
-                ? `base:${data.under}` 
-                : data.parent?.toString() ?? "", 
+                ? `base:${data.under}`
+                : data.parent?.toString() ?? "",
 
               type: data.type ?? "",
               nature: data.nature ?? "",

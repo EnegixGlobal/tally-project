@@ -40,7 +40,6 @@ router.post("/", async (req, res) => {
   const ownerType = payload.ownerType;
   const companyId = parseInt(payload.companyId, 10);
 
-  console.log("form", req.body);
 
   if (!ownerType || isNaN(ownerId) || isNaN(companyId)) {
     return res
@@ -94,7 +93,6 @@ router.post("/", async (req, res) => {
       );
 
       parentId = insertParent.insertId;
-      console.log("AUTO CREATED PARENT GROUP:", parentId, parentName);
     }
 
     // -----------------------------------------
