@@ -686,7 +686,7 @@ const BatchList: React.FC = () => {
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="w-full border-collapse">
             <thead
               className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}
             >
@@ -759,7 +759,7 @@ const BatchList: React.FC = () => {
                         }`}
                       >
                         {/* STATUS */}
-                        <td className="px-4 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 align-top whitespace-nowrap">
                           {(() => {
                             const status = getOverallStatus(batches);
                             return (
@@ -778,7 +778,7 @@ const BatchList: React.FC = () => {
                         </td>
 
                         {/* ITEM NAME */}
-                        <td className="px-4 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 align-top">
                           <div className="font-medium">{item.name}</div>
                           <div className="text-sm text-gray-500">
                             Unit: {item.unit}
@@ -786,11 +786,11 @@ const BatchList: React.FC = () => {
                         </td>
 
                          {/* TYPE - Show batch type for each batch */}
-                         <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 space-y-1">
+                         <td className="px-4 py-4 align-top">
+                          <div className="space-y-2">
                             {batches.map((b: any, i: number) => (
-                              <div key={i} className="font-medium">
-                                <span className="inline-block px-2 py-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
+                              <div key={i} className="font-medium leading-5 min-h-[20px]">
+                                <span className="inline-block px-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
                                   {b.batchType || "opening"}
                                 </span>
                               </div>
@@ -799,15 +799,15 @@ const BatchList: React.FC = () => {
                         </td>
 
                         {/* HSN */}
-                        <td className="px-4 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 align-top whitespace-nowrap">
                           {item.hsnCode || "—"}
                         </td>
 
                         {/* BATCH NAME LIST */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 space-y-1">
+                        <td className="px-4 py-4 align-top">
+                          <div className="space-y-2">
                             {batches.map((b: any, i: number) => (
-                              <div key={i} className="font-medium">
+                              <div key={i} className="font-medium break-words leading-5 min-h-[20px]">
                                 {b.batchName}
                               </div>
                             ))}
@@ -815,19 +815,19 @@ const BatchList: React.FC = () => {
                         </td>
 
                         {/* QTY LIST */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 space-y-1">
+                        <td className="px-4 py-4 align-top">
+                          <div className="space-y-2">
                             {batches.map((b: any, i: number) => (
-                              <div key={i}>{b.batchQuantity}</div>
+                              <div key={i} className="leading-5 min-h-[20px]">{b.batchQuantity}</div>
                             ))}
                           </div>
                         </td>
 
                         {/* RATE LIST */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 space-y-1">
+                        <td className="px-4 py-4 align-top">
+                          <div className="space-y-2">
                             {batches.map((b: any, i: number) => (
-                              <div key={i}>
+                              <div key={i} className="leading-5 min-h-[20px]">
                                 {b.batchRate !== null && b.batchRate !== undefined
                                   ? b.batchRate
                                   : b.openingRate !== null && b.openingRate !== undefined
@@ -839,50 +839,54 @@ const BatchList: React.FC = () => {
                         </td>
 
                         {/* MFG DATE LIST */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 space-y-1">
+                        <td className="px-4 py-4 align-top">
+                          <div className="space-y-2">
                             {batches.map((b: any, i: number) => (
-                              <div key={i} className="flex items-center">
+                              <div key={i} className="flex items-center min-h-[20px]">
                                 <Calendar
                                   size={14}
-                                  className="mr-1 text-gray-400"
+                                  className="mr-1 text-gray-400 flex-shrink-0"
                                 />
-                                {b.batchManufacturingDate
-                                  ? new Date(
-                                      b.batchManufacturingDate
-                                    ).toLocaleDateString()
-                                  : "—"}
+                                <span className="text-sm leading-5">
+                                  {b.batchManufacturingDate
+                                    ? new Date(
+                                        b.batchManufacturingDate
+                                      ).toLocaleDateString()
+                                    : "—"}
+                                </span>
                               </div>
                             ))}
                           </div>
                         </td>
 
                         {/* EXP DATE LIST */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 space-y-1">
+                        <td className="px-4 py-4 align-top">
+                          <div className="space-y-2">
                             {batches.map((b: any, i: number) => (
-                              <div key={i} className="flex items-center">
+                              <div key={i} className="flex items-center min-h-[20px]">
                                 <Calendar
                                   size={14}
-                                  className="mr-1 text-gray-400"
+                                  className="mr-1 text-gray-400 flex-shrink-0"
                                 />
-                                {b.batchExpiryDate
-                                  ? new Date(
-                                      b.batchExpiryDate
-                                    ).toLocaleDateString()
-                                  : "—"}
+                                <span className="text-sm leading-5">
+                                  {b.batchExpiryDate
+                                    ? new Date(
+                                        b.batchExpiryDate
+                                      ).toLocaleDateString()
+                                    : "—"}
+                                </span>
                               </div>
                             ))}
                           </div>
                         </td>
 
                         {/* DAYS LEFT */}
-                        <td className="px-4 py-4 whitespace-nowrap">
-                          <div className="max-h-20 space-y-1">
+                        <td className="px-4 py-4 align-top">
+                          <div className="space-y-2">
                             {batches.map((b: any, i: number) => {
                               if (!b.batchExpiryDate)
                                 return (
-                                  <div key={i} className="text-gray-500">
+                                  <div key={i} className="text-gray-500 min-h-[20px] leading-5">
                                     —
                                   </div>
                                 );
@@ -896,7 +900,7 @@ const BatchList: React.FC = () => {
                               return (
                                 <div
                                   key={i}
-                                  className={`font-medium ${
+                                  className={`font-medium text-sm leading-5 min-h-[20px] ${
                                     days < 0
                                       ? "text-red-600"
                                       : days <= 30
@@ -914,7 +918,7 @@ const BatchList: React.FC = () => {
                         </td>
 
                         {/* ACTION BUTTON */}
-                        <td className="px-4 py-4 whitespace-nowrap">
+                        <td className="px-4 py-4 align-top whitespace-nowrap">
                           <button
                             onClick={() =>
                               setOpenFormItemId(
@@ -933,7 +937,12 @@ const BatchList: React.FC = () => {
                       {/* ================= FORM ROW (ONLY ONE PER ITEM) ================= */}
                       {openFormItemId === item.id && (
                         <tr>
-                          <td colSpan={11} className="bg-gray-100 p-4">
+                          <td 
+                            colSpan={11} 
+                            className={`p-4 ${
+                              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                            }`}
+                          >
                             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                               <input
                                 type="text"
@@ -941,7 +950,11 @@ const BatchList: React.FC = () => {
                                 value={batchForm.batchName}
                                 onChange={handleChange}
                                 placeholder="Batch Number"
-                                className="p-2 border rounded"
+                                className={`p-2 border rounded ${
+                                  theme === "dark"
+                                    ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400"
+                                    : "bg-white border-gray-300"
+                                }`}
                               />
 
                               <input
@@ -950,7 +963,11 @@ const BatchList: React.FC = () => {
                                 value={batchForm.batchQuantity}
                                 onChange={handleChange}
                                 placeholder="Quantity"
-                                className="p-2 border rounded"
+                                className={`p-2 border rounded ${
+                                  theme === "dark"
+                                    ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400"
+                                    : "bg-white border-gray-300"
+                                }`}
                               />
 
                               <input
@@ -959,7 +976,11 @@ const BatchList: React.FC = () => {
                                 value={batchForm.batchRate}
                                 onChange={handleChange}
                                 placeholder="Rate"
-                                className="p-2 border rounded"
+                                className={`p-2 border rounded ${
+                                  theme === "dark"
+                                    ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400"
+                                    : "bg-white border-gray-300"
+                                }`}
                               />
 
                               <input
@@ -967,7 +988,11 @@ const BatchList: React.FC = () => {
                                 name="batchManufacturingDate"
                                 value={batchForm.batchManufacturingDate}
                                 onChange={handleChange}
-                                className="p-2 border rounded"
+                                className={`p-2 border rounded ${
+                                  theme === "dark"
+                                    ? "bg-gray-600 border-gray-500 text-white"
+                                    : "bg-white border-gray-300"
+                                }`}
                               />
 
                               <input
@@ -975,7 +1000,11 @@ const BatchList: React.FC = () => {
                                 name="batchExpiryDate"
                                 value={batchForm.batchExpiryDate}
                                 onChange={handleChange}
-                                className="p-2 border rounded"
+                                className={`p-2 border rounded ${
+                                  theme === "dark"
+                                    ? "bg-gray-600 border-gray-500 text-white"
+                                    : "bg-white border-gray-300"
+                                }`}
                               />
                             </div>
 
