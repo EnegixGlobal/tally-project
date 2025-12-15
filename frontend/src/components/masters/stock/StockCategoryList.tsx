@@ -17,6 +17,35 @@ const StockCategoryList: React.FC = () => {
   );
   const queryParams = `company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
+  // stockGroups get
+  const [stockGroups, setStockGroupData] = useState<any[]>([]);
+  useEffect(() => {
+    const companyId = localStorage.getItem("company_id");
+    const ownerType = localStorage.getItem("supplier");
+    const ownerId = localStorage.getItem(
+      ownerType === "employee" ? "employee_id" : "user_id"
+    );
+
+    if (!companyId || !ownerType || !ownerId) return;
+
+    const fetchData = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-groups/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const data = await res.json();
+        setStockGroupData(data);
+      } catch (err) {
+        console.error("Failed to fetch stock groups:", err);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  // stock category list fatch
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -24,8 +53,8 @@ const StockCategoryList: React.FC = () => {
           `${import.meta.env.VITE_API_URL}/api/stock-categories?${queryParams}`
         );
         const data = await res.json();
+        console.log("dddd", data);
 
-        console.log('data', data)
         setCategories(data);
       } catch (err) {
         console.error("Failed to fetch stock categories:", err);
@@ -216,8 +245,18 @@ const StockCategoryList: React.FC = () => {
                       theme === "dark" ? "text-gray-100" : "text-gray-900"
                     }`}
                   >
-                    {categories.find((c) => c.id === cat.parent)?.name || "-"}
+                    {(() => {
+                      const parentId = cat.parent_id ?? cat.parent;
+                      if (!parentId) return "-";
+
+                      const parentGroup = stockGroups.find(
+                        (group) => Number(group.id) === Number(parentId)
+                      );
+
+                      return parentGroup ? parentGroup.name : parentId;
+                    })()}
                   </td>
+
                   <td
                     className={`px-4 py-3 ${
                       theme === "dark" ? "text-gray-100" : "text-gray-900"

@@ -317,6 +317,44 @@ router.post("/", async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    /* ===============================
+       🔥 RUNTIME COLUMN CHECK & ADD
+       =============================== */
+
+    const ensureColumn = async (table, column, definition) => {
+      const [rows] = await connection.execute(
+        `
+        SELECT COUNT(*) AS count
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
+        `,
+        [table, column]
+      );
+
+      if (rows[0].count === 0) {
+        console.log(`⚠️ Adding missing column: ${column}`);
+        await connection.execute(
+          `ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`
+        );
+      }
+    };
+
+    // Required columns
+    await ensureColumn("stock_items", "categoryId", "VARCHAR(50) NULL");
+    await ensureColumn("stock_items", "stockGroupId", "INT(11) NULL");
+    await ensureColumn(
+      "stock_items",
+      "openingValue",
+      "DECIMAL(10,2) DEFAULT 0"
+    );
+    await ensureColumn("stock_items", "type", "VARCHAR(50) DEFAULT 'opening'");
+
+    /* ===============================
+       📥 REQUEST DATA
+       =============================== */
+
     const {
       name,
       stockGroupId,
@@ -339,6 +377,7 @@ router.post("/", async (req, res) => {
       owner_type,
       owner_id,
     } = req.body;
+    console.log("this is categoryid", categoryId);
 
     if (!name || !unit || !taxType) {
       return res.status(400).json({
@@ -347,73 +386,42 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Ensure openingValue column exists
-    const [colCheck] = await connection.execute(`
-      SELECT COUNT(*) AS count 
-      FROM information_schema.COLUMNS 
-      WHERE TABLE_NAME = 'stock_items' 
-      AND COLUMN_NAME = 'openingValue'
-    `);
+    const sanitize = (v) => (v === "" || v === undefined ? null : v);
 
-    if (colCheck[0].count === 0) {
-      await connection.execute(`
-        ALTER TABLE stock_items 
-        ADD COLUMN openingValue DECIMAL(15,2) DEFAULT 0
-      `);
-    }
+    /* ===============================
+       📦 BATCH CALCULATION
+       =============================== */
 
-    // Ensure 'type' column exists
-    const [typeColCheck] = await connection.execute(`
-      SELECT COUNT(*) AS count 
-      FROM information_schema.COLUMNS 
-      WHERE TABLE_NAME = 'stock_items' 
-      AND COLUMN_NAME = 'type'
-    `);
-
-    if (typeColCheck[0].count === 0) {
-      await connection.execute(`
-        ALTER TABLE stock_items 
-        ADD COLUMN type VARCHAR(50) DEFAULT 'opening'
-      `);
-    }
-
-    // Helper to convert empty strings to null
-    const sanitize = (value) => {
-      if (value === "" || value === undefined) return null;
-      return value;
-    };
-
-    // Batch handling
     let totalOpeningValue = 0;
 
-    const batchData = (batches || []).map((batch) => {
-      const qty = Number(batch.batchQuantity) || 0;
-      const rate = Number(batch.batchRate) || 0;
-      const openingRate = rate;
+    const batchData = batches.map((b) => {
+      const qty = Number(b.batchQuantity) || 0;
+      const rate = Number(b.batchRate) || 0;
       const openingValue = qty * rate;
 
       totalOpeningValue += openingValue;
 
       return {
-        batchName: sanitize(batch.batchName),
+        batchName: sanitize(b.batchName),
         batchQuantity: qty,
-        openingRate,
+        openingRate: rate,
         openingValue,
-        batchExpiryDate: sanitize(batch.batchExpiryDate),
-        batchManufacturingDate: sanitize(batch.batchManufacturingDate),
+        batchExpiryDate: sanitize(b.batchExpiryDate),
+        batchManufacturingDate: sanitize(b.batchManufacturingDate),
       };
     });
 
-    const finalOpeningValue = totalOpeningValue;
+    /* ===============================
+       🧠 DYNAMIC INSERT
+       =============================== */
 
-    // Fetch stock_items table columns dynamically
     const [columnsResult] = await connection.execute(
-      `SHOW COLUMNS FROM stock_items`
+      "SHOW COLUMNS FROM stock_items"
     );
 
     const columnNames = columnsResult
-      .filter((col) => col.Field !== "id")
-      .map((col) => col.Field);
+      .filter((c) => c.Field !== "id")
+      .map((c) => c.Field);
 
     const values = columnNames.map((column) => {
       switch (column) {
@@ -428,7 +436,7 @@ router.post("/", async (req, res) => {
         case "openingBalance":
           return openingBalance ?? 0;
         case "openingValue":
-          return finalOpeningValue ?? 0;
+          return totalOpeningValue ?? 0;
         case "hsnCode":
           return sanitize(hsnCode);
         case "gstRate":
@@ -458,15 +466,14 @@ router.post("/", async (req, res) => {
         case "batches":
           return JSON.stringify(batchData);
         case "type":
-          return "opening"; // always "opening"
-        case "createdAt":
-          return "CURRENT_TIMESTAMP";
+          return "opening";
         default:
           return null;
       }
     });
 
     const placeholders = columnNames.map(() => "?").join(", ");
+
     const insertQuery = `
       INSERT INTO stock_items (${columnNames.join(", ")})
       VALUES (${placeholders})
@@ -475,13 +482,17 @@ router.post("/", async (req, res) => {
     const [result] = await connection.execute(insertQuery, values);
     const stockItemId = result.insertId;
 
-    // Insert Godown Allocations
-    for (const alloc of godownAllocations || []) {
+    /* ===============================
+       🏬 GODOWN ALLOCATIONS
+       =============================== */
+
+    for (const alloc of godownAllocations) {
       await connection.execute(
         `
-        INSERT INTO godown_allocations (stockItemId, godownId, quantity, value)
+        INSERT INTO godown_allocations
+        (stockItemId, godownId, quantity, value)
         VALUES (?, ?, ?, ?)
-      `,
+        `,
         [
           stockItemId,
           sanitize(alloc.godownId),
@@ -497,8 +508,7 @@ router.post("/", async (req, res) => {
       success: true,
       message: "Stock item saved successfully",
       stockItemId,
-      batchesInserted: batchData.length,
-      openingValue: finalOpeningValue,
+      openingValue: totalOpeningValue,
     });
   } catch (err) {
     console.error("🔥 Error saving stock item:", err);
@@ -512,7 +522,6 @@ router.post("/", async (req, res) => {
     connection.release();
   }
 });
-
 
 // stock purchase item
 
@@ -712,7 +721,7 @@ router.get("/purchase-batch", async (req, res) => {
       batches: row.batches ? JSON.parse(row.batches) : [],
     }));
 
-    console.log('formattedRow', formattedRows)
+    console.log("formattedRow", formattedRows);
 
     res.json({
       success: true,
@@ -828,9 +837,47 @@ router.put("/:id", async (req, res) => {
 
     const { id } = req.params;
 
+    /* ===============================
+       🔥 RUNTIME COLUMN CHECK & ADD
+       =============================== */
+
+    const ensureColumn = async (table, column, definition) => {
+      const [rows] = await connection.execute(
+        `
+        SELECT COUNT(*) AS count
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
+        `,
+        [table, column]
+      );
+
+      if (rows[0].count === 0) {
+        console.log(`⚠️ Adding missing column: ${column}`);
+        await connection.execute(
+          `ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`
+        );
+      }
+    };
+
+    // Ensure required columns
+    await ensureColumn("stock_items", "categoryId", "VARCHAR(50) NULL");
+    await ensureColumn("stock_items", "stockGroupId", "INT(11) NULL");
+    await ensureColumn(
+      "stock_items",
+      "openingValue",
+      "DECIMAL(10,2) DEFAULT 0"
+    );
+
+    /* ===============================
+       📥 REQUEST DATA
+       =============================== */
+
     const {
       name,
       stockGroupId,
+      categoryId,
       unit,
       openingBalance,
       hsnCode,
@@ -855,50 +902,67 @@ router.put("/:id", async (req, res) => {
         .json({ success: false, message: "Missing fields" });
     }
 
-    // Helper to sanitize empty strings
-    const sanitize = (value) => {
-      if (value === "" || value === undefined) return null;
-      return value;
-    };
+    const sanitize = (v) => (v === "" || v === undefined ? null : v);
 
-    // Map batches and calculate total opening value
+    /* ===============================
+       📦 BATCH CALCULATION
+       =============================== */
+
     let totalOpeningValue = 0;
 
-    const batchData = (batches || []).map((batch) => {
-      const qty = Number(batch.batchQuantity) || 0;
-      const rate = Number(batch.batchRate) || 0;
-      const openingRate = rate;
+    const batchData = batches.map((b) => {
+      const qty = Number(b.batchQuantity) || 0;
+      const rate = Number(b.batchRate) || 0;
       const openingValue = qty * rate;
 
       totalOpeningValue += openingValue;
 
       return {
-        batchName: sanitize(batch.batchName),
+        batchName: sanitize(b.batchName),
         batchQuantity: qty,
-        openingRate,
+        openingRate: rate,
         openingValue,
-        batchExpiryDate: sanitize(batch.batchExpiryDate),
-        batchManufacturingDate: sanitize(batch.batchManufacturingDate),
+        batchExpiryDate: sanitize(b.batchExpiryDate),
+        batchManufacturingDate: sanitize(b.batchManufacturingDate),
       };
     });
 
-    const finalOpeningValue = totalOpeningValue;
+    /* ===============================
+       🧠 UPDATE QUERY
+       =============================== */
 
     const updateQuery = `
       UPDATE stock_items SET 
-        name=?, stockGroupId=?, unit=?, openingBalance=?, openingValue=?,
-        hsnCode=?, gstRate=?, taxType=?, standardPurchaseRate=?, standardSaleRate=?,
-        enableBatchTracking=?, allowNegativeStock=?, maintainInPieces=?, secondaryUnit=?,
-        batches=?, barcode=?, company_id=?, owner_type=?, owner_id=? 
-      WHERE id=?
+        name = ?,
+        stockGroupId = ?,
+        categoryId = ?,
+        unit = ?,
+        openingBalance = ?,
+        openingValue = ?,
+        hsnCode = ?,
+        gstRate = ?,
+        taxType = ?,
+        standardPurchaseRate = ?,
+        standardSaleRate = ?,
+        enableBatchTracking = ?,
+        allowNegativeStock = ?,
+        maintainInPieces = ?,
+        secondaryUnit = ?,
+        batches = ?,
+        barcode = ?,
+        company_id = ?,
+        owner_type = ?,
+        owner_id = ?
+      WHERE id = ?
     `;
 
     const values = [
       sanitize(name),
       sanitize(stockGroupId),
+      sanitize(categoryId), // ✅ FIXED
       sanitize(unit),
       openingBalance ?? 0,
-      finalOpeningValue ?? 0,
+      totalOpeningValue ?? 0,
       sanitize(hsnCode),
       gstRate ?? 0,
       taxType ?? "Taxable",
@@ -923,8 +987,8 @@ router.put("/:id", async (req, res) => {
       success: true,
       message: "Stock item updated successfully!",
       id,
+      openingValue: totalOpeningValue,
       batches: batchData,
-      openingValue: finalOpeningValue,
     });
   } catch (err) {
     await connection.rollback();
@@ -958,6 +1022,7 @@ router.get("/:id", async (req, res) => {
         s.id,
         s.name,
         s.stockGroupId,
+        s.categoryId,
         sg.name AS stockGroupName,
         s.unit,
         u.name AS unitName,
@@ -994,12 +1059,10 @@ router.get("/:id", async (req, res) => {
     const [rows] = await connection.execute(query, params);
 
     if (!rows.length) {
-      return res
-        .status(404)
-        .json({
-          success: false,
-          message: "No stock item found for this tenant",
-        });
+      return res.status(404).json({
+        success: false,
+        message: "No stock item found for this tenant",
+      });
     }
 
     const item = rows[0];
@@ -1055,7 +1118,9 @@ router.patch("/:id/batches", async (req, res) => {
     // 🔍 Find batch — treat null and empty string as equivalent so
     // frontend sending "" will match stored null/"" batches
     const targetName = batchName == null ? "" : String(batchName);
-    const index = batches.findIndex((b) => String(b.batchName ?? "") === targetName);
+    const index = batches.findIndex(
+      (b) => String(b.batchName ?? "") === targetName
+    );
 
     if (index >= 0) {
       let currentQty = Number(batches[index].batchQuantity || 0);

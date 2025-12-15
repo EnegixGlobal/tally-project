@@ -5,9 +5,7 @@ import { useNavigate } from "react-router-dom";
 import type { LedgerGroup, GstClassification } from "../../../types";
 import { Edit, Trash2, Plus, Search, ArrowLeft } from "lucide-react";
 import { apiFetch } from "../../../utils/apiFetch";
-
-
-
+import Swal from "sweetalert2";
 
 const GroupList: React.FC = () => {
   const { theme } = useAppContext();
@@ -16,6 +14,10 @@ const GroupList: React.FC = () => {
   const [groups, setGroups] = useState<LedgerGroup[]>([]);
   const [gstClassifications] = useState<GstClassification[]>([]);
   const { user, companyId: authCompanyId } = useAuth();
+
+  const notedeleteId = [
+    47, 49, 52, 54, 56, 58, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80,
+  ];
 
   // prefer AuthContext values, fall back to localStorage
   const companyId = authCompanyId ?? localStorage.getItem("company_id");
@@ -31,30 +33,61 @@ const GroupList: React.FC = () => {
     null;
 
   useEffect(() => {
-  const fetchLedgerGroups = async () => {
-    if (!companyId || !ownerType || !ownerId) {
-      setGroups([]);
+    const fetchLedgerGroups = async () => {
+      if (!companyId || !ownerType || !ownerId) {
+        setGroups([]);
+        return;
+      }
+
+      try {
+        const data = await apiFetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+
+        setGroups(data);
+      } catch (err) {
+        console.error("Failed to load ledger groups", err);
+      }
+    };
+
+    fetchLedgerGroups();
+  }, [companyId, ownerType, ownerId]);
+
+  const handleDelete = async (id: string) => {
+    // 🚫 block protected IDs
+    if (notedeleteId.includes(Number(id))) {
+      Swal.fire({
+        icon: "warning",
+        title: "Action not allowed",
+        text: "This is a system group and cannot be deleted.",
+      });
       return;
     }
 
-    try {
-      const data = await apiFetch(
-        `${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-      );
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "This group will be permanently deleted!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, delete it",
+    });
 
-      setGroups(data);
-    } catch (err) {
-      console.error("Failed to load ledger groups", err);
-    }
-  };
+    if (!result.isConfirmed) return;
 
-  fetchLedgerGroups();
-}, [companyId, ownerType, ownerId]); 
+    // 🔵 SHOW LOADER
+    Swal.fire({
+      title: "Deleting...",
+      text: "Please wait",
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      },
+    });
 
-
-
-  const handleDelete = async (id: string) => {
-    if (!window.confirm("Are you sure you want to delete this group?")) return;
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/ledger-groups/${id}`,
@@ -62,16 +95,32 @@ const GroupList: React.FC = () => {
           method: "DELETE",
         }
       );
+
       const data = await res.json();
+
       if (res.ok) {
         setGroups((prev) => prev.filter((group) => group.id !== id));
-        alert(data.message || "Group deleted successfully!");
+
+        Swal.fire({
+          icon: "success",
+          title: "Deleted!",
+          text: data.message || "Group deleted successfully",
+          timer: 1500,
+          showConfirmButton: false,
+        });
       } else {
-        alert(data.message || "Failed to delete group");
+        Swal.fire({
+          icon: "error",
+          title: "Failed",
+          text: data.message || "Unable to delete group",
+        });
       }
-    } catch (err) {
-      console.error("Group delete error:", err);
-      alert("Something went wrong!");
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Something went wrong!",
+      });
     }
   };
 
@@ -179,7 +228,7 @@ const GroupList: React.FC = () => {
                 >
                   Name
                 </th>
-               
+
                 <th
                   className={`px-4 py-3 text-left ${
                     theme === "dark" ? "text-gray-300" : "text-gray-700"
@@ -246,7 +295,7 @@ const GroupList: React.FC = () => {
                   >
                     {group.name}
                   </td>
-                 
+
                   <td
                     className={`px-4 py-3 ${
                       theme === "dark" ? "text-gray-100" : "text-gray-900"
@@ -275,7 +324,7 @@ const GroupList: React.FC = () => {
                       theme === "dark" ? "text-gray-100" : "text-gray-900"
                     }`}
                   >
-                   {group.gstClassificationId}
+                    {group.gstClassificationId}
                   </td>
                   <td
                     className={`px-4 py-3 ${
@@ -316,10 +365,17 @@ const GroupList: React.FC = () => {
                             />
                           </button>
                           <button
-                            title="Delete Group"
+                            title={
+                              notedeleteId.includes(Number(group.id))
+                                ? "Delete disabled for system group"
+                                : "Delete Group"
+                            }
+                            disabled={notedeleteId.includes(Number(group.id))}
                             onClick={() => handleDelete(group.id)}
-                            className={`p-1 rounded ${
-                              theme === "dark"
+                            className={`p-1 rounded transition-all ${
+                              notedeleteId.includes(Number(group.id))
+                                ? "opacity-40 cursor-not-allowed"
+                                : theme === "dark"
                                 ? "hover:bg-gray-700"
                                 : "hover:bg-gray-100"
                             }`}
@@ -327,7 +383,9 @@ const GroupList: React.FC = () => {
                             <Trash2
                               size={16}
                               className={`${
-                                theme === "dark"
+                                notedeleteId.includes(Number(group.id))
+                                  ? "text-gray-400"
+                                  : theme === "dark"
                                   ? "text-gray-300"
                                   : "text-gray-700"
                               }`}

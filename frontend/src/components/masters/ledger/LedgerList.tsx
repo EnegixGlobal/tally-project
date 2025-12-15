@@ -23,7 +23,7 @@ const LedgerList: React.FC = () => {
           localStorage.getItem("company_id") ||
           localStorage.getItem("company_id");
         const ownerType =
-          localStorage.getItem("supplier") || localStorage.getItem("supplier");
+          localStorage.getItem("supplier") 
         const ownerId =
           ownerType === "employee"
             ? localStorage.getItem("employee_id") ||

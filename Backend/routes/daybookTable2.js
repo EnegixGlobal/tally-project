@@ -83,11 +83,7 @@ router.get("/", async (req, res) => {
 
     const finalResponse = Object.values(vouchers);
 
-    // Log final response
-    console.log(
-      "🔍 FINAL GROUPED VOUCHER RESPONSE:\n",
-      JSON.stringify(finalResponse, null, 2)
-    );
+   
 
     // Return clean array
     res.json(finalResponse);

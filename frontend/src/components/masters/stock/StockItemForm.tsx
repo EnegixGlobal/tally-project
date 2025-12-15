@@ -265,6 +265,8 @@ const StockItemForm = () => {
 
         const data = await res.json();
 
+        console.log('this is unit', data)
+
         if (Array.isArray(data)) {
           setUnitsData(data);
         } else {
@@ -327,6 +329,7 @@ const StockItemForm = () => {
         );
 
         const data = await res.json();
+        console.log("this is edit id", data);
 
         if (res.ok && data.success) {
           const item = data.data;
@@ -583,6 +586,8 @@ const StockItemForm = () => {
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
+
+  console.log("formData", formData);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();

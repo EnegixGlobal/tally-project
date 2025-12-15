@@ -126,6 +126,8 @@ const StockCategoryForm: React.FC = () => {
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
+  console.log('formdata', formData);
+
   const handleSubmit = useCallback(async () => {
     const valid = validateForm();
     if (!valid) return;

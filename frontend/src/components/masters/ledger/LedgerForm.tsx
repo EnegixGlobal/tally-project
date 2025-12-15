@@ -11,7 +11,7 @@ const LedgerForm: React.FC = () => {
   const { theme, ledgers } = useAppContext();
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);
   const [chekStock, setChekStock] = useState("");
-  console.log('chekStock', chekStock)
+
 
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
@@ -37,7 +37,7 @@ const LedgerForm: React.FC = () => {
     panNumber: "",
   });
 
-  console.log("groupoid", formData.groupId);
+
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
@@ -102,25 +102,42 @@ const LedgerForm: React.FC = () => {
   }, [id, isEditMode, companyId, ownerType, ownerId]);
 
   // Prefill from context if available
-  useEffect(() => {
-    if (isEditMode && id) {
-      const ledger = ledgers.find((l) => l.id === id);
-      if (ledger) {
+ useEffect(() => {
+  if (!isEditMode || !id) return;
+
+  const fetchLedgerById = async () => {
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      );
+      const data = await res.json();
+
+      if (res.ok && data) {
         setFormData({
-          name: ledger.name,
-          groupId: ledger.groupId,
-          openingBalance: ledger.openingBalance,
-          closingBalance: ledger.closingBalance,
-          balanceType: ledger.balanceType,
-          address: ledger.address || "",
-          email: ledger.email || "",
-          phone: ledger.phone || "",
-          gstNumber: ledger.gstNumber || "",
-          panNumber: ledger.panNumber || "",
+          name: data.name || "",
+          groupId: data.groupId?.toString() || "",
+          openingBalance: Number(data.openingBalance) || 0,
+          closingBalance: Number(data.closingBalance) || 0,
+          balanceType: data.balanceType || "debit",
+          address: data.address || "",
+          email: data.email || "",
+          phone: data.phone || "",
+          gstNumber: data.gstNumber || "",
+          panNumber: data.panNumber || "",
         });
+
+        if (data.groupName) {
+          setChekStock(data.groupName);
+        }
       }
+    } catch (err) {
+      console.error("Error fetching ledger:", err);
     }
-  }, [id, isEditMode, ledgers]);
+  };
+
+  fetchLedgerById();
+}, [id, isEditMode, companyId, ownerType, ownerId]);
+
 
   // Handle input changes
   const handleChange = (

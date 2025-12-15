@@ -86,6 +86,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherEntry | null>(
     null
   );
+  const [ledgerList, setLedgerList] = useState<any[]>([]);
 
   // New state for Change View functionality
   const [viewType, setViewType] = useState<
@@ -282,6 +283,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
   // Filter vouchers based on search, filters, and view type
   const convertToVoucherEntry = (p: any): VoucherEntry & any => {
+    console.log("this is p", p);
     // ---------------------- PURCHASE ----------------------
     if (voucherType === "purchase") {
       return {
@@ -313,25 +315,26 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       };
     }
 
+
     // ---------------------- SALES ----------------------
-
     if (voucherType === "sales") {
-      console.log("SALES CONVERT INPUT:", p);
-      const party =
-        p.partyName ||
-        p.party_name ||
-        p.customerName ||
-        p.customer_name ||
-        p.partyId ||
-        p.customerId ||
-        "-";
+      const partyId =
+        p.partyId || p.customerId || p.party_id || p.customer_id || null;
 
-      const invoiceDate =
-        p.supplierInvoiceDate ||
+      const supplierInvoiceDate =
         p.invoiceDate ||
         p.invoice_date ||
         p.billDate ||
         p.bill_date ||
+        p.date || // fallback
+        "";
+
+      const referenceNo =
+        p.referenceNo ||
+        p.reference_no ||
+        p.invoiceNo ||
+        p.invoice_no ||
+        p.refNo ||
         "";
 
       const subtotal =
@@ -353,11 +356,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         id: String(p.id),
         date: p.date,
         number: p.number,
-        referenceNo: p.referenceNo || p.reference_no || "",
+        referenceNo,
         type: "sales",
 
-        party,
-        supplierInvoiceDate: invoiceDate,
+        supplierInvoiceDate,
         subtotal,
         cgstTotal: cgst,
         sgstTotal: sgst,
@@ -366,12 +368,12 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
         entries: [
           {
-            ledgerId: party,
+            ledgerId: partyId,
             type: "debit",
             amount: total,
           },
           {
-            ledgerId: p.salesLedgerName || p.salesLedger || "Sales A/c",
+            ledgerId: p.salesLedgerId || p.salesLedger || "Sales A/c",
             type: "credit",
             amount: total,
           },
@@ -381,30 +383,49 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
     // ---------------------- SALES ORDER ----------------------
     if (voucherType === "sales_order") {
+      const partyId =
+        p.partyId || p.customerId || p.party_id || p.customer_id || null;
+
+      const supplierInvoiceDate =
+        p.invoiceDate ||
+        p.orderDate ||
+        p.date || // ✅ fallback
+        "";
+
+      const referenceNo =
+        p.referenceNo ||
+        p.reference_no ||
+        p.orderNo ||
+        p.order_no ||
+        p.number ||
+        "";
+
+      const total = Number(p.totalAmount || 0);
+
       return {
         id: String(p.id),
         date: p.date,
         number: p.number,
-        referenceNo: p.referenceNo || "",
+        referenceNo,
         type: "sales_order",
 
-        supplierInvoiceDate: p.supplier_invoice_date || "",
-        subtotal: Number(p.totalAmount || 0),
+        supplierInvoiceDate,
+        subtotal: total,
         cgstTotal: 0,
         sgstTotal: 0,
         igstTotal: 0,
-        total: Number(p.totalAmount || 0),
+        total,
 
         entries: [
           {
-            ledgerId: p.partyName,
+            ledgerId: partyId,
             type: "debit",
-            amount: Number(p.totalAmount || 0),
+            amount: total,
           },
           {
-            ledgerId: p.salesLedgerName,
+            ledgerId: p.salesLedgerId || p.salesLedger || null,
             type: "credit",
-            amount: Number(p.totalAmount || 0),
+            amount: total,
           },
         ],
       };
@@ -795,6 +816,45 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     setShowPrintOptions(false);
     setSelectedVoucher(null);
   };
+
+  // ledger name get using id
+  useEffect(() => {
+    const fetchLedgers = async () => {
+      try {
+        const ledgerRes = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+
+        const ledgerData = await ledgerRes.json();
+
+        // IMPORTANT: handle different response formats
+        if (ledgerData.data) {
+          setLedgerList(ledgerData.data);
+        } else if (Array.isArray(ledgerData)) {
+          setLedgerList(ledgerData);
+        } else {
+          setLedgerList([]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch ledger:", error);
+      }
+    };
+
+    if (companyId && ownerType && ownerId) {
+      fetchLedgers();
+    }
+  }, [companyId, ownerType, ownerId]);
+  //helper function to fetch party name/ ledger name
+  const getLedgerNameById = (ledgerId?: number | string) => {
+    if (!ledgerId) return "-";
+
+    const ledger = ledgerList.find((l) => String(l.id) === String(ledgerId));
+
+    return ledger ? ledger.name : `Unknown (${ledgerId})`;
+  };
+
   useEffect(() => {
     const loadVouchers = async () => {
       try {
@@ -1269,7 +1329,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
                     {/* Party */}
                     <td className="px-6 py-4 text-sm text-gray-500">
-                      {creditEntry?.ledgerId ?? "-"}
+                      {voucherType === "sales"
+                        ? getLedgerNameById(debitEntry?.ledgerId)
+                        : getLedgerNameById(creditEntry?.ledgerId)}
                     </td>
 
                     {/* Supplier Invoice Date */}

@@ -288,7 +288,6 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ message: "Ledger not found" });
     }
 
-    console.log("Fetched Ledger:", rows[0]);
 
     // res.json(rows[0]);
     const ledger = rows[0];
