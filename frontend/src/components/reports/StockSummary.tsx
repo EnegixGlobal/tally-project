@@ -283,7 +283,10 @@ const StockSummary: React.FC = () => {
     try {
       const params = new URLSearchParams({ company_id, owner_type, owner_id });
 
-      const [purchaseRes, salesRes] = await Promise.all([
+      const [stockItemsRes, purchaseRes, salesRes] = await Promise.all([
+        fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
+        ),
         fetch(
           `${
             import.meta.env.VITE_API_URL
@@ -296,8 +299,17 @@ const StockSummary: React.FC = () => {
         ),
       ]);
 
+      const stockItemsData = await stockItemsRes.json();
       const purchaseData = await purchaseRes.json();
       const salesData = await salesRes.json();
+
+      // Create opening balance map
+      const openingBalanceMap: Record<string, number> = {};
+      if (Array.isArray(stockItemsData.data)) {
+        stockItemsData.data.forEach((item: any) => {
+          openingBalanceMap[item.name] = Number(item.openingBalance || 0);
+        });
+      }
 
       const allFormatted: any[] = [];
 
@@ -310,7 +322,9 @@ const StockSummary: React.FC = () => {
             hsnCode: v.hsnCode,
             batchNumber: v.batchNumber,
             qty: `+${v.purchaseQuantity}`,
+            qtyValue: Number(v.purchaseQuantity || 0),
             date: v.purchaseDate,
+            openingBalance: openingBalanceMap[v.itemName] || 0,
           });
         });
       }
@@ -324,10 +338,30 @@ const StockSummary: React.FC = () => {
             hsnCode: v.hsnCode,
             batchNumber: v.batchNumber,
             qty: `-${Math.abs(v.qtyChange)}`,
+            qtyValue: -Math.abs(Number(v.qtyChange || 0)),
             date: v.movementDate,
+            openingBalance: openingBalanceMap[v.itemName] || 0,
           });
         });
       }
+
+      // Sort by date and calculate closing balance
+      allFormatted.sort((a, b) => {
+        const dateA = new Date(a.date).getTime();
+        const dateB = new Date(b.date).getTime();
+        return dateA - dateB;
+      });
+
+      // Calculate running closing balance per item
+      const closingBalanceMap: Record<string, number> = {};
+      allFormatted.forEach((transaction) => {
+        const itemName = transaction.name;
+        if (!closingBalanceMap.hasOwnProperty(itemName)) {
+          closingBalanceMap[itemName] = openingBalanceMap[itemName] || 0;
+        }
+        closingBalanceMap[itemName] += transaction.qtyValue;
+        transaction.closingBalance = closingBalanceMap[itemName];
+      });
 
       setData(allFormatted);
     } catch (err: any) {
@@ -363,6 +397,15 @@ const StockSummary: React.FC = () => {
     });
 
     return Object.entries(groups).map(([itemName, transactions]) => {
+      // Sort transactions by date within each group (for All view)
+      if (reportView === "All") {
+        transactions.sort((a, b) => {
+          const dateA = new Date(a.date).getTime();
+          const dateB = new Date(b.date).getTime();
+          return dateA - dateB;
+        });
+      }
+
       // Calculate totals
       let totalQty = 0;
       const firstItem = transactions[0];
@@ -384,12 +427,29 @@ const StockSummary: React.FC = () => {
         totalQty += qty;
       });
 
+      // Calculate final closing balance for All view
+      let finalClosingBalance = 0;
+      if (reportView === "All" && transactions.length > 0) {
+        // Recalculate closing balance per item group to ensure accuracy
+        // Get opening balance from the first transaction
+        let runningBalance = transactions[0].openingBalance ?? 0;
+        
+        // Recalculate closing balance for each transaction in this group
+        transactions.forEach((t) => {
+          runningBalance += t.qtyValue ?? 0;
+          t.closingBalance = runningBalance;
+        });
+        
+        finalClosingBalance = runningBalance;
+      }
+
       return {
         itemName,
         hsnCode,
         unitName,
         transactions,
         totalQty,
+        finalClosingBalance,
         transactionCount: transactions.length,
         isGroup: true,
       };
@@ -469,6 +529,12 @@ const StockSummary: React.FC = () => {
           header: "Qty",
           accessor: "qty",
           align: "center" as const,
+        },
+        {
+          header: "Closing",
+          accessor: "closingBalance",
+          align: "center" as const,
+          render: (r: any) => r.closingBalance ?? 0,
         },
         {
           header: "Date",
@@ -863,6 +929,17 @@ const StockSummary: React.FC = () => {
                                     theme === "dark"
                                       ? "border-gray-500"
                                       : "border-gray-400"
+                                  } text-center font-semibold`}
+                                >
+                                  {group.finalClosingBalance ?? 0}
+                                </td>
+                              )}
+                              {reportView === "All" && (
+                                <td
+                                  className={`p-2 border ${
+                                    theme === "dark"
+                                      ? "border-gray-500"
+                                      : "border-gray-400"
                                   } text-center`}
                                 >
                                   -
@@ -957,6 +1034,15 @@ const StockSummary: React.FC = () => {
                                           } text-center`}
                                         >
                                           {transaction.qty}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${
+                                            theme === "dark"
+                                              ? "border-gray-500"
+                                              : "border-gray-400"
+                                          } text-center`}
+                                        >
+                                          {transaction.closingBalance ?? 0}
                                         </td>
                                         <td
                                           className={`p-2 border ${
