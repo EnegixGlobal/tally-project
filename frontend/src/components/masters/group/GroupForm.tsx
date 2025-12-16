@@ -36,24 +36,44 @@ interface FormData {
   cess: string;
 }
 
+// const baseGroups = [
+//   { name: "Branch Accounts", nature: "Assets" },
+//   { name: "Branch OD A/c", nature: "Assets" },
+//   { name: "Branch/Division", nature: "Assets" },
+//   { name: "Capital Account", nature: "Liabilities" },
+//   { name: "Current Assets", nature: "Assets" },
+//   { name: "Current Liabilities", nature: "Liabilities" },
+//   { name: "Direct Expenses", nature: "Expenses" },
+//   { name: "Direct Income", nature: "Income" },
+//   { name: "Fixed Assets", nature: "Assets" },
+//   { name: "Indirect Expenses", nature: "Expenses" },
+//   { name: "Indirect Income", nature: "Income" },
+//   { name: "Investments", nature: "Assets" },
+//   { name: "Loan(Liability)", nature: "Liabilities" },
+//   { name: "Misc expenses (Assets)", nature: "Assets" },
+//   { name: "Purchase Accounts", nature: "Expenses" },
+//   { name: "Sales Accounts", nature: "Income" },
+//   { name: "Suspense A/C", nature: "Assets" },
+// ];
+
 const baseGroups = [
-  { name: "Branch Accounts", nature: "Assets" },
-  { name: "Branch OD A/c", nature: "Assets" },
-  { name: "Branch/Division", nature: "Assets" },
-  { name: "Capital Account", nature: "Liabilities" },
-  { name: "Current Assets", nature: "Assets" },
-  { name: "Current Liabilities", nature: "Liabilities" },
-  { name: "Direct Expenses", nature: "Expenses" },
-  { name: "Direct Income", nature: "Income" },
-  { name: "Fixed Assets", nature: "Assets" },
-  { name: "Indirect Expenses", nature: "Expenses" },
-  { name: "Indirect Income", nature: "Income" },
-  { name: "Investments", nature: "Assets" },
-  { name: "Loan(Liability)", nature: "Liabilities" },
-  { name: "Misc expenses (Assets)", nature: "Assets" },
-  { name: "Purchase Accounts", nature: "Expenses" },
-  { name: "Sales Accounts", nature: "Income" },
-  { name: "Suspense A/C", nature: "Assets" },
+  { id: -1, name: "Branch Accounts", nature: "Assets" },
+  { id: -2, name: "Branch OD A/c", nature: "Assets" },
+  { id: -3, name: "Branch/Division", nature: "Assets" },
+  { id: -4, name: "Capital Account", nature: "Liabilities" },
+  { id: -5, name: "Current Assets", nature: "Assets" },
+  { id: -6, name: "Current Liabilities", nature: "Liabilities" },
+  { id: -7, name: "Direct Expenses", nature: "Expenses" },
+  { id: -8, name: "Direct Income", nature: "Income" },
+  { id: -9, name: "Fixed Assets", nature: "Assets" },
+  { id: -10, name: "Indirect Expenses", nature: "Expenses" },
+  { id: -11, name: "Indirect Income", nature: "Income" },
+  { id: -12, name: "Investments", nature: "Assets" },
+  { id: -13, name: "Loan(Liability)", nature: "Liabilities" },
+  { id: -14, name: "Misc expenses (Assets)", nature: "Assets" },
+  { id: -15, name: "Purchase Accounts", nature: "Expenses" },
+  { id: -16, name: "Sales Accounts", nature: "Income" },
+  { id: -17, name: "Suspense A/C", nature: "Assets" },
 ];
 
 const GroupForm: React.FC = () => {
@@ -121,15 +141,22 @@ const GroupForm: React.FC = () => {
           const data = await res.json();
 
           if (res.ok) {
+            // prefer numeric parent id returned from backend; if parent is negative
+            // map to baseGroups to infer nature
+            const parentId = data.parent !== undefined && data.parent !== null ? data.parent : null;
+            let inferredNature = data.nature ?? "";
+            if (parentId !== null && Number(parentId) < 0) {
+              const base = baseGroups.find((b) => b.id === Number(parentId));
+              if (base) inferredNature = base.nature;
+            }
+
             setFormData({
               name: data.name ?? "",
               alias: data.alias ?? "",
-              under: data.under
-                ? `base:${data.under}`
-                : data.parent?.toString() ?? "",
+              under: parentId !== null ? String(parentId) : "",
 
               type: data.type ?? "",
-              nature: data.nature ?? "",
+              nature: inferredNature ?? "",
 
               behavesLikeSubLedger:
                 data.behavesLikeSubLedger == 1 ? "yes" : "no",
@@ -234,15 +261,15 @@ const GroupForm: React.FC = () => {
     const { name, value } = e.target;
 
     if (name === "under") {
-      if (value.startsWith("base:")) {
-        const baseName = value.replace("base:", "");
-        const group = baseGroups.find((b) => b.name === baseName);
-
+      // value is numeric id (may be negative for base groups)
+      const parsed = Number(value);
+      if (!isNaN(parsed) && parsed < 0) {
+        const group = baseGroups.find((b) => b.id === parsed);
         setFormData((prev) => ({
           ...prev,
           under: value,
           nature: group?.nature ?? "",
-          behavesLikeSubLedger: "no", // base group default
+          behavesLikeSubLedger: "no",
         }));
       } else {
         setFormData((prev) => ({
@@ -362,11 +389,19 @@ const GroupForm: React.FC = () => {
     "28",
   ];
 
-  const isPurchaseRelated =
-    formData.under === "Primary"
-      ? formData.nature === "Expenses"
-      : formData.under.includes("expense") ||
-        formData.under.includes("purchase");
+  const isPurchaseRelated = (() => {
+    const underId = formData.under ? Number(formData.under) : NaN;
+    if (!isNaN(underId)) {
+      if (underId < 0) {
+        const base = baseGroups.find((b) => b.id === underId);
+        if (base) return /purchase|expense/i.test(base.name) || base.nature === "Expenses";
+      } else {
+        const group = ledgerGroups.find((g) => g.id === underId);
+        if (group) return /purchase|expense/i.test(group.name) || group.nature === "Expenses";
+      }
+    }
+    return formData.nature === "Expenses";
+  })();
 
   return (
     <div className="pt-[56px] px-4" onKeyDown={handleKeyDown} tabIndex={0}>
@@ -475,7 +510,7 @@ const GroupForm: React.FC = () => {
 
                 {/* Base Groups — always top */}
                 {baseGroups.map((g) => (
-                  <option key={g.name} value={`base:${g.name}`}>
+                  <option key={g.id} value={g.id}>
                     {g.name}
                   </option>
                 ))}
@@ -510,13 +545,13 @@ const GroupForm: React.FC = () => {
                 value={formData.nature}
                 onChange={handleChange}
                 required
-                disabled={formData.under.startsWith("base:")}
+                disabled={formData.under && Number(formData.under) < 0}
                 className={`w-full p-2 rounded border ${
                   theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
                     : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
                 } ${
-                  formData.under.startsWith("base:")
+                  formData.under && Number(formData.under) < 0
                     ? "cursor-not-allowed text-gray-400"
                     : ""
                 }`}

@@ -15,8 +15,24 @@ const GroupList: React.FC = () => {
   const [gstClassifications] = useState<GstClassification[]>([]);
   const { user, companyId: authCompanyId } = useAuth();
 
-  const notedeleteId = [
-    47, 49, 52, 54, 56, 58, 62, 64, 66, 68, 70, 72, 74, 76, 78, 80,
+  const baseGroups = [
+    { id: -1, name: "Branch Accounts", nature: "Assets", isSystem: true },
+    { id: -2, name: "Branch OD A/c", nature: "Assets", isSystem: true },
+    { id: -3, name: "Branch/Division", nature: "Assets", isSystem: true },
+    { id: -4, name: "Capital Account", nature: "Liabilities", isSystem: true },
+    { id: -5, name: "Current Assets", nature: "Assets", isSystem: true },
+    { id: -6, name: "Current Liabilities", nature: "Liabilities", isSystem: true },
+    { id: -7, name: "Direct Expenses", nature: "Expenses", isSystem: true },
+    { id: -8, name: "Direct Income", nature: "Income", isSystem: true },
+    { id: -9, name: "Fixed Assets", nature: "Assets", isSystem: true },
+    { id: -10, name: "Indirect Expenses", nature: "Expenses", isSystem: true },
+    { id: -11, name: "Indirect Income", nature: "Income", isSystem: true },
+    { id: -12, name: "Investments", nature: "Assets", isSystem: true },
+    { id: -13, name: "Loan(Liability)", nature: "Liabilities", isSystem: true },
+    { id: -14, name: "Misc expenses (Assets)", nature: "Assets", isSystem: true },
+    { id: -15, name: "Purchase Accounts", nature: "Expenses", isSystem: true },
+    { id: -16, name: "Sales Accounts", nature: "Income", isSystem: true },
+    { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },    
   ];
 
   // prefer AuthContext values, fall back to localStorage
@@ -46,7 +62,7 @@ const GroupList: React.FC = () => {
           }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
-        setGroups(data);
+        setGroups([...baseGroups, ...data]);
       } catch (err) {
         console.error("Failed to load ledger groups", err);
       }
@@ -56,12 +72,14 @@ const GroupList: React.FC = () => {
   }, [companyId, ownerType, ownerId]);
 
   const handleDelete = async (id: string) => {
-    // 🚫 block protected IDs
-    if (notedeleteId.includes(Number(id))) {
+    const group = groups.find((g) => g.id === id);
+
+    // 🚫 SYSTEM GROUP DELETE BLOCK
+    if (group?.isSystem) {
       Swal.fire({
         icon: "warning",
-        title: "Action not allowed",
-        text: "This is a system group and cannot be deleted.",
+        title: "Not Allowed",
+        text: "System groups cannot be deleted.",
       });
       return;
     }
@@ -78,28 +96,23 @@ const GroupList: React.FC = () => {
 
     if (!result.isConfirmed) return;
 
-    // 🔵 SHOW LOADER
     Swal.fire({
       title: "Deleting...",
       text: "Please wait",
       allowOutsideClick: false,
-      didOpen: () => {
-        Swal.showLoading();
-      },
+      didOpen: () => Swal.showLoading(),
     });
 
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/ledger-groups/${id}`,
-        {
-          method: "DELETE",
-        }
+        { method: "DELETE" }
       );
 
       const data = await res.json();
 
       if (res.ok) {
-        setGroups((prev) => prev.filter((group) => group.id !== id));
+        setGroups((prev) => prev.filter((g) => g.id !== id));
 
         Swal.fire({
           icon: "success",
@@ -125,16 +138,24 @@ const GroupList: React.FC = () => {
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
+    const firstDbGroup = groups.find((g) => !g.isSystem);
+
     if (e.ctrlKey && e.key === "c") {
       e.preventDefault();
       navigate("/app/masters/group/create");
-    } else if (e.ctrlKey && e.key === "a" && groups.length > 0) {
+    }
+
+    if (e.ctrlKey && e.key === "a" && firstDbGroup) {
       e.preventDefault();
-      navigate(`/app/masters/group/edit/${groups[0].id}`);
-    } else if (e.ctrlKey && e.key === "d" && groups.length > 0) {
+      navigate(`/app/masters/group/edit/${firstDbGroup.id}`);
+    }
+
+    if (e.ctrlKey && e.key === "d" && firstDbGroup) {
       e.preventDefault();
-      handleDelete(groups[0].id);
-    } else if (e.key === "F12") {
+      handleDelete(firstDbGroup.id);
+    }
+
+    if (e.key === "F12") {
       e.preventDefault();
       alert("Configuration options not implemented yet.");
     }
@@ -345,51 +366,46 @@ const GroupList: React.FC = () => {
                       {ownerType !== "user" && (
                         <>
                           <button
-                            title="Edit Group"
+                            disabled={group.isSystem}
+                            title={
+                              group.isSystem
+                                ? "System group cannot be edited"
+                                : "Edit Group"
+                            }
                             onClick={() =>
+                              !group.isSystem &&
                               navigate(`/app/masters/group/edit/${group.id}`)
                             }
                             className={`p-1 rounded ${
-                              theme === "dark"
-                                ? "hover:bg-gray-700"
-                                : "hover:bg-gray-100"
-                            }`}
-                          >
-                            <Edit
-                              size={16}
-                              className={`${
-                                theme === "dark"
-                                  ? "text-gray-300"
-                                  : "text-gray-700"
-                              }`}
-                            />
-                          </button>
-                          <button
-                            title={
-                              notedeleteId.includes(Number(group.id))
-                                ? "Delete disabled for system group"
-                                : "Delete Group"
-                            }
-                            disabled={notedeleteId.includes(Number(group.id))}
-                            onClick={() => handleDelete(group.id)}
-                            className={`p-1 rounded transition-all ${
-                              notedeleteId.includes(Number(group.id))
+                              group.isSystem
                                 ? "opacity-40 cursor-not-allowed"
                                 : theme === "dark"
                                 ? "hover:bg-gray-700"
                                 : "hover:bg-gray-100"
                             }`}
                           >
-                            <Trash2
-                              size={16}
-                              className={`${
-                                notedeleteId.includes(Number(group.id))
-                                  ? "text-gray-400"
-                                  : theme === "dark"
-                                  ? "text-gray-300"
-                                  : "text-gray-700"
-                              }`}
-                            />
+                            <Edit size={16} />
+                          </button>
+
+                          <button
+                            disabled={group.isSystem}
+                            title={
+                              group.isSystem
+                                ? "System group cannot be deleted"
+                                : "Delete Group"
+                            }
+                            onClick={() =>
+                              !group.isSystem && handleDelete(group.id)
+                            }
+                            className={`p-1 rounded transition-all ${
+                              group.isSystem
+                                ? "opacity-40 cursor-not-allowed"
+                                : theme === "dark"
+                                ? "hover:bg-gray-700"
+                                : "hover:bg-gray-100"
+                            }`}
+                          >
+                            <Trash2 size={16} />
                           </button>
                         </>
                       )}

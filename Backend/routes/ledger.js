@@ -14,8 +14,6 @@ router.get("/", async (req, res) => {
       .json({ message: "company_id, owner_type and owner_id are required" });
   }
 
-
-
   try {
     const [rows] = await db.execute(
       `SELECT 
@@ -39,8 +37,6 @@ router.get("/", async (req, res) => {
   `,
       [company_id, owner_type, owner_id]
     );
-
- 
 
     res.json(rows);
   } catch (err) {
@@ -74,56 +70,54 @@ router.post("/", async (req, res) => {
   }
 
   try {
-  // 🔍 Check if column exists
-  const [col] = await db.execute(`
+    // 🔍 Check if column exists
+    const [col] = await db.execute(`
     SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'ledgers'
     AND COLUMN_NAME = 'closing_balance';
   `);
 
-  // ➕ Add column only if missing
-  if (col.length === 0) {
-    await db.execute(`
+    // ➕ Add column only if missing
+    if (col.length === 0) {
+      await db.execute(`
       ALTER TABLE ledgers
       ADD COLUMN closing_balance DECIMAL(15,2) DEFAULT 0;
     `);
-  }
+    }
 
-  // 🔁 Auto handle missing closingBalance
-  const finalClosingBalance =
-    closingBalance !== undefined ? closingBalance : openingBalance || 0;
+    // 🔁 Auto handle missing closingBalance
+    const finalClosingBalance =
+      closingBalance !== undefined ? closingBalance : openingBalance || 0;
 
-  const sql = `
+    const sql = `
     INSERT INTO ledgers 
     (name, group_id, opening_balance, closing_balance, balance_type, address, email, phone, gst_number, pan_number, company_id, owner_type, owner_id)
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-  await db.execute(sql, [
-    name,
-    groupId,
-    openingBalance || 0,
-    finalClosingBalance,
-    balanceType || "debit",
-    address || "",
-    email || "",
-    phone || "",
-    gstNumber || "",
-    panNumber || "",
-    companyId,
-    ownerType,
-    ownerId,
-  ]);
+    await db.execute(sql, [
+      name,
+      groupId,
+      openingBalance || 0,
+      finalClosingBalance,
+      balanceType || "debit",
+      address || "",
+      email || "",
+      phone || "",
+      gstNumber || "",
+      panNumber || "",
+      companyId,
+      ownerType,
+      ownerId,
+    ]);
 
-  res.status(201).json({ message: "Ledger created successfully" });
-} catch (err) {
-  console.error("Error creating ledger:", err);
-  res.status(500).json({ message: "Failed to create ledger" });
-}
-
+    res.status(201).json({ message: "Ledger created successfully" });
+  } catch (err) {
+    console.error("Error creating ledger:", err);
+    res.status(500).json({ message: "Failed to create ledger" });
+  }
 });
-
 
 // Get only Cash/Bank Ledgers (for Contra Voucher)
 router.get("/cash-bank", async (req, res) => {
@@ -159,17 +153,12 @@ router.get("/cash-bank", async (req, res) => {
       [company_id, owner_type, owner_id]
     );
 
-
-
     res.json(rows);
   } catch (err) {
     console.error("Error fetching cash/bank ledgers:", err);
     res.status(500).json({ message: "Failed to fetch cash/bank ledgers" });
   }
 });
-
-
-
 
 // Create multiple ledgers in bulk
 router.post("/bulk", async (req, res) => {
@@ -265,7 +254,8 @@ router.get("/:id", async (req, res) => {
 
   if (!owner_type || !owner_id || !company_id) {
     return res.status(400).json({
-      message: "Missing required query params: owner_type, owner_id, company_id",
+      message:
+        "Missing required query params: owner_type, owner_id, company_id",
     });
   }
 
@@ -288,31 +278,28 @@ router.get("/:id", async (req, res) => {
       return res.status(404).json({ message: "Ledger not found" });
     }
 
-
     // res.json(rows[0]);
     const ledger = rows[0];
 
-res.json({
-  id: ledger.id,
-  name: ledger.name,
-  groupId: ledger.group_id,   // FIXED
-  openingBalance: ledger.opening_balance,
-  closingBalance: ledger.closing_balance,
-  balanceType: ledger.balance_type,
-  address: ledger.address,
-  email: ledger.email,
-  phone: ledger.phone,
-  gstNumber: ledger.gst_number,
-  panNumber: ledger.pan_number,
-  groupName: ledger.groupName
-});
-
+    res.json({
+      id: ledger.id,
+      name: ledger.name,
+      groupId: ledger.group_id, // FIXED
+      openingBalance: ledger.opening_balance,
+      closingBalance: ledger.closing_balance,
+      balanceType: ledger.balance_type,
+      address: ledger.address,
+      email: ledger.email,
+      phone: ledger.phone,
+      gstNumber: ledger.gst_number,
+      panNumber: ledger.pan_number,
+      groupName: ledger.groupName,
+    });
   } catch (err) {
     console.error("Error fetching ledger by ID:", err);
     res.status(500).json({ message: "Internal server error" });
   }
 });
-
 
 // Update a ledger by ID
 router.put("/:id", async (req, res) => {
@@ -337,7 +324,8 @@ router.put("/:id", async (req, res) => {
 
   if (!owner_type || !owner_id || !company_id) {
     return res.status(400).json({
-      message: "Missing required query params: owner_type, owner_id, company_id",
+      message:
+        "Missing required query params: owner_type, owner_id, company_id",
     });
   }
 
@@ -376,7 +364,9 @@ router.put("/:id", async (req, res) => {
     ]);
 
     if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Ledger not found or unauthorized" });
+      return res
+        .status(404)
+        .json({ message: "Ledger not found or unauthorized" });
     }
 
     res.json({ message: "Ledger updated successfully" });
@@ -386,34 +376,71 @@ router.put("/:id", async (req, res) => {
   }
 });
 
-
 // Delete a ledger by ID
 router.delete("/:id", async (req, res) => {
   const ledgerId = parseInt(req.params.id, 10);
-  const { owner_type, owner_id } = req.query;
 
   if (isNaN(ledgerId)) {
     return res.status(400).json({ message: "Invalid ledger ID" });
   }
 
   try {
-    const [check] = await db.execute("SELECT id FROM ledgers WHERE id = ?", [
-      ledgerId,
-    ]);
+    // 1️⃣ Ledger exist check
+    const [ledgerRows] = await db.execute(
+      "SELECT id FROM ledgers WHERE id = ?",
+      [ledgerId]
+    );
 
-    if (check.length === 0) {
+    if (ledgerRows.length === 0) {
       return res.status(404).json({ message: "Ledger not found" });
     }
 
-    const [result] = await db.execute("DELETE FROM ledgers WHERE id = ?", [
-      ledgerId,
-    ]);
-
-    if (result.affectedRows === 0) {
-      return res
-        .status(404)
-        .json({ message: "Ledger not found or already deleted" });
+    // 2️⃣ sales_vouchers check
+    const [salesVoucher] = await db.execute(
+      "SELECT 1 FROM sales_vouchers WHERE partyId = ? LIMIT 1",
+      [ledgerId]
+    );
+    if (salesVoucher.length) {
+      return res.status(400).json({
+        message: "Ledger used in Sales Voucher, cannot delete",
+      });
     }
+
+    // 3️⃣ purchase_orders check
+    const [purchaseOrder] = await db.execute(
+      "SELECT 1 FROM purchase_orders WHERE party_id = ? LIMIT 1",
+      [ledgerId]
+    );
+    if (purchaseOrder.length) {
+      return res.status(400).json({
+        message: "Ledger used in Purchase Order, cannot delete",
+      });
+    }
+
+    // 4️⃣ sales_orders check
+    const [salesOrder] = await db.execute(
+      "SELECT 1 FROM sales_orders WHERE partyId = ? LIMIT 1",
+      [ledgerId]
+    );
+    if (salesOrder.length) {
+      return res.status(400).json({
+        message: "Ledger used in Sales Order, cannot delete",
+      });
+    }
+
+    // 5️⃣ voucher_entries check
+    const [voucherEntries] = await db.execute(
+      "SELECT 1 FROM voucher_entries WHERE ledger_id = ? LIMIT 1",
+      [ledgerId]
+    );
+    if (voucherEntries.length) {
+      return res.status(400).json({
+        message: "Ledger used in Vouchers, cannot delete",
+      });
+    }
+
+    // 6️⃣ SAFE DELETE
+    await db.execute("DELETE FROM ledgers WHERE id = ?", [ledgerId]);
 
     res.json({ message: "Ledger deleted successfully" });
   } catch (err) {
