@@ -22,8 +22,7 @@ const LedgerList: React.FC = () => {
         const companyId =
           localStorage.getItem("company_id") ||
           localStorage.getItem("company_id");
-        const ownerType =
-          localStorage.getItem("supplier") 
+        const ownerType = localStorage.getItem("supplier");
         const ownerId =
           ownerType === "employee"
             ? localStorage.getItem("employee_id") ||
@@ -44,6 +43,8 @@ const LedgerList: React.FC = () => {
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const ledgerData = await ledgerRes.json();
+
+        console.log("ledgetrData", ledgerData);
 
         if (ledgerRes.ok) {
           setLedgers(Array.isArray(ledgerData) ? ledgerData : []);
@@ -91,54 +92,72 @@ const LedgerList: React.FC = () => {
       })
     : [];
 
- const handleDelete = async (id: string | number) => {
-  const result = await Swal.fire({
-    title: "Are you sure?",
-    text: "This ledger will be permanently deleted!",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonColor: "#d33",
-    cancelButtonColor: "#3085d6",
-    confirmButtonText: "Yes, Delete",
-  });
+  const handleDelete = async (id: string | number) => {
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: "This ledger will be permanently deleted!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonColor: "#d33",
+      cancelButtonColor: "#3085d6",
+      confirmButtonText: "Yes, Delete",
+    });
 
-  if (!result.isConfirmed) return;
+    if (!result.isConfirmed) return;
 
-  try {
-    const companyId = localStorage.getItem("company_id");
-    const ownerType = localStorage.getItem("supplier");
-    const ownerId = localStorage.getItem(
-      ownerType === "employee" ? "employee_id" : "user_id"
-    );
+    try {
+      const companyId = localStorage.getItem("company_id");
+      const ownerType = localStorage.getItem("supplier");
+      const ownerId = localStorage.getItem(
+        ownerType === "employee" ? "employee_id" : "user_id"
+      );
 
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-      { method: "DELETE" }
-    );
+      const res = await fetch(
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        { method: "DELETE" }
+      );
 
-    const data = await res.json();
+      const data = await res.json();
 
-    if (res.ok) {
-      Swal.fire({
-        icon: "success",
-        title: "Deleted!",
-        text: data.message,
-        timer: 1600,
-        showConfirmButton: false,
-      });
+      if (res.ok) {
+        Swal.fire({
+          icon: "success",
+          title: "Deleted!",
+          text: data.message,
+          timer: 1600,
+          showConfirmButton: false,
+        });
 
-      // 🟢 FIX: Remove deleted ledger from list without refresh
-      setLedgers((prev) => prev.filter((l) => l.id !== id));
-    } else {
-      Swal.fire("Error", data.message || "Failed to delete ledger!", "error");
+        setLedgers((prev) => prev.filter((l) => l.id !== id));
+      } else {
+        Swal.fire({
+          icon: "warning",
+          title: "Ledger cannot be deleted",
+          text: data.message || "This ledger is already used in transactions.",
+        });
+      }
+    } catch (err) {
+      Swal.fire("Network Error", "Unable to connect to server", "error");
+      console.error("Delete error:", err);
     }
-  } catch (err) {
-    Swal.fire("Network Error", "Unable to connect to server", "error");
-    console.error("Delete error:", err);
-  }
-};
+  };
 
+  //total debit or total cradit
+  const totalDebit = filteredLedgers.reduce((sum, ledger) => {
+    if (ledger.balanceType === "debit") {
+      return sum + Number(ledger.openingBalance || 0);
+    }
+    return sum;
+  }, 0);
 
+  const totalCredit = filteredLedgers.reduce((sum, ledger) => {
+    if (ledger.balanceType === "credit") {
+      return sum + Number(ledger.openingBalance || 0);
+    }
+    return sum;
+  }, 0);
 
   return (
     <>
@@ -381,6 +400,37 @@ const LedgerList: React.FC = () => {
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                {/* TOTAL DEBIT */}
+                <tr className="font-semibold">
+                  <td></td>
+                  <td></td>
+                  <td className="px-4 py-3 text-right">Total Debit</td>
+
+                  <td className="px-4 py-3 text-right font-mono text-red-600">
+                    {totalDebit.toFixed(2)}
+                  </td>
+
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+
+                {/* TOTAL CREDIT */}
+                <tr className="font-semibold">
+                  <td></td>
+                  <td></td>
+                  <td className="px-4 py-3 text-right">Total Credit</td>
+
+                  <td className="px-4 py-3 text-right font-mono text-green-600">
+                    {totalCredit.toFixed(2)}
+                  </td>
+
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+              </tfoot>
             </table>
           </div>
 
