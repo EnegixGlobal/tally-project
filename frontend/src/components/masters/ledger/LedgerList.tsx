@@ -15,7 +15,28 @@ const LedgerList: React.FC = () => {
   );
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);
-  // const ownerType = localStorage.getItem('userType') || localStorage.getItem('userType');
+
+  // groudp name
+  const baseGroups = [
+    { id: -1, name: "Branch Accounts", nature: "Assets" },
+    { id: -2, name: "Branch OD A/c", nature: "Assets" },
+    { id: -3, name: "Branch/Division", nature: "Assets" },
+    { id: -4, name: "Capital Account", nature: "Liabilities" },
+    { id: -5, name: "Current Assets", nature: "Assets" },
+    { id: -6, name: "Current Liabilities", nature: "Liabilities" },
+    { id: -7, name: "Direct Expenses", nature: "Expenses" },
+    { id: -8, name: "Direct Income", nature: "Income" },
+    { id: -9, name: "Fixed Assets", nature: "Assets" },
+    { id: -10, name: "Indirect Expenses", nature: "Expenses" },
+    { id: -11, name: "Indirect Income", nature: "Income" },
+    { id: -12, name: "Investments", nature: "Assets" },
+    { id: -13, name: "Loan(Liability)", nature: "Liabilities" },
+    { id: -14, name: "Misc expenses (Assets)", nature: "Assets" },
+    { id: -15, name: "Purchase Accounts", nature: "Expenses" },
+    { id: -16, name: "Sales Accounts", nature: "Income" },
+    { id: -17, name: "Suspense A/C", nature: "Assets" },
+  ];
+
   useEffect(() => {
     const fetchData = async () => {
       try {
@@ -44,7 +65,6 @@ const LedgerList: React.FC = () => {
         );
         const ledgerData = await ledgerRes.json();
 
-        console.log("ledgetrData", ledgerData);
 
         if (ledgerRes.ok) {
           setLedgers(Array.isArray(ledgerData) ? ledgerData : []);
@@ -71,9 +91,23 @@ const LedgerList: React.FC = () => {
     fetchData();
   }, []);
 
-  const getGroupName = (groupId: string): string => {
-    const group = ledgerGroups.find((g) => g.id === groupId);
-    return group ? group.name : "Unknown Group";
+  const resolveGroup = (groupId: number, normalGroups: any[]) => {
+    // 🔹 negative id → baseGroups se uthao
+    if (groupId < 0) {
+      return baseGroups.find((g) => g.id === groupId) || null;
+    }
+
+    // 🔹 positive id → normal groups jaise ke waise
+    return normalGroups.find((g) => g.id === groupId) || null;
+  };
+
+  const getGroupName = (groupId: number | string) => {
+    const gid = Number(groupId); // 🔥 VERY IMPORTANT
+
+    if (isNaN(gid)) return "—";
+
+    const group = resolveGroup(gid, ledgerGroups);
+    return group ? group.name : "—";
   };
 
   const filteredLedgers = Array.isArray(ledgers)
@@ -324,6 +358,7 @@ const LedgerList: React.FC = () => {
                     <td className="px-4 py-3">
                       {getGroupName(ledger.groupId)}
                     </td>
+
                     <td className="px-4 py-3">{ledger.gstNumber}</td>
                     <td className="px-4 py-3 text-right font-mono">
                       {ledger.openingBalance}

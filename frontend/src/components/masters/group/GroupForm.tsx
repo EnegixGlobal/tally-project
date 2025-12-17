@@ -80,9 +80,9 @@ const GroupForm: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  console.log("this is paramsid", id);
   const isEditMode = Boolean(id);
-  const [ledgerGroups] = useState<LedgerGroup[]>([]);
+  const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);
+
   const [gstClassifications] = useState<GstClassification[]>([]);
   const { user, companyId: authCompanyId } = useAuth();
 
@@ -99,9 +99,7 @@ const GroupForm: React.FC = () => {
   );
   // Prefer explicit owner id from localStorage, fall back to authenticated user's id
   const ownerId = ownerIdRaw ?? user?.id ?? null;
-  console.log("componeyId", companyId);
-  console.log("ownerType", ownerType);
-  console.log("ownerId", ownerId);
+  
 
   const [formData, setFormData] = useState({
     name: "",
@@ -129,6 +127,37 @@ const GroupForm: React.FC = () => {
     {}
   );
 
+  //get all group-list
+  useEffect(() => {
+    const fetchLedgerGroups = async () => {
+      if (!companyId || !ownerType || !ownerId) {
+        setLedgerGroups([]);
+        return;
+      }
+
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+
+        const data = await res.json();
+
+        if (res.ok && Array.isArray(data)) {
+          setLedgerGroups(data);
+        } else {
+          setLedgerGroups([]);
+        }
+      } catch (err) {
+        console.error("Failed to load ledger groups", err);
+        setLedgerGroups([]);
+      }
+    };
+
+    fetchLedgerGroups();
+  }, [companyId, ownerType, ownerId]);
+
   useEffect(() => {
     if (isEditMode && id) {
       const fetchGroup = async () => {
@@ -143,7 +172,10 @@ const GroupForm: React.FC = () => {
           if (res.ok) {
             // prefer numeric parent id returned from backend; if parent is negative
             // map to baseGroups to infer nature
-            const parentId = data.parent !== undefined && data.parent !== null ? data.parent : null;
+            const parentId =
+              data.parent !== undefined && data.parent !== null
+                ? data.parent
+                : null;
             let inferredNature = data.nature ?? "";
             if (parentId !== null && Number(parentId) < 0) {
               const base = baseGroups.find((b) => b.id === Number(parentId));
@@ -201,7 +233,6 @@ const GroupForm: React.FC = () => {
     }
   }, [id, isEditMode]);
 
-  console.log("formdata", formData);
 
   useEffect(() => {
     if (formData.setAlterHSNSAC === "yes" && formData.hsnSacClassificationId) {
@@ -256,34 +287,52 @@ const GroupForm: React.FC = () => {
   };
 
   const handleChange = (
-    e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
-  ) => {
-    const { name, value } = e.target;
+  e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
+) => {
+  const { name, value } = e.target;
 
-    if (name === "under") {
-      // value is numeric id (may be negative for base groups)
-      const parsed = Number(value);
-      if (!isNaN(parsed) && parsed < 0) {
-        const group = baseGroups.find((b) => b.id === parsed);
-        setFormData((prev) => ({
-          ...prev,
-          under: value,
-          nature: group?.nature ?? "",
-          behavesLikeSubLedger: "no",
-        }));
-      } else {
-        setFormData((prev) => ({
-          ...prev,
-          under: value,
-          nature: "",
-          behavesLikeSubLedger: "no",
-        }));
-      }
+  if (name === "under") {
+    const parsed = Number(value);
+
+    // 🔹 Case 1: Base Group (negative id)
+    if (!isNaN(parsed) && parsed < 0) {
+      const base = baseGroups.find((b) => b.id === parsed);
+
+      setFormData((prev) => ({
+        ...prev,
+        under: value,
+        nature: base?.nature ?? "",
+        behavesLikeSubLedger: "no",
+      }));
       return;
     }
 
-    setFormData((prev) => ({ ...prev, [name]: value }));
-  };
+    // 🔹 Case 2: Custom Group (DB group, positive id)
+    if (!isNaN(parsed) && parsed > 0) {
+      const group = ledgerGroups.find((g) => g.id === parsed);
+
+      setFormData((prev) => ({
+        ...prev,
+        under: value,
+        nature: group?.nature ?? "", // ⭐ FIX HERE
+        behavesLikeSubLedger: "no",
+      }));
+      return;
+    }
+
+    // 🔹 Fallback (should not normally hit)
+    setFormData((prev) => ({
+      ...prev,
+      under: value,
+      nature: "",
+      behavesLikeSubLedger: "no",
+    }));
+    return;
+  }
+
+  setFormData((prev) => ({ ...prev, [name]: value }));
+};
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -394,10 +443,16 @@ const GroupForm: React.FC = () => {
     if (!isNaN(underId)) {
       if (underId < 0) {
         const base = baseGroups.find((b) => b.id === underId);
-        if (base) return /purchase|expense/i.test(base.name) || base.nature === "Expenses";
+        if (base)
+          return (
+            /purchase|expense/i.test(base.name) || base.nature === "Expenses"
+          );
       } else {
         const group = ledgerGroups.find((g) => g.id === underId);
-        if (group) return /purchase|expense/i.test(group.name) || group.nature === "Expenses";
+        if (group)
+          return (
+            /purchase|expense/i.test(group.name) || group.nature === "Expenses"
+          );
       }
     }
     return formData.nature === "Expenses";
@@ -496,28 +551,23 @@ const GroupForm: React.FC = () => {
                 id="under"
                 name="under"
                 value={formData.under}
+                
                 onChange={handleChange}
                 required
-                className={`w-full p-2 rounded border ${
-                  errors.under
-                    ? "border-red-500"
-                    : theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
-                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
-                } outline-none transition-colors`}
+                className="w-full p-2 rounded border"
               >
                 <option value="">Select Group</option>
 
-                {/* Base Groups — always top */}
+                {/* 🔹 Base Groups (hard coded) */}
                 {baseGroups.map((g) => (
-                  <option key={g.id} value={g.id}>
+                  <option key={`base-${g.id}`} value={g.id}>
                     {g.name}
                   </option>
                 ))}
 
-                {/* Custom User Groups */}
+                {/* 🔹 Custom Groups (from DB) */}
                 {ledgerGroups.map((group) => (
-                  <option key={group.id} value={group.id}>
+                  <option key={`db-${group.id}`} value={group.id}>
                     {group.name}
                   </option>
                 ))}
@@ -545,7 +595,7 @@ const GroupForm: React.FC = () => {
                 value={formData.nature}
                 onChange={handleChange}
                 required
-                disabled={formData.under && Number(formData.under) < 0}
+                disabled={!!formData.under}
                 className={`w-full p-2 rounded border ${
                   theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
