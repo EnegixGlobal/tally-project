@@ -96,12 +96,13 @@ router.get("/report", async (req, res) => {
          vm.id AS voucher_id,
          vm.voucher_type,
          vm.voucher_number,
+           vm.reference_no,
          vm.date,
          ve.id AS entry_id,
          ve.entry_type,
          ve.amount,
          ve.narration,
-         ve.ledger_name,      -- ⭐️ ledger_name added
+         ve.ledger_name,     
          ve.cheque_number,
          ve.bank_name
        FROM voucher_entries ve
@@ -115,8 +116,6 @@ router.get("/report", async (req, res) => {
     const transactions = [];
     let balance = runningBalance;
 
-    // 📌 5️⃣ Add Opening Row if required
-  
 
     // 📌 6️⃣ Add all transactions
     txns.forEach((row) => {
@@ -131,8 +130,7 @@ router.get("/report", async (req, res) => {
         voucherType: row.voucher_type,
         voucherNo: row.voucher_number,
 
-        // ⭐️ FINAL FIX: Particulars = ledger_name (NOT narration)
-        particulars: row.ledger_name || "-",
+        particulars:  row.reference_no || "-",
 
         debit,
         credit,

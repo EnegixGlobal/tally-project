@@ -879,7 +879,8 @@ const PurchaseVoucher: React.FC = () => {
           // (but has quantity/openingRate), treat that batch as the
           // target and sync the purchased quantity into it.
           const candidateBatch = (entry.batches || []).find((b: any) => {
-            const nameEmpty = !b?.batchName || String(b.batchName).trim() === "";
+            const nameEmpty =
+              !b?.batchName || String(b.batchName).trim() === "";
             const hasQtyMeta =
               (b?.batchQuantity && Number(b.batchQuantity) !== 0) ||
               (b?.openingRate && Number(b.openingRate) !== 0) ||
@@ -887,13 +888,18 @@ const PurchaseVoucher: React.FC = () => {
             return nameEmpty && hasQtyMeta;
           });
 
-          const shouldSync = itemId && diffQty !== 0 && (batchName || candidateBatch);
+          const shouldSync =
+            itemId && diffQty !== 0 && (batchName || candidateBatch);
 
           if (shouldSync) {
-            const batchToSend = batchName || (candidateBatch ? candidateBatch.batchName ?? "" : "");
+            const batchToSend =
+              batchName ||
+              (candidateBatch ? candidateBatch.batchName ?? "" : "");
 
             fetch(
-              `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+              `${
+                import.meta.env.VITE_API_URL
+              }/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
               {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -1127,6 +1133,7 @@ const PurchaseVoucher: React.FC = () => {
             hsnCode: e.hsnCode || "",
             batchNumber: e.batchNumber || null,
             purchaseQuantity: Number(e.quantity) || 0,
+            rate: Number(e.rate) || 0,
             purchaseDate: formData.date,
 
             companyId,
@@ -1134,7 +1141,6 @@ const PurchaseVoucher: React.FC = () => {
             ownerId,
           }));
 
-        console.log("Purchase History Sent:", historyData);
 
         await fetch(
           `${
@@ -1411,50 +1417,50 @@ const PurchaseVoucher: React.FC = () => {
               )}
             </div>
 
-           {formData.mode !== "accounting-invoice" &&
- formData.mode !== "as-voucher" && (
-  <div>
-    <label
-      className="block text-sm font-medium mb-1"
-      htmlFor="partyId"
-    >
-      Party Name
-    </label>
+            {formData.mode !== "accounting-invoice" &&
+              formData.mode !== "as-voucher" && (
+                <div>
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    htmlFor="partyId"
+                  >
+                    Party Name
+                  </label>
 
-    <select
-      id="partyId"
-      name="partyId"
-      value={formData.partyId}
-      onChange={handlePartyChange}
-      className={getSelectClasses(theme, !!errors.partyId)}
-    >
-      <option value="">-- Select Party --</option>
+                  <select
+                    id="partyId"
+                    name="partyId"
+                    value={formData.partyId}
+                    onChange={handlePartyChange}
+                    className={getSelectClasses(theme, !!errors.partyId)}
+                  >
+                    <option value="">-- Select Party --</option>
 
-      {partyLedgers.map((ledger) => (
-        <option key={ledger.id} value={ledger.id}>
-          {ledger.name}
-        </option>
-      ))}
+                    {partyLedgers.map((ledger) => (
+                      <option key={ledger.id} value={ledger.id}>
+                        {ledger.name}
+                      </option>
+                    ))}
 
-      <option
-        value="add-new"
-        className={`flex items-center px-4 py-2 rounded ${
-          theme === "dark"
-            ? "bg-blue-600 hover:bg-green-700"
-            : "bg-green-600 hover:bg-green-700 text-white"
-        }`}
-      >
-        + Add New Ledger
-      </option>
-    </select>
+                    <option
+                      value="add-new"
+                      className={`flex items-center px-4 py-2 rounded ${
+                        theme === "dark"
+                          ? "bg-blue-600 hover:bg-green-700"
+                          : "bg-green-600 hover:bg-green-700 text-white"
+                      }`}
+                    >
+                      + Add New Ledger
+                    </option>
+                  </select>
 
-    {errors.partyId && (
-      <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>
-    )}
-  </div>
-)}
-
-            
+                  {errors.partyId && (
+                    <p className="text-red-500 text-xs mt-1">
+                      {errors.partyId}
+                    </p>
+                  )}
+                </div>
+              )}
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -1651,7 +1657,7 @@ const PurchaseVoucher: React.FC = () => {
                     {formData.entries.map((entry, index) => {
                       const itemDetails = getItemDetails(entry.itemId || "");
 
-                      console.log('entry', entry)
+                      console.log("entry", entry);
 
                       return (
                         <tr
