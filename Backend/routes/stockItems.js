@@ -341,7 +341,7 @@ router.post("/", async (req, res) => {
       }
     };
 
-    // Required columns
+    // 🔒 REQUIRED SAFE COLUMNS (LOCAL + PROD)
     await ensureColumn("stock_items", "categoryId", "VARCHAR(50) NULL");
     await ensureColumn("stock_items", "stockGroupId", "INT(11) NULL");
     await ensureColumn(
@@ -349,7 +349,16 @@ router.post("/", async (req, res) => {
       "openingValue",
       "DECIMAL(10,2) DEFAULT 0"
     );
-    await ensureColumn("stock_items", "type", "VARCHAR(50) DEFAULT 'opening'");
+    await ensureColumn(
+      "stock_items",
+      "type",
+      "VARCHAR(50) DEFAULT 'opening'"
+    );
+    await ensureColumn(
+      "stock_items",
+      "createdAt",
+      "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
+    );
 
     /* ===============================
        📥 REQUEST DATA
@@ -377,7 +386,6 @@ router.post("/", async (req, res) => {
       owner_type,
       owner_id,
     } = req.body;
-    console.log("this is categoryid", categoryId);
 
     if (!name || !unit || !taxType) {
       return res.status(400).json({
@@ -386,7 +394,8 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const sanitize = (v) => (v === "" || v === undefined ? null : v);
+    const sanitize = (v) =>
+      v === "" || v === undefined ? null : v;
 
     /* ===============================
        📦 BATCH CALCULATION
@@ -407,12 +416,14 @@ router.post("/", async (req, res) => {
         openingRate: rate,
         openingValue,
         batchExpiryDate: sanitize(b.batchExpiryDate),
-        batchManufacturingDate: sanitize(b.batchManufacturingDate),
+        batchManufacturingDate: sanitize(
+          b.batchManufacturingDate
+        ),
       };
     });
 
     /* ===============================
-       🧠 DYNAMIC INSERT
+       🧠 SAFE DYNAMIC INSERT
        =============================== */
 
     const [columnsResult] = await connection.execute(
@@ -467,8 +478,23 @@ router.post("/", async (req, res) => {
           return JSON.stringify(batchData);
         case "type":
           return "opening";
+        case "createdAt":
+          return new Date(); // 🔥 NEVER NULL
         default:
           return null;
+      }
+    });
+
+    // 🔐 FAIL-SAFE FOR FUTURE NOT-NULL COLUMNS
+    columnsResult.forEach((col, i) => {
+      if (
+        col.Null === "NO" &&
+        col.Default === null &&
+        values[i] === null &&
+        col.Field !== "id"
+      ) {
+        values[i] =
+          col.Field === "createdAt" ? new Date() : "";
       }
     });
 
@@ -479,7 +505,11 @@ router.post("/", async (req, res) => {
       VALUES (${placeholders})
     `;
 
-    const [result] = await connection.execute(insertQuery, values);
+    const [result] = await connection.execute(
+      insertQuery,
+      values
+    );
+
     const stockItemId = result.insertId;
 
     /* ===============================
@@ -522,6 +552,7 @@ router.post("/", async (req, res) => {
     connection.release();
   }
 });
+
 
 // stock purchase item
 
