@@ -8,7 +8,7 @@ import Swal from "sweetalert2";
 import { validateGSTIN } from "../../../utils/ledgerUtils";
 
 const LedgerForm: React.FC = () => {
-  const { theme, ledgers } = useAppContext();
+  const { theme } = useAppContext();
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);
   const [chekStock, setChekStock] = useState("");
 
@@ -28,7 +28,6 @@ const LedgerForm: React.FC = () => {
     name: "",
     groupId: "",
     openingBalance: 0,
-    closingBalance: 0,
     balanceType: "debit",
     address: "",
     email: "",
@@ -100,7 +99,6 @@ const LedgerForm: React.FC = () => {
             name: data.name || "",
             groupId: data.groupId || "",
             openingBalance: data.opening_balance || 0,
-            closingBalance: data.closing_balance || 0,
             balanceType: data.balance_type || "debit",
             address: data.address || "",
             email: data.email || "",
@@ -139,7 +137,6 @@ const LedgerForm: React.FC = () => {
           name: data.name || "",
           groupId: data.groupId?.toString() || "",
           openingBalance: Number(data.openingBalance) || 0,
-          closingBalance: Number(data.closingBalance) || 0,
           balanceType: data.balanceType || "debit",
           address: data.address || "",
           email: data.email || "",
@@ -419,20 +416,6 @@ const LedgerForm: React.FC = () => {
                 </label>
               </div>
             </div>
-
-           {["cash-in-hand"].includes(chekStock.toLowerCase()) && (
-  <div>
-    <label className="block text-sm font-medium mb-1">Closing Balance</label>
-    <input
-      type="number"
-      name="closingBalance"
-      value={formData.closingBalance}
-      onChange={handleChange}
-      step="0.01"
-      className="w-full p-2 rounded border"
-    />
-  </div>
-)}
 
           </div>
 

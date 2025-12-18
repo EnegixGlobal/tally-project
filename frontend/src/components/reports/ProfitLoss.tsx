@@ -7,7 +7,7 @@ const ProfitLoss: React.FC = () => {
   const { theme, ledgers, ledgerGroups } = useAppContext();
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-   const companyId = localStorage.getItem("company_id");
+  const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");
   const ownerId =
     localStorage.getItem(
@@ -19,82 +19,105 @@ const ProfitLoss: React.FC = () => {
     navigate("/app/reports/stock-summary");
   };
 
-  //get ledger data
-const [ledgerData, setLedgerData] = useState<any[]>([]);
-useEffect(() => {
-  if (!companyId || !ownerType || !ownerId) {
-    setLedgerData([]);
-    return;
-  }
+  //get stock opening  data
+  const [stockopening, setStockopening] = useState([]);
 
-  const fetchLedgerData = async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-      );
+  useEffect(() => {
+    const stockBatch = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
 
-      if (!res.ok) {
-        throw new Error("Failed to fetch ledger data");
+        if (!res.ok) {
+          throw new Error("Failed to fetch stock items");
+        }
+
+        const data = await res.json();
+
+        const allBatches = data.data.flatMap((item: any) => item.batches || []);
+
+        console.log("All batches:", allBatches);
+
+        setStockopening(allBatches);
+      } catch (error) {
+        console.error("Stock batch fetch error:", error);
       }
+    };
 
-      const data = await res.json();
-      setLedgerData(data || []);
-    } catch (error) {
-      console.error("Error fetching ledger data:", error);
-      setLedgerData([]);
+    if (companyId && ownerType && ownerId) {
+      stockBatch();
     }
+  }, [companyId, ownerType, ownerId]);
+
+
+  //get purchase Data
+  const [purchaseData, setPurchaseData] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchPurchaseData = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/purchase-vouchers/purchase-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+
+        const result = await res.json();
+
+        setPurchaseData(result.data || []);
+      } catch (error) {
+        console.error("Purchase fetch error", error);
+      }
+    };
+
+    fetchPurchaseData();
+  }, [companyId, ownerType, ownerId]);
+
+  //sales data
+  const [salesData, setSalesData] = useState<any[]>([]);
+  useEffect(() => {
+    const fatchSalesData = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/sales-vouchers/sale-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const result = await res.json();
+
+        setSalesData(result.data);
+      } catch (error) {
+        console.log("SalesData fatch error", error);
+      }
+    };
+
+    fatchSalesData();
+  }, [companyId, ownerType, ownerId]);
+
+  //calcultate opening stock
+  const getOpeningStock = () => {
+    return stockopening.reduce((sum, p: any) => {
+      const qty = Number(p.batchQuantity || 0);
+      const rate = Number(p.openingRate || 0);
+      return sum + qty * rate;
+    }, 0);
   };
 
-  fetchLedgerData();
-}, []);
-
-//get purchase Data 
-const [purchaseData, setPurchaseData] = useState<any[]>([]);
-
-useEffect(() => {
-  const fetchPurchaseData = async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-      );
-
-      const result = await res.json();
-
-      setPurchaseData(result.data || []);
-    } catch (error) {
-      console.error("Purchase fetch error", error);
-    }
-  };
-
-  fetchPurchaseData();
-}, [companyId, ownerType, ownerId]);
-
-
-
-
-  // Stock calculations
-const getOpeningStock = () => {
-  return ledgerData
-    .reduce((sum, l) => sum + Number(l.openingBalance || 0), 0);
-};
-
-
+  //get closingStock data
   const getClosingStock = () => {
-    return ledgers
-      .filter(
-        (l) =>
-          ledgerGroups.find((g) => g.id === l.groupId)?.type === "closing-stock"
-      )
-      .reduce((sum, l) => sum + l.openingBalance, 0);
+    return 0;
   };
 
   // Income calculations
   const getSalesTotal = () => {
-    return ledgers
-      .filter(
-        (l) => ledgerGroups.find((g) => g.id === l.groupId)?.type === "sales"
-      )
-      .reduce((sum, l) => sum + l.openingBalance, 0);
+    return salesData.reduce((sum, p) => {
+      const qty = Math.abs(Number(p.qtyChange || 0));
+      const rate = Number(p.rate || 0);
+      return sum + qty * rate;
+    }, 0);
   };
 
   const getIndirectIncomeTotal = () => {
@@ -108,15 +131,13 @@ const getOpeningStock = () => {
   };
 
   // Expense calculations
-const getPurchaseTotal = () => {
-  return purchaseData.reduce((sum, p) => {
-    const qty = Number(p.purchaseQuantity || 0);
-    const rate = Number(p.rate || 0);
-    return sum + qty * rate;
-  }, 0);
-};
-
-
+  const getPurchaseTotal = () => {
+    return purchaseData.reduce((sum, p) => {
+      const qty = Number(p.purchaseQuantity || 0);
+      const rate = Number(p.rate || 0);
+      return sum + qty * rate;
+    }, 0);
+  };
 
   const getDirectExpensesTotal = () => {
     return ledgers

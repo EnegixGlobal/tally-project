@@ -21,6 +21,7 @@ router.get("/", async (req, res) => {
     l.name,
     l.group_id AS groupId,
     l.opening_balance AS openingBalance,
+    l.closing_balance AS closingBalance,
     l.balance_type AS balanceType,
     l.address,
     l.email,
@@ -448,5 +449,48 @@ router.delete("/:id", async (req, res) => {
     res.status(500).json({ message: "Failed to delete ledger" });
   }
 });
+
+//patch closing balance
+router.patch("/", async (req, res) => {
+  const { company_id, owner_type, owner_id } = req.query;
+  const { ledgerId, closingBalance } = req.body;
+
+  if (!company_id || !owner_type || !owner_id) {
+    return res.status(400).json({
+      message: "company_id, owner_type and owner_id are required",
+    });
+  }
+
+  if (!ledgerId || closingBalance === undefined) {
+    return res.status(400).json({
+      message: "ledgerId and closingBalance are required",
+    });
+  }
+
+  try {
+    const [result] = await db.execute(
+      `
+      UPDATE ledgers
+      SET closing_balance = ?
+      WHERE id = ?
+        AND company_id = ?
+        AND owner_type = ?
+        AND (owner_id = ? OR owner_id = 0)
+      `,
+      [closingBalance, ledgerId, company_id, owner_type, owner_id]
+    );
+
+    res.json({
+      success: true,
+      message: "Closing balance updated successfully",
+    });
+  } catch (err) {
+    console.error("Closing balance update error:", err);
+    res.status(500).json({
+      message: "Failed to update closing balance",
+    });
+  }
+});
+
 
 module.exports = router;

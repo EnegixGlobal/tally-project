@@ -8,6 +8,7 @@ const db = require("../db");
 // =========================
 router.get("/", async (req, res) => {
   const { company_id, owner_type, owner_id } = req.query;
+  console.log(company_id, owner_type, owner_id)
 
   if (!company_id || !owner_type || !owner_id) {
     return res
@@ -25,7 +26,7 @@ router.get("/", async (req, res) => {
       [company_id, owner_type, owner_id]
     );
 
-    // console.log('rows', rows.length)
+    console.log('rows', rows.length)
     res.json(rows);
   } catch (err) {
     console.error("Error fetching ledger groups:", err);
