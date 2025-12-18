@@ -213,7 +213,6 @@ const SalesVoucher: React.FC = () => {
   // Add these states at top of your component:
   const [statusMsg, setStatusMsg] = useState("");
   const [statusColor, setStatusColor] = useState("");
-  
 
   // Add this useEffect() in component (below states)
   useEffect(() => {
@@ -393,7 +392,6 @@ const SalesVoucher: React.FC = () => {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
-          console.log("this is data", data);
           setStockItems(data.data);
         } else setStockItems([]);
       })
@@ -536,7 +534,8 @@ const SalesVoucher: React.FC = () => {
 
           // Try to find a candidate batch with empty name but quantity/meta present
           const candidateBatch = (entry.batches || []).find((b: any) => {
-            const nameEmpty = !b?.batchName || String(b.batchName).trim() === "";
+            const nameEmpty =
+              !b?.batchName || String(b.batchName).trim() === "";
             const hasQtyMeta =
               (b?.batchQuantity && Number(b.batchQuantity) !== 0) ||
               (b?.openingRate && Number(b.openingRate) !== 0) ||
@@ -567,14 +566,18 @@ const SalesVoucher: React.FC = () => {
               const allowedReduction = availableQty;
               const adjustedNewQty = Number(oldQty) - allowedReduction;
               updatedEntries[index].quantity = adjustedNewQty;
-              updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+              updatedEntries[index].amount = recalcAmount(
+                updatedEntries[index]
+              );
               setFormData((p) => ({ ...p, entries: updatedEntries }));
 
               // recalc stockDiff to send
               const adjustedStockDiff = oldQty - adjustedNewQty;
 
               fetch(
-                `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+                `${
+                  import.meta.env.VITE_API_URL
+                }/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
                 {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
@@ -593,7 +596,9 @@ const SalesVoucher: React.FC = () => {
 
             // Send the actual stock diff (negative for sale)
             fetch(
-              `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+              `${
+                import.meta.env.VITE_API_URL
+              }/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
               {
                 method: "PATCH",
                 headers: { "Content-Type": "application/json" },
@@ -774,7 +779,6 @@ const SalesVoucher: React.FC = () => {
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
-        console.log("data", data);
         setLedgers(data);
       } catch (error) {
         console.error("Failed to fetch ledgers:", error);
@@ -903,7 +907,10 @@ const SalesVoucher: React.FC = () => {
           itemName: item.name,
           hsnCode: entry.hsnCode || item.hsnCode || "",
           batchNumber: entry.batchNumber || null,
-          qtyChange: -Number(entry.quantity || 0), // Negative because SALE
+
+          qtyChange: -Number(entry.quantity || 0), 
+          rate: Number(entry.rate || 0), 
+
           movementDate: formData.date,
           companyId,
           ownerType,
@@ -1069,7 +1076,6 @@ const SalesVoucher: React.FC = () => {
     if (!ledgerId) return "-";
 
     const ledger = safeLedgers.find((l) => String(l.id) === String(ledgerId));
-    console.log("ledger", ledger);
     return ledger ? ledger.name : "-";
   };
 
@@ -1120,10 +1126,9 @@ const SalesVoucher: React.FC = () => {
     };
   };
 
-  const hasAnyBatch = formData.entries?.some(
-  (entry) => entry?.batches?.some((b) => b?.batchName)
-);
-
+  const hasAnyBatch = formData.entries?.some((entry) =>
+    entry?.batches?.some((b) => b?.batchName)
+  );
 
   return (
     <React.Fragment>
@@ -1242,7 +1247,9 @@ const SalesVoucher: React.FC = () => {
                       </option>
                     </select>
                     {errors.partyId && (
-                      <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>
+                      <p className="text-red-500 text-xs mt-1">
+                        {errors.partyId}
+                      </p>
                     )}
                   </div>
                 )}
@@ -1625,8 +1632,9 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-left">S.No</th>
                         <th className="px-4 py-2 text-left">Item</th>
                         <th className="px-4 py-2 text-left">HSN/SAC</th>
-                        {columnSettings.showBatch && hasAnyBatch && <th>Batch</th>}
-
+                        {columnSettings.showBatch && hasAnyBatch && (
+                          <th>Batch</th>
+                        )}
 
                         <th className="px-4 py-2 text-right">Quantity</th>
                         <th className="px-4 py-2 text-left">Unit</th>
@@ -1645,8 +1653,6 @@ const SalesVoucher: React.FC = () => {
                     <tbody>
                       {formData.entries.map((entry, index) => {
                         const itemDetails = getItemDetails(entry.itemId || "");
-
-                        console.log("this is data", entry);
 
                         return (
                           <tr
@@ -1696,28 +1702,31 @@ const SalesVoucher: React.FC = () => {
                             </td>
 
                             {/* BATCH */}
-                           {columnSettings.showBatch &&
-  entry.batches?.some((b) => b.batchName) && (
-    <td className="px-1 py-2 min-w-[100px]">
-      <select
-        name="batchNumber"
-        value={entry.batchNumber || ""}
-        onChange={(e) => handleEntryChange(index, e)}
-        className={`${FORM_STYLES.tableSelect(theme)} min-w-[100px] text-xs`}
-      >
-        <option value="">Batch</option>
+                            {columnSettings.showBatch &&
+                              entry.batches?.some((b) => b.batchName) && (
+                                <td className="px-1 py-2 min-w-[100px]">
+                                  <select
+                                    name="batchNumber"
+                                    value={entry.batchNumber || ""}
+                                    onChange={(e) =>
+                                      handleEntryChange(index, e)
+                                    }
+                                    className={`${FORM_STYLES.tableSelect(
+                                      theme
+                                    )} min-w-[100px] text-xs`}
+                                  >
+                                    <option value="">Batch</option>
 
-        {entry.batches
-          .filter((b) => b.batchName)
-          .map((b, i) => (
-            <option key={i} value={b.batchName}>
-              {b.batchName}
-            </option>
-          ))}
-      </select>
-    </td>
-)}
-
+                                    {entry.batches
+                                      .filter((b) => b.batchName)
+                                      .map((b, i) => (
+                                        <option key={i} value={b.batchName}>
+                                          {b.batchName}
+                                        </option>
+                                      ))}
+                                  </select>
+                                </td>
+                              )}
 
                             {/* QTY */}
                             <td className="px-1 py-2 min-w-[55px]">
