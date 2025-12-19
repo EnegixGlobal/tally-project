@@ -198,6 +198,7 @@ import RoleManagement from "./components/config/RoleManagement";
 import AccessControl from "./components/config/AccessControl";
 import SetProfit from "./components/config/SetProfit";
 import SalesByFifo from "./components/config/SalesByFifo";
+import Profile from "./components/config/Profile";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -485,6 +486,7 @@ function App() {
               <Route path="config/access" element={<RequireCompany><AccessControl /></RequireCompany>} />
               <Route path="config/set-profit" element={<RequireCompany><SetProfit /></RequireCompany>} />
               <Route path="config/sales-fifo" element={<RequireCompany><SalesByFifo /></RequireCompany>} />
+              <Route path='config/profile' element={<RequireCompany><Profile /></RequireCompany>} />
             </Route>
           </Routes>
         </Router>
