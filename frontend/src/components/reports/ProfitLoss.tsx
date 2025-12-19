@@ -107,9 +107,19 @@ const ProfitLoss: React.FC = () => {
   };
 
   //get closingStock data
+  // const getClosingStock = () => {
+  //   return 0;
+  // };
   const getClosingStock = () => {
-    return 0;
+    const openingValue = getOpeningStock();
+    const purchaseValue = getPurchaseTotal();
+    const salesValue = getSalesTotal();
+
+    const closing = openingValue + purchaseValue - salesValue;
+
+    return closing > 0 ? closing : 0;
   };
+
 
   // Income calculations
   const getSalesTotal = () => {
