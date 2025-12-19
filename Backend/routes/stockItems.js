@@ -800,6 +800,84 @@ router.get("/barcode/:barcode", async (req, res) => {
   }
 });
 
+// POST add a single batch to existing stock item
+router.post('/:id/batches', async (req, res) => {
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const { id } = req.params;
+    const {
+      batchName,
+      batchQuantity = 0,
+      batchRate = 0,
+      batchExpiryDate = null,
+      batchManufacturingDate = null,
+      company_id,
+      owner_type,
+      owner_id,
+    } = req.body;
+
+    if (!id || !batchName) {
+      return res.status(400).json({ success: false, message: 'Missing item id or batchName' });
+    }
+
+    // Fetch existing item
+    const [rows] = await connection.execute(
+      `SELECT id, batches, company_id, owner_type, owner_id FROM stock_items WHERE id = ?`,
+      [id]
+    );
+
+    if (!rows || rows.length === 0) {
+      return res.status(404).json({ success: false, message: 'Stock item not found' });
+    }
+
+    const item = rows[0];
+
+    // Optional access control: if company/owner provided, verify
+    if (company_id && String(item.company_id) !== String(company_id)) {
+      return res.status(403).json({ success: false, message: 'Company mismatch' });
+    }
+
+    if (owner_id && String(item.owner_id) !== String(owner_id)) {
+      return res.status(403).json({ success: false, message: 'Owner mismatch' });
+    }
+
+    let batches = [];
+    try {
+      batches = item.batches ? JSON.parse(item.batches) : [];
+      if (!Array.isArray(batches)) batches = [];
+    } catch (e) {
+      batches = [];
+    }
+
+    const newBatch = {
+      batchName,
+      batchQuantity: Number(batchQuantity) || 0,
+      batchRate: Number(batchRate) || 0,
+      batchExpiryDate: batchExpiryDate || null,
+      batchManufacturingDate: batchManufacturingDate || null,
+    };
+
+    batches.push(newBatch);
+
+    await connection.execute(
+      `UPDATE stock_items SET batches = ? WHERE id = ?`,
+      [JSON.stringify(batches), id]
+    );
+
+    await connection.commit();
+
+    res.json({ success: true, message: 'Batch added', batch: newBatch, batches });
+  } catch (err) {
+    console.error('🔥 Error adding batch:', err);
+    await connection.rollback();
+    res.status(500).json({ success: false, message: 'Error adding batch', error: err.message });
+  } finally {
+    connection.release();
+  }
+});
+
 // Deleter Request
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
