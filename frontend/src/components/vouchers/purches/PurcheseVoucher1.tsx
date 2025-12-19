@@ -1385,6 +1385,136 @@ const PurchaseVoucher: React.FC = () => {
     }));
   };
 
+  const handleSaveBatch = async () => {
+    const index = addBatchModal.index!;
+    const entry = formData.entries[index];
+    const pb = pendingBatches[index];
+
+    if (!entry || !entry.itemId) {
+      Swal.fire("Error", "Select item for the batch", "error");
+      return;
+    }
+
+    if (!pb || !pb.batchName || String(pb.batchName).trim() === "") {
+      Swal.fire("Error", "Batch name is required", "error");
+      return;
+    }
+
+    // Validate required fields
+    if (!formData.referenceNo && !formData.supplierInvoiceDate) {
+      Swal.fire("Error", "Supplier invoice is required", "error");
+      return;
+    }
+
+    if (!formData.partyId) {
+      Swal.fire("Error", "Party name is required", "error");
+      return;
+    }
+
+    if (!formData.purchaseLedgerId) {
+      Swal.fire("Error", "Purchase ledger is required", "error");
+      return;
+    }
+
+    if (!entry.quantity || entry.quantity <= 0) {
+      Swal.fire("Error", "Quantity must be greater than 0", "error");
+      return;
+    }
+
+    if (!entry.rate || entry.rate <= 0) {
+      Swal.fire("Error", "Rate must be greater than 0", "error");
+      return;
+    }
+
+    // Save the batch
+    try {
+      const url = `${import.meta.env.VITE_API_URL}/api/stock-items/${
+        entry.itemId
+      }/batches`;
+      const resBatch = await fetch(url, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          batchName: pb.batchName,
+          batchQuantity: pb.batchQuantity ?? 0,
+          batchRate: pb.batchRate ?? 0,
+          batchExpiryDate: pb.batchExpiryDate || null,
+          batchManufacturingDate: pb.batchManufacturingDate || null,
+          company_id: companyId,
+          owner_type: ownerType,
+          owner_id: ownerId,
+        }),
+      });
+
+      const batchData = await resBatch.json();
+      if (!resBatch.ok) {
+        Swal.fire(
+          "Error",
+          batchData.message || "Failed to save batch",
+          "error"
+        );
+        return;
+      }
+
+      // Append returned batch to stockItems
+      setStockItems((prev) =>
+        prev.map((it) => {
+          if (String(it.id) === String(entry.itemId)) {
+            const newBatches = Array.isArray(it.batches)
+              ? [...it.batches, batchData.batch]
+              : [batchData.batch];
+            return { ...it, batches: newBatches } as any;
+          }
+          return it;
+        })
+      );
+
+      // Update form entry to select new batch and set meta
+      setFormData((prev) => {
+        const updated: any = { ...prev };
+        const entries = [...updated.entries];
+        const ent = { ...entries[index] } as any;
+        ent.batches = ent.batches
+          ? [...ent.batches, batchData.batch]
+          : [batchData.batch];
+        ent.batchNumber = batchData.batch.batchName;
+        ent.batchExpiryDate = batchData.batch.batchExpiryDate || "";
+        ent.batchManufacturingDate =
+          batchData.batch.batchManufacturingDate || "";
+        ent.rate =
+          ent.rate || Number(batchData.batch.batchRate ?? pb.batchRate ?? 0);
+        entries[index] = ent;
+        updated.entries = entries;
+        return updated;
+      });
+
+      // Clear pending batch and close modal
+      setPendingBatches((prev) => {
+        const newPending = { ...prev };
+        delete newPending[index];
+        return newPending;
+      });
+
+      setAddBatchModal({
+        visible: false,
+        index: null,
+        itemId: null,
+        fields: {
+          batchName: "",
+          batchQuantity: 0,
+          batchRate: 0,
+          batchExpiryDate: "",
+          batchManufacturingDate: "",
+        },
+      });
+
+      Swal.fire("Success", "Batch saved successfully", "success");
+    } catch (error) {
+      console.error("Save batch error:", error);
+      Swal.fire("Error", "Failed to save batch", "error");
+    }
+  };
+
   const hasAnyBatch = formData.entries?.some((entry) =>
     entry?.batches?.some((b) => b?.batchName)
   );
@@ -1916,21 +2046,21 @@ const PurchaseVoucher: React.FC = () => {
                                 </select>
 
                                 {/* Inline add fields (no separate save) */}
-                                {addBatchModal.visible &&
+                                {/* {addBatchModal.visible &&
                                   addBatchModal.index === index && (
-                                    <div className="mt-2 border p-3 rounded bg-gray-50 text-xs space-y-2">
-                                      {/* 🔹 FORM TITLE */}
-                                      <div className="text-[11px] font-semibold text-blue-700 border-b pb-1">
+                                    <div className="mt-2 border p-3 rounded bg-gray-50 text-xs space-y-2"> */}
+                                {/* 🔹 FORM TITLE */}
+                                {/* <div className="text-[11px] font-semibold text-blue-700 border-b pb-1">
                                         Add New Batch for:{" "}
                                         <span className="font-bold">
                                           {stockItems.find(
                                             (i) => i.id === entry.itemId
                                           )?.name || "Item"}
                                         </span>
-                                      </div>
+                                      </div> */}
 
-                                      {/* 🔹 BATCH NAME */}
-                                      <div>
+                                {/* 🔹 BATCH NAME */}
+                                {/* <div>
                                         <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
                                           Batch Name
                                         </label>
@@ -1949,10 +2079,10 @@ const PurchaseVoucher: React.FC = () => {
                                           }
                                           className={`${TABLE_STYLES.input} text-xs`}
                                         />
-                                      </div>
+                                      </div> */}
 
-                                      {/* 🔹 QTY & RATE */}
-                                      <div className="flex gap-2">
+                                {/* 🔹 QTY & RATE */}
+                                {/* <div className="flex gap-2">
                                         <div className="flex-1">
                                           <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
                                             Batch Quantity
@@ -1996,10 +2126,10 @@ const PurchaseVoucher: React.FC = () => {
                                             className={`${TABLE_STYLES.input} text-xs`}
                                           />
                                         </div>
-                                      </div>
+                                      </div> */}
 
-                                      {/* 🔹 MFG & EXP DATE */}
-                                      <div className="flex gap-2">
+                                {/* 🔹 MFG & EXP DATE */}
+                                {/* <div className="flex gap-2">
                                         <div className="flex-1">
                                           <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
                                             Manufacturing Date
@@ -2041,10 +2171,10 @@ const PurchaseVoucher: React.FC = () => {
                                             className={`${TABLE_STYLES.input} text-xs`}
                                           />
                                         </div>
-                                      </div>
+                                      </div> */}
 
-                                      {/* 🔹 ACTION */}
-                                      <div className="flex justify-end mt-2">
+                                {/* 🔹 ACTION */}
+                                {/* <div className="flex justify-end mt-2">
                                         <button
                                           type="button"
                                           onClick={() => {
@@ -2064,9 +2194,169 @@ const PurchaseVoucher: React.FC = () => {
                                         >
                                           Cancel
                                         </button>
+                                      </div> */}
+                                {/* </div> */}
+                                {/* )} */}
+                                {addBatchModal.visible && (
+                                  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[300]">
+                                    <div className="w-[420px] rounded-lg bg-white shadow-xl p-5">
+                                      <h3 className="text-lg font-semibold mb-4">
+                                        Add New Batch
+                                      </h3>
+
+                                      <div className="space-y-3 text-sm">
+                                        <div>
+                                          <label className="block font-medium">
+                                            Batch Name
+                                          </label>
+                                          <input
+                                            className="w-full border rounded p-2"
+                                            value={
+                                              pendingBatches[
+                                                addBatchModal.index!
+                                              ]?.batchName || ""
+                                            }
+                                            onChange={(e) =>
+                                              handleAddBatchFieldChange(
+                                                addBatchModal.index!,
+                                                "batchName",
+                                                e.target.value
+                                              )
+                                            }
+                                          />
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                          <div>
+                                            <label className="block font-medium">
+                                              Quantity
+                                            </label>
+                                            <input
+                                              type="number"
+                                              className="w-full border rounded p-2"
+                                              value={
+                                                pendingBatches[
+                                                  addBatchModal.index!
+                                                ]?.batchQuantity || 0
+                                              }
+                                              onChange={(e) =>
+                                                handleAddBatchFieldChange(
+                                                  addBatchModal.index!,
+                                                  "batchQuantity",
+                                                  Number(e.target.value)
+                                                )
+                                              }
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="block font-medium">
+                                              Rate
+                                            </label>
+                                            <input
+                                              type="number"
+                                              className="w-full border rounded p-2"
+                                              value={
+                                                pendingBatches[
+                                                  addBatchModal.index!
+                                                ]?.batchRate || 0
+                                              }
+                                              onChange={(e) =>
+                                                handleAddBatchFieldChange(
+                                                  addBatchModal.index!,
+                                                  "batchRate",
+                                                  Number(e.target.value)
+                                                )
+                                              }
+                                            />
+                                          </div>
+                                        </div>
+
+                                        <div className="grid grid-cols-2 gap-3">
+                                          <div>
+                                            <label className="block font-medium">
+                                              MFG Date
+                                            </label>
+                                            <input
+                                              type="date"
+                                              className="w-full border rounded p-2"
+                                              value={
+                                                pendingBatches[
+                                                  addBatchModal.index!
+                                                ]?.batchManufacturingDate || ""
+                                              }
+                                              onChange={(e) =>
+                                                handleAddBatchFieldChange(
+                                                  addBatchModal.index!,
+                                                  "batchManufacturingDate",
+                                                  e.target.value
+                                                )
+                                              }
+                                            />
+                                          </div>
+
+                                          <div>
+                                            <label className="block font-medium">
+                                              Expiry Date
+                                            </label>
+                                            <input
+                                              type="date"
+                                              className="w-full border rounded p-2"
+                                              value={
+                                                pendingBatches[
+                                                  addBatchModal.index!
+                                                ]?.batchExpiryDate || ""
+                                              }
+                                              onChange={(e) =>
+                                                handleAddBatchFieldChange(
+                                                  addBatchModal.index!,
+                                                  "batchExpiryDate",
+                                                  e.target.value
+                                                )
+                                              }
+                                            />
+                                          </div>
+                                        </div>
+                                      </div>
+
+                                      <div className="flex justify-end gap-3 mt-5">
+                                        <button
+                                          onClick={() => {
+                                            setAddBatchModal({
+                                              visible: false,
+                                              index: null,
+                                              itemId: null,
+                                              fields: {
+                                                batchName: "",
+                                                batchQuantity: 0,
+                                                batchRate: 0,
+                                                batchExpiryDate: "",
+                                                batchManufacturingDate: "",
+                                              },
+                                            });
+                                            setPendingBatches((prev) => {
+                                              const newPending = { ...prev };
+                                              delete newPending[
+                                                addBatchModal.index!
+                                              ];
+                                              return newPending;
+                                            });
+                                          }}
+                                          className="px-4 py-2 rounded bg-gray-200 hover:bg-gray-300"
+                                        >
+                                          Cancel
+                                        </button>
+
+                                        <button
+                                          onClick={handleSaveBatch}
+                                          className="px-4 py-2 rounded bg-blue-600 text-white hover:bg-blue-700"
+                                        >
+                                          Save Batch
+                                        </button>
                                       </div>
                                     </div>
-                                  )}
+                                  </div>
+                                )}
                               </td>
                             )}
 
