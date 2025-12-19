@@ -908,8 +908,8 @@ const SalesVoucher: React.FC = () => {
           hsnCode: entry.hsnCode || item.hsnCode || "",
           batchNumber: entry.batchNumber || null,
 
-          qtyChange: -Number(entry.quantity || 0), 
-          rate: Number(entry.rate || 0), 
+          qtyChange: -Number(entry.quantity || 0),
+          rate: Number(entry.rate || 0),
 
           movementDate: formData.date,
           companyId,
@@ -1129,6 +1129,24 @@ const SalesVoucher: React.FC = () => {
   const hasAnyBatch = formData.entries?.some((entry) =>
     entry?.batches?.some((b) => b?.batchName)
   );
+
+  const handleBatchQuantityChange = (entryIndex, value) => {
+    setFormData((prev) => ({
+      ...prev,
+      entries: prev.entries.map((entry, i) => {
+        if (i !== entryIndex) return entry;
+
+        return {
+          ...entry,
+          batches: entry.batches.map((batch) =>
+            batch.batchName === entry.batchNumber
+              ? { ...batch, batchQuantity: Number(value) }
+              : batch
+          ),
+        };
+      }),
+    }));
+  };
 
   return (
     <React.Fragment>
@@ -1654,6 +1672,13 @@ const SalesVoucher: React.FC = () => {
                       {formData.entries.map((entry, index) => {
                         const itemDetails = getItemDetails(entry.itemId || "");
 
+                        // ✅ SELECTED BATCH
+                        const selectedBatch = entry.batches?.find(
+                          (b) => b.batchName === entry.batchNumber
+                        );
+
+                        console.log("this is entry", entry);
+
                         return (
                           <tr
                             key={entry.id}
@@ -1716,7 +1741,6 @@ const SalesVoucher: React.FC = () => {
                                     )} min-w-[100px] text-xs`}
                                   >
                                     <option value="">Batch</option>
-
                                     {entry.batches
                                       .filter((b) => b.batchName)
                                       .map((b, i) => (
@@ -1728,13 +1752,18 @@ const SalesVoucher: React.FC = () => {
                                 </td>
                               )}
 
-                            {/* QTY */}
+                            {/* ✅ QTY (BATCH WISE) */}
                             <td className="px-1 py-2 min-w-[55px]">
                               <input
                                 type="number"
-                                name="quantity"
-                                value={entry.quantity ?? ""}
-                                onChange={(e) => handleEntryChange(index, e)}
+                                value={selectedBatch?.batchQuantity ?? ""}
+                                onChange={(e) =>
+                                  handleBatchQuantityChange(
+                                    index,
+                                    e.target.value
+                                  )
+                                }
+                                disabled={!entry.batchNumber}
                                 className={`${FORM_STYLES.tableInput(
                                   theme
                                 )} text-right text-xs`}
@@ -1744,7 +1773,6 @@ const SalesVoucher: React.FC = () => {
                             {/* UNIT */}
                             <td className="px-1 py-2 text-center min-w-[45px] text-xs">
                               {(() => {
-                                // Match by stored unitId
                                 if (entry.unitId) {
                                   const found = units.find(
                                     (u) => String(u.id) === String(entry.unitId)
@@ -1752,7 +1780,6 @@ const SalesVoucher: React.FC = () => {
                                   if (found) return found.name;
                                 }
 
-                                // Match by label fallback
                                 if (entry.unitLabel) {
                                   const found = units.find(
                                     (u) =>
