@@ -119,7 +119,7 @@ const StockSummary: React.FC = () => {
     fetchData();
   }, [company_id, owner_type, owner_id]);
 
-  console.log("group", groups);
+  // console.log("group", groups);
 
   // OPENING STOCK
   const loadOpeningStock = async () => {
@@ -133,7 +133,7 @@ const StockSummary: React.FC = () => {
       if (!response.ok) throw new Error("Failed to load opening stock");
 
       const json = await response.json();
-      console.log("json", json.data);
+      // console.log("json", json.data);
       const formatted = Array.isArray(json.data)
         ? json.data.map((item: any) => ({
             item: {
@@ -352,18 +352,16 @@ const StockSummary: React.FC = () => {
       const params = new URLSearchParams({ company_id, owner_type, owner_id });
 
       const [stockItemsRes, purchaseRes, salesRes] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params}`),
         fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/purchase-vouchers/purchase-history?${params}`
         ),
         fetch(
           `${
             import.meta.env.VITE_API_URL
-          }/api/purchase-vouchers/purchase-history?${params.toString()}`
-        ),
-        fetch(
-          `${
-            import.meta.env.VITE_API_URL
-          }/api/sales-vouchers/sale-history?${params.toString()}`
+          }/api/sales-vouchers/sale-history?${params}`
         ),
       ]);
 
@@ -371,67 +369,89 @@ const StockSummary: React.FC = () => {
       const purchaseData = await purchaseRes.json();
       const salesData = await salesRes.json();
 
-      // Create opening balance map
-      const openingBalanceMap: Record<string, number> = {};
-      if (Array.isArray(stockItemsData.data)) {
-        stockItemsData.data.forEach((item: any) => {
-          openingBalanceMap[item.name] = Number(item.openingBalance || 0);
+      const itemMap: Record<string, any> = {};
+
+      // 1️⃣ OPENING STOCK (BATCH-WISE)
+      stockItemsData.data.forEach((item: any) => {
+        itemMap[item.name] = {
+          itemName: item.name,
+          unitName: units.find((u) => u.id === item.unit)?.name ?? "",
+          batches: {},
+        };
+
+        item.batches?.forEach((b: any) => {
+          itemMap[item.name].batches[b.batchName] = {
+            batchName: b.batchName,
+            opening: {
+              qty: Number(b.batchQuantity || 0),
+              rate: Number(b.openingRate || 0),
+              value: Number(b.batchQuantity || 0) * Number(b.openingRate || 0),
+            },
+            inward: { qty: 0, rate: 0, value: 0 },
+            outward: { qty: 0, rate: 0, value: 0 },
+            closing: { qty: 0, rate: 0, value: 0 },
+          };
         });
-      }
-
-      const allFormatted: any[] = [];
-
-      // Purchase
-      if (Array.isArray(purchaseData.data)) {
-        purchaseData.data.forEach((v: any) => {
-          allFormatted.push({
-            type: "Purchase",
-            name: v.itemName,
-            hsnCode: v.hsnCode,
-            batchNumber: v.batchNumber,
-            qty: `+${v.purchaseQuantity}`,
-            qtyValue: Number(v.purchaseQuantity || 0),
-            date: v.purchaseDate,
-            openingBalance: openingBalanceMap[v.itemName] || 0,
-          });
-        });
-      }
-
-      // Sales
-      if (Array.isArray(salesData.data)) {
-        salesData.data.forEach((v: any) => {
-          allFormatted.push({
-            type: "Sales",
-            name: v.itemName,
-            hsnCode: v.hsnCode,
-            batchNumber: v.batchNumber,
-            qty: `-${Math.abs(v.qtyChange)}`,
-            qtyValue: -Math.abs(Number(v.qtyChange || 0)),
-            date: v.movementDate,
-            openingBalance: openingBalanceMap[v.itemName] || 0,
-          });
-        });
-      }
-
-      // Sort by date and calculate closing balance
-      allFormatted.sort((a, b) => {
-        const dateA = new Date(a.date).getTime();
-        const dateB = new Date(b.date).getTime();
-        return dateA - dateB;
       });
 
-      // Calculate running closing balance per item
-      const closingBalanceMap: Record<string, number> = {};
-      allFormatted.forEach((transaction) => {
-        const itemName = transaction.name;
-        if (!closingBalanceMap.hasOwnProperty(itemName)) {
-          closingBalanceMap[itemName] = openingBalanceMap[itemName] || 0;
-        }
-        closingBalanceMap[itemName] += transaction.qtyValue;
-        transaction.closingBalance = closingBalanceMap[itemName];
+      // 2️⃣ PURCHASES (INWARD)
+      purchaseData.data.forEach((p: any) => {
+        const item = itemMap[p.itemName];
+        if (!item) return;
+
+        const batch =
+          item.batches[p.batchNumber] ??
+          (item.batches[p.batchNumber] = {
+            batchName: p.batchNumber,
+            opening: { qty: 0, rate: 0, value: 0 },
+            inward: { qty: 0, rate: 0, value: 0 },
+            outward: { qty: 0, rate: 0, value: 0 },
+            closing: { qty: 0, rate: 0, value: 0 },
+          });
+
+        batch.inward.qty += Number(p.purchaseQuantity || 0);
+        batch.inward.value +=
+          Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
+        batch.inward.rate =
+          batch.inward.qty > 0 ? batch.inward.value / batch.inward.qty : 0;
       });
 
-      setData(allFormatted);
+      // 3️⃣ SALES (OUTWARD)
+      salesData.data.forEach((s: any) => {
+        const item = itemMap[s.itemName];
+        if (!item) return;
+
+        const batch = item.batches[s.batchNumber];
+        if (!batch) return;
+
+        const qty = Math.abs(Number(s.qtyChange || 0));
+        batch.outward.qty += qty;
+        batch.outward.value += qty * Number(s.rate || 0);
+        batch.outward.rate =
+          batch.outward.qty > 0 ? batch.outward.value / batch.outward.qty : 0;
+      });
+
+      // 4️⃣ CLOSING (TALLY LOGIC)
+      Object.values(itemMap).forEach((item: any) => {
+        Object.values(item.batches).forEach((b: any) => {
+          b.closing.qty = b.opening.qty + b.inward.qty - b.outward.qty;
+
+          const totalInQty = b.opening.qty + b.inward.qty;
+          const totalInValue = b.opening.value + b.inward.value;
+
+          b.closing.rate = totalInQty > 0 ? totalInValue / totalInQty : 0;
+
+          b.closing.value = b.closing.qty * b.closing.rate;
+        });
+      });
+
+      // 5️⃣ FINAL ARRAY
+      const finalData = Object.values(itemMap).map((item: any) => ({
+        ...item,
+        batches: Object.values(item.batches),
+      }));
+
+      setData(finalData);
     } catch (err: any) {
       setError(err.message);
       setData([]);
@@ -450,10 +470,17 @@ const StockSummary: React.FC = () => {
     else if (reportView === "All") loadAllData();
   }, [reportView, integrate]);
 
-  // Group data by item name for Purchase, Sales, Closing, and All views
+  // Group data by item name for Purchase, Sales, Closing views
+  // For All view, group by GST rate
   const groupedData = useMemo(() => {
-    if (reportView === "Opening") return data; // Opening doesn't need grouping
+    if (reportView === "Opening") return data;
 
+    if (reportView === "All") {
+      // Data is already grouped by item with batches from loadAllData
+      return data;
+    }
+
+    // For Purchase, Sales, Closing views
     const groups: Record<string, any[]> = {};
 
     data.forEach((item) => {
@@ -465,16 +492,6 @@ const StockSummary: React.FC = () => {
     });
 
     return Object.entries(groups).map(([itemName, transactions]) => {
-      // Sort transactions by date within each group (for All view)
-      if (reportView === "All") {
-        transactions.sort((a, b) => {
-          const dateA = new Date(a.date).getTime();
-          const dateB = new Date(b.date).getTime();
-          return dateA - dateB;
-        });
-      }
-
-      // Calculate totals
       let totalQty = 0;
       const firstItem = transactions[0];
       const hsnCode = firstItem.hsnCode || "";
@@ -483,10 +500,8 @@ const StockSummary: React.FC = () => {
       transactions.forEach((t) => {
         let qty = 0;
         if (reportView === "Closing") {
-          // For closing, use closingQty
           qty = Number(t.closingQty || t.qty || 0);
         } else {
-          // For Purchase/Sales/All, parse qty string or number
           qty =
             typeof t.qty === "string"
               ? parseFloat(t.qty.replace(/[+-]/g, "")) || 0
@@ -495,29 +510,12 @@ const StockSummary: React.FC = () => {
         totalQty += qty;
       });
 
-      // Calculate final closing balance for All view
-      let finalClosingBalance = 0;
-      if (reportView === "All" && transactions.length > 0) {
-        // Recalculate closing balance per item group to ensure accuracy
-        // Get opening balance from the first transaction
-        let runningBalance = transactions[0].openingBalance ?? 0;
-
-        // Recalculate closing balance for each transaction in this group
-        transactions.forEach((t) => {
-          runningBalance += t.qtyValue ?? 0;
-          t.closingBalance = runningBalance;
-        });
-
-        finalClosingBalance = runningBalance;
-      }
-
       return {
         itemName,
         hsnCode,
         unitName,
         transactions,
         totalQty,
-        finalClosingBalance,
         transactionCount: transactions.length,
         isGroup: true,
       };
@@ -579,38 +577,20 @@ const StockSummary: React.FC = () => {
     }
   };
 
+  // Helper to format currency
+  const formatCurrency = (value: number) => {
+    if (!value && value !== 0) return "-";
+    return value.toLocaleString("en-IN", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: 2,
+    });
+  };
+
   // TABLE COLUMNS
   const columns = useMemo(() => {
     if (reportView === "All") {
-      return [
-        { header: "S.No", accessor: "sno", align: "center" as const },
-        { header: "Type", accessor: "type", align: "center" as const },
-        { header: "Item", accessor: "name", align: "center" as const },
-        { header: "HSN", accessor: "hsnCode", align: "center" as const },
-        {
-          header: "Batch",
-          accessor: "batchNumber",
-          align: "center" as const,
-          render: (r: any) => r.batchNumber || "-",
-        },
-        {
-          header: "Qty",
-          accessor: "qty",
-          align: "center" as const,
-        },
-        {
-          header: "Closing",
-          accessor: "closingBalance",
-          align: "center" as const,
-          render: (r: any) => r.closingBalance ?? 0,
-        },
-        {
-          header: "Date",
-          accessor: "date",
-          align: "center" as const,
-          render: (r: any) => formatDate(r.date),
-        },
-      ];
+      // Not used for All view - we render custom table
+      return [];
     }
 
     if (reportView === "Purchase") {
@@ -740,7 +720,7 @@ const StockSummary: React.FC = () => {
 
   // handleEdit
   const handleEditClick = (ledger: any) => {
-    console.log("handle", ledger);
+    // console.log("handle", ledger);
     setEditLedgerId(ledger.id);
     setEditClosingBalance(ledger.closingBalance ?? "");
   };
@@ -1012,6 +992,445 @@ const StockSummary: React.FC = () => {
                     navigate(`/app/reports/movement-analysis?itemId=${itemId}`);
                   }}
                 />
+              ) : reportView === "All" ? (
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr
+                        className={
+                          theme === "dark"
+                            ? "bg-gray-700 text-white"
+                            : "bg-gray-200 text-black"
+                        }
+                      >
+                        <th
+                          rowSpan={2}
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-2 text-left font-semibold`}
+                          style={{ minWidth: "200px" }}
+                        >
+                          Particulars
+                        </th>
+                        <th
+                          colSpan={3}
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center font-semibold`}
+                        >
+                          Opening Balance
+                        </th>
+                        <th
+                          colSpan={3}
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center font-semibold`}
+                        >
+                          Inwards
+                        </th>
+                        <th
+                          colSpan={3}
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center font-semibold`}
+                        >
+                          Outwards
+                        </th>
+                        <th
+                          colSpan={3}
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center font-semibold`}
+                        >
+                          Closing Balance
+                        </th>
+                      </tr>
+                      {/* Sub Header Row */}
+                      <tr
+                        className={
+                          theme === "dark"
+                            ? "bg-gray-700 text-white"
+                            : "bg-gray-200 text-black"
+                        }
+                      >
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Quantity
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Rate
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Value
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Quantity
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Rate
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Value
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Quantity
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Rate
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Value
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Quantity
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Rate
+                        </th>
+                        <th
+                          className={`border ${
+                            theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                          } p-1 text-center`}
+                        >
+                          Value
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {data.map((item: any, idx: number) => {
+                        const isExpanded = expandedItems.has(item.itemName);
+
+                        // ✅ CALCULATE TOTALS FROM BATCHES
+                        // const totals = item.batches.reduce(
+                        //   (acc: any, b: any) => {
+                        //     acc.openingQty += b.opening.qty;
+                        //     acc.openingValue += b.opening.value;
+
+                        //     acc.inwardQty += b.inward.qty;
+                        //     acc.inwardValue += b.inward.value;
+
+                        //     acc.outwardQty += b.outward.qty;
+                        //     acc.outwardValue += b.outward.value;
+
+                        //     acc.closingQty += b.closing.qty;
+                        //     acc.closingValue += b.closing.value;
+                        //     return acc;
+                        //   },
+                        //   {
+                        //     openingQty: 0,
+                        //     openingValue: 0,
+                        //     inwardQty: 0,
+                        //     inwardValue: 0,
+                        //     outwardQty: 0,
+                        //     outwardValue: 0,
+                        //     closingQty: 0,
+                        //     closingValue: 0,
+                        //   }
+                        // );
+
+                        const batches = Array.isArray(item.batches)
+                          ? item.batches
+                          : [];
+
+                        const totals = batches.reduce(
+                          (acc: any, b: any) => {
+                            acc.openingQty += b.opening.qty;
+                            acc.openingValue += b.opening.value;
+                            acc.inwardQty += b.inward.qty;
+                            acc.inwardValue += b.inward.value;
+                            acc.outwardQty += b.outward.qty;
+                            acc.outwardValue += b.outward.value;
+                            acc.closingQty += b.closing.qty;
+                            acc.closingValue += b.closing.value;
+                            return acc;
+                          },
+                          {
+                            openingQty: 0,
+                            openingValue: 0,
+                            inwardQty: 0,
+                            inwardValue: 0,
+                            outwardQty: 0,
+                            outwardValue: 0,
+                            closingQty: 0,
+                            closingValue: 0,
+                          }
+                        );
+
+                        const closingRate =
+                          totals.closingQty > 0
+                            ? totals.closingValue / totals.closingQty
+                            : 0;
+
+                        return (
+                          <React.Fragment key={idx}>
+                            {/* ITEM ROW */}
+                            <tr
+                              className={`cursor-pointer font-semibold ${
+                                theme === "dark"
+                                  ? "bg-gray-800 text-white hover:bg-gray-700"
+                                  : "bg-gray-50 hover:bg-gray-100"
+                              }`}
+                              onClick={() => toggleItem(item.itemName)}
+                            >
+                              <td className="border p-2">
+                                <div className="flex items-center gap-2">
+                                  {isExpanded ? (
+                                    <ChevronDown size={16} />
+                                  ) : (
+                                    <ChevronRight size={16} />
+                                  )}
+                                  {item.itemName}
+                                </div>
+                              </td>
+
+                              <td className="border p-2 text-right align-middle">
+                                {totals.openingQty || ""}
+                              </td>
+                              <td className="border"></td>
+                              <td className="border p-2 text-right align-middle">
+                                {formatCurrency(totals.openingValue)}
+                              </td>
+
+                              <td className="border p-2 text-right align-middle">
+                                {totals.inwardQty || ""}
+                              </td>
+                              <td className="border"></td>
+                              <td className="border p-2 text-right align-middle">
+                                {formatCurrency(totals.inwardValue)}
+                              </td>
+
+                              <td className="border p-2 text-right align-middle">
+                                {totals.outwardQty || ""}
+                              </td>
+                              <td className="border"></td>
+                              <td className="border p-2 text-right align-middle">
+                                {formatCurrency(totals.outwardValue)}
+                              </td>
+
+                              <td className="border p-2 text-right align-middle">
+                                {totals.closingQty}
+                              </td>
+                              <td className="border p-2 text-right align-middle">
+                                {formatCurrency(closingRate)}
+                              </td>
+                              <td className="border p-2 text-right align-middle">
+                                {formatCurrency(totals.closingValue)}
+                              </td>
+                            </tr>
+
+                            {/* 🔽 BATCH ROWS */}
+                            {isExpanded &&
+                              batches.map((b: any, bIdx: number) => (
+                                // <tr
+                                //   key={bIdx}
+                                //   className={
+                                //     theme === "dark"
+                                //       ? "bg-gray-900"
+                                //       : "bg-white"
+                                //   }
+                                // >
+                                <tr
+                                  key={bIdx}
+                                  className={`cursor-pointer ${
+                                    theme === "dark"
+                                      ? "bg-gray-900"
+                                      : "bg-white"
+                                  } hover:bg-yellow-100`}
+                                  onClick={() =>
+                                    navigate(
+                                      `/app/reports/item-monthly-summary?item=${item.itemName}&batch=${b.batchName}`
+                                    )
+                                  }
+                                >
+                                  <td className="border pl-8 italic">
+                                    {b.batchName}
+                                  </td>
+
+                                  <td className="border p-2 text-right align-middle">
+                                    {b.opening.qty || ""}
+                                  </td>
+                                  <td className="border p-2 text-right align-middle">
+                                    {formatCurrency(b.opening.rate)}
+                                  </td>
+                                  <td className="border p-2 text-right align-middle">
+                                    {formatCurrency(b.opening.value)}
+                                  </td>
+
+                                  <td className="border p-2 text-right align-middle">
+                                    {b.inward.qty || ""}
+                                  </td>
+                                  <td className="border p-2 text-right align-middle">
+                                    {b.inward.rate
+                                      ? formatCurrency(b.inward.rate)
+                                      : ""}
+                                  </td>
+                                  <td className="border p-2 text-right align-middle">
+                                    {b.inward.value
+                                      ? formatCurrency(b.inward.value)
+                                      : ""}
+                                  </td>
+
+                                  <td className="border p-2 text-right align-middle">
+                                    {b.outward.qty || ""}
+                                  </td>
+                                  <td className="border p-2 text-right align-middle">
+                                    {b.outward.rate
+                                      ? formatCurrency(b.outward.rate)
+                                      : ""}
+                                  </td>
+                                  <td className="border p-2 text-right align-middle">
+                                    {b.outward.value
+                                      ? formatCurrency(b.outward.value)
+                                      : ""}
+                                  </td>
+
+                                  <td className="border p-2 text-right align-middle">
+                                    {b.closing.qty}
+                                  </td>
+                                  <td className="border p-2 text-right align-middle">
+                                    {formatCurrency(b.closing.rate)}
+                                  </td>
+                                  <td className="border p-2 text-right align-middle">
+                                    {formatCurrency(b.closing.value)}
+                                  </td>
+                                </tr>
+                              ))}
+                          </React.Fragment>
+                        );
+                      })}
+
+                      {/* ✅ GRAND TOTAL */}
+                      {(() => {
+                        // const grand = data.reduce(
+                        //   (acc: any, item: any) => {
+                        //     item.batches.forEach((b: any) => {
+                        //       acc.opening += b.opening.value;
+                        //       acc.inward += b.inward.value;
+                        //       acc.outward += b.outward.value;
+                        //       acc.closing += b.closing.value;
+                        //     });
+                        //     return acc;
+                        //   },
+                        //   { opening: 0, inward: 0, outward: 0, closing: 0 }
+                        // );
+                        const grand = data.reduce(
+                          (acc: any, item: any) => {
+                            const batches = Array.isArray(item.batches)
+                              ? item.batches
+                              : [];
+                            batches.forEach((b: any) => {
+                              acc.opening += b.opening.value;
+                              acc.inward += b.inward.value;
+                              acc.outward += b.outward.value;
+                              acc.closing += b.closing.value;
+                            });
+                            return acc;
+                          },
+                          { opening: 0, inward: 0, outward: 0, closing: 0 }
+                        );
+
+                        return (
+                          <tr className="font-bold bg-gray-200">
+                            <td className="border p-2">Grand Total</td>
+                            <td colSpan={2}></td>
+                            <td className="border p-2 text-right align-middle">
+                              {formatCurrency(grand.opening)}
+                            </td>
+                            <td colSpan={2}></td>
+                            <td className="border p-2 text-right align-middle">
+                              {formatCurrency(grand.inward)}
+                            </td>
+                            <td colSpan={2}></td>
+                            <td className="border p-2 text-right align-middle">
+                              {formatCurrency(grand.outward)}
+                            </td>
+                            <td colSpan={2}></td>
+                            <td className="border p-2 text-right align-middle">
+                              {formatCurrency(grand.closing)}
+                            </td>
+                          </tr>
+                        );
+                      })()}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className={`w-full border-collapse`}>
@@ -1038,7 +1457,7 @@ const StockSummary: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {groupedData.map((group, idx) => {
+                      {groupedData.map((group: any, idx: number) => {
                         const isExpanded = expandedItems.has(group.itemName);
                         return (
                           <React.Fragment key={idx}>
@@ -1083,17 +1502,6 @@ const StockSummary: React.FC = () => {
                                   </span>
                                 </div>
                               </td>
-                              {reportView === "All" && (
-                                <td
-                                  className={`p-2 border ${
-                                    theme === "dark"
-                                      ? "border-gray-500"
-                                      : "border-gray-400"
-                                  } text-center`}
-                                >
-                                  -
-                                </td>
-                              )}
                               {reportView === "Closing" && (
                                 <td
                                   className={`p-2 border ${
@@ -1114,19 +1522,7 @@ const StockSummary: React.FC = () => {
                               >
                                 {group.hsnCode || "-"}
                               </td>
-                              {reportView !== "All" &&
-                                reportView !== "Closing" && (
-                                  <td
-                                    className={`p-2 border ${
-                                      theme === "dark"
-                                        ? "border-gray-500"
-                                        : "border-gray-400"
-                                    } text-center`}
-                                  >
-                                    -
-                                  </td>
-                                )}
-                              {reportView === "All" && (
+                              {reportView !== "Closing" && (
                                 <td
                                   className={`p-2 border ${
                                     theme === "dark"
@@ -1159,32 +1555,8 @@ const StockSummary: React.FC = () => {
                                   ? `+${group.totalQty}`
                                   : reportView === "Sales"
                                   ? `-${group.totalQty}`
-                                  : reportView === "Closing"
-                                  ? group.totalQty
                                   : group.totalQty}
                               </td>
-                              {reportView === "All" && (
-                                <td
-                                  className={`p-2 border ${
-                                    theme === "dark"
-                                      ? "border-gray-500"
-                                      : "border-gray-400"
-                                  } text-center font-semibold`}
-                                >
-                                  {group.finalClosingBalance ?? 0}
-                                </td>
-                              )}
-                              {reportView === "All" && (
-                                <td
-                                  className={`p-2 border ${
-                                    theme === "dark"
-                                      ? "border-gray-500"
-                                      : "border-gray-400"
-                                  } text-center`}
-                                >
-                                  -
-                                </td>
-                              )}
                               {(reportView === "Purchase" ||
                                 reportView === "Sales") && (
                                 <td
@@ -1219,82 +1591,7 @@ const StockSummary: React.FC = () => {
                                       }
                                     }}
                                   >
-                                    {reportView === "All" ? (
-                                      <>
-                                        <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
-                                        >
-                                          {tIdx + 1}
-                                        </td>
-                                        <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center pl-8`}
-                                        >
-                                          {transaction.type}
-                                        </td>
-                                        <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
-                                        >
-                                          {transaction.name}
-                                        </td>
-                                        <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
-                                        >
-                                          {transaction.hsnCode || "-"}
-                                        </td>
-                                        <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
-                                        >
-                                          {transaction.batchNumber || "-"}
-                                        </td>
-                                        <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
-                                        >
-                                          {transaction.qty}
-                                        </td>
-                                        <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
-                                        >
-                                          {transaction.closingBalance ?? 0}
-                                        </td>
-                                        <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
-                                        >
-                                          {formatDate(transaction.date)}
-                                        </td>
-                                      </>
-                                    ) : reportView === "Closing" ? (
+                                    {reportView === "Closing" ? (
                                       <>
                                         <td
                                           className={`p-2 border ${
