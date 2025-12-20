@@ -370,7 +370,7 @@ const SetProfit: React.FC = () => {
                         }
                         className="h-4 w-4"
                       />
-                      <span className="text-sm">Sell on Profit %</span>
+                      <span className="text-sm">Profit Percentage %</span>
                     </label>
 
                   

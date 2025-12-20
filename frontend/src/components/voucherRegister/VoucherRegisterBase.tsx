@@ -24,7 +24,6 @@ interface PurchaseVoucher {
   partyId: number;
   supplierInvoiceDate: string;
   referenceNo: string;
-  profit?: number;
   subtotal: string;
   cgstTotal: string;
   sgstTotal: string;
@@ -360,7 +359,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
         supplierInvoiceDate,
         subtotal,
-        profit: Number(p.profit || 0),
         cgstTotal: cgst,
         sgstTotal: sgst,
         igstTotal: igst,
@@ -1281,11 +1279,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Subtotal
                 </th>
-                {voucherType === "sales" && (
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                    Profit
-                  </th>
-                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   GST Total
                 </th>
@@ -1355,12 +1348,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {subtotal.toLocaleString()}
                     </td>
-                    {/* {profit} */}
-                    {voucherType === "sales" && (
-                      <td className="px-6 py-4 text-sm text-green-600 font-semibold">
-                        {(voucher as any).profit?.toLocaleString() || "0"}
-                      </td>
-                    )}
+                   
 
                     {/* GST Total */}
                     <td className="px-6 py-4 text-sm text-gray-900">
@@ -1425,9 +1413,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         )
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-500 text-right">
-                      -
-                    </td>
+                    
                   </>
                 ) : (
                   <>

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -217,6 +217,9 @@ const SalesVoucher: React.FC = () => {
   // Add these states at top of your component:
   const [statusMsg, setStatusMsg] = useState("");
   const [statusColor, setStatusColor] = useState("");
+
+  // timers for debouncing rate input per entry
+  const rateDebounceTimers = useRef<{ [entryId: string]: number | null }>({});
 
   // Add this useEffect() in component (below states)
   useEffect(() => {
@@ -678,9 +681,63 @@ const SalesVoucher: React.FC = () => {
 
       // 4️⃣ Rate / Discount
       if (["rate", "discount"].includes(name)) {
-        updatedEntries[index][name] = Number(value) || 0;
+        // Discount: apply immediately
+        if (name === "discount") {
+          updatedEntries[index][name] = Number(value) || 0;
+          updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+          setFormData((p) => ({ ...p, entries: updatedEntries }));
+          return;
+        }
+
+        // Rate: update shown value immediately, then debounce applying profit percentage
+        const rawRate = Number(value) || 0;
+        updatedEntries[index].rate = rawRate;
         updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
         setFormData((p) => ({ ...p, entries: updatedEntries }));
+
+        const entryId = updatedEntries[index].id || `idx-${index}`;
+
+        // clear existing timer
+        const existing = rateDebounceTimers.current[entryId];
+        if (existing) clearTimeout(existing);
+
+        // set new debounce timer (2.5s)
+        rateDebounceTimers.current[entryId] = window.setTimeout(() => {
+          setFormData((prev) => {
+            const newEntries = prev.entries.map((e) => ({ ...e }));
+            const targetIndex = newEntries.findIndex((e) => e.id === entryId);
+            const target =
+              (targetIndex !== -1 && newEntries[targetIndex]) ||
+              newEntries[index];
+
+            if (!target) return prev;
+
+            const rateToUse = rawRate;
+
+            if (
+              pricingRule.method === "profit_percentage" &&
+              Number(pricingRule.value) > 0
+            ) {
+              const adjusted = Number(
+                (
+                  rateToUse +
+                  (rateToUse * Number(pricingRule.value)) / 100
+                ).toFixed(2)
+              );
+              target.rate = adjusted;
+            } else {
+              target.rate = rateToUse;
+            }
+
+            target.amount = recalcAmount(target);
+
+            // clear stored timer
+            rateDebounceTimers.current[entryId] = null;
+
+            return { ...prev, entries: newEntries };
+          });
+        }, 1000);
+
         return;
       }
     }
@@ -852,19 +909,7 @@ const SalesVoucher: React.FC = () => {
     };
   };
 
-  const calculateProfit = (subtotal: number) => {
-    if (!pricingRule.method || pricingRule.value <= 0) return 0;
 
-    if (pricingRule.method === "profit_percentage") {
-      return (subtotal * pricingRule.value) / 100;
-    }
-
-    if (pricingRule.method === "on_mrp") {
-      return 0;
-    }
-
-    return 0;
-  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -907,7 +952,6 @@ const SalesVoucher: React.FC = () => {
       entries: formData.entries,
 
       subtotal: totals.subtotal,
-      profit: profitAmount,
       cgstTotal: totals.cgstTotal,
       sgstTotal: totals.sgstTotal,
       igstTotal: totals.igstTotal,
@@ -1071,14 +1115,9 @@ const SalesVoucher: React.FC = () => {
     total = 0,
   } = calculateTotals();
 
-  const profitAmount = calculateProfit(subtotal);
 
-  // subtotal + profit
-  const subtotalWithProfit = subtotal + profitAmount;
+  const grandTotal = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
 
-  // FINAL GRAND TOTAL
-  const grandTotal =
-    subtotalWithProfit + cgstTotal + sgstTotal + igstTotal - discountTotal;
 
   // Helper functions for print layout
   const getItemDetails = (itemId: string) => {
@@ -1914,20 +1953,7 @@ const SalesVoucher: React.FC = () => {
                         <td></td>
                       </tr>
 
-                      {/* Profit */}
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td colSpan={7}>Profit ({pricingRule.value}%)</td>
-
-                        <td className="px-4 py-2 text-right">
-                          ₹{profitAmount.toFixed(2)}
-                        </td>
-                      </tr>
+                     
 
                       {/* GST TOTAL */}
                       <tr

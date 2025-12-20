@@ -34,13 +34,14 @@ router.post("/", async (req, res) => {
       partyId,
       referenceNo,
       dispatchDetails,
+
       subtotal,
-      profit,
       cgstTotal,
       sgstTotal,
       igstTotal,
       discountTotal,
       total,
+
       type,
       isQuotation,
       salesLedgerId,
@@ -54,6 +55,7 @@ router.post("/", async (req, res) => {
       items,
     } = req.body;
 
+    // 🔐 Required checks
     if (!companyId || !ownerType || !ownerId) {
       return res.status(400).json({
         success: false,
@@ -61,26 +63,7 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // ✅ ensure profit column exists
-    const ensureProfitColumnExists = async () => {
-      const [rows] = await db.query(`
-        SELECT COUNT(*) AS count
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'sales_vouchers'
-          AND COLUMN_NAME = 'profit'
-      `);
-
-      if (rows[0].count === 0) {
-        await db.query(`
-          ALTER TABLE sales_vouchers
-          ADD COLUMN profit DECIMAL(12,2) DEFAULT 0 AFTER subtotal
-        `);
-      }
-    };
-
-    await ensureProfitColumnExists();
-
+    // 🧾 Entries safety
     const receivedEntries = Array.isArray(entries)
       ? entries
       : Array.isArray(items)
@@ -91,15 +74,32 @@ router.post("/", async (req, res) => {
     const dispatchThrough = dispatchDetails?.through || null;
     const destination = dispatchDetails?.destination || null;
 
+    // 🚫 PROFIT COMPLETELY REMOVED
     const insertVoucherSQL = `
       INSERT INTO sales_vouchers (
-        number, date, narration, partyId, referenceNo,
-        dispatchDocNo, dispatchThrough, destination,
-        subtotal, profit, cgstTotal, sgstTotal, igstTotal, discountTotal, total,
-        type, isQuotation, salesLedgerId, supplierInvoiceDate,
-        company_id, owner_type, owner_id
+        number,
+        date,
+        narration,
+        partyId,
+        referenceNo,
+        dispatchDocNo,
+        dispatchThrough,
+        destination,
+        subtotal,
+        cgstTotal,
+        sgstTotal,
+        igstTotal,
+        discountTotal,
+        total,
+        type,
+        isQuotation,
+        salesLedgerId,
+        supplierInvoiceDate,
+        company_id,
+        owner_type,
+        owner_id
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const voucherValues = [
@@ -112,7 +112,6 @@ router.post("/", async (req, res) => {
       dispatchThrough,
       destination,
       subtotal ?? 0,
-      profit ?? 0,
       cgstTotal ?? 0,
       sgstTotal ?? 0,
       igstTotal ?? 0,
@@ -127,11 +126,16 @@ router.post("/", async (req, res) => {
       ownerId,
     ];
 
-    const [voucherResult] = await db.execute(insertVoucherSQL, voucherValues);
+    const [voucherResult] = await db.execute(
+      insertVoucherSQL,
+      voucherValues
+    );
+
     const voucherId = voucherResult.insertId;
 
-    // ITEM ENTRIES
+    // ================= ITEM ENTRIES =================
     const itemEntries = receivedEntries.filter((e) => e.itemId);
+
     if (itemEntries.length > 0) {
       const itemValues = itemEntries.map((e) => [
         voucherId,
@@ -149,9 +153,24 @@ router.post("/", async (req, res) => {
       ]);
 
       await db.query(
-        `INSERT INTO sales_voucher_items
-         (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId)
-         VALUES ?`,
+        `
+        INSERT INTO sales_voucher_items
+        (
+          voucherId,
+          itemId,
+          quantity,
+          rate,
+          amount,
+          cgstRate,
+          sgstRate,
+          igstRate,
+          discount,
+          hsnCode,
+          batchNumber,
+          godownId
+        )
+        VALUES ?
+        `,
         [itemValues]
       );
     }
@@ -162,7 +181,7 @@ router.post("/", async (req, res) => {
       id: voucherId,
     });
   } catch (err) {
-    console.error("Voucher save failed:", err);
+    console.error("❌ Voucher save failed:", err);
     return res.status(500).json({
       success: false,
       message: "Error saving voucher",
@@ -170,6 +189,7 @@ router.post("/", async (req, res) => {
     });
   }
 });
+
 
 
 // GET Sale History (Only fetch existing data, no table creation)
@@ -272,7 +292,7 @@ router.get("/", async (req, res) => {
     const [voucherRows] = await db.execute(
       `SELECT 
           id, number, date, partyId, referenceNo, supplierInvoiceDate,
-          subtotal, cgstTotal, sgstTotal, igstTotal, profit, discountTotal, total
+          subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total
        FROM sales_vouchers
        WHERE owner_type = ? AND owner_id = ?
        ORDER BY id DESC`,
