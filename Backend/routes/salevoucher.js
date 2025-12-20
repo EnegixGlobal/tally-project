@@ -34,30 +34,28 @@ router.post("/", async (req, res) => {
       partyId,
       referenceNo,
       dispatchDetails,
+
       subtotal,
       cgstTotal,
       sgstTotal,
       igstTotal,
       discountTotal,
       total,
+
       type,
-      mode,
       isQuotation,
       salesLedgerId,
       supplierInvoiceDate,
 
-      // MULTI TENANT
       companyId,
       ownerType,
       ownerId,
 
-      // ENTRIES (frontend may send `entries` or `items`)
       entries,
       items,
     } = req.body;
-    console.log("total", total);
 
-    // Required Fields
+    // 🔐 Required checks
     if (!companyId || !ownerType || !ownerId) {
       return res.status(400).json({
         success: false,
@@ -65,30 +63,41 @@ router.post("/", async (req, res) => {
       });
     }
 
-    // Merge entries
+    // 🧾 Entries safety
     const receivedEntries = Array.isArray(entries)
       ? entries
       : Array.isArray(items)
       ? items
       : [];
 
-    // Extract dispatch fields
     const dispatchDocNo = dispatchDetails?.docNo || null;
     const dispatchThrough = dispatchDetails?.through || null;
     const destination = dispatchDetails?.destination || null;
 
-    let voucherId;
-
-    // ----------------------------
-    // INSERT MAIN SALES VOUCHER
-    // ----------------------------
+    // 🚫 PROFIT COMPLETELY REMOVED
     const insertVoucherSQL = `
       INSERT INTO sales_vouchers (
-        number, date, narration, partyId, referenceNo,
-        dispatchDocNo, dispatchThrough, destination,
-        subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total,
-        type, isQuotation, salesLedgerId, supplierInvoiceDate,
-        company_id, owner_type, owner_id
+        number,
+        date,
+        narration,
+        partyId,
+        referenceNo,
+        dispatchDocNo,
+        dispatchThrough,
+        destination,
+        subtotal,
+        cgstTotal,
+        sgstTotal,
+        igstTotal,
+        discountTotal,
+        total,
+        type,
+        isQuotation,
+        salesLedgerId,
+        supplierInvoiceDate,
+        company_id,
+        owner_type,
+        owner_id
       )
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
@@ -117,27 +126,17 @@ router.post("/", async (req, res) => {
       ownerId,
     ];
 
-    const [voucherResult] = await db.execute(insertVoucherSQL, voucherValues);
-    voucherId = voucherResult.insertId;
+    const [voucherResult] = await db.execute(
+      insertVoucherSQL,
+      voucherValues
+    );
 
-    // ----------------------------
-    // SPLIT ITEM + LEDGER ENTRIES
-    // ----------------------------
+    const voucherId = voucherResult.insertId;
+
+    // ================= ITEM ENTRIES =================
     const itemEntries = receivedEntries.filter((e) => e.itemId);
-    const ledgerEntries = receivedEntries.filter((e) => e.ledgerId);
 
-    // ----------------------------
-    // INSERT ITEM ENTRIES
-    // ----------------------------
     if (itemEntries.length > 0) {
-      const insertItemsSQL = `
-        INSERT INTO sales_voucher_items (
-          voucherId, itemId, quantity, rate, amount,
-          cgstRate, sgstRate, igstRate,
-          discount, hsnCode, batchNumber, godownId
-        ) VALUES ?
-      `;
-
       const itemValues = itemEntries.map((e) => [
         voucherId,
         e.itemId,
@@ -153,27 +152,27 @@ router.post("/", async (req, res) => {
         e.godownId ?? null,
       ]);
 
-      await db.query(insertItemsSQL, [itemValues]);
-    }
-
-    // ----------------------------
-    // INSERT LEDGER ENTRIES
-    // ----------------------------
-    if (ledgerEntries.length > 0) {
-      const insertLedgerSQL = `
-        INSERT INTO voucher_entries (
-          voucher_id, ledger_id, amount, entry_type
-        ) VALUES ?
-      `;
-
-      const ledgerValues = ledgerEntries.map((e) => [
-        voucherId,
-        e.ledgerId,
-        e.amount,
-        e.type,
-      ]);
-
-      await db.query(insertLedgerSQL, [ledgerValues]);
+      await db.query(
+        `
+        INSERT INTO sales_voucher_items
+        (
+          voucherId,
+          itemId,
+          quantity,
+          rate,
+          amount,
+          cgstRate,
+          sgstRate,
+          igstRate,
+          discount,
+          hsnCode,
+          batchNumber,
+          godownId
+        )
+        VALUES ?
+        `,
+        [itemValues]
+      );
     }
 
     return res.status(200).json({
@@ -182,7 +181,7 @@ router.post("/", async (req, res) => {
       id: voucherId,
     });
   } catch (err) {
-    console.error("Voucher save failed:", err);
+    console.error("❌ Voucher save failed:", err);
     return res.status(500).json({
       success: false,
       message: "Error saving voucher",
@@ -190,6 +189,8 @@ router.post("/", async (req, res) => {
     });
   }
 });
+
+
 
 // GET Sale History (Only fetch existing data, no table creation)
 // router.get("/sale-history", async (req, res) => {

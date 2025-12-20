@@ -283,7 +283,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
   // Filter vouchers based on search, filters, and view type
   const convertToVoucherEntry = (p: any): VoucherEntry & any => {
-    console.log("this is p", p);
     // ---------------------- PURCHASE ----------------------
     if (voucherType === "purchase") {
       return {
@@ -315,7 +314,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       };
     }
 
-
     // ---------------------- SALES ----------------------
     if (voucherType === "sales") {
       const partyId =
@@ -326,7 +324,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         p.invoice_date ||
         p.billDate ||
         p.bill_date ||
-        p.date || // fallback
+        p.date ||
         "";
 
       const referenceNo =
@@ -1350,6 +1348,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {subtotal.toLocaleString()}
                     </td>
+                   
 
                     {/* GST Total */}
                     <td className="px-6 py-4 text-sm text-gray-900">
@@ -1382,7 +1381,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
                       {onDelete && (
                         <button
-                          onClick={() => onDelete(String(voucher.id))} // TS-safe
+                          onClick={() => onDelete(String(voucher.id))} 
                           className="text-red-600 hover:text-red-900"
                         >
                           Delete
@@ -1414,9 +1413,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         )
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-500 text-right">
-                      -
-                    </td>
+                    
                   </>
                 ) : (
                   <>

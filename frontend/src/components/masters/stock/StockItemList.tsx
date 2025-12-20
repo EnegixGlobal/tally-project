@@ -46,7 +46,6 @@ const StockItemList = () => {
 
         const data = await res.json();
 
-        console.log("this is unit", data);
 
         if (Array.isArray(data)) {
           setUnitsData(data);
@@ -73,7 +72,7 @@ const StockItemList = () => {
           }/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const json = await res.json();
-        console.log("jsondata", json);
+
         if (json.success) {
           setStockItems(json.data);
         } else {

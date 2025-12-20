@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
 import {
   TrendingUp,
   Save,
@@ -29,6 +29,14 @@ interface ProfitRule {
 
 const SetProfit: React.FC = () => {
   const navigate = useNavigate();
+
+  const companyId = localStorage.getItem("company_id");
+  const ownerType = localStorage.getItem("supplier");
+  const ownerId = localStorage.getItem(
+    ownerType === "employee" ? "employee_id" : "user_id"
+  );
+
+  console.log("this is ", companyId, ownerType, ownerId);
 
   const [profitSettings, setProfitSettings] = useState({
     defaultProfitMethod: "percentage", // percentage, fixed_amount, markup
@@ -70,22 +78,77 @@ const SetProfit: React.FC = () => {
     priority: 1,
   });
 
+  const [mappedData, setMappedData] = useState<any[]>([]);
+  useEffect(() => {
+    if (!companyId || !ownerType || !ownerId) return;
+
+    const fetchAllData = async () => {
+      try {
+        // 1️⃣ Fetch stock groups
+        const groupRes = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-groups/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const groups = await groupRes.json();
+        console.log("this ", groups);
+
+        // 2️⃣ Fetch stock categories
+        const catRes = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-categories?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const categories = await catRes.json();
+
+        // 3️⃣ MATCH & MAP DATA
+        const result = categories.map((cat: any) => {
+          const parentId = cat.parent_id ?? cat.parent;
+
+          const parentGroup = groups.find(
+            (group: any) => Number(group.id) === Number(parentId)
+          );
+
+          return {
+            id: cat.id,
+            categoryName: cat.name,
+            description: cat.description || "-",
+            groupId: parentGroup?.id || null,
+            groupName: parentGroup?.name || "-",
+          };
+        });
+
+        console.log("FINAL MAPPED DATA:", result);
+        setMappedData(result);
+      } catch (err) {
+        console.error("Error fetching data:", err);
+      }
+    };
+
+    fetchAllData();
+  }, [companyId, ownerType, ownerId]);
+
+
+
   const handleSave = async () => {
     const ownerId = localStorage.getItem("employee_id") || 1;
     const ownerType = localStorage.getItem("supplier") || "admin";
 
     try {
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/set-profit`, {
-        method: "PUT",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          customerType: profitConfig.customerType,
-          method: profitConfig.method,
-          value: profitConfig.value || 0, // default 0
-          ownerType,
-          ownerId,
-        }),
-      });
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/set-profit`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            customerType: profitConfig.customerType,
+            method: profitConfig.method,
+            value: profitConfig.value || 0, // default 0
+            ownerType,
+            ownerId,
+          }),
+        }
+      );
 
       const data = await response.json();
 
@@ -296,8 +359,8 @@ const SetProfit: React.FC = () => {
                       <input
                         type="radio"
                         name="wholesaleMethod"
-                        value="sell_on_profit"
-                        checked={profitConfig.method === "sell_on_profit"}
+                        value="profit_percentage"
+                        checked={profitConfig.method === "profit_percentage"}
                         onChange={(e) =>
                           setProfitConfig({
                             ...profitConfig,
@@ -307,26 +370,10 @@ const SetProfit: React.FC = () => {
                         }
                         className="h-4 w-4"
                       />
-                      <span className="text-sm">Sell on Profit %</span>
+                      <span className="text-sm">Profit Percentage %</span>
                     </label>
 
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="wholesaleMethod"
-                        value="percent_on_profit"
-                        checked={profitConfig.method === "percent_on_profit"}
-                        onChange={(e) =>
-                          setProfitConfig({
-                            ...profitConfig,
-                            method: e.target.value,
-                            value: "", // user input required
-                          })
-                        }
-                        className="h-4 w-4"
-                      />
-                      <span className="text-sm">Percent on Profit %</span>
-                    </label>
+                  
                   </div>
                 </>
               )}
@@ -343,8 +390,8 @@ const SetProfit: React.FC = () => {
                       <input
                         type="radio"
                         name="retailerMethod"
-                        value="sell_on_profit"
-                        checked={profitConfig.method === "sell_on_profit"}
+                        value="profit_percentage"
+                        checked={profitConfig.method === "profit_percentage"}
                         onChange={(e) =>
                           setProfitConfig({
                             ...profitConfig,
@@ -354,26 +401,10 @@ const SetProfit: React.FC = () => {
                         }
                         className="h-4 w-4"
                       />
-                      <span className="text-sm">Sell on Profit %</span>
+                      <span className="text-sm">Profit Percentage %</span>
                     </label>
 
-                    <label className="flex items-center gap-2">
-                      <input
-                        type="radio"
-                        name="retailerMethod"
-                        value="percent_on_profit"
-                        checked={profitConfig.method === "percent_on_profit"}
-                        onChange={(e) =>
-                          setProfitConfig({
-                            ...profitConfig,
-                            method: e.target.value,
-                            value: "",
-                          })
-                        }
-                        className="h-4 w-4"
-                      />
-                      <span className="text-sm">Percent on Profit %</span>
-                    </label>
+                   
 
                     {/* On MRP — auto 0 */}
                     <label className="flex items-center gap-2">
@@ -626,14 +657,15 @@ const SetProfit: React.FC = () => {
             <thead>
               <tr className="bg-gray-50">
                 <th className="border border-gray-300 px-4 py-2 text-left">
-                  Priority
+                  Name
+                </th>
+                 <th className="border border-gray-300 px-4 py-2 text-left">
+                  Parent Categories
                 </th>
                 <th className="border border-gray-300 px-4 py-2 text-left">
-                  Rule Name
+                  Description
                 </th>
-                <th className="border border-gray-300 px-4 py-2 text-left">
-                  Type
-                </th>
+               
                 <th className="border border-gray-300 px-4 py-2 text-left">
                   Value
                 </th>
@@ -646,82 +678,59 @@ const SetProfit: React.FC = () => {
                 <th className="border border-gray-300 px-4 py-2 text-left">
                   Status
                 </th>
-                <th className="border border-gray-300 px-4 py-2 text-left">
+                {/* <th className="border border-gray-300 px-4 py-2 text-left">
                   Actions
-                </th>
+                </th> */}
               </tr>
             </thead>
             <tbody>
-              {profitRules.map((rule) => (
-                <tr key={rule.id} className="hover:bg-gray-50">
+              {mappedData.map((row) => (
+                <tr key={row.id} className="hover:bg-gray-50">
+                  {/* Name */}
                   <td className="border border-gray-300 px-4 py-2">
-                    {rule.priority}
+                    {row.categoryName}
                   </td>
-                  <td className="border border-gray-300 px-4 py-2 font-medium">
-                    {rule.name}
-                  </td>
+
+
+                  {/* Parent Category */}
                   <td className="border border-gray-300 px-4 py-2">
-                    <span
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        rule.type === "percentage"
-                          ? "bg-blue-100 text-blue-800"
-                          : rule.type === "fixed_amount"
-                          ? "bg-green-100 text-green-800"
-                          : "bg-orange-100 text-orange-800"
-                      }`}
-                    >
-                      {rule.type === "percentage"
-                        ? "Percentage"
-                        : rule.type === "fixed_amount"
-                        ? "Fixed Amount"
-                        : "Markup"}
-                    </span>
+                    {row.groupName}
                   </td>
+
+                  {/* Description */}
                   <td className="border border-gray-300 px-4 py-2">
-                    {rule.type === "fixed_amount" ? "₹" : ""}
-                    {rule.value}
-                    {rule.type !== "fixed_amount" ? "%" : ""}
+                    {row.description}
                   </td>
+
+                  
+
+                  {/* Value */}
                   <td className="border border-gray-300 px-4 py-2">
-                    {rule.applicableToCategories.length > 0
-                      ? rule.applicableToCategories.join(", ")
-                      : "All"}
+
                   </td>
+
+                  {/* Categories */}
                   <td className="border border-gray-300 px-4 py-2">
-                    {rule.minQuantity || rule.maxQuantity
-                      ? `${rule.minQuantity || 0} - ${rule.maxQuantity || "∞"}`
-                      : "Any"}
+                    {row.categoryName}
                   </td>
+
+                  {/* Quantity Range */}
                   <td className="border border-gray-300 px-4 py-2">
-                    <button
-                      onClick={() => toggleRuleActive(rule.id)}
-                      className={`px-2 py-1 rounded-full text-xs ${
-                        rule.isActive
-                          ? "bg-green-100 text-green-800"
-                          : "bg-red-100 text-red-800"
-                      }`}
-                    >
-                      {rule.isActive ? "Active" : "Inactive"}
+
+                  </td>
+
+                  {/* Status */}
+                  <td className="border border-gray-300 px-4 py-2">Active</td>
+
+                  {/* Actions */}
+                  {/* <td className="border border-gray-300 px-4 py-2 flex gap-2">
+                    <button className="text-blue-600 hover:underline">
+                      
                     </button>
-                  </td>
-                  <td className="border border-gray-300 px-4 py-2">
-                    <div className="flex space-x-2">
-                      <button
-                        onClick={() => handleEditRule(rule)}
-                        className="p-1 text-blue-600 hover:bg-blue-100 rounded"
-                        title="Edit Rule"
-                      >
-                        <Edit className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteRule(rule.id)}
-                        className="p-1 text-red-600 hover:bg-red-100 rounded"
-                        title="Delete Rule"
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
-                    </div>
-                  </td>
+                    <button className="text-red-600 hover:underline">
+                      
+                    </button>
+                  </td> */}
                 </tr>
               ))}
             </tbody>

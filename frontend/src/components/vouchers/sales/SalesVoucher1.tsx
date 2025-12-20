@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -126,6 +126,17 @@ const SalesVoucher: React.FC = () => {
   const [isQuotation, setIsQuotation] = useState(isQuotationMode); // Initialize with URL parameter
   const [godownList, setGodownList] = useState<Godown[]>([]);
 
+  // 🔹 PROFIT / PRICING RULE STATE
+  const [pricingRule, setPricingRule] = useState<{
+    customerType: "wholesale" | "retailer" | "";
+    method: "profit_percentage" | "on_mrp" | "";
+    value: number; // % value (2, 5, etc.)
+  }>({
+    customerType: "",
+    method: "",
+    value: 0,
+  });
+
   // Generate voucher number (e.g., ABCDEF0001 or QT0001)
   const generateVoucherNumber = useCallback(() => {
     const salesVouchers = vouchers.filter((v) => v.type === "sales");
@@ -203,16 +214,12 @@ const SalesVoucher: React.FC = () => {
     value: "",
   });
 
-  // Pricing selection state (missing before) — keeps which pricing mode is active
-  const [pricingSelection, setPricingSelection] = useState({
-    main: "",
-    wholesale: "",
-    retailer: "",
-  });
-
   // Add these states at top of your component:
   const [statusMsg, setStatusMsg] = useState("");
   const [statusColor, setStatusColor] = useState("");
+
+  // timers for debouncing rate input per entry
+  const rateDebounceTimers = useRef<{ [entryId: string]: number | null }>({});
 
   // Add this useEffect() in component (below states)
   useEffect(() => {
@@ -237,14 +244,16 @@ const SalesVoucher: React.FC = () => {
             saved.customer_type === profitConfig.customerType &&
             saved.method === profitConfig.method
           ) {
-            setProfitConfig({
-              ...profitConfig,
-              value: saved.value,
+            setPricingRule({
+              customerType: saved.customer_type, // wholesale / retailer
+              method: saved.method, // profit_percentage
+              value: Number(saved.value), // 2.00
             });
 
             setStatusMsg(
-              `Value: ${saved.customer_type} ${saved.method} ${saved.value}%`
+              `Value: ${saved.customer_type} Profit Percentage ${saved.value}%`
             );
+
             setStatusColor("text-green-600 font-semibold");
           } else {
             setStatusMsg("Not Set");
@@ -494,18 +503,32 @@ const SalesVoucher: React.FC = () => {
       }
 
       // 2️⃣ BATCH SELECT
+      // 2️⃣ BATCH SELECT (AUTO QTY + AUTO RATE + AUTO CALCULATION)
       if (name === "batchNumber") {
-        const selected = (entry.batches || []).find(
+        const selected = entry.batches?.find(
           (b: any) => String(b.batchName) === String(value)
+        );
+
+        if (!selected) return;
+
+        const autoQty = Number(
+          selected.batchQuantity ?? selected.quantity ?? 0
+        );
+
+        const autoRate = Number(
+          selected.rate ?? selected.openingRate ?? entry.rate ?? 0
         );
 
         updatedEntries[index] = {
           ...entry,
           batchNumber: value,
-          availableQty: Number(
-            selected?.batchQuantity ?? selected?.quantity ?? 0
-          ),
+          quantity: autoQty,
+          rate: autoRate,
+          availableQty: autoQty,
         };
+
+        // ✅ auto amount calculation
+        updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
 
         setFormData((p) => ({ ...p, entries: updatedEntries }));
         return;
@@ -658,9 +681,63 @@ const SalesVoucher: React.FC = () => {
 
       // 4️⃣ Rate / Discount
       if (["rate", "discount"].includes(name)) {
-        updatedEntries[index][name] = Number(value) || 0;
+        // Discount: apply immediately
+        if (name === "discount") {
+          updatedEntries[index][name] = Number(value) || 0;
+          updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+          setFormData((p) => ({ ...p, entries: updatedEntries }));
+          return;
+        }
+
+        // Rate: update shown value immediately, then debounce applying profit percentage
+        const rawRate = Number(value) || 0;
+        updatedEntries[index].rate = rawRate;
         updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
         setFormData((p) => ({ ...p, entries: updatedEntries }));
+
+        const entryId = updatedEntries[index].id || `idx-${index}`;
+
+        // clear existing timer
+        const existing = rateDebounceTimers.current[entryId];
+        if (existing) clearTimeout(existing);
+
+        // set new debounce timer (2.5s)
+        rateDebounceTimers.current[entryId] = window.setTimeout(() => {
+          setFormData((prev) => {
+            const newEntries = prev.entries.map((e) => ({ ...e }));
+            const targetIndex = newEntries.findIndex((e) => e.id === entryId);
+            const target =
+              (targetIndex !== -1 && newEntries[targetIndex]) ||
+              newEntries[index];
+
+            if (!target) return prev;
+
+            const rateToUse = rawRate;
+
+            if (
+              pricingRule.method === "profit_percentage" &&
+              Number(pricingRule.value) > 0
+            ) {
+              const adjusted = Number(
+                (
+                  rateToUse +
+                  (rateToUse * Number(pricingRule.value)) / 100
+                ).toFixed(2)
+              );
+              target.rate = adjusted;
+            } else {
+              target.rate = rateToUse;
+            }
+
+            target.amount = recalcAmount(target);
+
+            // clear stored timer
+            rateDebounceTimers.current[entryId] = null;
+
+            return { ...prev, entries: newEntries };
+          });
+        }, 1000);
+
         return;
       }
     }
@@ -702,72 +779,80 @@ const SalesVoucher: React.FC = () => {
   };
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
-    if (!formData.date) newErrors.date = "Date is required";
-    if (!formData.partyId) newErrors.partyId = "Party is required";
-    if (!formData.number) newErrors.number = "Voucher number is required";
+    const errorMessages: string[] = [];
+
+    if (!formData.date) {
+      newErrors.date = "Date is required";
+      errorMessages.push("Date is required");
+    }
+
+    if (!formData.partyId) {
+      newErrors.partyId = "Party is required";
+      errorMessages.push("Party is required");
+    }
+
+    if (!formData.number) {
+      newErrors.number = "Voucher number is required";
+      errorMessages.push("Voucher number is required");
+    }
 
     if (formData.mode === "item-invoice") {
-      if (!formData.salesLedgerId)
+      if (!formData.salesLedgerId) {
         newErrors.salesLedgerId = "Sales Ledger is required";
+        errorMessages.push("Sales Ledger is required");
+      }
 
       formData.entries.forEach((entry, index) => {
-        if (!entry.itemId)
-          newErrors[`entry${index}.itemId`] = "Item is required";
+        const row = index + 1;
 
-        if ((entry.quantity ?? 0) <= 0)
+        if (!entry.itemId) {
+          newErrors[`entry${index}.itemId`] = "Item is required";
+          errorMessages.push(`Item is required in row ${row}`);
+        }
+
+        if ((entry.quantity ?? 0) <= 0) {
           newErrors[`entry${index}.quantity`] =
             "Quantity must be greater than 0";
+          errorMessages.push(`Quantity must be greater than 0 in row ${row}`);
+        }
 
-        // ✅ Godown only required IF:
-        // - Enabled by user (YES)
-        // - Column visible in settings
-        // - Godowns exist in database
         if (
-          formData.mode === "item-invoice" &&
           godownEnabled === "yes" &&
-          columnSettings.showGodown === true &&
+          columnSettings.showGodown &&
           godownList.length > 0 &&
           !entry.godownId
         ) {
-          newErrors[`entry${index}.godownId`] = "Please select Godown";
-        }
-
-        if (entry.itemId) {
-          const stockItem = safeStockItems.find(
-            (item) => item.id === entry.itemId
-          );
-          if (stockItem && (entry.quantity ?? 0) > stockItem.openingBalance) {
-            newErrors[
-              `entry${index}.quantity`
-            ] = `Quantity exceeds available stock (${stockItem.openingBalance})`;
-          }
+          newErrors[`entry${index}.godownId`] = "Godown is required";
+          errorMessages.push(`Godown is required in row ${row}`);
         }
       });
     } else {
       formData.entries.forEach((entry, index) => {
-        if (!entry.ledgerId)
-          newErrors[`entry${index}.ledgerId`] = "Ledger is required";
-        if ((entry.amount ?? 0) <= 0)
-          newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
-      });
+        const row = index + 1;
 
-      const debitTotal = formData.entries
-        .filter((e) => e.type === "debit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
-      const creditTotal = formData.entries
-        .filter((e) => e.type === "credit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
-      if (Math.abs(debitTotal - creditTotal) > 0.01) {
-        newErrors.entries = "Debit and credit amounts must balance";
-      }
+        if (!entry.ledgerId) {
+          newErrors[`entry${index}.ledgerId`] = "Ledger is required";
+          errorMessages.push(`Ledger is required in row ${row}`);
+        }
+
+        if ((entry.amount ?? 0) <= 0) {
+          newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
+          errorMessages.push(`Amount must be greater than 0 in row ${row}`);
+        }
+      });
     }
 
     if (!formData.entries.length) {
       newErrors.entries = "At least one entry is required";
+      errorMessages.push("At least one entry is required");
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
+    return {
+      isValid: errorMessages.length === 0,
+      errorMessages,
+    };
   };
 
   useEffect(() => {
@@ -824,11 +909,23 @@ const SalesVoucher: React.FC = () => {
     };
   };
 
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) {
-      alert("Please fix the errors before submitting");
+    const validation = validateForm();
+
+    if (!validation.isValid) {
+      Swal.fire({
+        icon: "warning",
+        title: "Please fix the following errors",
+        html: `
+        <ul style="text-align:left">
+          ${validation.errorMessages.map((msg) => `<li>• ${msg}</li>`).join("")}
+        </ul>
+      `,
+      });
       return;
     }
 
@@ -859,13 +956,13 @@ const SalesVoucher: React.FC = () => {
       sgstTotal: totals.sgstTotal,
       igstTotal: totals.igstTotal,
       discountTotal: totals.discountTotal,
-      total: totals.total,
+      total: grandTotal,
     };
 
     try {
       let voucherSaved = false;
 
-      // ********** UPDATE MODE **********
+      // ================= UPDATE MODE =================
       if (id) {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/sales-vouchers/${id}`,
@@ -879,7 +976,7 @@ const SalesVoucher: React.FC = () => {
         voucherSaved = data.success;
       }
 
-      // ********** CREATE MODE **********
+      // ================= CREATE MODE =================
       if (!id) {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/sales-vouchers`,
@@ -893,13 +990,34 @@ const SalesVoucher: React.FC = () => {
         voucherSaved = !!data.id;
       }
 
-      // Continue only if voucher saved correctly
+      // ❌ Stop if voucher not saved
       if (!voucherSaved) {
         Swal.fire("Error", "Save failed", "error");
         return;
       }
 
-      // ********** SALE HISTORY SAVE **********
+      // ================= STOCK DEDUCTION (FINAL & IMPORTANT) =================
+      await Promise.all(
+        formData.entries.map((entry) => {
+          if (!entry.itemId || !entry.batchNumber) return;
+
+          return fetch(
+            `${import.meta.env.VITE_API_URL}/api/stock-items/${
+              entry.itemId
+            }/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+            {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                batchName: entry.batchNumber,
+                quantity: -Number(entry.quantity || 0), // 🔴 subtract stock
+              }),
+            }
+          );
+        })
+      );
+
+      // ================= SALE HISTORY SAVE =================
       const historyPayload = formData.entries.map((entry) => {
         const item = getItemDetails(entry.itemId);
 
@@ -995,9 +1113,11 @@ const SalesVoucher: React.FC = () => {
     igstTotal = 0,
     discountTotal = 0,
     total = 0,
-    debitTotal = 0,
-    creditTotal = 0,
   } = calculateTotals();
+
+
+  const grandTotal = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
+
 
   // Helper functions for print layout
   const getItemDetails = (itemId: string) => {
@@ -1129,24 +1249,6 @@ const SalesVoucher: React.FC = () => {
   const hasAnyBatch = formData.entries?.some((entry) =>
     entry?.batches?.some((b) => b?.batchName)
   );
-
-  const handleBatchQuantityChange = (entryIndex, value) => {
-    setFormData((prev) => ({
-      ...prev,
-      entries: prev.entries.map((entry, i) => {
-        if (i !== entryIndex) return entry;
-
-        return {
-          ...entry,
-          batches: entry.batches.map((batch) =>
-            batch.batchName === entry.batchNumber
-              ? { ...batch, batchQuantity: Number(value) }
-              : batch
-          ),
-        };
-      }),
-    }));
-  };
 
   return (
     <React.Fragment>
@@ -1517,8 +1619,8 @@ const SalesVoucher: React.FC = () => {
                     <input
                       type="radio"
                       name="wholesaleMethod"
-                      value="sell_on_profit"
-                      checked={profitConfig.method === "sell_on_profit"}
+                      value="profit_percentage"
+                      checked={profitConfig.method === "profit_percentage"}
                       onChange={(e) =>
                         setProfitConfig({
                           ...profitConfig,
@@ -1527,24 +1629,7 @@ const SalesVoucher: React.FC = () => {
                       }
                       className="h-4 w-4"
                     />
-                    <span>Sell on Profit %</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="wholesaleMethod"
-                      value="percent_on_profit"
-                      checked={profitConfig.method === "percent_on_profit"}
-                      onChange={(e) =>
-                        setProfitConfig({
-                          ...profitConfig,
-                          method: e.target.value,
-                        })
-                      }
-                      className="h-4 w-4"
-                    />
-                    <span>Percent on Profit %</span>
+                    <span>Profit Percentage %</span>
                   </label>
                 </div>
               )}
@@ -1556,8 +1641,8 @@ const SalesVoucher: React.FC = () => {
                     <input
                       type="radio"
                       name="retailerMethod"
-                      value="sell_on_profit"
-                      checked={profitConfig.method === "sell_on_profit"}
+                      value="profit_percentage"
+                      checked={profitConfig.method === "profit_percentage"}
                       onChange={(e) =>
                         setProfitConfig({
                           ...profitConfig,
@@ -1566,24 +1651,7 @@ const SalesVoucher: React.FC = () => {
                       }
                       className="h-4 w-4"
                     />
-                    <span>Sell on Profit %</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="retailerMethod"
-                      value="percent_on_profit"
-                      checked={profitConfig.method === "percent_on_profit"}
-                      onChange={(e) =>
-                        setProfitConfig({
-                          ...profitConfig,
-                          method: e.target.value,
-                        })
-                      }
-                      className="h-4 w-4"
-                    />
-                    <span>Percent on Profit %</span>
+                    <span>Profit Percentage %</span>
                   </label>
 
                   <label className="flex items-center gap-2 cursor-pointer">
@@ -1756,17 +1824,13 @@ const SalesVoucher: React.FC = () => {
                             <td className="px-1 py-2 min-w-[55px]">
                               <input
                                 type="number"
-                                value={selectedBatch?.batchQuantity ?? ""}
-                                onChange={(e) =>
-                                  handleBatchQuantityChange(
-                                    index,
-                                    e.target.value
-                                  )
-                                }
-                                disabled={!entry.batchNumber}
+                                name="quantity"
+                                value={entry.quantity ?? ""}
+                                onChange={(e) => handleEntryChange(index, e)}
                                 className={`${FORM_STYLES.tableInput(
                                   theme
                                 )} text-right text-xs`}
+                                min={0}
                               />
                             </td>
 
@@ -1889,21 +1953,7 @@ const SalesVoucher: React.FC = () => {
                         <td></td>
                       </tr>
 
-                      {/* Profit */}
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-left" colSpan={7}>
-                          Profit:
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          ₹{subtotal.toLocaleString()}
-                        </td>
-                      </tr>
+                     
 
                       {/* GST TOTAL */}
                       <tr
@@ -1917,8 +1967,7 @@ const SalesVoucher: React.FC = () => {
                           GST Total:
                         </td>
                         <td className="px-4 py-2 text-right text-blue-600 font-bold">
-                          ₹
-                          {(cgstTotal + sgstTotal + igstTotal).toLocaleString()}
+                          ₹{(cgstTotal + sgstTotal + igstTotal).toFixed(2)}
                         </td>
                       </tr>
 
@@ -1934,7 +1983,7 @@ const SalesVoucher: React.FC = () => {
                           Discount:
                         </td>
                         <td className="px-4 py-2 text-right text-red-600 font-bold">
-                          ₹{discountTotal.toLocaleString()}
+                          ₹{discountTotal}
                         </td>
                         <td></td>
                         <td></td>
@@ -1952,7 +2001,7 @@ const SalesVoucher: React.FC = () => {
                           Grand Total:
                         </td>
                         <td className="px-4 py-2 text-right text-lg text-green-600 font-bold">
-                          ₹{total.toLocaleString()}
+                          ₹{grandTotal.toFixed(2)}
                         </td>
                         <td></td>
                         <td></td>
@@ -2112,75 +2161,6 @@ const SalesVoucher: React.FC = () => {
                         <td></td>
                       </tr>
 
-                      {/* PRICING APPLIED */}
-                      {pricingSelection.main !== "" &&
-                        (() => {
-                          let totalProfit = 0;
-                          let methodText = "";
-
-                          formData.entries.forEach((e) => {
-                            if (!e.rate || !e.quantity) return;
-                            const baseRate = e.rate;
-                            const qty = e.quantity;
-                            const baseAmount = baseRate * qty;
-
-                            if (pricingSelection.main === "wholesale") {
-                              if (pricingSelection.wholesale === "sellProfit") {
-                                totalProfit +=
-                                  qty * Number(formData.whSellProfit || 0);
-                                methodText = `Sell on Profit (₹${formData.whSellProfit})`;
-                              } else if (
-                                pricingSelection.wholesale === "percentProfit"
-                              ) {
-                                const percent = Number(formData.whPercent || 0);
-                                totalProfit += (baseAmount * percent) / 100;
-                                methodText = `Percent on Profit (${percent}%)`;
-                              }
-                            }
-
-                            if (pricingSelection.main === "retailer") {
-                              if (pricingSelection.retailer === "sellProfit") {
-                                totalProfit +=
-                                  qty * Number(formData.rtSellProfit || 0);
-                                methodText = `Sell on Profit (₹${formData.rtSellProfit})`;
-                              } else if (
-                                pricingSelection.retailer === "percentProfit"
-                              ) {
-                                const percent = Number(formData.rtPercent || 0);
-                                totalProfit += (baseAmount * percent) / 100;
-                                methodText = `Percent on Profit (${percent}%)`;
-                              } else if (
-                                pricingSelection.retailer === "onMRP"
-                              ) {
-                                methodText = "On MRP";
-                              }
-                            }
-                          });
-
-                          return (
-                            <tr
-                              className={`${
-                                theme === "dark"
-                                  ? "border-t border-gray-600 text-white"
-                                  : "border-t border-gray-300 text-black"
-                              } font-semibold`}
-                            >
-                              <td colSpan={7}></td>
-                              <td className="text-right py-2">
-                                Pricing Applied:{" "}
-                                {pricingSelection.main === "wholesale"
-                                  ? "Wholesale"
-                                  : "Retailer"}{" "}
-                                – {methodText}:
-                              </td>
-                              <td className="text-right py-2 font-bold">
-                                ₹{totalProfit.toFixed(2)}
-                              </td>
-                              <td></td>
-                            </tr>
-                          );
-                        })()}
-
                       {/* DISCOUNT */}
                       <tr
                         className={`${
@@ -2209,51 +2189,7 @@ const SalesVoucher: React.FC = () => {
                         <td className="text-right py-3 text-lg">
                           Grand Total:
                         </td>
-                        <td className="text-right py-3 text-lg text-green-600 font-bold">
-                          {(
-                            total +
-                            (() => {
-                              let totalProfit = 0;
-                              formData.entries.forEach((e) => {
-                                if (!e.rate || !e.quantity) return;
-                                const baseAmount = e.rate * e.quantity;
-                                if (pricingSelection.main === "wholesale") {
-                                  if (
-                                    pricingSelection.wholesale ===
-                                    "percentProfit"
-                                  )
-                                    totalProfit +=
-                                      (baseAmount *
-                                        Number(formData.whPercent || 0)) /
-                                      100;
-                                  if (
-                                    pricingSelection.wholesale === "sellProfit"
-                                  )
-                                    totalProfit +=
-                                      Number(formData.whSellProfit || 0) *
-                                      e.quantity;
-                                }
-                                if (pricingSelection.main === "retailer") {
-                                  if (
-                                    pricingSelection.retailer ===
-                                    "percentProfit"
-                                  )
-                                    totalProfit +=
-                                      (baseAmount *
-                                        Number(formData.rtPercent || 0)) /
-                                      100;
-                                  if (
-                                    pricingSelection.retailer === "sellProfit"
-                                  )
-                                    totalProfit +=
-                                      Number(formData.rtSellProfit || 0) *
-                                      e.quantity;
-                                }
-                              });
-                              return totalProfit;
-                            })()
-                          ).toLocaleString()}
-                        </td>
+
                         <td></td>
                       </tr>
                     </tfoot>
