@@ -1290,4 +1290,78 @@ router.patch("/:id/batches", async (req, res) => {
   }
 });
 
+//delete only batch
+router.delete("/:id/batch", async (req, res) => {
+  const { id } = req.params;
+  const { company_id, owner_type, owner_id } = req.query;
+  const { batchName, batchQuantity, openingRate, openingValue } = req.body;
+  
+
+  if (!company_id || !owner_type || !owner_id) {
+    return res.status(400).json({
+      success: false,
+      message: "company_id, owner_type & owner_id are required",
+    });
+  }
+
+  const connection = await db.getConnection();
+
+  try {
+    await connection.beginTransaction();
+
+    const [rows] = await connection.execute(
+      `
+      SELECT batches FROM stock_items
+      WHERE id = ? AND company_id = ? AND owner_type = ? AND owner_id = ?
+      `,
+      [id, company_id, owner_type, owner_id]
+    );
+
+    if (rows.length === 0) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Stock item not found or access denied",
+      });
+    }
+
+    const batches = JSON.parse(rows[0].batches || "[]");
+
+    const updatedBatches = batches.filter(
+      (b) =>
+        !(
+          b.batchName === batchName &&
+          b.batchQuantity === batchQuantity &&
+          b.openingRate === openingRate &&
+          b.openingValue === openingValue
+        )
+    );
+
+    if (updatedBatches.length === batches.length) {
+      await connection.rollback();
+      return res.status(404).json({
+        success: false,
+        message: "Batch not found",
+      });
+    }
+
+    await connection.execute(
+      "UPDATE stock_items SET batches = ? WHERE id = ?",
+      [JSON.stringify(updatedBatches), id]
+    );
+
+    await connection.commit();
+
+    res.json({ success: true, batches: updatedBatches });
+  } catch (err) {
+    await connection.rollback();
+    console.error("🔥 Delete batch error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  } finally {
+    connection.release();
+  }
+});
+
+
+
 module.exports = router;

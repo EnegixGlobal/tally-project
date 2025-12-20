@@ -265,8 +265,6 @@ const StockItemForm = () => {
 
         const data = await res.json();
 
-        console.log('this is unit', data)
-
         if (Array.isArray(data)) {
           setUnitsData(data);
         } else {
@@ -329,7 +327,6 @@ const StockItemForm = () => {
         );
 
         const data = await res.json();
-        console.log("this is edit id", data);
 
         if (res.ok && data.success) {
           const item = data.data;
@@ -499,9 +496,37 @@ const StockItemForm = () => {
       },
     ]);
   };
+  const removeBatchRow = async (index: number) => {
+    const batchToDelete = batchRows[index];
 
-  const removeBatchRow = (index: number) => {
-    setBatchRows(batchRows.filter((_, i) => i !== index));
+    console.log("Deleting batch:", batchToDelete);
+
+    // UI se remove (optional – optimistic update)
+    setBatchRows((prev) => prev.filter((_, i) => i !== index));
+
+    try {
+      const res = await fetch(
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/stock-items/${id}/batch?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(batchToDelete),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to delete batch");
+      }
+
+    } catch (err) {
+      console.error("❌ Delete batch error:", err);
+    }
   };
 
   const updateBatchRow = (index: number, field: string, value: string) => {
@@ -587,7 +612,6 @@ const StockItemForm = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  console.log("formData", formData);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -894,7 +918,7 @@ const StockItemForm = () => {
             <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
               {batchRows.map((row, index) => (
                 <div
-                  key={index}
+                 key={row.batchName + index}
                   className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end w-full"
                 >
                   {formData.enableBatchTracking && (

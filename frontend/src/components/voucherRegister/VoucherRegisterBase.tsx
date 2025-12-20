@@ -24,6 +24,7 @@ interface PurchaseVoucher {
   partyId: number;
   supplierInvoiceDate: string;
   referenceNo: string;
+  profit?: number;
   subtotal: string;
   cgstTotal: string;
   sgstTotal: string;
@@ -283,7 +284,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
   // Filter vouchers based on search, filters, and view type
   const convertToVoucherEntry = (p: any): VoucherEntry & any => {
-    console.log("this is p", p);
     // ---------------------- PURCHASE ----------------------
     if (voucherType === "purchase") {
       return {
@@ -315,7 +315,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       };
     }
 
-
     // ---------------------- SALES ----------------------
     if (voucherType === "sales") {
       const partyId =
@@ -326,7 +325,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         p.invoice_date ||
         p.billDate ||
         p.bill_date ||
-        p.date || // fallback
+        p.date ||
         "";
 
       const referenceNo =
@@ -361,6 +360,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
         supplierInvoiceDate,
         subtotal,
+        profit: Number(p.profit || 0),
         cgstTotal: cgst,
         sgstTotal: sgst,
         igstTotal: igst,
@@ -1281,6 +1281,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Subtotal
                 </th>
+                {voucherType === "sales" && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Profit
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   GST Total
                 </th>
@@ -1350,6 +1355,12 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {subtotal.toLocaleString()}
                     </td>
+                    {/* {profit} */}
+                    {voucherType === "sales" && (
+                      <td className="px-6 py-4 text-sm text-green-600 font-semibold">
+                        {(voucher as any).profit?.toLocaleString() || "0"}
+                      </td>
+                    )}
 
                     {/* GST Total */}
                     <td className="px-6 py-4 text-sm text-gray-900">
@@ -1382,7 +1393,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
                       {onDelete && (
                         <button
-                          onClick={() => onDelete(String(voucher.id))} // TS-safe
+                          onClick={() => onDelete(String(voucher.id))} 
                           className="text-red-600 hover:text-red-900"
                         >
                           Delete
