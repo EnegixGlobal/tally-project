@@ -1294,13 +1294,12 @@ router.patch("/:id/batches", async (req, res) => {
 router.delete("/:id/batch", async (req, res) => {
   const { id } = req.params;
   const { company_id, owner_type, owner_id } = req.query;
-  const { batchName, batchQuantity, openingRate, openingValue } = req.body;
-  
+  const { batchName } = req.body;
 
-  if (!company_id || !owner_type || !owner_id) {
+  if (!batchName) {
     return res.status(400).json({
       success: false,
-      message: "company_id, owner_type & owner_id are required",
+      message: "batchName is required",
     });
   }
 
@@ -1321,20 +1320,14 @@ router.delete("/:id/batch", async (req, res) => {
       await connection.rollback();
       return res.status(404).json({
         success: false,
-        message: "Stock item not found or access denied",
+        message: "Stock item not found",
       });
     }
 
     const batches = JSON.parse(rows[0].batches || "[]");
 
     const updatedBatches = batches.filter(
-      (b) =>
-        !(
-          b.batchName === batchName &&
-          b.batchQuantity === batchQuantity &&
-          b.openingRate === openingRate &&
-          b.openingValue === openingValue
-        )
+      (b) => String(b.batchName) !== String(batchName)
     );
 
     if (updatedBatches.length === batches.length) {
@@ -1361,6 +1354,7 @@ router.delete("/:id/batch", async (req, res) => {
     connection.release();
   }
 });
+
 
 
 

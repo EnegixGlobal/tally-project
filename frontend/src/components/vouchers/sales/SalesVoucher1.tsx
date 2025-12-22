@@ -455,6 +455,61 @@ const SalesVoucher: React.FC = () => {
     }
   };
 
+  const applyProfit = (baseRate: number) => {
+    if (
+      pricingRule.method === "profit_percentage" &&
+      Number(pricingRule.value) > 0
+    ) {
+      return Number(
+        (baseRate + (baseRate * Number(pricingRule.value)) / 100).toFixed(2)
+      );
+    }
+
+    return baseRate;
+  };
+
+  useEffect(() => {
+    // ❌ agar profit rule hi select nahi hai → kuch mat karo
+    if (
+      pricingRule.method !== "profit_percentage" ||
+      Number(pricingRule.value) <= 0
+    ) {
+      return;
+    }
+
+    setFormData((prev) => {
+      const updatedEntries = prev.entries.map((entry) => {
+        // ❌ empty rows skip
+        if (!entry.rate || entry.rate <= 0) return entry;
+
+        // 🟢 original/base rate nikalo
+        // NOTE: assume current rate is base if profit pehle applied nahi hua
+        const baseRate = Number(entry.rate);
+
+        const newRate = applyProfit(baseRate);
+
+        // ❌ agar same hai to re-render avoid karo
+        if (newRate === entry.rate) return entry;
+
+        return {
+          ...entry,
+          rate: newRate,
+          amount:
+            (entry.quantity || 0) * newRate +
+            ((entry.quantity || 0) *
+              newRate *
+              ((entry.cgstRate || 0) +
+                (entry.sgstRate || 0) +
+                (entry.igstRate || 0))) /
+              100 -
+            (entry.discount || 0),
+        };
+      });
+
+      return { ...prev, entries: updatedEntries };
+    });
+  }, [pricingRule.method, pricingRule.value]);
+
   const handleEntryChange = async (
     index: number,
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -515,19 +570,23 @@ const SalesVoucher: React.FC = () => {
           selected.batchQuantity ?? selected.quantity ?? 0
         );
 
-        const autoRate = Number(
+        // ✅ base rate nikalo
+        const baseRate = Number(
           selected.rate ?? selected.openingRate ?? entry.rate ?? 0
         );
+
+        // ✅ profit apply karo
+        const finalRate = applyProfit(baseRate);
 
         updatedEntries[index] = {
           ...entry,
           batchNumber: value,
           quantity: autoQty,
-          rate: autoRate,
+          rate: finalRate, // ✅ FIXED
           availableQty: autoQty,
         };
 
-        // ✅ auto amount calculation
+        // ✅ amount recalculation
         updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
 
         setFormData((p) => ({ ...p, entries: updatedEntries }));
@@ -778,80 +837,83 @@ const SalesVoucher: React.FC = () => {
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
   };
   const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
-    const errorMessages: string[] = [];
+    const newErrors: Record<string, string> = {};
+    const messages: string[] = [];
 
-    if (!formData.date) {
-      newErrors.date = "Date is required";
-      errorMessages.push("Date is required");
-    }
-
-    if (!formData.partyId) {
-      newErrors.partyId = "Party is required";
-      errorMessages.push("Party is required");
-    }
-
-    if (!formData.number) {
-      newErrors.number = "Voucher number is required";
-      errorMessages.push("Voucher number is required");
-    }
-
-    if (formData.mode === "item-invoice") {
-      if (!formData.salesLedgerId) {
-        newErrors.salesLedgerId = "Sales Ledger is required";
-        errorMessages.push("Sales Ledger is required");
+    const pushError = (key: string, msg: string) => {
+      if (!newErrors[key]) {
+        newErrors[key] = msg;
+        messages.push(msg);
       }
+    };
 
-      formData.entries.forEach((entry, index) => {
-        const row = index + 1;
+    // ===== HEADER LEVEL VALIDATION =====
+    if (!formData.date) pushError("date", "Voucher Date is required");
+    if (!formData.number) pushError("number", "Voucher Number is required");
+    if (!formData.partyId) pushError("partyId", "Party is required");
 
-        if (!entry.itemId) {
-          newErrors[`entry${index}.itemId`] = "Item is required";
-          errorMessages.push(`Item is required in row ${row}`);
-        }
+    if (formData.mode === "item-invoice" && !formData.salesLedgerId) {
+      pushError("salesLedgerId", "Sales Ledger is required");
+    }
 
-        if ((entry.quantity ?? 0) <= 0) {
-          newErrors[`entry${index}.quantity`] =
-            "Quantity must be greater than 0";
-          errorMessages.push(`Quantity must be greater than 0 in row ${row}`);
+    // ===== ENTRY LEVEL VALIDATION =====
+    if (!formData.entries.length) {
+      pushError("entries", "At least one entry is required");
+    }
+
+    formData.entries.forEach((entry, index) => {
+      const row = index + 1;
+
+      if (formData.mode === "item-invoice") {
+        if (!entry.itemId)
+          pushError(`entry.${index}.itemId`, `Row ${row}: Item is required`);
+
+        if ((entry.quantity ?? 0) <= 0)
+          pushError(
+            `entry.${index}.quantity`,
+            `Row ${row}: Quantity must be greater than 0`
+          );
+
+        if (
+          columnSettings.showBatch &&
+          entry.batches?.length &&
+          !entry.batchNumber
+        ) {
+          pushError(
+            `entry.${index}.batchNumber`,
+            `Row ${row}: Batch selection is required`
+          );
         }
 
         if (
           godownEnabled === "yes" &&
           columnSettings.showGodown &&
-          godownList.length > 0 &&
           !entry.godownId
-        ) {
-          newErrors[`entry${index}.godownId`] = "Godown is required";
-          errorMessages.push(`Godown is required in row ${row}`);
-        }
-      });
-    } else {
-      formData.entries.forEach((entry, index) => {
-        const row = index + 1;
+        )
+          pushError(
+            `entry.${index}.godownId`,
+            `Row ${row}: Godown is required`
+          );
+      } else {
+        if (!entry.ledgerId)
+          pushError(
+            `entry.${index}.ledgerId`,
+            `Row ${row}: Ledger is required`
+          );
 
-        if (!entry.ledgerId) {
-          newErrors[`entry${index}.ledgerId`] = "Ledger is required";
-          errorMessages.push(`Ledger is required in row ${row}`);
-        }
-
-        if ((entry.amount ?? 0) <= 0) {
-          newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
-          errorMessages.push(`Amount must be greater than 0 in row ${row}`);
-        }
-      });
-    }
-
-    if (!formData.entries.length) {
-      newErrors.entries = "At least one entry is required";
-      errorMessages.push("At least one entry is required");
-    }
+        if ((entry.amount ?? 0) <= 0)
+          pushError(
+            `entry.${index}.amount`,
+            `Row ${row}: Amount must be greater than 0`
+          );
+      }
+    });
 
     setErrors(newErrors);
 
     return {
-      isValid: errorMessages.length === 0,
-      errorMessages,
+      isValid: messages.length === 0,
+      messages,
     };
   };
 
@@ -909,22 +971,21 @@ const SalesVoucher: React.FC = () => {
     };
   };
 
-
-
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    const validation = validateForm();
+    const { isValid, messages } = validateForm();
 
-    if (!validation.isValid) {
+    if (!isValid) {
       Swal.fire({
         icon: "warning",
-        title: "Please fix the following errors",
+        title: "Please fix the following",
         html: `
-        <ul style="text-align:left">
-          ${validation.errorMessages.map((msg) => `<li>• ${msg}</li>`).join("")}
+        <ul style="text-align:left; margin-left:16px">
+          ${messages.map((m) => `<li>• ${m}</li>`).join("")}
         </ul>
       `,
+        confirmButtonText: "OK",
       });
       return;
     }
@@ -1115,9 +1176,8 @@ const SalesVoucher: React.FC = () => {
     total = 0,
   } = calculateTotals();
 
-
-  const grandTotal = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
-
+  const grandTotal =
+    subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
 
   // Helper functions for print layout
   const getItemDetails = (itemId: string) => {
@@ -1735,7 +1795,7 @@ const SalesVoucher: React.FC = () => {
                         )}
                         <th className="px-4 py-2 text-center">Action</th>
                       </tr>
-                    </thead>{" "}
+                    </thead>
                     <tbody>
                       {formData.entries.map((entry, index) => {
                         const itemDetails = getItemDetails(entry.itemId || "");
@@ -1745,7 +1805,6 @@ const SalesVoucher: React.FC = () => {
                           (b) => b.batchName === entry.batchNumber
                         );
 
-                        console.log("this is entry", entry);
 
                         return (
                           <tr
@@ -1953,8 +2012,6 @@ const SalesVoucher: React.FC = () => {
                         <td></td>
                       </tr>
 
-                     
-
                       {/* GST TOTAL */}
                       <tr
                         className={`font-semibold ${
@@ -2127,7 +2184,7 @@ const SalesVoucher: React.FC = () => {
                           </td>
                         </tr>
                       ))}
-                    </tbody>{" "}
+                    </tbody>
                     <tfoot>
                       {/* SUBTOTAL */}
                       <tr
@@ -2217,7 +2274,7 @@ const SalesVoucher: React.FC = () => {
                 placeholder="Enter narration for this sales voucher"
                 className={FORM_STYLES.input(theme)}
               />
-            </div>{" "}
+            </div>
             <div className="flex justify-end space-x-4">
               <button
                 title="Cancel (Esc)"
