@@ -1310,6 +1310,35 @@ const SalesVoucher: React.FC = () => {
     entry?.batches?.some((b) => b?.batchName)
   );
 
+  // 🔹 Fetch units from backend
+  const [unitss, setUnits] = useState([]);
+  useEffect(() => {
+    const fetchUnits = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const data = await res.json();
+        setUnits(data);
+      } catch (error) {
+        console.error("Failed to fetch units:", error);
+      }
+    };
+
+    fetchUnits();
+  }, []);
+
+  //get Unit Name
+  const getUnitName = (unitId: any) => {
+    if (!unitId) return "-";
+
+    const unit = unitss.find((u: any) => String(u.id) === String(unitId));
+
+    return unit?.name || "-";
+  };
+
   return (
     <React.Fragment>
       <div className="pt-[56px] px-4">
@@ -1805,7 +1834,6 @@ const SalesVoucher: React.FC = () => {
                           (b) => b.batchName === entry.batchNumber
                         );
 
-
                         return (
                           <tr
                             key={entry.id}
@@ -1894,28 +1922,10 @@ const SalesVoucher: React.FC = () => {
                             </td>
 
                             {/* UNIT */}
-                            <td className="px-1 py-2 text-center min-w-[45px] text-xs">
-                              {(() => {
-                                if (entry.unitId) {
-                                  const found = units.find(
-                                    (u) => String(u.id) === String(entry.unitId)
-                                  );
-                                  if (found) return found.name;
-                                }
+                            <td className="px-1 py-2 min-w-[45px] text-center text-xs">
+  {getUnitName(entry.unitId)}
+</td>
 
-                                if (entry.unitLabel) {
-                                  const found = units.find(
-                                    (u) =>
-                                      u.name?.toLowerCase() ===
-                                      entry.unitLabel?.toLowerCase()
-                                  );
-                                  if (found) return found.name;
-                                  return entry.unitLabel;
-                                }
-
-                                return "-";
-                              })()}
-                            </td>
 
                             {/* RATE */}
                             <td className="px-1 py-2 min-w-[70px]">

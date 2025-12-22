@@ -62,88 +62,89 @@ const ReceiptVoucher: React.FC = () => {
   );
 
   const validateForm = () => {
-    const newErrors: { [key: string]: string } = {};
+    const newErrors: Record<string, string> = {};
+    const messages: string[] = [];
 
-    // ----------- COMMON VALIDATIONS ------------
-    if (!formData.date) newErrors.date = "Date is required";
-    if (!formData.number) newErrors.number = "Voucher number is required";
-
-    // ----------- SINGLE ENTRY MODE VALIDATIONS ------------
-    if (formData.mode === "single-entry") {
-      // Must have at least 1 debit + 1 credit
-      if (formData.entries.length < 2) {
-        newErrors.entries = "At least one debit and one credit entry required";
+    const addError = (key: string, msg: string) => {
+      if (!newErrors[key]) {
+        newErrors[key] = msg;
+        messages.push(msg);
       }
+    };
 
-      // First entry must ALWAYS be debit (Cash/Bank)
-      if (formData.entries[0].type !== "debit") {
-        newErrors.entries = "First entry must be debit (Cash/Bank)";
-      }
-
-      // Debit ledger must be cash or bank
-      const debitLedger = [...cashBankLedgers, ...allLedgers].find(
-        (l) => l.id === formData.entries[0].ledgerId
-      );
-
-      if (
-        debitLedger &&
-        debitLedger.type !== "cash" &&
-        debitLedger.type !== "bank"
-      ) {
-        newErrors.ledgerId0 = "Debit ledger must be Cash or Bank";
-      }
-
-      // ALL remaining entries must be CREDIT
-      for (let i = 1; i < formData.entries.length; i++) {
-        const entry = formData.entries[i];
-
-        if (entry.type !== "credit") {
-          newErrors[`type${i}`] = "All party entries must be Credit";
-        }
-
-        // Allowed: Sundry Debtors OR Income
-        const ledger = ledgers.find((l) => l.id === entry.ledgerId);
-        if (
-          ledger &&
-          ledger.type !== "sundry-debtors" &&
-          ledger.type !== "indirect-income"
-        ) {
-          newErrors[`ledgerId${i}`] =
-            "Credit ledger must be Sundry Debtors or Income";
-        }
-      }
+    // ================= HEADER LEVEL =================
+    if (!formData.date) {
+      addError("date", "Voucher Date is required");
     }
 
-    // ----------- DOUBLE ENTRY MODE VALIDATION ------------
-    if (formData.mode === "double-entry") {
-      const totalDebit = formData.entries
-        .filter((e) => e.type === "debit")
-        .reduce((s, e) => s + e.amount, 0);
-
-      const totalCredit = formData.entries
-        .filter((e) => e.type === "credit")
-        .reduce((s, e) => s + e.amount, 0);
-
-      if (totalDebit !== totalCredit) {
-        newErrors.balance = "Total debit must equal total credit";
-      }
+    if (!formData.number) {
+      addError("number", "Voucher Number is required");
     }
 
-    // ----------- COMMON ENTRY VALIDATIONS (Both modes) ------------
+    // 🔥 Reference Date mandatory (as you asked earlier)
+    if (!formData.supplierInvoiceDate) {
+      addError("supplierInvoiceDate", "Reference Date is required");
+    }
+
+    // ================= ENTRY EXISTENCE =================
+    if (!formData.entries || formData.entries.length === 0) {
+      addError("entries", "At least one entry is required");
+    }
+
+    // ================= ENTRY LEVEL =================
     formData.entries.forEach((entry, index) => {
-      if (!entry.ledgerId)
-        newErrors[`ledgerId${index}`] = `Ledger is required (line ${
-          index + 1
-        })`;
+      const row = index + 1;
 
-      if (entry.amount <= 0)
-        newErrors[`amount${index}`] = `Amount must be greater than 0 (line ${
-          index + 1
-        })`;
+      if (!entry.ledgerId) {
+        addError(`ledgerId${index}`, `Row ${row}: Ledger is required`);
+      }
+
+      if (!entry.amount || Number(entry.amount) <= 0) {
+        addError(`amount${index}`, `Row ${row}: Amount must be greater than 0`);
+      }
     });
 
+    // ================= SINGLE ENTRY RULES =================
+    if (formData.mode === "single-entry") {
+      if (formData.entries.length < 2) {
+        addError(
+          "entries",
+          "Single-entry mode requires at least one party entry"
+        );
+      }
+
+      // First entry must be Cash/Bank (Credit in your logic)
+      const firstLedger = cashBankLedgers.find(
+        (l) => String(l.id) === String(formData.entries[0]?.ledgerId)
+      );
+
+      if (!firstLedger) {
+        addError("ledgerId0", "Receipt Ledger must be Cash or Bank");
+      }
+    }
+
+    // ================= DOUBLE ENTRY BALANCE =================
+    const totalDebit = formData.entries
+      .filter((e) => e.type === "debit")
+      .reduce((s, e) => s + Number(e.amount || 0), 0);
+
+    const totalCredit = formData.entries
+      .filter((e) => e.type === "credit")
+      .reduce((s, e) => s + Number(e.amount || 0), 0);
+
+    if (formData.mode === "double-entry" && totalDebit !== totalCredit) {
+      addError(
+        "balance",
+        `Debit (${totalDebit}) and Credit (${totalCredit}) are not balanced`
+      );
+    }
+
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
+
+    return {
+      isValid: messages.length === 0,
+      messages,
+    };
   };
 
   const handleChange = (
@@ -406,6 +407,22 @@ const ReceiptVoucher: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    const { isValid, messages } = validateForm();
+
+    if (!isValid) {
+      Swal.fire({
+        icon: "warning",
+        title: "Please fix the following errors",
+        html: `
+        <ul style="text-align:left; margin-left:16px">
+          ${messages.map((m) => `<li>• ${m}</li>`).join("")}
+        </ul>
+      `,
+        confirmButtonText: "OK",
+      });
+      return;
+    }
 
     try {
       const payload = {

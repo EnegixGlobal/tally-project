@@ -88,7 +88,6 @@ const PaymentVoucher: React.FC = () => {
         // Backend returns { data: {...} }
         const v = json.data;
 
-
         if (!v) {
           console.error("Invalid response format", json);
           return;
@@ -143,73 +142,77 @@ const PaymentVoucher: React.FC = () => {
     fetchVoucher();
   }, [id]);
 
-  // Load existing voucher data in edit mode
+  const validateForm = () => {
+    const newErrors: Record<string, string> = {};
+    const messages: string[] = [];
 
-  // Auto-generate voucher number
-  // useEffect(() => {
-  //   if (config.autoNumbering && !isEditMode) {
-  //     const lastVoucher = vouchers
-  //       .filter(v => v.type === 'payment')
-  //       .sort((a, b) => parseInt(b.number || '0') - parseInt(a.number || '0'))[0];
-  //     const newNumber = lastVoucher ? (parseInt(lastVoucher.number || '0') + 1).toString() : '1';
-  //     setFormData(prev => ({ ...prev, number: newNumber }));
-  //   }
-  // }, [config.autoNumbering, vouchers, isEditMode]);
+    const addError = (key: string, msg: string) => {
+      if (!newErrors[key]) {
+        newErrors[key] = msg;
+        messages.push(msg);
+      }
+    };
 
-  const validateForm = useCallback(() => {
-    const newErrors: { [key: string]: string } = {};
+    // ===== HEADER LEVEL =====
+    if (!formData.date) addError("date", "Voucher Date is required");
+    if (!formData.number) addError("number", "Voucher Number is required");
 
-    if (!formData.date) newErrors.date = "Date is required";
-    if (!formData.number) newErrors.number = "Voucher number is required";
+    // ===== SUPPLIER INVOICE DATE (MANDATORY) =====
+    if (!formData.supplierInvoiceDate) {
+      addError("supplierInvoiceDate", "Supplier Invoice Date is required");
+    }
 
-    // 🛠️ safer single-entry checks
-    // if (formData.mode === "single-entry") {
-    //   if (!formData.entries || formData.entries.length < 2) {
-    //     newErrors.entries = "Single entry mode requires one debit and one credit";
-    //   } else {
-    //     if (formData.entries[0]?.type !== "debit") {
-    //       newErrors.entries = "First entry must be debit in single entry mode";
-    //     }
-    //     if (formData.entries[1]?.type !== "credit") {
-    //       newErrors.entries = "Second entry must be credit in single entry mode";
-    //     }
-    //   }
-    // }
+    // ===== ENTRY EXISTENCE =====
+    if (!formData.entries || formData.entries.length === 0) {
+      addError("entries", "At least one entry is required");
+    }
 
+    // ===== ENTRY LEVEL VALIDATION =====
+    formData.entries.forEach((entry, index) => {
+      const row = index + 1;
+
+      if (!entry.ledgerId) {
+        addError(`ledgerId${index}`, `Row ${row}: Ledger is required`);
+      }
+
+      if (!entry.amount || Number(entry.amount) <= 0) {
+        addError(`amount${index}`, `Row ${row}: Amount must be greater than 0`);
+      }
+    });
+
+    // ===== MODE-SPECIFIC RULES =====
     if (formData.mode === "single-entry") {
-      if (!formData.entries || formData.entries.length < 1) {
-        newErrors.entries =
-          "At least one entry is required in single-entry mode";
+      if (formData.entries.length < 2) {
+        addError(
+          "entries",
+          "Single-entry mode requires at least one party entry"
+        );
       }
     }
 
-    // 🧾 Entry field validations
-    formData.entries.forEach((entry, index) => {
-      if (!entry.ledgerId)
-        newErrors[`ledgerId${index}`] = `Ledger is required for entry ${
-          index + 1
-        }`;
-      if (entry.amount <= 0)
-        newErrors[
-          `amount${index}`
-        ] = `Amount must be greater than 0 for entry ${index + 1}`;
-    });
-
-    // ⚖️ Balance validation
+    // ===== BALANCE CHECK (DOUBLE ENTRY) =====
     const totalDebit = formData.entries
       .filter((e) => e.type === "debit")
-      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      .reduce((s, e) => s + Number(e.amount || 0), 0);
+
     const totalCredit = formData.entries
       .filter((e) => e.type === "credit")
-      .reduce((sum, e) => sum + Number(e.amount || 0), 0);
+      .reduce((s, e) => s + Number(e.amount || 0), 0);
 
     if (formData.mode === "double-entry" && totalDebit !== totalCredit) {
-      newErrors.balance = "Total debit must equal total credit";
+      addError(
+        "balance",
+        `Debit (${totalDebit}) and Credit (${totalCredit}) are not balanced`
+      );
     }
 
     setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  }, [formData]);
+
+    return {
+      isValid: messages.length === 0,
+      messages,
+    };
+  };
 
   const handleChange = (
     e: React.ChangeEvent<
@@ -342,12 +345,19 @@ const PaymentVoucher: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!validateForm()) {
-      Swal.fire(
-        "Validation Error",
-        "Please fix the errors before submitting.",
-        "warning"
-      );
+    const { isValid, messages } = validateForm();
+
+    if (!isValid) {
+      Swal.fire({
+        icon: "warning",
+        title: "Please fix the following errors",
+        html: `
+        <ul style="text-align:left; margin-left:16px">
+          ${messages.map((m) => `<li>• ${m}</li>`).join("")}
+        </ul>
+      `,
+        confirmButtonText: "OK",
+      });
       return;
     }
 
