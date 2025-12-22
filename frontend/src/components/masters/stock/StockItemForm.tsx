@@ -497,37 +497,38 @@ const StockItemForm = () => {
     ]);
   };
   const removeBatchRow = async (index: number) => {
-    const batchToDelete = batchRows[index];
+  const batchToDelete = batchRows[index];
 
-    console.log("Deleting batch:", batchToDelete);
+  // UI optimistic update
+  setBatchRows((prev) => prev.filter((_, i) => i !== index));
 
-    // UI se remove (optional – optimistic update)
-    setBatchRows((prev) => prev.filter((_, i) => i !== index));
-
-    try {
-      const res = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
-        }/api/stock-items/${id}/batch?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(batchToDelete),
-        }
-      );
-
-      const data = await res.json();
-
-      if (!res.ok) {
-        throw new Error(data.message || "Failed to delete batch");
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/stock-items/${id}/batch?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+      {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          batchName: batchToDelete.batchName,
+        }),
       }
+    );
 
-    } catch (err) {
-      console.error("❌ Delete batch error:", err);
+    const data = await res.json();
+
+    if (!res.ok) {
+      throw new Error(data.message || "Failed to delete batch");
     }
-  };
+
+    console.log("✅ Batch deleted:", data);
+  } catch (err) {
+    console.error("❌ Delete batch error:", err);
+    Swal.fire("Error", "Failed to delete batch", "error");
+  }
+};
+
 
   const updateBatchRow = (index: number, field: string, value: string) => {
     setBatchRows((prev) =>

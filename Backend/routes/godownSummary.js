@@ -1,13 +1,18 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const pool = require('../db'); // your mysql2 pool connection
+const pool = require("../db"); // your mysql2 pool connection
 
-router.get('/api/godown-summary', async (req, res) => {
+router.get("/api/godown-summary", async (req, res) => {
   try {
     const { godownId, asOnDate, company_id, owner_type, owner_id } = req.query;
+    console.log("hit hua", company_id, owner_type, owner_id);
 
     if (!company_id || !owner_type || !owner_id) {
-      return res.status(400).json({ error: 'Missing tenant parameters (company_id, owner_type, owner_id)' });
+      return res
+        .status(400)
+        .json({
+          error: "Missing tenant parameters (company_id, owner_type, owner_id)",
+        });
     }
 
     // Base query: join godown_allocations with stock_items and godowns
@@ -32,20 +37,19 @@ router.get('/api/godown-summary', async (req, res) => {
     const params = [company_id, owner_type, owner_id];
 
     if (godownId) {
-      sql += ' AND g.id = ?';
+      sql += " AND g.id = ?";
       params.push(godownId);
     }
 
     // TODO if you want to filter asOnDate, you must maintain history in godown_allocations or similar
 
-    sql += ' ORDER BY g.name, si.name';
+    sql += " ORDER BY g.name, si.name";
 
     const [rows] = await pool.query(sql, params);
     res.json(rows);
-
   } catch (error) {
-    console.error('Error fetching godown summary:', error);
-    res.status(500).json({ error: 'Internal Server Error' });
+    console.error("Error fetching godown summary:", error);
+    res.status(500).json({ error: "Internal Server Error" });
   }
 });
 

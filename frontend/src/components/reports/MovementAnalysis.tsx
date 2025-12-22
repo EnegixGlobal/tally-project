@@ -4,30 +4,19 @@ import { useAppContext } from "../../context/AppContext";
 import { ArrowLeft, Printer, Download, Filter } from "lucide-react";
 
 interface MovementEntry {
-  // For table display
-  name: string; // Stock item name
+  date: string;
+  stockItemName: string;
+  voucherType: string;
+  voucherNumber: string;
 
-  // Batches for movement rows
-  batches?: {
+  batches: {
     batchName: string;
-    batchQuantity: number;
-    batchRate: number;
-    batchExpiryDate?: string;
-    batchManufacturingDate?: string;
+    quantity: number;
+    rate: number;
+    manufacturingDate?: string;
+    expiryDate?: string;
   }[];
-
-  // Optional because API may not send them
-  date?: string;
-  stockItemId?: number | string;
-  stockItemName?: string;
-  voucherType?: string;
-  voucherNumber?: string;
-  inwardQty?: number;
-  outwardQty?: number;
-  rate?: number;
-  value?: number;
 }
-
 
 const MovementAnalysis: React.FC = () => {
   const { theme } = useAppContext();
@@ -43,6 +32,13 @@ const MovementAnalysis: React.FC = () => {
   const [toDate, setToDate] = useState(() =>
     new Date().toISOString().slice(0, 10)
   );
+
+  const companyId = localStorage.getItem("company_id") || "";
+  const ownerType = localStorage.getItem("supplier") || "";
+  const ownerId =
+    ownerType === "employee"
+      ? localStorage.getItem("employee_id") || ""
+      : localStorage.getItem("user_id") || "";
 
   const [data, setData] = useState<MovementEntry[]>([]);
   const [loading, setLoading] = useState(false);
@@ -65,7 +61,9 @@ const MovementAnalysis: React.FC = () => {
 
       try {
         const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-items/${stockItemId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-movements?itemId=${stockItemId}&fromDate=${fromDate}&toDate=${toDate}&company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
         if (!response.ok) {
@@ -73,6 +71,8 @@ const MovementAnalysis: React.FC = () => {
         }
 
         const json = await response.json();
+
+        console.log('json', json)
 
         setData([json.data]);
       } catch (e: any) {
@@ -212,80 +212,52 @@ const MovementAnalysis: React.FC = () => {
           <tbody>
             {data.length === 0 && !loading && (
               <tr>
-                <td colSpan={8} className="p-4 text-center opacity-70">
-                  No movement data found.
+                <td colSpan={7} className="p-4 text-center opacity-70">
+                  No movement data found
                 </td>
               </tr>
             )}
 
             {data.map((entry, idx) =>
-              Array.isArray(entry.batches)
-                ? entry.batches
-                    .filter((batch: any) => {
-                      const batchDate =
-                        batch.batchManufacturingDate || batch.batchExpiryDate;
-                      if (!batchDate) return true;
+              entry.batches.map((batch, bIdx) => (
+                <tr
+                  key={`${idx}-${bIdx}`}
+                  className="hover:bg-gray-100 dark:hover:bg-gray-600"
+                >
+                  {/* Date */}
+                  <td className="p-2 border">
+                    {new Date(entry.date).toLocaleDateString("en-GB")}
+                  </td>
 
-                      const dateObj = new Date(batchDate);
-                      const fromObj = new Date(fromDate);
-                      const toObj = new Date(toDate);
+                  {/* Item */}
+                  <td className="p-2 border">{entry.stockItemName}</td>
 
-                      return dateObj >= fromObj && dateObj <= toObj;
-                    })
-                    .map((batch: any, bIdx: number) => (
-                      <tr
-                        key={`${idx}-${bIdx}`}
-                        className="cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-400"
-                      >
-                        {/* Date */}
-                        <td className="p-2 border border-gray-400">
-                          {entry.date
-                            ? new Date(entry.date)
-                                .toLocaleDateString("en-GB")
-                                .slice(0, 8)
-                            : "-"}
-                        </td>
+                  {/* Batch */}
+                  <td className="p-2 border">{batch.batchName}</td>
 
-                        {/* Item Name */}
-                        <td className="p-2 border border-gray-400">
-                          {entry.name}
-                        </td>
+                  {/* Qty */}
+                  <td className="p-2 border text-right">{batch.quantity}</td>
 
-                        {/* Batch Name */}
-                        <td className="p-2 border border-gray-400">
-                          {batch.batchName}
-                        </td>
+                  {/* Rate */}
+                  <td className="p-2 border text-right">₹{batch.rate}</td>
 
-                        {/* Qty */}
-                        <td className="p-2 border border-gray-400 text-right">
-                          {batch.batchQuantity}
-                        </td>
+                  {/* MFG */}
+                  <td className="p-2 border">
+                    {batch.manufacturingDate
+                      ? new Date(batch.manufacturingDate).toLocaleDateString(
+                          "en-GB"
+                        )
+                      : "-"}
+                  </td>
 
-                        {/* Rate */}
-                        <td className="p-2 border border-gray-400 text-right">
-                          ₹{batch.batchRate}
-                        </td>
-
-                        {/* Expiry */}
-                        <td className="p-2 border border-gray-400">
-                          {batch.batchExpiryDate
-                            ? new Date(batch.batchExpiryDate)
-                                .toLocaleDateString("en-GB")
-                                .slice(0, 8)
-                            : "-"}
-                        </td>
-
-                        {/* MFG */}
-                        <td className="p-2 border border-gray-400">
-                          {batch.batchManufacturingDate
-                            ? new Date(batch.batchManufacturingDate)
-                                .toLocaleDateString("en-GB")
-                                .slice(0, 8)
-                            : "-"}
-                        </td>
-                      </tr>
-                    ))
-                : null
+                  {/* EXP */}
+                  <td className="p-2 border">
+                    {batch.expiryDate
+                      ? new Date(batch.expiryDate).toLocaleDateString("en-GB")
+                      : "-"}
+                  </td>
+                </tr>
+              ))
             )}
           </tbody>
         </table>
