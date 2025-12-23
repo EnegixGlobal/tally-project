@@ -55,6 +55,7 @@ const ProfitLoss: React.FC = () => {
   }, [companyId, ownerType, ownerId]);
 
   type SimpleLedger = {
+    id: number;
     name: string;
     opening_balance: number | string;
   };
@@ -122,6 +123,7 @@ const ProfitLoss: React.FC = () => {
         const purchases: SimpleLedger[] = ledgers
           .filter((l: any) => String(l.group_id) === "-15")
           .map((l: any) => ({
+            id: Number(l.id),
             name: l.name,
             opening_balance: l.opening_balance,
           }));
@@ -130,6 +132,7 @@ const ProfitLoss: React.FC = () => {
         const sales: SimpleLedger[] = ledgers
           .filter((l: any) => String(l.group_id) === "-16")
           .map((l: any) => ({
+            id: Number(l.id),
             name: l.name,
             opening_balance: l.opening_balance,
           }));
@@ -138,6 +141,7 @@ const ProfitLoss: React.FC = () => {
         const directExpense: SimpleLedger[] = ledgers
           .filter((l: any) => String(l.group_id) === "-7")
           .map((l: any) => ({
+            id: Number(l.id),
             name: l.name,
             opening_balance: l.opening_balance,
           }));
@@ -250,6 +254,23 @@ const ProfitLoss: React.FC = () => {
 
   const getNetProfit = () => {
     return getProfitLossCreditTotal() - getProfitLossDebitTotal();
+  };
+
+  // Drilldown handlers for GST breakup rows
+  const handlePurchaseLedgerClick = (ledgerName: string, ledgerId: number) => {
+    navigate(
+      `/app/reports/profit-loss/purchase/alldetails?ledger=${encodeURIComponent(
+        ledgerName
+      )}&groupId=${ledgerId}`
+    );
+  };
+
+  const handleSalesLedgerClick = (ledgerName: string, ledgerId: number) => {
+    navigate(
+      `/app/reports/profit-loss/sales/alldetails?ledger=${encodeURIComponent(
+        ledgerName
+      )}&groupId=${ledgerId}`
+    );
   };
 
   return (
@@ -452,9 +473,14 @@ const ProfitLoss: React.FC = () => {
                       {purchaseLedgers.map((item, index) => (
                         <div
                           key={index}
-                          className="flex justify-between text-gray-700"
+                          onClick={() =>
+                            handlePurchaseLedgerClick(item.name, item.id)
+                          }
+                          className="flex justify-between text-gray-700 cursor-pointer hover:bg-gray-100"
                         >
-                          <span>{item.name}</span>
+                          <span className="text-blue-600 underline">
+                            {item.name}
+                          </span>
                           <span className="font-mono">
                             {Number(item.opening_balance).toLocaleString()}
                           </span>
@@ -580,9 +606,14 @@ const ProfitLoss: React.FC = () => {
                       {salesLedgers.map((item, index) => (
                         <div
                           key={index}
-                          className="flex justify-between text-gray-700"
+                          onClick={() =>
+                            handleSalesLedgerClick(item.name, item.id)
+                          }
+                          className="flex justify-between text-gray-700 cursor-pointer hover:bg-gray-100"
                         >
-                          <span>{item.name}</span>
+                          <span className="text-blue-600 underline">
+                            {item.name}
+                          </span>
                           <span className="font-mono">
                             {Number(item.opening_balance).toLocaleString()}
                           </span>
