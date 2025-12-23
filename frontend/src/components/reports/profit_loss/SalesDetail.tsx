@@ -3,7 +3,7 @@ import { useAppContext } from "../../../context/AppContext";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer, Download } from "lucide-react";
 
-const PurchaseDetail: React.FC = () => {
+const SalesDetail: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
 
@@ -14,8 +14,8 @@ const PurchaseDetail: React.FC = () => {
       ownerType === "employee" ? "employee_id" : "user_id"
     ) || "";
 
-  /* ===================== PURCHASE LEDGERS ===================== */
-  const [purchaseLedgers, setPurchaseLedgers] = useState<any[]>([]);
+  /* ===================== SALES LEDGERS ===================== */
+  const [salesLedgers, setSalesLedgers] = useState<any[]>([]);
 
   useEffect(() => {
     fetch(
@@ -27,8 +27,8 @@ const PurchaseDetail: React.FC = () => {
       .then((data) => {
         const ledgers = data.ledgers || [];
 
-        const purchases = ledgers
-          .filter((l: any) => String(l.group_id) === "-15")
+        const sales = ledgers
+          .filter((l: any) => String(l.group_id) === "-16")
           .map((l: any) => ({
             name: l.name,
             opening_balance: l.opening_balance,
@@ -36,14 +36,14 @@ const PurchaseDetail: React.FC = () => {
             group_id: l.id,
           }));
 
-        setPurchaseLedgers(purchases);
+        setSalesLedgers(sales);
       })
-      .catch(() => setPurchaseLedgers([]));
+      .catch(() => setSalesLedgers([]));
   }, [companyId, ownerId, ownerType]);
 
   /* ===================== ROW DATA ===================== */
-  const getPurchaseAccountRows = () => {
-    return purchaseLedgers.map((l: any) => {
+  const getSalesAccountRows = () => {
+    return salesLedgers.map((l: any) => {
       const amount = Number(l.opening_balance || 0);
 
       return {
@@ -58,7 +58,7 @@ const PurchaseDetail: React.FC = () => {
   /* ===================== ROW CLICK HANDLER ===================== */
   const handleRowClick = (ledgerName: string, groupId: number) => {
     navigate(
-      `/app/reports/profit-loss/purchase/alldetails?ledger=${encodeURIComponent(
+      `/app/reports/profit-loss/sales/alldetails?ledger=${encodeURIComponent(
         ledgerName
       )}&groupId=${groupId}`
     );
@@ -78,7 +78,7 @@ const PurchaseDetail: React.FC = () => {
           <ArrowLeft size={20} />
         </button>
 
-        <h1 className="text-2xl font-bold">Purchase Account</h1>
+        <h1 className="text-2xl font-bold">Sales Account</h1>
 
         <div className="ml-auto flex gap-2">
           <button className="p-2 rounded-md hover:bg-gray-200">
@@ -94,7 +94,7 @@ const PurchaseDetail: React.FC = () => {
       <div className="w-full border border-gray-300 rounded-md overflow-hidden">
         <div className="bg-gray-100 border-b border-gray-300">
           <div className="py-3 text-center">
-            <div className="text-lg font-semibold">Purchase Account</div>
+            <div className="text-lg font-semibold">Sales Account</div>
             <div className="text-xs text-gray-500">
               For the year ended {new Date().getFullYear()}
             </div>
@@ -111,7 +111,7 @@ const PurchaseDetail: React.FC = () => {
           </div>
         </div>
 
-        {getPurchaseAccountRows().map((row, index) => (
+        {getSalesAccountRows().map((row, index) => (
           <div
             key={index}
             onClick={() => handleRowClick(row.name, row.groupId)}
@@ -135,4 +135,6 @@ const PurchaseDetail: React.FC = () => {
   );
 };
 
-export default PurchaseDetail;
+export default SalesDetail;
+
+

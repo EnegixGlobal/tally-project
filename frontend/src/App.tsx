@@ -84,6 +84,8 @@ import TrialBalance from "./components/reports/TrialBalance";
 // import TradingAccount from './components/reports/TradingAccount';
 // import ProfitLoss from './components/accounting/ProfitLoss';
 import ProfitLoss from "./components/reports/ProfitLoss";
+import SalesDetail from "./components/reports/profit_loss/SalesDetail";
+import SalesAddDetails from "./components/reports/profit_loss/SalesAddDetails";
 import BalanceSheet from "./components/reports/BalanceSheet";
 import GroupSummary from "./components/reports/GroupSummary";
 import GroupSummaryIndex from "./components/reports/GroupSummaryIndex";
@@ -968,7 +970,7 @@ function App() {
                 }
               />
 
-               <Route
+              <Route
                 path="reports/profit-loss/purchase"
                 element={
                   <RequireCompany>
@@ -976,11 +978,27 @@ function App() {
                   </RequireCompany>
                 }
               />
-               <Route
+              <Route
                 path="reports/profit-loss/purchase/alldetails"
                 element={
                   <RequireCompany>
                     <PurchaseAddDetails />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/profit-loss/sales"
+                element={
+                  <RequireCompany>
+                    <SalesDetail />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/profit-loss/sales/alldetails"
+                element={
+                  <RequireCompany>
+                    <SalesAddDetails />
                   </RequireCompany>
                 }
               />
