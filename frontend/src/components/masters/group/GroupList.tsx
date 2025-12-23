@@ -3,7 +3,7 @@ import { useAppContext } from "../../../context/AppContext";
 import { useAuth } from "../../../home/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import type { LedgerGroup, GstClassification } from "../../../types";
-import { Edit, Trash2, Plus, Search, ArrowLeft } from "lucide-react";
+import { Edit, Trash2, Plus, Search, ArrowLeft, Settings } from "lucide-react";
 import { apiFetch } from "../../../utils/apiFetch";
 import Swal from "sweetalert2";
 
@@ -14,6 +14,7 @@ const GroupList: React.FC = () => {
   const [groups, setGroups] = useState<LedgerGroup[]>([]);
   const [gstClassifications] = useState<GstClassification[]>([]);
   const { user, companyId: authCompanyId } = useAuth();
+  const [del, setDel]= useState(false)
 
   const baseGroups = [
     { id: -1, name: "Branch Accounts", nature: "Assets", isSystem: true },
@@ -21,7 +22,12 @@ const GroupList: React.FC = () => {
     { id: -3, name: "Branch/Division", nature: "Assets", isSystem: true },
     { id: -4, name: "Capital Account", nature: "Liabilities", isSystem: true },
     { id: -5, name: "Current Assets", nature: "Assets", isSystem: true },
-    { id: -6, name: "Current Liabilities", nature: "Liabilities", isSystem: true },
+    {
+      id: -6,
+      name: "Current Liabilities",
+      nature: "Liabilities",
+      isSystem: true,
+    },
     { id: -7, name: "Direct Expenses", nature: "Expenses", isSystem: true },
     { id: -8, name: "Direct Income", nature: "Income", isSystem: true },
     { id: -9, name: "Fixed Assets", nature: "Assets", isSystem: true },
@@ -29,10 +35,15 @@ const GroupList: React.FC = () => {
     { id: -11, name: "Indirect Income", nature: "Income", isSystem: true },
     { id: -12, name: "Investments", nature: "Assets", isSystem: true },
     { id: -13, name: "Loan(Liability)", nature: "Liabilities", isSystem: true },
-    { id: -14, name: "Misc expenses (Assets)", nature: "Assets", isSystem: true },
+    {
+      id: -14,
+      name: "Misc expenses (Assets)",
+      nature: "Assets",
+      isSystem: true,
+    },
     { id: -15, name: "Purchase Accounts", nature: "Expenses", isSystem: true },
     { id: -16, name: "Sales Accounts", nature: "Income", isSystem: true },
-    { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },    
+    { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },
   ];
 
   // prefer AuthContext values, fall back to localStorage
@@ -168,7 +179,8 @@ const GroupList: React.FC = () => {
   return (
     <div className="pt-[56px] px-4" onKeyDown={handleKeyDown} tabIndex={0}>
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center mb-6">
+        {/* Left: Back + Title */}
+        <div className="flex items-center">
           <button
             title="Back to Group List"
             onClick={() => navigate("/app/masters")}
@@ -178,6 +190,7 @@ const GroupList: React.FC = () => {
           >
             <ArrowLeft size={20} />
           </button>
+
           <h1
             className={`text-2xl font-bold ${
               theme === "dark" ? "text-gray-100" : "text-gray-900"
@@ -186,7 +199,10 @@ const GroupList: React.FC = () => {
             Group List
           </h1>
         </div>
-        {ownerType !== "user" && (
+
+        {/* Right: Create Group + Settings */}
+        <div className="flex items-center gap-2">
+          {/* Create Group Button */}
           <button
             type="button"
             title="Create Group"
@@ -200,7 +216,19 @@ const GroupList: React.FC = () => {
             <Plus size={18} className="mr-1" />
             Create Group
           </button>
-        )}
+
+          {/* Settings Icon */}
+          <button
+            type="button"
+            title="Group Settings"
+            onClick={() => setDel(!del)}
+            className={`p-2 rounded ${
+              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
+          >
+            <Settings size={20} />
+          </button>
+        </div>
       </div>
 
       <div
@@ -405,7 +433,10 @@ const GroupList: React.FC = () => {
                                 : "hover:bg-gray-100"
                             }`}
                           >
-                            <Trash2 size={16} />
+                            {
+                              del &&  <Trash2 size={16} />
+                            }
+                           
                           </button>
                         </>
                       )}
