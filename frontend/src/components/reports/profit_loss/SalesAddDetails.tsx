@@ -1,9 +1,9 @@
-import React, { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft, Printer, Download, Filter } from "lucide-react";
 
-const PurchaseAddDetails: React.FC = () => {
+const SalesAddDetails: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -36,28 +36,29 @@ const PurchaseAddDetails: React.FC = () => {
   ];
 
   /* ===================== STATES ===================== */
-  const [purchase, setPurchase] = useState<any[]>([]);
+  const [sales, setSales] = useState<any[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [parties, setParties] = useState<any[]>([]);
 
-  /* ===================== FETCH PURCHASE ===================== */
+  /* ===================== FETCH SALES VOUCHERS ===================== */
   useEffect(() => {
-    const fetchPurchaseData = async () => {
+    const fetchSalesData = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
-        setPurchase(data.data || []);
+        console.log("data", data);
+        setSales(Array.isArray(data) ? data : data.data || []);
       } catch (err) {
-        console.error("Purchase fetch error:", err);
+        console.error("Sales fetch error:", err);
       }
     };
 
-    if (companyId && ownerType && ownerId) {
-      fetchPurchaseData();
+    if (ownerType && ownerId) {
+      fetchSalesData();
     }
-  }, [companyId, ownerType, ownerId]);
+  }, [ownerType, ownerId]);
 
   /* ===================== FETCH LEDGERS (PARTIES) ===================== */
   useEffect(() => {
@@ -68,8 +69,7 @@ const PurchaseAddDetails: React.FC = () => {
         );
 
         const data = await res.json();
-
-        // ✅ IMPORTANT FIX (LedgerList jaisa)
+        console.log("ledger data", data);
         setParties(Array.isArray(data) ? data : data.data || []);
       } catch (err) {
         console.error("Party fetch error:", err);
@@ -93,15 +93,16 @@ const PurchaseAddDetails: React.FC = () => {
   const getPartyNameById = (partyId: number | string) =>
     partyMap[Number(partyId)] || "-";
 
-  /* ===================== MONTH WISE DEBIT ===================== */
-  const getMonthWiseDebit = () => {
+  /* ===================== MONTH WISE CREDIT ===================== */
+  const getMonthWiseCredit = () => {
     const totals: Record<string, number> = {};
     MONTHS.forEach((m) => (totals[m] = 0));
 
-    purchase
-      .filter((p) => Number(p.purchaseLedgerId) === groupId)
-      .forEach((p) => {
-        const d = new Date(p.date);
+    sales
+      // Fallback: if salesLedgerId is missing (old vouchers), still include them
+      .filter((s) => Number(s.salesLedgerId ?? groupId) === groupId)
+      .forEach((s) => {
+        const d = new Date(s.date);
         const monthName = [
           "January",
           "February",
@@ -118,14 +119,14 @@ const PurchaseAddDetails: React.FC = () => {
         ][d.getMonth()];
 
         if (totals[monthName] !== undefined) {
-          totals[monthName] += Number(p.total || 0);
+          totals[monthName] += Number(s.total || 0);
         }
       });
 
     return totals;
   };
 
-  const monthWiseDebit = getMonthWiseDebit();
+  const monthWiseCredit = getMonthWiseCredit();
 
   /* ===================== MONTH FILTER ===================== */
   const monthIndexMap: Record<string, number> = {
@@ -144,11 +145,11 @@ const PurchaseAddDetails: React.FC = () => {
   };
 
   const selectedMonthData = selectedMonth
-    ? purchase.filter((p) => {
-        const d = new Date(p.date);
+    ? sales.filter((s) => {
+        const d = new Date(s.date);
         return (
           d.getMonth() === monthIndexMap[selectedMonth] &&
-          Number(p.purchaseLedgerId) === groupId
+          Number(s.salesLedgerId ?? groupId) === groupId
         );
       })
     : [];
@@ -172,7 +173,7 @@ const PurchaseAddDetails: React.FC = () => {
           <ArrowLeft size={20} />
         </button>
 
-        <h1 className="text-2xl font-bold">Purchase Account</h1>
+        <h1 className="text-2xl font-bold">Sales Account</h1>
 
         <div className="ml-auto flex gap-2">
           <button
@@ -194,7 +195,7 @@ const PurchaseAddDetails: React.FC = () => {
       {!selectedMonth && (
         <div>
           <div className="bg-gray-100 border-b text-center py-3">
-            <div className="text-lg font-semibold">Purchase Account</div>
+            <div className="text-lg font-semibold">Sales Account</div>
             <div className="text-sm text-gray-600">{ledgerName}</div>
           </div>
 
@@ -211,12 +212,12 @@ const PurchaseAddDetails: React.FC = () => {
               className="grid grid-cols-3 border-b cursor-pointer hover:bg-blue-50"
             >
               <div className="px-3 py-2">{month}</div>
+              <div className="px-3 py-2 text-center">0</div>
               <div className="px-3 py-2 text-center font-mono">
-                {monthWiseDebit[month]
-                  ? monthWiseDebit[month].toLocaleString()
+                {monthWiseCredit[month]
+                  ? monthWiseCredit[month].toLocaleString()
                   : "0"}
               </div>
-              <div className="px-3 py-2 text-center">0</div>
             </div>
           ))}
         </div>
@@ -255,21 +256,21 @@ const PurchaseAddDetails: React.FC = () => {
               <div className="px-3 py-2">
                 {getPartyNameById(row.partyId)}
               </div>
-              <div className="px-3 py-2">Purchase</div>
+              <div className="px-3 py-2">Sales</div>
               <div className="px-3 py-2">{row.number}</div>
+              <div className="px-3 py-2 text-right"></div>
               <div className="px-3 py-2 text-right font-mono">
                 {Number(row.total).toLocaleString()}
               </div>
-              <div className="px-3 py-2 text-right"></div>
             </div>
           ))}
 
           <div className="grid grid-cols-6 bg-gray-100 font-semibold">
             <div className="col-span-4 px-3 py-2 text-right">Total :</div>
+            <div className="px-3 py-2 text-right"></div>
             <div className="px-3 py-2 text-right font-mono">
               {selectedMonthTotal.toLocaleString()}
             </div>
-            <div></div>
           </div>
         </div>
       )}
@@ -277,4 +278,6 @@ const PurchaseAddDetails: React.FC = () => {
   );
 };
 
-export default PurchaseAddDetails;
+export default SalesAddDetails;
+
+

@@ -278,9 +278,9 @@ router.get("/sale-history", async (req, res) => {
   }
 });
 
-// get ourchase vouncher
+// get sales vouchers
 router.get("/", async (req, res) => {
-  const { owner_type, owner_id } = req.query;
+  const { owner_type, owner_id, company_id } = req.query;
 
   if (!owner_type || !owner_id) {
     return res.status(400).json({
@@ -289,15 +289,25 @@ router.get("/", async (req, res) => {
   }
 
   try {
-    const [voucherRows] = await db.execute(
-      `SELECT 
-          id, number, date, partyId, referenceNo, supplierInvoiceDate,
-          subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total
-       FROM sales_vouchers
-       WHERE owner_type = ? AND owner_id = ?
-       ORDER BY id DESC`,
-      [owner_type, owner_id]
-    );
+    let sql = `
+      SELECT 
+        id, number, date, partyId, referenceNo, supplierInvoiceDate,
+        subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total,
+        salesLedgerId, company_id
+      FROM sales_vouchers
+      WHERE owner_type = ? AND owner_id = ?
+    `;
+
+    const params = [owner_type, owner_id];
+
+    if (company_id) {
+      sql += " AND company_id = ?";
+      params.push(company_id);
+    }
+
+    sql += " ORDER BY id DESC";
+
+    const [voucherRows] = await db.execute(sql, params);
 
     return res.status(200).json(voucherRows);
   } catch (err) {

@@ -54,6 +54,11 @@ const ProfitLoss: React.FC = () => {
     }
   }, [companyId, ownerType, ownerId]);
 
+  type SimpleLedger = {
+    name: string;
+    opening_balance: number | string;
+  };
+
   //get purchase Data
   const [purchaseData, setPurchaseData] = useState<any[]>([]);
 
@@ -99,9 +104,9 @@ const ProfitLoss: React.FC = () => {
   }, [companyId, ownerType, ownerId]);
 
   //get purchase ledger or Sales Ladger
-  const [purchaseLedgers, setPurchaseLedgers] = useState([]);
-  const [salesLedgers, setSalesLedgers] = useState([]);
-  const [directexpense, setDirectexpense] = useState([]);
+  const [purchaseLedgers, setPurchaseLedgers] = useState<SimpleLedger[]>([]);
+  const [salesLedgers, setSalesLedgers] = useState<SimpleLedger[]>([]);
+  const [directexpense, setDirectexpense] = useState<SimpleLedger[]>([]);
 
   useEffect(() => {
     fetch(
@@ -114,25 +119,25 @@ const ProfitLoss: React.FC = () => {
         const ledgers = data.ledgers || [];
 
         // Purchase → group_id = -15
-        const purchases = ledgers
-          .filter((l) => String(l.group_id) === "-15")
-          .map((l) => ({
+        const purchases: SimpleLedger[] = ledgers
+          .filter((l: any) => String(l.group_id) === "-15")
+          .map((l: any) => ({
             name: l.name,
             opening_balance: l.opening_balance,
           }));
 
         // Sales → group_id = -16
-        const sales = ledgers
-          .filter((l) => String(l.group_id) === "-16")
-          .map((l) => ({
+        const sales: SimpleLedger[] = ledgers
+          .filter((l: any) => String(l.group_id) === "-16")
+          .map((l: any) => ({
             name: l.name,
             opening_balance: l.opening_balance,
           }));
 
         //direct-expense
-        const directExpense = ledgers
-          .filter((l) => String(l.group_id) === "-7")
-          .map((l) => ({
+        const directExpense: SimpleLedger[] = ledgers
+          .filter((l: any) => String(l.group_id) === "-7")
+          .map((l: any) => ({
             name: l.name,
             opening_balance: l.opening_balance,
           }));
@@ -280,38 +285,35 @@ const ProfitLoss: React.FC = () => {
             {/* 🔽 Settings Dropdown */}
             {showFullData && (
               <div
-                className="absolute right-0 mt-2 w-52 rounded-md shadow-lg z-50
-    bg-white border border-gray-300"
+                className="absolute right-0 mt-2 w-52 rounded-md shadow-lg z-50 bg-white border border-gray-300"
               >
-                {/* Inventory */}
-                <label
-                  htmlFor="inventoryBreakup"
-                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer
-      hover:bg-gray-100"
-                >
-                  <input
-                    type="checkbox"
-                    id="inventoryBreakup"
-                    checked={showInventoryBreakup}
-                    onChange={(e) => setShowInventoryBreakup(e.target.checked)}
-                  />
-                  Inventory
-                </label>
-
                 {/* Detailed */}
                 <label
                   htmlFor="detailedView"
-                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer
-      hover:bg-gray-100 border-t border-gray-200"
+                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-100"
                 >
                   <input
                     type="checkbox"
                     id="detailedView"
                     checked={showDetailed}
                     onChange={(e) => setShowDetailed(e.target.checked)}
-                    disabled={!showInventoryBreakup}
                   />
                   Detailed
+                </label>
+
+                {/* Inventory */}
+                <label
+                  htmlFor="inventoryBreakup"
+                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 border-t border-gray-200"
+                >
+                  <input
+                    type="checkbox"
+                    id="inventoryBreakup"
+                    checked={showInventoryBreakup}
+                    onChange={(e) => setShowInventoryBreakup(e.target.checked)}
+                    disabled={!showDetailed}
+                  />
+                  Inventory
                 </label>
               </div>
             )}
@@ -417,7 +419,7 @@ const ProfitLoss: React.FC = () => {
               {/* purchase */}
               <div className="py-2 border-b border-gray-300 dark:border-gray-600">
 
-                {showInventoryBreakup ? (
+                {showDetailed ? (
                   // Inventory ON (breakup view)
                   <div className="py-2 border-b border-gray-300 dark:border-gray-600">
                     <div className="flex justify-between font-semibold">
@@ -444,7 +446,7 @@ const ProfitLoss: React.FC = () => {
                 )}
 
                 {/* GST Breakup */}
-                {showInventoryBreakup && (
+                {showDetailed && (
                   <>
                     <div className="mt-2 space-y-1 pl-4 text-sm">
                       {purchaseLedgers.map((item, index) => (
@@ -491,7 +493,7 @@ const ProfitLoss: React.FC = () => {
                 </div>
 
                 {/* Breakup – only if Inventory ON AND data exists */}
-                {showInventoryBreakup && directexpense.length > 0 && (
+                {showDetailed && directexpense.length > 0 && (
                   <div className="mt-2 space-y-1 pl-4 text-sm">
                     {directexpense.map((item, index) => (
                       <div
@@ -554,14 +556,25 @@ const ProfitLoss: React.FC = () => {
             <div className="space-y-2">
               <div className="py-2 border-b border-gray-300 dark:border-gray-600">
                 {/* Sales Account */}
-                <div className="flex justify-between font-semibold">
-                  <span>By Sales</span>
-                  <span className="font-mono">
-                    {getSalesTotal().toLocaleString()}
-                  </span>
-                </div>
+                {showDetailed ? (
+                  <div className="flex justify-between font-semibold">
+                    <span>By Sales</span>
+                    <span className="font-mono">
+                      {getSalesTotal().toLocaleString()}
+                    </span>
+                  </div>
+                ) : (
+                  <div className="flex justify-between font-semibold cursor-pointer">
+                    <Link to="sales">
+                      <span>By Sales</span>
+                    </Link>
+                    <span className="font-mono">
+                      {getSalesTotal().toLocaleString()}
+                    </span>
+                  </div>
+                )}
 
-                {showInventoryBreakup && (
+                {showDetailed && (
                   <>
                     <div className="mt-2 space-y-1 pl-4 text-sm">
                       {salesLedgers.map((item, index) => (
