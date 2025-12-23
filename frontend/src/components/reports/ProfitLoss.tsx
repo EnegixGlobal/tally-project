@@ -1,12 +1,16 @@
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "../../context/AppContext";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer, Download, Filter } from "lucide-react";
+import { useNavigate,Link } from "react-router-dom";
+import { ArrowLeft, Printer, Download, Filter, Settings } from "lucide-react";
 
 const ProfitLoss: React.FC = () => {
   const { theme, ledgers, ledgerGroups } = useAppContext();
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [showFullData, setShowFullData] = useState(false);
+  const [showInventoryBreakup, setShowInventoryBreakup] = useState(false);
+  const [showDetailed, setShowDetailed] = useState(false);
+
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");
   const ownerId =
@@ -39,8 +43,6 @@ const ProfitLoss: React.FC = () => {
 
         const allBatches = data.data.flatMap((item: any) => item.batches || []);
 
-        console.log("All batches:", allBatches);
-
         setStockopening(allBatches);
       } catch (error) {
         console.error("Stock batch fetch error:", error);
@@ -51,7 +53,6 @@ const ProfitLoss: React.FC = () => {
       stockBatch();
     }
   }, [companyId, ownerType, ownerId]);
-
 
   //get purchase Data
   const [purchaseData, setPurchaseData] = useState<any[]>([]);
@@ -97,6 +98,56 @@ const ProfitLoss: React.FC = () => {
     fatchSalesData();
   }, [companyId, ownerType, ownerId]);
 
+  //get purchase ledger or Sales Ladger
+  const [purchaseLedgers, setPurchaseLedgers] = useState([]);
+  const [salesLedgers, setSalesLedgers] = useState([]);
+  const [directexpense, setDirectexpense] = useState([]);
+
+  useEffect(() => {
+    fetch(
+      `${
+        import.meta.env.VITE_API_URL
+      }/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        const ledgers = data.ledgers || [];
+
+        // Purchase → group_id = -15
+        const purchases = ledgers
+          .filter((l) => String(l.group_id) === "-15")
+          .map((l) => ({
+            name: l.name,
+            opening_balance: l.opening_balance,
+          }));
+
+        // Sales → group_id = -16
+        const sales = ledgers
+          .filter((l) => String(l.group_id) === "-16")
+          .map((l) => ({
+            name: l.name,
+            opening_balance: l.opening_balance,
+          }));
+
+        //direct-expense
+        const directExpense = ledgers
+          .filter((l) => String(l.group_id) === "-7")
+          .map((l) => ({
+            name: l.name,
+            opening_balance: l.opening_balance,
+          }));
+
+        setPurchaseLedgers(purchases);
+        setSalesLedgers(sales);
+        setDirectexpense(directExpense);
+      })
+      .catch((err) => {
+        console.error("Failed to fetch ledgers:", err);
+        setPurchaseLedgers([]);
+        setSalesLedgers([]);
+      });
+  }, [companyId, ownerId, ownerType]);
+
   //calcultate opening stock
   const getOpeningStock = () => {
     return stockopening.reduce((sum, p: any) => {
@@ -119,7 +170,6 @@ const ProfitLoss: React.FC = () => {
 
     return closing > 0 ? closing : 0;
   };
-
 
   // Income calculations
   const getSalesTotal = () => {
@@ -199,7 +249,7 @@ const ProfitLoss: React.FC = () => {
 
   return (
     <div className="pt-[56px] px-4 ">
-      <div className="flex items-center mb-6">
+      <div className="flex items-center mb-6 relative">
         <button
           title="Back to Reports"
           type="button"
@@ -210,18 +260,76 @@ const ProfitLoss: React.FC = () => {
         >
           <ArrowLeft size={20} />
         </button>
+
         <h1 className="text-2xl font-bold">Profit & Loss Statement</h1>
-        <div className="ml-auto flex space-x-2">
+
+        <div className="ml-auto flex space-x-2 relative">
+          {/* ⚙️ Settings Button */}
+          <div className="relative">
+            <button
+              title="Settings"
+              type="button"
+              onClick={() => setShowFullData((prev) => !prev)}
+              className={`p-2 rounded-md ${
+                theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
+            >
+              <Settings size={18} />
+            </button>
+
+            {/* 🔽 Settings Dropdown */}
+            {showFullData && (
+              <div
+                className="absolute right-0 mt-2 w-52 rounded-md shadow-lg z-50
+    bg-white border border-gray-300"
+              >
+                {/* Inventory */}
+                <label
+                  htmlFor="inventoryBreakup"
+                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer
+      hover:bg-gray-100"
+                >
+                  <input
+                    type="checkbox"
+                    id="inventoryBreakup"
+                    checked={showInventoryBreakup}
+                    onChange={(e) => setShowInventoryBreakup(e.target.checked)}
+                  />
+                  Inventory
+                </label>
+
+                {/* Detailed */}
+                <label
+                  htmlFor="detailedView"
+                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer
+      hover:bg-gray-100 border-t border-gray-200"
+                >
+                  <input
+                    type="checkbox"
+                    id="detailedView"
+                    checked={showDetailed}
+                    onChange={(e) => setShowDetailed(e.target.checked)}
+                    disabled={!showInventoryBreakup}
+                  />
+                  Detailed
+                </label>
+              </div>
+            )}
+          </div>
+
+          {/* Filter Button */}
           <button
             title="Toggle Filters"
             type="button"
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
+            className={`p-2 rounded-md  ${
               theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
             }`}
           >
             <Filter size={18} />
           </button>
+
+          {/* Print Button */}
           <button
             title="Print Report"
             className={`p-2 rounded-md ${
@@ -230,6 +338,8 @@ const ProfitLoss: React.FC = () => {
           >
             <Printer size={18} />
           </button>
+
+          {/* Download Button */}
           <button
             title="Download Report"
             type="button"
@@ -303,18 +413,119 @@ const ProfitLoss: React.FC = () => {
                   {getOpeningStock().toLocaleString()}
                 </span>
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600">
-                <span>To Purchases</span>
-                <span className="font-mono">
-                  {getPurchaseTotal().toLocaleString()}
-                </span>
+
+              {/* purchase */}
+              <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+
+                {showInventoryBreakup ? (
+                  // Inventory ON (breakup view)
+                  <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                    <div className="flex justify-between font-semibold">
+                      <span>To Purchases</span>
+                      <span className="font-mono">
+                        {getPurchaseTotal().toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* breakup yahan */}
+                  </div>
+                ) : (
+                 
+                  <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                    <div className="flex justify-between font-semibold cursor-pointer">
+                      <Link to="purchase">
+                      <span>To Purchases </span>
+                      </Link>
+                      <span className="font-mono">
+                        {getPurchaseTotal().toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
+
+                {/* GST Breakup */}
+                {showInventoryBreakup && (
+                  <>
+                    <div className="mt-2 space-y-1 pl-4 text-sm">
+                      {purchaseLedgers.map((item, index) => (
+                        <div
+                          key={index}
+                          className="flex justify-between text-gray-700"
+                        >
+                          <span>{item.name}</span>
+                          <span className="font-mono">
+                            {Number(item.opening_balance).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Divider */}
+                      <div className="border-t border-dashed border-gray-400 my-1" />
+
+                      {/* TOTAL */}
+                      <div className="flex justify-between font-semibold text-gray-900">
+                        <span>Total GST Purchase</span>
+                        <span className="font-mono">
+                          {(
+                            Number(getPurchaseTotal() || 0) +
+                            purchaseLedgers.reduce(
+                              (sum, item) =>
+                                sum + Number(item.opening_balance || 0),
+                              0
+                            )
+                          ).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
-              <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600">
-                <span>To Direct Expenses</span>
-                <span className="font-mono">
-                  {getDirectExpensesTotal().toLocaleString()}
-                </span>
+
+              <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                {/* Header – Always visible */}
+                <div className="flex justify-between font-semibold">
+                  <span>To Direct Expenses</span>
+                  <span className="font-mono">
+                    {getDirectExpensesTotal().toLocaleString()}
+                  </span>
+                </div>
+
+                {/* Breakup – only if Inventory ON AND data exists */}
+                {showInventoryBreakup && directexpense.length > 0 && (
+                  <div className="mt-2 space-y-1 pl-4 text-sm">
+                    {directexpense.map((item, index) => (
+                      <div
+                        key={index}
+                        className="flex justify-between text-gray-700"
+                      >
+                        <span>{item.name}</span>
+                        <span className="font-mono">
+                          {Number(item.opening_balance).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+
+                    {/* Divider */}
+                    <div className="border-t border-dashed border-gray-400 my-1" />
+
+                    {/* TOTAL */}
+                    <div className="flex justify-between font-semibold text-gray-900">
+                      <span>Total Direct Expenses</span>
+                      <span className="font-mono">
+                        {(
+                          Number(getDirectExpensesTotal() || 0) +
+                          directexpense.reduce(
+                            (sum, item) =>
+                              sum + Number(item.opening_balance || 0),
+                            0
+                          )
+                        ).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
               </div>
+
               {getGrossProfit() > 0 && (
                 <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 font-semibold text-green-600">
                   <span>To Gross Profit c/o</span>
@@ -341,12 +552,52 @@ const ProfitLoss: React.FC = () => {
               Cr.
             </h3>
             <div className="space-y-2">
-              <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600">
-                <span>By Sales</span>
-                <span className="font-mono">
-                  {getSalesTotal().toLocaleString()}
-                </span>
+              <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                {/* Sales Account */}
+                <div className="flex justify-between font-semibold">
+                  <span>By Sales</span>
+                  <span className="font-mono">
+                    {getSalesTotal().toLocaleString()}
+                  </span>
+                </div>
+
+                {showInventoryBreakup && (
+                  <>
+                    <div className="mt-2 space-y-1 pl-4 text-sm">
+                      {salesLedgers.map((item, index) => (
+                        <div
+                          key={index}
+                          className="flex justify-between text-gray-700"
+                        >
+                          <span>{item.name}</span>
+                          <span className="font-mono">
+                            {Number(item.opening_balance).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
+
+                      {/* Divider */}
+                      <div className="border-t border-dashed border-gray-400 my-1" />
+
+                      {/* TOTAL */}
+                      <div className="flex justify-between font-semibold text-gray-900">
+                        <span>Total GST Sales</span>
+                        <span className="font-mono">
+                          {(
+                            Number(getSalesTotal() || 0) +
+                            salesLedgers.reduce(
+                              (sum, item) =>
+                                sum + Number(item.opening_balance || 0),
+                              0
+                            )
+                          ).toLocaleString()}
+                        </span>
+                      </div>
+                    </div>
+                  </>
+                )}
               </div>
+
               <div
                 className={`flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
                   theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"

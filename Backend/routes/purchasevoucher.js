@@ -68,8 +68,6 @@ router.get("/purchase-history", async (req, res) => {
       owner_id,
     ]);
 
-    
-
     return res.status(200).json({ success: true, data: rows });
   } catch (error) {
     console.error("🔥 Fetch purchase history failed:", error);
@@ -252,10 +250,30 @@ router.post("/", async (req, res) => {
 // get ourchase vouncher
 router.get("/", async (req, res) => {
   try {
-    const [rows] = await db.execute("SELECT * FROM purchase_vouchers");
-    res.json(rows);
+    const finalCompanyId = req.query.company_id || req.body?.companyId;
+    const finalOwnerType = req.query.owner_type || req.body?.ownerType;
+    const finalOwnerId = req.query.owner_id || req.body?.ownerId;
+
+    if (!finalCompanyId || !finalOwnerType || !finalOwnerId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
+    }
+
+    const [rows] = await db.execute(
+      `SELECT *
+       FROM purchase_vouchers
+       WHERE company_id = ?
+         AND owner_type = ?
+         AND owner_id = ?
+       ORDER BY date DESC`,
+      [finalCompanyId, finalOwnerType, finalOwnerId]
+    );
+
+    res.json({ success: true, data: rows });
   } catch (err) {
-    res.status(500).json({ error: err.message });
+    res.status(500).json({ success: false, error: err.message });
   }
 });
 
@@ -492,7 +510,7 @@ router.post("/purchase-history", async (req, res) => {
       hsnCode: "VARCHAR(50)",
       batchNumber: "VARCHAR(255)",
       purchaseQuantity: "INT",
-      rate: "DECIMAL(10,2)",                 // ✅ ADDED
+      rate: "DECIMAL(10,2)", // ✅ ADDED
       purchaseDate: "DATE",
       companyId: "VARCHAR(100)",
       ownerType: "VARCHAR(50)",
@@ -560,7 +578,7 @@ router.post("/purchase-history", async (req, res) => {
       e.hsnCode || null,
       e.batchNumber || null,
       Number(e.purchaseQuantity) || 0,
-      Number(e.rate) || 0,            // ✅ RATE SAVED
+      Number(e.rate) || 0, // ✅ RATE SAVED
       e.purchaseDate || null,
       e.companyId || null,
       e.ownerType || null,
@@ -595,7 +613,6 @@ router.post("/purchase-history", async (req, res) => {
     });
   }
 });
-
 
 //voucher history get
 

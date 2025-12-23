@@ -257,9 +257,9 @@ const PurchaseVoucher: React.FC = () => {
     fetchLedgers();
   }, [companyId, ownerType, ownerId]);
   // Safe fallbacks for context data
-  const safeStockItems = stockItems 
+  const safeStockItems = stockItems;
   // Purchase-specific suppliers (sundry-creditors)
-  const safeLedgers = ledgers 
+  const safeLedgers = ledgers;
 
   // 🟢 Backend se aaye final formatted godown list
 
@@ -598,7 +598,6 @@ const PurchaseVoucher: React.FC = () => {
 
           const itemId = entry.itemId;
           const batchName = entry.batchNumber;
-
 
           const candidateBatch = (entry.batches || []).find((b: any) => {
             const nameEmpty =
@@ -1210,12 +1209,40 @@ const PurchaseVoucher: React.FC = () => {
       },
     });
 
-    // ✅ clear pending batch
     setPendingBatches((prev) => {
       const copy = { ...prev };
       delete copy[index];
       return copy;
     });
+  };
+
+  // 🔹 Fetch units from backend
+  const [unitss, setUnits] = useState([]);
+  useEffect(() => {
+    const fetchUnits = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const data = await res.json();
+        setUnits(data);
+      } catch (error) {
+        console.error("Failed to fetch units:", error);
+      }
+    };
+
+    fetchUnits();
+  }, []);
+
+  //get Unit Name
+  const getUnitName = (unitId: any) => {
+    if (!unitId) return "-";
+
+    const unit = unitss.find((u: any) => String(u.id) === String(unitId));
+
+    return unit?.name || "-";
   };
 
   return (
@@ -1741,158 +1768,6 @@ const PurchaseVoucher: React.FC = () => {
                                 </option>
                               </select>
 
-                              {/* Inline add fields (no separate save) */}
-                              {/* {addBatchModal.visible &&
-                                  addBatchModal.index === index && (
-                                    <div className="mt-2 border p-3 rounded bg-gray-50 text-xs space-y-2"> */}
-                              {/* 🔹 FORM TITLE */}
-                              {/* <div className="text-[11px] font-semibold text-blue-700 border-b pb-1">
-                                        Add New Batch for:{" "}
-                                        <span className="font-bold">
-                                          {stockItems.find(
-                                            (i) => i.id === entry.itemId
-                                          )?.name || "Item"}
-                                        </span>
-                                      </div> */}
-
-                              {/* 🔹 BATCH NAME */}
-                              {/* <div>
-                                        <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
-                                          Batch Name
-                                        </label>
-                                        <input
-                                          placeholder="Enter batch name"
-                                          value={
-                                            pendingBatches[index]?.batchName ||
-                                            ""
-                                          }
-                                          onChange={(e) =>
-                                            handleAddBatchFieldChange(
-                                              index,
-                                              "batchName",
-                                              e.target.value
-                                            )
-                                          }
-                                          className={`${TABLE_STYLES.input} text-xs`}
-                                        />
-                                      </div> */}
-
-                              {/* 🔹 QTY & RATE */}
-                              {/* <div className="flex gap-2">
-                                        <div className="flex-1">
-                                          <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
-                                            Batch Quantity
-                                          </label>
-                                          <input
-                                            type="number"
-                                            placeholder="Qty"
-                                            value={
-                                              pendingBatches[index]
-                                                ?.batchQuantity ?? 0
-                                            }
-                                            onChange={(e) =>
-                                              handleAddBatchFieldChange(
-                                                index,
-                                                "batchQuantity",
-                                                Number(e.target.value)
-                                              )
-                                            }
-                                            className={`${TABLE_STYLES.input} text-xs`}
-                                          />
-                                        </div>
-
-                                        <div className="flex-1">
-                                          <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
-                                            Batch Rate
-                                          </label>
-                                          <input
-                                            type="number"
-                                            placeholder="Rate"
-                                            value={
-                                              pendingBatches[index]
-                                                ?.batchRate ?? 0
-                                            }
-                                            onChange={(e) =>
-                                              handleAddBatchFieldChange(
-                                                index,
-                                                "batchRate",
-                                                Number(e.target.value)
-                                              )
-                                            }
-                                            className={`${TABLE_STYLES.input} text-xs`}
-                                          />
-                                        </div>
-                                      </div> */}
-
-                              {/* 🔹 MFG & EXP DATE */}
-                              {/* <div className="flex gap-2">
-                                        <div className="flex-1">
-                                          <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
-                                            Manufacturing Date
-                                          </label>
-                                          <input
-                                            type="date"
-                                            value={
-                                              pendingBatches[index]
-                                                ?.batchManufacturingDate || ""
-                                            }
-                                            onChange={(e) =>
-                                              handleAddBatchFieldChange(
-                                                index,
-                                                "batchManufacturingDate",
-                                                e.target.value
-                                              )
-                                            }
-                                            className={`${TABLE_STYLES.input} text-xs`}
-                                          />
-                                        </div>
-
-                                        <div className="flex-1">
-                                          <label className="block text-[10px] font-medium text-gray-600 mb-0.5">
-                                            Expiry Date
-                                          </label>
-                                          <input
-                                            type="date"
-                                            value={
-                                              pendingBatches[index]
-                                                ?.batchExpiryDate || ""
-                                            }
-                                            onChange={(e) =>
-                                              handleAddBatchFieldChange(
-                                                index,
-                                                "batchExpiryDate",
-                                                e.target.value
-                                              )
-                                            }
-                                            className={`${TABLE_STYLES.input} text-xs`}
-                                          />
-                                        </div>
-                                      </div> */}
-
-                              {/* 🔹 ACTION */}
-                              {/* <div className="flex justify-end mt-2">
-                                        <button
-                                          type="button"
-                                          onClick={() => {
-                                            setAddBatchModal((p) => ({
-                                              ...p,
-                                              visible: false,
-                                              index: null,
-                                              itemId: null,
-                                            }));
-                                            setPendingBatches((p) => {
-                                              const copy = { ...p };
-                                              delete copy[index];
-                                              return copy;
-                                            });
-                                          }}
-                                          className="px-2 py-1 rounded bg-gray-200 text-xs hover:bg-gray-300"
-                                        >
-                                          Cancel
-                                        </button>
-                                      </div> */}
-                              {/* </div> */}
-                              {/* )} */}
                               {addBatchModal.visible && (
                                 <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[300]">
                                   <div className="w-[420px] rounded-lg bg-white shadow-xl p-5">
@@ -2043,7 +1918,7 @@ const PurchaseVoucher: React.FC = () => {
                                       </button>
 
                                       <button
-                                        type="button" // 🔥 VERY IMPORTANT
+                                        type="button"
                                         onClick={() =>
                                           applyNewBatchToRow(
                                             addBatchModal.index!
@@ -2075,11 +1950,7 @@ const PurchaseVoucher: React.FC = () => {
 
                           {/* UNIT */}
                           <td className="px-1 py-2 min-w-[45px] text-center text-xs">
-                            {units.find(
-                              (u) =>
-                                String(u.id) ===
-                                String(entry.unitName || entry.unitId)
-                            )?.name || "-"}
+                            {getUnitName(entry.unitName)}
                           </td>
 
                           {/* RATE */}
