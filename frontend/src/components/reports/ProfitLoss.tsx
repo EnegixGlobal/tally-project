@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "../../context/AppContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate,Link } from "react-router-dom";
 import { ArrowLeft, Printer, Download, Filter, Settings } from "lucide-react";
 
 const ProfitLoss: React.FC = () => {
@@ -8,7 +8,8 @@ const ProfitLoss: React.FC = () => {
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showFullData, setShowFullData] = useState(false);
-  const [showInventoryBreakup, setShowInventoryBreakup] = useState(true);
+  const [showInventoryBreakup, setShowInventoryBreakup] = useState(false);
+  const [showDetailed, setShowDetailed] = useState(false);
 
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");
@@ -279,14 +280,14 @@ const ProfitLoss: React.FC = () => {
             {/* 🔽 Settings Dropdown */}
             {showFullData && (
               <div
-                className="absolute right-0 mt-2 w-48 rounded-md shadow-lg z-50
-          bg-white 
-          border border-gray-300 "
+                className="absolute right-0 mt-2 w-52 rounded-md shadow-lg z-50
+    bg-white border border-gray-300"
               >
+                {/* Inventory */}
                 <label
                   htmlFor="inventoryBreakup"
                   className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer
-            hover:bg-gray-100 "
+      hover:bg-gray-100"
                 >
                   <input
                     type="checkbox"
@@ -295,6 +296,22 @@ const ProfitLoss: React.FC = () => {
                     onChange={(e) => setShowInventoryBreakup(e.target.checked)}
                   />
                   Inventory
+                </label>
+
+                {/* Detailed */}
+                <label
+                  htmlFor="detailedView"
+                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer
+      hover:bg-gray-100 border-t border-gray-200"
+                >
+                  <input
+                    type="checkbox"
+                    id="detailedView"
+                    checked={showDetailed}
+                    onChange={(e) => setShowDetailed(e.target.checked)}
+                    disabled={!showInventoryBreakup}
+                  />
+                  Detailed
                 </label>
               </div>
             )}
@@ -399,12 +416,32 @@ const ProfitLoss: React.FC = () => {
 
               {/* purchase */}
               <div className="py-2 border-b border-gray-300 dark:border-gray-600">
-                <div className="flex justify-between font-semibold">
-                  <span>To Purchases</span>
-                  <span className="font-mono">
-                    {getPurchaseTotal().toLocaleString()}
-                  </span>
-                </div>
+
+                {showInventoryBreakup ? (
+                  // Inventory ON (breakup view)
+                  <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                    <div className="flex justify-between font-semibold">
+                      <span>To Purchases</span>
+                      <span className="font-mono">
+                        {getPurchaseTotal().toLocaleString()}
+                      </span>
+                    </div>
+
+                    {/* breakup yahan */}
+                  </div>
+                ) : (
+                 
+                  <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                    <div className="flex justify-between font-semibold cursor-pointer">
+                      <Link to="purchase">
+                      <span>To Purchases </span>
+                      </Link>
+                      <span className="font-mono">
+                        {getPurchaseTotal().toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                )}
 
                 {/* GST Breakup */}
                 {showInventoryBreakup && (

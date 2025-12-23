@@ -201,6 +201,8 @@ import AccessControl from "./components/config/AccessControl";
 import SetProfit from "./components/config/SetProfit";
 import SalesByFifo from "./components/config/SalesByFifo";
 import Profile from "./components/config/Profile";
+import PurchaseDetail from "./components/reports/profit_loss/PurchaseDetail";
+import PurchaseAddDetails from "./components/reports/profit_loss/PurchaseAddDetails";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -965,6 +967,24 @@ function App() {
                   </RequireCompany>
                 }
               />
+
+               <Route
+                path="reports/profit-loss/purchase"
+                element={
+                  <RequireCompany>
+                    <PurchaseDetail />
+                  </RequireCompany>
+                }
+              />
+               <Route
+                path="reports/profit-loss/purchase/alldetails"
+                element={
+                  <RequireCompany>
+                    <PurchaseAddDetails />
+                  </RequireCompany>
+                }
+              />
+              
               <Route
                 path="reports/balance-sheet"
                 element={
