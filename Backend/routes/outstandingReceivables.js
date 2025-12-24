@@ -201,7 +201,6 @@ router.get("/api/outstanding-receivables", async (req, res) => {
     }
 
     const [ledgers] = await pool.query(ledgerSql, params);
-    console.log('this is ledger', ledgers)
 
     if (!ledgers.length) return res.json([]);
 
@@ -241,7 +240,10 @@ router.get("/api/outstanding-receivables", async (req, res) => {
     const purchaseSql = `
       SELECT
         id,
+        number,
+        partyId ,
         date,
+        subtotal,
         total,
         purchaseLedgerId
       FROM purchase_vouchers
@@ -257,7 +259,6 @@ router.get("/api/outstanding-receivables", async (req, res) => {
       owner_id,
       ...ledgerIds,
     ]);
-    console.log('this is purchaseRows', purchaseRows)
 
     /* =========================
        4️⃣ MERGE DATA (FINAL)
