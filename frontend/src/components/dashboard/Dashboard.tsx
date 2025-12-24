@@ -21,9 +21,11 @@ const Dashboard: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [userLimit, setUserLimit] = useState(1);
   const [allCompanies, setAllCompanies] = useState<AllCompanies[]>([]);
-  const [selectedCompany, setSelectedCompany] = useState("");
   const [caAllCompanies, setCaAllCompanies] = useState<AllCompanies[]>([]);
-  const [selectedCaCompany, setSelectedCaCompany] = useState("");
+  const [selectedCaCompany, setSelectedCaCompany] = useState(() => {
+    const storedCompanyId = localStorage.getItem("company_id");
+    return storedCompanyId || "";
+  });
   const [caEmployees, setCaEmployees] = useState<any[]>([]); // Optional to reload list after create
   const [showAddForm, setShowAddForm] = useState(false);
   const caId = localStorage.getItem("user_id");
@@ -39,7 +41,9 @@ const Dashboard: React.FC = () => {
     name: string;
     address?: string;
     gstNumber?: string;
+    gst_number?: string;
     panNumber?: string;
+    pan_number?: string;
     taxType?: string;
   };
 
@@ -56,6 +60,12 @@ const Dashboard: React.FC = () => {
     name: string;
   };
   const [companies, setCompanies] = useState<Company[]>([]);
+  
+  // Initialize selectedCompany from localStorage first
+  const [selectedCompany, setSelectedCompany] = useState(() => {
+    const storedCompanyId = localStorage.getItem("company_id");
+    return storedCompanyId || "";
+  });
 
   const [employees, setEmployees] = useState<Employee[]>([
     {
@@ -90,10 +100,25 @@ const Dashboard: React.FC = () => {
   const employeeId = localStorage.getItem("employee_id");
 
   useEffect(() => {
-  if (companyInfo?.id) {
-    setSelectedCompany(companyInfo.id.toString());
-  }
-}, [companyInfo]);
+    // Only update if companyInfo exists and selectedCompany is empty or different
+    if (companyInfo?.id) {
+      const companyIdStr = companyInfo.id.toString();
+      const storedCompanyId = localStorage.getItem("company_id");
+      
+      // If localStorage has a company_id, use it; otherwise use companyInfo.id
+      if (storedCompanyId && storedCompanyId !== companyIdStr) {
+        // If stored company is different, update selectedCompany but don't change localStorage
+        setSelectedCompany(storedCompanyId);
+      } else if (!storedCompanyId) {
+        // If no stored company, use companyInfo.id and save it
+        setSelectedCompany(companyIdStr);
+        localStorage.setItem("company_id", companyIdStr);
+      } else {
+        // If they match, just ensure state is in sync
+        setSelectedCompany(companyIdStr);
+      }
+    }
+  }, [companyInfo]);
 
 
   useEffect(() => {
@@ -271,47 +296,50 @@ const Dashboard: React.FC = () => {
                 {companyCount} of {userLimit} allowed
               </div>
             </div>
-            {canCreateCompany ? (
-              <button
-                onClick={handleCreateCompany}
-                className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg shadow-md hover:scale-105 transition-transform font-medium"
-              >
-                <PlusCircle className="w-5 h-5" />
-                Create Company
-              </button>
-            ) : (
-              <span className="bg-red-100 text-red-700 px-4 py-2 rounded-full font-semibold text-sm">
-                Company Limit Reached ({companyCount}/{userLimit})
-              </span>
-            )}
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+              {canCreateCompany ? (
+                <button
+                  onClick={handleCreateCompany}
+                  className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg shadow-md hover:scale-105 transition-transform font-medium"
+                >
+                  <PlusCircle className="w-5 h-5" />
+                  Create Company
+                </button>
+              ) : (
+                <span className="bg-red-100 text-red-700 px-4 py-2 rounded-full font-semibold text-sm">
+                  Company Limit Reached ({companyCount}/{userLimit})
+                </span>
+              )}
 
-            <div className="pt-[56px] px-4 mb-6">
-              <label className="block mb-2 font-medium text-gray-700">
-                Switch Company
-              </label>
-              <select
-                value={selectedCompany}
-                onChange={(e) => {
-                  const companyId = e.target.value;
-
-                  // ✅ Save to localStorage
-                  localStorage.setItem("company_id", companyId);
-
-                  // ✅ Update state
-                  setSelectedCompany(companyId);
-
-                  // ✅ Reload the page
-                  window.location.reload();
-                }}
-                className="border rounded px-3 py-2 w-full max-w-xs"
-              >
-                <option value="">Select Company</option>
-                {allCompanies.map((c) => (
-                  <option key={c.id} value={c.id.toString()}>
-                    {c.name}
-                  </option>
-                ))}
-              </select>
+              {allCompanies.length > 0 && (
+                <div className="pt-[56px] px-4 mb-6">
+                  <label className="block mb-2 font-medium text-gray-700 text-sm">
+                    Switch Company
+                  </label>
+                  <select
+                    value={selectedCompany}
+                    onChange={(e) => {
+                      const companyId = e.target.value;
+                      if (companyId) {
+                        // ✅ Save to localStorage
+                        localStorage.setItem("company_id", companyId);
+                        // ✅ Update state
+                        setSelectedCompany(companyId);
+                        // ✅ Reload the page to refresh data
+                        window.location.reload();
+                      }
+                    }}
+                    className="border rounded px-3 py-2 w-full max-w-xs bg-white"
+                  >
+                    <option value="">Select Company</option>
+                    {allCompanies.map((c) => (
+                      <option key={c.id} value={c.id.toString()}>
+                        {c.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </div>
           </div>
 
@@ -327,28 +355,48 @@ const Dashboard: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-              {companies.map((c) => (
-                <div
-                  key={c.id}
-                  className="bg-gradient-to-b from-purple-50 to-blue-50 shadow-md rounded-2xl p-6 hover:shadow-xl transition-shadow border border-indigo-100"
-                >
-                  <h3 className="text-lg font-bold mb-1">{c.name}</h3>
+              {companies.map((c) => {
+                const isSelected = c.id.toString() === selectedCompany;
+                return (
+                  <div
+                    key={c.id}
+                    className={`rounded-2xl p-6 hover:shadow-xl transition-all border-2 ${
+                      isSelected
+                        ? "bg-gradient-to-b from-indigo-100 to-purple-100 shadow-lg border-indigo-500 ring-2 ring-indigo-300 ring-offset-2"
+                        : "bg-gradient-to-b from-purple-50 to-blue-50 shadow-md border-indigo-100"
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <h3 className={`text-lg font-bold ${
+                        isSelected ? "text-indigo-800" : "text-gray-800"
+                      }`}>
+                        {c.name}
+                      </h3>
+                      {isSelected && (
+                        <span className="bg-indigo-600 text-white text-xs px-2 py-1 rounded-full font-semibold">
+                          Active
+                        </span>
+                      )}
+                    </div>
 
-                  <div className="text-sm text-gray-500 mb-3">
-                    {c.address || "—"}
+                    <div className={`text-sm mb-3 ${
+                      isSelected ? "text-gray-600" : "text-gray-500"
+                    }`}>
+                      {c.address || "—"}
+                    </div>
+
+                    <div className="flex flex-col gap-1 text-xs">
+                      <span className={isSelected ? "text-gray-700" : "opacity-70"}>
+                        GST: {c.gst_number || c.gstNumber || "—"}
+                      </span>
+
+                      <span className={isSelected ? "text-gray-700" : "opacity-70"}>
+                        PAN: {c.pan_number || c.panNumber || "—"}
+                      </span>
+                    </div>
                   </div>
-
-                  <div className="flex flex-col gap-1 text-xs">
-                    <span className="opacity-70">
-                      GST: {c.gst_number || "—"}
-                    </span>
-
-                    <span className="opacity-70">
-                      PAN: {c.pan_number || "—"}
-                    </span>
-                  </div>
-                </div>
-              ))}
+                );
+              })}
             </div>
           )}
 
@@ -489,28 +537,32 @@ const Dashboard: React.FC = () => {
         </div>
       ) : suppl === "ca" ? (
         <div className="pt-[56px] px-4 space-y-8">
-          <div className="pt-4 px-4 mb-6">
-            <label className="block mb-2 font-medium text-gray-700">
-              Switch Company
-            </label>
-            <select
-              value={selectedCaCompany}
-              onChange={(e) => {
-                const companyId = e.target.value;
-                localStorage.setItem("company_id", companyId);
-                setSelectedCaCompany(companyId);
-                window.location.reload();
-              }}
-              className="border rounded px-3 py-2 w-full max-w-xs"
-            >
-              <option value="">Select Company</option>
-              {caAllCompanies.map((c) => (
-                <option key={c.id} value={c.id.toString()}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {caAllCompanies.length > 0 && (
+            <div className="mb-6">
+              <label className="block mb-2 font-medium text-gray-700">
+                Switch Company
+              </label>
+              <select
+                value={selectedCaCompany}
+                onChange={(e) => {
+                  const companyId = e.target.value;
+                  if (companyId) {
+                    localStorage.setItem("company_id", companyId);
+                    setSelectedCaCompany(companyId);
+                    window.location.reload();
+                  }
+                }}
+                className="border rounded px-3 py-2 w-full max-w-xs bg-white"
+              >
+                <option value="">Select Company</option>
+                {caAllCompanies.map((c) => (
+                  <option key={c.id} value={c.id.toString()}>
+                    {c.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Company Details Table */}
           <div className="bg-white shadow rounded-2xl p-6 overflow-x-auto">

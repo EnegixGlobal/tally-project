@@ -850,10 +850,13 @@ const SalesVoucher: React.FC = () => {
     // ===== HEADER LEVEL VALIDATION =====
     if (!formData.date) pushError("date", "Voucher Date is required");
     if (!formData.number) pushError("number", "Voucher Number is required");
-    if (!formData.partyId) pushError("partyId", "Party is required");
 
-    if (formData.mode === "item-invoice" && !formData.salesLedgerId) {
-      pushError("salesLedgerId", "Sales Ledger is required");
+    // Only validate item-invoice specific fields when mode is item-invoice
+    if (formData.mode === "item-invoice") {
+      if (!formData.partyId) pushError("partyId", "Party is required");
+      if (!formData.salesLedgerId) {
+        pushError("salesLedgerId", "Sales Ledger is required");
+      }
     }
 
     // ===== ENTRY LEVEL VALIDATION =====
@@ -992,11 +995,25 @@ const SalesVoucher: React.FC = () => {
 
     const totals = calculateTotals();
 
+    // Extract partyId from first ledger entry when in accounting mode
+    let finalPartyId = formData.partyId;
+    if (
+      (formData.mode === "accounting-invoice" ||
+        formData.mode === "as-voucher") &&
+      formData.entries.length > 0
+    ) {
+      // Use first debit entry's ledgerId as partyId, or first entry if no debit found
+      const firstDebitEntry = formData.entries.find(
+        (e) => e.type === "debit" && e.ledgerId
+      );
+      finalPartyId = firstDebitEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
+    }
+
     const payload = {
       date: formData.date,
       number: formData.number,
       referenceNo: formData.referenceNo,
-      partyId: formData.partyId,
+      partyId: finalPartyId,
       salesLedgerId: formData.salesLedgerId,
       narration: formData.narration,
 
@@ -1005,9 +1022,9 @@ const SalesVoucher: React.FC = () => {
       ownerId,
 
       dispatchDetails: {
-        docNo: formData.dispatchDetails.docNo,
-        through: formData.dispatchDetails.through,
-        destination: formData.dispatchDetails.destination,
+        docNo: formData.dispatchDetails?.docNo || "",
+        through: formData.dispatchDetails?.through || "",
+        destination: formData.dispatchDetails?.destination || "",
       },
 
       entries: formData.entries,

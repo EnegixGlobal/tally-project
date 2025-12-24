@@ -714,14 +714,18 @@ const PurchaseVoucher: React.FC = () => {
     const newErrors: { [key: string]: string } = {};
 
     if (!formData.date) newErrors.date = "Date is required";
-    if (!formData.partyId) newErrors.partyId = "Party is required";
     if (!formData.number) newErrors.number = "Voucher number is required";
-    if (!formData.referenceNo)
-      newErrors.referenceNo = "Supplier Invoice number is required";
-    if (!formData.supplierInvoiceDate)
-      newErrors.supplierInvoiceDate = "Supplier Invoice date is required";
-    if (!formData.purchaseLedgerId)
-      newErrors.purchaseLedgerId = "Purchase Ledger is required";
+
+    // Only validate item-invoice specific fields when mode is item-invoice
+    if (formData.mode === "item-invoice") {
+      if (!formData.partyId) newErrors.partyId = "Party is required";
+      if (!formData.referenceNo)
+        newErrors.referenceNo = "Supplier Invoice number is required";
+      if (!formData.supplierInvoiceDate)
+        newErrors.supplierInvoiceDate = "Supplier Invoice date is required";
+      if (!formData.purchaseLedgerId)
+        newErrors.purchaseLedgerId = "Purchase Ledger is required";
+    }
 
     if (formData.mode === "item-invoice") {
       formData.entries.forEach((entry, index) => {
@@ -817,9 +821,24 @@ const PurchaseVoucher: React.FC = () => {
     try {
       const totals = calculateTotals();
 
+      // Extract partyId from first ledger entry when in accounting mode
+      let finalPartyId = formData.partyId;
+      if (
+        (formData.mode === "accounting-invoice" ||
+          formData.mode === "as-voucher") &&
+        formData.entries.length > 0
+      ) {
+        // Use first debit entry's ledgerId as partyId, or first entry if no debit found
+        const firstDebitEntry = formData.entries.find(
+          (e) => e.type === "debit" && e.ledgerId
+        );
+        finalPartyId = firstDebitEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
+      }
+
       // 🔥 1. Voucher payload (batchMeta INCLUDED but no API yet)
       const payload = {
         ...formData,
+        partyId: finalPartyId, // Use extracted partyId
         ...totals,
         companyId,
         ownerType,
@@ -912,7 +931,7 @@ const PurchaseVoucher: React.FC = () => {
         "success"
       );
 
-      navigate("/app/vouchers/purchase/create");
+      navigate("/app/vouchers");
     } catch (err) {
       console.error("Submit error:", err);
       Swal.fire("Error", "Network or server issue", "error");

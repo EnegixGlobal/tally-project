@@ -28,6 +28,7 @@ router.get("/", async (req, res) => {
     l.phone,
     l.gst_number AS gstNumber,
     l.pan_number AS panNumber,
+    l.created_at AS createdAt,
     g.name AS groupName,
     g.type AS groupType,
     g.nature AS groupNature
@@ -38,7 +39,6 @@ router.get("/", async (req, res) => {
   `,
       [company_id, owner_type, owner_id]
     );
-
     res.json(rows);
   } catch (err) {
     console.error("Error fetching ledgers:", err);
@@ -136,6 +136,7 @@ router.get("/cash-bank", async (req, res) => {
       SELECT 
         l.id,
         l.name,
+        l.created_at AS createdAt,
         g.name AS groupName
       FROM ledgers l
       INNER JOIN ledger_groups g ON l.group_id = g.id
@@ -294,6 +295,7 @@ router.get("/:id", async (req, res) => {
       phone: ledger.phone,
       gstNumber: ledger.gst_number,
       panNumber: ledger.pan_number,
+      createdAt: ledger.created_at,
       groupName: ledger.groupName,
     });
   } catch (err) {
