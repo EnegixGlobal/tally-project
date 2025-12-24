@@ -205,6 +205,10 @@ import SalesByFifo from "./components/config/SalesByFifo";
 import Profile from "./components/config/Profile";
 import PurchaseDetail from "./components/reports/profit_loss/PurchaseDetail";
 import PurchaseAddDetails from "./components/reports/profit_loss/PurchaseAddDetails";
+import PurchaseItemDetail from "./components/reports/profit_loss/PurchaseItemDetail";
+import OpeningStockDetail from "./components/reports/profit_loss/OpeningStockDetail";
+import SalesItemDetail from "./components/reports/profit_loss/SalesItemDetail";
+import DirectExpenseDetail from "./components/reports/profit_loss/DirectExpenseDetail";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -999,6 +1003,38 @@ function App() {
                 element={
                   <RequireCompany>
                     <SalesAddDetails />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/profit-loss/opening-stock/alldetails"
+                element={
+                  <RequireCompany>
+                    <OpeningStockDetail />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/profit-loss/purchase-item/alldetails"
+                element={
+                  <RequireCompany>
+                    <PurchaseItemDetail />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/profit-loss/sales-item/alldetails"
+                element={
+                  <RequireCompany>
+                    <SalesItemDetail />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/profit-loss/direct-expense/alldetails"
+                element={
+                  <RequireCompany>
+                    <DirectExpenseDetail />
                   </RequireCompany>
                 }
               />

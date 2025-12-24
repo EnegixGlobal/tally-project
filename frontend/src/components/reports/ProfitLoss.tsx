@@ -25,6 +25,7 @@ const ProfitLoss: React.FC = () => {
 
   //get stock opening  data
   const [stockopening, setStockopening] = useState([]);
+  const [stockItems, setStockItems] = useState<any[]>([]);
 
   useEffect(() => {
     const stockBatch = async () => {
@@ -40,6 +41,9 @@ const ProfitLoss: React.FC = () => {
         }
 
         const data = await res.json();
+
+        // Store full stock items for inventory breakup
+        setStockItems(data.data || []);
 
         const allBatches = data.data.flatMap((item: any) => item.batches || []);
 
@@ -256,6 +260,184 @@ const ProfitLoss: React.FC = () => {
     return getProfitLossCreditTotal() - getProfitLossDebitTotal();
   };
 
+  // Helper functions for inventory breakup
+  const getOpeningStockByItems = () => {
+    return stockItems
+      .filter((item: any) => item.batches && item.batches.length > 0)
+      .map((item: any) => ({
+        id: item.id,
+        name: item.name,
+        batches: item.batches.filter((b: any) => b.openingRate),
+        totalValue: item.batches
+          .filter((b: any) => b.openingRate)
+          .reduce((sum: number, b: any) => {
+            const qty = Number(b.batchQuantity || 0);
+            const rate = Number(b.openingRate || 0);
+            return sum + qty * rate;
+          }, 0),
+      }))
+      .filter((item) => item.totalValue > 0);
+  };
+
+  const getPurchaseByItems = () => {
+    // Create a map to store item IDs by name
+    const itemIdMap = new Map<string, string | number>();
+    stockItems.forEach((item: any) => {
+      itemIdMap.set(item.name, item.id);
+    });
+
+    const itemMap = new Map<string, { id: string | number; name: string; qty: number; rate: number; value: number }>();
+    
+    purchaseData.forEach((p: any) => {
+      const itemName = p.itemName || "Unknown Item";
+      const qty = Number(p.purchaseQuantity || 0);
+      const rate = Number(p.rate || 0);
+      const value = qty * rate;
+
+      if (itemMap.has(itemName)) {
+        const existing = itemMap.get(itemName)!;
+        existing.qty += qty;
+        existing.value += value;
+        existing.rate = existing.value / existing.qty || 0;
+      } else {
+        itemMap.set(itemName, { 
+          id: itemIdMap.get(itemName) || itemName,
+          name: itemName, 
+          qty, 
+          rate, 
+          value 
+        });
+      }
+    });
+
+    return Array.from(itemMap.values()).filter((item) => item.value > 0);
+  };
+
+  const getSalesByItems = () => {
+    // Create a map to store item IDs by name
+    const itemIdMap = new Map<string, string | number>();
+    stockItems.forEach((item: any) => {
+      itemIdMap.set(item.name, item.id);
+    });
+
+    const itemMap = new Map<string, { id: string | number; name: string; qty: number; rate: number; value: number }>();
+    
+    salesData.forEach((s: any) => {
+      const itemName = s.itemName || "Unknown Item";
+      const qty = Math.abs(Number(s.qtyChange || 0));
+      const rate = Number(s.rate || 0);
+      const value = qty * rate;
+
+      if (itemMap.has(itemName)) {
+        const existing = itemMap.get(itemName)!;
+        existing.qty += qty;
+        existing.value += value;
+        existing.rate = existing.value / existing.qty || 0;
+      } else {
+        itemMap.set(itemName, { 
+          id: itemIdMap.get(itemName) || itemName,
+          name: itemName, 
+          qty, 
+          rate, 
+          value 
+        });
+      }
+    });
+
+    return Array.from(itemMap.values()).filter((item) => item.value > 0);
+  };
+
+  const getClosingStockByItems = () => {
+    const openingItems = getOpeningStockByItems();
+    const purchaseItems = getPurchaseByItems();
+    const salesItems = getSalesByItems();
+
+    // Create a map to store item IDs by name
+    const itemIdMap = new Map<string, string | number>();
+    openingItems.forEach((item) => {
+      itemIdMap.set(item.name, item.id);
+    });
+    // Also check stockItems for items that might not be in opening stock
+    stockItems.forEach((item: any) => {
+      if (!itemIdMap.has(item.name)) {
+        itemIdMap.set(item.name, item.id);
+      }
+    });
+
+    const itemMap = new Map<string, { id: string | number; name: string; opening: number; purchase: number; sales: number; closing: number }>();
+
+    // Add opening stock
+    openingItems.forEach((item) => {
+      itemMap.set(item.name, {
+        id: item.id,
+        name: item.name,
+        opening: item.totalValue,
+        purchase: 0,
+        sales: 0,
+        closing: item.totalValue,
+      });
+    });
+
+    // Add purchases
+    purchaseItems.forEach((item) => {
+      if (itemMap.has(item.name)) {
+        const existing = itemMap.get(item.name)!;
+        existing.purchase = item.value;
+        existing.closing = existing.opening + existing.purchase - existing.sales;
+      } else {
+        itemMap.set(item.name, {
+          id: itemIdMap.get(item.name) || item.name,
+          name: item.name,
+          opening: 0,
+          purchase: item.value,
+          sales: 0,
+          closing: item.value,
+        });
+      }
+    });
+
+    // Subtract sales
+    salesItems.forEach((item) => {
+      if (itemMap.has(item.name)) {
+        const existing = itemMap.get(item.name)!;
+        existing.sales = item.value;
+        existing.closing = existing.opening + existing.purchase - existing.sales;
+      } else {
+        itemMap.set(item.name, {
+          id: itemIdMap.get(item.name) || item.name,
+          name: item.name,
+          opening: 0,
+          purchase: 0,
+          sales: item.value,
+          closing: -item.value,
+        });
+      }
+    });
+
+    return Array.from(itemMap.values())
+      .map((item) => ({
+        ...item,
+        closing: Math.max(0, item.closing),
+      }))
+      .filter((item) => item.closing > 0);
+  };
+
+  const getIndirectIncomeLedgers = () => {
+    return ledgers.filter(
+      (l) =>
+        ledgerGroups.find((g) => g.id === l.groupId)?.type ===
+        "indirect-income"
+    );
+  };
+
+  const getIndirectExpensesLedgers = () => {
+    return ledgers.filter(
+      (l) =>
+        ledgerGroups.find((g) => g.id === l.groupId)?.type ===
+        "indirect-expenses"
+    );
+  };
+
   // Drilldown handlers for GST breakup rows
   const handlePurchaseLedgerClick = (ledgerName: string, ledgerId: number) => {
     navigate(
@@ -268,6 +450,38 @@ const ProfitLoss: React.FC = () => {
   const handleSalesLedgerClick = (ledgerName: string, ledgerId: number) => {
     navigate(
       `/app/reports/profit-loss/sales/alldetails?ledger=${encodeURIComponent(
+        ledgerName
+      )}&groupId=${ledgerId}`
+    );
+  };
+
+  const handleOpeningStockItemClick = (itemName: string, itemId: string | number) => {
+    navigate(
+      `/app/reports/profit-loss/opening-stock/alldetails?item=${encodeURIComponent(
+        itemName
+      )}&itemId=${itemId}`
+    );
+  };
+
+  const handlePurchaseItemClick = (itemName: string, itemId: string | number) => {
+    navigate(
+      `/app/reports/profit-loss/purchase-item/alldetails?item=${encodeURIComponent(
+        itemName
+      )}&itemId=${itemId}`
+    );
+  };
+
+  const handleSalesItemClick = (itemName: string, itemId: string | number) => {
+    navigate(
+      `/app/reports/profit-loss/sales-item/alldetails?item=${encodeURIComponent(
+        itemName
+      )}&itemId=${itemId}`
+    );
+  };
+
+  const handleDirectExpenseClick = (ledgerName: string, ledgerId: number) => {
+    navigate(
+      `/app/reports/profit-loss/direct-expense/alldetails?ledger=${encodeURIComponent(
         ledgerName
       )}&groupId=${ledgerId}`
     );
@@ -422,90 +636,153 @@ const ProfitLoss: React.FC = () => {
               Dr.
             </h3>
             <div className="space-y-2">
-              <div
-                className={`flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                  theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                }`}
-                onClick={handleStockClick}
-                title="Click to view Stock Summary"
-              >
-                <span className="text-blue-600 dark:text-blue-400 underline">
-                  To Opening Stock
-                </span>
-                <span className="font-mono">
-                  {getOpeningStock().toLocaleString()}
-                </span>
+              <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                <div
+                  className={`flex justify-between cursor-pointer transition-colors ${
+                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                  }`}
+                  onClick={handleStockClick}
+                  title="Click to view Stock Summary"
+                >
+                  <span className="text-blue-600 dark:text-blue-400 underline font-semibold">
+                    To Opening Stock
+                  </span>
+                  <span className="font-mono font-semibold">
+                    {getOpeningStock().toLocaleString()}
+                  </span>
+                </div>
+
+                {/* Inventory Breakup - Opening Stock */}
+                {showInventoryBreakup && (
+                  <div className="mt-2 space-y-1 pl-4 text-sm">
+                    {getOpeningStockByItems().map((item, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleOpeningStockItemClick(item.name, item.id)}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
+                          theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                        }`}
+                      >
+                        <span className="text-blue-600 underline">
+                          {item.name}
+                        </span>
+                        <span className="font-mono">
+                          {item.totalValue.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                    {getOpeningStockByItems().length === 0 && (
+                      <div className={`text-xs italic ${
+                        theme === "dark" ? "text-gray-500" : "text-gray-500"
+                      }`}>No opening stock items</div>
+                    )}
+                  </div>
+                )}
               </div>
 
               {/* purchase */}
               <div className="py-2 border-b border-gray-300 dark:border-gray-600">
-
                 {showDetailed ? (
-                  // Inventory ON (breakup view)
-                  <div className="py-2 border-b border-gray-300 dark:border-gray-600">
-                    <div className="flex justify-between font-semibold">
-                      <span>To Purchases</span>
-                      <span className="font-mono">
-                        {getPurchaseTotal().toLocaleString()}
-                      </span>
-                    </div>
-
-                    {/* breakup yahan */}
+                  <div className="flex justify-between font-semibold">
+                    <span>To Purchases</span>
+                    <span className="font-mono">
+                      {(
+                        purchaseLedgers.reduce(
+                          (sum, item) =>
+                            sum + Number(item.opening_balance || 0),
+                          0
+                        ) +
+                        (showInventoryBreakup
+                          ? getPurchaseByItems().reduce(
+                              (sum, item) => sum + item.value,
+                              0
+                            )
+                          : 0)
+                      ).toLocaleString()}
+                    </span>
                   </div>
                 ) : (
-                 
-                  <div className="py-2 border-b border-gray-300 dark:border-gray-600">
-                    <div className="flex justify-between font-semibold cursor-pointer">
-                      <Link to="purchase">
-                      <span>To Purchases </span>
-                      </Link>
-                      <span className="font-mono">
-                        {getPurchaseTotal().toLocaleString()}
-                      </span>
-                    </div>
+                  <div className="flex justify-between font-semibold cursor-pointer">
+                    <Link to="purchase">
+                      <span>To Purchases</span>
+                    </Link>
+                    <span className="font-mono">
+                      {getPurchaseTotal().toLocaleString()}
+                    </span>
                   </div>
                 )}
 
-                {/* GST Breakup */}
+                {/* GST Breakup - Ledgers */}
                 {showDetailed && (
-                  <>
-                    <div className="mt-2 space-y-1 pl-4 text-sm">
-                      {purchaseLedgers.map((item, index) => (
-                        <div
-                          key={index}
-                          onClick={() =>
-                            handlePurchaseLedgerClick(item.name, item.id)
-                          }
-                          className="flex justify-between text-gray-700 cursor-pointer hover:bg-gray-100"
-                        >
-                          <span className="text-blue-600 underline">
-                            {item.name}
-                          </span>
-                          <span className="font-mono">
-                            {Number(item.opening_balance).toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
-
-                      {/* Divider */}
-                      <div className="border-t border-dashed border-gray-400 my-1" />
-
-                      {/* TOTAL */}
-                      <div className="flex justify-between font-semibold text-gray-900">
-                        <span>Total GST Purchase</span>
+                  <div className="mt-2 space-y-1 pl-4 text-sm">
+                    {purchaseLedgers.map((item, index) => (
+                      <div
+                        key={index}
+                        onClick={() =>
+                          handlePurchaseLedgerClick(item.name, item.id)
+                        }
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
+                          theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
+                      >
+                        <span className="text-blue-600 underline">
+                          {item.name}
+                        </span>
                         <span className="font-mono">
-                          {(
-                            Number(getPurchaseTotal() || 0) +
-                            purchaseLedgers.reduce(
-                              (sum, item) =>
-                                sum + Number(item.opening_balance || 0),
-                              0
-                            )
-                          ).toLocaleString()}
+                          {Number(item.opening_balance).toLocaleString()}
                         </span>
                       </div>
-                    </div>
-                  </>
+                    ))}
+
+                    {/* Inventory Breakup - Purchase Items */}
+                    {showInventoryBreakup && (
+                      <>
+                        {getPurchaseByItems().map((item, index) => (
+                          <div
+                            key={`item-${index}`}
+                            onClick={() => handlePurchaseItemClick(item.name, item.id)}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
+                              theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                            }`}
+                          >
+                            <span className="text-blue-600 underline">
+                              {item.name}
+                            </span>
+                            <span className="font-mono">
+                              {item.value.toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Inventory Breakup - Purchase Items (when detailed is off but inventory is on) */}
+                {!showDetailed && showInventoryBreakup && (
+                  <div className="mt-2 space-y-1 pl-4 text-sm">
+                    {getPurchaseByItems().map((item, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handlePurchaseItemClick(item.name, item.id)}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
+                          theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                        }`}
+                      >
+                        <span className="text-blue-600 underline">
+                          {item.name}
+                        </span>
+                        <span className="font-mono">
+                          {item.value.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                    {getPurchaseByItems().length === 0 && (
+                      <div className={`text-xs italic ${
+                        theme === "dark" ? "text-gray-500" : "text-gray-500"
+                      }`}>No purchase items</div>
+                    )}
+                  </div>
                 )}
               </div>
 
@@ -524,9 +801,14 @@ const ProfitLoss: React.FC = () => {
                     {directexpense.map((item, index) => (
                       <div
                         key={index}
-                        className="flex justify-between text-gray-700"
+                        onClick={() => handleDirectExpenseClick(item.name, item.id)}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
+                          theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                        }`}
                       >
-                        <span>{item.name}</span>
+                        <span className="text-blue-600 underline">
+                          {item.name}
+                        </span>
                         <span className="font-mono">
                           {Number(item.opening_balance).toLocaleString()}
                         </span>
@@ -537,7 +819,9 @@ const ProfitLoss: React.FC = () => {
                     <div className="border-t border-dashed border-gray-400 my-1" />
 
                     {/* TOTAL */}
-                    <div className="flex justify-between font-semibold text-gray-900">
+                    <div className={`flex justify-between font-semibold ${
+                      theme === "dark" ? "text-gray-200" : "text-gray-900"
+                    }`}>
                       <span>Total Direct Expenses</span>
                       <span className="font-mono">
                         {(
@@ -586,7 +870,19 @@ const ProfitLoss: React.FC = () => {
                   <div className="flex justify-between font-semibold">
                     <span>By Sales</span>
                     <span className="font-mono">
-                      {getSalesTotal().toLocaleString()}
+                      {(
+                        salesLedgers.reduce(
+                          (sum, item) =>
+                            sum + Number(item.opening_balance || 0),
+                          0
+                        ) +
+                        (showInventoryBreakup
+                          ? getSalesByItems().reduce(
+                              (sum, item) => sum + item.value,
+                              0
+                            )
+                          : 0)
+                      ).toLocaleString()}
                     </span>
                   </div>
                 ) : (
@@ -600,61 +896,122 @@ const ProfitLoss: React.FC = () => {
                   </div>
                 )}
 
+                {/* GST Breakup - Ledgers */}
                 {showDetailed && (
-                  <>
-                    <div className="mt-2 space-y-1 pl-4 text-sm">
-                      {salesLedgers.map((item, index) => (
-                        <div
-                          key={index}
-                          onClick={() =>
-                            handleSalesLedgerClick(item.name, item.id)
-                          }
-                          className="flex justify-between text-gray-700 cursor-pointer hover:bg-gray-100"
-                        >
-                          <span className="text-blue-600 underline">
-                            {item.name}
-                          </span>
-                          <span className="font-mono">
-                            {Number(item.opening_balance).toLocaleString()}
-                          </span>
-                        </div>
-                      ))}
-
-                      {/* Divider */}
-                      <div className="border-t border-dashed border-gray-400 my-1" />
-
-                      {/* TOTAL */}
-                      <div className="flex justify-between font-semibold text-gray-900">
-                        <span>Total GST Sales</span>
+                  <div className="mt-2 space-y-1 pl-4 text-sm">
+                    {salesLedgers.map((item, index) => (
+                      <div
+                        key={index}
+                        onClick={() =>
+                          handleSalesLedgerClick(item.name, item.id)
+                        }
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
+                          theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
+                      >
+                        <span className="text-blue-600 underline">
+                          {item.name}
+                        </span>
                         <span className="font-mono">
-                          {(
-                            Number(getSalesTotal() || 0) +
-                            salesLedgers.reduce(
-                              (sum, item) =>
-                                sum + Number(item.opening_balance || 0),
-                              0
-                            )
-                          ).toLocaleString()}
+                          {Number(item.opening_balance).toLocaleString()}
                         </span>
                       </div>
-                    </div>
-                  </>
+                    ))}
+
+                    {/* Inventory Breakup - Sales Items */}
+                    {showInventoryBreakup && (
+                      <>
+                        {getSalesByItems().map((item, index) => (
+                          <div
+                            key={`item-${index}`}
+                            onClick={() => handleSalesItemClick(item.name, item.id)}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
+                              theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                            }`}
+                          >
+                            <span className="text-blue-600 underline">
+                              {item.name}
+                            </span>
+                            <span className="font-mono">
+                              {item.value.toLocaleString()}
+                            </span>
+                          </div>
+                        ))}
+                      </>
+                    )}
+                  </div>
+                )}
+
+                {/* Inventory Breakup - Sales Items (when detailed is off but inventory is on) */}
+                {!showDetailed && showInventoryBreakup && (
+                  <div className="mt-2 space-y-1 pl-4 text-sm">
+                    {getSalesByItems().map((item, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleSalesItemClick(item.name, item.id)}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
+                          theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                        }`}
+                      >
+                        <span className="text-blue-600 underline">
+                          {item.name}
+                        </span>
+                        <span className="font-mono">
+                          {item.value.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                    {getSalesByItems().length === 0 && (
+                      <div className={`text-xs italic ${
+                        theme === "dark" ? "text-gray-500" : "text-gray-500"
+                      }`}>No sales items</div>
+                    )}
+                  </div>
                 )}
               </div>
 
-              <div
-                className={`flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                  theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                }`}
-                onClick={handleStockClick}
-                title="Click to view Stock Summary"
-              >
-                <span className="text-blue-600 dark:text-blue-400 underline">
-                  By Closing Stock
-                </span>
-                <span className="font-mono">
-                  {getClosingStock().toLocaleString()}
-                </span>
+              <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                <div
+                  className={`flex justify-between cursor-pointer transition-colors ${
+                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                  }`}
+                  onClick={handleStockClick}
+                  title="Click to view Stock Summary"
+                >
+                  <span className="text-blue-600 dark:text-blue-400 underline font-semibold">
+                    By Closing Stock
+                  </span>
+                  <span className="font-mono font-semibold">
+                    {getClosingStock().toLocaleString()}
+                  </span>
+                </div>
+
+                {/* Inventory Breakup - Closing Stock */}
+                {showInventoryBreakup && (
+                  <div className="mt-2 space-y-1 pl-4 text-sm">
+                    {getClosingStockByItems().map((item, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleOpeningStockItemClick(item.name, item.id)}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
+                          theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                        }`}
+                      >
+                        <span className="text-blue-600 underline">
+                          {item.name}
+                        </span>
+                        <span className="font-mono">
+                          {item.closing.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                    {getClosingStockByItems().length === 0 && (
+                      <div className={`text-xs italic ${
+                        theme === "dark" ? "text-gray-500" : "text-gray-500"
+                      }`}>No closing stock items</div>
+                    )}
+                  </div>
+                )}
               </div>
               {getGrossProfit() < 0 && (
                 <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 font-semibold text-red-600">
@@ -706,11 +1063,37 @@ const ProfitLoss: React.FC = () => {
                   </span>
                 </div>
               )}
-              <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600">
-                <span>To Indirect Expenses</span>
-                <span className="font-mono">
-                  {getIndirectExpensesTotal().toLocaleString()}
-                </span>
+              <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                <div className="flex justify-between font-semibold">
+                  <span>To Indirect Expenses</span>
+                  <span className="font-mono">
+                    {getIndirectExpensesTotal().toLocaleString()}
+                  </span>
+                </div>
+
+                {/* Inventory Breakup - Indirect Expenses */}
+                {showInventoryBreakup && (
+                  <div className="mt-2 space-y-1 pl-4 text-sm">
+                    {getIndirectExpensesLedgers().map((ledger, index) => (
+                      <div
+                        key={index}
+                        className={`flex justify-between ${
+                          theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
+                      >
+                        <span>{ledger.name}</span>
+                        <span className="font-mono">
+                          {ledger.openingBalance.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                    {getIndirectExpensesLedgers().length === 0 && (
+                      <div className={`text-xs italic ${
+                        theme === "dark" ? "text-gray-500" : "text-gray-500"
+                      }`}>No indirect expenses</div>
+                    )}
+                  </div>
+                )}
               </div>
               {getNetProfit() > 0 && (
                 <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 font-semibold text-green-600">
@@ -746,11 +1129,37 @@ const ProfitLoss: React.FC = () => {
                   </span>
                 </div>
               )}
-              <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600">
-                <span>By Indirect Income</span>
-                <span className="font-mono">
-                  {getIndirectIncomeTotal().toLocaleString()}
-                </span>
+              <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                <div className="flex justify-between font-semibold">
+                  <span>By Indirect Income</span>
+                  <span className="font-mono">
+                    {getIndirectIncomeTotal().toLocaleString()}
+                  </span>
+                </div>
+
+                {/* Inventory Breakup - Indirect Income */}
+                {showInventoryBreakup && (
+                  <div className="mt-2 space-y-1 pl-4 text-sm">
+                    {getIndirectIncomeLedgers().map((ledger, index) => (
+                      <div
+                        key={index}
+                        className={`flex justify-between ${
+                          theme === "dark" ? "text-gray-300" : "text-gray-700"
+                        }`}
+                      >
+                        <span>{ledger.name}</span>
+                        <span className="font-mono">
+                          {ledger.openingBalance.toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
+                    {getIndirectIncomeLedgers().length === 0 && (
+                      <div className={`text-xs italic ${
+                        theme === "dark" ? "text-gray-500" : "text-gray-500"
+                      }`}>No indirect income</div>
+                    )}
+                  </div>
+                )}
               </div>
               {getNetProfit() < 0 && (
                 <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 font-semibold text-red-600">
