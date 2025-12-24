@@ -6,10 +6,19 @@ interface Ledger {
   id: number;
   name: string;
   group_id: number;
-  opening_balance: number;
-  balance_type: "debit" | "credit";
-  group_name: string;
-  group_type: string | null;
+  openingBalance: number;
+  balanceType: "debit" | "credit";
+  groupName: string | null;
+  groupType: string | null;
+  groupNature: string | null;
+  createdAt?: string;
+  closingBalance?: number;
+  address?: string;
+  email?: string;
+  phone?: string;
+  gstNumber?: string;
+  panNumber?: string;
+  groupId?: number;
 }
 
 const GroupSummary: React.FC = () => {
@@ -77,6 +86,7 @@ const GroupSummary: React.FC = () => {
         }
 
         const data = await res.json();
+        console.log("this is ledger groups data", data);
         setGroups(data || []);
       } catch (err) {
         console.error("Failed to load ledger groups", err);
@@ -105,6 +115,7 @@ const GroupSummary: React.FC = () => {
         }
 
         const data = await res.json();
+        console.log("this is ledger data", data);
         const groupIdFromUrl = Number(groupType);
 
         let resolvedName = "Unknown Group";
@@ -171,7 +182,7 @@ const GroupSummary: React.FC = () => {
     if (base) return base.id;
 
     // Try match with fetched ledgerGroups by name
-    const found = ledgerGroups.find(
+    const found = groups.find(
       (g) => g.name.toLowerCase() === trimmed.toLowerCase()
     );
     if (found) return found.id;
@@ -185,7 +196,7 @@ const GroupSummary: React.FC = () => {
   const groupLedgers =
     resolvedGroupId !== null
       ? ledgers.filter(
-          (ledger) => Number(ledger.group_id) === Number(resolvedGroupId)
+          (ledger) => Number(ledger.groupId || ledger.group_id) === Number(resolvedGroupId)
         )
       : [];
 
@@ -195,7 +206,7 @@ const GroupSummary: React.FC = () => {
     0
   );
 
-  // Generate mock monthly-wise data for demonstration (you can replace this with real data)
+  // Generate monthly-wise data based on creation date
   const generateMonthlyData = (ledger: any) => {
     const months = [
       "Apr",
@@ -213,13 +224,39 @@ const GroupSummary: React.FC = () => {
     ];
 
     const opening = Number(ledger.openingBalance) || 0;
+    
+    // If no createdAt, show opening balance in first month (Apr)
+    let creationMonthIndex = 0;
+    
+    if (ledger.createdAt) {
+      const createdDate = new Date(ledger.createdAt);
+      const createdMonth = createdDate.getMonth(); // 0-11 (Jan-Dec)
+      
+      // Map calendar months to financial year months (Apr-Mar)
+      // Jan (0) -> 9, Feb (1) -> 10, Mar (2) -> 11
+      // Apr (3) -> 0, May (4) -> 1, ..., Dec (11) -> 8
+      if (createdMonth >= 3) {
+        // Apr to Dec (months 3-11) map to indices 0-8
+        creationMonthIndex = createdMonth - 3;
+      } else {
+        // Jan to Mar (months 0-2) map to indices 9-11
+        creationMonthIndex = createdMonth + 9;
+      }
+    }
 
-    return months.map((month) => ({
-      month,
-      opening,
-      current: 0,
-      closing: opening,
-    }));
+    return months.map((month, index) => {
+      // Only show opening balance in the month when ledger was created
+      const isCreationMonth = index === creationMonthIndex;
+      const monthOpening = isCreationMonth ? opening : 0;
+      const monthClosing = isCreationMonth ? opening : 0;
+
+      return {
+        month,
+        opening: monthOpening,
+        current: 0,
+        closing: monthClosing,
+      };
+    });
   };
 
   // You can replace this with your actual theme logic or context
@@ -416,9 +453,9 @@ const GroupSummary: React.FC = () => {
                       {Number(ledger.openingBalance).toLocaleString()}
                     </td>
 
-                    {/* Closing Balance (same as opening for now) */}
+                    {/* Closing Balance */}
                     <td className="px-4 py-3 text-right font-mono">
-                      {Number(ledger.openingBalance).toLocaleString()}
+                      {Number(ledger.closingBalance ?? ledger.openingBalance).toLocaleString()}
                     </td>
 
                     {/* Type */}
