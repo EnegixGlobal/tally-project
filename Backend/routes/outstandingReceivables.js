@@ -174,6 +174,7 @@ router.get("/api/outstanding-receivables", async (req, res) => {
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({ error: "Missing tenant info" });
     }
+    console.log('customergroup', customerGroup)
 
     /* =========================
        1️⃣ LEDGERS (FILTER BY GROUP)
@@ -193,7 +194,7 @@ router.get("/api/outstanding-receivables", async (req, res) => {
         AND l.owner_id = ?
     `;
 
-    const params = [company_id, owner_type, owner_id, customerGroup];
+    const params = [company_id, owner_type, owner_id];
 
     if (customerGroup) {
       ledgerSql += ` AND l.group_id = ?`;
@@ -201,47 +202,26 @@ router.get("/api/outstanding-receivables", async (req, res) => {
     }
 
     const [ledgers] = await pool.query(ledgerSql, params);
-    console.log('this is ledger', ledgers)
 
-    if (!ledgers.length) return res.json([]);
+    if (!ledgers.length) {
+      return res.json([]);
+    }
 
     /* =========================
-       2️⃣ SALES VOUCHERS
+       2️⃣ LEDGER IDS
     ========================== */
     const ledgerIds = ledgers.map((l) => l.ledger_id);
 
- 
-
-    const salesSql = `
-      SELECT
-        id,
-        date,
-        total,
-        salesLedgerId
-      FROM sales_vouchers
-      WHERE company_id = ?
-        AND owner_type = ?
-        AND owner_id = ?
-        AND salesLedgerId IN (${ledgerIds.map(() => "?").join(",")})
-    `;
-
-    const [salesRows] = await pool.query(salesSql, [
-      company_id,
-      owner_type,
-      owner_id,
-      ...ledgerIds,
-    ]);
-  
-
-
-
     /* =========================
-       3️⃣ PURCHASE VOUCHERS
+       3️⃣ PURCHASE VOUCHERS (ONLY)
     ========================== */
     const purchaseSql = `
       SELECT
         id,
+        number,
+        partyId,
         date,
+        subtotal,
         total,
         purchaseLedgerId
       FROM purchase_vouchers
@@ -257,21 +237,15 @@ router.get("/api/outstanding-receivables", async (req, res) => {
       owner_id,
       ...ledgerIds,
     ]);
-    console.log('this is purchaseRows', purchaseRows)
+
+    // 🔍 DEBUG (OPTIONAL – REMOVE LATER)
+    console.log("🔵 PURCHASE ROWS COUNT:", purchaseRows.length);
+    console.log("🔵 PURCHASE ROWS SAMPLE:", purchaseRows.slice(0, 5));
 
     /* =========================
-       4️⃣ MERGE DATA (FINAL)
+       4️⃣ MERGE DATA (ONLY PURCHASE)
     ========================== */
     const finalResult = ledgers.map((ledger) => {
-      const sales = salesRows
-        .filter((s) => s.salesLedgerId === ledger.ledger_id)
-        .map((s) => ({
-          source: "sales",
-          voucher_id: s.id,
-          date: s.date,
-          total: s.total,
-        }));
-
       const purchases = purchaseRows
         .filter((p) => p.purchaseLedgerId === ledger.ledger_id)
         .map((p) => ({
@@ -281,11 +255,16 @@ router.get("/api/outstanding-receivables", async (req, res) => {
           total: p.total,
         }));
 
-
+      // 🔍 LEDGER LEVEL DEBUG
+      console.log("📒 LEDGER PURCHASE DEBUG:", {
+        ledger_name: ledger.ledger_name,
+        ledger_id: ledger.ledger_id,
+        purchase_count: purchases.length,
+      });
 
       return {
         ...ledger,
-        vouchers: [...sales, ...purchases],
+        vouchers: purchases, // ✅ ONLY PURCHASE DATA
       };
     });
 
@@ -293,10 +272,12 @@ router.get("/api/outstanding-receivables", async (req, res) => {
        5️⃣ RESPONSE
     ========================== */
     res.json(finalResult);
+
   } catch (err) {
     console.error("Outstanding receivables error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
 
 module.exports = router;

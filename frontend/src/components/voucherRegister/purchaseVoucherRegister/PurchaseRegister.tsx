@@ -32,29 +32,33 @@ const PurchaseRegister: React.FC = () => {
           fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${id}`, {
             method: "DELETE",
           })
-            .then((res) => res.json())
-            .then((data) => {
-              console.log("Delete Response:", data);
+            .then(async (res) => {
+              if (!res.ok) {
+                throw new Error("Delete failed");
+              }
 
-              if (data.message === "Voucher deleted successfully") {
-                // 🔥 Notify Parent Component
-                window.dispatchEvent(
-                  new CustomEvent("voucher-deleted", { detail: { id } })
-                );
-
-                Swal.fire({
-                  title: "Deleted!",
-                  text: "Voucher has been deleted successfully.",
-                  icon: "success",
-                  timer: 1200,
-                  showConfirmButton: false,
-                });
-              } else {
-                Swal.fire("Error!", "Failed to delete voucher!", "error");
+              // response optional hai
+              try {
+                return await res.json();
+              } catch {
+                return {};
               }
             })
+            .then(() => {
+              window.dispatchEvent(
+                new CustomEvent("voucher-deleted", { detail: { id } })
+              );
+
+              Swal.fire({
+                title: "Deleted!",
+                text: "Voucher has been deleted successfully.",
+                icon: "success",
+                timer: 1200,
+                showConfirmButton: false,
+              });
+            })
             .catch(() => {
-              Swal.fire("Error!", "Server not responding!", "error");
+              Swal.fire("Error!", "Failed to delete voucher!", "error");
             });
         });
       }}

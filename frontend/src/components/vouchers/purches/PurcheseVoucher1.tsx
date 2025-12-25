@@ -832,7 +832,8 @@ const PurchaseVoucher: React.FC = () => {
         const firstDebitEntry = formData.entries.find(
           (e) => e.type === "debit" && e.ledgerId
         );
-        finalPartyId = firstDebitEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
+        finalPartyId =
+          firstDebitEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
       }
 
       // 🔥 1. Voucher payload (batchMeta INCLUDED but no API yet)
@@ -906,6 +907,7 @@ const PurchaseVoucher: React.FC = () => {
             purchaseQuantity: Number(e.quantity),
             rate: Number(e.rate),
             purchaseDate: formData.date,
+            voucherNumber: formData.number,
             companyId,
             ownerType,
             ownerId,

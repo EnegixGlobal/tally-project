@@ -321,32 +321,50 @@ router.delete("/:id", async (req, res) => {
   const voucherId = req.params.id;
 
   try {
-    // 1️⃣ Delete items
-    await db.execute(`DELETE FROM sales_voucher_items WHERE voucherId = ?`, [
-      voucherId,
-    ]);
-
-    // 2️⃣ Delete ledger entries
-    await db.execute(`DELETE FROM voucher_entries WHERE voucher_id = ?`, [
-      voucherId,
-    ]);
-
-    // 3️⃣ Delete from main sales_vouchers table
-    const [result] = await db.execute(
-      `DELETE FROM sales_vouchers WHERE id = ?`,
+    // 1️⃣ voucher number nikaalo
+    const [[row]] = await db.execute(
+      "SELECT number FROM sales_vouchers WHERE id = ?",
       [voucherId]
     );
 
-    if (result.affectedRows === 0) {
+    if (!row) {
       return res.status(404).json({ message: "Voucher not found" });
     }
 
-    return res.json({ message: "Sales voucher deleted successfully" });
+    const voucherNumber = row.number;
+
+    // 2️⃣ sales_history se delete (✨ यही extra line है)
+    await db.execute(
+      "DELETE FROM sale_history WHERE voucherNumber = ?",
+      [voucherNumber]
+    );
+
+    // 3️⃣ voucher related tables
+    await db.execute(
+      "DELETE FROM sales_voucher_items WHERE voucherId = ?",
+      [voucherId]
+    );
+
+    await db.execute(
+      "DELETE FROM voucher_entries WHERE voucher_id = ?",
+      [voucherId]
+    );
+
+    // 4️⃣ main voucher delete
+    await db.execute(
+      "DELETE FROM sales_vouchers WHERE id = ?",
+      [voucherId]
+    );
+
+    return res.json({
+      message: "Sales voucher deleted successfully",
+    });
   } catch (err) {
     console.error("Delete failed:", err);
-    return res.status(500).json({ message: err.message || "Delete failed" });
+    return res.status(500).json({ message: err.message });
   }
 });
+
 
 //single get
 router.get("/:id", async (req, res) => {
@@ -527,70 +545,102 @@ router.put("/:id", async (req, res) => {
 
 router.post("/sale-history", async (req, res) => {
   try {
+    // Normalize input (single object OR array)
     const movementData = Array.isArray(req.body) ? req.body : [req.body];
 
-    const createTableSql = `
+    /* =====================================================
+       1️⃣ CREATE TABLE IF NOT EXISTS (MINIMAL)
+    ===================================================== */
+    await db.execute(`
       CREATE TABLE IF NOT EXISTS sale_history (
         id INT AUTO_INCREMENT PRIMARY KEY
       )
-    `;
-    await db.execute(createTableSql);
+    `);
 
-    const requiredColumns = [
-      "itemName VARCHAR(255)",
-      "hsnCode VARCHAR(50)",
-      "batchNumber VARCHAR(255)",
-      "qtyChange INT",
-      "rate DECIMAL(10,2)",
-      "movementDate DATE",
-      "companyId VARCHAR(100)",
-      "ownerType VARCHAR(50)",
-      "ownerId VARCHAR(100)",
-    ];
+    /* =====================================================
+       2️⃣ REQUIRED COLUMNS (WITH voucherNumber)
+    ===================================================== */
+    const requiredColumns = {
+      itemName: "VARCHAR(255)",
+      hsnCode: "VARCHAR(50)",
+      batchNumber: "VARCHAR(255)",
+      qtyChange: "INT",
+      rate: "DECIMAL(10,2)",
+      movementDate: "DATE",
+      voucherNumber: "VARCHAR(100)",     
+      companyId: "VARCHAR(100)",
+      ownerType: "VARCHAR(50)",
+      ownerId: "VARCHAR(100)",
+    };
 
-    for (const col of requiredColumns) {
-      const columnName = col.split(" ")[0];
-
+    /* =====================================================
+       3️⃣ CHECK & ADD MISSING COLUMNS (AUTO MIGRATION)
+    ===================================================== */
+    for (const [col, def] of Object.entries(requiredColumns)) {
       const [rows] = await db.execute(
-        `SELECT COLUMN_NAME 
-         FROM INFORMATION_SCHEMA.COLUMNS 
-         WHERE TABLE_NAME = 'sale_history' 
-           AND COLUMN_NAME = ?`,
-        [columnName]
+        `
+        SELECT COLUMN_NAME
+        FROM INFORMATION_SCHEMA.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = 'sale_history'
+          AND COLUMN_NAME = ?
+        `,
+        [col]
       );
 
       if (rows.length === 0) {
-        await db.execute(`ALTER TABLE sale_history ADD COLUMN ${col}`);
+        await db.execute(
+          `ALTER TABLE sale_history ADD COLUMN ${col} ${def}`
+        );
       }
     }
 
-    // 3️⃣ Insert data
+    /* =====================================================
+       4️⃣ INSERT QUERY (ORDER MATTERS)
+    ===================================================== */
     const insertSql = `
-      INSERT INTO sale_history 
-      (itemName, hsnCode, batchNumber, qtyChange, rate, movementDate, companyId, ownerType, ownerId)
+      INSERT INTO sale_history
+      (
+        itemName,
+        hsnCode,
+        batchNumber,
+        qtyChange,
+        rate,
+        movementDate,
+        voucherNumber,
+        companyId,
+        ownerType,
+        ownerId
+      )
       VALUES ?
     `;
 
     const values = movementData.map((e) => [
-      e.itemName,
+      e.itemName || null,
       e.hsnCode || "",
       e.batchNumber || null,
-      e.qtyChange || 0,
-      e.rate || 0,
-      e.movementDate,
-      e.companyId,
-      e.ownerType,
-      e.ownerId,
+      Number(e.qtyChange) || 0,
+      Number(e.rate) || 0,
+      e.movementDate || null,
+      e.voucherNumber || null,   // ✅ SAVED HERE
+      e.companyId || null,
+      e.ownerType || null,
+      e.ownerId || null,
     ]);
 
-    // Auth safety check
-    if (values.some((v) => !v[6] || !v[7] || !v[8])) {
+    /* =====================================================
+       5️⃣ TENANT SECURITY CHECK
+    ===================================================== */
+    if (values.some((v) => !v[7] || !v[8] || !v[9])) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized: company or owner missing",
       });
     }
 
+    /* =====================================================
+       6️⃣ EXECUTE INSERT
+    ===================================================== */
     await db.query(insertSql, [values]);
 
     return res.status(200).json({
@@ -605,5 +655,6 @@ router.post("/sale-history", async (req, res) => {
     });
   }
 });
+
 
 module.exports = router;

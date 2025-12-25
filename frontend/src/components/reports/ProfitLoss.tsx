@@ -77,6 +77,7 @@ const ProfitLoss: React.FC = () => {
         );
 
         const result = await res.json();
+        console.log('purchase history', result.data)
 
         setPurchaseData(result.data || []);
       } catch (error) {
@@ -98,6 +99,7 @@ const ProfitLoss: React.FC = () => {
           }/api/sales-vouchers/sale-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const result = await res.json();
+        console.log('sales', result.data)
 
         setSalesData(result.data);
       } catch (error) {

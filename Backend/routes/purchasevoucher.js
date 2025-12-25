@@ -281,25 +281,46 @@ router.delete("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
 
   try {
-    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
+    // 1️⃣ voucher number nikaalo
+    const [rows] = await db.execute(
+      "SELECT number FROM purchase_vouchers WHERE id = ?",
+      [id]
+    );
 
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Voucher not found",
+      });
+    }
+
+    const voucherNumber = rows[0].number;
+
+    // 2️⃣ child tables delete
+    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
     await db.execute("DELETE FROM purchase_voucher_items WHERE voucherId = ?", [
       id,
     ]);
 
-    const [result] = await db.execute(
-      "DELETE FROM purchase_vouchers WHERE id = ?",
-      [id]
-    );
+    // 3️⃣ purchase history delete
+    await db.execute("DELETE FROM purchase_history WHERE voucherNumber = ?", [
+      voucherNumber,
+    ]);
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: "Voucher not found" });
-    }
+    // 4️⃣ main voucher delete
+    await db.execute("DELETE FROM purchase_vouchers WHERE id = ?", [id]);
 
-    return res.json({ message: "Voucher deleted successfully" });
+    // ✅ IMPORTANT RESPONSE
+    return res.json({
+      success: true,
+      message: "Purchase voucher deleted successfully",
+    });
   } catch (err) {
     console.error("Delete error:", err);
-    return res.status(500).json({ error: err.message });
+    return res.status(500).json({
+      success: false,
+      message: "Failed to delete voucher",
+    });
   }
 });
 
@@ -486,44 +507,45 @@ router.put("/:id", async (req, res) => {
 
 router.post("/purchase-history", async (req, res) => {
   try {
-    // Normalize input (single object OR array)
+    // 1️⃣ Normalize input (single OR array)
     const historyData = Array.isArray(req.body) ? req.body : [req.body];
 
-    /* =====================================================
-       1️⃣ CHECK EXISTING TABLE COLUMNS
-    ===================================================== */
-    const existingColsQuery = `
-      SELECT COLUMN_NAME 
+    /* ================================
+       2️⃣ CHECK EXISTING COLUMNS
+    ================================= */
+    const [colsRows] = await db.execute(`
+      SELECT COLUMN_NAME
       FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE() 
+      WHERE TABLE_SCHEMA = DATABASE()
         AND TABLE_NAME = 'purchase_history'
-    `;
-    const [colsRows] = await db.execute(existingColsQuery);
+    `);
+
     const existingCols = colsRows.map((r) => r.COLUMN_NAME);
 
-    /* =====================================================
-       2️⃣ REQUIRED COLUMNS (INCLUDING rate)
-    ===================================================== */
+    /* ================================
+       3️⃣ REQUIRED COLUMNS
+    ================================= */
     const requiredCols = {
       id: "INT AUTO_INCREMENT PRIMARY KEY",
       itemName: "VARCHAR(255)",
       hsnCode: "VARCHAR(50)",
       batchNumber: "VARCHAR(255)",
       purchaseQuantity: "INT",
-      rate: "DECIMAL(10,2)", // ✅ ADDED
+      rate: "DECIMAL(10,2)",
       purchaseDate: "DATE",
+      voucherNumber: "VARCHAR(100)", // ✅ NEW COLUMN
       companyId: "VARCHAR(100)",
       ownerType: "VARCHAR(50)",
       ownerId: "VARCHAR(100)",
       type: "VARCHAR(50) DEFAULT 'purchase'",
     };
 
-    /* =====================================================
-       3️⃣ CREATE TABLE IF NOT EXISTS
-    ===================================================== */
+    /* ================================
+       4️⃣ CREATE TABLE (IF NOT EXISTS)
+    ================================= */
     if (existingCols.length === 0) {
-      const createTableSql = `
-        CREATE TABLE IF NOT EXISTS purchase_history (
+      await db.execute(`
+        CREATE TABLE purchase_history (
           id INT AUTO_INCREMENT PRIMARY KEY,
           itemName VARCHAR(255),
           hsnCode VARCHAR(50),
@@ -531,31 +553,30 @@ router.post("/purchase-history", async (req, res) => {
           purchaseQuantity INT,
           rate DECIMAL(10,2),
           purchaseDate DATE,
+          voucherNumber VARCHAR(100),
           companyId VARCHAR(100),
           ownerType VARCHAR(50),
           ownerId VARCHAR(100),
           type VARCHAR(50) DEFAULT 'purchase'
         )
-      `;
-      await db.execute(createTableSql);
+      `);
     } else {
-      /* =====================================================
-         4️⃣ ADD MISSING COLUMNS (SAFE MIGRATION)
-      ===================================================== */
+      /* ================================
+         5️⃣ ADD MISSING COLUMNS (AUTO)
+      ================================= */
       for (const [col, def] of Object.entries(requiredCols)) {
         if (!existingCols.includes(col)) {
-          const alterSql = `
-            ALTER TABLE purchase_history 
+          await db.execute(`
+            ALTER TABLE purchase_history
             ADD COLUMN ${col} ${def}
-          `;
-          await db.execute(alterSql);
+          `);
         }
       }
     }
 
-    /* =====================================================
-       5️⃣ INSERT QUERY (ORDER MATTERS)
-    ===================================================== */
+    /* ================================
+       6️⃣ INSERT DATA
+    ================================= */
     const insertSql = `
       INSERT INTO purchase_history
       (
@@ -565,6 +586,7 @@ router.post("/purchase-history", async (req, res) => {
         purchaseQuantity,
         rate,
         purchaseDate,
+        voucherNumber,
         companyId,
         ownerType,
         ownerId,
@@ -578,35 +600,36 @@ router.post("/purchase-history", async (req, res) => {
       e.hsnCode || null,
       e.batchNumber || null,
       Number(e.purchaseQuantity) || 0,
-      Number(e.rate) || 0, // ✅ RATE SAVED
+      Number(e.rate) || 0,
       e.purchaseDate || null,
+      e.voucherNumber || null, // ✅ SAVED
       e.companyId || null,
       e.ownerType || null,
       e.ownerId || null,
       e.type || "purchase",
     ]);
 
-    /* =====================================================
-       6️⃣ SECURITY CHECK (TENANT SAFETY)
-    ===================================================== */
-    if (values.some((v) => !v[6] || !v[7] || !v[8])) {
+    /* ================================
+       7️⃣ BASIC SECURITY CHECK
+    ================================= */
+    if (values.some((v) => !v[7] || !v[8] || !v[9])) {
       return res.status(401).json({
         success: false,
-        message: "Unauthorized: company or owner missing",
+        message: "Company / Owner missing",
       });
     }
 
-    /* =====================================================
-       7️⃣ EXECUTE INSERT
-    ===================================================== */
+    /* ================================
+       8️⃣ EXECUTE QUERY
+    ================================= */
     await db.query(insertSql, [values]);
 
-    return res.status(200).json({
+    return res.json({
       success: true,
       message: "Purchase history saved successfully",
     });
   } catch (error) {
-    console.error("🔥 Purchase history save failed:", error);
+    console.error("Purchase history error:", error);
     return res.status(500).json({
       success: false,
       error: error.message,
