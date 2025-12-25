@@ -66,6 +66,14 @@ const SalesVoucher: React.FC = () => {
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
 
   // Robust detection for party ledgers — backend may return different field names
+
+const generateVoucherNumber = useCallback(() => {
+  const prefix = "SLSV";
+  const randomNumber = Math.floor(100000 + Math.random() * 900000);
+  return `${prefix}${randomNumber}`;
+}, []);
+
+
   const isPartyLedger = (l: any) => {
     const groupName =
       l.groupName || l.group_name || (l.group && l.group.name) || "";
@@ -137,21 +145,7 @@ const SalesVoucher: React.FC = () => {
     value: 0,
   });
 
-  // Generate voucher number (e.g., ABCDEF0001 or QT0001)
-  const generateVoucherNumber = useCallback(() => {
-    const salesVouchers = vouchers.filter((v) => v.type === "sales");
-    const prefix = isQuotation ? "QT" : "SLSV";
-    const lastNumber =
-      salesVouchers.length > 0
-        ? parseInt(
-            salesVouchers[salesVouchers.length - 1].number.replace(
-              /^(XYZ|QT)/,
-              ""
-            )
-          ) || 0
-        : 0;
-    return `${prefix}${(lastNumber + 1).toString().padStart(4, "0")}`;
-  }, [vouchers, isQuotation]);
+ 
 
   const getInitialFormData = (): Omit<VoucherEntry, "id"> => {
     if (isEditMode && id) {
@@ -165,7 +159,8 @@ const SalesVoucher: React.FC = () => {
     return {
       date: new Date().toISOString().split("T")[0],
       type: isQuotation ? "quotation" : "sales",
-      number: `${isQuotation ? "QT" : "XYZ"}0001`, // Will be updated by useEffect
+      // number: `${isQuotation ? "QT" : "XYZ"}0001`, // Will be updated by useEffect
+      number: generateVoucherNumber(),
       narration: "",
       referenceNo: "",
       partyId: "",
@@ -191,9 +186,10 @@ const SalesVoucher: React.FC = () => {
     };
   };
 
-  const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>(
-    getInitialFormData()
-  );
+ const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>(
+  () => getInitialFormData()
+);
+
   const [godownEnabled, setGodownEnabled] = useState<"yes" | "no">("yes"); // Add state for godown selection visibility
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showPrintOptions, setShowPrintOptions] = useState(false); // Print options popup state
@@ -1108,6 +1104,7 @@ const SalesVoucher: React.FC = () => {
           rate: Number(entry.rate || 0),
 
           movementDate: formData.date,
+          voucherNumber: formData.number,
           companyId,
           ownerType,
           ownerId,

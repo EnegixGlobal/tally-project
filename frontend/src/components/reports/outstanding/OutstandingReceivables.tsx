@@ -52,6 +52,7 @@ const OutstandingReceivables: React.FC = () => {
         }
 
         const data = await response.json();
+        console.log("this is data", data);
 
         if (!Array.isArray(data)) {
           setGroups([]);
@@ -164,20 +165,14 @@ const OutstandingReceivables: React.FC = () => {
   const calculateTotals = (ledger: LedgerOutstanding) => {
     const vouchers = Array.isArray(ledger.vouchers) ? ledger.vouchers : [];
 
-    const salesTotal = vouchers
-      .filter((v) => v.source === "sales")
-      .reduce((sum, v) => sum + Number(v.total), 0);
-
-    const purchaseTotal = vouchers
-      .filter((v) => v.source === "purchase")
-      .reduce((sum, v) => sum + Number(v.total), 0);
+    const purchaseTotal = vouchers.reduce((sum, v) => sum + Number(v.total), 0);
 
     const outstanding =
       ledger.balance_type === "debit"
-        ? salesTotal - purchaseTotal
-        : purchaseTotal - salesTotal;
+        ? Number(ledger.opening_balance) - purchaseTotal
+        : purchaseTotal - Number(ledger.opening_balance);
 
-    return { salesTotal, purchaseTotal, outstanding };
+    return { purchaseTotal, outstanding };
   };
 
   return (
@@ -356,8 +351,7 @@ const OutstandingReceivables: React.FC = () => {
               }
             >
               {filteredData.map((ledger) => {
-                const { salesTotal, purchaseTotal, outstanding } =
-                  calculateTotals(ledger);
+                const { purchaseTotal, outstanding } = calculateTotals(ledger);
 
                 return (
                   <React.Fragment key={ledger.ledger_id}>
@@ -385,7 +379,7 @@ const OutstandingReceivables: React.FC = () => {
                           {formatCurrency(outstanding)}
                         </div>
                         <div className="text-xs text-green-600">
-                          Sales: {formatCurrency(salesTotal)}
+                          {/* Sales: {formatCurrency(salesTotal)} */}
                         </div>
                         <div className="text-xs text-red-600">
                           Purchase: {formatCurrency(purchaseTotal)}
@@ -442,19 +436,27 @@ const OutstandingReceivables: React.FC = () => {
                                 </tr>
                               </thead>
                               <tbody>
-                                {ledger.vouchers.map((tx, idx) => (
-                                  <tr key={idx} className="border-t">
-                                    <td className="px-3 py-2 capitalize">
-                                      {tx.source}
-                                    </td>
-                                    <td className="px-3 py-2">
-                                      {new Date(tx.date).toLocaleDateString()}
-                                    </td>
-                                    <td className="px-3 py-2 text-right">
-                                      {formatCurrency(Number(tx.total))}
-                                    </td>
-                                  </tr>
-                                ))}
+                                {ledger.vouchers?.length ? (
+                                  <table>
+                                    <tbody>
+                                      {ledger.vouchers.map((tx, idx) => (
+                                        <tr key={idx}>
+                                          <td>{tx.source}</td>
+                                          <td>
+                                            {new Date(
+                                              tx.date
+                                            ).toLocaleDateString()}
+                                          </td>
+                                          <td>
+                                            {formatCurrency(Number(tx.total))}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                ) : (
+                                  <div>No transactions available</div>
+                                )}
                               </tbody>
                             </table>
                           ) : (
