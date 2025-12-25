@@ -253,6 +253,23 @@ const OutstandingReceivables: React.FC = () => {
 
   console.log("ledgerVoucher", ledgerVouchers);
 
+  //get all total
+  const getPurchaseTotals = (ledgerId: number) => {
+    const list = ledgerVouchers[ledgerId]?.purchase || [];
+    return {
+      subtotal: list.reduce((s, x) => s + Number(x.subtotal || 0), 0),
+      total: list.reduce((s, x) => s + Number(x.total || 0), 0),
+    };
+  };
+
+  const getSalesTotals = (ledgerId: number) => {
+    const list = ledgerVouchers[ledgerId]?.sales || [];
+    return {
+      subtotal: list.reduce((s, x) => s + Number(x.subtotal || 0), 0),
+      total: list.reduce((s, x) => s + Number(x.total || 0), 0),
+    };
+  };
+
   return (
     <div className="space-y-6">
             {/* Header */}     
@@ -286,16 +303,7 @@ const OutstandingReceivables: React.FC = () => {
             </p>
                      
           </div>
-                   
-          <div className="flex space-x-2">
-                       
-            <button className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors">
-                            <Download className="w-4 h-4 mr-2 inline" />       
-                    Export            
-            </button>
-                     
-          </div>
-                 
+                           
         </div>
         {loading && (
           <div className="mt-4 p-3 text-center text-sm text-gray-500">
@@ -456,12 +464,6 @@ const OutstandingReceivables: React.FC = () => {
                         <div className="font-semibold">
                           {formatCurrency(outstanding)}
                         </div>
-                        <div className="text-xs text-green-600">
-                          {/* Sales: {formatCurrency(salesTotal)} */}
-                        </div>
-                        <div className="text-xs text-red-600">
-                          Purchase: {formatCurrency(purchaseTotal)}
-                        </div>
                       </td>
 
                       {/* AGEING */}
@@ -488,11 +490,11 @@ const OutstandingReceivables: React.FC = () => {
                             <Eye className="w-4 h-4" />
                           </button>
 
-                          {expandedLedgerId === ledger.ledger_id && (
+                          {/* {expandedLedgerId === ledger.ledger_id && (
                             <span className="ml-2 text-xs text-blue-600 font-medium">
                               Expanded: {ledger.ledger_id}
                             </span>
-                          )}
+                          )} */}
                         </div>
                       </td>
                     </tr>
@@ -500,39 +502,63 @@ const OutstandingReceivables: React.FC = () => {
                     {/* ================= EXPANDED ROW ================= */}
                     {expandedLedgerId === ledger.ledger_id && (
                       <tr>
-                        <td colSpan={5} className="bg-gray-50  px-6 py-4">
-                          {ledgerVouchers[ledger.ledger_id] &&
-                          (ledgerVouchers[ledger.ledger_id].purchase.length >
-                            0 ||
-                            ledgerVouchers[ledger.ledger_id].sales.length >
-                              0) ? (
-                            <table className="w-full text-sm border">
-                              <thead className="bg-gray-200 ">
-                                <tr>
-                                  <th className="px-3 py-2 text-left">Date</th>
-                                  <th className="px-3 py-2 text-left">
-                                    Voucher Type
-                                  </th>
-                                  <th className="px-3 py-2 text-left">
-                                    Voucher No
-                                  </th>
-                                  <th className="px-3 py-2 text-left">Party</th>
-                                  <th className="px-3 py-2 text-left">
-                                    Reference No
-                                  </th>
-                                  <th className="px-3 py-2 text-right">
-                                    Subtotal
-                                  </th>
-                                  <th className="px-3 py-2 text-right">
-                                    Total
-                                  </th>
-                                </tr>
-                              </thead>
+                        <td colSpan={5} className="bg-gray-50 px-6 py-4">
+                          {(() => {
+                            const purchaseTotals = getPurchaseTotals(
+                              ledger.ledger_id
+                            );
+                            const salesTotals = getSalesTotals(
+                              ledger.ledger_id
+                            );
 
-                              <tbody>
-                                {/* PURCHASE */}
-                                {ledgerVouchers[ledger.ledger_id].purchase.map(
-                                  (tx, idx) => (
+                            const hasPurchase =
+                              ledgerVouchers[ledger.ledger_id]?.purchase
+                                ?.length > 0;
+                            const hasSales =
+                              ledgerVouchers[ledger.ledger_id]?.sales?.length >
+                              0;
+
+                            if (!hasPurchase && !hasSales) {
+                              return (
+                                <div className="text-sm text-gray-400">
+                                  No transactions available
+                                </div>
+                              );
+                            }
+
+                            return (
+                              <table className="w-full text-sm border">
+                                <thead className="bg-gray-200">
+                                  <tr>
+                                    <th className="px-3 py-2 text-left">
+                                      Date
+                                    </th>
+                                    <th className="px-3 py-2 text-left">
+                                      Voucher Type
+                                    </th>
+                                    <th className="px-3 py-2 text-left">
+                                      Voucher No
+                                    </th>
+                                    <th className="px-3 py-2 text-left">
+                                      Party
+                                    </th>
+                                    <th className="px-3 py-2 text-left">
+                                      Reference No
+                                    </th>
+                                    <th className="px-3 py-2 text-right">
+                                      Subtotal
+                                    </th>
+                                    <th className="px-3 py-2 text-right">
+                                      Total
+                                    </th>
+                                  </tr>
+                                </thead>
+
+                                <tbody>
+                                  {/* ================= PURCHASE ================= */}
+                                  {ledgerVouchers[
+                                    ledger.ledger_id
+                                  ].purchase.map((tx, idx) => (
                                     <tr
                                       key={`purchase-${idx}`}
                                       className="border-t"
@@ -551,50 +577,9 @@ const OutstandingReceivables: React.FC = () => {
                                         {tx.number || "-"}
                                       </td>
                                       <td className="px-3 py-2">
-                                        {tx.partyId || "-"}
+                                        {ledger.ledger_name}
                                       </td>
-                                      <td className="px-3 py-2">
-                                        {tx.referenceNo || "-"}
-                                      </td>
-                                      <td className="px-3 py-2 text-right">
-                                        {formatCurrency(
-                                          Number(tx.subtotal || 0)
-                                        )}
-                                      </td>
-                                      <td className="px-3 py-2 text-right font-semibold">
-                                        {formatCurrency(Number(tx.total || 0))}
-                                      </td>
-                                    </tr>
-                                  )
-                                )}
 
-                                {/* SALES */}
-                                {ledgerVouchers[ledger.ledger_id].sales.map(
-                                  (tx, idx) => (
-                                    <tr
-                                      key={`sales-${idx}`}
-                                      className="border-t"
-                                    >
-                                      <td className="px-3 py-2">
-                                        {tx.date
-                                          ? new Date(
-                                              tx.date
-                                            ).toLocaleDateString("en-IN")
-                                          : "-"}
-                                      </td>
-                                      <td className="px-3 py-2 text-green-600 font-medium">
-                                        sales
-                                      </td>
-                                      <td className="px-3 py-2">
-                                        {tx.number || "-"}
-                                      </td>
-                                      <td className="px-3 py-2">
-                                        {tx.supplierInvoiceDate
-                                          ? new Date(
-                                              tx.supplierInvoiceDate
-                                            ).toLocaleDateString("en-IN")
-                                          : "-"}
-                                      </td>
                                       <td className="px-3 py-2">
                                         {tx.referenceNo || "-"}
                                       </td>
@@ -607,15 +592,88 @@ const OutstandingReceivables: React.FC = () => {
                                         {formatCurrency(Number(tx.total || 0))}
                                       </td>
                                     </tr>
-                                  )
-                                )}
-                              </tbody>
-                            </table>
-                          ) : (
-                            <div className="text-sm text-gray-400">
-                              No transactions available
-                            </div>
-                          )}
+                                  ))}
+
+                                  {hasPurchase && (
+                                    <tr className="bg-blue-50 font-semibold border-t">
+                                      <td
+                                        colSpan={5}
+                                        className="px-3 py-2 text-right"
+                                      >
+                                        TOTAL (Purchase)
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        {formatCurrency(
+                                          purchaseTotals.subtotal
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        {formatCurrency(purchaseTotals.total)}
+                                      </td>
+                                    </tr>
+                                  )}
+
+                                  {/* ================= SALES ================= */}
+                                  {ledgerVouchers[ledger.ledger_id].sales.map(
+                                    (tx, idx) => (
+                                      <tr
+                                        key={`sales-${idx}`}
+                                        className="border-t"
+                                      >
+                                        <td className="px-3 py-2">
+                                          {tx.date
+                                            ? new Date(
+                                                tx.date
+                                              ).toLocaleDateString("en-IN")
+                                            : "-"}
+                                        </td>
+                                        <td className="px-3 py-2 text-green-600 font-medium">
+                                          sales
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          {tx.number || "-"}
+                                        </td>
+                                        <td className="px-3 py-2">
+                                          {ledger.ledger_name}
+                                        </td>
+
+                                        <td className="px-3 py-2">
+                                          {tx.referenceNo || "-"}
+                                        </td>
+                                        <td className="px-3 py-2 text-right">
+                                          {formatCurrency(
+                                            Number(tx.subtotal || 0)
+                                          )}
+                                        </td>
+                                        <td className="px-3 py-2 text-right font-semibold">
+                                          {formatCurrency(
+                                            Number(tx.total || 0)
+                                          )}
+                                        </td>
+                                      </tr>
+                                    )
+                                  )}
+
+                                  {hasSales && (
+                                    <tr className="bg-green-50 font-semibold border-t">
+                                      <td
+                                        colSpan={5}
+                                        className="px-3 py-2 text-right"
+                                      >
+                                        TOTAL (Sales)
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        {formatCurrency(salesTotals.subtotal)}
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        {formatCurrency(salesTotals.total)}
+                                      </td>
+                                    </tr>
+                                  )}
+                                </tbody>
+                              </table>
+                            );
+                          })()}
                         </td>
                       </tr>
                     )}
@@ -633,6 +691,3 @@ const OutstandingReceivables: React.FC = () => {
 };
 
 export default OutstandingReceivables;
-
-
-//  const url = `${          import.meta.env.VITE_API_URL        }/api/outstanding-receivables?${params.toString()}`;
