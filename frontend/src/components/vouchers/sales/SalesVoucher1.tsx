@@ -1674,7 +1674,9 @@ const generateVoucherNumber = useCallback(() => {
               </div>
             )}
             {/* ///whollsell or retailer */}
-            <div>
+            {formData.mode !== "accounting-invoice" && 
+              formData.mode !== 'as-voucher' && (
+                <div>
               <div className="flex gap-6 mb-3">
                 {/* Wholesale */}
                 <label className="flex items-center gap-2 cursor-pointer">
@@ -1782,6 +1784,9 @@ const generateVoucherNumber = useCallback(() => {
                 <p className={`mt-2 text-sm ${statusColor}`}>{statusMsg}</p>
               )}
             </div>
+              )
+            }
+            
             <div
               className={`p-4 mb-6 rounded ${
                 theme === "dark" ? "bg-gray-700" : "bg-gray-50"
