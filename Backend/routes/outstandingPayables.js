@@ -1,7 +1,6 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const pool = require('../db'); // your mysql2 pool
-
+const pool = require("../db"); // your mysql2 pool
 
 // Utility to safely handle empty array for SQL IN
 function safeArray(arr) {
@@ -9,7 +8,7 @@ function safeArray(arr) {
 }
 
 // Helper to safely parse int query params
-function toInt(val, def=0) {
+function toInt(val, def = 0) {
   const n = parseInt(val, 10);
   return isNaN(n) ? def : n;
 }
@@ -193,7 +192,7 @@ function toInt(val, def=0) {
 //   }
 // });
 
-router.get('/api/outstanding-payables', async (req, res) => {
+router.get("/api/outstanding-payables", async (req, res) => {
   try {
     const { company_id, owner_type, owner_id, customerGroup } = req.query;
 
@@ -202,24 +201,24 @@ router.get('/api/outstanding-payables', async (req, res) => {
     }
 
     /* =========================
-       1️⃣ LEDGERS (FILTER BY GROUP)
-    ========================== */
+        1️⃣ LEDGERS (FILTER BY GROUP)
+     ========================== */
     let ledgerSql = `
-      SELECT
-        l.id    AS ledger_id,
-        l.name  AS ledger_name,
-        l.group_id,
-        l.opening_balance,
-        l.balance_type,
-        lg.name AS ledger_group_name
-      FROM ledgers l
-      LEFT JOIN ledger_groups lg ON lg.id = l.group_id
-      WHERE l.company_id = ?
-        AND l.owner_type = ?
-        AND l.owner_id = ?
-    `;
+       SELECT
+         l.id    AS ledger_id,
+         l.name  AS ledger_name,
+         l.group_id,
+         l.opening_balance,
+         l.balance_type,
+         lg.name AS ledger_group_name
+       FROM ledgers l
+       LEFT JOIN ledger_groups lg ON lg.id = l.group_id
+       WHERE l.company_id = ?
+         AND l.owner_type = ?
+         AND l.owner_id = ?
+     `;
 
-    const params = [company_id, owner_type, owner_id , customerGroup];
+    const params = [company_id, owner_type, owner_id];
 
     if (customerGroup) {
       ledgerSql += ` AND l.group_id = ?`;
@@ -228,93 +227,88 @@ router.get('/api/outstanding-payables', async (req, res) => {
 
     const [ledgers] = await pool.query(ledgerSql, params);
 
+    /* =========================
+        2️⃣ RESPONSE (ONLY LEDGERS)
+     ========================== */
+    res.json(ledgers);
+  } catch (err) {
+    console.error("Outstanding receivables error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
 
+// get single data by id
+router.get("/api/outstanding-payables/:id", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id } = req.query;
+    const { id: ledgerId } = req.params;
 
-    if (!ledgers.length) return res.json([]);
+    if (!company_id || !owner_type || !owner_id || !ledgerId) {
+      return res.status(400).json({ error: "Missing required parameters" });
+    }
 
     /* =========================
-       2️⃣ SALES VOUCHERS
-    ========================== */
-    const ledgerIds = ledgers.map(l => l.ledger_id);
-
-    const salesSql = `
-      SELECT
-        id,
-        date,
-        total,
-        salesLedgerId
-      FROM sales_vouchers
-      WHERE company_id = ?
-        AND owner_type = ?
-        AND owner_id = ?
-        AND salesLedgerId IN (${ledgerIds.map(() => "?").join(",")})
-    `;
-
-    const [salesRows] = await pool.query(salesSql, [
-      company_id,
-      owner_type,
-      owner_id,
-      ...ledgerIds,
-    ]);
-
-    /* =========================
-       3️⃣ PURCHASE VOUCHERS
+       1️⃣ PURCHASE VOUCHERS
     ========================== */
     const purchaseSql = `
       SELECT
         id,
+        number,
         date,
-        total,
-        purchaseLedgerId
+        partyId ,
+        referenceNo,
+        subtotal,
+        total
       FROM purchase_vouchers
       WHERE company_id = ?
         AND owner_type = ?
         AND owner_id = ?
-        AND purchaseLedgerId IN (${ledgerIds.map(() => "?").join(",")})
+        AND partyId = ?
+      ORDER BY date DESC
     `;
 
     const [purchaseRows] = await pool.query(purchaseSql, [
       company_id,
       owner_type,
       owner_id,
-      ...ledgerIds,
+      ledgerId,
     ]);
 
     /* =========================
-       4️⃣ MERGE DATA (FINAL)
+       2️⃣ SALES VOUCHERS
     ========================== */
-    const finalResult = ledgers.map(ledger => {
-      const sales = salesRows
-        .filter(s => s.salesLedgerId === ledger.ledger_id)
-        .map(s => ({
-          source: "sales",
-          voucher_id: s.id,
-          date: s.date,
-          total: s.total,
-        }));
+    const salesSql = `
+      SELECT
+        id,
+        number,
+        date,
+        partyId ,
+        referenceNo,
+        subtotal,
+        total
+      FROM sales_vouchers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+        AND partyId = ?
+      ORDER BY date DESC
+    `;
 
-      const purchases = purchaseRows
-        .filter(p => p.purchaseLedgerId === ledger.ledger_id)
-        .map(p => ({
-          source: "purchase",
-          voucher_id: p.id,
-          date: p.date,
-          total: p.total,
-        }));
-
-
-
-      return {
-        ...ledger,
-        transactions: [...sales, ...purchases],
-      };
-    });
+    const [salesRows] = await pool.query(salesSql, [
+      company_id,
+      owner_type,
+      owner_id,
+      ledgerId,
+    ]);
 
     /* =========================
-       5️⃣ RESPONSE
+       3️⃣ RESPONSE (STRUCTURED)
     ========================== */
-    res.json(finalResult);
-
+    res.json({
+      ledger_id: Number(ledgerId),
+      purchase: purchaseRows,
+      sales: salesRows,
+    });
   } catch (err) {
     console.error("Outstanding receivables error:", err);
     res.status(500).json({ error: "Internal server error" });
