@@ -17,7 +17,7 @@ interface LedgerOutstanding {
   }[];
 }
 
-const OutstandingPaybles: React.FC = () => {
+const OutstandingPayables: React.FC = () => {
   const { theme } = useAppContext();
 
   // Filters & search state
@@ -25,61 +25,69 @@ const OutstandingPaybles: React.FC = () => {
   const [selectedGroup, setSelectedGroup] = useState("");
   const [selectedRisk, setSelectedRisk] = useState("");
   const [groups, setGroups] = useState<any[]>([]);
+  const [expandedLedgerId, setExpandedLedgerId] = useState<number | null>(null);
+  const [ledgerVouchers, setLedgerVouchers] = useState<
+    Record<
+      number,
+      {
+        purchase: any[];
+        sales: any[];
+      }
+    >
+  >({});
 
- useEffect(() => {
-  const fetchLedgerGroups = async () => {
-    const companyId = localStorage.getItem("company_id");
-    const ownerType = localStorage.getItem("supplier");
-    const ownerId = localStorage.getItem(
-      ownerType === "employee" ? "employee_id" : "user_id"
-    );
-
-    if (!companyId || !ownerType || !ownerId) {
-      setGroups([]);
-      return;
-    }
-
-    try {
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+  useEffect(() => {
+    const fetchLedgerGroups = async () => {
+      const companyId = localStorage.getItem("company_id");
+      const ownerType = localStorage.getItem("supplier");
+      const ownerId = localStorage.getItem(
+        ownerType === "employee" ? "employee_id" : "user_id"
       );
 
-      if (!response.ok) {
-        throw new Error("Failed to fetch ledger groups");
-      }
-
-      const data = await response.json();
-
-      if (!Array.isArray(data)) {
+      if (!companyId || !ownerType || !ownerId) {
         setGroups([]);
         return;
       }
 
-      const sundryCreditorsGroup = data.filter((g) => {
-        if (!g?.name) return false;
+      try {
+        const response = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
 
-        const normalizedName = g.name
-          .toLowerCase()
-          .replace(/\s+/g, "");
+        if (!response.ok) {
+          throw new Error("Failed to fetch ledger groups");
+        }
 
-        return normalizedName === "sundrycreditors";
-      });
+        const data = await response.json();
 
-      // ✅ ONLY Sundry Creditors saved
-      setGroups(sundryCreditorsGroup);
+        if (!Array.isArray(data)) {
+          setGroups([]);
+          return;
+        }
 
-      if (sundryCreditorsGroup.length > 0) {
-        setSelectedGroup(String(sundryCreditorsGroup[0].id));
+        const sundryDebtorsGroup = data.filter((g) => {
+          if (!g?.name) return false;
+
+          const normalizedName = g.name.toLowerCase().replace(/\s+/g, ""); // remove spaces
+
+          return normalizedName === "sundrycreditors";
+        });
+
+        // ✅ ONLY Sundry Debtors saved
+        setGroups(sundryDebtorsGroup);
+        if (sundryDebtorsGroup.length > 0) {
+          setSelectedGroup(String(sundryDebtorsGroup[0].id));
+        }
+      } catch (err) {
+        console.error("Failed to load ledger groups", err);
+        setGroups([]);
       }
-    } catch (err) {
-      console.error("Failed to load ledger groups", err);
-      setGroups([]);
-    }
-  };
+    };
 
-  fetchLedgerGroups();
-}, []);
-
+    fetchLedgerGroups();
+  }, []);
 
   console.log("groups", groups);
 
@@ -117,9 +125,7 @@ const OutstandingPaybles: React.FC = () => {
         if (selectedGroup) params.append("customerGroup", selectedGroup);
         if (selectedRisk) params.append("riskCategory", selectedRisk);
 
-        const url = `${
-          import.meta.env.VITE_API_URL
-        }/api/outstanding-receivables?${params.toString()}`;
+       const url = `${import.meta.env.VITE_API_URL}/api/outstanding-receivables?${params.toString()}`;
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -128,7 +134,7 @@ const OutstandingPaybles: React.FC = () => {
         }
 
         const data: CustomerOutstanding[] = await response.json();
-        console.log("this is data", data);
+
         setCustomersData(data);
       } catch (e: any) {
         setError(e.message || "Failed to load data");
@@ -140,6 +146,8 @@ const OutstandingPaybles: React.FC = () => {
 
     fetchOutstandingData();
   }, [searchTerm, selectedGroup, selectedRisk]);
+
+  console.log("customerdata", customersData);
 
   // Filter & sort data client-side
   const filteredData = useMemo(() => {
@@ -165,21 +173,82 @@ const OutstandingPaybles: React.FC = () => {
   const calculateTotals = (ledger: LedgerOutstanding) => {
     const vouchers = Array.isArray(ledger.vouchers) ? ledger.vouchers : [];
 
-    const salesTotal = vouchers
-      .filter((v) => v.source === "sales")
-      .reduce((sum, v) => sum + Number(v.total), 0);
-
-    const purchaseTotal = vouchers
-      .filter((v) => v.source === "purchase")
-      .reduce((sum, v) => sum + Number(v.total), 0);
+    const purchaseTotal = vouchers.reduce((sum, v) => sum + Number(v.total), 0);
 
     const outstanding =
       ledger.balance_type === "debit"
-        ? salesTotal - purchaseTotal
-        : purchaseTotal - salesTotal;
+        ? Number(ledger.opening_balance) - purchaseTotal
+        : purchaseTotal - Number(ledger.opening_balance);
 
-    return { salesTotal, purchaseTotal, outstanding };
+    return { purchaseTotal, outstanding };
   };
+
+  // get purchse ledger vouche data
+
+  const handleViewClick = async (ledgerId: number) => {
+    // toggle close
+    if (expandedLedgerId === ledgerId) {
+      setExpandedLedgerId(null);
+      return;
+    }
+
+    setExpandedLedgerId(ledgerId);
+
+    // 🛡️ ensure default structure immediately (prevents undefined.length error)
+    if (!ledgerVouchers[ledgerId]) {
+      setLedgerVouchers((prev) => ({
+        ...prev,
+        [ledgerId]: {
+          purchase: [],
+          sales: [],
+        },
+      }));
+    } else {
+      // cache hit → no API call
+      return;
+    }
+
+    try {
+      const company_id = localStorage.getItem("company_id") || "";
+      const owner_type = localStorage.getItem("supplier") || "";
+      const owner_id =
+        localStorage.getItem(
+          owner_type === "employee" ? "employee_id" : "user_id"
+        ) || "";
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/outstanding-receivables/${ledgerId}` +
+          `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+      );
+
+
+      if (!res.ok) throw new Error("Failed to fetch vouchers");
+
+      const data = await res.json();
+      console.log("voucher api data", data);
+
+      setLedgerVouchers((prev) => ({
+        ...prev,
+        [ledgerId]: {
+          purchase: Array.isArray(data.purchase) ? data.purchase : [],
+          sales: Array.isArray(data.sales) ? data.sales : [],
+        },
+      }));
+    } catch (err) {
+      console.error("Voucher fetch error", err);
+
+      // 🛡️ fallback safe state (never undefined)
+      setLedgerVouchers((prev) => ({
+        ...prev,
+        [ledgerId]: {
+          purchase: [],
+          sales: [],
+        },
+      }));
+    }
+  };
+
+  console.log("ledgerVoucher", ledgerVouchers);
 
   return (
     <div className="space-y-6">
@@ -357,62 +426,198 @@ const OutstandingPaybles: React.FC = () => {
               }
             >
               {filteredData.map((ledger) => {
-                const { salesTotal, purchaseTotal, outstanding } =
-                  calculateTotals(ledger);
+                const { purchaseTotal, outstanding } = calculateTotals(ledger);
 
                 return (
-                  <tr
-                    key={ledger.ledger_id}
-                    className={
-                      theme === "dark"
-                        ? "hover:bg-gray-800"
-                        : "hover:bg-gray-50"
-                    }
-                  >
-                    {/* LEDGER */}
-                    <td className="px-4 py-4 align-top">
-                      <div className="font-medium text-sm">
-                        {ledger.ledger_name}
-                      </div>
-                      <div className="text-xs text-gray-500">
-                        {ledger.ledger_group_name}
-                      </div>
-                    </td>
+                  <React.Fragment key={ledger.ledger_id}>
+                    {/* ================= MAIN ROW ================= */}
+                    <tr
+                      className={
+                        theme === "dark"
+                          ? "hover:bg-gray-800"
+                          : "hover:bg-gray-50"
+                      }
+                    >
+                      {/* LEDGER */}
+                      <td className="px-4 py-4 align-top">
+                        <div className="font-medium text-sm">
+                          {ledger.ledger_name}
+                        </div>
+                        <div className="text-xs text-gray-500">
+                          {ledger.ledger_group_name}
+                        </div>
+                      </td>
 
-                    {/* OUTSTANDING */}
-                    <td className="px-4 py-4 text-right">
-                      <div className="font-semibold">
-                        {formatCurrency(outstanding)}
-                      </div>
-                      <div className="text-xs text-green-600">
-                        Sales: {formatCurrency(salesTotal)}
-                      </div>
-                      <div className="text-xs text-red-600">
-                        Purchase: {formatCurrency(purchaseTotal)}
-                      </div>
-                    </td>
+                      {/* OUTSTANDING */}
+                      <td className="px-4 py-4 text-right">
+                        <div className="font-semibold">
+                          {formatCurrency(outstanding)}
+                        </div>
+                        <div className="text-xs text-green-600">
+                          {/* Sales: {formatCurrency(salesTotal)} */}
+                        </div>
+                        <div className="text-xs text-red-600">
+                          Purchase: {formatCurrency(purchaseTotal)}
+                        </div>
+                      </td>
 
-                    {/* AGEING (NOT AVAILABLE) */}
-                    <td className="px-4 py-4 text-sm text-gray-400">
-                      Ageing not available
-                    </td>
+                      {/* AGEING */}
+                      <td className="px-4 py-4 text-sm text-gray-400">
+                        Ageing not available
+                      </td>
 
-                    {/* CREDIT / OPENING */}
-                    <td className="px-4 py-4 text-xs text-gray-500">
-                      <div>
-                        Opening:{" "}
-                        {formatCurrency(Number(ledger.opening_balance))}
-                      </div>
-                      <div>Type: {ledger.balance_type}</div>
-                    </td>
+                      {/* CREDIT / OPENING */}
+                      <td className="px-4 py-4 text-xs text-gray-500">
+                        <div>
+                          Opening:{" "}
+                          {formatCurrency(Number(ledger.opening_balance))}
+                        </div>
+                        <div>Type: {ledger.balance_type}</div>
+                      </td>
 
-                    {/* ACTIONS */}
-                    <td className="px-4 py-4 text-center">
-                      <button className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700">
-                        <Eye className="w-4 h-4" />
-                      </button>
-                    </td>
-                  </tr>
+                      {/* ACTIONS */}
+                      <td className="px-4 py-4 text-center">
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => handleViewClick(ledger.ledger_id)}
+                            className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+
+                          {/* print ledger id */}
+                          {/* {expandedLedgerId === ledger.ledger_id && (
+                            <span className="ml-2 text-xs text-blue-600 font-medium">
+                              Expanded: {ledger.ledger_id}
+                            </span>
+                          )} */}
+                        </div>
+                      </td>
+                    </tr>
+
+                    {/* ================= EXPANDED ROW ================= */}
+                    {expandedLedgerId === ledger.ledger_id && (
+                      <tr>
+                        <td colSpan={5} className="bg-gray-50  px-6 py-4">
+                          {ledgerVouchers[ledger.ledger_id] &&
+                          (ledgerVouchers[ledger.ledger_id].purchase.length >
+                            0 ||
+                            ledgerVouchers[ledger.ledger_id].sales.length >
+                              0) ? (
+                            <table className="w-full text-sm border">
+                              <thead className="bg-gray-200 ">
+                                <tr>
+                                  <th className="px-3 py-2 text-left">Date</th>
+                                  <th className="px-3 py-2 text-left">
+                                    Voucher Type
+                                  </th>
+                                  <th className="px-3 py-2 text-left">
+                                    Voucher No
+                                  </th>
+                                  <th className="px-3 py-2 text-left">Party</th>
+                                  <th className="px-3 py-2 text-left">
+                                    Reference No
+                                  </th>
+                                  <th className="px-3 py-2 text-right">
+                                    Subtotal
+                                  </th>
+                                  <th className="px-3 py-2 text-right">
+                                    Total
+                                  </th>
+                                </tr>
+                              </thead>
+
+                              <tbody>
+                                {/* PURCHASE */}
+                                {ledgerVouchers[ledger.ledger_id].purchase.map(
+                                  (tx, idx) => (
+                                    <tr
+                                      key={`purchase-${idx}`}
+                                      className="border-t"
+                                    >
+                                      <td className="px-3 py-2">
+                                        {tx.date
+                                          ? new Date(
+                                              tx.date
+                                            ).toLocaleDateString("en-IN")
+                                          : "-"}
+                                      </td>
+                                      <td className="px-3 py-2 text-blue-600 font-medium">
+                                        purchase
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.number || "-"}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.partyId || "-"}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.referenceNo || "-"}
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        {formatCurrency(
+                                          Number(tx.subtotal || 0)
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-semibold">
+                                        {formatCurrency(Number(tx.total || 0))}
+                                      </td>
+                                    </tr>
+                                  )
+                                )}
+
+                                {/* SALES */}
+                                {ledgerVouchers[ledger.ledger_id].sales.map(
+                                  (tx, idx) => (
+                                    <tr
+                                      key={`sales-${idx}`}
+                                      className="border-t"
+                                    >
+                                      <td className="px-3 py-2">
+                                        {tx.date
+                                          ? new Date(
+                                              tx.date
+                                            ).toLocaleDateString("en-IN")
+                                          : "-"}
+                                      </td>
+                                      <td className="px-3 py-2 text-green-600 font-medium">
+                                        sales
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.number || "-"}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.supplierInvoiceDate
+                                          ? new Date(
+                                              tx.supplierInvoiceDate
+                                            ).toLocaleDateString("en-IN")
+                                          : "-"}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.referenceNo || "-"}
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        {formatCurrency(
+                                          Number(tx.subtotal || 0)
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-semibold">
+                                        {formatCurrency(Number(tx.total || 0))}
+                                      </td>
+                                    </tr>
+                                  )
+                                )}
+                              </tbody>
+                            </table>
+                          ) : (
+                            <div className="text-sm text-gray-400">
+                              No transactions available
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 );
               })}
             </tbody>
@@ -425,6 +630,7 @@ const OutstandingPaybles: React.FC = () => {
   );
 };
 
-export default OutstandingPaybles;
+export default OutstandingPayables;
 
-//  const res = await fetch(`${import.meta.env.VITE_API_URL}/api/outstanding-payables?${params.toString()}`);
+
+//  const url = `${          import.meta.env.VITE_API_URL        }/api/outstanding-receivables?${params.toString()}`;

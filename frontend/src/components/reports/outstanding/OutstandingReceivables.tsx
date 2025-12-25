@@ -26,6 +26,15 @@ const OutstandingReceivables: React.FC = () => {
   const [selectedRisk, setSelectedRisk] = useState("");
   const [groups, setGroups] = useState<any[]>([]);
   const [expandedLedgerId, setExpandedLedgerId] = useState<number | null>(null);
+  const [ledgerVouchers, setLedgerVouchers] = useState<
+    Record<
+      number,
+      {
+        purchase: any[];
+        sales: any[];
+      }
+    >
+  >({});
 
   useEffect(() => {
     const fetchLedgerGroups = async () => {
@@ -52,7 +61,6 @@ const OutstandingReceivables: React.FC = () => {
         }
 
         const data = await response.json();
-        console.log("this is data", data);
 
         if (!Array.isArray(data)) {
           setGroups([]);
@@ -128,7 +136,7 @@ const OutstandingReceivables: React.FC = () => {
         }
 
         const data: CustomerOutstanding[] = await response.json();
-        console.log("this is data", data);
+
         setCustomersData(data);
       } catch (e: any) {
         setError(e.message || "Failed to load data");
@@ -140,6 +148,8 @@ const OutstandingReceivables: React.FC = () => {
 
     fetchOutstandingData();
   }, [searchTerm, selectedGroup, selectedRisk]);
+
+  console.log("customerdata", customersData);
 
   // Filter & sort data client-side
   const filteredData = useMemo(() => {
@@ -174,6 +184,74 @@ const OutstandingReceivables: React.FC = () => {
 
     return { purchaseTotal, outstanding };
   };
+
+  // get purchse ledger vouche data
+
+  const handleViewClick = async (ledgerId: number) => {
+    // toggle close
+    if (expandedLedgerId === ledgerId) {
+      setExpandedLedgerId(null);
+      return;
+    }
+
+    setExpandedLedgerId(ledgerId);
+
+    // 🛡️ ensure default structure immediately (prevents undefined.length error)
+    if (!ledgerVouchers[ledgerId]) {
+      setLedgerVouchers((prev) => ({
+        ...prev,
+        [ledgerId]: {
+          purchase: [],
+          sales: [],
+        },
+      }));
+    } else {
+      // cache hit → no API call
+      return;
+    }
+
+    try {
+      const company_id = localStorage.getItem("company_id") || "";
+      const owner_type = localStorage.getItem("supplier") || "";
+      const owner_id =
+        localStorage.getItem(
+          owner_type === "employee" ? "employee_id" : "user_id"
+        ) || "";
+
+      const res = await fetch(
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/outstanding-receivables/${ledgerId}` +
+          `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+      );
+
+      if (!res.ok) throw new Error("Failed to fetch vouchers");
+
+      const data = await res.json();
+      console.log("voucher api data", data);
+
+      setLedgerVouchers((prev) => ({
+        ...prev,
+        [ledgerId]: {
+          purchase: Array.isArray(data.purchase) ? data.purchase : [],
+          sales: Array.isArray(data.sales) ? data.sales : [],
+        },
+      }));
+    } catch (err) {
+      console.error("Voucher fetch error", err);
+
+      // 🛡️ fallback safe state (never undefined)
+      setLedgerVouchers((prev) => ({
+        ...prev,
+        [ledgerId]: {
+          purchase: [],
+          sales: [],
+        },
+      }));
+    }
+  };
+
+  console.log("ledgerVoucher", ledgerVouchers);
 
   return (
     <div className="space-y-6">
@@ -402,60 +480,134 @@ const OutstandingReceivables: React.FC = () => {
 
                       {/* ACTIONS */}
                       <td className="px-4 py-4 text-center">
-                        <button
-                          onClick={() =>
-                            setExpandedLedgerId(
-                              expandedLedgerId === ledger.ledger_id
-                                ? null
-                                : ledger.ledger_id
-                            )
-                          }
-                          className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                        <div className="flex items-center">
+                          <button
+                            onClick={() => handleViewClick(ledger.ledger_id)}
+                            className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+
+                          {expandedLedgerId === ledger.ledger_id && (
+                            <span className="ml-2 text-xs text-blue-600 font-medium">
+                              Expanded: {ledger.ledger_id}
+                            </span>
+                          )}
+                        </div>
                       </td>
                     </tr>
 
                     {/* ================= EXPANDED ROW ================= */}
                     {expandedLedgerId === ledger.ledger_id && (
                       <tr>
-                        <td
-                          colSpan={5}
-                          className="bg-gray-50 dark:bg-gray-900 px-6 py-4"
-                        >
-                          {ledger.vouchers?.length ? (
+                        <td colSpan={5} className="bg-gray-50  px-6 py-4">
+                          {ledgerVouchers[ledger.ledger_id] &&
+                          (ledgerVouchers[ledger.ledger_id].purchase.length >
+                            0 ||
+                            ledgerVouchers[ledger.ledger_id].sales.length >
+                              0) ? (
                             <table className="w-full text-sm border">
-                              <thead className="bg-gray-200 dark:bg-gray-700">
+                              <thead className="bg-gray-200 ">
                                 <tr>
-                                  <th className="px-3 py-2 text-left">Type</th>
                                   <th className="px-3 py-2 text-left">Date</th>
+                                  <th className="px-3 py-2 text-left">
+                                    Voucher Type
+                                  </th>
+                                  <th className="px-3 py-2 text-left">
+                                    Voucher No
+                                  </th>
+                                  <th className="px-3 py-2 text-left">Party</th>
+                                  <th className="px-3 py-2 text-left">
+                                    Reference No
+                                  </th>
                                   <th className="px-3 py-2 text-right">
-                                    Amount
+                                    Subtotal
+                                  </th>
+                                  <th className="px-3 py-2 text-right">
+                                    Total
                                   </th>
                                 </tr>
                               </thead>
+
                               <tbody>
-                                {ledger.vouchers?.length ? (
-                                  <table>
-                                    <tbody>
-                                      {ledger.vouchers.map((tx, idx) => (
-                                        <tr key={idx}>
-                                          <td>{tx.source}</td>
-                                          <td>
-                                            {new Date(
+                                {/* PURCHASE */}
+                                {ledgerVouchers[ledger.ledger_id].purchase.map(
+                                  (tx, idx) => (
+                                    <tr
+                                      key={`purchase-${idx}`}
+                                      className="border-t"
+                                    >
+                                      <td className="px-3 py-2">
+                                        {tx.date
+                                          ? new Date(
                                               tx.date
-                                            ).toLocaleDateString()}
-                                          </td>
-                                          <td>
-                                            {formatCurrency(Number(tx.total))}
-                                          </td>
-                                        </tr>
-                                      ))}
-                                    </tbody>
-                                  </table>
-                                ) : (
-                                  <div>No transactions available</div>
+                                            ).toLocaleDateString("en-IN")
+                                          : "-"}
+                                      </td>
+                                      <td className="px-3 py-2 text-blue-600 font-medium">
+                                        purchase
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.number || "-"}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.partyId || "-"}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.referenceNo || "-"}
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        {formatCurrency(
+                                          Number(tx.subtotal || 0)
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-semibold">
+                                        {formatCurrency(Number(tx.total || 0))}
+                                      </td>
+                                    </tr>
+                                  )
+                                )}
+
+                                {/* SALES */}
+                                {ledgerVouchers[ledger.ledger_id].sales.map(
+                                  (tx, idx) => (
+                                    <tr
+                                      key={`sales-${idx}`}
+                                      className="border-t"
+                                    >
+                                      <td className="px-3 py-2">
+                                        {tx.date
+                                          ? new Date(
+                                              tx.date
+                                            ).toLocaleDateString("en-IN")
+                                          : "-"}
+                                      </td>
+                                      <td className="px-3 py-2 text-green-600 font-medium">
+                                        sales
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.number || "-"}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.supplierInvoiceDate
+                                          ? new Date(
+                                              tx.supplierInvoiceDate
+                                            ).toLocaleDateString("en-IN")
+                                          : "-"}
+                                      </td>
+                                      <td className="px-3 py-2">
+                                        {tx.referenceNo || "-"}
+                                      </td>
+                                      <td className="px-3 py-2 text-right">
+                                        {formatCurrency(
+                                          Number(tx.subtotal || 0)
+                                        )}
+                                      </td>
+                                      <td className="px-3 py-2 text-right font-semibold">
+                                        {formatCurrency(Number(tx.total || 0))}
+                                      </td>
+                                    </tr>
+                                  )
                                 )}
                               </tbody>
                             </table>
@@ -481,3 +633,6 @@ const OutstandingReceivables: React.FC = () => {
 };
 
 export default OutstandingReceivables;
+
+
+//  const url = `${          import.meta.env.VITE_API_URL        }/api/outstanding-receivables?${params.toString()}`;

@@ -174,7 +174,6 @@ router.get("/api/outstanding-receivables", async (req, res) => {
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({ error: "Missing tenant info" });
     }
-    console.log('customergroup', customerGroup)
 
     /* =========================
        1️⃣ LEDGERS (FILTER BY GROUP)
@@ -203,81 +202,100 @@ router.get("/api/outstanding-receivables", async (req, res) => {
 
     const [ledgers] = await pool.query(ledgerSql, params);
 
-    if (!ledgers.length) {
-      return res.json([]);
+    /* =========================
+       2️⃣ RESPONSE (ONLY LEDGERS)
+    ========================== */
+    res.json(ledgers);
+  } catch (err) {
+    console.error("Outstanding receivables error:", err);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+
+// get ledger by id
+
+router.get("/api/outstanding-receivables/:id", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id } = req.query;
+    const { id: ledgerId } = req.params;
+
+    if (!company_id || !owner_type || !owner_id || !ledgerId) {
+      return res.status(400).json({ error: "Missing required parameters" });
     }
 
     /* =========================
-       2️⃣ LEDGER IDS
-    ========================== */
-    const ledgerIds = ledgers.map((l) => l.ledger_id);
-
-    /* =========================
-       3️⃣ PURCHASE VOUCHERS (ONLY)
+       1️⃣ PURCHASE VOUCHERS
     ========================== */
     const purchaseSql = `
       SELECT
         id,
         number,
-        partyId,
         date,
+        partyId ,
+        referenceNo,
         subtotal,
-        total,
-        purchaseLedgerId
+        total
       FROM purchase_vouchers
       WHERE company_id = ?
         AND owner_type = ?
         AND owner_id = ?
-        AND purchaseLedgerId IN (${ledgerIds.map(() => "?").join(",")})
+        AND partyId = ?
+      ORDER BY date DESC
     `;
 
     const [purchaseRows] = await pool.query(purchaseSql, [
       company_id,
       owner_type,
       owner_id,
-      ...ledgerIds,
+      ledgerId,
     ]);
 
-    // 🔍 DEBUG (OPTIONAL – REMOVE LATER)
-    console.log("🔵 PURCHASE ROWS COUNT:", purchaseRows.length);
-    console.log("🔵 PURCHASE ROWS SAMPLE:", purchaseRows.slice(0, 5));
+    /* =========================
+       2️⃣ SALES VOUCHERS
+    ========================== */
+    const salesSql = `
+      SELECT
+        id,
+        number,
+        date,
+        partyId ,
+        referenceNo,
+        subtotal,
+        total
+      FROM sales_vouchers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+        AND partyId = ?
+      ORDER BY date DESC
+    `;
+
+    const [salesRows] = await pool.query(salesSql, [
+      company_id,
+      owner_type,
+      owner_id,
+      ledgerId,
+    ]);
+
+   
 
     /* =========================
-       4️⃣ MERGE DATA (ONLY PURCHASE)
+       3️⃣ RESPONSE (STRUCTURED)
     ========================== */
-    const finalResult = ledgers.map((ledger) => {
-      const purchases = purchaseRows
-        .filter((p) => p.purchaseLedgerId === ledger.ledger_id)
-        .map((p) => ({
-          source: "purchase",
-          voucher_id: p.id,
-          date: p.date,
-          total: p.total,
-        }));
-
-      // 🔍 LEDGER LEVEL DEBUG
-      console.log("📒 LEDGER PURCHASE DEBUG:", {
-        ledger_name: ledger.ledger_name,
-        ledger_id: ledger.ledger_id,
-        purchase_count: purchases.length,
-      });
-
-      return {
-        ...ledger,
-        vouchers: purchases, // ✅ ONLY PURCHASE DATA
-      };
+    res.json({
+      ledger_id: Number(ledgerId),
+      purchase: purchaseRows,
+      sales: salesRows,
     });
-
-    /* =========================
-       5️⃣ RESPONSE
-    ========================== */
-    res.json(finalResult);
 
   } catch (err) {
     console.error("Outstanding receivables error:", err);
     res.status(500).json({ error: "Internal server error" });
   }
 });
+
+
 
 
 module.exports = router;
