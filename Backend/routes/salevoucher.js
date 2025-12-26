@@ -251,6 +251,7 @@ router.get("/sale-history", async (req, res) => {
         qtyChange,
         rate,
         movementDate,
+        godownId,
         companyId,
         ownerType,
         ownerId
@@ -545,11 +546,11 @@ router.put("/:id", async (req, res) => {
 
 router.post("/sale-history", async (req, res) => {
   try {
-    // Normalize input (single object OR array)
+    // 1️⃣ Normalize input (single OR array)
     const movementData = Array.isArray(req.body) ? req.body : [req.body];
 
     /* =====================================================
-       1️⃣ CREATE TABLE IF NOT EXISTS (MINIMAL)
+       2️⃣ CREATE TABLE IF NOT EXISTS (MINIMAL)
     ===================================================== */
     await db.execute(`
       CREATE TABLE IF NOT EXISTS sale_history (
@@ -558,7 +559,7 @@ router.post("/sale-history", async (req, res) => {
     `);
 
     /* =====================================================
-       2️⃣ REQUIRED COLUMNS (WITH voucherNumber)
+       3️⃣ REQUIRED COLUMNS (AUTO-MIGRATION)
     ===================================================== */
     const requiredColumns = {
       itemName: "VARCHAR(255)",
@@ -567,14 +568,15 @@ router.post("/sale-history", async (req, res) => {
       qtyChange: "INT",
       rate: "DECIMAL(10,2)",
       movementDate: "DATE",
-      voucherNumber: "VARCHAR(100)",     
+      voucherNumber: "VARCHAR(100)",
+      godownId: "INT",                
       companyId: "VARCHAR(100)",
       ownerType: "VARCHAR(50)",
       ownerId: "VARCHAR(100)",
     };
 
     /* =====================================================
-       3️⃣ CHECK & ADD MISSING COLUMNS (AUTO MIGRATION)
+       4️⃣ CHECK & ADD MISSING COLUMNS
     ===================================================== */
     for (const [col, def] of Object.entries(requiredColumns)) {
       const [rows] = await db.execute(
@@ -596,7 +598,7 @@ router.post("/sale-history", async (req, res) => {
     }
 
     /* =====================================================
-       4️⃣ INSERT QUERY (ORDER MATTERS)
+       5️⃣ INSERT QUERY (ORDER MATTERS)
     ===================================================== */
     const insertSql = `
       INSERT INTO sale_history
@@ -608,6 +610,7 @@ router.post("/sale-history", async (req, res) => {
         rate,
         movementDate,
         voucherNumber,
+        godownId,
         companyId,
         ownerType,
         ownerId
@@ -622,16 +625,20 @@ router.post("/sale-history", async (req, res) => {
       Number(e.qtyChange) || 0,
       Number(e.rate) || 0,
       e.movementDate || null,
-      e.voucherNumber || null,   // ✅ SAVED HERE
+      e.voucherNumber || null,
+
+      // ✅ SAVE ONLY GODOWN ID
+      e.godownId ? Number(e.godownId) : null,
+
       e.companyId || null,
       e.ownerType || null,
       e.ownerId || null,
     ]);
 
     /* =====================================================
-       5️⃣ TENANT SECURITY CHECK
+       6️⃣ TENANT SECURITY CHECK
     ===================================================== */
-    if (values.some((v) => !v[7] || !v[8] || !v[9])) {
+    if (values.some((v) => !v[8] || !v[9] || !v[10])) {
       return res.status(401).json({
         success: false,
         message: "Unauthorized: company or owner missing",
@@ -639,7 +646,7 @@ router.post("/sale-history", async (req, res) => {
     }
 
     /* =====================================================
-       6️⃣ EXECUTE INSERT
+       7️⃣ EXECUTE INSERT
     ===================================================== */
     await db.query(insertSql, [values]);
 
@@ -655,6 +662,7 @@ router.post("/sale-history", async (req, res) => {
     });
   }
 });
+
 
 
 module.exports = router;

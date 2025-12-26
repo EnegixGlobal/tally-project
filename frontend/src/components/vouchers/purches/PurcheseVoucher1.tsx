@@ -908,6 +908,7 @@ const PurchaseVoucher: React.FC = () => {
             rate: Number(e.rate),
             purchaseDate: formData.date,
             voucherNumber: formData.number,
+            godownId: e.godownId ? Number(e.godownId) : null,
             companyId,
             ownerType,
             ownerId,
@@ -1676,7 +1677,6 @@ const PurchaseVoucher: React.FC = () => {
                       const isAddingBatch =
                         addBatchModal.visible && addBatchModal.index === index;
 
-                      console.log("entry", entry);
 
                       return (
                         <tr

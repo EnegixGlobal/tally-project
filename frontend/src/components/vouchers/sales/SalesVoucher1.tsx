@@ -1105,6 +1105,7 @@ const generateVoucherNumber = useCallback(() => {
 
           movementDate: formData.date,
           voucherNumber: formData.number,
+           godownId: entry.godownId ? Number(entry.godownId) : null,
           companyId,
           ownerType,
           ownerId,
