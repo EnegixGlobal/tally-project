@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Dec 23, 2025 at 12:45 PM
+-- Generation Time: Dec 26, 2025 at 12:40 PM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -410,7 +410,8 @@ CREATE TABLE `godowns` (
 --
 
 INSERT INTO `godowns` (`id`, `name`, `address`, `description`, `company_id`, `owner_type`, `owner_id`) VALUES
-(3, 'First', 'First', 'First', 1, 'employee', 1);
+(4, 'Lalpur', 'Lalpur Ranchi', '', 1, 'employee', 1),
+(5, 'Kadru', 'Kadru Ranchi', '', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -594,14 +595,25 @@ INSERT INTO `ledgers` (`id`, `name`, `group_id`, `opening_balance`, `balance_typ
 (65, 'Mohan', 99, 1000.00, 'debit', '', '', '', '', '', '2025-12-17 07:49:29', 1, 'employee', 1, 100.00),
 (67, 'FFFF', -9, 1000.00, 'debit', '', '', '', '', '', '2025-12-17 10:23:14', 1, 'employee', 1, 0.00),
 (68, 'Purchase', 99, 100.00, 'debit', '', '', '', '', '', '2025-12-17 11:17:48', 1, 'employee', 1, 100.00),
-(70, 'Stock 28%', 99, 10000.00, 'debit', '', '', '', '', '', '2025-12-18 06:36:58', 1, 'employee', 1, 0.00),
+(70, 'Stock 28%', 99, 10000.00, 'debit', '', '', '', '', '', '2025-12-18 06:36:58', 1, 'employee', 1, 10000.00),
 (71, 'Stock 5%', 99, 1000.00, 'debit', '', '', '', '', '', '2025-12-18 06:37:20', 1, 'employee', 1, 0.00),
 (74, '18% gst sales', -16, 100.00, 'debit', '', '', '', '', '', '2025-12-18 11:05:53', 1, 'employee', 1, 100.00),
 (75, '18% gst purchase', -15, 100.00, 'debit', '', '', '', '', '', '2025-12-18 11:06:36', 1, 'employee', 1, 100.00),
 (76, 'Cash', 98, 100.00, 'debit', '', '', '', '', '', '2025-12-20 10:50:55', 1, 'employee', 1, 100.00),
 (77, '28% gst sales', -15, 100.00, 'debit', '', '', '', '', '', '2025-12-22 05:58:43', 1, 'employee', 1, 100.00),
 (78, 'Rohan', -7, 100.00, 'debit', '', '', '', '', '', '2025-12-22 12:58:01', 1, 'employee', 1, 100.00),
-(80, '100% Stock Purchase', -15, 1000.00, 'credit', '', '', '', '', '', '2025-12-23 05:39:49', 1, 'employee', 1, 1000.00);
+(80, '100% Stock Purchase', -15, 1000.00, 'credit', '', '', '', '', '', '2025-12-23 05:39:49', 1, 'employee', 1, 1000.00),
+(81, 'Rohan', 106, 1000.00, 'debit', '', '', '', '', '', '2025-12-24 05:13:33', 1, 'employee', 1, 1000.00),
+(82, 'Sohna', -5, 1000.00, 'debit', '', '', '', '', '', '2025-12-24 05:29:29', 10, 'employee', 1, 1000.00),
+(83, 'Ayush', -6, 1000.00, 'debit', '', '', '', '', '', '2025-12-24 05:29:45', 10, 'employee', 1, 1000.00),
+(84, '18% gst purchase', -15, 0.00, 'debit', '', '', '', '', '', '2025-12-24 05:30:20', 10, 'employee', 1, 100.00),
+(85, '18% gst sales', -16, 0.00, 'debit', '', '', '', '', '', '2025-12-24 05:30:39', 10, 'employee', 1, 0.00),
+(86, '9% Cgst', 108, 100.00, 'debit', '', '', '', '', '', '2025-12-24 05:32:12', 10, 'employee', 1, 100.00),
+(87, '9% Sgst', 108, 100.00, 'debit', '', '', '', '', '', '2025-12-24 05:32:31', 10, 'employee', 1, 100.00),
+(88, 'S1', 107, 1000.00, 'debit', '', '', '', '', '', '2025-12-24 06:13:03', 1, 'employee', 1, 1000.00),
+(89, 'S2 ', 107, 100.00, 'debit', '', '', '', '', '', '2025-12-24 06:13:17', 1, 'employee', 1, 100.00),
+(90, 'P1', 104, 1000.00, 'debit', '', '', '', '', '', '2025-12-24 10:24:58', 1, 'employee', 1, 1000.00),
+(91, 'S3', 107, 100.00, 'debit', '', '', '', '', '', '2025-12-24 11:20:25', 1, 'employee', 1, 100.00);
 
 -- --------------------------------------------------------
 
@@ -648,8 +660,9 @@ INSERT INTO `ledger_groups` (`id`, `name`, `type`, `parent`, `created_at`, `alia
 (103, 'Provisions', NULL, -6, '2025-12-23 10:19:03', NULL, 'Liabilities', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 1, 'employee', 1),
 (104, 'Sundry Creditors', NULL, -6, '2025-12-23 10:20:02', NULL, 'Liabilities', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 1, 'employee', 1),
 (105, 'Deposite (Asset)', NULL, -6, '2025-12-23 10:20:56', NULL, 'Liabilities', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 1, 'employee', 1),
-(106, 'Loans & Advances (Asset)', NULL, -6, '2025-12-23 10:21:27', NULL, 'Liabilities', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 1, 'employee', 1),
-(107, 'Sundry Debtors', NULL, -6, '2025-12-23 10:23:42', NULL, 'Liabilities', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 1, 'employee', 1);
+(106, 'Loans & Advances (Asset)', NULL, -5, '2025-12-23 10:21:27', NULL, 'Assets', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 1, 'employee', 1),
+(107, 'Sundry Debtors', NULL, -6, '2025-12-23 10:23:42', NULL, 'Liabilities', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 1, 'employee', 1),
+(108, 'Duties & Taxes', NULL, -6, '2025-12-24 05:31:47', NULL, 'Liabilities', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 10, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -668,18 +681,19 @@ CREATE TABLE `purchase_history` (
   `ownerType` varchar(50) DEFAULT NULL,
   `ownerId` varchar(100) DEFAULT NULL,
   `type` varchar(50) DEFAULT 'purchase',
-  `rate` decimal(10,2) DEFAULT NULL
+  `rate` decimal(10,2) DEFAULT NULL,
+  `voucherNumber` varchar(100) DEFAULT NULL,
+  `godownId` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `purchase_history`
 --
 
-INSERT INTO `purchase_history` (`id`, `itemName`, `hsnCode`, `batchNumber`, `purchaseQuantity`, `purchaseDate`, `companyId`, `ownerType`, `ownerId`, `type`, `rate`) VALUES
-(58, 'Biscute', '1111', 'ParleG', 10, '2025-12-23', '1', 'employee', '1', 'purchase', 10.00),
-(59, 'Biscute', '1111', 'ParleG', 10, '2025-12-23', '1', 'employee', '1', 'purchase', 10.00),
-(60, 'Biscute', '1111', 'ParleG', 10, '2025-12-23', '1', 'employee', '1', 'purchase', 10.00),
-(61, 'Biscute', '1111', 'ParleG', 10, '2026-01-23', '1', 'employee', '1', 'purchase', 10.00);
+INSERT INTO `purchase_history` (`id`, `itemName`, `hsnCode`, `batchNumber`, `purchaseQuantity`, `purchaseDate`, `companyId`, `ownerType`, `ownerId`, `type`, `rate`, `voucherNumber`, `godownId`) VALUES
+(88, 'Acc', '1111', 'AA', 10, '2025-12-26', '1', 'employee', '1', 'purchase', 10.00, 'PRV412694', 5),
+(91, 'Biscute', '1111', 'ParleG', 10, '2025-12-26', '1', 'employee', '1', 'purchase', 10.00, 'PRV617842', 4),
+(92, 'Biscute', '1111', 'GoodDay', 10, '2025-12-26', '1', 'employee', '1', 'purchase', 10.00, 'PRV174884', NULL);
 
 -- --------------------------------------------------------
 
@@ -779,10 +793,9 @@ CREATE TABLE `purchase_vouchers` (
 --
 
 INSERT INTO `purchase_vouchers` (`id`, `number`, `date`, `supplierInvoiceDate`, `narration`, `partyId`, `referenceNo`, `dispatchDocNo`, `dispatchThrough`, `destination`, `purchaseLedgerId`, `subtotal`, `cgstTotal`, `sgstTotal`, `igstTotal`, `discountTotal`, `total`, `company_id`, `owner_type`, `owner_id`) VALUES
-(88, 'PRV206073', '2025-12-23', '2025-12-23', '', 63, '1', '1', '1', '1', 75, 100.00, 9.00, 9.00, 0.00, 0.00, 118.00, 1, 'employee', 1),
-(89, 'PRV610783', '2025-12-23', '2025-12-23', '', 78, '2', '2', '2', '2', 80, 100.00, 9.00, 9.00, 0.00, 0.00, 118.00, 1, 'employee', 1),
-(90, 'PRV674943', '2025-12-23', '2025-12-23', '', 65, '3', NULL, '3', '3', 80, 100.00, 9.00, 9.00, 0.00, 0.00, 118.00, 1, 'employee', 1),
-(91, 'PRV262537', '2026-01-23', '2026-01-23', '', 78, '4', '4', '3', '4', 80, 100.00, 9.00, 9.00, 0.00, 0.00, 118.00, 1, 'employee', 1);
+(118, 'PRV412694', '2025-12-26', '2025-12-26', '', 90, '1', '1', '1', '1', 75, 100.00, 9.00, 9.00, 0.00, 0.00, 118.00, 1, 'employee', 1),
+(121, 'PRV617842', '2025-12-26', '2025-12-26', '', 61, '3', '3', '3', '3', 80, 100.00, 9.00, 9.00, 0.00, 0.00, 118.00, 1, 'employee', 1),
+(122, 'PRV174884', '2025-12-26', '2025-12-26', '', 88, '11', '11', '11', '11', 75, 100.00, 9.00, 9.00, 0.00, 0.00, 118.00, 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -809,10 +822,11 @@ CREATE TABLE `purchase_voucher_items` (
 --
 
 INSERT INTO `purchase_voucher_items` (`id`, `voucherId`, `itemId`, `quantity`, `rate`, `discount`, `cgstRate`, `sgstRate`, `igstRate`, `amount`, `godownId`) VALUES
-(88, 88, 40, 10.00, 10.00, 0.00, 9.00, 9.00, 0.00, 118.00, 0),
-(89, 89, 40, 10.00, 10.00, 0.00, 9.00, 9.00, 0.00, 118.00, 0),
-(90, 90, 40, 10.00, 10.00, 0.00, 9.00, 9.00, 0.00, 118.00, 0),
-(91, 91, 40, 10.00, 10.00, 0.00, 9.00, 9.00, 0.00, 118.00, 0);
+(94, 94, 45, 10.00, 10.00, 0.00, 0.00, 0.00, 0.00, 100.00, 0),
+(95, 95, 40, 10.00, 10.00, 0.00, 9.00, 9.00, 0.00, 118.00, 0),
+(118, 118, 44, 10.00, 10.00, 0.00, 9.00, 9.00, 0.00, 118.00, 5),
+(121, 121, 40, 10.00, 10.00, 0.00, 9.00, 9.00, 0.00, 118.00, 4),
+(122, 122, 40, 10.00, 10.00, 0.00, 9.00, 9.00, 0.00, 118.00, 0);
 
 -- --------------------------------------------------------
 
@@ -904,9 +918,8 @@ CREATE TABLE `sales_vouchers` (
 --
 
 INSERT INTO `sales_vouchers` (`id`, `number`, `date`, `narration`, `partyId`, `referenceNo`, `dispatchDocNo`, `dispatchThrough`, `destination`, `subtotal`, `profit`, `cgstTotal`, `sgstTotal`, `igstTotal`, `discountTotal`, `total`, `createdAt`, `company_id`, `owner_type`, `owner_id`, `type`, `isQuotation`, `salesLedgerId`, `supplierInvoiceDate`) VALUES
-(55, 'SLSV0001', '2025-12-20', '', 60, '1', '1', '1', '1', 1050.00, 0.00, 94.50, 94.50, 0.00, 0.00, 1239.00, '2025-12-20 10:40:00', '1', 'employee', '1', 'sales', 0, '74', NULL),
-(56, 'SLSV0001', '2025-12-22', '', 63, '12', '12', '12', '12', 1000000.00, 0.00, 90000.00, 90000.00, 0.00, 0.00, 1180000.00, '2025-12-22 04:43:55', '1', 'employee', '1', 'sales', 0, '74', NULL),
-(57, 'SLSV0001', '2025-12-22', '', 63, '1', '1', NULL, '1', 10500.00, 0.00, 945.00, 945.00, 0.00, 0.00, 12390.00, '2025-12-22 10:17:24', '1', 'employee', '1', 'sales', 0, '74', NULL);
+(71, 'SLSV511737', '2025-12-26', '', 89, '', '2', NULL, '2', 500.00, 0.00, 45.00, 45.00, 0.00, 0.00, 590.00, '2025-12-26 08:29:18', '1', 'employee', '1', 'sales', 0, '74', NULL),
+(72, 'SLSV771759', '2025-12-26', '', 78, '4', '4', '4', '4', 100.00, 0.00, 9.00, 9.00, 0.00, 0.00, 118.00, '2025-12-26 10:13:03', '1', 'employee', '1', 'sales', 0, '77', NULL);
 
 -- --------------------------------------------------------
 
@@ -936,9 +949,8 @@ CREATE TABLE `sales_voucher_items` (
 
 INSERT INTO `sales_voucher_items` (`id`, `voucherId`, `itemId`, `quantity`, `rate`, `amount`, `cgstRate`, `sgstRate`, `igstRate`, `discount`, `hsnCode`, `batchNumber`, `godownId`) VALUES
 (54, 54, 40, 5.00, 10.00, 59.00, 9.00, 9.00, 0.00, 0.00, '1111', 'GoodDay', '3'),
-(55, 55, 40, 10.00, 105.00, 1239.00, 9.00, 9.00, 0.00, 0.00, '1111', 'ParleG', '3'),
-(56, 56, 40, 10000.00, 100.00, 1180000.00, 9.00, 9.00, 0.00, 0.00, '1111', 'Mary', '3'),
-(57, 57, 40, 100.00, 105.00, 12390.00, 9.00, 9.00, 0.00, 0.00, '1111', 'ParleG', '3');
+(70, 71, 44, 50.00, 10.00, 590.00, 9.00, 9.00, 0.00, 0.00, '1111', 'AA', '4'),
+(71, 72, 40, 10.00, 10.00, 118.00, 9.00, 9.00, 0.00, 0.00, '1111', 'GoodDay', '5');
 
 -- --------------------------------------------------------
 
@@ -956,25 +968,18 @@ CREATE TABLE `sale_history` (
   `companyId` varchar(100) DEFAULT NULL,
   `ownerType` varchar(50) DEFAULT NULL,
   `ownerId` varchar(100) DEFAULT NULL,
-  `rate` decimal(10,2) DEFAULT NULL
+  `rate` decimal(10,2) DEFAULT NULL,
+  `voucherNumber` varchar(100) DEFAULT NULL,
+  `godownId` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `sale_history`
 --
 
-INSERT INTO `sale_history` (`id`, `itemName`, `hsnCode`, `batchNumber`, `qtyChange`, `movementDate`, `companyId`, `ownerType`, `ownerId`, `rate`) VALUES
-(26, 'ParleG', '1111', 'P1', -10, '2025-12-18', '1', 'employee', '1', 10.00),
-(27, 'ParleG', '1111', 'P1', -10, '2025-12-18', '1', 'employee', '1', 10.00),
-(28, 'ParleG', '1111', 'P1', -10, '2025-12-18', '1', 'employee', '1', 10.00),
-(29, 'Biscute', '1111', 'ParleG', -5, '2025-12-20', '1', 'employee', '1', 10.00),
-(30, 'Biscute', '1111', 'ParleG', -5, '2025-12-20', '1', 'employee', '1', 10.00),
-(31, 'Biscute', '1111', 'ParleG', -10, '2025-12-20', '1', 'employee', '1', 10.00),
-(32, 'Biscute', '1111', 'ParleG', -5, '2025-12-20', '1', 'employee', '1', 10.00),
-(33, 'Biscute', '1111', 'GoodDay', -5, '2025-12-20', '1', 'employee', '1', 10.00),
-(34, 'Biscute', '1111', 'ParleG', -10, '2025-12-20', '1', 'employee', '1', 105.00),
-(35, 'Biscute', '1111', 'Mary', -10000, '2025-12-22', '1', 'employee', '1', 100.00),
-(36, 'Biscute', '1111', 'ParleG', -100, '2025-12-22', '1', 'employee', '1', 105.00);
+INSERT INTO `sale_history` (`id`, `itemName`, `hsnCode`, `batchNumber`, `qtyChange`, `movementDate`, `companyId`, `ownerType`, `ownerId`, `rate`, `voucherNumber`, `godownId`) VALUES
+(51, 'Acc', '1111', 'AA', -50, '2025-12-26', '1', 'employee', '1', 10.00, 'SLSV511737', 4),
+(52, 'Biscute', '1111', 'GoodDay', -10, '2025-12-26', '1', 'employee', '1', 10.00, 'SLSV771759', 5);
 
 -- --------------------------------------------------------
 
@@ -1050,7 +1055,8 @@ INSERT INTO `stock_categories` (`id`, `name`, `parent`, `description`, `created_
 ('SC-1766211180209', 'Bar', '16', 'This is Bar', '2025-12-20 06:13:00', '2025-12-20 06:13:00', 1, 'employee', 1),
 ('SC-1766211196681', 'Cement', '17', 'This is Cement\n', '2025-12-20 06:13:16', '2025-12-20 06:13:16', 1, 'employee', 1),
 ('SC-1766211228369', 'Chemical', '18', 'This is Chemical', '2025-12-20 06:13:48', '2025-12-20 06:13:48', 1, 'employee', 1),
-('SC-1766211252849', 'FMCG', '18', 'This is FMCG', '2025-12-20 06:14:12', '2025-12-20 06:14:12', 1, 'employee', 1);
+('SC-1766211252849', 'FMCG', '18', 'This is FMCG', '2025-12-20 06:14:12', '2025-12-20 06:14:12', 1, 'employee', 1),
+('SC-1766576754271', 'Biscute', NULL, 'This is Biscute.', '2025-12-24 11:45:54', '2025-12-24 11:45:54', 10, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -1128,8 +1134,9 @@ CREATE TABLE `stock_items` (
 --
 
 INSERT INTO `stock_items` (`id`, `name`, `stockGroupId`, `unit`, `openingBalance`, `openingValue`, `hsnCode`, `gstRate`, `taxType`, `standardPurchaseRate`, `standardSaleRate`, `enableBatchTracking`, `allowNegativeStock`, `maintainInPieces`, `secondaryUnit`, `createdAt`, `batchNumber`, `batchExpiryDate`, `batchManufacturingDate`, `company_id`, `owner_type`, `owner_id`, `barcode`, `batches`, `type`, `categoryId`) VALUES
-(40, 'Biscute', 0, '10', 0.00, 1500.00, '1111', 18.00, 'Taxable', 0.00, 0.00, 1, 0, 0, NULL, '2025-12-19 12:04:04', NULL, NULL, NULL, 1, 'employee', 1, 'XKPwD0ZpPC3k', '[{\"batchName\":\"ParleG\",\"batchQuantity\":340,\"openingRate\":10,\"openingValue\":1000,\"batchExpiryDate\":\"2025-12-31\",\"batchManufacturingDate\":\"2025-12-19\"},{\"batchName\":\"GoodDay\",\"batchQuantity\":1000060,\"openingRate\":10,\"openingValue\":500,\"batchExpiryDate\":\"2025-12-31\",\"batchManufacturingDate\":\"2025-12-19\"},{\"batchName\":\"Mary\",\"batchQuantity\":9990000,\"batchRate\":100,\"batchExpiryDate\":\"2025-12-30\",\"batchManufacturingDate\":\"2025-12-22\"}]', 'opening', 'SC-1766211180209'),
-(44, 'Acc', 0, '9', 0.00, 1000.00, '1111', 18.00, 'Taxable', 0.00, 0.00, 0, 0, 0, NULL, '2025-12-22 06:18:06', NULL, NULL, NULL, 1, 'employee', 1, '0CWMUMn-cBB-', '[{\"batchName\":null,\"batchQuantity\":0,\"openingRate\":0,\"openingValue\":0,\"batchExpiryDate\":null,\"batchManufacturingDate\":null},{\"batchName\":\"AA\",\"batchQuantity\":100,\"openingRate\":10,\"openingValue\":1000,\"batchExpiryDate\":\"2025-12-31\",\"batchManufacturingDate\":\"2025-12-22\"}]', 'opening', 'SC-1766211180209');
+(40, 'Biscute', 0, '10', 0.00, 1500.00, '1111', 18.00, 'Taxable', 0.00, 0.00, 1, 0, 0, NULL, '2025-12-19 12:04:04', NULL, NULL, NULL, 1, 'employee', 1, 'XKPwD0ZpPC3k', '[{\"batchName\":\"ParleG\",\"batchQuantity\":320,\"openingRate\":10,\"openingValue\":1000,\"batchExpiryDate\":\"2025-12-31\",\"batchManufacturingDate\":\"2025-12-19\"},{\"batchName\":\"GoodDay\",\"batchQuantity\":1001110,\"openingRate\":10,\"openingValue\":500,\"batchExpiryDate\":\"2025-12-31\",\"batchManufacturingDate\":\"2025-12-19\"},{\"batchName\":\"Mary\",\"batchQuantity\":9990000,\"batchRate\":100,\"batchExpiryDate\":\"2025-12-30\",\"batchManufacturingDate\":\"2025-12-22\"}]', 'opening', 'SC-1766211180209'),
+(44, 'Acc', 0, '9', 0.00, 1000.00, '1111', 18.00, 'Taxable', 0.00, 0.00, 0, 0, 0, NULL, '2025-12-22 06:18:06', NULL, NULL, NULL, 1, 'employee', 1, '0CWMUMn-cBB-', '[{\"batchName\":null,\"batchQuantity\":0,\"openingRate\":0,\"openingValue\":0,\"batchExpiryDate\":null,\"batchManufacturingDate\":null},{\"batchName\":\"AA\",\"batchQuantity\":675,\"openingRate\":10,\"openingValue\":1000,\"batchExpiryDate\":\"2025-12-31\",\"batchManufacturingDate\":\"2025-12-22\"}]', 'opening', 'SC-1766211180209'),
+(45, 'Biscute', 0, '11', 0.00, 200.00, NULL, 0.00, 'Taxable', 0.00, 0.00, 1, 1, 0, NULL, '2025-12-24 11:47:56', NULL, NULL, NULL, 10, 'employee', 1, 'ZZ6UcnbBL_O2', '[{\"batchName\":\"ParleG\",\"batchQuantity\":20,\"openingRate\":10,\"openingValue\":100,\"batchExpiryDate\":\"2025-12-31\",\"batchManufacturingDate\":\"2025-12-24\"},{\"batchName\":\"GoodDay\",\"batchQuantity\":10,\"openingRate\":10,\"openingValue\":100,\"batchExpiryDate\":\"2025-12-31\",\"batchManufacturingDate\":\"2025-12-24\"}]', 'opening', 'SC-1766576754271');
 
 -- --------------------------------------------------------
 
@@ -1250,7 +1257,8 @@ CREATE TABLE `stock_units` (
 INSERT INTO `stock_units` (`id`, `name`, `symbol`, `created_at`, `company_id`, `owner_type`, `owner_id`) VALUES
 (6, 'Killo', '$', '2025-12-01 06:38:51', 0, 'employee', 1),
 (9, 'Kilo', 'KG', '2025-12-06 11:36:05', 1, 'employee', 1),
-(10, 'Meters', 'Mtr', '2025-12-06 11:45:04', 1, 'employee', 1);
+(10, 'Meters', 'Mtr', '2025-12-06 11:45:04', 1, 'employee', 1),
+(11, 'Kilo', 'KG', '2025-12-24 11:46:48', 10, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -1343,7 +1351,8 @@ CREATE TABLE `tbcompanies` (
 --
 
 INSERT INTO `tbcompanies` (`id`, `name`, `financial_year`, `books_beginning_year`, `address`, `pin`, `phone_number`, `email`, `pan_number`, `gst_number`, `state`, `country`, `tax_type`, `employee_id`, `vault_password`, `created_at`, `vat_number`, `fdAccountType`, `fdAccountantName`) VALUES
-(1, 'My Company', '2026', '2026', 'Ranchi ', '834001', '1234567890', 'a@gmail.com', 'ABCDE1234F', '27ABCDE1234F1Z5', 'Jharkhand(20)', 'India', 'GST', 1, NULL, '2025-12-01 04:26:18', NULL, 'self', NULL);
+(1, 'My Company', '2026', '2026', 'Ranchi ', '834001', '1234567890', 'a@gmail.com', 'ABCDE1234F', '27ABCDE1234F1Z5', 'Jharkhand(20)', 'India', 'GST', 1, NULL, '2025-12-01 04:26:18', NULL, 'self', NULL),
+(10, 'My Company 2', '2025', '2025', 'Ranchi Kadru', '834001', '1234567890', 'd@gmail.com', 'ABCDE1234F', '27ABCDE1234F1Z5', 'Jharkhand(20)', 'India', 'GST', 1, NULL, '2025-12-24 05:28:26', NULL, 'self', NULL);
 
 -- --------------------------------------------------------
 
@@ -1905,10 +1914,14 @@ CREATE TABLE `voucher_entries` (
 --
 
 INSERT INTO `voucher_entries` (`id`, `voucher_id`, `ledger_id`, `amount`, `entry_type`, `narration`, `bank_name`, `cheque_number`, `cost_centre_id`, `item_id`, `ledger_name`) VALUES
-(133, 70, 70, 10.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'Stock 28%'),
-(134, 70, 59, 10.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'CCCCCCCCC'),
 (135, 71, 71, 10.00, 'debit', NULL, NULL, NULL, NULL, NULL, NULL),
-(136, 71, 70, 10.00, 'credit', NULL, NULL, NULL, NULL, NULL, NULL);
+(136, 71, 70, 10.00, 'credit', NULL, NULL, NULL, NULL, NULL, NULL),
+(137, 72, 84, 10000.00, 'debit', NULL, NULL, NULL, NULL, NULL, NULL),
+(138, 72, 83, 10000.00, 'credit', NULL, NULL, NULL, NULL, NULL, NULL),
+(139, 73, 65, 1000.00, 'debit', NULL, NULL, NULL, NULL, NULL, NULL),
+(140, 73, 75, 1000.00, 'credit', NULL, NULL, NULL, NULL, NULL, NULL),
+(141, 74, 76, 110.00, 'credit', NULL, NULL, NULL, NULL, NULL, NULL),
+(142, 74, 58, 110.00, 'debit', NULL, NULL, NULL, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1956,7 +1969,10 @@ CREATE TABLE `voucher_main` (
 
 INSERT INTO `voucher_main` (`id`, `voucher_type`, `voucher_number`, `date`, `narration`, `reference_no`, `supplier_invoice_date`, `due_date`, `company_id`, `owner_type`, `owner_id`) VALUES
 (70, 'receipt', 'RV948521', '2025-12-22', NULL, '87', '2025-12-22', NULL, '1', 'employee', '1'),
-(71, 'payment', 'PV544119', '2025-12-22', NULL, '1', '2025-12-23', NULL, '1', 'employee', '1');
+(71, 'payment', 'PV544119', '2025-12-22', NULL, '1', '2025-12-23', NULL, '1', 'employee', '1'),
+(72, NULL, 'PRV314305', '2025-12-24', '', NULL, NULL, NULL, NULL, NULL, NULL),
+(73, NULL, 'PRV153211', '2025-12-24', '', NULL, NULL, NULL, NULL, NULL, NULL),
+(74, 'payment', 'PV147954', '2025-12-26', NULL, '11', '2025-12-26', NULL, '1', 'employee', '1');
 
 -- --------------------------------------------------------
 
@@ -2683,7 +2699,7 @@ ALTER TABLE `fifo_transactions`
 -- AUTO_INCREMENT for table `godowns`
 --
 ALTER TABLE `godowns`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `godown_allocations`
@@ -2719,19 +2735,19 @@ ALTER TABLE `itr_tax_payments`
 -- AUTO_INCREMENT for table `ledgers`
 --
 ALTER TABLE `ledgers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=81;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=92;
 
 --
 -- AUTO_INCREMENT for table `ledger_groups`
 --
 ALTER TABLE `ledger_groups`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=108;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=109;
 
 --
 -- AUTO_INCREMENT for table `purchase_history`
 --
 ALTER TABLE `purchase_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=62;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=93;
 
 --
 -- AUTO_INCREMENT for table `purchase_orders`
@@ -2749,13 +2765,13 @@ ALTER TABLE `purchase_order_items`
 -- AUTO_INCREMENT for table `purchase_vouchers`
 --
 ALTER TABLE `purchase_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=92;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=123;
 
 --
 -- AUTO_INCREMENT for table `purchase_voucher_items`
 --
 ALTER TABLE `purchase_voucher_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=92;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=123;
 
 --
 -- AUTO_INCREMENT for table `sales_orders`
@@ -2773,19 +2789,19 @@ ALTER TABLE `sales_order_items`
 -- AUTO_INCREMENT for table `sales_vouchers`
 --
 ALTER TABLE `sales_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=73;
 
 --
 -- AUTO_INCREMENT for table `sales_voucher_items`
 --
 ALTER TABLE `sales_voucher_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=58;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=72;
 
 --
 -- AUTO_INCREMENT for table `sale_history`
 --
 ALTER TABLE `sale_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=53;
 
 --
 -- AUTO_INCREMENT for table `scenarios`
@@ -2809,7 +2825,7 @@ ALTER TABLE `stock_groups`
 -- AUTO_INCREMENT for table `stock_items`
 --
 ALTER TABLE `stock_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=45;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=46;
 
 --
 -- AUTO_INCREMENT for table `stock_item_batches`
@@ -2839,7 +2855,7 @@ ALTER TABLE `stock_purchase`
 -- AUTO_INCREMENT for table `stock_units`
 --
 ALTER TABLE `stock_units`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `tbca`
@@ -2863,7 +2879,7 @@ ALTER TABLE `tbcaemployees`
 -- AUTO_INCREMENT for table `tbcompanies`
 --
 ALTER TABLE `tbcompanies`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `tbemployees`
@@ -2989,7 +3005,7 @@ ALTER TABLE `tds_26q_returns`
 -- AUTO_INCREMENT for table `voucher_entries`
 --
 ALTER TABLE `voucher_entries`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=137;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=143;
 
 --
 -- AUTO_INCREMENT for table `voucher_entries_old`
@@ -3001,7 +3017,7 @@ ALTER TABLE `voucher_entries_old`
 -- AUTO_INCREMENT for table `voucher_main`
 --
 ALTER TABLE `voucher_main`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=72;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=75;
 
 --
 -- AUTO_INCREMENT for table `voucher_main_old`
