@@ -1,305 +1,216 @@
-import React, { useState, useEffect } from "react";
-import { useAppContext } from "../../context/AppContext";
+import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Printer, Download, Filter } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
+import Swal from "sweetalert2";
+import { useAppContext } from "../../context/AppContext";
 
-interface GodownSummaryRow {
-  godownId: number;
-  godownName: string;
-  itemId: number;
+interface MovementRow {
   itemName: string;
-  unit: string;
-  quantity: number; // decimal
-  rate: number; // decimal
-  value: number; // decimal
+  batch: string;
+  date: string;
+  type: "Inward" | "Outward";
+  qty: number;
+  rate: number;
+  godownId: number;
 }
 
-const GodownSummary: React.FC = () => {
+const GodownMovementRegister: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
 
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [purchaseHistory, setPurchaseHistory] = useState<any[]>([]);
+  const [salesHistory, setSalesHistory] = useState<any[]>([]);
 
-  // Filters state - add godown filter and asOnDate if needed
-  const [filters, setFilters] = useState({
-    godownId: "",
-    asOnDate: new Date().toISOString().slice(0, 10),
-  });
+  const companyId = localStorage.getItem("company_id");
+  const ownerType = localStorage.getItem("supplier");
+  const ownerId =
+    localStorage.getItem(
+      ownerType === "employee" ? "employee_id" : "user_id"
+    ) || "";
 
-  const [data, setData] = useState<GodownSummaryRow[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [godowns, setGodowns] = useState<
+    { id: string; name: string; address: string }[]
+  >([]);
 
-  // Fetch data on filter change
   useEffect(() => {
-    async function fetchGodownSummary() {
-      setLoading(true);
-      setError(null);
-      const companyId = localStorage.getItem("company_id") || "";
-      const ownerType = localStorage.getItem("supplier") || "";
-      const ownerId =
-        ownerType === "employee"
-          ? localStorage.getItem("employee_id") || ""
-          : localStorage.getItem("user_id") || "";
+    fetch(
+      `${
+        import.meta.env.VITE_API_URL
+      }/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+    )
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success) setGodowns(data.data);
+        else Swal.fire("Error", "Failed to load godowns", "error");
+      })
+      .catch(() => {
+        Swal.fire("Error", "Something went wrong", "error");
+      });
+  }, []);
 
-      try {
-        const params = new URLSearchParams();
-        if (filters.godownId) params.append("godownId", filters.godownId);
-        params.append("company_id", companyId);
-        params.append("owner_type", ownerType);
-        params.append("owner_id", ownerId);
+  /* ================= LOAD PURCHASE ================= */
+  useEffect(() => {
+    if (!companyId || !ownerType || !ownerId) return;
 
-        const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
-          }/api/godown-summary?${params.toString()}`
-        );
-        if (!res.ok) {
-          const text = await res.text();
-          throw new Error(text || `Error: ${res.status}`);
-        }
+    fetch(
+      `${
+        import.meta.env.VITE_API_URL
+      }/api/purchase-vouchers/purchase-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+    )
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success) setPurchaseHistory(res.data || []);
+        else Swal.fire("Error", "Failed to load purchase history", "error");
+      });
+  }, [companyId, ownerType, ownerId]);
 
-        const json: GodownSummaryRow[] = await res.json();
-        setData(json);
-      } catch (e: any) {
-        setError(e.message || "Failed to load");
-        setData([]);
-      } finally {
-        setLoading(false);
+  /* ================= LOAD SALES ================= */
+  useEffect(() => {
+    if (!companyId || !ownerType || !ownerId) return;
+
+    fetch(
+      `${
+        import.meta.env.VITE_API_URL
+      }/api/sales-vouchers/sale-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+    )
+      .then((r) => r.json())
+      .then((res) => {
+        if (res.success) setSalesHistory(res.data || []);
+        else Swal.fire("Error", "Failed to load sales history", "error");
+      });
+  }, [companyId, ownerType, ownerId]);
+
+  /* ================= MERGE MOVEMENTS ================= */
+  const movements: MovementRow[] = useMemo(() => {
+    const inward = purchaseHistory.map((p) => ({
+      itemName: p.itemName,
+      batch: p.batchNumber || "Default",
+      date: p.purchaseDate,
+      type: "Inward" as const,
+      qty: Number(p.purchaseQuantity || 0),
+      rate: Number(p.rate || 0),
+      godownId: p.godownId,
+    }));
+
+    const outward = salesHistory.map((s) => ({
+      itemName: s.itemName,
+      batch: s.batchNumber || "Default",
+      date: s.movementDate,
+      type: "Outward" as const,
+      qty: Math.abs(Number(s.qtyChange || 0)),
+      rate: Number(s.rate || 0),
+      godownId: s.godownId,
+    }));
+
+    return [...inward, ...outward];
+  }, [purchaseHistory, salesHistory]);
+
+  /* ================= GROUP BY ITEM ================= */
+  const itemGrouped = useMemo(() => {
+    const map: Record<string, MovementRow[]> = {};
+
+    movements.forEach((m) => {
+      if (!map[m.itemName]) {
+        map[m.itemName] = [];
       }
-    }
+      map[m.itemName].push(m);
+    });
 
-    fetchGodownSummary();
-  }, [filters]);
+    return map;
+  }, [movements]);
 
-  // Memoize total calculation
-  // const totals = useMemo(() => {
-  //   const totalQty = data.reduce((sum, row) => sum + row.quantity, 0);
-  //   const totalValue = data.reduce((sum, row) => sum + row.value, 0);
-  //   return { totalQty, totalValue };
-  // }, [data]);
+  // get godown name with id
+
+  const godownName = (id) => {
+    return godowns.find((i) => i.id === id)?.name || "-";
+  };
 
   return (
     <div className="pt-[56px] px-4">
-      {/* Header */}
+      {/* HEADER */}
       <div className="flex items-center mb-6">
         <button
-          type="button"
-          title="Back to Reports"
           onClick={() => navigate("/app/reports")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className="mr-4 p-2 rounded-full hover:bg-gray-200"
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold">Godown Summary</h1>
-        <div className="ml-auto flex space-x-2">
-          <button
-            title="Toggle Filters"
-            type="button"
-            onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
-          >
-            <Filter size={18} />
-          </button>
-          <button
-            title="Print Report"
-            type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
-          >
+
+        <h1 className="text-2xl font-bold">
+          Stock Movement Register (Item Wise)
+        </h1>
+
+        <div className="ml-auto">
+          <button onClick={() => window.print()} className="p-2">
             <Printer size={18} />
           </button>
-          <button
-            title="Download Report"
-            type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
-          >
-            <Download size={18} />
-          </button>
         </div>
       </div>
 
-      {/* Filters Panel */}
-      {showFilterPanel && (
-        <div
-          className={`p-4 mb-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
-        >
-          <h3 className="font-semibold mb-4">Filters</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">Godown</label>
-              <select
-                title="Select Godown"
-                value={filters.godownId}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, godownId: e.target.value }))
-                }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
-              >
-                <option value="">All Godowns</option>
-                {/* 
-                  You can fetch godowns list from backend or context and map options here.
-                  Example:
-                  godowns.map(g => <option key={g.id} value={g.id}>{g.name}</option>)
-                */}
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                As on Date
-              </label>
-              <input
-                title="Select Date"
-                type="date"
-                value={filters.asOnDate}
-                onChange={(e) =>
-                  setFilters((f) => ({ ...f, asOnDate: e.target.value }))
-                }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
-              />
-            </div>
-          </div>
-        </div>
-      )}
+      {/* CONTENT */}
+      <div className="space-y-8 text-sm">
+        {Object.keys(itemGrouped).length === 0 && (
+          <p className="text-gray-500 text-center py-8">
+            No stock movement data available
+          </p>
+        )}
 
-      {/* Summary Table */}
-      <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
-      >
-        <div className="mb-4 text-center">
-          <h2 className="text-xl font-bold">Godown-wise Stock Summary</h2>
-          <p className="text-sm opacity-75">{filters.asOnDate}</p>
-        </div>
+        {Object.entries(itemGrouped).map(([itemName, rows]) => (
+          <div key={itemName} className="border rounded-md p-4">
+            {/* ITEM NAME */}
+            <h3 className="font-bold text-lg mb-3">{itemName}</h3>
 
-        {loading && <p>Loading...</p>}
-        {error && <p className="text-red-600">{error}</p>}
-
-        {!loading && !error && (
-          <table className="w-full border-collapse border border-gray-300">
-            <thead>
-              <tr
-                className={`${
-                  theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-100"
-                }`}
-              >
-                <th className="border border-gray-300 px-4 py-3 text-left">
-                  Godown
-                </th>
-                <th className="border border-gray-300 px-4 py-3 text-left">
-                  Stock Item
-                </th>
-                <th className="border border-gray-300 px-4 py-3 text-left">
-                  Unit
-                </th>
-                <th className="border border-gray-300 px-4 py-3 text-right">
-                  Quantity
-                </th>
-                <th className="border border-gray-300 px-4 py-3 text-right">
-                  Rate
-                </th>
-                <th className="border border-gray-300 px-4 py-3 text-right">
-                  Value
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {data.length === 0 ? (
-                <tr>
-                  <td colSpan={6} className="px-4 py-8 text-center opacity-70">
-                    No stock found in godowns
-                  </td>
+            <table className="w-full border-collapse text-sm">
+              <thead>
+                <tr className="bg-gray-100">
+                  <th className="border px-2 py-1 text-center">Type</th>
+                  <th className="border px-2 py-1 text-center">Godown</th>
+                  <th className="border px-2 py-1 text-center">Batch</th>
+                  <th className="border px-2 py-1 text-center">Date</th>
+                  <th className="border px-2 py-1 text-center">Qty</th>
+                  <th className="border px-2 py-1 text-center">Rate</th>
+                  <th className="border px-2 py-1 text-center">Total Amount</th>
                 </tr>
-              ) : (
-                data.map((row, idx) => (
-                  <tr
-                    key={idx}
-                    className="hover:bg-gray-100 dark:hover:bg-gray-700"
-                  >
-                    <td className="border border-gray-300 px-4 py-2">
-                      {row.godownName}
+              </thead>
+
+              <tbody>
+                {rows.map((r, i) => (
+                  <tr key={i}>
+                    <td
+                      className={`border px-2 py-1 text-center font-semibold ${
+                        r.type === "Inward" ? "text-green-600" : "text-red-600"
+                      }`}
+                    >
+                      {r.type}
                     </td>
-                    <td className="border border-gray-300 px-4 py-2">
-                      {row.itemName}
+                    <td className="border text-center px-2 py-1">
+                      {godownName(r.godownId)}
                     </td>
-                    <td className="border border-gray-300 px-4 py-2">
-                      {row.unit}
+
+                    <td className="border text-center px-2 py-1">{r.batch}</td>
+
+                    <td className="border px-2 py-1 text-center">
+                      {r.date ? new Date(r.date).toLocaleDateString() : "-"}
                     </td>
-                    <td className="border border-gray-300 px-4 py-2 text-right">
-                      {row.quantity.toLocaleString()}
+
+                    <td className="border px-2 py-1 text-center">{r.qty}</td>
+
+                    <td className="border px-2 py-1 text-center">
+                      {r.rate.toFixed(2)}
                     </td>
-                    <td className="border border-gray-300 px-4 py-2 text-right">
-                      ₹{row.rate.toLocaleString()}
-                    </td>
-                    <td className="border border-gray-300 px-4 py-2 text-right">
-                      ₹{row.value.toLocaleString()}
+
+                    <td className="border px-2 py-1 text-center font-semibold">
+                      {(r.qty * r.rate).toFixed(2)}
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
-            {data.length > 0 && (
-              <tfoot>
-                <tr
-                  className={`${
-                    theme === "dark"
-                      ? "bg-gray-900 text-white"
-                      : "bg-gray-200 font-bold"
-                  }`}
-                >
-                  <td
-                    colSpan={3}
-                    className="border border-gray-300 px-4 py-2 text-right"
-                  >
-                    Total:
-                  </td>
-                  <td className="border border-gray-300 px-4 py-2 text-right">
-                    {data
-                      .reduce((sum, r) => sum + r.quantity, 0)
-                      .toLocaleString()}
-                  </td>
-                  <td className="border border-gray-300 px-4 py-2" />
-                  <td className="border border-gray-300 px-4 py-2 text-right">
-                    ₹
-                    {data.reduce((sum, r) => sum + r.value, 0).toLocaleString()}
-                  </td>
-                </tr>
-              </tfoot>
-            )}
-          </table>
-        )}
-      </div>
-
-      <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
-      >
-        <p className="text-sm">
-          <span className="font-semibold">Pro Tip:</span> Press F5 to refresh,
-          F12 to configure display options.
-        </p>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ))}
       </div>
     </div>
   );
 };
 
-export default GodownSummary;
+export default GodownMovementRegister;

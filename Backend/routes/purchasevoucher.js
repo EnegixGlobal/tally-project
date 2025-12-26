@@ -53,6 +53,7 @@ router.get("/purchase-history", async (req, res) => {
         purchaseQuantity,
         rate,
         purchaseDate,
+        godownId,
         companyId,
         ownerType,
         ownerId,
@@ -523,7 +524,7 @@ router.post("/purchase-history", async (req, res) => {
     const existingCols = colsRows.map((r) => r.COLUMN_NAME);
 
     /* ================================
-       3️⃣ REQUIRED COLUMNS
+       3️⃣ REQUIRED COLUMNS (UPDATED)
     ================================= */
     const requiredCols = {
       id: "INT AUTO_INCREMENT PRIMARY KEY",
@@ -533,11 +534,12 @@ router.post("/purchase-history", async (req, res) => {
       purchaseQuantity: "INT",
       rate: "DECIMAL(10,2)",
       purchaseDate: "DATE",
-      voucherNumber: "VARCHAR(100)", // ✅ NEW COLUMN
+      voucherNumber: "VARCHAR(100)",
       companyId: "VARCHAR(100)",
       ownerType: "VARCHAR(50)",
       ownerId: "VARCHAR(100)",
       type: "VARCHAR(50) DEFAULT 'purchase'",
+      godownId: "INT", // ✅ NEW FIELD (ONLY ID)
     };
 
     /* ================================
@@ -557,7 +559,8 @@ router.post("/purchase-history", async (req, res) => {
           companyId VARCHAR(100),
           ownerType VARCHAR(50),
           ownerId VARCHAR(100),
-          type VARCHAR(50) DEFAULT 'purchase'
+          type VARCHAR(50) DEFAULT 'purchase',
+          godownId INT
         )
       `);
     } else {
@@ -575,7 +578,7 @@ router.post("/purchase-history", async (req, res) => {
     }
 
     /* ================================
-       6️⃣ INSERT DATA
+       6️⃣ INSERT DATA (UPDATED)
     ================================= */
     const insertSql = `
       INSERT INTO purchase_history
@@ -590,7 +593,8 @@ router.post("/purchase-history", async (req, res) => {
         companyId,
         ownerType,
         ownerId,
-        type
+        type,
+        godownId
       )
       VALUES ?
     `;
@@ -602,11 +606,12 @@ router.post("/purchase-history", async (req, res) => {
       Number(e.purchaseQuantity) || 0,
       Number(e.rate) || 0,
       e.purchaseDate || null,
-      e.voucherNumber || null, // ✅ SAVED
+      e.voucherNumber || null,
       e.companyId || null,
       e.ownerType || null,
       e.ownerId || null,
       e.type || "purchase",
+      Number(e.godownId) || null, // ✅ ONLY ID SAVED
     ]);
 
     /* ================================
