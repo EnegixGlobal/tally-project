@@ -48,64 +48,52 @@ router.get('/api/ageing-analysis', async (req, res) => {
 
     const itemWhereClause = `WHERE ${itemFilters.join(' AND ')}`;
 
-    // Get all stock items with their current balances
-    const itemsSql = `
-      SELECT
+    // Get distinct item+godown combinations from transactions
+    // This ensures we show separate rows for same item in different godowns
+    const itemGodownCombinationsSql = `
+      SELECT DISTINCT
         si.id AS item_id,
         si.name AS item_name,
         si.batchNumber,
         si.batchExpiryDate,
         si.openingBalance,
         si.standardPurchaseRate AS rate,
-        -- Calculate current balance
-        (COALESCE(si.openingBalance, 0) + 
-         COALESCE(purchase_summary.totalInward, 0) - 
-         COALESCE(sales_summary.totalOutward, 0)) AS currentBalance
+        COALESCE(pvi.godownId, COALESCE(svi.godownId, 0)) AS godown_id
       FROM stock_items si
-      LEFT JOIN (
-        SELECT 
-          pvi.itemId,
-          SUM(pvi.quantity) AS totalInward
-        FROM purchase_voucher_items pvi
-        JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
-        WHERE pv.date <= ?
-          AND pv.company_id = ?
-          AND pv.owner_type = ?
-          AND pv.owner_id = ?
-          ${godownId ? 'AND pvi.godownId = ?' : ''}
-        GROUP BY pvi.itemId
-      ) AS purchase_summary ON purchase_summary.itemId = si.id
-      LEFT JOIN (
-        SELECT 
-          svi.itemId,
-          SUM(svi.quantity) AS totalOutward
-        FROM sales_voucher_items svi
-        JOIN sales_vouchers sv ON svi.voucherId = sv.id
-        WHERE sv.date <= ?
-          AND sv.company_id = ?
-          AND sv.owner_type = ?
-          AND sv.owner_id = ?
-          ${godownId ? 'AND svi.godownId = ?' : ''}
-        GROUP BY svi.itemId
-      ) AS sales_summary ON sales_summary.itemId = si.id
+      LEFT JOIN purchase_voucher_items pvi ON pvi.itemId = si.id
+      LEFT JOIN purchase_vouchers pv ON pvi.voucherId = pv.id 
+        AND pv.date <= ? 
+        AND pv.company_id = ? 
+        AND pv.owner_type = ? 
+        AND pv.owner_id = ?
+        ${godownId ? 'AND pvi.godownId = ?' : ''}
+      LEFT JOIN sales_voucher_items svi ON svi.itemId = si.id
+      LEFT JOIN sales_vouchers sv ON svi.voucherId = sv.id 
+        AND sv.date <= ? 
+        AND sv.company_id = ? 
+        AND sv.owner_type = ? 
+        AND sv.owner_id = ?
+        ${godownId ? 'AND svi.godownId = ?' : ''}
       ${itemWhereClause}
-      ORDER BY si.id ASC
+      HAVING godown_id > 0 OR si.openingBalance > 0
+      ORDER BY si.id ASC, godown_id ASC
     `;
 
-    // Get purchase transactions for ageing calculation
-    const purchaseParams = [toDate, companyId, ownerType, ownerId];
-    if (godownId) purchaseParams.push(godownId);
-    
-    const salesParams = [toDate, companyId, ownerType, ownerId];
-    if (godownId) salesParams.push(godownId);
-    
-    const itemsParams = [...purchaseParams, ...salesParams, ...itemParams];
-    const [itemsRows] = await pool.query(itemsSql, itemsParams);
+    // Build params for combinations query
+    const combinationsParams = [
+      toDate, companyId, ownerType, ownerId,  // for purchase_vouchers join
+      ...(godownId ? [godownId] : []),
+      toDate, companyId, ownerType, ownerId,  // for sales_vouchers join
+      ...(godownId ? [godownId] : []),
+      ...itemParams
+    ];
+    const [itemsRows] = await pool.query(itemGodownCombinationsSql, combinationsParams);
 
-    // Get purchase transactions for ageing
+    // Get purchase transactions for ageing, including godownId
     const purchasesSql = `
       SELECT 
         pvi.itemId,
+        COALESCE(pvi.godownId, 0) AS godown_id,
         pv.date AS purchase_date,
         pvi.quantity AS purchase_qty,
         pvi.rate AS purchase_rate
@@ -126,10 +114,49 @@ router.get('/api/ageing-analysis', async (req, res) => {
     
     const [purchaseRows] = await pool.query(purchasesSql, purchaseDataParams);
 
-    // Combine items with purchases
+    // Get sales transactions to calculate current balance per item+godown
+    const salesSql = `
+      SELECT 
+        svi.itemId,
+        COALESCE(svi.godownId, 0) AS godown_id,
+        SUM(svi.quantity) AS totalOutward
+      FROM sales_voucher_items svi
+      JOIN sales_vouchers sv ON svi.voucherId = sv.id
+      WHERE sv.date <= ?
+        AND sv.company_id = ?
+        AND sv.owner_type = ?
+        AND sv.owner_id = ?
+        ${godownId ? 'AND svi.godownId = ?' : ''}
+        ${stockItemId ? 'AND svi.itemId = ?' : ''}
+      GROUP BY svi.itemId, svi.godownId
+    `;
+    
+    const salesParams = [toDate, companyId, ownerType, ownerId];
+    if (godownId) salesParams.push(godownId);
+    if (stockItemId) salesParams.push(stockItemId);
+    
+    const [salesRows] = await pool.query(salesSql, salesParams);
+
+    // Combine items with purchases and calculate balances
     const rows = itemsRows.map(item => {
-      const purchases = purchaseRows.filter(p => p.itemId === item.item_id);
-      return { ...item, purchases };
+      const purchases = purchaseRows.filter(p => 
+        p.itemId === item.item_id && p.godown_id == item.godown_id
+      );
+      
+      // Calculate current balance for this item+godown
+      const totalInward = purchases.reduce((sum, p) => sum + parseFloat(p.purchase_qty || 0), 0);
+      const salesRow = salesRows.find(s => s.itemId === item.item_id && s.godown_id == item.godown_id);
+      const totalOutward = salesRow ? parseFloat(salesRow.totalOutward || 0) : 0;
+      const openingQty = parseFloat(item.openingBalance || 0);
+      const currentBalance = openingQty + totalInward - totalOutward;
+      
+      return { 
+        ...item, 
+        purchases,
+        currentBalance,
+        totalInward,
+        totalOutward
+      };
     });
 
     const today = new Date(toDate);
@@ -145,10 +172,17 @@ router.get('/api/ageing-analysis', async (req, res) => {
     const result = {};
 
     for (const row of rows) {
+      // Use composite key: item_id + godown_id to separate same item in different godowns
+      const compositeKey = `${row.item_id}_${row.godown_id || 0}`;
       const currentBalance = parseFloat(row.currentBalance) || 0;
       const rate = parseFloat(row.rate) || 0;
       
-      result[row.item_id] = {
+      // Skip if no balance and no purchases
+      if (currentBalance <= 0 && (!row.purchases || row.purchases.length === 0)) {
+        continue;
+      }
+      
+      result[compositeKey] = {
         item: {
           id: String(row.item_id),
           name: row.item_name,
@@ -170,18 +204,20 @@ router.get('/api/ageing-analysis', async (req, res) => {
             const purchaseRate = parseFloat(purchase.purchase_rate) || rate;
             const val = qty * purchaseRate;
 
-            result[row.item_id].ageing[idx].qty += qty;
-            result[row.item_id].ageing[idx].value += val;
+            result[compositeKey].ageing[idx].qty += qty;
+            result[compositeKey].ageing[idx].value += val;
           }
         }
-      } else if (currentBalance > 0) {
-        // If no purchase transactions but has balance (opening balance), put in oldest bucket
+      }
+      
+      // If we have current balance but no purchases, use opening balance for ageing
+      if (currentBalance > 0 && (!row.purchases || row.purchases.length === 0)) {
         const openingQty = parseFloat(row.openingBalance) || 0;
         if (openingQty > 0) {
           const idx = ageingBuckets.length - 1; // "Above 180 Days"
           const val = openingQty * rate;
-          result[row.item_id].ageing[idx].qty += openingQty;
-          result[row.item_id].ageing[idx].value += val;
+          result[compositeKey].ageing[idx].qty += openingQty;
+          result[compositeKey].ageing[idx].value += val;
         }
       }
     }
