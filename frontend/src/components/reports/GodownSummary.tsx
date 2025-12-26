@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer } from "lucide-react";
 import Swal from "sweetalert2";
-import { useAppContext } from "../../context/AppContext";
 
 interface MovementRow {
   itemName: string;
@@ -15,7 +14,6 @@ interface MovementRow {
 }
 
 const GodownMovementRegister: React.FC = () => {
-  const { theme } = useAppContext();
   const navigate = useNavigate();
 
   const [purchaseHistory, setPurchaseHistory] = useState<any[]>([]);
@@ -31,6 +29,7 @@ const GodownMovementRegister: React.FC = () => {
   const [godowns, setGodowns] = useState<
     { id: string; name: string; address: string }[]
   >([]);
+  const [selectedGodownId, setSelectedGodownId] = useState<string>("");
 
   useEffect(() => {
     fetch(
@@ -105,24 +104,39 @@ const GodownMovementRegister: React.FC = () => {
     return [...inward, ...outward];
   }, [purchaseHistory, salesHistory]);
 
-  /* ================= GROUP BY ITEM ================= */
-  const itemGrouped = useMemo(() => {
-    const map: Record<string, MovementRow[]> = {};
+  /* ================= GROUP BY GODOWN, THEN BY ITEM ================= */
+  const godownGrouped = useMemo(() => {
+    // First group by godownId
+    const godownMap: Record<string | number, Record<string, MovementRow[]>> = {};
 
     movements.forEach((m) => {
-      if (!map[m.itemName]) {
-        map[m.itemName] = [];
+      const godownKey = m.godownId;
+      if (!godownMap[godownKey]) {
+        godownMap[godownKey] = {};
       }
-      map[m.itemName].push(m);
+      if (!godownMap[godownKey][m.itemName]) {
+        godownMap[godownKey][m.itemName] = [];
+      }
+      godownMap[godownKey][m.itemName].push(m);
     });
 
-    return map;
+    return godownMap;
   }, [movements]);
 
-  // get godown name with id
+  /* ================= FILTER BY SELECTED GODOWN ================= */
+  const filteredGodownGrouped = useMemo(() => {
+    if (!selectedGodownId) {
+      return godownGrouped;
+    }
+    return {
+      [selectedGodownId]: godownGrouped[selectedGodownId] || {},
+    };
+  }, [godownGrouped, selectedGodownId]);
 
-  const godownName = (id) => {
-    return godowns.find((i) => i.id === id)?.name || "-";
+  // get godown name with id
+  const godownName = (id: number | string) => {
+    const godown = godowns.find((g) => String(g.id) === String(id));
+    return godown?.name || "-";
   };
 
   return (
@@ -137,10 +151,30 @@ const GodownMovementRegister: React.FC = () => {
         </button>
 
         <h1 className="text-2xl font-bold">
-          Stock Movement Register (Item Wise)
+          Stock Movement Register (Godown Wise)
         </h1>
 
-        <div className="ml-auto">
+        <div className="ml-auto flex items-center gap-4">
+          {/* GODOWN SELECT DROPDOWN */}
+          <div className="flex items-center gap-2">
+            <label htmlFor="godownSelect" className="text-sm font-medium">
+              Select Godown:
+            </label>
+            <select
+              id="godownSelect"
+              value={selectedGodownId}
+              onChange={(e) => setSelectedGodownId(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md bg-white text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="">All Godowns</option>
+              {godowns.map((godown) => (
+                <option key={godown.id} value={godown.id}>
+                  {godown.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           <button onClick={() => window.print()} className="p-2">
             <Printer size={18} />
           </button>
@@ -149,65 +183,88 @@ const GodownMovementRegister: React.FC = () => {
 
       {/* CONTENT */}
       <div className="space-y-8 text-sm">
-        {Object.keys(itemGrouped).length === 0 && (
+        {Object.keys(filteredGodownGrouped).length === 0 && (
           <p className="text-gray-500 text-center py-8">
-            No stock movement data available
+            {selectedGodownId
+              ? "No stock movement data available for selected godown"
+              : "No stock movement data available"}
           </p>
         )}
 
-        {Object.entries(itemGrouped).map(([itemName, rows]) => (
-          <div key={itemName} className="border rounded-md p-4">
-            {/* ITEM NAME */}
-            <h3 className="font-bold text-lg mb-3">{itemName}</h3>
+        {Object.entries(filteredGodownGrouped).map(([godownId, itemMap]) => {
+          const godownNameValue = godownName(godownId);
+          return (
+            <div key={godownId} className="border rounded-md p-4">
+              {/* GODOWN NAME */}
+              <h3 className="font-bold text-lg mb-4">{godownNameValue}</h3>
 
-            <table className="w-full border-collapse text-sm">
-              <thead>
-                <tr className="bg-gray-100">
-                  <th className="border px-2 py-1 text-center">Type</th>
-                  <th className="border px-2 py-1 text-center">Godown</th>
-                  <th className="border px-2 py-1 text-center">Batch</th>
-                  <th className="border px-2 py-1 text-center">Date</th>
-                  <th className="border px-2 py-1 text-center">Qty</th>
-                  <th className="border px-2 py-1 text-center">Rate</th>
-                  <th className="border px-2 py-1 text-center">Total Amount</th>
-                </tr>
-              </thead>
+              {/* ITEMS UNDER THIS GODOWN */}
+              {Object.entries(itemMap).map(([itemName, rows]) => (
+                <div key={itemName} className="mb-6 last:mb-0">
+                  {/* ITEM NAME */}
+                  <h4 className="font-semibold text-md mb-2 text-gray-700">
+                    {itemName}
+                  </h4>
 
-              <tbody>
-                {rows.map((r, i) => (
-                  <tr key={i}>
-                    <td
-                      className={`border px-2 py-1 text-center font-semibold ${
-                        r.type === "Inward" ? "text-green-600" : "text-red-600"
-                      }`}
-                    >
-                      {r.type}
-                    </td>
-                    <td className="border text-center px-2 py-1">
-                      {godownName(r.godownId)}
-                    </td>
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className="bg-gray-100">
+                        <th className="border px-2 py-1 text-center">Type</th>
+                        <th className="border px-2 py-1 text-center">Item</th>
+                        <th className="border px-2 py-1 text-center">Batch</th>
+                        <th className="border px-2 py-1 text-center">Date</th>
+                        <th className="border px-2 py-1 text-center">Qty</th>
+                        <th className="border px-2 py-1 text-center">Rate</th>
+                        <th className="border px-2 py-1 text-center">Total Amount</th>
+                      </tr>
+                    </thead>
 
-                    <td className="border text-center px-2 py-1">{r.batch}</td>
+                    <tbody>
+                      {rows.map((r, i) => (
+                        <tr key={i}>
+                          <td
+                            className={`border px-2 py-1 text-center font-semibold ${
+                              r.type === "Inward"
+                                ? "text-green-600"
+                                : "text-red-600"
+                            }`}
+                          >
+                            {r.type}
+                          </td>
+                          <td className="border text-center px-2 py-1">
+                            {r.itemName}
+                          </td>
 
-                    <td className="border px-2 py-1 text-center">
-                      {r.date ? new Date(r.date).toLocaleDateString() : "-"}
-                    </td>
+                          <td className="border text-center px-2 py-1">
+                            {r.batch}
+                          </td>
 
-                    <td className="border px-2 py-1 text-center">{r.qty}</td>
+                          <td className="border px-2 py-1 text-center">
+                            {r.date
+                              ? new Date(r.date).toLocaleDateString()
+                              : "-"}
+                          </td>
 
-                    <td className="border px-2 py-1 text-center">
-                      {r.rate.toFixed(2)}
-                    </td>
+                          <td className="border px-2 py-1 text-center">
+                            {r.qty}
+                          </td>
 
-                    <td className="border px-2 py-1 text-center font-semibold">
-                      {(r.qty * r.rate).toFixed(2)}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ))}
+                          <td className="border px-2 py-1 text-center">
+                            {r.rate.toFixed(2)}
+                          </td>
+
+                          <td className="border px-2 py-1 text-center font-semibold">
+                            {(r.qty * r.rate).toFixed(2)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ))}
+            </div>
+          );
+        })}
       </div>
     </div>
   );
