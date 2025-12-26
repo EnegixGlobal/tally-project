@@ -209,6 +209,8 @@ import PurchaseItemDetail from "./components/reports/profit_loss/PurchaseItemDet
 import OpeningStockDetail from "./components/reports/profit_loss/OpeningStockDetail";
 import SalesItemDetail from "./components/reports/profit_loss/SalesItemDetail";
 import DirectExpenseDetail from "./components/reports/profit_loss/DirectExpenseDetail";
+import ReceivablesDetails from "./components/reports/outstanding/outStandingDetails/ReceivablesDetails";
+import Payablesdetails from "./components/reports/outstanding/outStandingDetails/payablesdetails";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -973,7 +975,6 @@ function App() {
                   </RequireCompany>
                 }
               />
-
               <Route
                 path="reports/profit-loss/purchase"
                 element={
@@ -1038,7 +1039,6 @@ function App() {
                   </RequireCompany>
                 }
               />
-              
               <Route
                 path="reports/balance-sheet"
                 element={
@@ -1112,6 +1112,22 @@ function App() {
                 }
               />
               <Route
+                path="reports/outstanding/receivables"
+                element={
+                  <RequireCompany>
+                    <ReceivablesDetails />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/outstanding/payables"
+                element={
+                  <RequireCompany>
+                    <Payablesdetails />
+                  </RequireCompany>
+                }
+              />
+              <Route
                 path="reports/stock-summary"
                 element={
                   <RequireCompany>
@@ -1131,7 +1147,7 @@ function App() {
                 path="reports/stock-vouchers"
                 element={
                   <RequireCompany>
-                    <StockVouchers/>
+                    <StockVouchers />
                   </RequireCompany>
                 }
               />
