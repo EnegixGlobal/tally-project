@@ -4,6 +4,7 @@ import { useAppContext } from '../../context/AppContext';
 import FilterPanel from './FilterPanel';
 import ReportTable from './ReportTable';
 import { ArrowLeft, Filter } from 'lucide-react';
+import type { StockGroup, StockItem, Godown } from '../../types';
 
 type AgeingBucket = { label: string; qty: number; value: number };
 
@@ -46,17 +47,93 @@ const AgeingAnalysis: React.FC = () => {
   const [data, setData] = useState<AgeingData[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const companyId = localStorage.getItem('company_id') || '';
-      const ownerType = localStorage.getItem('userType') || '';
+  
+  // Filter options
+  const [stockGroups, setStockGroups] = useState<StockGroup[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [godowns, setGodowns] = useState<Godown[]>([]);
+
+  // Fetch filter options (stock groups, stock items, godowns)
+  useEffect(() => {
+    async function fetchFilterOptions() {
+      const companyId = localStorage.getItem('company_id') || '';
+      const ownerType = localStorage.getItem('supplier') || localStorage.getItem('userType') || '';
       const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id') || '';
 
-        if (!companyId || !ownerType || !ownerId) {
-              setError("Missing tenant information.");
-              setLoading(false);
-              return;
-            }
+      if (!companyId || !ownerType || !ownerId) return;
+
+      try {
+        // Fetch stock groups
+        const stockGroupsRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-groups/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        if (stockGroupsRes.ok) {
+          const stockGroupsData = await stockGroupsRes.json();
+          setStockGroups(Array.isArray(stockGroupsData) ? stockGroupsData.map((g: any) => ({ 
+            id: String(g.id), 
+            name: g.name 
+          })) : []);
+        }
+
+        // Fetch stock items
+        const stockItemsRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        if (stockItemsRes.ok) {
+          const stockItemsData = await stockItemsRes.json();
+          const items = stockItemsData.success && stockItemsData.data 
+            ? stockItemsData.data 
+            : Array.isArray(stockItemsData) 
+              ? stockItemsData 
+              : [];
+          
+          setStockItems(items.map((item: any) => ({ 
+            id: String(item.id), 
+            name: item.name,
+            unit: item.unit || '',
+            openingBalance: item.openingBalance || 0,
+            openingValue: item.openingValue || 0,
+            stockGroupId: item.stockGroupId ? String(item.stockGroupId) : undefined,
+            batchDetails: item.batches || item.batchDetails || []
+          } as StockItem)));
+        }
+
+        // Fetch godowns
+        const godownsRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        if (godownsRes.ok) {
+          const godownsData = await godownsRes.json();
+          const godownsList = godownsData.success && godownsData.data 
+            ? godownsData.data 
+            : Array.isArray(godownsData) 
+              ? godownsData 
+              : [];
+          
+          setGodowns(godownsList.map((g: any) => ({ 
+            id: String(g.id), 
+            name: g.name 
+          })));
+        }
+      } catch (e) {
+        console.error('Error fetching filter options:', e);
+      }
+    }
+    fetchFilterOptions();
+  }, []);
+
   useEffect(() => {
     async function fetchData() {
+      const companyId = localStorage.getItem('company_id') || '';
+      const ownerType = localStorage.getItem('supplier') || localStorage.getItem('userType') || '';
+      const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id') || '';
+
+      if (!companyId || !ownerType || !ownerId) {
+        setError("Missing tenant information. Please ensure you are logged in and have selected a company.");
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError(null);
       try {
@@ -164,9 +241,9 @@ const AgeingAnalysis: React.FC = () => {
           filters={filters}
           onFilterChange={setFilters}
           onToggle={() => setShowFilterPanel(false)}
-          stockGroups={[]} // optionally pass your stockGroups here if needed
-          stockItems={[]}  // optionally pass your stockItems here if needed
-          godowns={[]} // Empty as per your original code or pass actual godowns if available
+          stockGroups={stockGroups}
+          stockItems={stockItems}
+          godowns={godowns}
         />
       )}
 

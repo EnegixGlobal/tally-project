@@ -44,6 +44,8 @@ const MovementAnalysis: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [stockItemId, setStockItemId] = useState<string | undefined>(undefined);
+  const [stockItems, setStockItems] = useState<{ id: number; name: string }[]>([]);
+  const [loadingStockItems, setLoadingStockItems] = useState(false);
 
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
@@ -51,6 +53,36 @@ const MovementAnalysis: React.FC = () => {
 
     if (itemId) setStockItemId(itemId);
   }, [location.search]);
+
+  // Fetch stock items list on component mount
+  useEffect(() => {
+    const fetchStockItems = async () => {
+      if (!companyId || !ownerType || !ownerId) return;
+
+      setLoadingStockItems(true);
+      try {
+        const response = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+
+        if (!response.ok) {
+          throw new Error("Failed to load stock items");
+        }
+
+        const json = await response.json();
+        
+        if (json.success && json.data) {
+          setStockItems(json.data.map((item: any) => ({ id: item.id, name: item.name })));
+        }
+      } catch (e: any) {
+        console.error("Error fetching stock items:", e);
+      } finally {
+        setLoadingStockItems(false);
+      }
+    };
+
+    fetchStockItems();
+  }, [companyId, ownerType, ownerId]);
 
   useEffect(() => {
     const fetchMovementData = async () => {
@@ -67,14 +99,23 @@ const MovementAnalysis: React.FC = () => {
         );
 
         if (!response.ok) {
-          throw new Error("Failed to load item details");
+          const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
+          console.error('❌ API Error:', errorData);
+          throw new Error(errorData.error || errorData.message || `Failed to load item details: ${response.status}`);
         }
 
         const json = await response.json();
 
         console.log('json', json)
 
-        setData([json.data]);
+        // Handle response - json.data is already an array
+        if (Array.isArray(json.data)) {
+          setData(json.data);
+        } else if (json.data) {
+          setData([json.data]);
+        } else {
+          setData([]);
+        }
       } catch (e: any) {
         setError(e.message || "Unknown error");
         setData([]);
@@ -84,7 +125,7 @@ const MovementAnalysis: React.FC = () => {
     };
 
     fetchMovementData();
-  }, [stockItemId]);
+  }, [stockItemId, fromDate, toDate, companyId, ownerType, ownerId]);
 
   return (
     <div className="pt-[56px] px-4">
@@ -92,7 +133,7 @@ const MovementAnalysis: React.FC = () => {
       <div className="flex items-center mb-6">
         <button
           type="button"
-          onClick={() => navigate("/app/reports/stock-summary")}
+          onClick={() => navigate(-1)}
           className={`mr-4 p-2 rounded-full ${
             theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
           }`}
@@ -164,17 +205,34 @@ const MovementAnalysis: React.FC = () => {
 
         <div>
           <label className="block text-sm font-medium mb-1">Stock Item</label>
-          <input
-            type="text"
-            placeholder="Enter Stock Item ID"
+          <select
             value={stockItemId ?? ""}
-            onChange={(e) => setStockItemId(e.target.value)}
+            onChange={(e) => setStockItemId(e.target.value || undefined)}
             className={`w-full p-2 rounded border ${
               theme === "dark"
-                ? "bg-gray-700 border-gray-600"
-                : "border-gray-300"
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "border-gray-300 bg-white"
             }`}
-          />
+            disabled={loadingStockItems}
+          >
+            <option value="">-- Select Stock Item --</option>
+            {stockItems.map((item) => (
+              // <option key={item.id} value={item.id.toString()}>
+              //   {item.name} (ID: {item.id})
+              // </option>
+              <option key={item.id} value={item.id.toString()}>
+                {item.name}
+               </option>
+            ))}
+          </select>
+          {loadingStockItems && (
+            <p className="text-sm text-gray-500 mt-1">Loading stock items...</p>
+          )}
+          {!loadingStockItems && stockItems.length === 0 && (
+            <p className="text-sm text-gray-500 mt-1">
+              No stock items found. Please create stock items first.
+            </p>
+          )}
         </div>
       </div>
 
@@ -182,86 +240,135 @@ const MovementAnalysis: React.FC = () => {
       {loading && <p>Loading movement data...</p>}
       {error && <p className="text-red-600">Error: {error}</p>}
 
-      {/* Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr
-              className={`${
-                theme === "dark"
-                  ? "bg-gray-700 text-white"
-                  : "bg-gray-200 text-black"
-              }`}
-            >
-              <th className="p-2 border border-gray-400">Date</th>
-              <th className="p-2 border border-gray-400">Stock Item</th>
-              <th className="p-2 border border-gray-400">Batch Number</th>
-              <th className="p-2 border border-gray-400">Batch Quantity</th>
-              <th className="p-2 border border-gray-400 text-right">
-                Batch Rate
-              </th>
-              <th className="p-2 border border-gray-400 text-right">
-                Batch Manufactring
-              </th>
-              <th className="p-2 border border-gray-400 text-right">
-                Batch Expire
-              </th>
-            </tr>
-          </thead>
+      {/* Filter data into Purchase and Sales */}
+      {(() => {
+        const purchaseData = data.filter(
+          (entry) =>
+            entry.voucherType === "Purchase"
+        );
+        const salesData = data.filter(
+          (entry) =>
+            entry.voucherType === "Sales"
+        );
 
-          <tbody>
-            {data.length === 0 && !loading && (
-              <tr>
-                <td colSpan={7} className="p-4 text-center opacity-70">
-                  No movement data found
-                </td>
-              </tr>
+        // Helper function to render table
+        const renderTable = (
+          tableData: MovementEntry[],
+          title: string,
+          emptyMessage: string
+        ) => (
+          <div className="mb-8">
+            <h2 className="text-xl font-semibold mb-4">{title}</h2>
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr
+                    className={`${
+                      theme === "dark"
+                        ? "bg-gray-700 text-white"
+                        : "bg-gray-200 text-black"
+                    }`}
+                  >
+                    <th className="p-2 border border-gray-400">Date</th>
+                    <th className="p-2 border border-gray-400">Stock Item</th>
+                    <th className="p-2 border border-gray-400">
+                      Voucher Number
+                    </th>
+                    <th className="p-2 border border-gray-400">Batch Number</th>
+                    <th className="p-2 border border-gray-400">
+                      Batch Quantity
+                    </th>
+                    <th className="p-2 border border-gray-400 text-right">
+                      Batch Rate
+                    </th>
+                    <th className="p-2 border border-gray-400 text-right">
+                      Batch Manufactring
+                    </th>
+                    <th className="p-2 border border-gray-400 text-right">
+                      Batch Expire
+                    </th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {tableData.length === 0 && !loading && (
+                    <tr>
+                      <td colSpan={8} className="p-4 text-center opacity-70">
+                        {emptyMessage}
+                      </td>
+                    </tr>
+                  )}
+
+                  {tableData.map((entry, idx) =>
+                    entry.batches.map((batch, bIdx) => (
+                      <tr
+                        key={`${idx}-${bIdx}`}
+                        className="hover:bg-gray-100 dark:hover:bg-gray-600"
+                      >
+                        {/* Date */}
+                        <td className="p-2 border">
+                          {new Date(entry.date).toLocaleDateString("en-GB")}
+                        </td>
+
+                        {/* Item */}
+                        <td className="p-2 border">{entry.stockItemName}</td>
+
+                        {/* Voucher Number */}
+                        <td className="p-2 border">
+                          {entry.voucherNumber || "-"}
+                        </td>
+
+                        {/* Batch */}
+                        <td className="p-2 border">{batch.batchName}</td>
+
+                        {/* Qty */}
+                        <td className="p-2 border text-right">
+                          {batch.quantity}
+                        </td>
+
+                        {/* Rate */}
+                        <td className="p-2 border text-right">₹{batch.rate}</td>
+
+                        {/* MFG */}
+                        <td className="p-2 border">
+                          {batch.manufacturingDate
+                            ? new Date(
+                                batch.manufacturingDate
+                              ).toLocaleDateString("en-GB")
+                            : "-"}
+                        </td>
+
+                        {/* EXP */}
+                        <td className="p-2 border">
+                          {batch.expiryDate
+                            ? new Date(batch.expiryDate).toLocaleDateString(
+                                "en-GB"
+                              )
+                            : "-"}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        );
+
+        return (
+          <>
+            {/* Purchase Table */}
+            {renderTable(
+              purchaseData,
+              "Purchase Movements",
+              "No purchase data found"
             )}
 
-            {data.map((entry, idx) =>
-              entry.batches.map((batch, bIdx) => (
-                <tr
-                  key={`${idx}-${bIdx}`}
-                  className="hover:bg-gray-100 dark:hover:bg-gray-600"
-                >
-                  {/* Date */}
-                  <td className="p-2 border">
-                    {new Date(entry.date).toLocaleDateString("en-GB")}
-                  </td>
-
-                  {/* Item */}
-                  <td className="p-2 border">{entry.stockItemName}</td>
-
-                  {/* Batch */}
-                  <td className="p-2 border">{batch.batchName}</td>
-
-                  {/* Qty */}
-                  <td className="p-2 border text-right">{batch.quantity}</td>
-
-                  {/* Rate */}
-                  <td className="p-2 border text-right">₹{batch.rate}</td>
-
-                  {/* MFG */}
-                  <td className="p-2 border">
-                    {batch.manufacturingDate
-                      ? new Date(batch.manufacturingDate).toLocaleDateString(
-                          "en-GB"
-                        )
-                      : "-"}
-                  </td>
-
-                  {/* EXP */}
-                  <td className="p-2 border">
-                    {batch.expiryDate
-                      ? new Date(batch.expiryDate).toLocaleDateString("en-GB")
-                      : "-"}
-                  </td>
-                </tr>
-              ))
-            )}
-          </tbody>
-        </table>
-      </div>
+            {/* Sales Table */}
+            {renderTable(salesData, "Sales Movements", "No sales data found")}
+          </>
+        );
+      })()}
 
       <div className="mt-4 px-2 text-sm text-center text-gray-500">
         Use filters above to change report range or item.
