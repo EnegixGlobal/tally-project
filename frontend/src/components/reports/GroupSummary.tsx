@@ -86,7 +86,7 @@ const GroupSummary: React.FC = () => {
         }
 
         const data = await res.json();
-        console.log("this is ledger groups data", data);
+        // console.log("this is ledger groups data", data);
         setGroups(data || []);
       } catch (err) {
         console.error("Failed to load ledger groups", err);
@@ -115,7 +115,7 @@ const GroupSummary: React.FC = () => {
         }
 
         const data = await res.json();
-        console.log("this is ledger data", data);
+        // console.log("this is ledger data", data);
         const groupIdFromUrl = Number(groupType);
 
         let resolvedName = "Unknown Group";
@@ -165,7 +165,7 @@ const GroupSummary: React.FC = () => {
     fetchGroupSummary();
   }, [groupType, companyId, ownerType, ownerId, groups]);
 
-  console.log("ledgers", ledgers);
+  // console.log("ledgers", ledgers);
 
   // Resolve `groupType` param to a numeric group id.
   const resolveGroupId = (param?: string | null): number | null => {
