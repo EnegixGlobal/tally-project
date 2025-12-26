@@ -736,7 +736,11 @@ const PurchaseVoucher: React.FC = () => {
           newErrors[`entry${index}.quantity`] =
             "Quantity must be greater than 0";
 
-        // 🚨 Godown missing → only soft warning, NOT blocking submit
+        if (godownEnabled === "yes" && visibleColumns.godown) {
+          if (!entry.godownId || String(entry.godownId).trim() === "") {
+            newErrors[`entry${index}.godownId`] = "Godown is required";
+          }
+        }
       });
     } else {
       formData.entries.forEach((entry, index) => {
@@ -814,7 +818,11 @@ const PurchaseVoucher: React.FC = () => {
     e.preventDefault();
 
     if (!validateForm()) {
-      Swal.fire("Error", "Please fix the errors before submitting", "error");
+      Swal.fire({
+        icon: "warning",
+        title: "Godown not selected",
+        text: "Please select godown for all items before submitting.",
+      });
       return;
     }
 
@@ -1677,7 +1685,6 @@ const PurchaseVoucher: React.FC = () => {
                       const isAddingBatch =
                         addBatchModal.visible && addBatchModal.index === index;
 
-
                       return (
                         <tr
                           key={entry.id}
@@ -2027,15 +2034,14 @@ const PurchaseVoucher: React.FC = () => {
                                 name="godownId"
                                 value={entry.godownId}
                                 onChange={(e) => handleEntryChange(index, e)}
-                                className={`${TABLE_STYLES.select} min-w-[95px] text-xs`}
-                              >
-                                <option value="">Gdn</option>
-                                {godowndata.map((g) => (
-                                  <option key={g.id} value={g.id}>
-                                    {g.name}
-                                  </option>
-                                ))}
-                              </select>
+                                className={`${
+                                  TABLE_STYLES.select
+                                } min-w-[95px] text-xs ${
+                                  errors[`entry${index}.godownId`]
+                                    ? "border-red-500"
+                                    : ""
+                                }`}
+                              ></select>
                             </td>
                           )}
 
