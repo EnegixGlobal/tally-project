@@ -92,8 +92,6 @@ router.get('/api/movement-analysis', async (req, res) => {
 
 // GET /api/stock-movements - Returns stock movements with batch details
 router.get('/api/stock-movements', async (req, res) => {
-    console.log('🚀 /api/stock-movements endpoint hit');
-  console.log('📥 Query params:', req.query);
   try {
     const { itemId, fromDate, toDate, company_id, owner_type, owner_id } = req.query;
 
@@ -113,7 +111,6 @@ router.get('/api/stock-movements', async (req, res) => {
       return res.status(400).json({ error: 'Invalid itemId format' });
     }
 
-    console.log('🔍 Fetching stock item:', itemIdNum);
 
     // Get stock item details including batches
     const [stockItemRows] = await pool.query(
@@ -168,7 +165,6 @@ router.get('/api/stock-movements', async (req, res) => {
       stockItem.name, fromDate, toDate, company_id, owner_type, owner_id
     ]);
     
-    console.log('📥 Purchase rows found:', purchaseRows.length);
 
     // Query sales history (using sale_history table)
     // Note: sale_history has batchNumber, qtyChange, movementDate, rate, itemName
@@ -194,7 +190,6 @@ router.get('/api/stock-movements', async (req, res) => {
       stockItem.name, fromDate, toDate, company_id, owner_type, owner_id
     ]);
     
-    console.log('📤 Sales rows found:', salesRows.length);
 
     // Combine and group by voucher
     const allRows = [...purchaseRows, ...salesRows];
@@ -237,7 +232,6 @@ router.get('/api/stock-movements', async (req, res) => {
       }
       return a.voucherNumber.localeCompare(b.voucherNumber);
     });
-    console.log('result', result)
     res.json({ data: result });
   } catch (err) {
     console.error("❌ Error querying stock movements:", err);
