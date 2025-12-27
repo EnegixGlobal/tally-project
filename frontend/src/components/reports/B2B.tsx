@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import axios from 'axios';
 import { 
   ArrowLeft, 
   Download, 
@@ -328,15 +329,23 @@ const B2B: React.FC = () => {
   // ], []);
 
   useEffect(() => {
-    async function fetchPartners() {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({ company_id, owner_type, owner_id });
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/b2b-partners?${params.toString()}`);
-        if (!res.ok) throw new Error(await res.text());
-        const data = await res.json();
-        const sanitized = (data as any[]).map((partner) => ({
+    if (!company_id || !owner_type || !owner_id) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    axios
+      .get(`${import.meta.env.VITE_API_URL}/api/b2b-partners`, {
+        params: {
+          company_id,
+          owner_type,
+          owner_id,
+        }
+      })
+      .then(res => {
+        const sanitized = (res.data as any[]).map((partner) => ({
           ...partner,
           totalValue: Number(partner.totalValue) || 0,
           outstanding: Number(partner.outstanding) || 0,
@@ -347,13 +356,13 @@ const B2B: React.FC = () => {
         }));
 
         setPartners(sanitized);
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Failed to fetch partners');
-      } finally {
         setLoading(false);
-      }
-    }
-    if(company_id && owner_type && owner_id) fetchPartners();
+      })
+      .catch((err) => {
+        console.error('Error fetching B2B partners:', err);
+        setError(err.response?.data?.error || err.message || 'Failed to fetch partners');
+        setLoading(false);
+      });
   }, [company_id, owner_type, owner_id]);
 
   
@@ -416,53 +425,131 @@ const B2B: React.FC = () => {
   //     }
   //   }
   // ], []);
-useEffect(() => {
-    const fetchTransactions = async () => {
-      setLoading(true);
-      setError(null);
-      try {
-        const params = new URLSearchParams({
+  useEffect(() => {
+    if (!company_id || !owner_type || !owner_id) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    // Fetch B2B transactions (sales with GST numbers)
+    // Backend filters: WHERE l.gst_number IS NOT NULL AND l.gst_number != ''
+    axios
+      .get(`${import.meta.env.VITE_API_URL}/api/b2b-transactions`, {
+        params: {
           company_id,
           owner_type,
           owner_id,
           fromDate: filters.fromDate,
           toDate: filters.toDate,
-        });
-        const resp = await fetch(`${import.meta.env.VITE_API_URL}/api/b2b-transactions?${params.toString()}`);
-        if (!resp.ok) {
-          const errText = await resp.text();
-          throw new Error(errText);
         }
-        const data = await resp.json();
-        const sanitized = (data as any[]).map((txn) => ({
-          ...txn,
-          netAmount: Number(txn.netAmount) || 0,
-          totalAmount: Number(txn.totalAmount) || 0,
-          taxAmount: Number(txn.taxAmount) || 0,
-          outstanding: Number(txn.outstanding) || 0,
-          businessName: txn.businessName ?? "N/A",
-          contactPerson: txn.contactPerson ?? "N/A",
-          status: txn.status ?? "Unknown",
-          priority: txn.priority ?? "N/A",
-        }));
-
-        setTransactions(sanitized);
-
-        // After fetching transactions:
-
-
-      } catch (e) {
-        setError(e instanceof Error ? e.message : 'Unknown error');
-      } finally {
+      })
+      .then(res => {
+        console.log('B2B Transactions API Response:', res.data);
+        
+        // Backend returns item-level rows, need to group by voucherId
+        const rawData = res.data as any[];
+        
+        if (!Array.isArray(rawData)) {
+          console.error('Expected array but got:', typeof rawData);
+          setTransactions([]);
+          setLoading(false);
+          return;
+        }
+        
+        if (rawData.length === 0) {
+          console.log('No B2B transactions found for the selected date range');
+          setTransactions([]);
+          setLoading(false);
+          return;
+        }
+        
+        // Group items by voucherId to create transaction objects
+        const transactionMap = new Map<number, B2BTransactionLine>();
+        
+        rawData.forEach((row: any) => {
+          const voucherId = row.voucherId;
+          
+          if (!voucherId) {
+            console.warn('Row missing voucherId:', row);
+            return;
+          }
+          
+          if (!transactionMap.has(voucherId)) {
+            // Create new transaction object
+            // Use backend-provided calculated fields
+            const transactionType = row.isQuotation ? 'quote' : 'sale';
+            transactionMap.set(voucherId, {
+              id: voucherId,
+              voucherId: row.voucherId,
+              voucherNo: row.voucherNo || '',
+              date: row.date || '',
+              narration: row.narration || null,
+              referenceNo: row.referenceNo || null,
+              subtotal: String(row.totalAmount || 0),
+              cgstTotal: String(row.cgstTotal || 0),
+              sgstTotal: String(row.sgstTotal || 0),
+              igstTotal: String(row.igstTotal || 0),
+              discountTotal: String(row.discount || 0),
+              total: String(row.netAmount || 0),
+              createdAt: row.createdAt || '',
+              partyId: row.partyId,
+              partyName: row.partyName || '',
+              partyGSTIN: row.partyGSTIN || null,
+              netAmount: Number(row.netAmount) || 0,
+              totalAmount: Number(row.totalAmount) || 0,
+              taxAmount: Number(row.taxAmount) || 0,
+              businessName: row.partyName || 'N/A',
+              businessGSTIN: row.partyGSTIN || null,
+              businessType: 'N/A', // Not available in backend, can be enhanced later
+              transactionType: transactionType,
+              status: 'confirmed', // Default status - can be enhanced with payment status if available
+              priority: 'medium', // Default priority
+              contactPerson: row.email || row.phone || 'N/A', // Use email or phone as contact
+              outstanding: 0, // Can be calculated from ledger balances if needed
+              dueDate: null, // Not available in backend response
+              // Item-level fields - use first item's data (or can be enhanced to include items array)
+              itemId: row.itemId,
+              itemName: row.itemName || '',
+              hsnCode: row.hsnCode || null,
+              quantity: String(row.quantity || 0),
+              unit: row.unit || null,
+              rate: String(row.rate || 0),
+              amount: String(row.amount || 0),
+              cgstRate: String(row.cgstRate || 0),
+              sgstRate: String(row.sgstRate || 0),
+              igstRate: String(row.igstRate || 0),
+            });
+          }
+        });
+        
+        // Convert map to array - Backend already filters by GST number
+        // Only include transactions that have GST number (safety check)
+        const transactionsArray = Array.from(transactionMap.values()).filter(txn => {
+          // Keep transactions that have GST number and it's not empty
+          return txn.businessGSTIN && String(txn.businessGSTIN).trim() !== '';
+        });
+        
+        console.log(`Processed ${transactionsArray.length} B2B transactions from ${rawData.length} item rows`);
+        setTransactions(transactionsArray);
         setLoading(false);
-      }
-    };
-    if(company_id && owner_type && owner_id) fetchTransactions();
+      })
+      .catch((err) => {
+        console.error('Error fetching B2B transactions:', err);
+        setError(err.response?.data?.error || err.message || 'Failed to fetch B2B transactions');
+        setTransactions([]);
+        setLoading(false);
+      });
   }, [company_id, owner_type, owner_id, filters.fromDate, filters.toDate]);
 
 
   const filteredTransactions = useMemo(() => {
     return transactions.filter(transaction => {
+      // Safety filter: Ensure GST number exists (backend already filters, but double-check)
+      const hasGstNumber = transaction.businessGSTIN && String(transaction.businessGSTIN).trim() !== '';
+      
       const transactionDate = new Date(transaction.date);
       const fromDate = new Date(filters.fromDate);
       const toDate = new Date(filters.toDate);
@@ -477,7 +564,7 @@ useEffect(() => {
       if (filters.amountRangeMin && transaction.netAmount < parseFloat(filters.amountRangeMin)) return false;
       if (filters.amountRangeMax && transaction.netAmount > parseFloat(filters.amountRangeMax)) return false;
 
-      return dateInRange && businessMatch && typeMatch && statusMatch && businessTypeMatch;
+      return hasGstNumber && dateInRange && businessMatch && typeMatch && statusMatch && businessTypeMatch;
     });
   }, [transactions, filters]);
 
