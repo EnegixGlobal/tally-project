@@ -47,7 +47,7 @@ const ReportsIndex: React.FC = () => {
     {
       title: 'Sales Reports',
       items: [
-        { icon: <BookOpen size={20} />, name: 'Columner Sales', path: '/app/reports/columner-sales' },
+        { icon: <BookOpen size={20} />, name: 'Extract Sales', path: '/app/reports/extract-sales' },
         { icon: <Activity size={20} />, name: 'Sales Report', path: '/app/reports/sales-report' },
         { icon: <Calendar size={20} />, name: 'Sales Invoice Matching', path: '/app/reports/sales-invoice-matching' },
         { icon: <Calendar size={20} />, name: 'B2B', path: '/app/reports/b2b' },
