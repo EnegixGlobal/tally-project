@@ -34,7 +34,7 @@ const SalesRepostDetails = () => {
 
     const url = `${
       import.meta.env.VITE_API_URL
-    }/api/sales-report/month-wise?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&month=${month}&year=${year}`;
+    }/api/sales-report/?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&month=${month}&year=${year}`;
 
     fetch(url)
       .then((res) => res.json())
@@ -56,7 +56,6 @@ const SalesRepostDetails = () => {
   }, [month, companyId, ownerType, ownerId, year]);
 
   // get ledger and group data
-  // ✅ minimal & safe typing (structure SAME)
   const [ledgers, setLedgers] = useState<any[]>([]);
   const [ledgerGroups, setLedgerGroups] = useState<any[]>([]);
 
@@ -126,53 +125,51 @@ const SalesRepostDetails = () => {
   }, []);
 
   useEffect(() => {
-  if (!sales.length || !ledgers.length) return;
+    if (!sales.length || !ledgers.length) return;
 
-  const result: any[] = [];
-  const allGroups = [...ledgerGroups, ...baseGroups];
+    const result: any[] = [];
+    const allGroups = [...ledgerGroups, ...baseGroups];
 
-  sales.forEach((sale) => {
-    const ledger = ledgers.find(
-      (l: any) => String(l.id) === String(sale.partyId)
-    );
-    if (!ledger) return;
+    sales.forEach((sale) => {
+      const ledger = ledgers.find(
+        (l: any) => String(l.id) === String(sale.partyId)
+      );
+      if (!ledger) return;
 
-    const group =
-      allGroups.find(
+      const group = allGroups.find(
         (g: any) => String(g.id) === String(ledger.groupId)
       ) || {
         id: ledger.groupId,
         name: "Unknown Group",
       };
 
-    let groupObj = result.find((g) => g.groupId === group.id);
-    if (!groupObj) {
-      groupObj = {
-        groupId: group.id,
-        groupName: group.name,
-        ledgers: [],
-      };
-      result.push(groupObj);
-    }
+      let groupObj = result.find((g) => g.groupId === group.id);
+      if (!groupObj) {
+        groupObj = {
+          groupId: group.id,
+          groupName: group.name,
+          ledgers: [],
+        };
+        result.push(groupObj);
+      }
 
-    let ledgerObj = groupObj.ledgers.find(
-      (l: any) => l.ledgerId === ledger.id
-    );
-    if (!ledgerObj) {
-      ledgerObj = {
-        ledgerId: ledger.id,
-        ledgerName: ledger.name,
-        sales: [],
-      };
-      groupObj.ledgers.push(ledgerObj);
-    }
+      let ledgerObj = groupObj.ledgers.find(
+        (l: any) => l.ledgerId === ledger.id
+      );
+      if (!ledgerObj) {
+        ledgerObj = {
+          ledgerId: ledger.id,
+          ledgerName: ledger.name,
+          sales: [],
+        };
+        groupObj.ledgers.push(ledgerObj);
+      }
 
-    ledgerObj.sales.push(sale);
-  });
+      ledgerObj.sales.push(sale);
+    });
 
-  setGroupedSales(result);
-}, [sales, ledgers, ledgerGroups]);
-
+    setGroupedSales(result);
+  }, [sales, ledgers, ledgerGroups]);
 
   const getPartyName = (partyId: number | string) => {
     const ledger = ledgers.find((l: any) => String(l.id) === String(partyId));
@@ -239,29 +236,27 @@ const SalesRepostDetails = () => {
       ) : !showDetail ? (
         /* ================= SUMMARY VIEW ================= */
         <>
-        <table className="w-full border-collapse text-sm">
-          <thead className="bg-gray-100">
-            <tr>
-              <th className="border px-3 py-2 text-left">Particular</th>
-              <th className="border px-3 py-2 text-right">Total</th>
-            </tr>
-          </thead>
-
-          <tbody>
-            {groupedSales.map((group) => (
-              <tr key={group.groupId} className="font-semibold">
-                <td className="border px-3 py-2">{group.groupName}</td>
-                <td className="border px-3 py-2 text-right">
-                  ₹{getGroupTotal(group).toLocaleString()}
-                </td>
+          <table className="w-full border-collapse text-sm">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="border px-3 py-2 text-left">Particular</th>
+                <th className="border px-3 py-2 text-right">Total</th>
               </tr>
-            ))}
-          </tbody>
+            </thead>
 
-         
-        </table>
+            <tbody>
+              {groupedSales.map((group) => (
+                <tr key={group.groupId} className="font-semibold">
+                  <td className="border px-3 py-2">{group.groupName}</td>
+                  <td className="border px-3 py-2 text-right">
+                    ₹{getGroupTotal(group).toLocaleString()}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
-         <div className="mt-6 flex justify-end">
+          <div className="mt-6 flex justify-end">
             <div className="w-full max-w-sm border-t pt-3 text-right font-bold">
               Grand Total : ₹{getGrandTotal().toLocaleString()}
             </div>
@@ -279,6 +274,7 @@ const SalesRepostDetails = () => {
                 <thead className="bg-gray-100">
                   <tr>
                     <th className="border px-3 py-2 text-left">Date</th>
+                    <th className="border px-3 py-2 text-left">Particular</th>
                     <th className="border px-3 py-2 text-left">Voucher Type</th>
                     <th className="border px-3 py-2 text-left">Voucher No</th>
                     <th className="border px-3 py-2 text-right">Debit</th>
@@ -292,6 +288,9 @@ const SalesRepostDetails = () => {
                       <tr key={sale.id}>
                         <td className="border px-3 py-2">
                           {new Date(sale.date).toLocaleDateString("en-IN")}
+                        </td>
+                        <td className="border px-3 py-2 font-mono">
+                          {getPartyName(sale.partyId)}
                         </td>
                         <td className="border px-3 py-2">Sales</td>
                         <td className="border px-3 py-2 font-mono">
@@ -308,8 +307,6 @@ const SalesRepostDetails = () => {
                   )}
                 </tbody>
               </table>
-
-              
             </div>
           ))}
         </div>
