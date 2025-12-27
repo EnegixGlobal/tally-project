@@ -1192,8 +1192,8 @@ const ExtractSales: React.FC = () => {
                                         setSelectedView("extract");
                                         fetchExtractData(monthIndexMap[month], financialYear);
                                     }}
-                                    className={`grid grid-cols-3 px-4 py-2 border-t text-sm cursor-pointer hover:bg-opacity-50 ${
-                                        theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
+                                    className={`grid grid-cols-3 px-4 py-2 border-t text-sm cursor-pointer transition-colors ${
+                                        theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
                                     }`}
                                 >
                                     {/* Month */}
