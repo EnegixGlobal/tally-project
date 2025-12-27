@@ -680,7 +680,7 @@ const SalesReport: React.FC = () => {
   //sales repost month wise
   // ================= MONTH WISE SALES (REAL DATA) =================
 
-   const [salesVouchers, setSalesVouchers] = useState<any[]>([]);
+  const [salesVouchers, setSalesVouchers] = useState<any[]>([]);
   const MONTHS = [
     "April",
     "May",
@@ -732,7 +732,6 @@ const SalesReport: React.FC = () => {
       }
     });
 
-    // 🔴 closingBalance future me backend se ayega
     return map;
   }, [salesVouchers]);
 
@@ -741,7 +740,7 @@ const SalesReport: React.FC = () => {
 
     const url = `${
       import.meta.env.VITE_API_URL
-    }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+    }/api/sales-report?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
     fetch(url)
       .then((res) => res.json())
@@ -1182,17 +1181,15 @@ const SalesReport: React.FC = () => {
               return (
                 <div
                   key={month}
-                  className="grid grid-cols-3 px-4 py-2 border-t text-sm"
+                  onClick={() =>
+                    navigate(`/app/voucher-register/sales/detail/${month}`)
+                  }
+                  className="grid grid-cols-3 px-4 py-2 border-t text-sm cursor-pointer hover:bg-gray-100"
                 >
-                  {/* Month */}
-                  <div className="font-medium">{month}</div>
-
-                  {/* Credit */}
+                  <div className="font-medium text-blue-600">{month}</div>
                   <div className="text-right">
                     ₹{(row.credit ?? 0).toLocaleString()}
                   </div>
-
-                  {/* Closing Balance */}
                   <div className="text-right">
                     ₹{(row.closingBalance ?? 0).toLocaleString()}
                   </div>

@@ -212,6 +212,7 @@ import SalesItemDetail from "./components/reports/profit_loss/SalesItemDetail";
 import DirectExpenseDetail from "./components/reports/profit_loss/DirectExpenseDetail";
 import ReceivablesDetails from "./components/reports/outstanding/outStandingDetails/ReceivablesDetails";
 import Payablesdetails from "./components/reports/outstanding/outStandingDetails/Payablesdetails";
+import SalesRepostDetails from "./components/reports/SalesReportDetail/SalesRepostDetails";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -863,6 +864,16 @@ function App() {
                   </RequireCompany>
                 }
               />
+
+              <Route
+                path="voucher-register/sales/detail/:month"
+                element={
+                  <RequireCompany>
+                    <SalesRepostDetails />
+                  </RequireCompany>
+                }
+              />
+
               <Route
                 path="voucher-register/purchase"
                 element={
