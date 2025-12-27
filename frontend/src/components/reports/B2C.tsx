@@ -31,83 +31,6 @@ interface Customer {
   customerSegment: string;
   loyaltyPoints: number;
 }
-// interface B2CCustomer {
-//   id: string;
-//   name: string;
-//   email: string;
-//   phone: string;
-//   dateOfBirth?: string;
-//   gender?: 'male' | 'female' | 'other';
-//   address: {
-//     street: string;
-//     city: string;
-//     state: string;
-//     pincode: string;
-//     country: string;
-//   };
-//   registrationDate: string;
-//   lastActivity: string;
-//   totalOrders: number;
-//   totalSpent: number;
-//   averageOrderValue: number;
-//   customerSegment: 'new' | 'regular' | 'premium' | 'vip';
-//   loyaltyPoints: number;
-//   preferences: {
-//     categories: string[];
-//     brands: string[];
-//     priceRange: 'budget' | 'mid-range' | 'premium';
-//     communicationChannel: 'email' | 'sms' | 'app' | 'whatsapp';
-//   };
-//   status: 'active' | 'inactive' | 'suspended';
-//   riskProfile: 'low' | 'medium' | 'high';
-//   socialProfiles?: {
-//     instagram?: string;
-//     facebook?: string;
-//     twitter?: string;
-//   };
-// }
-
-// interface B2CTransaction {
-//   id: string;
-//   customerId: string;
-//   customerName: string;
-//   orderNumber: string;
-//   orderDate: string;
-//   items: {
-//     itemId: string;
-//     itemName: string;
-//     category: string;
-//     brand: string;
-//     quantity: number;
-//     unitPrice: number;
-//     discount: number;
-//     taxRate: number;
-//     amount: number;
-//     image?: string;
-//   }[];
-//   totalAmount: number;
-//   discount: number;
-//   taxAmount: number;
-//   shippingAmount: number;
-//   netAmount: number;
-//   paymentMethod: 'card' | 'upi' | 'netbanking' | 'wallet' | 'cod' | 'emi';
-//   paymentStatus: 'pending' | 'paid' | 'failed' | 'refunded' | 'partial';
-//   orderStatus: 'placed' | 'confirmed' | 'packed' | 'shipped' | 'delivered' | 'cancelled' | 'returned';
-//   shippingAddress: {
-//     street: string;
-//     city: string;
-//     state: string;
-//     pincode: string;
-//   };
-//   deliveryDate?: string;
-//   rating?: number;
-//   review?: string;
-//   source: 'website' | 'mobile_app' | 'marketplace' | 'social' | 'referral';
-//   campaign?: string;
-//   couponUsed?: string;
-//   loyaltyPointsEarned: number;
-//   loyaltyPointsUsed: number;
-// }
 
 interface FilterState {
   dateRange: string;
@@ -129,7 +52,7 @@ interface Order {
   paymentStatus: any;
   loyaltyPointsEarned: any;
   id: Key | null | undefined;
-  items: any;
+  items: any[];
   loyaltyPointsUsed: number;
   paymentMethod: string;
   orderId: number;
@@ -138,19 +61,22 @@ interface Order {
   customerName: string;
   netAmount: number;
   orderStatus: string;
+  gstNumber?: string | null; // For filtering - should always be null/empty for B2C
 }
 const B2C: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
-  const [, setLoading] = useState(true);
+  const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
-  // Example filters — can be moved to state and UI controlled
+  // Get auth parameters from localStorage
+  // Try multiple keys as different parts of the app may use different keys
   const company_id = localStorage.getItem('company_id') || '';
-  const owner_type = localStorage.getItem('userType') || '';
-  const owner_id = localStorage.getItem('employee_id') || '';
+  const owner_type = localStorage.getItem('userType') || localStorage.getItem('supplier') || localStorage.getItem('owner_type') || '';
+  const owner_id = localStorage.getItem('employee_id') || localStorage.getItem('user_id') || '';
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [selectedView, setSelectedView] = useState<'dashboard' | 'customers' | 'orders' | 'analytics' | 'marketing'>('dashboard');
@@ -166,8 +92,28 @@ const B2C: React.FC = () => {
     amountRangeMin: '',
     amountRangeMax: ''
   });
-useEffect(() => {
-    // Replace url with your backend host
+  useEffect(() => {
+    // Validate required parameters before making API calls
+    if (!company_id) {
+      setError('Company ID is missing. Please log in again.');
+      setLoading(false);
+      return;
+    }
+    
+    if (!owner_type) {
+      setError('User type is missing. Please log in again.');
+      setLoading(false);
+      return;
+    }
+    
+    if (!owner_id) {
+      setError('Owner ID is missing. Please log in again.');
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
     axios
       .get(`${import.meta.env.VITE_API_URL}/api/b2c-customers`, {
         params: {
@@ -180,107 +126,24 @@ useEffect(() => {
         setCustomers(res.data as Customer[]);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
-  }, []);
-  // Mock B2C customer data
-  // const b2cCustomers = useMemo((): B2CCustomer[] => [
-  //   {
-  //     id: 'CUST001',
-  //     name: 'Priya Sharma',
-  //     email: 'priya.sharma@email.com',
-  //     phone: '+91 9876543210',
-  //     dateOfBirth: '1990-05-15',
-  //     gender: 'female',
-  //     address: {
-  //       street: '123 Green Park',
-  //       city: 'Mumbai',
-  //       state: 'Maharashtra',
-  //       pincode: '400001',
-  //       country: 'India'
-  //     },
-  //     registrationDate: '2024-01-15',
-  //     lastActivity: '2025-07-20',
-  //     totalOrders: 12,
-  //     totalSpent: 45000,
-  //     averageOrderValue: 3750,
-  //     customerSegment: 'premium',
-  //     loyaltyPoints: 2250,
-  //     preferences: {
-  //       categories: ['Electronics', 'Fashion', 'Home'],
-  //       brands: ['Samsung', 'Nike', 'Apple'],
-  //       priceRange: 'premium',
-  //       communicationChannel: 'app'
-  //     },
-  //     status: 'active',
-  //     riskProfile: 'low',
-  //     socialProfiles: {
-  //       instagram: '@priya_sharma',
-  //       facebook: 'priya.sharma.90'
-  //     }
-  //   },
-  //   {
-  //     id: 'CUST002',
-  //     name: 'Rahul Kumar',
-  //     email: 'rahul.kumar@email.com',
-  //     phone: '+91 8765432109',
-  //     dateOfBirth: '1985-03-22',
-  //     gender: 'male',
-  //     address: {
-  //       street: '456 Tech City',
-  //       city: 'Bangalore',
-  //       state: 'Karnataka',
-  //       pincode: '560001',
-  //       country: 'India'
-  //     },
-  //     registrationDate: '2023-08-10',
-  //     lastActivity: '2025-07-25',
-  //     totalOrders: 8,
-  //     totalSpent: 32000,
-  //     averageOrderValue: 4000,
-  //     customerSegment: 'regular',
-  //     loyaltyPoints: 1600,
-  //     preferences: {
-  //       categories: ['Electronics', 'Books', 'Sports'],
-  //       brands: ['Dell', 'Adidas', 'Sony'],
-  //       priceRange: 'mid-range',
-  //       communicationChannel: 'email'
-  //     },
-  //     status: 'active',
-  //     riskProfile: 'low'
-  //   },
-  //   {
-  //     id: 'CUST003',
-  //     name: 'Anita Patel',
-  //     email: 'anita.patel@email.com',
-  //     phone: '+91 7654321098',
-  //     dateOfBirth: '1992-11-08',
-  //     gender: 'female',
-  //     address: {
-  //       street: '789 Royal Complex',
-  //       city: 'Ahmedabad',
-  //       state: 'Gujarat',
-  //       pincode: '380001',
-  //       country: 'India'
-  //     },
-  //     registrationDate: '2025-06-01',
-  //     lastActivity: '2025-07-15',
-  //     totalOrders: 3,
-  //     totalSpent: 8500,
-  //     averageOrderValue: 2833,
-  //     customerSegment: 'new',
-  //     loyaltyPoints: 425,
-  //     preferences: {
-  //       categories: ['Fashion', 'Beauty', 'Jewelry'],
-  //       brands: ['Zara', 'Lakme', 'Tanishq'],
-  //       priceRange: 'budget',
-  //       communicationChannel: 'whatsapp'
-  //     },
-  //     status: 'active',
-  //     riskProfile: 'low'
-  //   }
-  // ], []);
-useEffect(() => {
-    // Use params matching filters from frontend UI
+      .catch((err) => {
+        console.error('Error fetching B2C customers:', err);
+        setError(err.response?.data?.error || err.message || 'Failed to fetch B2C customers');
+        setLoading(false);
+      });
+  }, [company_id, owner_type, owner_id]);
+  
+  useEffect(() => {
+    if (!company_id || !owner_type || !owner_id) {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+    
+    // Fetch B2C orders (sales without GST numbers)
+    // Backend filters: WHERE (l.gst_number IS NULL OR l.gst_number = '')
     axios
       .get(`${import.meta.env.VITE_API_URL}/api/b2c-orders`, {
         params: {
@@ -292,161 +155,101 @@ useEffect(() => {
         }
       })
       .then(res => {
-        setOrders(res.data as Order[]);
+        console.log('B2C Orders API Response:', res.data);
+        
+        // Backend returns item-level rows, need to group by order
+        const rawData = res.data as any[];
+        
+        if (!Array.isArray(rawData)) {
+          console.error('Expected array but got:', typeof rawData);
+          setOrders([]);
+          setLoading(false);
+          return;
+        }
+        
+        if (rawData.length === 0) {
+          console.log('No B2C orders found for the selected date range');
+          setOrders([]);
+          setLoading(false);
+          return;
+        }
+        
+        // Group items by orderId to create order objects with items arrays
+        const orderMap = new Map<number, Order>();
+        
+        rawData.forEach((row: any) => {
+          const orderId = row.orderId;
+          
+          if (!orderId) {
+            console.warn('Row missing orderId:', row);
+            return;
+          }
+          
+          if (!orderMap.has(orderId)) {
+            // Create new order object
+            orderMap.set(orderId, {
+              id: orderId,
+              orderId: row.orderId,
+              orderNumber: row.orderNumber || '',
+              orderDate: row.orderDate || '',
+              customerName: row.customerName || '',
+              totalAmount: Number(row.totalAmount) || 0,
+              discount: Number(row.discount) || 0,
+              taxAmount: Number(row.taxAmount) || 0,
+              netAmount: Number(row.netAmount) || 0,
+              paymentMethod: row.paymentMethod || '',
+              paymentStatus: row.paymentStatus || 'paid',
+              orderStatus: 'delivered', // Default status
+              source: row.source || '',
+              loyaltyPointsEarned: Number(row.loyaltyPointsEarned) || 0,
+              loyaltyPointsUsed: Number(row.loyaltyPointsUsed) || 0,
+              items: [],
+              gstNumber: row.gstNumber || null, // Should be null/empty for B2C
+            });
+          }
+          
+          // Add item to order
+          const order = orderMap.get(orderId)!;
+          if (row.itemId && row.itemName) {
+            order.items.push({
+              itemId: row.itemId,
+              itemName: row.itemName,
+              quantity: Number(row.quantity) || 0,
+              unitPrice: Number(row.unitPrice) || 0,
+              discount: Number(row.discount) || 0,
+              amount: Number(row.amount) || 0,
+              unit: row.unit || '',
+              cgstRate: Number(row.cgstRate) || 0,
+              sgstRate: Number(row.sgstRate) || 0,
+              igstRate: Number(row.igstRate) || 0,
+            });
+          }
+        });
+        
+        // Convert map to array - Backend already filters by GST number
+        // Only filter out if GST number exists and is not empty (safety check)
+        const ordersArray = Array.from(orderMap.values()).filter(order => {
+          // Keep orders that have no GST number or empty GST number
+          return !order.gstNumber || String(order.gstNumber).trim() === '';
+        });
+        
+        console.log(`Processed ${ordersArray.length} B2C orders from ${rawData.length} item rows`);
+        setOrders(ordersArray);
         setLoading(false);
       })
-      .catch(() => setLoading(false));
-  }, []);
-
-
-  // // Mock B2C transaction data
-  // const b2cTransactions = useMemo((): B2CTransaction[] => [
-  //   {
-  //     id: 'ORD001',
-  //     customerId: 'CUST001',
-  //     customerName: 'Priya Sharma',
-  //     orderNumber: 'B2C-2025-001',
-  //     orderDate: '2025-07-01',
-  //     items: [
-  //       {
-  //         itemId: 'ITEM001',
-  //         itemName: 'iPhone 15 Pro',
-  //         category: 'Electronics',
-  //         brand: 'Apple',
-  //         quantity: 1,
-  //         unitPrice: 120000,
-  //         discount: 5000,
-  //         taxRate: 18,
-  //         amount: 115000
-  //       },
-  //       {
-  //         itemId: 'ITEM002',
-  //         itemName: 'AirPods Pro',
-  //         category: 'Electronics',
-  //         brand: 'Apple',
-  //         quantity: 1,
-  //         unitPrice: 25000,
-  //         discount: 1000,
-  //         taxRate: 18,
-  //         amount: 24000
-  //       }
-  //     ],
-  //     totalAmount: 139000,
-  //     discount: 6000,
-  //     taxAmount: 25020,
-  //     shippingAmount: 0,
-  //     netAmount: 164020,
-  //     paymentMethod: 'card',
-  //     paymentStatus: 'paid',
-  //     orderStatus: 'delivered',
-  //     shippingAddress: {
-  //       street: '123 Green Park',
-  //       city: 'Mumbai',
-  //       state: 'Maharashtra',
-  //       pincode: '400001'
-  //     },
-  //     deliveryDate: '2025-07-05',
-  //     rating: 5,
-  //     review: 'Excellent product and fast delivery!',
-  //     source: 'mobile_app',
-  //     campaign: 'Summer Sale 2025',
-  //     couponUsed: 'SUMMER5000',
-  //     loyaltyPointsEarned: 820,
-  //     loyaltyPointsUsed: 0
-  //   },
-  //   {
-  //     id: 'ORD002',
-  //     customerId: 'CUST002',
-  //     customerName: 'Rahul Kumar',
-  //     orderNumber: 'B2C-2025-002',
-  //     orderDate: '2025-07-03',
-  //     items: [
-  //       {
-  //         itemId: 'ITEM003',
-  //         itemName: 'Dell XPS 13 Laptop',
-  //         category: 'Electronics',
-  //         brand: 'Dell',
-  //         quantity: 1,
-  //         unitPrice: 80000,
-  //         discount: 3000,
-  //         taxRate: 18,
-  //         amount: 77000
-  //       }
-  //     ],
-  //     totalAmount: 77000,
-  //     discount: 3000,
-  //     taxAmount: 13860,
-  //     shippingAmount: 500,
-  //     netAmount: 91360,
-  //     paymentMethod: 'emi',
-  //     paymentStatus: 'paid',
-  //     orderStatus: 'delivered',
-  //     shippingAddress: {
-  //       street: '456 Tech City',
-  //       city: 'Bangalore',
-  //       state: 'Karnataka',
-  //       pincode: '560001'
-  //     },
-  //     deliveryDate: '2025-07-08',
-  //     rating: 4,
-  //     review: 'Good laptop, delivery was on time',
-  //     source: 'website',
-  //     loyaltyPointsEarned: 457,
-  //     loyaltyPointsUsed: 500
-  //   },
-  //   {
-  //     id: 'ORD003',
-  //     customerId: 'CUST003',
-  //     customerName: 'Anita Patel',
-  //     orderNumber: 'B2C-2025-003',
-  //     orderDate: '2025-07-10',
-  //     items: [
-  //       {
-  //         itemId: 'ITEM004',
-  //         itemName: 'Designer Kurti Set',
-  //         category: 'Fashion',
-  //         brand: 'Fabindia',
-  //         quantity: 2,
-  //         unitPrice: 2500,
-  //         discount: 250,
-  //         taxRate: 5,
-  //         amount: 4750
-  //       },
-  //       {
-  //         itemId: 'ITEM005',
-  //         itemName: 'Gold Earrings',
-  //         category: 'Jewelry',
-  //         brand: 'Tanishq',
-  //         quantity: 1,
-  //         unitPrice: 15000,
-  //         discount: 500,
-  //         taxRate: 3,
-  //         amount: 14500
-  //       }
-  //     ],
-  //     totalAmount: 19250,
-  //     discount: 750,
-  //     taxAmount: 673,
-  //     shippingAmount: 150,
-  //     netAmount: 20073,
-  //     paymentMethod: 'upi',
-  //     paymentStatus: 'paid',
-  //     orderStatus: 'shipped',
-  //     shippingAddress: {
-  //       street: '789 Royal Complex',
-  //       city: 'Ahmedabad',
-  //       state: 'Gujarat',
-  //       pincode: '380001'
-  //     },
-  //     source: 'social',
-  //     campaign: 'Instagram Ads',
-  //     loyaltyPointsEarned: 100,
-  //     loyaltyPointsUsed: 0
-  //   }
-  // ], []);
+      .catch((err) => {
+        console.error('Error fetching B2C orders:', err);
+        setError(err.response?.data?.error || err.message || 'Failed to fetch B2C orders');
+        setOrders([]);
+        setLoading(false);
+      });
+  }, [company_id, owner_type, owner_id, filters.fromDate, filters.toDate]);
 
   const filteredTransactions = useMemo(() => {
     return orders.filter(transaction => {
+      // Safety filter: Ensure no GST numbers (backend already filters, but double-check)
+      const noGstNumber = !transaction.gstNumber || String(transaction.gstNumber).trim() === '';
+      
       const transactionDate = new Date(transaction.orderDate);
       const fromDate = new Date(filters.fromDate);
       const toDate = new Date(filters.toDate);
@@ -458,7 +261,7 @@ useEffect(() => {
       const statusMatch = !filters.orderStatus || transaction.orderStatus === filters.orderStatus;
       const sourceMatch = !filters.source || transaction.source === filters.source;
       
-      return dateInRange && customerMatch && paymentMatch && statusMatch && sourceMatch;
+      return noGstNumber && dateInRange && customerMatch && paymentMatch && statusMatch && sourceMatch;
     });
   }, [orders, filters]);
 
@@ -591,7 +394,10 @@ useEffect(() => {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
+    if (!status || status.trim() === '') {
+      return 'text-gray-800 bg-gray-100';
+    }
+    switch (status.toLowerCase()) {
       case 'delivered':
       case 'paid':
         return 'text-green-800 bg-green-100';
@@ -648,8 +454,8 @@ useEffect(() => {
             </h1>
             <p className="text-sm text-gray-600 mt-1">Business-to-Consumer sales and customer management</p>
             <p className="text-xs text-purple-600 mt-1">
-              📊 <strong>Auto-populated from Ledgers without GSTIN/UIN numbers</strong> | 
-              <span className="ml-2">B2B transactions come from ledgers with GSTIN/UIN</span>
+              📊 <strong>Showing sales transactions from customers WITHOUT GST numbers</strong> | 
+              <span className="ml-2">B2B transactions (with GST numbers) are shown in the B2B module</span>
             </p>
           </div>
         </div>
@@ -676,6 +482,35 @@ useEffect(() => {
           </button>
         </div>
       </div>
+
+      {/* Error Message */}
+      {error && (
+        <div className={`mb-4 p-4 rounded-lg ${
+          theme === 'dark' ? 'bg-red-900 text-red-100' : 'bg-red-50 text-red-800'
+        }`}>
+          <p className="font-semibold">Error:</p>
+          <p className="text-sm">{error}</p>
+        </div>
+      )}
+
+      {/* Loading Message */}
+      {loading && (
+        <div className={`mb-4 p-4 rounded-lg text-center ${
+          theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+        }`}>
+          <p>Loading B2C orders...</p>
+        </div>
+      )}
+
+      {/* No Data Message */}
+      {!loading && !error && orders.length === 0 && (
+        <div className={`mb-4 p-4 rounded-lg text-center ${
+          theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+        }`}>
+          <p>No B2C orders found for the selected date range.</p>
+          <p className="text-sm mt-2 opacity-75">B2C orders are sales transactions from customers without GST numbers.</p>
+        </div>
+      )}
 
       {/* Filter Panel */}
       {showFilterPanel && (
@@ -797,7 +632,6 @@ useEffect(() => {
                   <div>
                     <p className="text-sm opacity-75">Total Orders</p>
                     <p className="text-2xl font-bold">{analytics.totalOrders}</p>
-                    <p className="text-xs text-green-600">+12% from last month</p>
                   </div>
                   <ShoppingBag className="text-purple-500" size={24} />
                 </div>
@@ -810,7 +644,6 @@ useEffect(() => {
                   <div>
                     <p className="text-sm opacity-75">Revenue</p>
                     <p className="text-2xl font-bold">{formatCurrency(analytics.totalRevenue)}</p>
-                    <p className="text-xs text-green-600">+8% from last month</p>
                   </div>
                   <DollarSign className="text-green-500" size={24} />
                 </div>
@@ -823,7 +656,6 @@ useEffect(() => {
                   <div>
                     <p className="text-sm opacity-75">Avg Order Value</p>
                     <p className="text-2xl font-bold">{formatCurrency(analytics.avgOrderValue)}</p>
-                    <p className="text-xs text-blue-600">+5% from last month</p>
                   </div>
                   <TrendingUp className="text-blue-500" size={24} />
                 </div>
@@ -836,7 +668,6 @@ useEffect(() => {
                   <div>
                     <p className="text-sm opacity-75">Active Customers</p>
                     <p className="text-2xl font-bold">{analytics.activeCustomers}</p>
-                    <p className="text-xs text-purple-600">+15% from last month</p>
                   </div>
                   <User className="text-orange-500" size={24} />
                 </div>
@@ -862,8 +693,8 @@ useEffect(() => {
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredTransactions.slice(0, 5).map((transaction) => (
-                      <tr key={transaction.id} className={`border-b ${
+                    {filteredTransactions.slice(0, 5).map((transaction, index) => (
+                      <tr key={transaction.id || transaction.orderId || `order-${index}`} className={`border-b ${
                         theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
                       }`}>
                         <td className="p-3">
@@ -881,7 +712,7 @@ useEffect(() => {
                         <td className="p-3 font-medium">{formatCurrency(transaction.netAmount)}</td>
                         <td className="p-3">
                           <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(transaction.orderStatus)}`}>
-                            {transaction.orderStatus}
+                            {transaction.orderStatus || 'N/A'}
                           </span>
                         </td>
                         <td className="p-3">{new Date(transaction.orderDate).toLocaleDateString()}</td>
@@ -899,7 +730,7 @@ useEffect(() => {
               <h3 className="text-lg font-semibold mb-4">Top Customers</h3>
               <div className="space-y-3">
                 {analytics.topCustomers.map((customer, index) => (
-                  <div key={customer.id} className={`flex items-center justify-between p-3 rounded ${
+                  <div key={customer.id || customer.customerId || `customer-${index}`} className={`flex items-center justify-between p-3 rounded ${
                     theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
                   }`}>
                     <div className="flex items-center">
@@ -948,8 +779,8 @@ useEffect(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  {customers.map((customer) => (
-                    <tr key={customer.id} className={`border-b ${
+                  {customers.map((customer, index) => (
+                    <tr key={customer.id || customer.customerId || `customer-${index}`} className={`border-b ${
                       theme === 'dark' ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'
                     }`}>
                       <td className="p-3">
@@ -1016,8 +847,8 @@ useEffect(() => {
                   </tr>
                 </thead>
                 <tbody>
-                  {filteredTransactions.map((transaction) => (
-                    <tr key={transaction.id} className={`border-b ${
+                  {filteredTransactions.map((transaction, index) => (
+                    <tr key={transaction.id || transaction.orderId || `order-${index}`} className={`border-b ${
                       theme === 'dark' ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'
                     }`}>
                       <td className="p-3 font-medium">{transaction.orderNumber}</td>
@@ -1041,7 +872,7 @@ useEffect(() => {
                         <div>
                           <div className="capitalize">{transaction.paymentMethod}</div>
                           <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(transaction.paymentStatus)}`}>
-                            {transaction.paymentStatus}
+                            {transaction.paymentStatus || 'N/A'}
                           </span>
                         </div>
                       </td>
@@ -1173,10 +1004,6 @@ useEffect(() => {
                     <span>Active Customers</span>
                     <span className="font-medium">{analytics.activeCustomers}</span>
                   </div>
-                  <div className="flex justify-between">
-                    <span>Customer Retention Rate</span>
-                    <span className="font-medium text-green-600">87%</span>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1186,35 +1013,8 @@ useEffect(() => {
         {/* Marketing View */}
         {selectedView === 'marketing' && (
           <div className="space-y-6">
-            {/* Campaign Performance */}
-            <div className={`p-6 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
-              <h3 className="text-lg font-semibold mb-4">Campaign Performance</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className={`p-4 rounded border ${
-                  theme === 'dark' ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'
-                }`}>
-                  <h4 className="font-medium mb-2">Summer Sale 2025</h4>
-                  <div className="text-2xl font-bold text-green-600">{formatCurrency(164020)}</div>
-                  <div className="text-sm opacity-75">1 order • 100% conversion</div>
-                </div>
-                <div className={`p-4 rounded border ${
-                  theme === 'dark' ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'
-                }`}>
-                  <h4 className="font-medium mb-2">Instagram Ads</h4>
-                  <div className="text-2xl font-bold text-blue-600">{formatCurrency(20073)}</div>
-                  <div className="text-sm opacity-75">1 order • 85% conversion</div>
-                </div>
-                <div className={`p-4 rounded border ${
-                  theme === 'dark' ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'
-                }`}>
-                  <h4 className="font-medium mb-2">Referral Program</h4>
-                  <div className="text-2xl font-bold text-purple-600">{formatCurrency(0)}</div>
-                  <div className="text-sm opacity-75">0 orders • New campaign</div>
-                </div>
-              </div>
-            </div>
+            {/* Campaign Performance - Removed hardcoded data */}
+            {/* Campaign performance data should be fetched from backend if needed */}
 
             {/* Customer Segments */}
             <div className={`p-6 rounded-lg ${
@@ -1261,10 +1061,8 @@ useEffect(() => {
                   </div>
                   <div className="text-sm opacity-75">Points Redeemed</div>
                 </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-green-600">92%</div>
-                  <div className="text-sm opacity-75">Customer Satisfaction</div>
-                </div>
+                {/* Customer Satisfaction - Removed hardcoded data */}
+                {/* Customer satisfaction data should be calculated from backend if available */}
               </div>
             </div>
           </div>

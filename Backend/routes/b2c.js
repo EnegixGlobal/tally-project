@@ -79,6 +79,7 @@ router.get('/b2c-orders', async (req, res) => {
   l.email,
   l.phone,
   l.address AS shippingAddress,
+  l.gst_number AS gstNumber,
   svi.itemId,
   si.name AS itemName,
   si.unit,
