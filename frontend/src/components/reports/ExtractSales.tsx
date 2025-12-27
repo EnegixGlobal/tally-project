@@ -106,6 +106,9 @@ const ExtractSales: React.FC = () => {
     >("summary");
     const [extractData, setExtractData] = useState<any>(null);
     const [loadingExtract, setLoadingExtract] = useState(false);
+    const [selectedParty, setSelectedParty] = useState<{ partyName: string; partyGSTIN?: string } | null>(null);
+    const [selectedSalesAccount, setSelectedSalesAccount] = useState<{ ledgerName: string } | null>(null);
+    const [selectedTaxType, setSelectedTaxType] = useState<"cgst" | "sgst" | "igst" | null>(null);
     const [filters, setFilters] = useState<FilterState>({
         dateRange: "this-month",
         fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), -100)
@@ -743,7 +746,7 @@ const ExtractSales: React.FC = () => {
             .then((data) => {
                 // safe handling
                 if (Array.isArray(data)) {
-                    console.log("data", data);
+                    console.log("Sales Data", data);
                     setSalesVouchers(data);
                 } else if (Array.isArray(data?.data)) {
                     setSalesVouchers(data.data);
@@ -765,6 +768,7 @@ const ExtractSales: React.FC = () => {
             const url = `${import.meta.env.VITE_API_URL}/api/extract-sales?month=${month}&year=${year}&company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
             const res = await fetch(url);
             const data = await res.json();
+            console.log("Extract Sales Data", data);
             
             if (data.success) {
                 setExtractData(data.data);
@@ -1240,6 +1244,151 @@ const ExtractSales: React.FC = () => {
                                     <div className="p-8 text-center">
                                         <p>Loading extract data...</p>
                                     </div>
+                                ) : (selectedParty || selectedSalesAccount || selectedTaxType) && extractData ? (
+                                    <div>
+                                        {/* Back button and header */}
+                                        <div className={`p-4 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                                            <div className="flex items-center gap-4 mb-2">
+                                                <button
+                                                    onClick={() => {
+                                                        setSelectedParty(null);
+                                                        setSelectedSalesAccount(null);
+                                                        setSelectedTaxType(null);
+                                                    }}
+                                                    className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
+                                                    title="Back to Extract View"
+                                                >
+                                                    <ArrowLeft size={20} />
+                                                </button>
+                                                <div>
+                                                    <h2 className="text-lg font-bold">Select Ledger Vouchers</h2>
+                                                    <p className="text-sm opacity-70">
+                                                        Ledger : {selectedParty?.partyName || selectedSalesAccount?.ledgerName || 
+                                                        (selectedTaxType === "cgst" ? "14% Cgst" : 
+                                                         selectedTaxType === "sgst" ? "14% Sgst" : 
+                                                         selectedTaxType === "igst" ? "IGST" : "")}
+                                                    </p>
+                                                </div>
+                                                {extractData && (
+                                                    <div className="ml-auto text-sm opacity-70">
+                                                        {new Date(extractData.fromDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })} to {new Date(extractData.toDate).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        {/* Voucher Details Table */}
+                                        <table className="w-full">
+                                            <thead className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                                                <tr>
+                                                    <th className="px-4 py-3 text-left font-medium">Date</th>
+                                                    <th className="px-4 py-3 text-left font-medium">Particulars</th>
+                                                    <th className="px-4 py-3 text-left font-medium">Vch Type</th>
+                                                    <th className="px-4 py-3 text-left font-medium">Vch No.</th>
+                                                    <th className="px-4 py-3 text-right font-medium">Debit</th>
+                                                    <th className="px-4 py-3 text-right font-medium">Credit</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody>
+                                                {(() => {
+                                                    let filteredVouchers = extractData.vouchers;
+                                                    
+                                                    if (selectedParty) {
+                                                        filteredVouchers = filteredVouchers.filter((voucher: any) => voucher.partyName === selectedParty.partyName);
+                                                    } else if (selectedSalesAccount) {
+                                                        filteredVouchers = filteredVouchers.filter((voucher: any) => voucher.salesLedgerName === selectedSalesAccount.ledgerName);
+                                                    } else if (selectedTaxType) {
+                                                        filteredVouchers = extractData.vouchers; // All vouchers for tax calculation
+                                                    }
+
+                                                    return filteredVouchers.map((voucher: any, index: number) => {
+                                                        let creditAmount = 0;
+                                                        let debitAmount = 0;
+                                                        let particulars = "-";
+
+                                                        if (selectedParty) {
+                                                            debitAmount = parseFloat(voucher.total) || 0;
+                                                            particulars = voucher.salesLedgerName || "-";
+                                                        } else if (selectedSalesAccount) {
+                                                            creditAmount = parseFloat(voucher.subtotal) || 0;
+                                                            particulars = voucher.partyName || "-";
+                                                        } else if (selectedTaxType) {
+                                                            if (selectedTaxType === "cgst") {
+                                                                creditAmount = parseFloat(voucher.cgstTotal) || 0;
+                                                            } else if (selectedTaxType === "sgst") {
+                                                                creditAmount = parseFloat(voucher.sgstTotal) || 0;
+                                                            } else if (selectedTaxType === "igst") {
+                                                                creditAmount = parseFloat(voucher.igstTotal) || 0;
+                                                            }
+                                                            particulars = voucher.partyName || "-";
+                                                        }
+
+                                                        // Only show rows with non-zero amounts
+                                                        if (debitAmount === 0 && creditAmount === 0) return null;
+
+                                                        return (
+                                                            <tr
+                                                                key={index}
+                                                                className={`border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}
+                                                            >
+                                                                <td className="px-4 py-2">
+                                                                    {new Date(voucher.date).toLocaleDateString("en-IN", { day: "numeric", month: "numeric", year: "numeric" })}
+                                                                </td>
+                                                                <td className="px-4 py-2">{particulars}</td>
+                                                                <td className="px-4 py-2">Sales</td>
+                                                                <td className="px-4 py-2">{voucher.voucherNo}</td>
+                                                                <td className="px-4 py-2 text-right font-mono">
+                                                                    {debitAmount > 0 ? formatCurrency(debitAmount) : "-"}
+                                                                </td>
+                                                                <td className="px-4 py-2 text-right font-mono">
+                                                                    {creditAmount > 0 ? formatCurrency(creditAmount) : "-"}
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    }).filter((row: any) => row !== null);
+                                                })()}
+                                            </tbody>
+                                            <tfoot className={`border-t-2 ${theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-gray-100 border-gray-300"}`}>
+                                                <tr className="font-bold">
+                                                    <td colSpan={4} className="px-4 py-3 text-right">Total :</td>
+                                                    <td className="px-4 py-3 text-right font-mono">
+                                                        {(() => {
+                                                            if (selectedParty) {
+                                                                const total = extractData.vouchers
+                                                                    .filter((voucher: any) => voucher.partyName === selectedParty.partyName)
+                                                                    .reduce((sum: number, voucher: any) => sum + (parseFloat(voucher.total) || 0), 0);
+                                                                return formatCurrency(total);
+                                                            }
+                                                            return "-";
+                                                        })()}
+                                                    </td>
+                                                    <td className="px-4 py-3 text-right font-mono">
+                                                        {(() => {
+                                                            if (selectedSalesAccount) {
+                                                                const total = extractData.vouchers
+                                                                    .filter((voucher: any) => voucher.salesLedgerName === selectedSalesAccount.ledgerName)
+                                                                    .reduce((sum: number, voucher: any) => sum + (parseFloat(voucher.subtotal) || 0), 0);
+                                                                return formatCurrency(total);
+                                                            } else if (selectedTaxType) {
+                                                                const total = extractData.vouchers.reduce((sum: number, voucher: any) => {
+                                                                    if (selectedTaxType === "cgst") {
+                                                                        return sum + (parseFloat(voucher.cgstTotal) || 0);
+                                                                    } else if (selectedTaxType === "sgst") {
+                                                                        return sum + (parseFloat(voucher.sgstTotal) || 0);
+                                                                    } else if (selectedTaxType === "igst") {
+                                                                        return sum + (parseFloat(voucher.igstTotal) || 0);
+                                                                    }
+                                                                    return sum;
+                                                                }, 0);
+                                                                return formatCurrency(total);
+                                                            }
+                                                            return "-";
+                                                        })()}
+                                                    </td>
+                                                </tr>
+                                            </tfoot>
+                                        </table>
+                                    </div>
                                 ) : extractData ? (
                                     <table className="w-full">
                                         <thead className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
@@ -1259,7 +1408,8 @@ const ExtractSales: React.FC = () => {
                                             {extractData.sundryDebtors.map((party: any, index: number) => (
                                                 <tr
                                                     key={index}
-                                                    className={`border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}
+                                                    onClick={() => setSelectedParty({ partyName: party.partyName, partyGSTIN: party.partyGSTIN })}
+                                                    className={`border-t cursor-pointer transition-colors ${theme === "dark" ? "border-gray-700 hover:bg-gray-700" : "border-gray-200 hover:bg-gray-100"}`}
                                                 >
                                                     <td className="px-4 py-2 pl-8">{party.partyName}</td>
                                                     <td className="px-4 py-2 text-right font-mono">
@@ -1280,7 +1430,8 @@ const ExtractSales: React.FC = () => {
                                             {extractData.salesAccounts.map((account: any, index: number) => (
                                                 <tr
                                                     key={index}
-                                                    className={`border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}
+                                                    onClick={() => setSelectedSalesAccount({ ledgerName: account.ledgerName })}
+                                                    className={`border-t cursor-pointer transition-colors ${theme === "dark" ? "border-gray-700 hover:bg-gray-700" : "border-gray-200 hover:bg-gray-100"}`}
                                                 >
                                                     <td className="px-4 py-2 pl-8">{account.ledgerName}</td>
                                                     <td className="px-4 py-2 text-right font-mono">-</td>
@@ -1302,7 +1453,10 @@ const ExtractSales: React.FC = () => {
                                                 <td className="px-4 py-2"></td>
                                             </tr>
                                             {extractData.currentLiabilities.cgst > 0 && (
-                                                <tr className={`border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                                                <tr 
+                                                    onClick={() => setSelectedTaxType("cgst")}
+                                                    className={`border-t cursor-pointer transition-colors ${theme === "dark" ? "border-gray-700 hover:bg-gray-700" : "border-gray-200 hover:bg-gray-100"}`}
+                                                >
                                                     <td className="px-4 py-2 pl-12">14% Cgst</td>
                                                     <td className="px-4 py-2 text-right font-mono">-</td>
                                                     <td className="px-4 py-2 text-right font-mono">
@@ -1311,7 +1465,10 @@ const ExtractSales: React.FC = () => {
                                                 </tr>
                                             )}
                                             {extractData.currentLiabilities.sgst > 0 && (
-                                                <tr className={`border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                                                <tr 
+                                                    onClick={() => setSelectedTaxType("sgst")}
+                                                    className={`border-t cursor-pointer transition-colors ${theme === "dark" ? "border-gray-700 hover:bg-gray-700" : "border-gray-200 hover:bg-gray-100"}`}
+                                                >
                                                     <td className="px-4 py-2 pl-12">14% Sgst</td>
                                                     <td className="px-4 py-2 text-right font-mono">-</td>
                                                     <td className="px-4 py-2 text-right font-mono">
@@ -1320,7 +1477,10 @@ const ExtractSales: React.FC = () => {
                                                 </tr>
                                             )}
                                             {extractData.currentLiabilities.igst > 0 && (
-                                                <tr className={`border-t ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>
+                                                <tr 
+                                                    onClick={() => setSelectedTaxType("igst")}
+                                                    className={`border-t cursor-pointer transition-colors ${theme === "dark" ? "border-gray-700 hover:bg-gray-700" : "border-gray-200 hover:bg-gray-100"}`}
+                                                >
                                                     <td className="px-4 py-2 pl-12">IGST</td>
                                                     <td className="px-4 py-2 text-right font-mono">-</td>
                                                     <td className="px-4 py-2 text-right font-mono">
