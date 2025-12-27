@@ -226,6 +226,9 @@ app.use("/api/fund-flow", fundflow);
 const salesreport = require("./routes/sales-report");
 app.use("/api/sales-report", salesreport);
 
+const extractSales = require("./routes/extractSales");
+app.use("/api/extract-sales", extractSales);
+
 const setProfit = require("./routes/setProfit");
 app.use("/api/set-profit", setProfit);
 

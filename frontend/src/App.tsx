@@ -105,6 +105,7 @@ import GSTAnalysis from "./components/reports/GSTAnalysis";
 import OutstandingReports from "./components/reports/outstanding/OutstandingReports";
 import SalesReport from "./components/reports/SalesReport";
 import SalesInvoiceMatching from "./components/reports/SalesInvoiceMatching";
+import ExtractSales from "./components/reports/ExtractSales";
 import PurchaseReport1 from "./components/reports/PurchaseReport1";
 import PurchaseInvoiceMatching1 from "./components/reports/PurchaseInvoiceMatching";
 import B2B from "./components/reports/B2B";
@@ -1172,6 +1173,14 @@ function App() {
                 element={
                   <RequireCompany>
                     <GodownSummary />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/extract-sales"
+                element={
+                  <RequireCompany>
+                    <ExtractSales />
                   </RequireCompany>
                 }
               />
