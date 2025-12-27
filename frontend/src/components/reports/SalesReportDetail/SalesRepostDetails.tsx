@@ -126,54 +126,53 @@ const SalesRepostDetails = () => {
   }, []);
 
   useEffect(() => {
-    if (!sales.length || !ledgers.length || !ledgerGroups.length) return;
+  if (!sales.length || !ledgers.length) return;
 
-    const result: any[] = [];
+  const result: any[] = [];
+  const allGroups = [...ledgerGroups, ...baseGroups];
 
-    sales.forEach((sale) => {
-      // 1️⃣ partyId → ledger
-      const ledger = ledgers.find(
-        (l: any) => String(l.id) === String(sale.partyId)
-      );
-      if (!ledger) return;
+  sales.forEach((sale) => {
+    const ledger = ledgers.find(
+      (l: any) => String(l.id) === String(sale.partyId)
+    );
+    if (!ledger) return;
 
-      // 2️⃣ ledger.groupId → ledger group
-      const group = ledgerGroups.find(
+    const group =
+      allGroups.find(
         (g: any) => String(g.id) === String(ledger.groupId)
-      );
-      if (!group) return;
+      ) || {
+        id: ledger.groupId,
+        name: "Unknown Group",
+      };
 
-      // 3️⃣ group already exist?
-      let groupObj = result.find((g) => g.groupId === group.id);
-      if (!groupObj) {
-        groupObj = {
-          groupId: group.id,
-          groupName: group.name,
-          ledgers: [],
-        };
-        result.push(groupObj);
-      }
+    let groupObj = result.find((g) => g.groupId === group.id);
+    if (!groupObj) {
+      groupObj = {
+        groupId: group.id,
+        groupName: group.name,
+        ledgers: [],
+      };
+      result.push(groupObj);
+    }
 
-      // 4️⃣ ledger already exist inside group?
-      let ledgerObj = groupObj.ledgers.find(
-        (l: any) => l.ledgerId === ledger.id
-      );
+    let ledgerObj = groupObj.ledgers.find(
+      (l: any) => l.ledgerId === ledger.id
+    );
+    if (!ledgerObj) {
+      ledgerObj = {
+        ledgerId: ledger.id,
+        ledgerName: ledger.name,
+        sales: [],
+      };
+      groupObj.ledgers.push(ledgerObj);
+    }
 
-      if (!ledgerObj) {
-        ledgerObj = {
-          ledgerId: ledger.id,
-          ledgerName: ledger.name,
-          sales: [],
-        };
-        groupObj.ledgers.push(ledgerObj);
-      }
+    ledgerObj.sales.push(sale);
+  });
 
-      // 5️⃣ sale push
-      ledgerObj.sales.push(sale);
-    });
+  setGroupedSales(result);
+}, [sales, ledgers, ledgerGroups]);
 
-    setGroupedSales(result);
-  }, [sales, ledgers, ledgerGroups]);
 
   const getPartyName = (partyId: number | string) => {
     const ledger = ledgers.find((l: any) => String(l.id) === String(partyId));
