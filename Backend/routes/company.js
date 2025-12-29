@@ -269,7 +269,6 @@ router.get('/company/:companyId', async (req, res) => {
       return res.status(404).json({ message: 'Company not found' });
     }
 
-    console.log(rows[0])
     return res.status(200).json(rows[0]);
 
   } catch (err) {
