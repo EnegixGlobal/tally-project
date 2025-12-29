@@ -779,7 +779,7 @@ const B2C: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {customers.map((customer, index) => (
+                  {/* {customers.map((customer, index) => (
                     <tr key={customer.id || customer.customerId || `customer-${index}`} className={`border-b ${
                       theme === 'dark' ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'
                     }`}>
@@ -815,7 +815,7 @@ const B2C: React.FC = () => {
                         </button>
                       </td>
                     </tr>
-                  ))}
+                  ))} */}
                 </tbody>
               </table>
             </div>
