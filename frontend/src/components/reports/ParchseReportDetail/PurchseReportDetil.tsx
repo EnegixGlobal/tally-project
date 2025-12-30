@@ -39,15 +39,33 @@ const PurchseReportDetil = () => {
     fetch(url)
       .then((res) => res.json())
       .then((res) => {
-        // backend response: { success, data }
+        let data: any[] = [];
+
+        // ✅ normalize backend response
         if (res?.success && Array.isArray(res.data)) {
-          setSales(res.data);
+          data = res.data;
         } else if (Array.isArray(res)) {
-          // fallback if backend sends array directly
-          setSales(res);
-        } else {
-          setSales([]);
+          data = res;
         }
+
+        // ✅ STRICT MONTH + YEAR FILTER (MAIN FIX)
+        const filteredData = data.filter((sale) => {
+          if (!sale.date) return false;
+
+          const d = new Date(sale.date);
+
+          const saleMonth = d.toLocaleString("en-US", {
+            month: "long",
+          });
+
+          return (
+            saleMonth.toLowerCase() === month.toLowerCase() &&
+            d.getFullYear() === year
+          );
+        });
+
+        // ✅ ONLY SELECTED MONTH DATA SET
+        setSales(filteredData);
       })
       .catch((err) => {
         console.error("Month-wise sales fetch error:", err);
@@ -203,10 +221,10 @@ const PurchseReportDetil = () => {
         </button>
 
         {/* TITLE */}
-        <h1 className="text-xl font-bold">Purchase Details for {month}</h1>
+        <h1 className="text-xl font-bold">Sales Details for {month}</h1>
 
         {/* 🔘 RADIO CONTROLS */}
-        <div className="flex items-center gap-6 text-sm font-medium">
+        <div className="flex items-center pt-16 gap-6 text-sm font-medium">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="radio"
@@ -234,79 +252,119 @@ const PurchseReportDetil = () => {
       {sales.length === 0 ? (
         <p className="text-gray-500">No sales found for {month}</p>
       ) : !showDetail ? (
-        /* ================= SUMMARY VIEW ================= */
         <>
-          <table className="w-full border-collapse text-sm">
-            <thead className="bg-gray-100">
-              <tr>
-                <th className="border px-3 py-2 text-left">Particular</th>
-                <th className="border px-3 py-2 text-right">Total</th>
-              </tr>
-            </thead>
+          {/* ================= SUMMARY VIEW ================= */}
+          <div className="max-full">
+            {/* Header */}
+            <div className="grid grid-cols-3 px-3 py-2 font-bold border-b">
+              <div>Particulars</div>
+              <div className="text-right">Debit</div>
+              <div className="text-right">Credit</div>
+            </div>
 
-            <tbody>
-              {groupedSales.map((group) => (
-                <tr key={group.groupId} className="font-semibold">
-                  <td className="border px-3 py-2">{group.groupName}</td>
-                  <td className="border px-3 py-2 text-right">
-                    ₹{getGroupTotal(group).toLocaleString()}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+            {/* Rows */}
+            {groupedSales.map((group) => {
+              const total = getGroupTotal(group);
 
-          <div className="mt-6 flex justify-end">
-            <div className="w-full max-w-sm border-t pt-3 text-right font-bold">
-              Grand Total : ₹{getGrandTotal().toLocaleString()}
+              return (
+                <div
+                  key={group.groupId}
+                  className="grid grid-cols-3 px-3 py-2 text-sm"
+                >
+                  <div className="font-medium">{group.groupName}</div>
+
+                  {/* Debit (only if negative type – optional future logic) */}
+                  <div className="text-right font-mono">
+                    {/* keep blank for sales */}
+                  </div>
+
+                  {/* Credit */}
+                  <div className="text-right font-mono">
+                    ₹{total.toLocaleString("en-IN")}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Divider */}
+            <div className="border-t my-2" />
+
+            {/* Grand Total */}
+            <div className="grid grid-cols-3 px-3 py-2 font-bold">
+              <div>Grand Total</div>
+              <div className="text-right"></div>
+              <div className="text-right font-mono">
+                ₹{getGrandTotal().toLocaleString("en-IN")}
+              </div>
+            </div>
+            <div className="mt-6 flex justify-end">
+              <div className="w-full max-w-sm border-t pt-3 text-right font-bold">
+                Grand Total : ₹{getGrandTotal().toLocaleString()}
+              </div>
             </div>
           </div>
         </>
       ) : (
         /* ================= DETAIL VIEW ================= */
+
         <div className="space-y-8">
+          {/* 🔹 TABLE HEADER – ONLY ONCE */}
+          <div className="grid grid-cols-6 px-3 py-2 text-xl border-b font-bold opacity-70">
+            <div>Date</div>
+            <div>Particulars</div>
+            <div>Voucher Type</div>
+            <div>Voucher No</div>
+            <div className="text-right">Debit</div>
+            <div className="text-right">Credit</div>
+          </div>
+
           {groupedSales.map((group) => (
-            <div key={group.groupId}>
-              {/* 🔹 GROUP NAME */}
-              <h2 className="text-lg font-bold mb-2">{group.groupName}</h2>
+            <div key={group.groupId} className="space-y-6">
+              {/* 🔹 GROUP / LEDGER HEADING */}
+              {group.ledgers.map((ledger: any) => (
+                <div key={ledger.ledgerId}>
+                  {/* Ledger title */}
+                  <div className="font-semibold py-2 px-3">
+                    {group.groupName}
+                  </div>
 
-              <table className="w-full border-collapse text-sm">
-                <thead className="bg-gray-100">
-                  <tr>
-                    <th className="border px-3 py-2 text-left">Date</th>
-                    <th className="border px-3 py-2 text-left">Particular</th>
-                    <th className="border px-3 py-2 text-left">Voucher Type</th>
-                    <th className="border px-3 py-2 text-left">Voucher No</th>
-                    <th className="border px-3 py-2 text-right">Debit</th>
-                    <th className="border px-3 py-2 text-right">Credit</th>
-                  </tr>
-                </thead>
-
-                <tbody>
-                  {group.ledgers.flatMap((ledger: any) =>
-                    ledger.sales.map((sale: any) => (
-                      <tr key={sale.id}>
-                        <td className="border px-3 py-2">
+                  {/* Entries */}
+                  {ledger.sales.map((sale: any, idx: number) => (
+                    <Fragment key={sale.id || idx}>
+                      <div className="grid grid-cols-6 px-3 py-2 text-sm">
+                        <div>
                           {new Date(sale.date).toLocaleDateString("en-IN")}
-                        </td>
-                        <td className="border px-3 py-2 font-mono">
-                          {getPartyName(sale.partyId)}
-                        </td>
-                        <td className="border px-3 py-2">Purchase</td>
-                        <td className="border px-3 py-2 font-mono">
-                          {sale.number}
-                        </td>
-                        <td className="border px-3 py-2 text-right font-semibold">
-                          ₹{Number(sale.total).toLocaleString()}
-                        </td>
-                        <td className="border px-3 py-2 text-right font-semibold">
-                          0
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                        </div>
+
+                        <div>{sale.itemName || ledger.ledgerName}</div>
+
+                        <div>{sale.voucherType || "Sales"}</div>
+
+                        <div className="font-mono">
+                          {sale.number || sale.voucherNo || "-"}
+                        </div>
+
+                        {/* Debit */}
+                        <div className="text-right font-mono">
+                          {sale.voucherType === "Purchase"
+                            ? `₹${Number(sale.total).toLocaleString("en-IN")}`
+                            : ""}
+                        </div>
+
+                        {/* Credit */}
+                        <div className="text-right font-mono">
+                          {sale.voucherType !== "Purchase"
+                            ? `₹${Number(sale.total).toLocaleString("en-IN")}`
+                            : ""}
+                        </div>
+                      </div>
+
+                      {/* HR separator */}
+                      <div className="h-px bg-gray-300 mx-3 opacity-60" />
+                    </Fragment>
+                  ))}
+                </div>
+              ))}
             </div>
           ))}
         </div>
