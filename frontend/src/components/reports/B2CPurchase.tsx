@@ -6,12 +6,10 @@ import {
   ArrowLeft, 
   Download, 
   Filter, 
-  Eye,
   User,
   ShoppingBag,
   TrendingUp,
-  DollarSign,
-  Star
+  DollarSign
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import './reports.css';
@@ -79,7 +77,6 @@ const B2CPurchase: React.FC = () => {
   const owner_id = localStorage.getItem('employee_id') || localStorage.getItem('user_id') || '';
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [selectedView, setSelectedView] = useState<'dashboard' | 'customers' | 'orders' | 'analytics' | 'marketing'>('dashboard');
   const [filters, setFilters] = useState<FilterState>({
     dateRange: 'this-month',
     fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
@@ -142,10 +139,10 @@ const B2CPurchase: React.FC = () => {
     setLoading(true);
     setError(null);
     
-    // Fetch B2C orders (sales without GST numbers)
+    // Fetch B2C purchases (purchases without GST numbers)
     // Backend filters: WHERE (l.gst_number IS NULL OR l.gst_number = '')
     axios
-      .get(`${import.meta.env.VITE_API_URL}/api/b2c-orders`, {
+      .get(`${import.meta.env.VITE_API_URL}/api/b2c-purchases`, {
         params: {
           company_id,
           owner_type,
@@ -155,7 +152,7 @@ const B2CPurchase: React.FC = () => {
         }
       })
       .then(res => {
-        console.log('B2C Orders API Response:', res.data);
+        console.log('B2C Purchases API Response:', res.data);
         
         // Backend returns item-level rows, need to group by order
         const rawData = res.data as any[];
@@ -168,7 +165,7 @@ const B2CPurchase: React.FC = () => {
         }
         
         if (rawData.length === 0) {
-          console.log('No B2C orders found for the selected date range');
+          console.log('No B2C purchases found for the selected date range');
           setOrders([]);
           setLoading(false);
           return;
@@ -192,7 +189,7 @@ const B2CPurchase: React.FC = () => {
               orderId: row.orderId,
               orderNumber: row.orderNumber || '',
               orderDate: row.orderDate || '',
-              customerName: row.customerName || '',
+              customerName: row.supplierName || '', // Using supplierName from API
               totalAmount: Number(row.totalAmount) || 0,
               discount: Number(row.discount) || 0,
               taxAmount: Number(row.taxAmount) || 0,
@@ -233,35 +230,64 @@ const B2CPurchase: React.FC = () => {
           return !order.gstNumber || String(order.gstNumber).trim() === '';
         });
         
-        console.log(`Processed ${ordersArray.length} B2C orders from ${rawData.length} item rows`);
+        console.log(`Processed ${ordersArray.length} B2C purchases from ${rawData.length} item rows`);
         setOrders(ordersArray);
         setLoading(false);
       })
       .catch((err) => {
-        console.error('Error fetching B2C orders:', err);
-        setError(err.response?.data?.error || err.message || 'Failed to fetch B2C orders');
+        console.error('Error fetching B2C purchases:', err);
+        setError(err.response?.data?.error || err.message || 'Failed to fetch B2C purchases');
         setOrders([]);
         setLoading(false);
       });
   }, [company_id, owner_type, owner_id, filters.fromDate, filters.toDate]);
 
   const filteredTransactions = useMemo(() => {
+    if (!orders || orders.length === 0) {
+      return [];
+    }
+
     return orders.filter(transaction => {
       // Safety filter: Ensure no GST numbers (backend already filters, but double-check)
       const noGstNumber = !transaction.gstNumber || String(transaction.gstNumber).trim() === '';
+      if (!noGstNumber) return false;
       
+      // Date filter - data is already filtered by API, but verify for safety
       const transactionDate = new Date(transaction.orderDate);
       const fromDate = new Date(filters.fromDate);
+      fromDate.setHours(0, 0, 0, 0);
       const toDate = new Date(filters.toDate);
+      toDate.setHours(23, 59, 59, 999);
       
       const dateInRange = transactionDate >= fromDate && transactionDate <= toDate;
-      const customerMatch = !filters.customerFilter || 
-        transaction.customerName.toLowerCase().includes(filters.customerFilter.toLowerCase());
-      const paymentMatch = !filters.paymentMethod || transaction.paymentMethod === filters.paymentMethod;
-      const statusMatch = !filters.orderStatus || transaction.orderStatus === filters.orderStatus;
-      const sourceMatch = !filters.source || transaction.source === filters.source;
+      if (!dateInRange) return false;
       
-      return noGstNumber && dateInRange && customerMatch && paymentMatch && statusMatch && sourceMatch;
+      // Customer/Supplier name filter (case-insensitive search)
+      const customerMatch = !filters.customerFilter || 
+        transaction.customerName?.toLowerCase().includes(filters.customerFilter.toLowerCase().trim());
+      if (!customerMatch) return false;
+      
+      // Payment method filter
+      const paymentMatch = !filters.paymentMethod || 
+        transaction.paymentMethod?.toLowerCase() === filters.paymentMethod.toLowerCase();
+      if (!paymentMatch) return false;
+      
+      // Order status filter (note: orderStatus is hardcoded as 'delivered' in current implementation)
+      const statusMatch = !filters.orderStatus || 
+        transaction.orderStatus?.toLowerCase() === filters.orderStatus.toLowerCase();
+      if (!statusMatch) return false;
+      
+      // Source filter (note: source is hardcoded as '' in current implementation)
+      const sourceMatch = !filters.source || 
+        transaction.source?.toLowerCase() === filters.source.toLowerCase();
+      if (!sourceMatch) return false;
+      
+      // Amount range filter
+      const amountMatch = (!filters.amountRangeMin || transaction.netAmount >= Number(filters.amountRangeMin)) &&
+        (!filters.amountRangeMax || transaction.netAmount <= Number(filters.amountRangeMax));
+      if (!amountMatch) return false;
+      
+      return true;
     });
   }, [orders, filters]);
 
@@ -338,6 +364,23 @@ const B2CPurchase: React.FC = () => {
     setFilters(prev => ({ ...prev, [key]: value }));
   };
 
+  const handleClearFilters = () => {
+    const today = new Date();
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    setFilters({
+      dateRange: 'this-month',
+      fromDate: firstDayOfMonth.toISOString().split('T')[0],
+      toDate: today.toISOString().split('T')[0],
+      customerFilter: '',
+      paymentMethod: '',
+      orderStatus: '',
+      customerSegment: '',
+      source: '',
+      amountRangeMin: '',
+      amountRangeMax: ''
+    });
+  };
+
   const handleDateRangeChange = (range: string) => {
     const today = new Date();
     let fromDate = new Date();
@@ -373,9 +416,9 @@ const B2CPurchase: React.FC = () => {
 
   const handleExport = () => {
     const exportData = filteredTransactions.map(transaction => ({
-      'Order Number': transaction.orderNumber,
-      'Customer': transaction.customerName,
-      'Order Date': transaction.orderDate,
+      'Purchase Number': transaction.orderNumber,
+      'Supplier': transaction.customerName,
+      'Purchase Date': transaction.orderDate,
       'Total Amount': transaction.totalAmount,
       'Discount': transaction.discount,
       'Tax Amount': transaction.taxAmount,
@@ -389,8 +432,8 @@ const B2CPurchase: React.FC = () => {
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'B2C Orders');
-    XLSX.writeFile(wb, `B2C_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'B2C Purchases');
+    XLSX.writeFile(wb, `B2C_Purchase_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const getStatusColor = (status: string) => {
@@ -411,21 +454,6 @@ const B2CPurchase: React.FC = () => {
       case 'returned':
       case 'failed':
         return 'text-red-800 bg-red-100';
-      default:
-        return 'text-gray-800 bg-gray-100';
-    }
-  };
-
-  const getSegmentColor = (segment: string) => {
-    switch (segment) {
-      case 'vip':
-        return 'text-purple-800 bg-purple-100';
-      case 'premium':
-        return 'text-blue-800 bg-blue-100';
-      case 'regular':
-        return 'text-green-800 bg-green-100';
-      case 'new':
-        return 'text-orange-800 bg-orange-100';
       default:
         return 'text-gray-800 bg-gray-100';
     }
@@ -452,10 +480,10 @@ const B2CPurchase: React.FC = () => {
               <User className="mr-2 text-purple-600" size={28} />
               B2C Purchase Management
             </h1>
-            <p className="text-sm text-gray-600 mt-1">Business-to-Consumer sales and customer management</p>
+            <p className="text-sm text-gray-600 mt-1">Business-to-Consumer purchases from suppliers without GST numbers</p>
             <p className="text-xs text-purple-600 mt-1">
-              📊 <strong>Showing sales transactions from customers WITHOUT GST numbers</strong> | 
-              <span className="ml-2">B2B transactions (with GST numbers) are shown in the B2B module</span>
+              📊 <strong>Showing purchase transactions from suppliers WITHOUT GST numbers</strong> | 
+              <span className="ml-2">B2B purchases (with GST numbers) are shown in the B2B module</span>
             </p>
           </div>
         </div>
@@ -498,26 +526,39 @@ const B2CPurchase: React.FC = () => {
         <div className={`mb-4 p-4 rounded-lg text-center ${
           theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
         }`}>
-          <p>Loading B2C orders...</p>
+          <p>Loading B2C purchases...</p>
         </div>
       )}
 
       {/* No Data Message */}
-      {!loading && !error && orders.length === 0 && (
+      {/* {!loading && !error && orders.length === 0 && (
         <div className={`mb-4 p-4 rounded-lg text-center ${
           theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
         }`}>
-          <p>No B2C orders found for the selected date range.</p>
-          <p className="text-sm mt-2 opacity-75">B2C orders are sales transactions from customers without GST numbers.</p>
+          <p>No B2C purchases found for the selected date range.</p>
+          <p className="text-sm mt-2 opacity-75">B2C purchases are purchase transactions from suppliers without GST numbers.</p>
         </div>
-      )}
+      )} */}
 
       {/* Filter Panel */}
       {showFilterPanel && (
         <div className={`p-4 rounded-lg mb-6 ${
           theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
         }`}>
-          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+          <div className="flex items-center justify-between mb-4">
+            <h3 className="text-lg font-semibold">Filters</h3>
+            <button
+              onClick={handleClearFilters}
+              className={`px-3 py-1 text-sm rounded ${
+                theme === 'dark' 
+                  ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+              }`}
+            >
+              Clear All
+            </button>
+          </div>
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Date Range</label>
               <select
@@ -539,11 +580,42 @@ const B2CPurchase: React.FC = () => {
               </select>
             </div>
 
+            {filters.dateRange === 'custom' && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1">From Date</label>
+                  <input
+                    type="date"
+                    value={filters.fromDate}
+                    onChange={(e) => handleFilterChange('fromDate', e.target.value)}
+                    className={`w-full p-2 rounded border ${
+                      theme === 'dark' 
+                        ? 'bg-gray-700 border-gray-600 text-white' 
+                        : 'bg-white border-gray-300 text-black'
+                    } outline-none`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">To Date</label>
+                  <input
+                    type="date"
+                    value={filters.toDate}
+                    onChange={(e) => handleFilterChange('toDate', e.target.value)}
+                    className={`w-full p-2 rounded border ${
+                      theme === 'dark' 
+                        ? 'bg-gray-700 border-gray-600 text-white' 
+                        : 'bg-white border-gray-300 text-black'
+                    } outline-none`}
+                  />
+                </div>
+              </>
+            )}
+
             <div>
-              <label className="block text-sm font-medium mb-1">Customer Name</label>
+              <label className="block text-sm font-medium mb-1">Supplier Name</label>
               <input
                 type="text"
-                placeholder="Search customer..."
+                placeholder="Search supplier..."
                 value={filters.customerFilter}
                 onChange={(e) => handleFilterChange('customerFilter', e.target.value)}
                 className={`w-full p-2 rounded border ${
@@ -598,30 +670,71 @@ const B2CPurchase: React.FC = () => {
                 <option value="returned">Returned</option>
               </select>
             </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Source</label>
+              <select
+                value={filters.source}
+                onChange={(e) => handleFilterChange('source', e.target.value)}
+                title="Select source"
+                className={`w-full p-2 rounded border ${
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-black'
+                } outline-none`}
+              >
+                <option value="">All Sources</option>
+                <option value="website">Website</option>
+                <option value="mobile_app">Mobile App</option>
+                <option value="marketplace">Marketplace</option>
+                <option value="social">Social Media</option>
+                <option value="referral">Referral</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Min Amount (₹)</label>
+              <input
+                type="number"
+                placeholder="0"
+                value={filters.amountRangeMin}
+                onChange={(e) => handleFilterChange('amountRangeMin', e.target.value)}
+                min="0"
+                step="0.01"
+                className={`w-full p-2 rounded border ${
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-black'
+                } outline-none`}
+              />
+            </div>
+
+            <div>
+              <label className="block text-sm font-medium mb-1">Max Amount (₹)</label>
+              <input
+                type="number"
+                placeholder="No limit"
+                value={filters.amountRangeMax}
+                onChange={(e) => handleFilterChange('amountRangeMax', e.target.value)}
+                min="0"
+                step="0.01"
+                className={`w-full p-2 rounded border ${
+                  theme === 'dark' 
+                    ? 'bg-gray-700 border-gray-600 text-white' 
+                    : 'bg-white border-gray-300 text-black'
+                } outline-none`}
+              />
+            </div>
+          </div>
+          <div className="mt-4 text-sm opacity-75">
+            Showing {filteredTransactions.length} of {orders.length} purchases
           </div>
         </div>
       )}
 
-      {/* View Selector */}
-      <div className="flex space-x-2 mb-6 overflow-x-auto">
-        {(['dashboard', 'customers', 'orders', 'analytics', 'marketing'] as const).map((view) => (
-          <button
-            key={view}
-            onClick={() => setSelectedView(view)}
-            className={`px-4 py-2 rounded-lg capitalize whitespace-nowrap ${
-              selectedView === view
-                ? (theme === 'dark' ? 'bg-purple-600 text-white' : 'bg-purple-500 text-white')
-                : (theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300')
-            }`}
-          >
-            {view}
-          </button>
-        ))}
-      </div>
-
       <div ref={printRef}>
         {/* Dashboard View */}
-        {selectedView === 'dashboard' && (
+        <div>
           <div className="space-y-6">
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -674,19 +787,19 @@ const B2CPurchase: React.FC = () => {
               </div>
             </div>
 
-            {/* Recent Orders */}
+            {/* Recent Purchases */}
             <div className={`p-6 rounded-lg ${
               theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
             }`}>
-              <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
+              <h3 className="text-lg font-semibold mb-4">Recent Purchases</h3>
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead className={`${
                     theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
                   }`}>
                     <tr>
-                      <th className="text-left p-3">Order</th>
-                      <th className="text-left p-3">Customer</th>
+                      <th className="text-left p-3">Purchase</th>
+                      <th className="text-left p-3">Supplier</th>
                       <th className="text-left p-3">Amount</th>
                       <th className="text-left p-3">Status</th>
                       <th className="text-left p-3">Date</th>
@@ -722,351 +835,8 @@ const B2CPurchase: React.FC = () => {
                 </table>
               </div>
             </div>
-
-            {/* Top Customers */}
-            <div className={`p-6 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
-              <h3 className="text-lg font-semibold mb-4">Top Customers</h3>
-              <div className="space-y-3">
-                {analytics.topCustomers.map((customer, index) => (
-                  <div key={customer.id || customer.customerId || `customer-${index}`} className={`flex items-center justify-between p-3 rounded ${
-                    theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                  }`}>
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
-                        index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : 'bg-orange-400'
-                      }`}>
-                        <span className="text-white font-bold text-sm">{index + 1}</span>
-                      </div>
-                      <div>
-                        <div className="font-medium">{customer.name}</div>
-                        <div className="text-sm opacity-75">{customer.customerSegment} customer</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium">{formatCurrency(customer.totalSpent)}</div>
-                      <div className="text-sm opacity-75">{customer.totalOrders} orders</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
           </div>
-        )}
-
-        {/* Customers View */}
-        {selectedView === 'customers' && (
-          <div className={`rounded-lg overflow-hidden ${
-            theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-          }`}>
-            <div className="p-4 border-b">
-              <h3 className="text-lg font-semibold">Customer Database</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className={`${
-                  theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                }`}>
-                  <tr>
-                    <th className="text-left p-3">Customer</th>
-                    <th className="text-left p-3">Segment</th>
-                    <th className="text-left p-3">Total Spent</th>
-                    <th className="text-left p-3">Orders</th>
-                    <th className="text-left p-3">Loyalty Points</th>
-                    <th className="text-left p-3">Last Activity</th>
-                    <th className="text-center p-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {/* {customers.map((customer, index) => (
-                    <tr key={customer.id || customer.customerId || `customer-${index}`} className={`border-b ${
-                      theme === 'dark' ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'
-                    }`}>
-                      <td className="p-3">
-                        <div>
-                          <div className="font-medium">{customer.name}</div>
-                          <div className="text-sm opacity-75">{customer.email}</div>
-                          <div className="text-xs opacity-60">{customer.phone}</div>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-xs ${getSegmentColor(customer.customerSegment)}`}>
-                          {customer.customerSegment}
-                        </span>
-                      </td>
-                      <td className="p-3 font-medium">{formatCurrency(customer.totalSpent)}</td>
-                      <td className="p-3">{customer.totalOrders}</td>
-                      <td className="p-3">
-                        <div className="flex items-center">
-                          <Star className="text-yellow-500 mr-1" size={14} />
-                          {customer.loyaltyPoints}
-                        </div>
-                      </td>
-                      <td className="p-3">{new Date(customer.lastActivity).toLocaleDateString()}</td>
-                      <td className="p-3 text-center">
-                        <button
-                          title="View Profile"
-                          className={`p-1 rounded ${
-                            theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
-                          }`}
-                        >
-                          <Eye size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))} */}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Orders View */}
-        {selectedView === 'orders' && (
-          <div className={`rounded-lg overflow-hidden ${
-            theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-          }`}>
-            <div className="p-4 border-b">
-              <h3 className="text-lg font-semibold">Order Management</h3>
-            </div>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className={`${
-                  theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                }`}>
-                  <tr>
-                    <th className="text-left p-3">Order Number</th>
-                    <th className="text-left p-3">Customer</th>
-                    <th className="text-left p-3">Items</th>
-                    <th className="text-left p-3">Amount</th>
-                    <th className="text-left p-3">Payment</th>
-                    <th className="text-left p-3">Status</th>
-                    <th className="text-left p-3">Date</th>
-                    <th className="text-center p-3">Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filteredTransactions.map((transaction, index) => (
-                    <tr key={transaction.id || transaction.orderId || `order-${index}`} className={`border-b ${
-                      theme === 'dark' ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'
-                    }`}>
-                      <td className="p-3 font-medium">{transaction.orderNumber}</td>
-                      <td className="p-3">
-                        <div>
-                          <div className="font-medium">{transaction.customerName}</div>
-                          <div className="text-sm opacity-75">{transaction.source}</div>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <div>
-                          <div className="font-medium">{transaction.items.length} items</div>
-                          <div className="text-sm opacity-75">
-                            {transaction.items.slice(0, 2).map((item: { itemName: any; }) => item.itemName).join(', ')}
-                            {transaction.items.length > 2 && '...'}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="p-3 font-medium">{formatCurrency(transaction.netAmount)}</td>
-                      <td className="p-3">
-                        <div>
-                          <div className="capitalize">{transaction.paymentMethod}</div>
-                          <span className={`text-xs px-2 py-1 rounded-full ${getStatusColor(transaction.paymentStatus)}`}>
-                            {transaction.paymentStatus || 'N/A'}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(transaction.orderStatus)}`}>
-                          {transaction.orderStatus}
-                        </span>
-                      </td>
-                      <td className="p-3">{new Date(transaction.orderDate).toLocaleDateString()}</td>
-                      <td className="p-3 text-center">
-                        <button
-                          title="View Order"
-                          className={`p-1 rounded ${
-                            theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
-                          }`}
-                        >
-                          <Eye size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* Analytics View */}
-        {selectedView === 'analytics' && (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Order Status Distribution */}
-              <div className={`p-6 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
-                <h3 className="text-lg font-semibold mb-4">Order Status Distribution</h3>
-                <div className="space-y-3">
-                  {Object.entries(analytics.orderStatusCounts).map(([status, count]) => {
-                    const percentage = analytics.totalOrders > 0 ? (count / analytics.totalOrders) * 100 : 0;
-                    return (
-                      <div key={status} className="flex items-center justify-between">
-                        <span className="capitalize">{status}</span>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-24 bg-gray-200 rounded-full h-2 relative">
-                            <div 
-                              className={`h-2 rounded-full absolute left-0 top-0 progress-bar ${
-                                status === 'delivered' ? 'bg-green-500' :
-                                status === 'shipped' ? 'bg-blue-500' :
-                                status === 'cancelled' || status === 'returned' ? 'bg-red-500' : 'bg-yellow-500'
-                              }`}
-                              data-percentage={percentage}
-                            />
-                          </div>
-                          <span className="text-sm">{count}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Payment Method Distribution */}
-              <div className={`p-6 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
-                <h3 className="text-lg font-semibold mb-4">Payment Method Distribution</h3>
-                <div className="space-y-3">
-                  {Object.entries(analytics.paymentMethodCounts).map(([method, count]) => {
-                    const percentage = analytics.totalOrders > 0 ? (count / analytics.totalOrders) * 100 : 0;
-                    return (
-                      <div key={method} className="flex items-center justify-between">
-                        <span className="capitalize">{method.replace('_', ' ')}</span>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-24 bg-gray-200 rounded-full h-2 relative">
-                            <div 
-                              className="bg-purple-500 h-2 rounded-full absolute left-0 top-0 progress-bar"
-                              data-percentage={percentage}
-                            />
-                          </div>
-                          <span className="text-sm">{count}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Traffic Source Distribution */}
-              <div className={`p-6 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
-                <h3 className="text-lg font-semibold mb-4">Traffic Source Distribution</h3>
-                <div className="space-y-3">
-                  {Object.entries(analytics.sourceCounts).map(([source, count]) => {
-                    const percentage = analytics.totalOrders > 0 ? (count / analytics.totalOrders) * 100 : 0;
-                    return (
-                      <div key={source} className="flex items-center justify-between">
-                        <span className="capitalize">{source.replace('_', ' ')}</span>
-                        <div className="flex items-center space-x-2">
-                          <div className="w-24 bg-gray-200 rounded-full h-2 relative">
-                            <div 
-                              className="bg-orange-500 h-2 rounded-full absolute left-0 top-0 progress-bar"
-                              data-percentage={percentage}
-                            />
-                          </div>
-                          <span className="text-sm">{count}</span>
-                        </div>
-                      </div>
-                    );
-                  })}
-                </div>
-              </div>
-
-              {/* Customer Metrics */}
-              <div className={`p-6 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
-                <h3 className="text-lg font-semibold mb-4">Customer Metrics</h3>
-                <div className="space-y-4">
-                  <div className="flex justify-between">
-                    <span>Customer Lifetime Value</span>
-                    <span className="font-medium">{formatCurrency(analytics.customerLifetimeValue)}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Total Customers</span>
-                    <span className="font-medium">{analytics.totalCustomers}</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span>Active Customers</span>
-                    <span className="font-medium">{analytics.activeCustomers}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Marketing View */}
-        {selectedView === 'marketing' && (
-          <div className="space-y-6">
-            {/* Campaign Performance - Removed hardcoded data */}
-            {/* Campaign performance data should be fetched from backend if needed */}
-
-            {/* Customer Segments */}
-            <div className={`p-6 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
-              <h3 className="text-lg font-semibold mb-4">Customer Segments</h3>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                {['new', 'regular', 'premium', 'vip'].map(segment => {
-                  const count = customers.filter(c => c.customerSegment === segment).length;
-                  const totalValue = customers
-                    .filter(c => c.customerSegment === segment)
-                    .reduce((sum, c) => sum + c.totalSpent, 0);
-                  
-                  return (
-                    <div key={segment} className={`p-4 rounded border text-center ${
-                      theme === 'dark' ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'
-                    }`}>
-                      <h4 className={`font-medium mb-2 capitalize ${getSegmentColor(segment)}`}>
-                        {segment} Customers
-                      </h4>
-                      <div className="text-2xl font-bold">{count}</div>
-                      <div className="text-sm opacity-75">{formatCurrency(totalValue)}</div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            {/* Loyalty Program */}
-            <div className={`p-6 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
-              <h3 className="text-lg font-semibold mb-4">Loyalty Program Performance</h3>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-yellow-600">
-                    {customers.reduce((sum, c) => sum + c.loyaltyPoints, 0)}
-                  </div>
-                  <div className="text-sm opacity-75">Total Points Issued</div>
-                </div>
-                <div className="text-center">
-                  <div className="text-2xl font-bold text-purple-600">
-                    {filteredTransactions.reduce((sum, t) => sum + t.loyaltyPointsUsed, 0)}
-                  </div>
-                  <div className="text-sm opacity-75">Points Redeemed</div>
-                </div>
-                {/* Customer Satisfaction - Removed hardcoded data */}
-                {/* Customer satisfaction data should be calculated from backend if available */}
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
 
       {/* Pro Tip */}
@@ -1074,8 +844,8 @@ const B2CPurchase: React.FC = () => {
         theme === 'dark' ? 'bg-gray-800' : 'bg-purple-50'
       }`}>
         <p className="text-sm">
-          <span className="font-semibold">Pro Tip:</span> Use the B2C module to track customer behavior, 
-          analyze purchase patterns, and create targeted marketing campaigns. Leverage loyalty programs to increase retention.
+          <span className="font-semibold">Pro Tip:</span> Use the B2C Purchase module to track purchases from suppliers without GST numbers, 
+          analyze purchase patterns, and manage your B2C supplier relationships effectively.
         </p>
       </div>
     </div>
