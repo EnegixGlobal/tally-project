@@ -216,6 +216,9 @@ import SalesRepostDetails from "./components/reports/SalesReportDetail/SalesRepo
 import PurchseReportDetil from "./components/reports/ParchseReportDetail/PurchseReportDetil";
 import B2BHsn from "./components/reports/B2BHsn";
 import B2CHsn from "./components/reports/B2CHsn";
+import B2BPurchase from "./components/reports/B2BPurchase";
+import B2CPurchase from "./components/reports/B2CPurchase";
+import B2BHsnPurchase from "./components/reports/B2BHsnPurchase";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -1269,6 +1272,30 @@ function App() {
                 element={
                   <RequireCompany>
                     <B2CHsn />
+                  </RequireCompany>
+                }
+              />
+               <Route
+                path="reports/b2bpurchase"
+                element={
+                  <RequireCompany>
+                    <B2BPurchase />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/b2cpurchase"
+                element={
+                  <RequireCompany>
+                    <B2CPurchase />
+                  </RequireCompany>
+                }
+              />
+                <Route
+                path="reports/b2bhsnpurchase"
+                element={
+                  <RequireCompany>
+                    <B2BHsnPurchase />
                   </RequireCompany>
                 }
               />

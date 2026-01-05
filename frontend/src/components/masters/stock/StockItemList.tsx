@@ -17,7 +17,7 @@ interface StockItem {
   barcode: string;
 }
 const StockItemList = () => {
-  const { theme, stockGroups = [], units = [] } = useAppContext();
+  const { theme } = useAppContext();
   const navigate = useNavigate();
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const companyId = localStorage.getItem("company_id");
@@ -26,12 +26,59 @@ const StockItemList = () => {
     ownerType === "employee" ? "employee_id" : "user_id"
   );
 
-  //   const [barcodeValue] = useState('');
-  // const [, setItemDetails] = useState<StockItem | null>(null);
-  //   const [, setError] = useState<string | null>(null);
+
+
+  // chek stock item alredy use or not
+const [salesHistory, setSalesHistory] = useState<any[]>([]);
+const [purchaseHistory, setPurchaseHistory] = useState<any[]>([]);
+
+useEffect(() => {
+  if (!companyId || !ownerType || !ownerId) return;
+
+  const fetchData = async () => {
+    try {
+      // 🔹 Purchase History
+      const purchaseRes = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      );
+      const purchaseJson = await purchaseRes.json();
+
+      setPurchaseHistory(
+        Array.isArray(purchaseJson?.data)
+          ? purchaseJson.data
+          : Array.isArray(purchaseJson)
+          ? purchaseJson
+          : []
+      );
+
+      // 🔹 Sales History
+      const salesRes = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/sales-vouchers/sale-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      );
+      const salesJson = await salesRes.json();
+
+      setSalesHistory(
+        Array.isArray(salesJson?.data)
+          ? salesJson.data
+          : Array.isArray(salesJson)
+          ? salesJson
+          : []
+      );
+    } catch (error) {
+      console.error("History fetch failed:", error);
+      setPurchaseHistory([]);
+      setSalesHistory([]);
+    }
+  };
+
+  fetchData();
+}, [companyId, ownerType, ownerId]);
+
+console.log('saleshist',salesHistory)
+console.log('pruchaseHisto',purchaseHistory)
 
   // fetch units from database
-  const [unitsData, setUnitsData] = useState([]);
+  const [unitsData, setUnitsData] = useState<any[]>([]);
 
   useEffect(() => {
     const fetchUnits = async () => {
@@ -45,7 +92,6 @@ const StockItemList = () => {
         );
 
         const data = await res.json();
-
 
         if (Array.isArray(data)) {
           setUnitsData(data);
@@ -85,23 +131,6 @@ const StockItemList = () => {
 
     fetchData();
   }, [companyId, ownerType, ownerId]);
-
-  // const handleSearch = async () => {
-  //     setError(null);
-  //     setItemDetails(null);
-  //     // API call to backend
-  //     try {
-  //       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/barcode/${barcodeValue}`);
-  //       const json = await res.json();
-  //       if (json.success) {
-  //         setItemDetails(json.data);
-  //       } else {
-  //         setError(json.message || 'Item not found');
-  //       }
-  //     } catch (err) {
-  //       setError('Failed to fetch item details');
-  //     }
-  //   };
 
   const handleDelete = async (id: string) => {
     const itemToDelete = stockItems.find((item) => item.id === id);
@@ -252,7 +281,7 @@ const StockItemList = () => {
                     >
                       Name
                     </th>
-                    
+
                     <th
                       scope="col"
                       className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
@@ -343,7 +372,7 @@ const StockItemList = () => {
                           >
                             {item.name}
                           </td>
-                          
+
                           <td
                             className={`px-6 py-4 whitespace-nowrap text-sm ${
                               theme === "dark"
