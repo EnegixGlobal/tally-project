@@ -707,13 +707,13 @@ const B2BHsn: React.FC = () => {
                           </td>
 
                           {/* IGST */}
-                          <td className="p-3">{sale.igstTotal}%</td>
+                          <td className="p-3">{sale.igstTotal}</td>
 
                           {/* CGST */}
-                          <td className="p-3">{sale.cgstTotal}%</td>
+                          <td className="p-3">{sale.cgstTotal}</td>
 
                           {/* SGST */}
-                          <td className="p-3">{sale.sgstTotal}%</td>
+                          <td className="p-3">{sale.sgstTotal}</td>
 
                           {/* Total */}
                           <td className="p-3 font-semibold">
