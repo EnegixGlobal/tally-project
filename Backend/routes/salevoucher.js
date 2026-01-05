@@ -252,6 +252,7 @@ router.get("/sale-history", async (req, res) => {
         rate,
         movementDate,
         godownId,
+        voucherNumber,
         companyId,
         ownerType,
         ownerId

@@ -6,41 +6,40 @@ const db = require("../db"); // your MySQL pool
 // Get Ledgers scoped by company and owner
 router.get("/", async (req, res) => {
   const { company_id, owner_type, owner_id } = req.query;
-  console.log(company_id, owner_type, owner_id);
 
   if (!company_id || !owner_type || !owner_id) {
-    return res
-      .status(400)
-      .json({ message: "company_id, owner_type and owner_id are required" });
+    return res.status(400).json({
+      message: "company_id, owner_type and owner_id are required",
+    });
   }
 
   try {
     const [rows] = await db.execute(
       `SELECT 
-    l.id,
-    l.name,
-    l.group_id AS groupId,
-    l.opening_balance AS openingBalance,
-    l.closing_balance AS closingBalance,
-    l.balance_type AS balanceType,
-    l.address,
-    l.email,
-    l.phone,
-    l.gst_number AS gstNumber,
-    l.pan_number AS panNumber,
-    l.state,
-    l.district,
-    l.created_at AS createdAt,
-    g.name AS groupName,
-    g.type AS groupType,
-    g.nature AS groupNature
-  FROM ledgers l
-  LEFT JOIN ledger_groups g ON l.group_id = g.id
-  WHERE l.company_id = ? AND l.owner_type = ? AND (l.owner_id = ? OR l.owner_id = 0)
-  ORDER BY l.name
-  `,
+        l.id,
+        l.name,
+        l.group_id AS groupId,
+        l.opening_balance AS openingBalance,
+        l.closing_balance AS closingBalance,
+        l.balance_type AS balanceType,
+        l.address,
+        l.email,
+        l.phone,
+        l.gst_number AS gstNumber,
+        l.pan_number AS panNumber,
+        l.created_at AS createdAt,
+        g.name AS groupName,
+        g.type AS groupType,
+        g.nature AS groupNature
+      FROM ledgers l
+      LEFT JOIN ledger_groups g ON l.group_id = g.id
+      WHERE l.company_id = ?
+        AND l.owner_type = ?
+        AND (l.owner_id = ? OR l.owner_id = 0)
+      ORDER BY l.name`,
       [company_id, owner_type, owner_id]
     );
+
     res.json(rows);
   } catch (err) {
     console.error("Error fetching ledgers:", err);
