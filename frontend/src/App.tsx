@@ -106,6 +106,7 @@ import OutstandingReports from "./components/reports/outstanding/OutstandingRepo
 import SalesReport from "./components/reports/SalesReport";
 import SalesInvoiceMatching from "./components/reports/SalesInvoiceMatching";
 import ExtractSales from "./components/reports/ExtractSales";
+import ExtractPurchase from "./components/reports/ExtractPurchase";
 import PurchaseReport1 from "./components/reports/PurchaseReport1";
 import PurchaseInvoiceMatching1 from "./components/reports/PurchaseInvoiceMatching";
 import B2B from "./components/reports/B2B";
@@ -1205,6 +1206,14 @@ function App() {
                 element={
                   <RequireCompany>
                     <ExtractSales />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/extract-purchase"
+                element={
+                  <RequireCompany>
+                    <ExtractPurchase />
                   </RequireCompany>
                 }
               />

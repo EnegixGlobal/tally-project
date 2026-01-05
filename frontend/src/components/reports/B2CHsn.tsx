@@ -7,11 +7,7 @@ import {
   Download, 
   Filter, 
   Eye,
-  User,
-  ShoppingBag,
-  TrendingUp,
-  DollarSign,
-  Star
+  User
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import './reports.css';
@@ -71,6 +67,14 @@ const B2CHsn: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
+  
+  // For HSN display (similar to B2BHsn)
+  const [saleData, setSaleData] = useState<any[]>([]);
+  const [partyIds, setPartyIds] = useState<number[]>([]);
+  const [ledger, setLedger] = useState<any[]>([]);
+  const [matchedSales, setMatchedSales] = useState<any[]>([]);
+  const [salesHistory, setSalesHistory] = useState<any[]>([]);
+  const [hsnSearch, setHsnSearch] = useState("");
 
   // Get auth parameters from localStorage
   // Try multiple keys as different parts of the app may use different keys
@@ -244,6 +248,138 @@ const B2CHsn: React.FC = () => {
         setLoading(false);
       });
   }, [company_id, owner_type, owner_id, filters.fromDate, filters.toDate]);
+
+  // Fetch sales vouchers for B2C (similar to B2BHsn)
+  useEffect(() => {
+    if (!company_id || !owner_type || !owner_id) return;
+
+    const loadSalesVouchers = async () => {
+      try {
+        const url = `${
+          import.meta.env.VITE_API_URL
+        }/api/sales-vouchers?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`;
+
+        const res = await fetch(url);
+        const json = await res.json();
+
+        const vouchers = json?.data || json || [];
+
+        const allPartyIds = vouchers
+          .map((v: any) => v.partyId)
+          .filter((id: any) => id !== null && id !== undefined);
+
+        setSaleData(vouchers);
+        setPartyIds(allPartyIds);
+      } catch (err) {
+        console.error("Failed to fetch sales vouchers:", err);
+        setSaleData([]);
+        setPartyIds([]);
+      }
+    };
+
+    loadSalesVouchers();
+  }, [company_id, owner_type, owner_id]);
+
+  // Fetch ledger data
+  useEffect(() => {
+    const fetchLedger = async () => {
+      try {
+        const ledgerRes = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+        );
+        const ledgerData = await ledgerRes.json();
+        setLedger(ledgerData || []);
+      } catch (err) {
+        console.error("Ledger fetch failed:", err);
+        setLedger([]);
+      }
+    };
+
+    if (company_id && owner_type && owner_id) {
+      fetchLedger();
+    }
+  }, [company_id, owner_type, owner_id]);
+
+  // Match B2C sales (ledgers WITHOUT GST numbers)
+  useEffect(() => {
+    if (!partyIds.length || !ledger.length || !saleData.length) return;
+
+    // Filter ledgers to only those WITHOUT GST numbers (B2C)
+    const filteredLedgers = ledger.filter((l: any) => {
+      return (
+        partyIds.includes(l.id) && 
+        (!l.gstNumber || String(l.gstNumber).trim() === "")
+      );
+    });
+
+    // Get matched ledger ids
+    const matchedLedgerIdSet = new Set(filteredLedgers.map((l: any) => l.id));
+
+    // Filter sales to only those with matched ledgers (B2C)
+    const filteredSales = saleData.filter((s: any) =>
+      matchedLedgerIdSet.has(s.partyId)
+    );
+
+    console.log("B2C filteredSales", filteredSales);
+    setMatchedSales(filteredSales);
+  }, [partyIds, ledger, saleData]);
+
+  // Ledger quick lookup (id → ledger)
+  const ledgerMap = useMemo(() => {
+    const map = new Map<number, any>();
+    ledger.forEach((l: any) => {
+      map.set(l.id, l);
+    });
+    return map;
+  }, [ledger]);
+
+  // Fetch sales history for HSN codes
+  useEffect(() => {
+    const fetchSalesHistory = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/sales-vouchers/sale-history?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+        );
+        const resJson = await res.json();
+        const rows = Array.isArray(resJson?.data)
+          ? resJson.data
+          : Array.isArray(resJson)
+          ? resJson
+          : [];
+
+        setSalesHistory(rows);
+      } catch (err) {
+        console.error("Sales history fetch failed", err);
+        setSalesHistory([]);
+      }
+    };
+
+    if (company_id && owner_type && owner_id) {
+      fetchSalesHistory();
+    }
+  }, [company_id, owner_type, owner_id]);
+
+  const salesHistoryMap = useMemo(() => {
+    return new Map(salesHistory.map((h: any) => [h.voucherNumber, h]));
+  }, [salesHistory]);
+
+  // Get HSN by voucher number
+  const getHsnByVoucher = (voucherNo: string) => {
+    return salesHistoryMap.get(voucherNo)?.hsnCode || "-";
+  };
+
+  const getQtyByVoucher = (voucherNo: string) => {
+    const qty = salesHistoryMap.get(voucherNo)?.qtyChange;
+    return qty ? Math.abs(qty) : "";
+  };
+
+  const getRateByVoucher = (voucherNo: string) => {
+    return salesHistoryMap.get(voucherNo)?.rate || "";
+  };
 
   const filteredTransactions = useMemo(() => {
     return orders.filter(transaction => {
@@ -431,6 +567,11 @@ const B2CHsn: React.FC = () => {
     }
   };
 
+  // Disabled block - only dashboard is enabled
+  const isTabDisabled = (view: 'dashboard' | 'customers' | 'orders' | 'analytics' | 'marketing') => {
+    return view !== 'dashboard';
+  };
+
   return (
     <div className="pt-[56px] px-4">
       {/* Header */}
@@ -503,14 +644,14 @@ const B2CHsn: React.FC = () => {
       )}
 
       {/* No Data Message */}
-      {!loading && !error && orders.length === 0 && (
+      {/* {!loading && !error && orders.length === 0 && (
         <div className={`mb-4 p-4 rounded-lg text-center ${
           theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
         }`}>
           <p>No B2C orders found for the selected date range.</p>
           <p className="text-sm mt-2 opacity-75">B2C orders are sales transactions from customers without GST numbers.</p>
         </div>
-      )}
+      )} */}
 
       {/* Filter Panel */}
       {showFilterPanel && (
@@ -604,153 +745,196 @@ const B2CHsn: React.FC = () => {
 
       {/* View Selector */}
       <div className="flex space-x-2 mb-6 overflow-x-auto">
-        {(['dashboard', 'customers', 'orders', 'analytics', 'marketing'] as const).map((view) => (
-          <button
-            key={view}
-            onClick={() => setSelectedView(view)}
-            className={`px-4 py-2 rounded-lg capitalize whitespace-nowrap ${
-              selectedView === view
-                ? (theme === 'dark' ? 'bg-purple-600 text-white' : 'bg-purple-500 text-white')
-                : (theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-200 hover:bg-gray-300')
-            }`}
-          >
-            {view}
-          </button>
-        ))}
+        {(['dashboard', 'customers', 'orders', 'analytics', 'marketing'] as const).map((view) => {
+          const disabled = isTabDisabled(view);
+
+          return (
+            <button
+              key={view}
+              disabled={disabled}
+              onClick={() => {
+                if (!disabled) setSelectedView(view);
+              }}
+              className={`px-4 py-2 rounded-lg capitalize whitespace-nowrap
+          ${
+            selectedView === view
+              ? theme === 'dark'
+                ? 'bg-purple-600 text-white'
+                : 'bg-purple-500 text-white'
+              : theme === 'dark'
+              ? 'bg-gray-700'
+              : 'bg-gray-200'
+          }
+          ${
+            disabled
+              ? 'opacity-50 cursor-not-allowed'
+              : 'hover:bg-purple-400 hover:text-white'
+          }
+        `}
+              title={disabled ? 'Coming soon' : view}
+            >
+              {view}
+            </button>
+          );
+        })}
       </div>
 
       <div ref={printRef}>
         {/* Dashboard View */}
         {selectedView === 'dashboard' && (
-          <div className="space-y-6">
-            {/* Summary Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className={`p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm opacity-75">Total Orders</p>
-                    <p className="text-2xl font-bold">{analytics.totalOrders}</p>
-                  </div>
-                  <ShoppingBag className="text-purple-500" size={24} />
-                </div>
-              </div>
+          <div
+            className={`p-6 rounded-lg ${
+              theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
+          >
+            {/* Header + Search */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Recent Orders</h3>
 
-              <div className={`p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm opacity-75">Revenue</p>
-                    <p className="text-2xl font-bold">{formatCurrency(analytics.totalRevenue)}</p>
-                  </div>
-                  <DollarSign className="text-green-500" size={24} />
-                </div>
-              </div>
-
-              <div className={`p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm opacity-75">Avg Order Value</p>
-                    <p className="text-2xl font-bold">{formatCurrency(analytics.avgOrderValue)}</p>
-                  </div>
-                  <TrendingUp className="text-blue-500" size={24} />
-                </div>
-              </div>
-
-              <div className={`p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm opacity-75">Active Customers</p>
-                    <p className="text-2xl font-bold">{analytics.activeCustomers}</p>
-                  </div>
-                  <User className="text-orange-500" size={24} />
-                </div>
-              </div>
+              {/* HSN Search Box */}
+              <input
+                type="text"
+                placeholder="Search HSN (Exact)..."
+                value={hsnSearch}
+                onChange={(e) => setHsnSearch(e.target.value)}
+                className={`px-3 py-2 text-sm rounded border w-56
+          ${
+            theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-black"
+          } outline-none`}
+              />
             </div>
 
-            {/* Recent Orders */}
-            <div className={`p-6 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
-              <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead className={`${
-                    theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                  }`}>
-                    <tr>
-                      <th className="text-left p-3">Order</th>
-                      <th className="text-left p-3">Customer</th>
-                      <th className="text-left p-3">Amount</th>
-                      <th className="text-left p-3">Status</th>
-                      <th className="text-left p-3">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filteredTransactions.slice(0, 5).map((transaction, index) => (
-                      <tr key={transaction.id || transaction.orderId || `order-${index}`} className={`border-b ${
-                        theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-                      }`}>
-                        <td className="p-3">
-                          <div>
-                            <div className="font-medium">{transaction.orderNumber}</div>
-                            <div className="text-sm opacity-75">{transaction.items.length} items</div>
-                          </div>
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead
+                  className={`${
+                    theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                  }`}
+                >
+                  <tr>
+                    <th className="text-left p-3">HSN</th>
+                    <th className="text-left p-3">Customer</th>
+                    <th className="text-left p-3">Voucher No</th>
+                    <th className="text-left p-3">QTY</th>
+                    <th className="text-left p-3">Rate</th>
+                    <th className="text-left p-3">Amount</th>
+                    <th className="text-left p-3">Tax Value</th>
+                    <th className="text-left p-3">IGST</th>
+                    <th className="text-left p-3">CGST</th>
+                    <th className="text-left p-3">SGST</th>
+                    <th className="text-left p-3">Total Amount</th>
+                    <th className="text-left p-3">Date</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {matchedSales
+                    .filter((sale: any) => {
+                      // 🔹 search blank → sab allow
+                      if (!hsnSearch.trim()) return true;
+
+                      const hsn = getHsnByVoucher(sale.number);
+
+                      // 🔥 EXACT MATCH ONLY
+                      return hsn?.toString().trim() === hsnSearch.trim();
+                    })
+                    // 🔹 search ho to limit hata do
+                    .slice(0, hsnSearch.trim() ? matchedSales.length : 5)
+                    .map((sale: any, index: number) => {
+                      const partyLedger = ledgerMap.get(sale.partyId);
+
+                      return (
+                        <tr
+                          key={sale.id || index}
+                          className={`border-b ${
+                            theme === "dark"
+                              ? "border-gray-700"
+                              : "border-gray-200"
+                          }`}
+                        >
+                          {/* HSN */}
+                          <td className="p-3">
+                            {getHsnByVoucher(sale.number)}
+                          </td>
+
+                          {/* Customer */}
+                          <td className="p-3">
+                            {partyLedger?.name || "Unknown Party"}
+                          </td>
+
+                          {/* Voucher No */}
+                          <td className="p-3 font-mono">{sale.number}</td>
+
+                          {/* QTY */}
+                          <td className="p-3">
+                            {getQtyByVoucher(sale.number)}
+                          </td>
+
+                          {/* Rate */}
+                          <td className="p-3">
+                            {getRateByVoucher(sale.number)}
+                          </td>
+
+                          {/* Taxable Amount */}
+                          <td className="p-3">
+                            ₹{Number(sale.subtotal || 0).toFixed(2)}
+                          </td>
+
+                          {/* Tax Value */}
+                          <td className="p-3">
+                            ₹
+                            {(
+                              Number(sale.igstTotal || 0) +
+                              Number(sale.cgstTotal || 0) +
+                              Number(sale.sgstTotal || 0)
+                            ).toFixed(2)}
+                          </td>
+
+                          {/* IGST */}
+                          <td className="p-3">{sale.igstTotal || 0}%</td>
+
+                          {/* CGST */}
+                          <td className="p-3">{sale.cgstTotal || 0}%</td>
+
+                          {/* SGST */}
+                          <td className="p-3">{sale.sgstTotal || 0}%</td>
+
+                          {/* Total */}
+                          <td className="p-3 font-semibold">
+                            ₹{Number(sale.total || 0)}
+                          </td>
+
+                          {/* Date */}
+                          <td className="p-3">
+                            {new Date(sale.date).toLocaleDateString("en-IN")}
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                  {/* No data found */}
+                  {matchedSales.length > 0 &&
+                    matchedSales.filter((sale: any) => {
+                      if (!hsnSearch.trim()) return true;
+                      return (
+                        getHsnByVoucher(sale.number)?.toString().trim() ===
+                        hsnSearch.trim()
+                      );
+                    }).length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={12}
+                          className="text-center p-4 text-gray-500"
+                        >
+                          No data found for this HSN
                         </td>
-                        <td className="p-3">
-                          <div>
-                            <div className="font-medium">{transaction.customerName}</div>
-                            <div className="text-sm opacity-75">{transaction.source}</div>
-                          </div>
-                        </td>
-                        <td className="p-3 font-medium">{formatCurrency(transaction.netAmount)}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(transaction.orderStatus)}`}>
-                            {transaction.orderStatus || 'N/A'}
-                          </span>
-                        </td>
-                        <td className="p-3">{new Date(transaction.orderDate).toLocaleDateString()}</td>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            </div>
-
-            {/* Top Customers */}
-            <div className={`p-6 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
-              <h3 className="text-lg font-semibold mb-4">Top Customers</h3>
-              <div className="space-y-3">
-                {analytics.topCustomers.map((customer, index) => (
-                  <div key={customer.id || customer.customerId || `customer-${index}`} className={`flex items-center justify-between p-3 rounded ${
-                    theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                  }`}>
-                    <div className="flex items-center">
-                      <div className={`w-8 h-8 rounded-full flex items-center justify-center mr-3 ${
-                        index === 0 ? 'bg-yellow-500' : index === 1 ? 'bg-gray-400' : 'bg-orange-400'
-                      }`}>
-                        <span className="text-white font-bold text-sm">{index + 1}</span>
-                      </div>
-                      <div>
-                        <div className="font-medium">{customer.name}</div>
-                        <div className="text-sm opacity-75">{customer.customerSegment} customer</div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="font-medium">{formatCurrency(customer.totalSpent)}</div>
-                      <div className="text-sm opacity-75">{customer.totalOrders} orders</div>
-                    </div>
-                  </div>
-                ))}
-              </div>
+                    )}
+                </tbody>
+              </table>
             </div>
           </div>
         )}

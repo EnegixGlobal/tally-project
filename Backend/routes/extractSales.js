@@ -2,22 +2,38 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 
-// GET Extract Sales data for a specific month
+// GET Extract Sales data for a specific month or date range
 router.get('/', async (req, res) => {
   try {
-    const { month, year, company_id, owner_type, owner_id } = req.query;
+    const { month, year, fromDate, toDate, company_id, owner_type, owner_id } = req.query;
 
-    if (!month || !year || !company_id || !owner_type || !owner_id) {
+    if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
         success: false,
-        message: 'month, year, company_id, owner_type, and owner_id are required'
+        message: 'company_id, owner_type, and owner_id are required'
       });
     }
 
-    // Calculate date range for the month
-    const monthIndex = parseInt(month) - 1; // JavaScript months are 0-indexed
-    const fromDate = new Date(year, monthIndex, 1).toISOString().split('T')[0];
-    const toDate = new Date(year, monthIndex + 1, 0).toISOString().split('T')[0];
+    let finalFromDate, finalToDate;
+
+    // If fromDate and toDate are provided, use them; otherwise use month/year
+    if (fromDate && toDate) {
+      finalFromDate = fromDate;
+      finalToDate = toDate;
+    } else if (month && year) {
+      // Calculate date range for the month
+      const monthIndex = parseInt(month) - 1; // JavaScript months are 0-indexed
+      finalFromDate = new Date(year, monthIndex, 1).toISOString().split('T')[0];
+      finalToDate = new Date(year, monthIndex + 1, 0).toISOString().split('T')[0];
+    } else {
+      return res.status(400).json({
+        success: false,
+        message: 'Either (month and year) or (fromDate and toDate) are required'
+      });
+    }
+
+    // const fromDate = '2025-10-01';
+    // const toDate = '2025-12-31';
 
     // Fetch sales vouchers with ledger and group information
     const [salesVouchers] = await db.execute(
@@ -48,7 +64,7 @@ router.get('/', async (req, res) => {
         AND sv.date >= ?
         AND sv.date <= ?
       ORDER BY sv.date ASC, sv.number ASC`,
-      [company_id, owner_type, owner_id, fromDate, toDate]
+      [company_id, owner_type, owner_id, finalFromDate, finalToDate]
     );
 
     // Group data for extract format
@@ -104,19 +120,19 @@ router.get('/', async (req, res) => {
       (sum, account) => sum + account.credit, 0
     );
 
-    const taxesTotal = extractData.currentLiabilities.cgst + 
-                      extractData.currentLiabilities.sgst + 
-                      extractData.currentLiabilities.igst;
+    const taxesTotal = extractData.currentLiabilities.cgst +
+      extractData.currentLiabilities.sgst +
+      extractData.currentLiabilities.igst;
 
     const grandTotal = Math.max(sundryDebtorsTotal, salesAccountsTotal + taxesTotal);
 
     res.json({
       success: true,
       data: {
-        month,
-        year,
-        fromDate,
-        toDate,
+        month: month || null,
+        year: year || null,
+        fromDate: finalFromDate,
+        toDate: finalToDate,
         sundryDebtors: Object.values(extractData.sundryDebtors),
         salesAccounts: Object.values(extractData.salesAccounts),
         currentLiabilities: extractData.currentLiabilities,
