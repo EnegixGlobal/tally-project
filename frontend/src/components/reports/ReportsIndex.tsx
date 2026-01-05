@@ -65,7 +65,7 @@ const ReportsIndex: React.FC = () => {
         { icon: <Calendar size={20} />, name: 'B2B', path: '/app/reports/b2bpurchase' },
         { icon: <Calendar size={20} />, name: 'B2C', path: '/app/reports/b2cpurchase' },
         { icon: <Calendar size={20} />, name: 'B2B HSN', path: '/app/reports/b2bhsnpurchase' },
-        { icon: <Calendar size={20} />, name: 'B2C HSN', path: '/app/reports/b2chsn' }
+        { icon: <Calendar size={20} />, name: 'B2C HSN', path: '/app/reports/b2chsnpurchase' }
       ]
     }
   ];

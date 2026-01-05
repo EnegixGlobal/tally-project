@@ -117,4 +117,74 @@ ORDER BY sv.date DESC, sv.number DESC, svi.id;
   }
 });
 
+// Fetch B2C purchases — join purchase_vouchers and purchase_voucher_items filtered by no GSTIN ledgers
+router.get('/b2c-purchases', async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id, fromDate, toDate, supplierId } = req.query;
+    if (!company_id || !owner_type || !owner_id || !fromDate || !toDate) {
+      return res.status(400).json({ error: 'Missing required parameters.' });
+    }
+
+    const params = [company_id, owner_type, owner_id, fromDate, toDate];
+    let extraWhere = '';
+    if (supplierId) {
+      extraWhere = ' AND l.id = ? ';
+      params.push(supplierId);
+    }
+
+    const sql = `
+      SELECT
+        pv.id AS orderId,
+        pv.number AS orderNumber,
+        pv.date AS orderDate,
+        pv.narration,
+        pv.referenceNo,
+        pv.subtotal AS totalAmount,
+        pv.discountTotal AS discount,
+        pv.cgstTotal + pv.sgstTotal + pv.igstTotal AS taxAmount,
+        pv.total AS netAmount,
+        pv.date,
+        pv.partyId AS supplierId,
+        l.name AS supplierName,
+        l.email,
+        l.phone,
+        l.address AS shippingAddress,
+        l.gst_number AS gstNumber,
+        pvi.itemId,
+        si.name AS itemName,
+        si.unit,
+        pvi.quantity,
+        pvi.rate AS unitPrice,
+        pvi.discount,
+        pvi.amount,
+        pvi.cgstRate,
+        pvi.sgstRate,
+        pvi.igstRate,
+        pv.destination,
+        pv.dispatchThrough,
+        pv.dispatchDocNo,
+        '' AS paymentMethod,
+        'paid' AS paymentStatus,
+        '' AS source,
+        0 AS loyaltyPointsEarned,
+        0 AS loyaltyPointsUsed
+      FROM purchase_vouchers pv
+      JOIN ledgers l ON pv.partyId = l.id
+      JOIN purchase_voucher_items pvi ON pv.id = pvi.voucherId
+      JOIN stock_items si ON si.id = pvi.itemId
+      WHERE pv.company_id = ?
+        AND pv.owner_type = ?
+        AND pv.owner_id = ?
+        AND pv.date BETWEEN ? AND ?
+        AND (l.gst_number IS NULL OR l.gst_number = '')
+      ORDER BY pv.date DESC, pv.number DESC, pvi.id;
+    `;
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching B2C purchases:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 module.exports = router;
