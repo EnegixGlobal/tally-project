@@ -356,7 +356,7 @@ const B2BHsn: React.FC = () => {
   const getHsnByVoucher = (voucherNo:any) => {
     if (!voucherNo || !hsn.length) return "-";
 
-    const match = hsn.find((item) => item.voucherNumber === voucherNo);
+    const match:any = hsn.find((item:any) => item.voucherNumber === voucherNo);
 
     return match?.hsnCode || "-";
   };
