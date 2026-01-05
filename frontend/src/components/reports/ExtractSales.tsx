@@ -137,6 +137,25 @@ const ExtractSales: React.FC = () => {
 
   const [selectedSale, setSelectedSale] = useState<SalesData | null>(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
+  const [extractDateFilters, setExtractDateFilters] = useState<{
+    fromDate: string;
+    toDate: string;
+  }>({
+    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .split("T")[0],
+    toDate: new Date().toISOString().split("T")[0],
+  });
+
+  // Sync extract date filters with main filters when Extract view is selected
+  useEffect(() => {
+    if (selectedView === "extract") {
+      setExtractDateFilters({
+        fromDate: filters.fromDate,
+        toDate: filters.toDate,
+      });
+    }
+  }, [selectedView]);
   useEffect(() => {
     async function fetchSales() {
       setLoading(true);
@@ -775,14 +794,38 @@ const ExtractSales: React.FC = () => {
       });
   }, [companyId, ownerType, ownerId]);
 
-  const fetchExtractData = async (month: number, year: number) => {
+  const fetchExtractData = async (
+    month?: number,
+    year?: number,
+    fromDate?: string,
+    toDate?: string
+  ) => {
     if (!companyId || !ownerType || !ownerId) return;
 
     setLoadingExtract(true);
     try {
+      const params = new URLSearchParams({
+        company_id: companyId,
+        owner_type: ownerType,
+        owner_id: ownerId,
+      });
+
+      // If fromDate and toDate are provided, use them; otherwise use month/year
+      if (fromDate && toDate) {
+        params.append("fromDate", fromDate);
+        params.append("toDate", toDate);
+      } else if (month && year) {
+        params.append("month", month.toString());
+        params.append("year", year.toString());
+      } else {
+        // Use extract date filters if no parameters provided
+        params.append("fromDate", extractDateFilters.fromDate);
+        params.append("toDate", extractDateFilters.toDate);
+      }
+
       const url = `${
         import.meta.env.VITE_API_URL
-      }/api/extract-sales?month=${month}&year=${year}&company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+      }/api/extract-sales?${params.toString()}`;
       const res = await fetch(url);
       const data = await res.json();
       console.log("Extract Sales Data", data);
@@ -1086,6 +1129,35 @@ const ExtractSales: React.FC = () => {
                 } outline-none`}
               />
             </div>
+
+            {/* Apply to Extract Button - Only show when Extract view is selected */}
+            {selectedView === "extract" && (
+              <div className="flex items-end">
+                <button
+                  onClick={() => {
+                    // Sync extract filters with main filters
+                    setExtractDateFilters({
+                      fromDate: filters.fromDate,
+                      toDate: filters.toDate,
+                    });
+                    // Fetch extract data with the filter dates
+                    fetchExtractData(
+                      undefined,
+                      undefined,
+                      filters.fromDate,
+                      filters.toDate
+                    );
+                  }}
+                  className={`w-full p-2 rounded border ${
+                    theme === "dark"
+                      ? "bg-blue-600 hover:bg-blue-500 border-blue-600 text-white"
+                      : "bg-blue-500 hover:bg-blue-600 border-blue-500 text-white"
+                  } transition-colors font-medium`}
+                >
+                  Apply to Extract
+                </button>
+              </div>
+            )}
 
             {/* Clear Filters */}
             <div className="flex items-end">

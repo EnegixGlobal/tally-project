@@ -229,6 +229,9 @@ app.use("/api/sales-report", salesreport);
 const extractSales = require("./routes/extractSales");
 app.use("/api/extract-sales", extractSales);
 
+const extractPurchase = require("./routes/extractPurchase");
+app.use("/api/extract-purchase", extractPurchase);
+
 const setProfit = require("./routes/setProfit");
 app.use("/api/set-profit", setProfit);
 

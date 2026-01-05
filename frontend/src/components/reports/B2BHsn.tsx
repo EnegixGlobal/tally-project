@@ -703,7 +703,7 @@ const B2BHsn: React.FC = () => {
                             {Number(sale.igstTotal || 0) +
                               Number(sale.cgstTotal || 0) +
                               Number(sale.sgstTotal || 0)}
-                            %
+                            
                           </td>
 
                           {/* IGST */}
