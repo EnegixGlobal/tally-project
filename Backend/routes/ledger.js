@@ -28,6 +28,8 @@ router.get("/", async (req, res) => {
     l.phone,
     l.gst_number AS gstNumber,
     l.pan_number AS panNumber,
+    l.state,
+    l.district,
     l.created_at AS createdAt,
     g.name AS groupName,
     g.type AS groupType,
@@ -59,6 +61,8 @@ router.post("/", async (req, res) => {
     phone,
     gstNumber,
     panNumber,
+    state,
+    district,
     companyId,
     ownerType,
     ownerId,
@@ -71,19 +75,48 @@ router.post("/", async (req, res) => {
   }
 
   try {
-    // 🔍 Check if column exists
-    const [col] = await db.execute(`
+    // 🔍 Check if columns exist and add if missing
+    const [colClosing] = await db.execute(`
     SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
     AND TABLE_NAME = 'ledgers'
     AND COLUMN_NAME = 'closing_balance';
   `);
 
-    // ➕ Add column only if missing
-    if (col.length === 0) {
+    if (colClosing.length === 0) {
       await db.execute(`
       ALTER TABLE ledgers
       ADD COLUMN closing_balance DECIMAL(15,2) DEFAULT 0;
+    `);
+    }
+
+    // Check for state column
+    const [colState] = await db.execute(`
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'ledgers'
+    AND COLUMN_NAME = 'state';
+  `);
+
+    if (colState.length === 0) {
+      await db.execute(`
+      ALTER TABLE ledgers
+      ADD COLUMN state VARCHAR(100) DEFAULT '';
+    `);
+    }
+
+    // Check for district column
+    const [colDistrict] = await db.execute(`
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'ledgers'
+    AND COLUMN_NAME = 'district';
+  `);
+
+    if (colDistrict.length === 0) {
+      await db.execute(`
+      ALTER TABLE ledgers
+      ADD COLUMN district VARCHAR(100) DEFAULT '';
     `);
     }
 
@@ -93,8 +126,8 @@ router.post("/", async (req, res) => {
 
     const sql = `
     INSERT INTO ledgers 
-    (name, group_id, opening_balance, closing_balance, balance_type, address, email, phone, gst_number, pan_number, company_id, owner_type, owner_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (name, group_id, opening_balance, closing_balance, balance_type, address, email, phone, gst_number, pan_number, state, district, company_id, owner_type, owner_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
     await db.execute(sql, [
@@ -108,6 +141,8 @@ router.post("/", async (req, res) => {
       phone || "",
       gstNumber || "",
       panNumber || "",
+      state || "",
+      district || "",
       companyId,
       ownerType,
       ownerId,
@@ -182,10 +217,39 @@ router.post("/bulk", async (req, res) => {
   try {
     await connection.beginTransaction();
 
+    // Check if state and district columns exist, add if missing
+    const [colState] = await connection.execute(`
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'ledgers'
+    AND COLUMN_NAME = 'state';
+  `);
+
+    if (colState.length === 0) {
+      await connection.execute(`
+      ALTER TABLE ledgers
+      ADD COLUMN state VARCHAR(100) DEFAULT '';
+    `);
+    }
+
+    const [colDistrict] = await connection.execute(`
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'ledgers'
+    AND COLUMN_NAME = 'district';
+  `);
+
+    if (colDistrict.length === 0) {
+      await connection.execute(`
+      ALTER TABLE ledgers
+      ADD COLUMN district VARCHAR(100) DEFAULT '';
+    `);
+    }
+
     const sql = `
       INSERT INTO ledgers 
-      (name, group_id, opening_balance, balance_type, address, email, phone, gst_number, pan_number, company_id, owner_type, owner_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (name, group_id, opening_balance, balance_type, address, email, phone, gst_number, pan_number, state, district, company_id, owner_type, owner_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const results = [];
@@ -201,6 +265,8 @@ router.post("/bulk", async (req, res) => {
         phone,
         gstNumber,
         panNumber,
+        state,
+        district,
       } = ledger;
 
       //  Validate required fields
@@ -220,6 +286,8 @@ router.post("/bulk", async (req, res) => {
         phone || "",
         gstNumber || "",
         panNumber || "",
+        state || "",
+        district || "",
         companyId,
         ownerType,
         ownerId,
@@ -295,6 +363,8 @@ router.get("/:id", async (req, res) => {
       phone: ledger.phone,
       gstNumber: ledger.gst_number,
       panNumber: ledger.pan_number,
+      state: ledger.state || "",
+      district: ledger.district || "",
       createdAt: ledger.created_at,
       groupName: ledger.groupName,
     });
@@ -319,6 +389,8 @@ router.put("/:id", async (req, res) => {
     phone,
     gstNumber,
     panNumber,
+    state,
+    district,
   } = req.body;
 
   if (isNaN(ledgerId)) {
@@ -333,6 +405,35 @@ router.put("/:id", async (req, res) => {
   }
 
   try {
+    // Check if state and district columns exist, add if missing
+    const [colState] = await db.execute(`
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'ledgers'
+    AND COLUMN_NAME = 'state';
+  `);
+
+    if (colState.length === 0) {
+      await db.execute(`
+      ALTER TABLE ledgers
+      ADD COLUMN state VARCHAR(100) DEFAULT '';
+    `);
+    }
+
+    const [colDistrict] = await db.execute(`
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'ledgers'
+    AND COLUMN_NAME = 'district';
+  `);
+
+    if (colDistrict.length === 0) {
+      await db.execute(`
+      ALTER TABLE ledgers
+      ADD COLUMN district VARCHAR(100) DEFAULT '';
+    `);
+    }
+
     const sql = `
       UPDATE ledgers
       SET name = ?, 
@@ -343,7 +444,9 @@ router.put("/:id", async (req, res) => {
           email = ?, 
           phone = ?, 
           gst_number = ?, 
-          pan_number = ?
+          pan_number = ?,
+          state = ?,
+          district = ?
       WHERE id = ? 
       AND owner_type = ?
       AND owner_id = ? 
@@ -360,6 +463,8 @@ router.put("/:id", async (req, res) => {
       phone || "",
       gstNumber || "",
       panNumber || "",
+      state || "",
+      district || "",
       ledgerId,
       owner_type,
       owner_id,
