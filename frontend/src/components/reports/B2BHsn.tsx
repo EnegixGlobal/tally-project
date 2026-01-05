@@ -316,6 +316,7 @@ const B2BHsn: React.FC = () => {
       matchedLedgerIdSet.has(s.partyId)
     );
 
+    console.log("filteredSales", filteredSales);
     setMatchedSales(filteredSales);
   }, [partyIds, ledger, saleData]);
 
@@ -329,36 +330,50 @@ const B2BHsn: React.FC = () => {
   }, [ledger]);
 
   //GET HSN NUMBER FROM SALES HISTORY
-  const [hsn, setHsn] = useState([]);
+  const [salesHistory, setSalesHistory] = useState<any[]>([]);
+  const [hsnSearch, setHsnSearch] = useState("");
 
   useEffect(() => {
-    const fetchLedger = async () => {
+    const fetchSalesHistory = async () => {
       try {
         const res = await fetch(
           `${
             import.meta.env.VITE_API_URL
           }/api/sales-vouchers/sale-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
+        const resJson = await res.json();
+        const rows = Array.isArray(resJson?.data)
+          ? resJson.data
+          : Array.isArray(resJson)
+          ? resJson
+          : [];
 
-        const data = await res.json();
-        console.log("this is hsn data", data.data);
-        setHsn(data.data || []);
+        setSalesHistory(rows);
       } catch (err) {
-        console.error("Ledger fetch failed:", err);
-        setHsn([]);
+        console.error("Sales history fetch failed", err);
+        setSalesHistory([]);
       }
     };
 
-    fetchLedger();
+    fetchSalesHistory();
   }, [companyId, ownerType, ownerId]);
 
+  const salesHistoryMap = useMemo(() => {
+    return new Map(salesHistory.map((h: any) => [h.voucherNumber, h]));
+  }, [salesHistory]);
+
   //get hsn number
-  const getHsnByVoucher = (voucherNo:any) => {
-    if (!voucherNo || !hsn.length) return "-";
+  const getHsnByVoucher = (voucherNo: string) => {
+    return salesHistoryMap.get(voucherNo)?.hsnCode || "-";
+  };
 
-    const match:any = hsn.find((item:any) => item.voucherNumber === voucherNo);
+  const getQtyByVoucher = (voucherNo: string) => {
+    const qty = salesHistoryMap.get(voucherNo)?.qtyChange;
+    return qty ? Math.abs(qty) : "";
+  };
 
-    return match?.hsnCode || "-";
+  const getRateByVoucher = (voucherNo: string) => {
+    return salesHistoryMap.get(voucherNo)?.rate || "";
   };
 
   return (
@@ -575,94 +590,166 @@ const B2BHsn: React.FC = () => {
       <div ref={printRef}>
         {/* Dashboard View */}
         {selectedView === "dashboard" && (
-          <>
-            <div
-              className={`p-6 rounded-lg ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
-            >
-              <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                    }`}
-                  >
-                    <tr>
-                      <th className="text-left p-3">Voucher No</th>
-                      <th className="text-left p-3">HSN</th>
-                      <th className="text-left p-3">Customer</th>
-                      <th className="text-left p-3">GST No</th>
+          <div
+            className={`p-6 rounded-lg ${
+              theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
+          >
+            {/* Header + Search */}
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-lg font-semibold">Recent Orders</h3>
 
-                      <th className="text-left p-3">Amount</th>
-                      <th className="text-left p-3">Status</th>
-                      <th className="text-left p-3">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {matchedSales
-                      .slice(0, 5)
-                      .map((sale: any, index: number) => {
-                        const partyLedger = ledgerMap.get(sale.partyId);
-
-                        return (
-                          <tr
-                            key={sale.id || `order-${index}`}
-                            className={`border-b ${
-                              theme === "dark"
-                                ? "border-gray-700"
-                                : "border-gray-200"
-                            }`}
-                          >
-                            {/* Voucher No */}
-                            <td className="p-3">
-                              <div className="font-medium">{sale.number}</div>
-                            </td>
-
-                            {/* HSN No */}
-                            <td className="p-3">
-                              <div className="font-medium">
-                                {getHsnByVoucher(sale.number)}
-                              </div>
-                            </td>
-
-                            {/* Customer */}
-                            <td className="p-3">
-                              <div className="font-medium">
-                                {partyLedger?.name || "Unknown Party"}
-                              </div>
-                            </td>
-
-                            {/* GST No */}
-                            <td className="p-3">
-                              {partyLedger?.gstNumber || "-"}
-                            </td>
-
-                            {/* Amount */}
-                            <td className="p-3 font-medium">
-                              ₹{Number(sale.total || 0).toFixed(2)}
-                            </td>
-
-                            {/* Status */}
-                            <td className="p-3">
-                              <span className="px-2 py-1 rounded-full text-xs bg-green-100 text-green-800">
-                                Completed
-                              </span>
-                            </td>
-
-                            {/* Date */}
-                            <td className="p-3">
-                              {new Date(sale.date).toLocaleDateString()}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
-              </div>
+              {/* HSN Search Box */}
+              <input
+                type="text"
+                placeholder="Search HSN (Exact)..."
+                value={hsnSearch}
+                onChange={(e) => setHsnSearch(e.target.value)}
+                className={`px-3 py-2 text-sm rounded border w-56
+          ${
+            theme === "dark"
+              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+              : "bg-white border-gray-300 text-black"
+          } outline-none`}
+              />
             </div>
-          </>
+
+            {/* Table */}
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead
+                  className={`${
+                    theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                  }`}
+                >
+                  <tr>
+                    <th className="text-left p-3">HSN</th>
+                    <th className="text-left p-3">Customer</th>
+                    <th className="text-left p-3">Voucher No</th>
+                    <th className="text-left p-3">GST No</th>
+                    <th className="text-left p-3">QTY</th>
+                    <th className="text-left p-3">Rate</th>
+                    <th className="text-left p-3">Amount</th>
+                    <th className="text-left p-3">Tax Value</th>
+                    <th className="text-left p-3">IGST</th>
+                    <th className="text-left p-3">CGST</th>
+                    <th className="text-left p-3">SGST</th>
+                    <th className="text-left p-3">Total Amount</th>
+                    <th className="text-left p-3">Date</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  {matchedSales
+                    .filter((sale: any) => {
+                      // 🔹 search blank → sab allow
+                      if (!hsnSearch.trim()) return true;
+
+                      const hsn = getHsnByVoucher(sale.number);
+
+                      // 🔥 EXACT MATCH ONLY
+                      return hsn?.toString().trim() === hsnSearch.trim();
+                    })
+                    // 🔹 search ho to limit hata do
+                    .slice(0, hsnSearch.trim() ? matchedSales.length : 5)
+                    .map((sale: any, index: number) => {
+                      const partyLedger = ledgerMap.get(sale.partyId);
+
+                      return (
+                        <tr
+                          key={sale.id || index}
+                          className={`border-b ${
+                            theme === "dark"
+                              ? "border-gray-700"
+                              : "border-gray-200"
+                          }`}
+                        >
+                          {/* HSN */}
+                          <td className="p-3">
+                            {getHsnByVoucher(sale.number)}
+                          </td>
+
+                          {/* Customer */}
+                          <td className="p-3">
+                            {partyLedger?.name || "Unknown Party"}
+                          </td>
+
+                          {/* Voucher No */}
+                          <td className="p-3 font-mono">{sale.number}</td>
+
+                          {/* GST No */}
+                          <td className="p-3">
+                            {partyLedger?.gstNumber || "-"}
+                          </td>
+
+                          {/* QTY */}
+                          <td className="p-3">
+                            {getQtyByVoucher(sale.number)}
+                          </td>
+
+                          {/* Rate */}
+                          <td className="p-3">
+                            {getRateByVoucher(sale.number)}
+                          </td>
+
+                          {/* Taxable Amount */}
+                          <td className="p-3">
+                            ₹{Number(sale.subtotal || 0).toFixed(2)}
+                          </td>
+
+                          {/* Tax Value */}
+                          <td className="p-3">
+                            ₹
+                            {Number(sale.igstTotal || 0) +
+                              Number(sale.cgstTotal || 0) +
+                              Number(sale.sgstTotal || 0)}
+                            %
+                          </td>
+
+                          {/* IGST */}
+                          <td className="p-3">{sale.igstTotal}%</td>
+
+                          {/* CGST */}
+                          <td className="p-3">{sale.cgstTotal}%</td>
+
+                          {/* SGST */}
+                          <td className="p-3">{sale.sgstTotal}%</td>
+
+                          {/* Total */}
+                          <td className="p-3 font-semibold">
+                            ₹{Number(sale.total || 0)}
+                          </td>
+
+                          {/* Date */}
+                          <td className="p-3">
+                            {new Date(sale.date).toLocaleDateString("en-IN")}
+                          </td>
+                        </tr>
+                      );
+                    })}
+
+                  {/* No data found */}
+                  {matchedSales.length > 0 &&
+                    matchedSales.filter((sale: any) => {
+                      if (!hsnSearch.trim()) return true;
+                      return (
+                        getHsnByVoucher(sale.number)?.toString().trim() ===
+                        hsnSearch.trim()
+                      );
+                    }).length === 0 && (
+                      <tr>
+                        <td
+                          colSpan={13}
+                          className="text-center p-4 text-gray-500"
+                        >
+                          No data found for this HSN
+                        </td>
+                      </tr>
+                    )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {/* Transactions View */}
