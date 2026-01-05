@@ -95,6 +95,7 @@ export type Ledger = {
   panNumber?: string;
   type?: LedgerType;
   state?: string;
+  district?: string;
 };
 export interface LedgerWithGroup extends Ledger {
   groupName?: string;

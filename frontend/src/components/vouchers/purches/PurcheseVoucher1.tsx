@@ -2038,7 +2038,7 @@ const PurchaseVoucher: React.FC = () => {
                             <td className="px-1 py-2 min-w-[95px]">
                               <select
                                 name="godownId"
-                                value={entry.godownId}
+                                value={entry.godownId || ""}
                                 onChange={(e) => handleEntryChange(index, e)}
                                 className={`${
                                   TABLE_STYLES.select
@@ -2047,7 +2047,19 @@ const PurchaseVoucher: React.FC = () => {
                                     ? "border-red-500"
                                     : ""
                                 }`}
-                              ></select>
+                              >
+                                <option value="">Select Godown</option>
+                                {godowndata.map((godown: any) => (
+                                  <option key={godown.id} value={godown.id}>
+                                    {godown.name}
+                                  </option>
+                                ))}
+                              </select>
+                              {errors[`entry${index}.godownId`] && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors[`entry${index}.godownId`]}
+                                </p>
+                              )}
                             </td>
                           )}
 

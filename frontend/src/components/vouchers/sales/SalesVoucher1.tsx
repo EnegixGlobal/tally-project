@@ -64,6 +64,7 @@ const SalesVoucher: React.FC = () => {
     ownerType === "employee" ? "employee_id" : "user_id"
   );
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
+  const [selectedPartyState, setSelectedPartyState] = useState<string>(""); // Store selected party's state
 
   // Robust detection for party ledgers — backend may return different field names
 
@@ -343,6 +344,14 @@ const SalesVoucher: React.FC = () => {
     loadSingleVoucher();
   }, [isEditMode, id]);
 
+  // Set party state when ledgers are loaded and party is selected
+  useEffect(() => {
+    if (formData.partyId && ledgers.length > 0) {
+      const party = ledgers.find((l) => String(l.id) === String(formData.partyId));
+      setSelectedPartyState(party?.state || "");
+    }
+  }, [formData.partyId, ledgers]);
+
   //godown fatch
   useEffect(() => {
     const fetchGodowns = async () => {
@@ -419,6 +428,53 @@ const SalesVoucher: React.FC = () => {
       }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
+      
+      // When party is selected, store the party's state
+      if (name === "partyId" && value) {
+        const selectedParty = ledgers.find((l) => String(l.id) === String(value));
+        const partyState = selectedParty?.state || "";
+        setSelectedPartyState(partyState);
+        
+        // Update GST rates for all existing entries when party changes
+        if (formData.mode === "item-invoice") {
+          setFormData((prev) => {
+            const companyState = safeCompanyInfo?.state || "";
+            const statesMatch = companyState && partyState && 
+              companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+            
+            return {
+              ...prev,
+              entries: prev.entries.map((entry) => {
+                if (!entry.itemId) return entry;
+                
+                const itemDetails = getItemDetails(entry.itemId);
+                const gstRate = itemDetails.gstRate || 0;
+                
+                if (statesMatch) {
+                  // Same state: CGST + SGST (each half of GST%)
+                  return {
+                    ...entry,
+                    cgstRate: gstRate / 2,
+                    sgstRate: gstRate / 2,
+                    igstRate: 0,
+                    gstRate: gstRate,
+                  };
+                } else {
+                  // Different state: IGST (full GST%)
+                  return {
+                    ...entry,
+                    cgstRate: 0,
+                    sgstRate: 0,
+                    igstRate: gstRate,
+                    gstRate: gstRate,
+                  };
+                }
+              }),
+            };
+          });
+        }
+      }
+      
       if (name === "mode") {
         setFormData((prev) => ({
           ...prev,
@@ -529,6 +585,29 @@ const SalesVoucher: React.FC = () => {
         const details = getItemDetails(value);
         const gst = details.gstRate || 0;
 
+        // Compare company state with party state
+        const companyState = safeCompanyInfo?.state || "";
+        const partyState = selectedPartyState || "";
+        const statesMatch = companyState && partyState && 
+          companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+
+        // Set GST rates based on state matching
+        let cgstRate = 0;
+        let sgstRate = 0;
+        let igstRate = 0;
+
+        if (statesMatch) {
+          // Same state: CGST + SGST (each half of GST%)
+          cgstRate = gst / 2;
+          sgstRate = gst / 2;
+          igstRate = 0;
+        } else {
+          // Different state: IGST (full GST%)
+          cgstRate = 0;
+          sgstRate = 0;
+          igstRate = gst;
+        }
+
         updatedEntries[index] = {
           ...entry,
           itemId: value,
@@ -540,9 +619,9 @@ const SalesVoucher: React.FC = () => {
           rate: details.rate || 0,
           quantity: 0,
           gstRate: gst,
-          cgstRate: gst / 2,
-          sgstRate: gst / 2,
-          igstRate: 0,
+          cgstRate: cgstRate,
+          sgstRate: sgstRate,
+          igstRate: igstRate,
         };
 
         updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
@@ -1003,6 +1082,20 @@ const SalesVoucher: React.FC = () => {
         firstDebitEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
     }
 
+    // Ensure entries have CGST, SGST, IGST rates properly formatted
+    const entriesWithGST = formData.entries.map((entry) => ({
+      ...entry,
+      // Ensure GST rates are numbers and properly set
+      cgstRate: Number(entry.cgstRate || 0),
+      sgstRate: Number(entry.sgstRate || 0),
+      igstRate: Number(entry.igstRate || 0),
+      // Ensure all numeric fields are properly formatted
+      quantity: Number(entry.quantity || 0),
+      rate: Number(entry.rate || 0),
+      amount: Number(entry.amount || 0),
+      discount: Number(entry.discount || 0),
+    }));
+
     const payload = {
       date: formData.date,
       number: formData.number,
@@ -1010,6 +1103,8 @@ const SalesVoucher: React.FC = () => {
       partyId: finalPartyId,
       salesLedgerId: formData.salesLedgerId,
       narration: formData.narration,
+      type: isQuotation ? "quotation" : "sales",
+      isQuotation: isQuotation,
 
       companyId,
       ownerType,
@@ -1021,15 +1116,39 @@ const SalesVoucher: React.FC = () => {
         destination: formData.dispatchDetails?.destination || "",
       },
 
-      entries: formData.entries,
+      entries: entriesWithGST,
 
-      subtotal: totals.subtotal,
-      cgstTotal: totals.cgstTotal,
-      sgstTotal: totals.sgstTotal,
-      igstTotal: totals.igstTotal,
-      discountTotal: totals.discountTotal,
-      total: grandTotal,
+      // Ensure totals are properly formatted as numbers with 2 decimal places
+      subtotal: Number(totals.subtotal.toFixed(2)),
+      cgstTotal: Number(totals.cgstTotal.toFixed(2)),
+      sgstTotal: Number(totals.sgstTotal.toFixed(2)),
+      igstTotal: Number(totals.igstTotal.toFixed(2)),
+      discountTotal: Number(totals.discountTotal.toFixed(2)),
+      total: Number(grandTotal.toFixed(2)),
     };
+
+    console.log("Saving voucher to database with GST details:", {
+      mode: formData.mode,
+      isQuotation: isQuotation,
+      entriesCount: entriesWithGST.length,
+      totals: {
+        subtotal: payload.subtotal,
+        cgstTotal: payload.cgstTotal,
+        sgstTotal: payload.sgstTotal,
+        igstTotal: payload.igstTotal,
+        discountTotal: payload.discountTotal,
+        total: payload.total,
+      },
+      sampleEntry: entriesWithGST[0] ? {
+        itemId: entriesWithGST[0].itemId,
+        cgstRate: entriesWithGST[0].cgstRate,
+        sgstRate: entriesWithGST[0].sgstRate,
+        igstRate: entriesWithGST[0].igstRate,
+        quantity: entriesWithGST[0].quantity,
+        rate: entriesWithGST[0].rate,
+        amount: entriesWithGST[0].amount,
+      } : null
+    });
 
     try {
       let voucherSaved = false;
@@ -1831,7 +1950,33 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-right">Quantity</th>
                         <th className="px-4 py-2 text-left">Unit</th>
                         <th className="px-4 py-2 text-right">Rate</th>
-                        {columnSettings.showGST && <th>GST%</th>}
+                        {columnSettings.showGST && (
+                          <>
+                            <th className="px-4 py-2 text-center">GST%</th>
+                            {(() => {
+                              // Check if states match for dynamic column display
+                              const companyState = safeCompanyInfo?.state || "";
+                              const partyState = selectedPartyState || "";
+                              const statesMatch = companyState && partyState && 
+                                companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+                              
+                              if (statesMatch) {
+                                // Same state: Show CGST and SGST
+                                return (
+                                  <>
+                                    <th className="px-4 py-2 text-center">CGST%</th>
+                                    <th className="px-4 py-2 text-center">SGST%</th>
+                                  </>
+                                );
+                              } else {
+                                // Different state: Show IGST
+                                return (
+                                  <th className="px-4 py-2 text-center">IGST%</th>
+                                );
+                              }
+                            })()}
+                          </>
+                        )}
 
                         {columnSettings.showDiscount && <th>Discount</th>}
 
@@ -1850,6 +1995,12 @@ const SalesVoucher: React.FC = () => {
                         const selectedBatch = entry.batches?.find(
                           (b) => b.batchName === entry.batchNumber
                         );
+
+                        // Check if states match for dynamic column display
+                        const companyState = safeCompanyInfo?.state || "";
+                        const partyState = selectedPartyState || "";
+                        const statesMatch = companyState && partyState && 
+                          companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
 
                         return (
                           <tr
@@ -1971,9 +2122,29 @@ const SalesVoucher: React.FC = () => {
                             </td>
 
                             {/* GST */}
-                            <td className="px-1 py-2 text-center min-w-[50px] text-xs">
-                              {entry.gstRate || 0}%
-                            </td>
+                            {columnSettings.showGST && (
+                              <>
+                                <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                  {((entry.cgstRate || 0) + (entry.sgstRate || 0) + (entry.igstRate || 0)).toFixed(2)}%
+                                </td>
+                                {statesMatch ? (
+                                  <>
+                                    {/* Same state: Show CGST and SGST */}
+                                    <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                      {(entry.cgstRate || 0).toFixed(2)}%
+                                    </td>
+                                    <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                      {(entry.sgstRate || 0).toFixed(2)}%
+                                    </td>
+                                  </>
+                                ) : (
+                                  /* Different state: Show IGST */
+                                  <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                    {(entry.igstRate || 0).toFixed(2)}%
+                                  </td>
+                                )}
+                              </>
+                            )}
 
                             {/* DISCOUNT */}
                             <td className="px-1 py-2 min-w-[70px]">
@@ -2004,7 +2175,7 @@ const SalesVoucher: React.FC = () => {
                                     theme
                                   )} min-w-[95px] text-xs`}
                                 >
-                                  <option value="">Gdn</option>
+                                  <option value="">Select Godown</option>
                                   {godownList.map((g) => (
                                     <option key={g.id} value={g.id}>
                                       {g.name}
@@ -2035,74 +2206,149 @@ const SalesVoucher: React.FC = () => {
                       })}
                     </tbody>
                     <tfoot>
-                      {/* SUBTOTAL */}
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-left" colSpan={7}>
-                          Subtotal:
-                        </td>
-                        <td className="px-4 py-2 text-right">
-                          ₹{subtotal.toLocaleString()}
-                        </td>
-                        <td></td>
-                      </tr>
+                      {(() => {
+                        // Check if states match for dynamic column calculation
+                        const companyState = safeCompanyInfo?.state || "";
+                        const partyState = selectedPartyState || "";
+                        const statesMatch = companyState && partyState && 
+                          companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+                        
+                        // Calculate total columns dynamically
+                        let totalCols = 7; // S.No, Item, HSN, Quantity, Unit, Rate, Amount
+                        if (columnSettings.showBatch && hasAnyBatch) totalCols += 1; // Batch
+                        if (columnSettings.showGST) {
+                          totalCols += 1; // GST
+                          // Add CGST+SGST (2 columns) if states match, or IGST (1 column) if not
+                          totalCols += statesMatch ? 2 : 1;
+                        }
+                        if (columnSettings.showDiscount) totalCols += 1; // Discount
+                        if (godownEnabled === "yes") totalCols += 1; // Godown
+                        // Action column is separate, so colspan = totalCols - 1 (excluding Action)
+                        const colspan = totalCols - 1;
+                        return (
+                          <>
+                            {/* SUBTOTAL */}
+                            <tr
+                              className={`font-semibold ${
+                                theme === "dark"
+                                  ? "border-t border-gray-600"
+                                  : "border-t border-gray-300"
+                              }`}
+                            >
+                              <td className="px-4 py-2 text-left" colSpan={colspan}>
+                                Subtotal:
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                ₹{subtotal.toLocaleString()}
+                              </td>
+                            </tr>
 
-                      {/* GST TOTAL */}
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-left" colSpan={7}>
-                          GST Total:
-                        </td>
-                        <td className="px-4 py-2 text-right text-blue-600 font-bold">
-                          ₹{(cgstTotal + sgstTotal + igstTotal).toFixed(2)}
-                        </td>
-                      </tr>
+                            {/* CGST TOTAL */}
+                            {columnSettings.showGST && cgstTotal > 0 && (
+                              <tr
+                                className={`font-semibold ${
+                                  theme === "dark"
+                                    ? "border-t border-gray-600"
+                                    : "border-t border-gray-300"
+                                }`}
+                              >
+                                <td className="px-4 py-2 text-left" colSpan={colspan}>
+                                  CGST Total:
+                                </td>
+                                <td className="px-4 py-2 text-right text-blue-600 font-bold">
+                                  ₹{cgstTotal.toFixed(2)}
+                                </td>
+                              </tr>
+                            )}
 
-                      {/* DISCOUNT */}
-                      <tr
-                        className={`font-semibold ${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-left" colSpan={7}>
-                          Discount:
-                        </td>
-                        <td className="px-4 py-2 text-right text-red-600 font-bold">
-                          ₹{discountTotal}
-                        </td>
-                        <td></td>
-                        <td></td>
-                      </tr>
+                            {/* SGST TOTAL */}
+                            {columnSettings.showGST && sgstTotal > 0 && (
+                              <tr
+                                className={`font-semibold ${
+                                  theme === "dark"
+                                    ? "border-t border-gray-600"
+                                    : "border-t border-gray-300"
+                                }`}
+                              >
+                                <td className="px-4 py-2 text-left" colSpan={colspan}>
+                                  SGST Total:
+                                </td>
+                                <td className="px-4 py-2 text-right text-blue-600 font-bold">
+                                  ₹{sgstTotal.toFixed(2)}
+                                </td>
+                              </tr>
+                            )}
 
-                      {/* GRAND TOTAL */}
-                      <tr
-                        className={`font-bold ${
-                          theme === "dark"
-                            ? "border-t-2 border-gray-500"
-                            : "border-t-2 border-black"
-                        }`}
-                      >
-                        <td className="px-4 py-2 text-left text-lg" colSpan={7}>
-                          Grand Total:
-                        </td>
-                        <td className="px-4 py-2 text-right text-lg text-green-600 font-bold">
-                          ₹{grandTotal.toFixed(2)}
-                        </td>
-                        <td></td>
-                        <td></td>
-                      </tr>
+                            {/* IGST TOTAL */}
+                            {columnSettings.showGST && igstTotal > 0 && (
+                              <tr
+                                className={`font-semibold ${
+                                  theme === "dark"
+                                    ? "border-t border-gray-600"
+                                    : "border-t border-gray-300"
+                                }`}
+                              >
+                                <td className="px-4 py-2 text-left" colSpan={colspan}>
+                                  IGST Total:
+                                </td>
+                                <td className="px-4 py-2 text-right text-blue-600 font-bold">
+                                  ₹{igstTotal.toFixed(2)}
+                                </td>
+                              </tr>
+                            )}
+
+                            {/* GST TOTAL */}
+                            <tr
+                              className={`font-semibold ${
+                                theme === "dark"
+                                  ? "border-t border-gray-600"
+                                  : "border-t border-gray-300"
+                              }`}
+                            >
+                              <td className="px-4 py-2 text-left" colSpan={colspan}>
+                                GST Total:
+                              </td>
+                              <td className="px-4 py-2 text-right text-blue-600 font-bold">
+                                ₹{(cgstTotal + sgstTotal + igstTotal).toFixed(2)}
+                              </td>
+                            </tr>
+
+                            {/* DISCOUNT */}
+                            {columnSettings.showDiscount && (
+                              <tr
+                                className={`font-semibold ${
+                                  theme === "dark"
+                                    ? "border-t border-gray-600"
+                                    : "border-t border-gray-300"
+                                }`}
+                              >
+                                <td className="px-4 py-2 text-left" colSpan={colspan}>
+                                  Discount:
+                                </td>
+                                <td className="px-4 py-2 text-right text-red-600 font-bold">
+                                  ₹{discountTotal}
+                                </td>
+                              </tr>
+                            )}
+
+                            {/* GRAND TOTAL */}
+                            <tr
+                              className={`font-bold ${
+                                theme === "dark"
+                                  ? "border-t-2 border-gray-500"
+                                  : "border-t-2 border-black"
+                              }`}
+                            >
+                              <td className="px-4 py-2 text-left text-lg" colSpan={colspan}>
+                                Grand Total:
+                              </td>
+                              <td className="px-4 py-2 text-right text-lg text-green-600 font-bold">
+                                ₹{grandTotal.toFixed(2)}
+                              </td>
+                            </tr>
+                          </>
+                        );
+                      })()}
                     </tfoot>
                   </table>
                 ) : (
