@@ -53,6 +53,7 @@ router.get("/purchase-history", async (req, res) => {
         purchaseQuantity,
         rate,
         purchaseDate,
+        voucherNumber,
         godownId,
         companyId,
         ownerType,

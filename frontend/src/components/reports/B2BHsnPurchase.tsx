@@ -72,7 +72,7 @@ type ViewType =
   | "analytics"
   | "contracts";
 
-const B2BHsnPurchase: React.FC = () => {
+const B2BPurchaseHsn: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement | null>(null);
@@ -251,7 +251,7 @@ const B2BHsnPurchase: React.FC = () => {
       try {
         const url = `${
           import.meta.env.VITE_API_URL
-        }/api/purchase-voucher?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
         const res = await fetch(url);
         const json = await res.json();
@@ -316,7 +316,6 @@ const B2BHsnPurchase: React.FC = () => {
       matchedLedgerIdSet.has(s.partyId)
     );
 
-    console.log("filteredSales", filteredSales);
     setMatchedSales(filteredSales);
   }, [partyIds, ledger, saleData]);
 
@@ -339,9 +338,10 @@ const B2BHsnPurchase: React.FC = () => {
         const res = await fetch(
           `${
             import.meta.env.VITE_API_URL
-          }/api/purchase-vouchers/purchase-histor?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          }/api/purchase-vouchers/purchase-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const resJson = await res.json();
+        console.log("res", resJson);
         const rows = Array.isArray(resJson?.data)
           ? resJson.data
           : Array.isArray(resJson)
@@ -350,7 +350,7 @@ const B2BHsnPurchase: React.FC = () => {
 
         setSalesHistory(rows);
       } catch (err) {
-        console.error("Sales history fetch failed", err);
+        console.error("Purchase history fetch failed", err);
         setSalesHistory([]);
       }
     };
@@ -395,7 +395,7 @@ const B2BHsnPurchase: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold flex items-center">
               <Building2 className="mr-2 text-blue-600" size={28} />
-              B2B PURCHASE HSN Management
+              B2B HSN Management
             </h1>
             <p className="text-sm text-gray-600 mt-1">
               Business-to-Business transactions and partnerships
@@ -703,7 +703,6 @@ const B2BHsnPurchase: React.FC = () => {
                             {Number(sale.igstTotal || 0) +
                               Number(sale.cgstTotal || 0) +
                               Number(sale.sgstTotal || 0)}
-                            %
                           </td>
 
                           {/* IGST */}
@@ -782,4 +781,4 @@ const B2BHsnPurchase: React.FC = () => {
   );
 };
 
-export default B2BHsnPurchase;
+export default B2BPurchaseHsn;
