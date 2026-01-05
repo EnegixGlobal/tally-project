@@ -368,7 +368,7 @@ const B2BPurchaseHsn: React.FC = () => {
   };
 
   const getQtyByVoucher = (voucherNo: string) => {
-    const qty = salesHistoryMap.get(voucherNo)?.qtyChange;
+    const qty = salesHistoryMap.get(voucherNo)?.purchaseQuantity;
     return qty ? Math.abs(qty) : "";
   };
 
@@ -706,13 +706,13 @@ const B2BPurchaseHsn: React.FC = () => {
                           </td>
 
                           {/* IGST */}
-                          <td className="p-3">{sale.igstTotal}%</td>
+                          <td className="p-3">{sale.igstTotal}</td>
 
                           {/* CGST */}
-                          <td className="p-3">{sale.cgstTotal}%</td>
+                          <td className="p-3">{sale.cgstTotal}</td>
 
                           {/* SGST */}
-                          <td className="p-3">{sale.sgstTotal}%</td>
+                          <td className="p-3">{sale.sgstTotal}</td>
 
                           {/* Total */}
                           <td className="p-3 font-semibold">
