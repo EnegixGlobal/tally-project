@@ -50,6 +50,7 @@ const SalesVoucher: React.FC = () => {
     vouchers = [],
     units = [],
     companyInfo,
+    setCompanyInfo,
     addVoucher,
     updateVoucher,
   } = useAppContext();
@@ -121,6 +122,60 @@ const SalesVoucher: React.FC = () => {
   // Safe fallbacks for context data - Remove demo data and use only from context
   const safeStockItems = stockItems || [];
   const safeLedgers = ledgers || [];
+  
+  // Fetch company info if not available in context
+  useEffect(() => {
+    if (!companyInfo && companyId && setCompanyInfo) {
+      const fetchCompanyInfo = async () => {
+        try {
+          const res = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/company/company/${companyId}`
+          );
+          if (!res.ok) {
+            console.error("Failed to fetch company info:", res.status);
+            return;
+          }
+          const data = await res.json();
+          console.log("🔍 Fetched Company Info from API:", data);
+          console.log("🔍 Company State from API:", data?.state);
+          // Update context with fetched company info
+          if (data) {
+            setCompanyInfo(data);
+          }
+        } catch (err) {
+          console.error("Error fetching company info:", err);
+        }
+      };
+      fetchCompanyInfo();
+    }
+  }, [companyId, companyInfo, setCompanyInfo]);
+
+  // Check localStorage for companyInfo as fallback
+  useEffect(() => {
+    if (!companyInfo) {
+      try {
+        const storedCompanyInfo = localStorage.getItem("companyInfo");
+        if (storedCompanyInfo) {
+          const parsed = JSON.parse(storedCompanyInfo);
+          console.log("🔍 CompanyInfo from localStorage:", parsed);
+          console.log("🔍 Company State from localStorage:", parsed?.state);
+          if (setCompanyInfo && parsed) {
+            setCompanyInfo(parsed);
+          }
+        }
+      } catch (err) {
+        console.error("Error parsing companyInfo from localStorage:", err);
+      }
+    }
+  }, [companyInfo, setCompanyInfo]);
+
+  // Debug: Log companyInfo to see what we have
+  useEffect(() => {
+    console.log("🔍 CompanyInfo from Context:", companyInfo);
+    console.log("🔍 CompanyInfo State Field:", companyInfo?.state);
+    console.log("🔍 CompanyInfo Keys:", companyInfo ? Object.keys(companyInfo) : []);
+  }, [companyInfo]);
+
   const safeCompanyInfo = companyInfo || {
     name: "Your Company Name",
     address: "Your Company Address",
@@ -348,9 +403,33 @@ const SalesVoucher: React.FC = () => {
   useEffect(() => {
     if (formData.partyId && ledgers.length > 0) {
       const party = ledgers.find((l) => String(l.id) === String(formData.partyId));
-      setSelectedPartyState(party?.state || "");
+      
+      // Debug: Log full party object to see all available fields
+      console.log("🔍 Full Party Object:", party);
+      console.log("🔍 Party State Field:", party?.state);
+      console.log("🔍 All Party Keys:", party ? Object.keys(party) : []);
+      
+      // Try multiple possible field names for state
+      const partyState = party?.state || party?.state_name || party?.State || "";
+      setSelectedPartyState(partyState);
+      
+      // Debug logging for state matching
+      const companyState = safeCompanyInfo?.state || "";
+      const statesMatch = companyState && partyState && 
+        companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+      
+      console.log("🔍 State Matching Check:", {
+        companyState: companyState || "Not Set",
+        partyState: partyState || "Not Set",
+        statesMatch: statesMatch,
+        gstType: statesMatch ? "CGST + SGST" : partyState ? "IGST" : "Unknown",
+        partyName: party?.name || "Unknown",
+        partyId: formData.partyId
+      });
+    } else {
+      setSelectedPartyState("");
     }
-  }, [formData.partyId, ledgers]);
+  }, [formData.partyId, ledgers, safeCompanyInfo?.state]);
 
   //godown fatch
   useEffect(() => {
@@ -1592,6 +1671,61 @@ const SalesVoucher: React.FC = () => {
                         {errors.partyId}
                       </p>
                     )}
+                    {/* State Matching Indicator - Commented out as it's working correctly */}
+                    {/* {formData.partyId && (
+                      <div className={`mt-2 p-2 rounded text-xs ${
+                        theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}>
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <span className="font-medium">State Check:</span>
+                          <span className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
+                            Company: <strong>{safeCompanyInfo?.state || "Not Set"}</strong>
+                            {safeCompanyInfo?.state === "Default State" && (
+                              <span className="ml-1 text-yellow-600 dark:text-yellow-400 text-xs">
+                                ⚠️ (Using Default - Company Info Not Loaded)
+                              </span>
+                            )}
+                          </span>
+                          <span className="mx-1">|</span>
+                          <span className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
+                            Party: <strong>{selectedPartyState || "Not Set"}</strong>
+                          </span>
+                          {(() => {
+                            const companyState = safeCompanyInfo?.state || "";
+                            const partyState = selectedPartyState || "";
+                            const isUsingDefault = companyState === "Default State";
+                            const statesMatch = !isUsingDefault && companyState && partyState && 
+                              companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+                            
+                            if (isUsingDefault) {
+                              return (
+                                <span className="ml-2 text-yellow-600 dark:text-yellow-400 font-semibold">
+                                  ⚠️ Please load company info to check state matching
+                                </span>
+                              );
+                            }
+                            
+                            if (!companyState || !partyState) {
+                              return (
+                                <span className="ml-2 text-yellow-600 dark:text-yellow-400">
+                                  ⚠️ States not available
+                                </span>
+                              );
+                            }
+                            
+                            return statesMatch ? (
+                              <span className="ml-2 text-green-600 dark:text-green-400 font-semibold">
+                                ✅ States Match (CGST + SGST)
+                              </span>
+                            ) : (
+                              <span className="ml-2 text-red-600 dark:text-red-400 font-semibold">
+                                ❌ States Don't Match (IGST)
+                              </span>
+                            );
+                          })()}
+                        </div>
+                      </div>
+                    )} */}
                   </div>
                 )}
             </div>
@@ -1950,33 +2084,38 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-right">Quantity</th>
                         <th className="px-4 py-2 text-left">Unit</th>
                         <th className="px-4 py-2 text-right">Rate</th>
-                        {columnSettings.showGST && (
-                          <>
-                            <th className="px-4 py-2 text-center">GST%</th>
-                            {(() => {
-                              // Check if states match for dynamic column display
-                              const companyState = safeCompanyInfo?.state || "";
-                              const partyState = selectedPartyState || "";
-                              const statesMatch = companyState && partyState && 
-                                companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
-                              
-                              if (statesMatch) {
-                                // Same state: Show CGST and SGST
-                                return (
-                                  <>
-                                    <th className="px-4 py-2 text-center">CGST%</th>
-                                    <th className="px-4 py-2 text-center">SGST%</th>
-                                  </>
-                                );
-                              } else {
-                                // Different state: Show IGST
-                                return (
-                                  <th className="px-4 py-2 text-center">IGST%</th>
-                                );
-                              }
-                            })()}
-                          </>
-                        )}
+                        {columnSettings.showGST && (() => {
+                          // Check if party is selected
+                          const hasParty = !!formData.partyId;
+                          const companyState = safeCompanyInfo?.state || "";
+                          const partyState = selectedPartyState || "";
+                          const statesMatch = hasParty && companyState && partyState && 
+                            companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+                          
+                          if (!hasParty) {
+                            // No party selected: Show only GST%
+                            return (
+                              <th className="px-4 py-2 text-center">GST%</th>
+                            );
+                          } else if (statesMatch) {
+                            // Party selected and states match: Show CGST and SGST
+                            return (
+                              <>
+                                <th className="px-4 py-2 text-center">GST%</th>
+                                <th className="px-4 py-2 text-center">CGST%</th>
+                                <th className="px-4 py-2 text-center">SGST%</th>
+                              </>
+                            );
+                          } else {
+                            // Party selected but states don't match: Show IGST
+                            return (
+                              <>
+                                <th className="px-4 py-2 text-center">GST%</th>
+                                <th className="px-4 py-2 text-center">IGST%</th>
+                              </>
+                            );
+                          }
+                        })()}
 
                         {columnSettings.showDiscount && <th>Discount</th>}
 
@@ -1996,10 +2135,11 @@ const SalesVoucher: React.FC = () => {
                           (b) => b.batchName === entry.batchNumber
                         );
 
-                        // Check if states match for dynamic column display
+                        // Check if party is selected and states match for dynamic column display
+                        const hasParty = !!formData.partyId;
                         const companyState = safeCompanyInfo?.state || "";
                         const partyState = selectedPartyState || "";
-                        const statesMatch = companyState && partyState && 
+                        const statesMatch = hasParty && companyState && partyState && 
                           companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
 
                         return (
@@ -2122,14 +2262,21 @@ const SalesVoucher: React.FC = () => {
                             </td>
 
                             {/* GST */}
-                            {columnSettings.showGST && (
-                              <>
-                                <td className="px-1 py-2 text-center min-w-[50px] text-xs">
-                                  {((entry.cgstRate || 0) + (entry.sgstRate || 0) + (entry.igstRate || 0)).toFixed(2)}%
-                                </td>
-                                {statesMatch ? (
+                            {columnSettings.showGST && (() => {
+                              if (!hasParty) {
+                                // No party selected: Show only GST%
+                                return (
+                                  <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                    {((entry.cgstRate || 0) + (entry.sgstRate || 0) + (entry.igstRate || 0)).toFixed(2)}%
+                                  </td>
+                                );
+                              } else if (statesMatch) {
+                                // Party selected and states match: Show CGST and SGST
+                                return (
                                   <>
-                                    {/* Same state: Show CGST and SGST */}
+                                    <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                      {((entry.cgstRate || 0) + (entry.sgstRate || 0) + (entry.igstRate || 0)).toFixed(2)}%
+                                    </td>
                                     <td className="px-1 py-2 text-center min-w-[50px] text-xs">
                                       {(entry.cgstRate || 0).toFixed(2)}%
                                     </td>
@@ -2137,14 +2284,21 @@ const SalesVoucher: React.FC = () => {
                                       {(entry.sgstRate || 0).toFixed(2)}%
                                     </td>
                                   </>
-                                ) : (
-                                  /* Different state: Show IGST */
-                                  <td className="px-1 py-2 text-center min-w-[50px] text-xs">
-                                    {(entry.igstRate || 0).toFixed(2)}%
-                                  </td>
-                                )}
-                              </>
-                            )}
+                                );
+                              } else {
+                                // Party selected but states don't match: Show IGST
+                                return (
+                                  <>
+                                    <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                      {((entry.cgstRate || 0) + (entry.sgstRate || 0) + (entry.igstRate || 0)).toFixed(2)}%
+                                    </td>
+                                    <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                      {(entry.igstRate || 0).toFixed(2)}%
+                                    </td>
+                                  </>
+                                );
+                              }
+                            })()}
 
                             {/* DISCOUNT */}
                             <td className="px-1 py-2 min-w-[70px]">
@@ -2207,19 +2361,27 @@ const SalesVoucher: React.FC = () => {
                     </tbody>
                     <tfoot>
                       {(() => {
-                        // Check if states match for dynamic column calculation
+                        // Check if party is selected and states match for dynamic column calculation
+                        const hasParty = !!formData.partyId;
                         const companyState = safeCompanyInfo?.state || "";
                         const partyState = selectedPartyState || "";
-                        const statesMatch = companyState && partyState && 
+                        const statesMatch = hasParty && companyState && partyState && 
                           companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
                         
                         // Calculate total columns dynamically
                         let totalCols = 7; // S.No, Item, HSN, Quantity, Unit, Rate, Amount
                         if (columnSettings.showBatch && hasAnyBatch) totalCols += 1; // Batch
                         if (columnSettings.showGST) {
-                          totalCols += 1; // GST
-                          // Add CGST+SGST (2 columns) if states match, or IGST (1 column) if not
-                          totalCols += statesMatch ? 2 : 1;
+                          if (!hasParty) {
+                            // No party: Only GST% column
+                            totalCols += 1;
+                          } else if (statesMatch) {
+                            // States match: GST%, CGST%, SGST% (3 columns)
+                            totalCols += 3;
+                          } else {
+                            // States don't match: GST%, IGST% (2 columns)
+                            totalCols += 2;
+                          }
                         }
                         if (columnSettings.showDiscount) totalCols += 1; // Discount
                         if (godownEnabled === "yes") totalCols += 1; // Godown
@@ -2243,8 +2405,8 @@ const SalesVoucher: React.FC = () => {
                               </td>
                             </tr>
 
-                            {/* CGST TOTAL */}
-                            {columnSettings.showGST && cgstTotal > 0 && (
+                            {/* CGST TOTAL - Only show when party selected and states match */}
+                            {columnSettings.showGST && hasParty && statesMatch && cgstTotal > 0 && (
                               <tr
                                 className={`font-semibold ${
                                   theme === "dark"
@@ -2261,8 +2423,8 @@ const SalesVoucher: React.FC = () => {
                               </tr>
                             )}
 
-                            {/* SGST TOTAL */}
-                            {columnSettings.showGST && sgstTotal > 0 && (
+                            {/* SGST TOTAL - Only show when party selected and states match */}
+                            {columnSettings.showGST && hasParty && statesMatch && sgstTotal > 0 && (
                               <tr
                                 className={`font-semibold ${
                                   theme === "dark"
@@ -2279,8 +2441,8 @@ const SalesVoucher: React.FC = () => {
                               </tr>
                             )}
 
-                            {/* IGST TOTAL */}
-                            {columnSettings.showGST && igstTotal > 0 && (
+                            {/* IGST TOTAL - Only show when party selected and states don't match */}
+                            {columnSettings.showGST && hasParty && !statesMatch && igstTotal > 0 && (
                               <tr
                                 className={`font-semibold ${
                                   theme === "dark"
@@ -2297,21 +2459,23 @@ const SalesVoucher: React.FC = () => {
                               </tr>
                             )}
 
-                            {/* GST TOTAL */}
-                            <tr
-                              className={`font-semibold ${
-                                theme === "dark"
-                                  ? "border-t border-gray-600"
-                                  : "border-t border-gray-300"
-                              }`}
-                            >
-                              <td className="px-4 py-2 text-left" colSpan={colspan}>
-                                GST Total:
-                              </td>
-                              <td className="px-4 py-2 text-right text-blue-600 font-bold">
-                                ₹{(cgstTotal + sgstTotal + igstTotal).toFixed(2)}
-                              </td>
-                            </tr>
+                            {/* GST TOTAL - Always show when GST is enabled */}
+                            {columnSettings.showGST && (
+                              <tr
+                                className={`font-semibold ${
+                                  theme === "dark"
+                                    ? "border-t border-gray-600"
+                                    : "border-t border-gray-300"
+                                }`}
+                              >
+                                <td className="px-4 py-2 text-left" colSpan={colspan}>
+                                  GST Total:
+                                </td>
+                                <td className="px-4 py-2 text-right text-blue-600 font-bold">
+                                  ₹{(cgstTotal + sgstTotal + igstTotal).toFixed(2)}
+                                </td>
+                              </tr>
+                            )}
 
                             {/* DISCOUNT */}
                             {columnSettings.showDiscount && (

@@ -27,6 +27,8 @@ router.get("/", async (req, res) => {
         l.phone,
         l.gst_number AS gstNumber,
         l.pan_number AS panNumber,
+        l.state,
+        l.district,
         l.created_at AS createdAt,
         g.name AS groupName,
         g.type AS groupType,
