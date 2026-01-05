@@ -67,12 +67,11 @@ const SalesVoucher: React.FC = () => {
 
   // Robust detection for party ledgers — backend may return different field names
 
-const generateVoucherNumber = useCallback(() => {
-  const prefix = "SLSV";
-  const randomNumber = Math.floor(100000 + Math.random() * 900000);
-  return `${prefix}${randomNumber}`;
-}, []);
-
+  const generateVoucherNumber = useCallback(() => {
+    const prefix = "SLSV";
+    const randomNumber = Math.floor(100000 + Math.random() * 900000);
+    return `${prefix}${randomNumber}`;
+  }, []);
 
   const isPartyLedger = (l: any) => {
     const groupName =
@@ -145,8 +144,6 @@ const generateVoucherNumber = useCallback(() => {
     value: 0,
   });
 
- 
-
   const getInitialFormData = (): Omit<VoucherEntry, "id"> => {
     if (isEditMode && id) {
       const existingVoucher = vouchers.find((v) => v.id === id);
@@ -186,9 +183,9 @@ const generateVoucherNumber = useCallback(() => {
     };
   };
 
- const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>(
-  () => getInitialFormData()
-);
+  const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>(() =>
+    getInitialFormData()
+  );
 
   const [godownEnabled, setGodownEnabled] = useState<"yes" | "no">("yes"); // Add state for godown selection visibility
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -1002,7 +999,8 @@ const generateVoucherNumber = useCallback(() => {
       const firstDebitEntry = formData.entries.find(
         (e) => e.type === "debit" && e.ledgerId
       );
-      finalPartyId = firstDebitEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
+      finalPartyId =
+        firstDebitEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
     }
 
     const payload = {
@@ -1105,7 +1103,7 @@ const generateVoucherNumber = useCallback(() => {
 
           movementDate: formData.date,
           voucherNumber: formData.number,
-           godownId: entry.godownId ? Number(entry.godownId) : null,
+          godownId: entry.godownId ? Number(entry.godownId) : null,
           companyId,
           ownerType,
           ownerId,
@@ -1675,119 +1673,118 @@ const generateVoucherNumber = useCallback(() => {
               </div>
             )}
             {/* ///whollsell or retailer */}
-            {formData.mode !== "accounting-invoice" && 
-              formData.mode !== 'as-voucher' && (
+            {formData.mode !== "accounting-invoice" &&
+              formData.mode !== "as-voucher" && (
                 <div>
-              <div className="flex gap-6 mb-3">
-                {/* Wholesale */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="customerType"
-                    value="wholesale"
-                    checked={profitConfig.customerType === "wholesale"}
-                    onChange={(e) =>
-                      setProfitConfig({
-                        customerType: e.target.value,
-                        method: "",
-                        value: "",
-                      })
-                    }
-                    className="h-4 w-4"
-                  />
-                  <span className="font-medium">Wholesale</span>
-                </label>
+                  <div className="flex gap-6 mb-3">
+                    {/* Wholesale */}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="customerType"
+                        value="wholesale"
+                        checked={profitConfig.customerType === "wholesale"}
+                        onChange={(e) =>
+                          setProfitConfig({
+                            customerType: e.target.value,
+                            method: "",
+                            value: "",
+                          })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <span className="font-medium">Wholesale</span>
+                    </label>
 
-                {/* Retailer */}
-                <label className="flex items-center gap-2 cursor-pointer">
-                  <input
-                    type="radio"
-                    name="customerType"
-                    value="retailer"
-                    checked={profitConfig.customerType === "retailer"}
-                    onChange={(e) =>
-                      setProfitConfig({
-                        customerType: e.target.value,
-                        method: "",
-                        value: "",
-                      })
-                    }
-                    className="h-4 w-4"
-                  />
-                  <span className="font-medium">Retailer</span>
-                </label>
-              </div>
+                    {/* Retailer */}
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <input
+                        type="radio"
+                        name="customerType"
+                        value="retailer"
+                        checked={profitConfig.customerType === "retailer"}
+                        onChange={(e) =>
+                          setProfitConfig({
+                            customerType: e.target.value,
+                            method: "",
+                            value: "",
+                          })
+                        }
+                        className="h-4 w-4"
+                      />
+                      <span className="font-medium">Retailer</span>
+                    </label>
+                  </div>
 
-              {/* Wholesale Inner Options */}
-              {profitConfig.customerType === "wholesale" && (
-                <div className="ml-6 space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="wholesaleMethod"
-                      value="profit_percentage"
-                      checked={profitConfig.method === "profit_percentage"}
-                      onChange={(e) =>
-                        setProfitConfig({
-                          ...profitConfig,
-                          method: e.target.value,
-                        })
-                      }
-                      className="h-4 w-4"
-                    />
-                    <span>Profit Percentage %</span>
-                  </label>
+                  {/* Wholesale Inner Options */}
+                  {profitConfig.customerType === "wholesale" && (
+                    <div className="ml-6 space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="wholesaleMethod"
+                          value="profit_percentage"
+                          checked={profitConfig.method === "profit_percentage"}
+                          onChange={(e) =>
+                            setProfitConfig({
+                              ...profitConfig,
+                              method: e.target.value,
+                            })
+                          }
+                          className="h-4 w-4"
+                        />
+                        <span>Profit Percentage %</span>
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Retailer Inner Options */}
+                  {profitConfig.customerType === "retailer" && (
+                    <div className="ml-6 space-y-2">
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="retailerMethod"
+                          value="profit_percentage"
+                          checked={profitConfig.method === "profit_percentage"}
+                          onChange={(e) =>
+                            setProfitConfig({
+                              ...profitConfig,
+                              method: e.target.value,
+                            })
+                          }
+                          className="h-4 w-4"
+                        />
+                        <span>Profit Percentage %</span>
+                      </label>
+
+                      <label className="flex items-center gap-2 cursor-pointer">
+                        <input
+                          type="radio"
+                          name="retailerMethod"
+                          value="on_mrp"
+                          checked={profitConfig.method === "on_mrp"}
+                          onChange={(e) =>
+                            setProfitConfig({
+                              ...profitConfig,
+                              method: e.target.value,
+                              value: "0", // Auto-set value when On MRP
+                            })
+                          }
+                          className="h-4 w-4"
+                        />
+                        <span>On MRP</span>
+                      </label>
+                    </div>
+                  )}
+
+                  {/* Status Display */}
+                  {statusMsg && (
+                    <p className={`mt-2 text-sm ${statusColor}`}>{statusMsg}</p>
+                  )}
                 </div>
               )}
 
-              {/* Retailer Inner Options */}
-              {profitConfig.customerType === "retailer" && (
-                <div className="ml-6 space-y-2">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="retailerMethod"
-                      value="profit_percentage"
-                      checked={profitConfig.method === "profit_percentage"}
-                      onChange={(e) =>
-                        setProfitConfig({
-                          ...profitConfig,
-                          method: e.target.value,
-                        })
-                      }
-                      className="h-4 w-4"
-                    />
-                    <span>Profit Percentage %</span>
-                  </label>
-
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <input
-                      type="radio"
-                      name="retailerMethod"
-                      value="on_mrp"
-                      checked={profitConfig.method === "on_mrp"}
-                      onChange={(e) =>
-                        setProfitConfig({
-                          ...profitConfig,
-                          method: e.target.value,
-                          value: "0", // Auto-set value when On MRP
-                        })
-                      }
-                      className="h-4 w-4"
-                    />
-                    <span>On MRP</span>
-                  </label>
-                </div>
-              )}
-
-              {/* Status Display */}
-              {statusMsg && (
-                <p className={`mt-2 text-sm ${statusColor}`}>{statusMsg}</p>
-              )}
-            </div>
-              )
-            }
-            
             <div
               className={`p-4 mb-6 rounded ${
                 theme === "dark" ? "bg-gray-700" : "bg-gray-50"
@@ -1904,7 +1901,7 @@ const generateVoucherNumber = useCallback(() => {
                             {/* BATCH */}
                             {columnSettings.showBatch &&
                               entry.batches?.some((b) => b.batchName) && (
-                                <td className="px-1 py-2 min-w-[100px]">
+                                <td className="px-1 py-2 min-w-[180px]">
                                   <select
                                     name="batchNumber"
                                     value={entry.batchNumber || ""}
@@ -1913,16 +1910,30 @@ const generateVoucherNumber = useCallback(() => {
                                     }
                                     className={`${FORM_STYLES.tableSelect(
                                       theme
-                                    )} min-w-[100px] text-xs`}
+                                    )} 
+          min-w-[180px] text-xs font-mono`}
                                   >
                                     <option value="">Batch</option>
+
                                     {entry.batches
                                       .filter((b) => b.batchName)
-                                      .map((b, i) => (
-                                        <option key={i} value={b.batchName}>
-                                          {b.batchName}
-                                        </option>
-                                      ))}
+                                      .map((b, i) => {
+                                        const qty = Number(
+                                          b.batchQuantity ?? b.quantity ?? 0
+                                        );
+
+                                        // left-right spacing (safe way)
+                                        const name = String(b.batchName).padEnd(
+                                          12,
+                                          " "
+                                        );
+
+                                        return (
+                                          <option key={i} value={b.batchName}>
+                                            {name} {qty}
+                                          </option>
+                                        );
+                                      })}
                                   </select>
                                 </td>
                               )}
@@ -1943,9 +1954,8 @@ const generateVoucherNumber = useCallback(() => {
 
                             {/* UNIT */}
                             <td className="px-1 py-2 min-w-[45px] text-center text-xs">
-  {getUnitName(entry.unitId)}
-</td>
-
+                              {getUnitName(entry.unitId)}
+                            </td>
 
                             {/* RATE */}
                             <td className="px-1 py-2 min-w-[70px]">

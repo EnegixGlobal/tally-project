@@ -600,10 +600,10 @@ const StockSummary: React.FC = () => {
         { header: "HSN", accessor: "hsnCode", align: "center" as const },
         { header: "Batch", accessor: "batchNumber", align: "center" as const },
         {
-          header: "Qty (+)",
+          header: "Qty ",
           accessor: "qty",
           align: "center" as const,
-          render: (r: any) => `+${r.qty}`,
+          render: (r: any) => `${r.qty}`,
         },
         {
           header: "Date",
@@ -621,10 +621,10 @@ const StockSummary: React.FC = () => {
         { header: "HSN", accessor: "hsnCode", align: "center" as const },
         { header: "Batch", accessor: "batchNumber", align: "center" as const },
         {
-          header: "Sale Qty (-)",
+          header: "Sale Qty",
           accessor: "qty",
           align: "center" as const,
-          render: (r: any) => `-${r.qty}`,
+          render: (r: any) => `${r.qty}`,
         },
         {
           header: "Sale Date",
@@ -1551,24 +1551,8 @@ const StockSummary: React.FC = () => {
                                     : "border-gray-400"
                                 } text-center font-semibold`}
                               >
-                                {reportView === "Purchase"
-                                  ? `+${group.totalQty}`
-                                  : reportView === "Sales"
-                                  ? `-${group.totalQty}`
-                                  : group.totalQty}
+                                {group.totalQty}
                               </td>
-                              {(reportView === "Purchase" ||
-                                reportView === "Sales") && (
-                                <td
-                                  className={`p-2 border ${
-                                    theme === "dark"
-                                      ? "border-gray-500"
-                                      : "border-gray-400"
-                                  } text-center`}
-                                >
-                                  -
-                                </td>
-                              )}
                             </tr>
                             {/* Expanded Transaction Rows */}
                             {isExpanded &&
@@ -1693,12 +1677,13 @@ const StockSummary: React.FC = () => {
                                             theme === "dark"
                                               ? "border-gray-500"
                                               : "border-gray-400"
-                                          } text-center`}
+                                          } text-center whitespace-nowrap`}
                                         >
-                                          {reportView === "Purchase"
-                                            ? `+${transaction.qty}`
-                                            : `-${transaction.qty}`}
+                                          {Math.abs(
+                                            Number(transaction.qty) || 0
+                                          )}
                                         </td>
+
                                         <td
                                           className={`p-2 border ${
                                             theme === "dark"

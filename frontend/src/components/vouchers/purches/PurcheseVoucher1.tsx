@@ -1781,11 +1781,17 @@ const PurchaseVoucher: React.FC = () => {
                                 <option value="">Batch</option>
 
                                 {/* 👇 Existing batches (agar ho to) */}
-                                {(entry.batches || []).map((batch, i) => (
-                                  <option key={i} value={batch.batchName}>
-                                    {batch.batchName}
-                                  </option>
-                                ))}
+                                {(entry.batches || []).map((batch, i) => {
+                                  const qty = Number(
+                                    batch.batchQuantity ?? batch.quantity ?? 0
+                                  );
+
+                                  return (
+                                    <option key={i} value={batch.batchName}>
+                                      {batch.batchName} {qty}
+                                    </option>
+                                  );
+                                })}
 
                                 {/* 👇 ALWAYS SHOW ADD BUTTON */}
                                 <option

@@ -571,110 +571,73 @@ const SalesReport: React.FC = () => {
       {/* Main Content */}
       <div className="p-4" ref={printRef}>
         {/* Summary Statistics */}
-        {selectedView === "summary" && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-            <div
-              className={`p-4 rounded-lg ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm opacity-70">Total Sales</p>
-                  <p className="text-2xl font-bold text-green-600">
-                    ₹{totalSales.toLocaleString("en-IN")}
-                  </p>
-                </div>
-                <DollarSign className="text-green-600" size={24} />
+       {selectedView === "summary" && (
+          <div
+            className={`rounded-lg overflow-hidden ${
+              theme === "dark"
+                ? "bg-gray-800 text-white"
+                : "bg-white text-black"
+            }`}
+          >
+            {/* 🔹 TOP BORDER */}
+            <div className="border-t border-b border-gray-400">
+              {/* Header */}
+              <div className="grid grid-cols-4 px-4 py-2 font-semibold border-b border-gray-400">
+                <div>Particulars</div>
+                <div className="text-right">Debit</div>
+                <div className="text-right">Credit</div>
+                <div className="text-right">Closing</div>
               </div>
-            </div>
 
-            <div
-              className={`p-4 rounded-lg ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm opacity-70">Total Transactions</p>
-                </div>
-                <FileText className="text-blue-600" size={24} />
-              </div>
-            </div>
+              {/* Month Rows */}
+              {MONTHS.map((month) => {
+                const row = monthDataMap[month] || {
+                  credit: 0,
+                  closingBalance: 0,
+                };
 
-            <div
-              className={`p-4 rounded-lg ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm opacity-70">Average Sale</p>
-                  <p className="text-2xl font-bold text-purple-600"></p>
-                </div>
-                <TrendingUp className="text-purple-600" size={24} />
-              </div>
-            </div>
+                return (
+                  <div
+                    key={month}
+                    onClick={() =>
+                      navigate(`/app/voucher-register/sales/detail/${month}`)
+                    }
+                    className="grid grid-cols-4 px-4 py-2 text-sm cursor-pointer hover:bg-gray-100"
+                  >
+                    <div className="font-medium">{month}</div>
 
-            <div
-              className={`p-4 rounded-lg ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
-            >
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm opacity-70">Total Tax</p>
-                </div>
-                <Grid3X3 className="text-orange-600" size={24} />
-              </div>
-            </div>
-          </div>
-        )}
+                    {/* Debit blank */}
+                    <div className="text-right opacity-40"></div>
 
-        {/* Status Distribution for Summary */}
-        {selectedView === "summary" && (
-          <div className="rounded-lg border">
-            {/* Header */}
-            <div className="grid grid-cols-3 bg-gray-100 font-semibold text-sm px-4 py-2">
-              <div>Particulars</div>
-              <div className="text-right">Credit</div>
-              <div className="text-right">Closing Balance</div>
-            </div>
+                    {/* Credit */}
+                    <div className="text-right font-mono">
+                      {row.credit ? row.credit.toLocaleString("en-IN") : ""}
+                    </div>
 
-            {[
-              "April",
-              "May",
-              "June",
-              "July",
-              "August",
-              "September",
-              "October",
-              "November",
-              "December",
-              "January",
-              "February",
-              "March",
-            ].map((month) => {
-              const row = monthDataMap[month] || {};
-
-              return (
-                <div
-                  key={month}
-                  onClick={() =>
-                    navigate(`/app/voucher-register/sales/detail/${month}`)
-                  }
-                  className="grid grid-cols-3 px-4 py-2 border-t text-sm cursor-pointer hover:bg-gray-100"
-                >
-                  <div className="font-medium text-blue-600">{month}</div>
-                  <div className="text-right">
-                    ₹{(row.credit ?? 0).toLocaleString()}
+                    {/* Closing */}
+                    <div className="text-right font-mono">
+                      {row.closingBalance
+                        ? row.closingBalance.toLocaleString("en-IN")
+                        : ""}
+                    </div>
                   </div>
-                  <div className="text-right">
-                    ₹{(row.closingBalance ?? 0).toLocaleString()}
+                );
+              })}
+
+              {/* 🔹 BOTTOM BORDER + GRAND TOTAL */}
+              <div className="border-t border-gray-400">
+                <div className="grid grid-cols-4 px-4 py-3 font-bold">
+                  <div>Grand Total</div>
+                  <div className="text-right opacity-40">—</div>
+                  <div className="text-right font-mono">
+                    {totalSales.toLocaleString("en-IN")}
+                  </div>
+                  <div className="text-right font-mono">
+                    {totalSales.toLocaleString("en-IN")}
                   </div>
                 </div>
-              );
-            })}
+              </div>
+            </div>
           </div>
         )}
 
