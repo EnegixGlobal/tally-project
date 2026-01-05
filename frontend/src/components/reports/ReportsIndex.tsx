@@ -51,7 +51,9 @@ const ReportsIndex: React.FC = () => {
         { icon: <Activity size={20} />, name: 'Sales Report', path: '/app/reports/sales-report' },
         { icon: <Calendar size={20} />, name: 'Sales Invoice Matching', path: '/app/reports/sales-invoice-matching' },
         { icon: <Calendar size={20} />, name: 'B2B', path: '/app/reports/b2b' },
-        { icon: <Calendar size={20} />, name: 'B2C', path: '/app/reports/b2c' }
+        { icon: <Calendar size={20} />, name: 'B2C', path: '/app/reports/b2c' },
+        { icon: <Calendar size={20} />, name: 'B2B HSN', path: '/app/reports/b2bhsn' },
+        { icon: <Calendar size={20} />, name: 'B2C HSN', path: '/app/reports/b2chsn' }
       ]
     },
     {
