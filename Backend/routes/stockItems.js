@@ -879,6 +879,7 @@ router.post('/:id/batches', async (req, res) => {
 });
 
 // Deleter Request
+
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
   const { company_id, owner_type, owner_id } = req.query;
@@ -895,16 +896,17 @@ router.delete("/:id", async (req, res) => {
   try {
     await connection.beginTransaction();
 
-    // Check if item belongs to same owner + company
-    const [check] = await connection.execute(
+    // 🔹 1. Get stock item (name check)
+    const [items] = await connection.execute(
       `
-      SELECT id FROM stock_items 
+      SELECT id, name 
+      FROM stock_items
       WHERE id = ? AND company_id = ? AND owner_type = ? AND owner_id = ?
       `,
       [id, company_id, owner_type, owner_id]
     );
 
-    if (check.length === 0) {
+    if (items.length === 0) {
       await connection.rollback();
       return res.status(404).json({
         success: false,
@@ -912,12 +914,53 @@ router.delete("/:id", async (req, res) => {
       });
     }
 
+    const itemName = items[0].name;
+
+    // 🔹 2. Check sales_history & purchase_history usage
+    const [[usage]] = await connection.execute(
+      `
+      SELECT 
+        EXISTS (
+          SELECT 1 FROM sale_history 
+          WHERE itemName = ? AND companyId = ? AND ownerType = ? AND ownerId = ?
+        ) AS saleUsed,
+        EXISTS (
+          SELECT 1 FROM purchase_history 
+          WHERE itemName = ? AND companyId = ? AND ownerType = ? AND ownerId = ?
+        ) AS purchaseUsed
+      `,
+      [
+        itemName,
+        company_id,
+        owner_type,
+        owner_id,
+        itemName,
+        company_id,
+        owner_type,
+        owner_id,
+      ]
+    );
+
+    if (usage.saleUsed || usage.purchaseUsed) {
+      await connection.rollback();
+      return res.status(400).json({
+        success: false,
+        message:
+          "This stock item is used in Sales or Purchase vouchers, cannot delete",
+      });
+    }
+
+    // 🔹 3. Delete dependent records
     await connection.execute(
       "DELETE FROM godown_allocations WHERE stockItemId = ?",
       [id]
     );
 
-    await connection.execute("DELETE FROM stock_items WHERE id = ?", [id]);
+    // 🔹 4. Delete stock item
+    await connection.execute(
+      "DELETE FROM stock_items WHERE id = ?",
+      [id]
+    );
 
     await connection.commit();
 
@@ -936,6 +979,7 @@ router.delete("/:id", async (req, res) => {
     connection.release();
   }
 });
+
 
 //put item
 router.put("/:id", async (req, res) => {
