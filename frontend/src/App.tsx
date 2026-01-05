@@ -220,6 +220,7 @@ import B2CHsn from "./components/reports/B2CHsn";
 import B2BPurchase from "./components/reports/B2BPurchase";
 import B2CPurchase from "./components/reports/B2CPurchase";
 import B2BHsnPurchase from "./components/reports/B2BHsnPurchase";
+import B2CHsnPurchase from "./components/reports/B2CHsnPurchase";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -1305,6 +1306,14 @@ function App() {
                 element={
                   <RequireCompany>
                     <B2BHsnPurchase />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="reports/b2chsnpurchase"
+                element={
+                  <RequireCompany>
+                    <B2CHsnPurchase />
                   </RequireCompany>
                 }
               />

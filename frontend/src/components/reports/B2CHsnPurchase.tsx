@@ -59,7 +59,7 @@ interface Order {
   orderStatus: string;
   gstNumber?: string | null; // For filtering - should always be null/empty for B2C
 }
-const B2CHsn: React.FC = () => {
+const B2CHsnPurchase: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
@@ -68,12 +68,12 @@ const B2CHsn: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
   
-  // For HSN display (similar to B2BHsn)
+  // For HSN display (similar to B2BHsnPurchase)
   const [saleData, setSaleData] = useState<any[]>([]);
   const [partyIds, setPartyIds] = useState<number[]>([]);
   const [ledger, setLedger] = useState<any[]>([]);
   const [matchedSales, setMatchedSales] = useState<any[]>([]);
-  const [salesHistory, setSalesHistory] = useState<any[]>([]);
+  const [purchaseHistory, setPurchaseHistory] = useState<any[]>([]);
   const [hsnSearch, setHsnSearch] = useState("");
 
   // Get auth parameters from localStorage
@@ -146,10 +146,10 @@ const B2CHsn: React.FC = () => {
     setLoading(true);
     setError(null);
     
-    // Fetch B2C orders (sales without GST numbers)
+    // Fetch B2C purchases (purchases without GST numbers)
     // Backend filters: WHERE (l.gst_number IS NULL OR l.gst_number = '')
     axios
-      .get(`${import.meta.env.VITE_API_URL}/api/b2c-orders`, {
+      .get(`${import.meta.env.VITE_API_URL}/api/b2c-purchases`, {
         params: {
           company_id,
           owner_type,
@@ -159,7 +159,7 @@ const B2CHsn: React.FC = () => {
         }
       })
       .then(res => {
-        console.log('B2C Orders API Response:', res.data);
+        console.log('B2C Purchases API Response:', res.data);
         
         // Backend returns item-level rows, need to group by order
         const rawData = res.data as any[];
@@ -172,7 +172,7 @@ const B2CHsn: React.FC = () => {
         }
         
         if (rawData.length === 0) {
-          console.log('No B2C orders found for the selected date range');
+          console.log('No B2C purchases found for the selected date range');
           setOrders([]);
           setLoading(false);
           return;
@@ -196,7 +196,7 @@ const B2CHsn: React.FC = () => {
               orderId: row.orderId,
               orderNumber: row.orderNumber || '',
               orderDate: row.orderDate || '',
-              customerName: row.customerName || '',
+              customerName: row.supplierName || '', // Using supplierName from API
               totalAmount: Number(row.totalAmount) || 0,
               discount: Number(row.discount) || 0,
               taxAmount: Number(row.taxAmount) || 0,
@@ -237,27 +237,27 @@ const B2CHsn: React.FC = () => {
           return !order.gstNumber || String(order.gstNumber).trim() === '';
         });
         
-        console.log(`Processed ${ordersArray.length} B2C orders from ${rawData.length} item rows`);
+        console.log(`Processed ${ordersArray.length} B2C purchases from ${rawData.length} item rows`);
         setOrders(ordersArray);
         setLoading(false);
       })
       .catch((err) => {
-        console.error('Error fetching B2C orders:', err);
-        setError(err.response?.data?.error || err.message || 'Failed to fetch B2C orders');
+        console.error('Error fetching B2C purchases:', err);
+        setError(err.response?.data?.error || err.message || 'Failed to fetch B2C purchases');
         setOrders([]);
         setLoading(false);
       });
   }, [company_id, owner_type, owner_id, filters.fromDate, filters.toDate]);
 
-  // Fetch sales vouchers for B2C (similar to B2BHsn)
+  // Fetch purchase vouchers for B2C (similar to B2BHsnPurchase)
   useEffect(() => {
     if (!company_id || !owner_type || !owner_id) return;
 
-    const loadSalesVouchers = async () => {
+    const loadPurchaseVouchers = async () => {
       try {
         const url = `${
           import.meta.env.VITE_API_URL
-        }/api/sales-vouchers?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`;
+        }/api/purchase-vouchers?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`;
 
         const res = await fetch(url);
         const json = await res.json();
@@ -271,13 +271,13 @@ const B2CHsn: React.FC = () => {
         setSaleData(vouchers);
         setPartyIds(allPartyIds);
       } catch (err) {
-        console.error("Failed to fetch sales vouchers:", err);
+        console.error("Failed to fetch purchase vouchers:", err);
         setSaleData([]);
         setPartyIds([]);
       }
     };
 
-    loadSalesVouchers();
+    loadPurchaseVouchers();
   }, [company_id, owner_type, owner_id]);
 
   // Fetch ledger data
@@ -302,7 +302,7 @@ const B2CHsn: React.FC = () => {
     }
   }, [company_id, owner_type, owner_id]);
 
-  // Match B2C sales (ledgers WITHOUT GST numbers)
+  // Match B2C purchases (ledgers WITHOUT GST numbers)
   useEffect(() => {
     if (!partyIds.length || !ledger.length || !saleData.length) return;
 
@@ -317,13 +317,13 @@ const B2CHsn: React.FC = () => {
     // Get matched ledger ids
     const matchedLedgerIdSet = new Set(filteredLedgers.map((l: any) => l.id));
 
-    // Filter sales to only those with matched ledgers (B2C)
-    const filteredSales = saleData.filter((s: any) =>
+    // Filter purchases to only those with matched ledgers (B2C)
+    const filteredPurchases = saleData.filter((s: any) =>
       matchedLedgerIdSet.has(s.partyId)
     );
 
-    console.log("B2C filteredSales", filteredSales);
-    setMatchedSales(filteredSales);
+    console.log("B2C filteredPurchases", filteredPurchases);
+    setMatchedSales(filteredPurchases);
   }, [partyIds, ledger, saleData]);
 
   // Ledger quick lookup (id → ledger)
@@ -335,14 +335,14 @@ const B2CHsn: React.FC = () => {
     return map;
   }, [ledger]);
 
-  // Fetch sales history for HSN codes
+  // Fetch purchase history for HSN codes
   useEffect(() => {
-    const fetchSalesHistory = async () => {
+    const fetchPurchaseHistory = async () => {
       try {
         const res = await fetch(
           `${
             import.meta.env.VITE_API_URL
-          }/api/sales-vouchers/sale-history?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+          }/api/purchase-vouchers/purchase-history?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
         );
         const resJson = await res.json();
         const rows = Array.isArray(resJson?.data)
@@ -351,34 +351,34 @@ const B2CHsn: React.FC = () => {
           ? resJson
           : [];
 
-        setSalesHistory(rows);
+        setPurchaseHistory(rows);
       } catch (err) {
-        console.error("Sales history fetch failed", err);
-        setSalesHistory([]);
+        console.error("Purchase history fetch failed", err);
+        setPurchaseHistory([]);
       }
     };
 
     if (company_id && owner_type && owner_id) {
-      fetchSalesHistory();
+      fetchPurchaseHistory();
     }
   }, [company_id, owner_type, owner_id]);
 
-  const salesHistoryMap = useMemo(() => {
-    return new Map(salesHistory.map((h: any) => [h.voucherNumber, h]));
-  }, [salesHistory]);
+  const purchaseHistoryMap = useMemo(() => {
+    return new Map(purchaseHistory.map((h: any) => [h.voucherNumber, h]));
+  }, [purchaseHistory]);
 
   // Get HSN by voucher number
   const getHsnByVoucher = (voucherNo: string) => {
-    return salesHistoryMap.get(voucherNo)?.hsnCode || "-";
+    return purchaseHistoryMap.get(voucherNo)?.hsnCode || "-";
   };
 
   const getQtyByVoucher = (voucherNo: string) => {
-    const qty = salesHistoryMap.get(voucherNo)?.qtyChange;
+    const qty = purchaseHistoryMap.get(voucherNo)?.qtyChange;
     return qty ? Math.abs(qty) : "";
   };
 
   const getRateByVoucher = (voucherNo: string) => {
-    return salesHistoryMap.get(voucherNo)?.rate || "";
+    return purchaseHistoryMap.get(voucherNo)?.rate || "";
   };
 
   const filteredTransactions = useMemo(() => {
@@ -510,7 +510,7 @@ const B2CHsn: React.FC = () => {
   const handleExport = () => {
     const exportData = filteredTransactions.map(transaction => ({
       'Order Number': transaction.orderNumber,
-      'Customer': transaction.customerName,
+      'Supplier': transaction.customerName,
       'Order Date': transaction.orderDate,
       'Total Amount': transaction.totalAmount,
       'Discount': transaction.discount,
@@ -525,8 +525,8 @@ const B2CHsn: React.FC = () => {
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'B2C Orders');
-    XLSX.writeFile(wb, `B2C_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
+    XLSX.utils.book_append_sheet(wb, ws, 'B2C Purchases');
+    XLSX.writeFile(wb, `B2C_Purchase_Report_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
   const getStatusColor = (status: string) => {
@@ -591,11 +591,11 @@ const B2CHsn: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold flex items-center">
               <User className="mr-2 text-purple-600" size={28} />
-              B2C HSN Sales Management
+              B2C HSN Purchase Management
             </h1>
-            <p className="text-sm text-gray-600 mt-1">Business-to-Consumer sales and customer management</p>
+            <p className="text-sm text-gray-600 mt-1">Business-to-Consumer purchase and supplier management</p>
             <p className="text-xs text-purple-600 mt-1">
-              📊 <strong>Showing sales transactions from customers WITHOUT GST numbers</strong> | 
+              📊 <strong>Showing purchase transactions from suppliers WITHOUT GST numbers</strong> | 
               <span className="ml-2">B2B transactions (with GST numbers) are shown in the B2B module</span>
             </p>
           </div>
@@ -639,19 +639,9 @@ const B2CHsn: React.FC = () => {
         <div className={`mb-4 p-4 rounded-lg text-center ${
           theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
         }`}>
-          <p>Loading B2C orders...</p>
+          <p>Loading B2C purchases...</p>
         </div>
       )}
-
-      {/* No Data Message */}
-      {/* {!loading && !error && orders.length === 0 && (
-        <div className={`mb-4 p-4 rounded-lg text-center ${
-          theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
-        }`}>
-          <p>No B2C orders found for the selected date range.</p>
-          <p className="text-sm mt-2 opacity-75">B2C orders are sales transactions from customers without GST numbers.</p>
-        </div>
-      )} */}
 
       {/* Filter Panel */}
       {showFilterPanel && (
@@ -681,10 +671,10 @@ const B2CHsn: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1">Customer Name</label>
+              <label className="block text-sm font-medium mb-1">Supplier Name</label>
               <input
                 type="text"
-                placeholder="Search customer..."
+                placeholder="Search supplier..."
                 value={filters.customerFilter}
                 onChange={(e) => handleFilterChange('customerFilter', e.target.value)}
                 className={`w-full p-2 rounded border ${
@@ -789,7 +779,7 @@ const B2CHsn: React.FC = () => {
           >
             {/* Header + Search */}
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-lg font-semibold">Recent Orders</h3>
+              <h3 className="text-lg font-semibold">Recent Purchases</h3>
 
               {/* HSN Search Box */}
               <input
@@ -816,7 +806,7 @@ const B2CHsn: React.FC = () => {
                 >
                   <tr>
                     <th className="text-left p-3">HSN</th>
-                    <th className="text-left p-3">Customer</th>
+                    <th className="text-left p-3">Supplier</th>
                     <th className="text-left p-3">Voucher No</th>
                     <th className="text-left p-3">QTY</th>
                     <th className="text-left p-3">Rate</th>
@@ -860,7 +850,7 @@ const B2CHsn: React.FC = () => {
                             {getHsnByVoucher(sale.number)}
                           </td>
 
-                          {/* Customer */}
+                          {/* Supplier */}
                           <td className="p-3">
                             {partyLedger?.name || "Unknown Party"}
                           </td>
@@ -945,7 +935,7 @@ const B2CHsn: React.FC = () => {
             theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
           }`}>
             <div className="p-4 border-b">
-              <h3 className="text-lg font-semibold">Customer Database</h3>
+              <h3 className="text-lg font-semibold">Supplier Database</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -953,7 +943,7 @@ const B2CHsn: React.FC = () => {
                   theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
                 }`}>
                   <tr>
-                    <th className="text-left p-3">Customer</th>
+                    <th className="text-left p-3">Supplier</th>
                     <th className="text-left p-3">Segment</th>
                     <th className="text-left p-3">Total Spent</th>
                     <th className="text-left p-3">Orders</th>
@@ -963,43 +953,7 @@ const B2CHsn: React.FC = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {/* {customers.map((customer, index) => (
-                    <tr key={customer.id || customer.customerId || `customer-${index}`} className={`border-b ${
-                      theme === 'dark' ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'
-                    }`}>
-                      <td className="p-3">
-                        <div>
-                          <div className="font-medium">{customer.name}</div>
-                          <div className="text-sm opacity-75">{customer.email}</div>
-                          <div className="text-xs opacity-60">{customer.phone}</div>
-                        </div>
-                      </td>
-                      <td className="p-3">
-                        <span className={`px-2 py-1 rounded-full text-xs ${getSegmentColor(customer.customerSegment)}`}>
-                          {customer.customerSegment}
-                        </span>
-                      </td>
-                      <td className="p-3 font-medium">{formatCurrency(customer.totalSpent)}</td>
-                      <td className="p-3">{customer.totalOrders}</td>
-                      <td className="p-3">
-                        <div className="flex items-center">
-                          <Star className="text-yellow-500 mr-1" size={14} />
-                          {customer.loyaltyPoints}
-                        </div>
-                      </td>
-                      <td className="p-3">{new Date(customer.lastActivity).toLocaleDateString()}</td>
-                      <td className="p-3 text-center">
-                        <button
-                          title="View Profile"
-                          className={`p-1 rounded ${
-                            theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
-                          }`}
-                        >
-                          <Eye size={16} />
-                        </button>
-                      </td>
-                    </tr>
-                  ))} */}
+                  {/* Supplier data would go here */}
                 </tbody>
               </table>
             </div>
@@ -1012,7 +966,7 @@ const B2CHsn: React.FC = () => {
             theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
           }`}>
             <div className="p-4 border-b">
-              <h3 className="text-lg font-semibold">Order Management</h3>
+              <h3 className="text-lg font-semibold">Purchase Management</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -1021,7 +975,7 @@ const B2CHsn: React.FC = () => {
                 }`}>
                   <tr>
                     <th className="text-left p-3">Order Number</th>
-                    <th className="text-left p-3">Customer</th>
+                    <th className="text-left p-3">Supplier</th>
                     <th className="text-left p-3">Items</th>
                     <th className="text-left p-3">Amount</th>
                     <th className="text-left p-3">Payment</th>
@@ -1174,18 +1128,18 @@ const B2CHsn: React.FC = () => {
               <div className={`p-6 rounded-lg ${
                 theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
               }`}>
-                <h3 className="text-lg font-semibold mb-4">Customer Metrics</h3>
+                <h3 className="text-lg font-semibold mb-4">Supplier Metrics</h3>
                 <div className="space-y-4">
                   <div className="flex justify-between">
-                    <span>Customer Lifetime Value</span>
+                    <span>Supplier Lifetime Value</span>
                     <span className="font-medium">{formatCurrency(analytics.customerLifetimeValue)}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Total Customers</span>
+                    <span>Total Suppliers</span>
                     <span className="font-medium">{analytics.totalCustomers}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span>Active Customers</span>
+                    <span>Active Suppliers</span>
                     <span className="font-medium">{analytics.activeCustomers}</span>
                   </div>
                 </div>
@@ -1197,14 +1151,11 @@ const B2CHsn: React.FC = () => {
         {/* Marketing View */}
         {selectedView === 'marketing' && (
           <div className="space-y-6">
-            {/* Campaign Performance - Removed hardcoded data */}
-            {/* Campaign performance data should be fetched from backend if needed */}
-
             {/* Customer Segments */}
             <div className={`p-6 rounded-lg ${
               theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
             }`}>
-              <h3 className="text-lg font-semibold mb-4">Customer Segments</h3>
+              <h3 className="text-lg font-semibold mb-4">Supplier Segments</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {['new', 'regular', 'premium', 'vip'].map(segment => {
                   const count = customers.filter(c => c.customerSegment === segment).length;
@@ -1217,7 +1168,7 @@ const B2CHsn: React.FC = () => {
                       theme === 'dark' ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'
                     }`}>
                       <h4 className={`font-medium mb-2 capitalize ${getSegmentColor(segment)}`}>
-                        {segment} Customers
+                        {segment} Suppliers
                       </h4>
                       <div className="text-2xl font-bold">{count}</div>
                       <div className="text-sm opacity-75">{formatCurrency(totalValue)}</div>
@@ -1245,8 +1196,6 @@ const B2CHsn: React.FC = () => {
                   </div>
                   <div className="text-sm opacity-75">Points Redeemed</div>
                 </div>
-                {/* Customer Satisfaction - Removed hardcoded data */}
-                {/* Customer satisfaction data should be calculated from backend if available */}
               </div>
             </div>
           </div>
@@ -1258,12 +1207,13 @@ const B2CHsn: React.FC = () => {
         theme === 'dark' ? 'bg-gray-800' : 'bg-purple-50'
       }`}>
         <p className="text-sm">
-          <span className="font-semibold">Pro Tip:</span> Use the B2C module to track customer behavior, 
-          analyze purchase patterns, and create targeted marketing campaigns. Leverage loyalty programs to increase retention.
+          <span className="font-semibold">Pro Tip:</span> Use the B2C Purchase module to track supplier behavior, 
+          analyze purchase patterns, and manage procurement efficiently.
         </p>
       </div>
     </div>
   );
 };
 
-export default B2CHsn;
+export default B2CHsnPurchase;
+

@@ -349,7 +349,7 @@ const B2B: React.FC = () => {
           <div>
             <h1 className="text-2xl font-bold flex items-center">
               <Building2 className="mr-2 text-blue-600" size={28} />
-              B2B Management
+              B2B Sales Management
             </h1>
             <p className="text-sm text-gray-600 mt-1">
               Business-to-Business transactions and partnerships
