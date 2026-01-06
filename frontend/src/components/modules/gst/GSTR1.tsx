@@ -973,6 +973,7 @@ const GSTR1: React.FC = () => {
             </div>
           </div>
         </div>
+        
         {/* 5B - B2C Small Supplies Section */}
         <div
           className={`mb-6 rounded-lg border-2 ${
