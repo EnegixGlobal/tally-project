@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import { useNavigate } from "react-router-dom";
 import {
@@ -21,6 +21,11 @@ const GSTR1: React.FC = () => {
     month: "03",
     year: "2024",
   });
+
+  // get company infomatiion
+  const companyDataStr = localStorage.getItem("companyInfo");
+
+  const companyData = companyDataStr ? JSON.parse(companyDataStr) : null;
 
   // Form data state matching the screenshot structure
   const [formData, setFormData] = useState({
@@ -389,6 +394,218 @@ const GSTR1: React.FC = () => {
   );
 
   // my logic
+  // ================= COMPANY STATE =================
+  const companyInfoStr = localStorage.getItem("companyInfo");
+  const companyState = companyInfoStr ? JSON.parse(companyInfoStr).state : "";
+  const companyStateCode = companyState.match(/\((\d+)\)/)?.[1] || "";
+
+  // ================= AUTH =================
+  const companyId = localStorage.getItem("company_id") || "";
+  const ownerType = localStorage.getItem("supplier") || "";
+  const ownerId =
+    localStorage.getItem(
+      ownerType === "employee" ? "employee_id" : "user_id"
+    ) || "";
+
+  // ================= STATE =================
+  const [loading, setLoading] = useState(false);
+  const [saleData, setSaleData] = useState<any[]>([]);
+  const [ledger, setLedger] = useState<any[]>([]);
+
+  // ================= DATE FILTER =================
+  const [filters, setFilters] = useState({
+    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .split("T")[0],
+    toDate: new Date().toISOString().split("T")[0],
+  });
+
+  // ================= SALES FETCH =================
+  useEffect(() => {
+    if (!companyId || !ownerType || !ownerId) return;
+
+    const loadSalesVouchers = async () => {
+      setLoading(true);
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const json = await res.json();
+        const vouchers = json?.data || json || [];
+
+        let filtered = vouchers;
+        if (filters.fromDate && filters.toDate) {
+          filtered = vouchers.filter((v: any) => {
+            const d = new Date(v.date);
+            return (
+              d >= new Date(filters.fromDate) && d <= new Date(filters.toDate)
+            );
+          });
+        }
+
+        setSaleData(filtered);
+      } catch (err) {
+        console.error("Sales fetch failed:", err);
+        setSaleData([]);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadSalesVouchers();
+  }, [companyId, ownerType, ownerId, filters.fromDate, filters.toDate]);
+
+  // ================= LEDGER FETCH =================
+  useEffect(() => {
+    const fetchLedger = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const data = await res.json();
+        setLedger(data || []);
+      } catch (err) {
+        console.error("Ledger fetch failed:", err);
+        setLedger([]);
+      }
+    };
+
+    fetchLedger();
+  }, [companyId, ownerType, ownerId]);
+
+  // ================= FINAL BUCKETS =================
+  const [gstInterState, setGstInterState] = useState<any[]>([]);
+  const [gstIntraState, setGstIntraState] = useState<any[]>([]);
+  const [nonGstInterState, setNonGstInterState] = useState<any[]>([]);
+  const [nonGstIntraState, setNonGstIntraState] = useState<any[]>([]);
+
+  // ✅ Allowed ledger names only
+  const allowedLedgerNames = ["Nil Rated", "Non-gst", "Exempted"];
+
+  // ================= MAIN LOGIC =================
+  useEffect(() => {
+  if (!ledger.length || !saleData.length || !companyStateCode) return;
+
+  const gstInter: any[] = [];
+  const gstIntra: any[] = [];
+  const nonGstInter: any[] = [];
+  const nonGstIntra: any[] = [];
+
+  saleData.forEach((sale) => {
+    const l = ledger.find((lg) => lg.id === sale.partyId);
+    if (!l) return;
+
+    // ✅ only allowed ledgers
+    if (!allowedLedgerNames.includes(String(l.name || "").trim())) return;
+
+    // ✅ GST number check (ONLY THIS decides GST / Non-GST)
+    const hasGst = Boolean(l.gstNumber && String(l.gstNumber).trim());
+
+    // ✅ Ledger state code
+    let ledgerStateCode = "";
+
+    if (hasGst) {
+      // GST present → GST number se state
+      ledgerStateCode = l.gstNumber.substring(0, 2);
+    } else {
+      // GST absent → ledger.state se
+      ledgerStateCode = l.state?.match(/\((\d+)\)/)?.[1] || "";
+    }
+
+    if (!ledgerStateCode) return;
+
+    const isSameState = ledgerStateCode === companyStateCode;
+
+    const finalObj = { ...sale, ledger: l };
+
+    // 1️⃣ GST + Inter
+    if (hasGst && !isSameState) {
+      gstInter.push(finalObj);
+    }
+
+    // 2️⃣ GST + Intra
+    else if (hasGst && isSameState) {
+      gstIntra.push(finalObj);
+    }
+
+    // 3️⃣ Non-GST + Inter
+    else if (!hasGst && !isSameState) {
+      nonGstInter.push(finalObj);
+    }
+
+    // 4️⃣ Non-GST + Intra
+    else if (!hasGst && isSameState) {
+      nonGstIntra.push(finalObj);
+    }
+  });
+
+  setGstInterState(gstInter);
+  setGstIntraState(gstIntra);
+  setNonGstInterState(nonGstInter);
+  setNonGstIntraState(nonGstIntra);
+}, [ledger, saleData, companyStateCode]);
+
+
+
+
+  // total logic no no 7 Coloum
+  const toNumber = (v: any) => Number(v || 0);
+  const sumTotal = (arr: any[]) =>
+    arr.reduce((sum, r) => sum + toNumber(r.total), 0);
+
+  // ===== INTER / INTRA REGISTERED (GST) =====
+  const interRegisteredNil = sumTotal(
+    gstInterState.filter((r) => r.ledger.name === "Nil Rated")
+  );
+
+  const interRegisteredExempted = sumTotal(
+    gstInterState.filter((r) => r.ledger.name === "Exempted")
+  );
+
+  const interRegisteredNonGst = sumTotal(
+    gstInterState.filter((r) => r.ledger.name === "Non-gst")
+  );
+
+  const intraRegisteredNil = sumTotal(
+    gstIntraState.filter((r) => r.ledger.name === "Nil Rated")
+  );
+
+  const intraRegisteredExempted = sumTotal(
+    gstIntraState.filter((r) => r.ledger.name === "Exempted")
+  );
+
+  const intraRegisteredNonGst = sumTotal(
+    gstIntraState.filter((r) => r.ledger.name === "Non-gst")
+  );
+
+  // ===== INTER / INTRA UNREGISTERED (NON-GST) =====
+  const interUnregisteredNil = sumTotal(
+    nonGstInterState.filter((r) => r.ledger.name === "Nil Rated")
+  );
+
+  const interUnregisteredExempted = sumTotal(
+    nonGstInterState.filter((r) => r.ledger.name === "Exempted")
+  );
+
+  const interUnregisteredNonGst = sumTotal(
+    nonGstInterState.filter((r) => r.ledger.name === "Non-gst")
+  );
+
+  const intraUnregisteredNil = sumTotal(
+    nonGstIntraState.filter((r) => r.ledger.name === "Nil Rated")
+  );
+
+  const intraUnregisteredExempted = sumTotal(
+    nonGstIntraState.filter((r) => r.ledger.name === "Exempted")
+  );
+
+  const intraUnregisteredNonGst = sumTotal(
+    nonGstIntraState.filter((r) => r.ledger.name === "Non-gst")
+  );
 
   return (
     <div className="pt-[56px] px-4 min-h-screen">
@@ -550,23 +767,33 @@ const GSTR1: React.FC = () => {
               <div className="space-y-3">
                 <div className="flex">
                   <span className="w-32 text-sm font-medium">GSTIN:</span>
-                  <span className="text-sm font-mono">{formData.gstin}</span>
+                  <span className="text-sm font-mono">
+                    {companyData.gst_number}
+                  </span>
                 </div>
                 <div className="flex">
-                  <span className="w-32 text-sm font-medium">Legal Name:</span>
-                  <span className="text-sm">{formData.legalName}</span>
+                  <span className="w-32 text-sm font-medium ">Legal Name:</span>
+                  <span className="text-sm uppercase">
+                    {companyData.name} PRIVATE LIMETED
+                  </span>
                 </div>
                 <div className="flex">
                   <span className="w-32 text-sm font-medium">Trade Name:</span>
-                  <span className="text-sm">{formData.tradeName}</span>
+                  <span className="text-sm uppercase">{companyData.name}</span>
                 </div>
               </div>
               <div className="space-y-3">
                 <div className="flex">
-                  <span className="w-32 text-sm font-medium">
-                    Return Period:
-                  </span>
-                  <span className="text-sm">{formData.returnPeriod}</span>
+                  <span className="w-32 text-sm font-medium">State:</span>
+                  <span className="text-sm uppercase">{companyData.state}</span>
+                </div>
+                <div className="flex">
+                  <span className="w-32 text-sm font-medium">Pan Number:</span>
+                  <span className="text-sm">{companyData.pan_number}</span>
+                </div>
+                <div className="flex">
+                  <span className="w-32 text-sm font-medium">Pin:</span>
+                  <span className="text-sm">{companyData.pin}</span>
                 </div>
               </div>
             </div>
@@ -973,7 +1200,6 @@ const GSTR1: React.FC = () => {
             </div>
           </div>
         </div>
-        
         {/* 5B - B2C Small Supplies Section */}
         <div
           className={`mb-6 rounded-lg border-2 ${
@@ -1167,9 +1393,11 @@ const GSTR1: React.FC = () => {
           >
             {/* LEFT */}
             <div className="min-w-0">
-              <h3 className="text-lg font-bold truncate">6A - Exports</h3>
+              <h3 className="text-lg font-bold truncate">
+                7 - Nil Rated, Exempted and Non GST Outward Supplies
+              </h3>
               <p className="text-sm opacity-90 truncate">
-                Details of Outward Supplies made to SEZ/Exports
+                Details of Outward Supplies which are Nil Rated/Exempted/Non-GST
               </p>
             </div>
 
@@ -1208,59 +1436,62 @@ const GSTR1: React.FC = () => {
                 </thead>
                 <tbody>
                   <tr>
-                    <td className="border border-gray-300 p-2 text-xs">
+                    <td className="border p-2 text-xs">
                       Inter-State supplies to registered persons
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {interRegisteredNil.toFixed(2)}
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {interRegisteredExempted.toFixed(2)}
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {interRegisteredNonGst.toFixed(2)}
                     </td>
                   </tr>
+
                   <tr>
-                    <td className="border border-gray-300 p-2 text-xs">
+                    <td className="border p-2 text-xs">
                       Intra-State supplies to registered persons
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {intraRegisteredNil.toFixed(2)}
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {intraRegisteredExempted.toFixed(2)}
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {intraRegisteredNonGst.toFixed(2)}
                     </td>
                   </tr>
+
                   <tr>
-                    <td className="border border-gray-300 p-2 text-xs">
+                    <td className="border p-2 text-xs">
                       Inter-State supplies to unregistered persons
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {interUnregisteredNil.toFixed(2)}
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {interUnregisteredExempted.toFixed(2)}
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {interUnregisteredNonGst.toFixed(2)}
                     </td>
                   </tr>
+
                   <tr>
-                    <td className="border border-gray-300 p-2 text-xs">
+                    <td className="border p-2 text-xs">
                       Intra-State supplies to unregistered persons
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {intraUnregisteredNil.toFixed(2)}
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {intraUnregisteredExempted.toFixed(2)}
                     </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0.00
+                    <td className="border p-2 text-xs text-right font-mono">
+                      {intraUnregisteredNonGst.toFixed(2)}
                     </td>
                   </tr>
                 </tbody>
