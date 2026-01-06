@@ -221,6 +221,8 @@ import B2BPurchase from "./components/reports/B2BPurchase";
 import B2CPurchase from "./components/reports/B2CPurchase";
 import B2BHsnPurchase from "./components/reports/B2BHsnPurchase";
 import B2CHsnPurchase from "./components/reports/B2CHsnPurchase";
+import Gstr2B2b from "./components/modules/gst/Gstr1/GstrB2b";
+import GstrB2cl from "./components/modules/gst/Gstr1/GstrB2cl";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -872,7 +874,6 @@ function App() {
                   </RequireCompany>
                 }
               />
-
               <Route
                 path="voucher-register/sales/detail/:month"
                 element={
@@ -881,7 +882,6 @@ function App() {
                   </RequireCompany>
                 }
               />
-
               <Route
                 path="voucher-register/purchase"
                 element={
@@ -890,8 +890,7 @@ function App() {
                   </RequireCompany>
                 }
               />
-
-                 <Route
+              <Route
                 path="voucher-register/purchase/detail/:month"
                 element={
                   <RequireCompany>
@@ -899,7 +898,6 @@ function App() {
                   </RequireCompany>
                 }
               />
-
               <Route
                 path="voucher-register/credit-note"
                 element={
@@ -1277,7 +1275,7 @@ function App() {
                   </RequireCompany>
                 }
               />
-                <Route
+              <Route
                 path="reports/b2chsn"
                 element={
                   <RequireCompany>
@@ -1285,7 +1283,7 @@ function App() {
                   </RequireCompany>
                 }
               />
-               <Route
+              <Route
                 path="reports/b2bpurchase"
                 element={
                   <RequireCompany>
@@ -1301,7 +1299,7 @@ function App() {
                   </RequireCompany>
                 }
               />
-                <Route
+              <Route
                 path="reports/b2bhsnpurchase"
                 element={
                   <RequireCompany>
@@ -1331,6 +1329,22 @@ function App() {
                 element={
                   <RequireCompany>
                     <GSTR1 />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="gst/gstr-1/b2b"
+                element={
+                  <RequireCompany>
+                    <Gstr2B2b />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="gst/gstr-1/b2cl"
+                element={
+                  <RequireCompany>
+                    <GstrB2cl />
                   </RequireCompany>
                 }
               />
