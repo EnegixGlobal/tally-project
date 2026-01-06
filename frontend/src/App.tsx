@@ -223,6 +223,7 @@ import B2BHsnPurchase from "./components/reports/B2BHsnPurchase";
 import B2CHsnPurchase from "./components/reports/B2CHsnPurchase";
 import Gstr2B2b from "./components/modules/gst/Gstr1/GstrB2b";
 import GstrB2cl from "./components/modules/gst/Gstr1/GstrB2cl";
+import GstrB2cs from "./components/modules/gst/Gstr1/GstrB2cs";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -1345,6 +1346,14 @@ function App() {
                 element={
                   <RequireCompany>
                     <GstrB2cl />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="gst/gstr-1/b2c-small"
+                element={
+                  <RequireCompany>
+                    <GstrB2cs />
                   </RequireCompany>
                 }
               />

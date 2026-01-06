@@ -1001,7 +1001,7 @@ const GSTR1: React.FC = () => {
             {/* RIGHT */}
             <button
               type="button"
-              onClick={() => navigate("/app/gst/gstr1/b2c-small")}
+              onClick={() => navigate("/app/gst/gstr-1/b2c-small")}
               className="text-xs px-3 py-1 rounded bg-white text-blue-800 font-semibold hover:bg-gray-100"
             >
               View More →
