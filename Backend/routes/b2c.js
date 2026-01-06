@@ -250,4 +250,67 @@ router.get('/b2cl', async (req, res) => {
   }
 });
 
+// Fetch B2C Small (B2CS) transactions - invoice value < 2.5 lakh
+router.get('/b2c-small', async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id, fromDate, toDate } = req.query;
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({ error: 'Missing required parameters.' });
+    }
+
+    const params = [company_id, owner_type, owner_id];
+    let dateFilter = '';
+
+    if (fromDate && toDate) {
+      dateFilter = ' AND sv.date BETWEEN ? AND ?';
+      params.push(fromDate, toDate);
+    }
+
+    const sql = `
+      SELECT
+        sv.id AS voucherId,
+        sv.number AS invoiceNumber,
+        sv.date AS invoiceDate,
+        COALESCE(sv.total, sv.subtotal, 0) AS invoiceValue,
+        sv.subtotal AS taxableValue,
+        sv.cgstTotal AS cgstAmount,
+        sv.sgstTotal AS sgstAmount,
+        sv.igstTotal AS igstAmount,
+        COALESCE(sv.destination, '') AS placeOfSupply,
+        CASE 
+          WHEN sv.igstTotal > 0 THEN 
+            COALESCE((SELECT MAX(igstRate) FROM sales_voucher_items WHERE voucherId = sv.id AND igstRate > 0), 0)
+          ELSE 0
+        END AS igstRate,
+        CASE 
+          WHEN sv.cgstTotal > 0 THEN 
+            COALESCE((SELECT MAX(cgstRate) FROM sales_voucher_items WHERE voucherId = sv.id AND cgstRate > 0), 0)
+          ELSE 0
+        END AS cgstRate,
+        CASE 
+          WHEN sv.sgstTotal > 0 THEN 
+            COALESCE((SELECT MAX(sgstRate) FROM sales_voucher_items WHERE voucherId = sv.id AND sgstRate > 0), 0)
+          ELSE 0
+        END AS sgstRate,
+        0 AS cessRate,
+        0 AS cessAmount
+      FROM sales_vouchers sv
+      JOIN ledgers l ON sv.partyId = l.id
+      WHERE sv.company_id = ?
+        AND sv.owner_type = ?
+        AND sv.owner_id = ?
+        AND (l.gst_number IS NULL OR l.gst_number = '')
+        AND COALESCE(sv.total, sv.subtotal, 0) < 250000
+        ${dateFilter}
+      ORDER BY sv.date DESC, sv.number DESC;
+    `;
+
+    const [rows] = await pool.query(sql, params);
+    res.json(rows);
+  } catch (err) {
+    console.error('Error fetching B2C Small data:', err);
+    res.status(500).json({ error: 'Internal Server Error' });
+  }
+});
+
 module.exports = router;
