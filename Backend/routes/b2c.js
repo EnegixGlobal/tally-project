@@ -237,7 +237,7 @@ router.get('/b2cl', async (req, res) => {
         AND sv.owner_type = ?
         AND sv.owner_id = ?
         AND (l.gst_number IS NULL OR l.gst_number = '')
-        AND COALESCE(sv.total, sv.subtotal, 0) >= 25
+        AND COALESCE(sv.total, sv.subtotal, 0) >= 250000
         ${dateFilter}
       ORDER BY sv.date DESC, sv.number DESC;
     `;
