@@ -1788,7 +1788,7 @@ const PurchaseVoucher: React.FC = () => {
 
                                   return (
                                     <option key={i} value={batch.batchName}>
-                                      {batch.batchName} {qty}
+                                      {`${batch.batchName} — Qty: ${qty}`}
                                     </option>
                                   );
                                 })}

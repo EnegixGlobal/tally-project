@@ -221,7 +221,7 @@ const PurchseReportDetil = () => {
         </button>
 
         {/* TITLE */}
-        <h1 className="text-xl font-bold">Sales Details for {month}</h1>
+        <h1 className="text-xl font-bold">Purchase Details for {month}</h1>
 
         {/* 🔘 RADIO CONTROLS */}
         <div className="flex items-center pt-16 gap-6 text-sm font-medium">
@@ -250,7 +250,7 @@ const PurchseReportDetil = () => {
       </div>
 
       {sales.length === 0 ? (
-        <p className="text-gray-500">No sales found for {month}</p>
+        <p className="text-gray-500">No Purchase found for {month}</p>
       ) : !showDetail ? (
         <>
           {/* ================= SUMMARY VIEW ================= */}
