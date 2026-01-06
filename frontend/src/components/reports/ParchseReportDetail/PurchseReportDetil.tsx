@@ -1,4 +1,5 @@
-import { useEffect, useState, Fragment } from "react";
+import { Filter, X } from "lucide-react";
+import { useEffect, useState, Fragment, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
 
 const PurchseReportDetil = () => {
@@ -7,6 +8,9 @@ const PurchseReportDetil = () => {
 
   const [sales, setSales] = useState<any[]>([]);
   const [showDetail, setShowDetail] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const filterPanelRef = useRef<HTMLDivElement>(null);
   const [groupedSales, setGroupedSales] = useState<
     {
       groupId: number;
@@ -19,6 +23,12 @@ const PurchseReportDetil = () => {
     }[]
   >([]);
 
+  // Date filter states
+  const [filters, setFilters] = useState({
+    fromDate: "",
+    toDate: "",
+  });
+
   const companyId = localStorage.getItem("company_id") || "";
   const ownerType = localStorage.getItem("supplier") || "";
   const ownerId =
@@ -29,12 +39,21 @@ const PurchseReportDetil = () => {
   // 🔹 current year (adjust later for FY logic)
   const year = new Date().getFullYear();
 
+  // Fetch purchase data from backend
   useEffect(() => {
     if (!month || !companyId || !ownerType || !ownerId) return;
 
-    const url = `${
+    setLoading(true);
+
+    // Build URL with date filters if provided
+    let url = `${
       import.meta.env.VITE_API_URL
-    }/api/purchase-vouchers/?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&month=${month}&year=${year}`;
+    }/api/purchase-vouchers/month-wise?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&month=${month}&year=${year}`;
+
+    // Add date filters if provided (these will override month/year on backend)
+    if (filters.fromDate && filters.toDate) {
+      url += `&fromDate=${filters.fromDate}&toDate=${filters.toDate}`;
+    }
 
     fetch(url)
       .then((res) => res.json())
@@ -48,30 +67,34 @@ const PurchseReportDetil = () => {
           data = res;
         }
 
-        // ✅ STRICT MONTH + YEAR FILTER (MAIN FIX)
-        const filteredData = data.filter((sale) => {
-          if (!sale.date) return false;
+        // If date filters are not applied, still filter by month on frontend as fallback
+        if (!filters.fromDate || !filters.toDate) {
+          const filteredData = data.filter((sale) => {
+            if (!sale.date) return false;
 
-          const d = new Date(sale.date);
+            const d = new Date(sale.date);
+            const saleMonth = d.toLocaleString("en-US", {
+              month: "long",
+            });
 
-          const saleMonth = d.toLocaleString("en-US", {
-            month: "long",
+            return (
+              saleMonth.toLowerCase() === month.toLowerCase() &&
+              d.getFullYear() === year
+            );
           });
-
-          return (
-            saleMonth.toLowerCase() === month.toLowerCase() &&
-            d.getFullYear() === year
-          );
-        });
-
-        // ✅ ONLY SELECTED MONTH DATA SET
-        setSales(filteredData);
+          setSales(filteredData);
+        } else {
+          setSales(data);
+        }
       })
       .catch((err) => {
-        console.error("Month-wise sales fetch error:", err);
+        console.error("Month-wise purchase fetch error:", err);
         setSales([]);
+      })
+      .finally(() => {
+        setLoading(false);
       });
-  }, [month, companyId, ownerType, ownerId, year]);
+  }, [month, companyId, ownerType, ownerId, year, filters.fromDate, filters.toDate]);
 
   // get ledger and group data
   const [ledgers, setLedgers] = useState<any[]>([]);
@@ -141,6 +164,41 @@ const PurchseReportDetil = () => {
 
     fetchData();
   }, []);
+
+  // Close filter panel when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (
+        filterPanelRef.current &&
+        !filterPanelRef.current.contains(event.target as Node)
+      ) {
+        setShowFilterPanel(false);
+      }
+    };
+
+    if (showFilterPanel) {
+      document.addEventListener("mousedown", handleClickOutside);
+    }
+
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, [showFilterPanel]);
+
+  const handleFilterChange = (name: string, value: string) => {
+    setFilters((prev) => ({ ...prev, [name]: value }));
+  };
+
+  const resetFilters = () => {
+    setFilters({
+      fromDate: "",
+      toDate: "",
+    });
+  };
+
+  const hasActiveFilters = () => {
+    return filters.fromDate !== "" || filters.toDate !== "";
+  };
 
   useEffect(() => {
     if (!sales.length || !ledgers.length) return;
@@ -223,8 +281,93 @@ const PurchseReportDetil = () => {
         {/* TITLE */}
         <h1 className="text-xl font-bold">Purchase Details for {month}</h1>
 
-        {/* 🔘 RADIO CONTROLS */}
-        <div className="flex items-center pt-16 gap-6 text-sm font-medium">
+        {/* 🔘 FILTER BUTTON & RADIO CONTROLS */}
+        <div className="flex items-center pt-16 gap-4 text-sm font-medium">
+          {/* 🔍 FILTER BUTTON */}
+          <div className="relative" ref={filterPanelRef}>
+            <button
+              onClick={() => setShowFilterPanel(!showFilterPanel)}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
+                hasActiveFilters()
+                  ? "bg-blue-50 border-blue-500 text-blue-700 hover:bg-blue-100"
+                  : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+              }`}
+            >
+              <Filter className="w-4 h-4" />
+              Filter
+              {hasActiveFilters() && (
+                <span className="ml-1 px-1.5 py-0.5 bg-blue-500 text-white text-xs rounded-full">
+                  {filters.fromDate && filters.toDate ? "1" : "0"}
+                </span>
+              )}
+            </button>
+
+            {/* FILTER PANEL DROPDOWN */}
+            {showFilterPanel && (
+              <div className="absolute right-0 top-full mt-2 w-80 bg-white border border-gray-200 rounded-lg shadow-xl z-50 p-4">
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="font-semibold text-gray-900">Date Filter</h3>
+                  <button
+                    onClick={() => setShowFilterPanel(false)}
+                    className="text-gray-400 hover:text-gray-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* Date Range */}
+                  <div className="grid grid-cols-2 gap-2">
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        From Date
+                      </label>
+                      <input
+                        type="date"
+                        value={filters.fromDate}
+                        onChange={(e) => handleFilterChange("fromDate", e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">
+                        To Date
+                      </label>
+                      <input
+                        type="date"
+                        value={filters.toDate}
+                        onChange={(e) => handleFilterChange("toDate", e.target.value)}
+                        className="w-full p-2 border border-gray-300 rounded-md text-sm"
+                      />
+                    </div>
+                  </div>
+
+                  <p className="text-xs text-gray-500">
+                    Select a date range to filter purchase data. Data will be fetched from the backend based on your selection.
+                  </p>
+                </div>
+
+                {/* Filter Actions */}
+                <div className="flex items-center justify-between mt-4 pt-4 border-t border-gray-200">
+                  <button
+                    onClick={resetFilters}
+                    className="text-sm text-gray-600 hover:text-gray-900 underline"
+                  >
+                    Reset Filters
+                  </button>
+                  <button
+                    onClick={() => setShowFilterPanel(false)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm"
+                  >
+                    Apply
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* 🔘 RADIO CONTROLS */}
+          <div className="flex items-center gap-6">
           <label className="flex items-center gap-2 cursor-pointer">
             <input
               type="radio"
@@ -246,11 +389,16 @@ const PurchseReportDetil = () => {
             />
             Detail
           </label>
+          </div>
         </div>
       </div>
 
-      {sales.length === 0 ? (
-        <p className="text-gray-500">No Purchase found for {month}</p>
+      {loading ? (
+        <p className="text-gray-500">Loading purchase data...</p>
+      ) : sales.length === 0 ? (
+        <p className="text-gray-500">
+          No Purchase found {filters.fromDate && filters.toDate ? `for the selected date range` : `for ${month}`}
+        </p>
       ) : !showDetail ? (
         <>
           {/* ================= SUMMARY VIEW ================= */}
