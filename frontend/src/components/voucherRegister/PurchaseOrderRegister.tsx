@@ -5,7 +5,7 @@ import Swal from "sweetalert2";
 import { useNavigate } from "react-router-dom";
 
 const PurchaseOrderRegister: React.FC = () => {
-  const navigate = useNavigate(); // ✅ React router navigation
+  const navigate = useNavigate(); 
 
   const handleEdit = (voucher: any) => {
     navigate(`/app/vouchers/purchase-order/edit/${voucher.id}`);

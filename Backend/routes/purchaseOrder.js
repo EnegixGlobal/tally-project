@@ -220,14 +220,17 @@ router.get("/", async (req, res) => {
     let whereClause = "WHERE 1=1";
     const params = [];
 
-    // ---- Filters ----
+    /* ===============================
+       FILTERS
+    =============================== */
     if (status) {
       whereClause += " AND po.status = ?";
       params.push(status);
     }
 
+    // 🔥 IMPORTANT: filter by purchase_ledger_id
     if (partyId) {
-      whereClause += " AND po.party_id = ?";
+      whereClause += " AND po.purchase_ledger_id = ?";
       params.push(partyId);
     }
 
@@ -243,7 +246,9 @@ router.get("/", async (req, res) => {
 
     const offset = (Number(page) - 1) * Number(limit);
 
-    // ---- MAIN DATA QUERY ----
+    /* ===============================
+       MAIN DATA QUERY
+    =============================== */
     const [rows] = await db.execute(
       `
       SELECT
@@ -254,20 +259,18 @@ router.get("/", async (req, res) => {
         po.status,
         po.narration,
 
-        -- 🔥 IMPORTANT ALIASES (Frontend expects these)
-        po.party_id           AS partyId,
-        po.purchase_ledger_id AS purchaseLedgerId,
+        -- ✅ FRONTEND "Party" COLUMN WILL USE THIS
+        po.purchase_ledger_id AS partyId,
+        purchaseLedger.name  AS party_name,
 
-        -- Party (Supplier) details from ledgers
-        supplier.name       AS party_name,
-        supplier.gst_number AS party_gst,
-
-        -- Purchase ledger name
-        purchaseLedger.name AS purchase_ledger_name,
+        -- 🔹 Supplier info (optional, future use)
+        po.party_id           AS supplierId,
+        supplier.name         AS supplier_name,
+        supplier.gst_number   AS supplier_gst,
 
         -- Summary
-        COUNT(poi.id)                  AS item_count,
-        COALESCE(SUM(poi.amount), 0)   AS totalAmount
+        COUNT(poi.id)                AS item_count,
+        COALESCE(SUM(poi.amount), 0) AS totalAmount
 
       FROM purchase_orders po
 
@@ -289,21 +292,24 @@ router.get("/", async (req, res) => {
       [...params, Number(limit), offset]
     );
 
-    // ---- TOTAL COUNT (for pagination) ----
+    /* ===============================
+       TOTAL COUNT (PAGINATION)
+    =============================== */
     const [countRows] = await db.execute(
       `
       SELECT COUNT(DISTINCT po.id) AS total
       FROM purchase_orders po
-      LEFT JOIN ledgers supplier ON po.party_id = supplier.id
       ${whereClause}
       `,
       params
     );
 
-    // ---- FRONTEND-COMPATIBLE RESPONSE ----
+    /* ===============================
+       RESPONSE
+    =============================== */
     res.json({
       success: true,
-      data: rows, // 🔥 frontend uses json.data
+      data: rows,
       pagination: {
         total: countRows[0].total,
         page: Number(page),
@@ -320,6 +326,7 @@ router.get("/", async (req, res) => {
     });
   }
 });
+
 
 
 // Update Purchase Order status
