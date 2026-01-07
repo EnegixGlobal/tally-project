@@ -1,9 +1,9 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const db = require('../db'); // mysql2/promise pool
+const db = require("../db"); // mysql2/promise pool
 
 // Create Purchase Order
-router.post('/', async (req, res) => {
+router.post("/", async (req, res) => {
   const {
     date,
     number,
@@ -16,15 +16,24 @@ router.post('/', async (req, res) => {
     orderRef,
     termsOfDelivery,
     expectedDeliveryDate,
-    status = 'pending',
+    status = "pending",
     companyId,
     ownerType,
-    ownerId
+    ownerId,
   } = req.body;
 
-  if (!date || !partyId || !purchaseLedgerId || !items.length || !companyId || !ownerType || !ownerId) {
-    return res.status(400).json({ 
-      message: 'Missing required fields: date, partyId, purchaseLedgerId, companyId, ownerType, ownerId, and items are required' 
+  if (
+    !date ||
+    !partyId ||
+    !purchaseLedgerId ||
+    !items.length ||
+    !companyId ||
+    !ownerType ||
+    !ownerId
+  ) {
+    return res.status(400).json({
+      message:
+        "Missing required fields: date, partyId, purchaseLedgerId, companyId, ownerType, ownerId, and items are required",
     });
   }
 
@@ -56,7 +65,7 @@ router.post('/', async (req, res) => {
         dispatchDetails.docNo || null,
         companyId,
         ownerType,
-        ownerId
+        ownerId,
       ]
     );
 
@@ -65,7 +74,7 @@ router.post('/', async (req, res) => {
     // Insert items into purchase_order_items table
     for (const item of items) {
       if (!item.itemId || !item.quantity || !item.rate) {
-        throw new Error('Each item must have itemId, quantity, and rate');
+        throw new Error("Each item must have itemId, quantity, and rate");
       }
 
       await conn.execute(
@@ -80,11 +89,11 @@ router.post('/', async (req, res) => {
           item.quantity,
           item.rate,
           item.discount || 0,
-          item.amount || (item.quantity * item.rate - (item.discount || 0)),
+          item.amount || item.quantity * item.rate - (item.discount || 0),
           item.godownId || null,
           companyId,
           ownerType,
-          ownerId
+          ownerId,
         ]
       );
     }
@@ -93,244 +102,429 @@ router.post('/', async (req, res) => {
     conn.release();
 
     res.status(201).json({
-      message: 'Purchase Order created successfully',
+      message: "Purchase Order created successfully",
       purchaseOrderId,
-      number: number || `PO${purchaseOrderId.toString().padStart(4, '0')}`
+      number: number || `PO${purchaseOrderId.toString().padStart(4, "0")}`,
     });
-
   } catch (err) {
     await conn.rollback();
     conn.release();
-    console.error('Purchase Order creation failed:', err);
+    console.error("Purchase Order creation failed:", err);
     res.status(500).json({
-      message: 'Failed to create Purchase Order',
-      error: err.message
+      message: "Failed to create Purchase Order",
+      error: err.message,
     });
   }
 });
 
-
 // Get Purchase Order by ID
-router.get('/:id', async (req, res) => {
+router.get("/:id", async (req, res) => {
   const { id } = req.params;
 
+
   try {
+    // 🔥 SAME COLUMNS AS LIST GET
     const [orderRows] = await db.execute(
-      `SELECT po.*, 
-              p.name as party_name, p.gst_number as party_gst,
-              pl.name as purchase_ledger_name
-       FROM purchase_orders po
-       LEFT JOIN parties p ON po.party_id = p.id
-       LEFT JOIN ledgers pl ON po.purchase_ledger_id = pl.id
-       WHERE po.id = ?`,
+      `
+      SELECT
+        po.id,
+        po.date,
+        po.number,
+        po.reference_no,
+        po.status,
+        po.narration,
+        po.expected_delivery_date AS expectedDeliveryDate,
+
+        po.party_id           AS partyId,
+        po.purchase_ledger_id AS purchaseLedgerId,
+
+        supplier.name       AS party_name,
+        supplier.gst_number AS party_gst,
+
+        purchaseLedger.name AS purchase_ledger_name,
+
+        COALESCE(SUM(poi.amount), 0) AS totalAmount
+
+      FROM purchase_orders po
+
+      LEFT JOIN ledgers supplier
+        ON po.party_id = supplier.id
+
+      LEFT JOIN ledgers purchaseLedger
+        ON po.purchase_ledger_id = purchaseLedger.id
+
+      LEFT JOIN purchase_order_items poi
+        ON po.id = poi.purchase_order_id
+
+      WHERE po.id = ?
+      GROUP BY po.id
+      `,
       [id]
     );
 
     if (orderRows.length === 0) {
-      return res.status(404).json({ message: 'Purchase Order not found' });
+      return res.status(404).json({ message: "Purchase Order not found" });
     }
 
+    // 🔥 ITEMS (NO extra columns)
     const [itemRows] = await db.execute(
-      `SELECT poi.*, si.name as item_name, si.unit, si.hsn_code as item_hsn
-       FROM purchase_order_items poi
-       LEFT JOIN stock_items si ON poi.item_id = si.id
-       WHERE poi.purchase_order_id = ?
-       ORDER BY poi.id`,
+      `
+      SELECT
+        poi.id,
+        poi.item_id,
+        poi.hsn_code,
+        poi.quantity,
+        poi.rate,
+        poi.discount,
+        poi.amount,
+        poi.godown_id,
+
+        si.name AS item_name,
+        si.unit
+
+      FROM purchase_order_items poi
+      LEFT JOIN stock_items si ON poi.item_id = si.id
+      WHERE poi.purchase_order_id = ?
+      ORDER BY poi.id
+      `,
       [id]
     );
 
-    const purchaseOrder = {
-      ...orderRows[0],
-      items: itemRows
-    };
-
-    res.json(purchaseOrder);
-
+    res.json({
+      ...orderRows[0],   // 🔥 same as list
+      items: itemRows,   // 🔥 extra only here
+    });
   } catch (err) {
-    console.error('Error fetching Purchase Order:', err);
+    console.error("Error fetching Purchase Order:", err);
     res.status(500).json({
-      message: 'Failed to fetch Purchase Order',
-      error: err.message
+      message: "Failed to fetch Purchase Order",
+      error: err.message,
     });
   }
 });
 
-// Get all Purchase Orders with filters
-router.get('/', async (req, res) => {
-  const { 
-    status, 
-    partyId, 
-    fromDate, 
-    toDate, 
-    page = 1, 
-    limit = 50 
+
+// Get all Purchase Orders with filters (FIXED)
+
+router.get("/", async (req, res) => {
+  const {
+    status,
+    partyId,
+    fromDate,
+    toDate,
+    page = 1,
+    limit = 50,
   } = req.query;
 
   try {
-    let whereClause = 'WHERE 1=1';
+    let whereClause = "WHERE 1=1";
     const params = [];
 
+    // ---- Filters ----
     if (status) {
-      whereClause += ' AND po.status = ?';
+      whereClause += " AND po.status = ?";
       params.push(status);
     }
 
     if (partyId) {
-      whereClause += ' AND po.party_id = ?';
+      whereClause += " AND po.party_id = ?";
       params.push(partyId);
     }
 
     if (fromDate) {
-      whereClause += ' AND po.date >= ?';
+      whereClause += " AND po.date >= ?";
       params.push(fromDate);
     }
 
     if (toDate) {
-      whereClause += ' AND po.date <= ?';
+      whereClause += " AND po.date <= ?";
       params.push(toDate);
     }
 
-    const offset = (page - 1) * limit;
+    const offset = (Number(page) - 1) * Number(limit);
 
+    // ---- MAIN DATA QUERY ----
     const [rows] = await db.execute(
-      `SELECT po.id, po.date, po.number, po.status, po.narration,
-              p.name as party_name, p.gst_number as party_gst,
-              pl.name as purchase_ledger_name,
-              COUNT(poi.id) as item_count,
-              SUM(poi.amount) as total_amount
-       FROM purchase_orders po
-       LEFT JOIN parties p ON po.party_id = p.id
-       LEFT JOIN ledgers pl ON po.purchase_ledger_id = pl.id
-       LEFT JOIN purchase_order_items poi ON po.id = poi.purchase_order_id
-       ${whereClause}
-       GROUP BY po.id
-       ORDER BY po.date DESC, po.id DESC
-       LIMIT ? OFFSET ?`,
-      [...params, parseInt(limit), offset]
+      `
+      SELECT
+        po.id,
+        po.date,
+        po.number,
+        po.reference_no,
+        po.status,
+        po.narration,
+
+        -- 🔥 IMPORTANT ALIASES (Frontend expects these)
+        po.party_id           AS partyId,
+        po.purchase_ledger_id AS purchaseLedgerId,
+
+        -- Party (Supplier) details from ledgers
+        supplier.name       AS party_name,
+        supplier.gst_number AS party_gst,
+
+        -- Purchase ledger name
+        purchaseLedger.name AS purchase_ledger_name,
+
+        -- Summary
+        COUNT(poi.id)                  AS item_count,
+        COALESCE(SUM(poi.amount), 0)   AS totalAmount
+
+      FROM purchase_orders po
+
+      LEFT JOIN ledgers supplier
+        ON po.party_id = supplier.id
+
+      LEFT JOIN ledgers purchaseLedger
+        ON po.purchase_ledger_id = purchaseLedger.id
+
+      LEFT JOIN purchase_order_items poi
+        ON po.id = poi.purchase_order_id
+
+      ${whereClause}
+
+      GROUP BY po.id
+      ORDER BY po.date DESC, po.id DESC
+      LIMIT ? OFFSET ?
+      `,
+      [...params, Number(limit), offset]
     );
 
-    // Get total count for pagination
+    // ---- TOTAL COUNT (for pagination) ----
     const [countRows] = await db.execute(
-      `SELECT COUNT(DISTINCT po.id) as total
-       FROM purchase_orders po
-       LEFT JOIN parties p ON po.party_id = p.id
-       ${whereClause}`,
+      `
+      SELECT COUNT(DISTINCT po.id) AS total
+      FROM purchase_orders po
+      LEFT JOIN ledgers supplier ON po.party_id = supplier.id
+      ${whereClause}
+      `,
       params
     );
 
+    // ---- FRONTEND-COMPATIBLE RESPONSE ----
     res.json({
-      purchaseOrders: rows,
+      success: true,
+      data: rows, // 🔥 frontend uses json.data
       pagination: {
         total: countRows[0].total,
-        page: parseInt(page),
-        limit: parseInt(limit),
-        totalPages: Math.ceil(countRows[0].total / limit)
-      }
+        page: Number(page),
+        limit: Number(limit),
+        totalPages: Math.ceil(countRows[0].total / Number(limit)),
+      },
     });
-
   } catch (err) {
-    console.error('Error fetching Purchase Orders:', err);
+    console.error("Error fetching Purchase Orders:", err);
     res.status(500).json({
-      message: 'Failed to fetch Purchase Orders',
-      error: err.message
+      success: false,
+      message: "Failed to fetch Purchase Orders",
+      error: err.message,
     });
   }
 });
+
 
 // Update Purchase Order status
-router.put('/:id/status', async (req, res) => {
+router.put("/:id", async (req, res) => {
   const { id } = req.params;
-  const { status, remarks } = req.body;
+  const body = req.body;
 
-  const validStatuses = ['pending', 'confirmed', 'partially_received', 'completed', 'cancelled'];
-  
-  if (!status || !validStatuses.includes(status)) {
-    return res.status(400).json({ 
-      message: 'Invalid status. Valid statuses: ' + validStatuses.join(', ')
-    });
-  }
+  const conn = await db.getConnection();
 
   try {
-    const [result] = await db.execute(
-      `UPDATE purchase_orders 
-       SET status = ?, remarks = ?, updated_at = NOW()
-       WHERE id = ?`,
-      [status, remarks || null, id]
-    );
+    await conn.beginTransaction();
 
-    if (result.affectedRows === 0) {
-      return res.status(404).json({ message: 'Purchase Order not found' });
+    /* ===============================
+       1️⃣ PURCHASE ORDERS UPDATE
+    =============================== */
+
+    const fieldMap = {
+      date: "date",
+      number: "number",
+      partyId: "party_id",
+      purchaseLedgerId: "purchase_ledger_id",
+      referenceNo: "reference_no",
+      narration: "narration",
+      orderRef: "order_ref",
+      termsOfDelivery: "terms_of_delivery",
+      expectedDeliveryDate: "expected_delivery_date",
+      status: "status",
+      companyId: "company_id",
+      ownerType: "owner_type",
+      ownerId: "owner_id",
+    };
+
+    const setParts = [];
+    const values = [];
+
+    for (const key in fieldMap) {
+      if (body[key] !== undefined) {
+        setParts.push(`${fieldMap[key]} = ?`);
+        values.push(body[key]);
+      }
     }
 
-    res.json({ 
-      message: 'Purchase Order status updated successfully',
-      status 
-    });
+    // dispatchDetails mapping
+    if (body.dispatchDetails) {
+      const d = body.dispatchDetails;
+      if (d.destination !== undefined) {
+        setParts.push("dispatch_destination = ?");
+        values.push(d.destination);
+      }
+      if (d.through !== undefined) {
+        setParts.push("dispatch_through = ?");
+        values.push(d.through);
+      }
+      if (d.docNo !== undefined) {
+        setParts.push("dispatch_doc_no = ?");
+        values.push(d.docNo);
+      }
+    }
 
-  } catch (err) {
-    console.error('Error updating Purchase Order status:', err);
-    res.status(500).json({
-      message: 'Failed to update Purchase Order status',
-      error: err.message
+    if (setParts.length > 0) {
+      const updateOrderSql = `
+        UPDATE purchase_orders
+        SET ${setParts.join(", ")}, updated_at = NOW()
+        WHERE id = ?
+      `;
+
+      await conn.execute(updateOrderSql, [...values, id]);
+    }
+
+    /* ===============================
+       2️⃣ PURCHASE ORDER ITEMS UPDATE
+    =============================== */
+
+    if (Array.isArray(body.items)) {
+      // 🔥 delete old items
+      await conn.execute(
+        "DELETE FROM purchase_order_items WHERE purchase_order_id = ?",
+        [id]
+      );
+
+      // 🔥 insert new items
+      for (const item of body.items) {
+        await conn.execute(
+          `
+          INSERT INTO purchase_order_items
+          (
+            purchase_order_id,
+            item_id,
+            hsn_code,
+            quantity,
+            rate,
+            discount,
+            amount,
+            godown_id,
+            company_id,
+            owner_type,
+            owner_id
+          )
+          VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+          `,
+          [
+            id,
+            item.itemId,
+            item.hsnCode || null,
+            item.quantity,
+            item.rate,
+            item.discount || 0,
+            item.amount,
+            item.godownId || null,
+            body.companyId,
+            body.ownerType,
+            body.ownerId,
+          ]
+        );
+      }
+    }
+
+    await conn.commit();
+
+    res.json({
+      success: true,
+      message: "Purchase Order updated successfully",
     });
+  } catch (err) {
+    await conn.rollback();
+    console.error("PUT PURCHASE ORDER ERROR:", err);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to update Purchase Order",
+      error: err.message,
+    });
+  } finally {
+    conn.release();
   }
 });
 
+
+
 // Delete Purchase Order
-router.delete('/:id', async (req, res) => {
+router.delete("/:id", async (req, res) => {
   const { id } = req.params;
+  if (!id || isNaN(Number(id))) {
+    return res.status(400).json({
+      message: "Invalid Purchase Order ID",
+    });
+  }
 
   const conn = await db.getConnection();
-  await conn.beginTransaction();
-
   try {
-    // Check if purchase order exists and can be deleted
+    await conn.beginTransaction();
+
+    // 🔎 Check PO
     const [orderRows] = await conn.execute(
-      'SELECT status FROM purchase_orders WHERE id = ?',
-      [id]
+      "SELECT status FROM purchase_orders WHERE id = ?",
+      [Number(id)]
     );
 
     if (orderRows.length === 0) {
       await conn.rollback();
-      conn.release();
-      return res.status(404).json({ message: 'Purchase Order not found' });
+      return res.status(404).json({ message: "Purchase Order not found" });
     }
 
-    // Don't allow deletion if order is completed or has been partially received
-    if (['completed', 'partially_received'].includes(orderRows[0].status)) {
+    const status = String(orderRows[0].status || "").toLowerCase();
+
+    if (["completed", "partially_received"].includes(status)) {
       await conn.rollback();
-      conn.release();
-      return res.status(400).json({ 
-        message: 'Cannot delete Purchase Order that has been received or completed' 
+      return res.status(400).json({
+        message:
+          "Cannot delete Purchase Order that is completed or partially received",
       });
     }
 
-    // Delete items first (foreign key constraint)
+    // 🔥 DELETE CHILD FIRST
     await conn.execute(
-      'DELETE FROM purchase_order_items WHERE purchase_order_id = ?',
-      [id]
+      "DELETE FROM purchase_order_items WHERE purchase_order_id = ?",
+      [Number(id)]
     );
 
-    // Delete purchase order
+    // 🔥 DELETE PARENT
     await conn.execute(
-      'DELETE FROM purchase_orders WHERE id = ?',
-      [id]
+      "DELETE FROM purchase_orders WHERE id = ?",
+      [Number(id)]
     );
 
     await conn.commit();
-    conn.release();
 
-    res.json({ message: 'Purchase Order deleted successfully' });
-
+    res.json({
+      success: true,
+      message: "Purchase Order deleted successfully",
+      id: Number(id),
+    });
   } catch (err) {
     await conn.rollback();
-    conn.release();
-    console.error('Error deleting Purchase Order:', err);
+    console.error("Delete PO Error:", err);
+
     res.status(500).json({
-      message: 'Failed to delete Purchase Order',
-      error: err.message
+      success: false,
+      message: "Failed to delete Purchase Order",
+      error: err.message,
     });
+  } finally {
+    conn.release();
   }
 });
+
 
 module.exports = router;

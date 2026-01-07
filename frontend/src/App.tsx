@@ -225,6 +225,7 @@ import Gstr2B2b from "./components/modules/gst/Gstr1/GstrB2b";
 import GstrB2cl from "./components/modules/gst/Gstr1/GstrB2cl";
 import GstrB2cs from "./components/modules/gst/Gstr1/GstrB2cs";
 import HSNSummary from "./components/modules/gst/Gstr1/HSNSummary";
+import PurchaseOrderRegister from "./components/voucherRegister/PurchaseOrderRegister";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -921,6 +922,14 @@ function App() {
                 element={
                   <RequireCompany>
                     <SalesOrderRegister />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="voucher-register/purchase-order"
+                element={
+                  <RequireCompany>
+                    <PurchaseOrderRegister />
                   </RequireCompany>
                 }
               />

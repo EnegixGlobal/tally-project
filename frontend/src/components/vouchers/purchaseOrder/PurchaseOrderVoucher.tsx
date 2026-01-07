@@ -87,29 +87,94 @@ const PurchaseOrderVoucher: React.FC = () => {
   );
 
   type PartyLedger = LedgerWithGroup & {
-  currentBalance?: number;
-  gstNumber?: string;
-  state?: string;
-};
+    currentBalance?: number;
+    gstNumber?: string;
+    state?: string;
+  };
 
+  const [loadedPO, setLoadedPO] = useState<any>(null);
+
+  //get sinlge data
+  useEffect(() => {
+    if (!isEditMode || !id) return;
+
+    const fetchPurchaseOrder = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/purchase-orders/${id}`
+        );
+        const data = await res.json();
+        setLoadedPO(data);
+      } catch (err) {
+        Swal.fire("Error", "Failed to load purchase order", "error");
+      }
+    };
+
+    fetchPurchaseOrder();
+  }, [id, isEditMode]);
 
   const [ledgers, setLedgers] = useState<PartyLedger[]>([]);
+
+  useEffect(() => {
+    if (!loadedPO) return;
+    if (ledgers.length === 0) return;
+
+    setFormData({
+      id: String(loadedPO.id),
+      date: loadedPO.date?.split("T")[0] || "",
+      number: loadedPO.number || "",
+
+      partyId: String(loadedPO.partyId),
+      purchaseLedgerId: String(loadedPO.purchaseLedgerId),
+
+      referenceNo: loadedPO.reference_no || "",
+      narration: loadedPO.narration || "",
+      orderRef: loadedPO.order_ref || "",
+      termsOfDelivery: loadedPO.terms_of_delivery || "",
+
+      expectedDeliveryDate: loadedPO.expectedDeliveryDate
+        ? loadedPO.expectedDeliveryDate.split("T")[0]
+        : "",
+
+      status: loadedPO.status || "pending",
+
+      dispatchDetails: {
+        destination: loadedPO.dispatch_destination || "",
+        through: loadedPO.dispatch_through || "",
+        docNo: loadedPO.dispatch_doc_no || "",
+      },
+
+      items: (loadedPO.items || []).map((item: any, index: number) => ({
+        id: String(index + 1),
+        itemId: String(item.item_id),
+        itemName: item.item_name,
+        hsnCode: item.hsn_code || "",
+        quantity: Number(item.quantity),
+        rate: Number(item.rate),
+        discount: Number(item.discount || 0),
+        amount: Number(item.amount),
+        godownId: item.godown_id ? String(item.godown_id) : "",
+        unit: item.unit || "",
+      })),
+    });
+  }, [loadedPO, ledgers]);
 
   const [godowns, setGodowns] = useState<Godown[]>([]);
   useEffect(() => {
     const fetchGodowns = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
 
-        console.log("GODOWNS RESPONSE:", data);
+  
 
-        if (Array.isArray(data)) {
-          setGodowns(data);
-        } else if (Array.isArray(data.godowns)) {
-          setGodowns(data.godowns);
+        // ✅ CORRECT PARSING
+        if (Array.isArray(data.data)) {
+          setGodowns(data.data);
         } else {
           setGodowns([]);
         }
@@ -128,7 +193,9 @@ const PurchaseOrderVoucher: React.FC = () => {
   useEffect(() => {
     const fetchLedgers = async () => {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
       );
       const data = await res.json();
       setLedgers(data);
@@ -142,11 +209,12 @@ const PurchaseOrderVoucher: React.FC = () => {
     const fetchStockItems = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
 
-        console.log("STOCK ITEMS RESPONSE:", data);
 
         if (Array.isArray(data.data)) {
           setStockItems(data.data); // ✔ Correct location
@@ -363,16 +431,17 @@ const PurchaseOrderVoucher: React.FC = () => {
           ownerId,
         };
 
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/purchase-orders`,
-          {
-            method: isEditMode ? "PUT" : "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          }
-        );
+        const url = isEditMode
+          ? `${import.meta.env.VITE_API_URL}/api/purchase-orders/${id}`
+          : `${import.meta.env.VITE_API_URL}/api/purchase-orders`;
+
+        const response = await fetch(url, {
+          method: isEditMode ? "PUT" : "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
 
         const data = await response.json();
 

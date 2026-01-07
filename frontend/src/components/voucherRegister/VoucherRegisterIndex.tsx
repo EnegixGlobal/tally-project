@@ -138,6 +138,17 @@ const VoucherRegisterIndex: React.FC = () => {
           count: getVoucherCount('sales-order')
         },
         {
+          id: 'purchase-order-register',
+          icon: <Clipboard size={20} />,
+          name: 'Purchase Order Register',
+          path: '/app/voucher-register/purchase-order',
+          color: theme === 'dark' ? 'bg-sky-900/50 hover:bg-sky-800/50' : 'bg-sky-50 hover:bg-sky-100',
+          iconBg: theme === 'dark' ? 'bg-sky-800/70' : 'bg-sky-100',
+          description: 'View all sales orders',
+          category: 'trading',
+          count: getVoucherCount('purchase-order')
+        },
+        {
           id: 'quotation-register',
           icon: <FileText size={20} />,
           name: 'Quotation Register',
