@@ -1939,7 +1939,7 @@ B - Credit/Debit Notes (Unregistered) */}
             {/* RIGHT */}
             <button
               type="button"
-              onClick={() => navigate("/app/gst/gstr1/hsn-summary")}
+              onClick={() => navigate("/app/gst/gstr-1/hsn-summary")}
               className="self-start sm:self-auto text-xs px-3 py-1 rounded bg-white text-blue-800 font-semibold hover:bg-gray-100 transition whitespace-nowrap"
             >
               View More →
