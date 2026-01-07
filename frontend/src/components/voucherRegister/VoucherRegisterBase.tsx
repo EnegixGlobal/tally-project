@@ -429,6 +429,52 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       };
     }
 
+    // ---------------------- PURCHASE ORDER ----------------------
+    if (voucherType === "purchase_order") {
+      const partyId =
+        p.partyId || p.supplierId || p.party_id || p.supplier_id || null;
+
+      const orderDate = p.orderDate || p.date || "";
+
+      const referenceNo =
+        p.referenceNo ||
+        p.reference_no ||
+        p.orderNo ||
+        p.order_no ||
+        p.number ||
+        "";
+
+      const total = Number(p.totalAmount || p.total || 0);
+
+      return {
+        id: String(p.id),
+        date: orderDate,
+        number: p.number,
+        referenceNo: p.reference_no || null,
+        type: "purchase_order",
+
+        supplierInvoiceDate: orderDate,
+        subtotal: total,
+        cgstTotal: 0,
+        sgstTotal: 0,
+        igstTotal: 0,
+        total,
+
+        entries: [
+          {
+            ledgerId: partyId, // Supplier
+            type: "credit",
+            amount: total,
+          },
+          {
+            ledgerId: "Purchase Order",
+            type: "debit",
+            amount: total,
+          },
+        ],
+      };
+    }
+
     // ---------------------- RECEIPT ----------------------
     if (voucherType === "receipt") {
       return {
@@ -1348,7 +1394,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     <td className="px-6 py-4 text-sm text-gray-900">
                       {subtotal.toLocaleString()}
                     </td>
-                   
 
                     {/* GST Total */}
                     <td className="px-6 py-4 text-sm text-gray-900">
@@ -1381,7 +1426,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
                       {onDelete && (
                         <button
-                          onClick={() => onDelete(String(voucher.id))} 
+                          onClick={() => onDelete(String(voucher.id))}
                           className="text-red-600 hover:text-red-900"
                         >
                           Delete
@@ -1413,7 +1458,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         )
                       )}
                     </td>
-                    
                   </>
                 ) : (
                   <>

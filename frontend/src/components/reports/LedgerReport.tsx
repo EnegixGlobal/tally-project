@@ -212,6 +212,7 @@ const LedgerReport: React.FC = () => {
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
+        console.log("this is ledger", data);
 
         setLedgers(data);
       } catch (err) {
@@ -222,6 +223,13 @@ const LedgerReport: React.FC = () => {
     fetchLedgers();
   }, []);
   // Fetch when ledger or date range changes
+  const ledgerIdNameMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    ledgers.forEach((l) => {
+      map[l.id] = l.name;
+    });
+    return map;
+  }, [ledgers]);
 
   // URL param init - update ledgerId, NOT selectedLedger
   useEffect(() => {
@@ -670,11 +678,12 @@ const LedgerReport: React.FC = () => {
                     </tr>
                   </thead>
                   <tbody className=" ">
-                    {groupedByVoucher.map((voucherGroup, index) => {
+                    {groupedByVoucher.map((voucherGroup) => {
                       const first = voucherGroup[0];
+                      const voucherKey = `${first.date}_${first.voucherNo}_${first.voucherType}`;
 
                       return (
-                        <React.Fragment key={index}>
+                        <React.Fragment key={voucherKey}>
                           {voucherGroup.map((txn, i) => (
                             <tr
                               key={txn.id}
@@ -691,7 +700,10 @@ const LedgerReport: React.FC = () => {
 
                               {/* Particulars */}
                               <td className="px-4 py-3 text-sm">
-                                {i === 0 ? first.particulars : ""}
+                                {i === 0
+                                  ? ledgerIdNameMap[first.particulars] ||
+                                    first.particulars
+                                  : ""}
                               </td>
 
                               {/* Voucher Type */}
@@ -718,8 +730,8 @@ const LedgerReport: React.FC = () => {
 
                               {/* Balance */}
                               <td className="px-4 py-3 text-sm text-right font-mono font-medium">
-                                {formatCurrency(Math.abs(txn.balance))}{" "}
-                                {txn.balance >= 0 ? "Dr" : "Cr"}
+                                {/* {formatCurrency(Math.abs(txn.balance))}{" "}
+                                {txn.balance >= 0 ? "Dr" : "Cr"} */}
                               </td>
                             </tr>
                           ))}
@@ -973,7 +985,8 @@ const LedgerReport: React.FC = () => {
                                           {formatDate(txn.date)}
                                         </td>
                                         <td className="px-3 py-2">
-                                          {txn.particulars}
+                                          {ledgerIdNameMap[txn.particulars] ||
+                                            txn.particulars}
                                         </td>
                                         <td className="px-3 py-2 text-right font-mono">
                                           {txn.debit > 0
