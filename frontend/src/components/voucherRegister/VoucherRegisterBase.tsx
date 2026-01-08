@@ -433,13 +433,14 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         igstTotal: igst,
         total,
         profit: Number(p.profit || 0),
-        dispatchDetails: p.dispatchDocNo || p.dispatchThrough || p.destination
-          ? {
-              docNo: p.dispatchDocNo || "",
-              through: p.dispatchThrough || "",
-              destination: p.destination || "",
-            }
-          : undefined,
+        dispatchDetails:
+          p.dispatchDocNo || p.dispatchThrough || p.destination
+            ? {
+                docNo: p.dispatchDocNo || "",
+                through: p.dispatchThrough || "",
+                destination: p.destination || "",
+              }
+            : undefined,
 
         entries: [
           {
@@ -551,6 +552,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         ],
       };
     }
+
+  
 
     // ---------------------- RECEIPT ----------------------
     if (voucherType === "receipt") {
@@ -1020,7 +1023,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           url = `${
             import.meta.env.VITE_API_URL
           }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=journal`;
-        } else {
+        } 
+         else {
           console.warn("Unknown voucherType:", voucherType);
           return;
         }
@@ -1457,7 +1461,12 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
                     {/* Party */}
                     <td className="px-6 py-4 text-sm text-gray-500">
-                      {voucherType === "sales"
+                      {voucherType === "debit_note"
+                        ? getLedgerNameById(
+                            voucher.entries.find((e) => e.type === "credit")
+                              ?.ledgerId
+                          )
+                        : voucherType === "sales"
                         ? getLedgerNameById(debitEntry?.ledgerId)
                         : getLedgerNameById(creditEntry?.ledgerId)}
                     </td>
