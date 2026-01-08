@@ -147,6 +147,20 @@ router.get("/report", async (req, res) => {
     );
 
     /* ===============================
+   6️⃣A DEBIT / CREDIT NOTES 🔥 (NEW)
+/* ===============================
+   DEBIT / CREDIT NOTES (FIXED)
+=============================== */
+    const [dcNotes] = await connection.execute(
+      `
+  SELECT id, date, number, party_id, narration
+  FROM debit_note_vouchers
+  WHERE narration IS NOT NULL
+  ORDER BY date ASC, id ASC
+  `
+    );
+
+    /* ===============================
        7️⃣ BUILD TRANSACTIONS
     =============================== */
     let balance = Number(ledger.opening_balance || 0);
@@ -168,6 +182,42 @@ router.get("/report", async (req, res) => {
         debit,
         credit,
         balance,
+      });
+    });
+
+    // Debit  Notes
+    dcNotes.forEach((note) => {
+      let parsed;
+
+      try {
+        parsed = JSON.parse(note.narration);
+      } catch {
+        return;
+      }
+
+      if (!Array.isArray(parsed.accountingEntries)) return;
+
+      parsed.accountingEntries.forEach((entry) => {
+        const debit = entry.type === "debit" ? Number(entry.amount || 0) : 0;
+        const credit = entry.type === "credit" ? Number(entry.amount || 0) : 0;
+
+        // ⚠ balance sirf tab update karo jab ledger match ho
+        if (String(entry.ledgerId) === String(ledgerId)) {
+          balance += debit - credit;
+        }
+
+        transactions.push({
+          id: `DN-${note.id}-${entry.ledgerId}`,
+          date: note.date,
+          voucherType: entry.type === "credit" ? "Debit Note" : "Debit Note",
+          voucherNo: note.number,
+          particulars: `${entry.ledgerId}`,
+          debit,
+          credit,
+          balance:
+            String(entry.ledgerId) === String(ledgerId) ? balance : balance,
+          isContra: String(entry.ledgerId) !== String(ledgerId),
+        });
       });
     });
 
@@ -327,7 +377,6 @@ router.get("/report", async (req, res) => {
       });
     });
 
-    console.log('purchseorder', purchaseOrders)
     /* ===============================
        🔟 SORT BY DATE
     =============================== */

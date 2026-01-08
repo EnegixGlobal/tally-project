@@ -41,7 +41,6 @@ interface VoucherGroup {
   supplier_invoice_date: Date;
 }
 
-
 const DayBook: React.FC = () => {
   const { theme, stockItems } = useAppContext();
   const navigate = useNavigate();
@@ -80,12 +79,63 @@ const DayBook: React.FC = () => {
     null
   );
 
-  console.log("sell", selectedVoucher);
   const [groupedVouchers, setGroupedVouchers] = useState<VoucherGroup[]>([]);
   const [processedEntries, setProcessedEntries] = useState<DayBookEntry[]>([]);
+  const [allGroupedVouchers, setAllGroupedVouchers] = useState<VoucherGroup[]>(
+    []
+  );
+  const [allProcessedEntries, setAllProcessedEntries] = useState<
+    DayBookEntry[]
+  >([]);
 
   //  const [entries, setEntries] = useState([]);
   //  const [entries, setEntries] = useState<DayBookEntry[]>([]);
+
+  //get all ledger
+  const [ledgers, setLedgers] = useState<any[]>([]);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const companyId =
+          localStorage.getItem("company_id") ||
+          localStorage.getItem("company_id");
+        const ownerType = localStorage.getItem("supplier");
+        const ownerId =
+          ownerType === "employee"
+            ? localStorage.getItem("employee_id") ||
+              localStorage.getItem("employee_id")
+            : localStorage.getItem("user_id") ||
+              localStorage.getItem("user_id");
+
+        if (!companyId || !ownerType || !ownerId) {
+          console.error("Missing required identifiers for ledger GET");
+          setLedgers([]);
+          return;
+        }
+
+        // Fetch ledgers scoped to company & owner
+        const ledgerRes = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const ledgerData = await ledgerRes.json();
+
+        if (ledgerRes.ok) {
+          setLedgers(Array.isArray(ledgerData) ? ledgerData : []);
+        } else {
+          console.error(ledgerData.message || "Failed to fetch ledgers");
+          setLedgers([]);
+        }
+      } catch (err) {
+        console.error("Failed to load data", err);
+        setLedgers([]);
+      }
+    };
+
+    fetchData();
+  }, []);
 
   useEffect(() => {
     const company_id = localStorage.getItem("company_id");
@@ -101,8 +151,6 @@ const DayBook: React.FC = () => {
     )
       .then((res) => res.json())
       .then((data) => {
-        console.log("data", data);
-
         const grouped: Record<string, VoucherGroup> = {};
 
         data.forEach((voucher: any) => {
@@ -154,7 +202,6 @@ const DayBook: React.FC = () => {
 
         // Convert object → array
         const groupedArray = Object.values(grouped);
-        setGroupedVouchers(groupedArray);
 
         // Create detailed entries list
         const detailedEntries = groupedArray.flatMap((v) =>
@@ -173,7 +220,7 @@ const DayBook: React.FC = () => {
         detailedEntries.forEach((entry) => {
           // Create a key from common fields
           const key = `${entry.date}|${entry.voucherType}|${entry.voucherNo}|${entry.particulars}`;
-          
+
           if (!groupMap.has(key)) {
             groupMap.set(key, entryGroups.length);
             entryGroups.push([]);
@@ -182,7 +229,10 @@ const DayBook: React.FC = () => {
         });
 
         // Flatten with rowspan info
-        const processedWithRowspan: (DayBookEntry & { rowspan?: number; isFirstInGroup?: boolean })[] = [];
+        const processedWithRowspan: (DayBookEntry & {
+          rowspan?: number;
+          isFirstInGroup?: boolean;
+        })[] = [];
         entryGroups.forEach((group) => {
           group.forEach((entry, index) => {
             processedWithRowspan.push({
@@ -193,6 +243,12 @@ const DayBook: React.FC = () => {
           });
         });
 
+        // Save original data
+        setAllGroupedVouchers(groupedArray);
+        setAllProcessedEntries(processedWithRowspan);
+
+        // Initially show all
+        setGroupedVouchers(groupedArray);
         setProcessedEntries(processedWithRowspan);
 
         // Summary totals
@@ -212,9 +268,74 @@ const DayBook: React.FC = () => {
           vouchersCount: groupedArray.length,
         });
       })
-      .catch((err) => console.error("DayBook Fetch Error:", err));
+      .catch((err) => console.error("DayBook  Error:", err));
   }, []);
 
+  const getLocalDate = (dateStr: string) => {
+    const d = new Date(dateStr);
+
+    const year = d.getFullYear();
+    const month = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+
+    return `${year}-${month}-${day}`; // yyyy-mm-dd
+  };
+
+  useEffect(() => {
+    /* ===== CLEAR DATE → SHOW ALL ===== */
+    if (!selectedDate) {
+      setGroupedVouchers(allGroupedVouchers);
+      setProcessedEntries(allProcessedEntries);
+
+      const totalDebit = allGroupedVouchers.reduce(
+        (sum, v) => sum + v.totalDebit,
+        0
+      );
+
+      const totalCredit = allGroupedVouchers.reduce(
+        (sum, v) => sum + v.totalCredit,
+        0
+      );
+
+      setTotals({
+        totalDebit,
+        totalCredit,
+        netDifference: totalDebit - totalCredit,
+        vouchersCount: allGroupedVouchers.length,
+      });
+
+      return;
+    }
+
+    /* ===== FILTER BY DATE ===== */
+    const filteredGrouped = allGroupedVouchers.filter(
+      (voucher) => getLocalDate(voucher.date) === selectedDate
+    );
+
+    const filteredEntries = allProcessedEntries.filter(
+      (entry) => getLocalDate(entry.date) === selectedDate
+    );
+
+    setGroupedVouchers(filteredGrouped);
+    setProcessedEntries(filteredEntries);
+
+    const totalDebit = filteredGrouped.reduce(
+      (sum, v) => sum + v.totalDebit,
+      0
+    );
+
+    const totalCredit = filteredGrouped.reduce(
+      (sum, v) => sum + v.totalCredit,
+      0
+    );
+
+    setTotals({
+      totalDebit,
+      totalCredit,
+      netDifference: totalDebit - totalCredit,
+      vouchersCount: filteredGrouped.length,
+    });
+  }, [selectedDate]);
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -233,7 +354,6 @@ const DayBook: React.FC = () => {
   };
 
   const handleVoucherClick = (voucher: VoucherGroup) => {
-    console.log("vchar", voucher);
     setSelectedVoucher(voucher);
   };
 
@@ -472,9 +592,32 @@ const DayBook: React.FC = () => {
           </div>
           <div className="flex items-center space-x-2">
             <Calendar size={16} className="text-gray-500" />
-            <span className="text-sm text-gray-500">
-              {/* {viewMode === 'grouped' ? `${groupedVouchers.length} vouchers` : `${processedEntries.length} entries`} */}
-            </span>
+
+            <input
+              type="date"
+              value={selectedDate}
+              onChange={(e) => {
+                setSelectedDate(e.target.value);
+                setSelectedDateRange("custom");
+              }}
+              className={`text-sm px-2 py-1 rounded border outline-none ${
+                theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300 text-gray-700"
+              }`}
+            />
+
+            {selectedDate && (
+              <button
+                onClick={() => {
+                  setSelectedDate("");
+                  setSelectedDateRange("today");
+                }}
+                className="text-xs px-2 py-1 rounded bg-red-100 text-red-600 hover:bg-red-200"
+              >
+                Clear
+              </button>
+            )}
           </div>
         </div>
 
@@ -614,7 +757,7 @@ const DayBook: React.FC = () => {
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-left">Voucher Type</th>
                   <th className="px-4 py-3 text-left">Voucher No.</th>
-                  <th className="px-4 py-3 text-left">Particulars</th>
+                  <th className="px-4 py-3 text-left">Reference No.</th>
                   <th className="px-4 py-3 text-right">Debit</th>
                   <th className="px-4 py-3 text-right">Credit</th>
                 </tr>
@@ -631,10 +774,17 @@ const DayBook: React.FC = () => {
                   </tr>
                 ) : (
                   processedEntries.map((entry, index) => {
-                    const entryWithRowspan = entry as DayBookEntry & { rowspan?: number; isFirstInGroup?: boolean };
-                    const showCommonFields = entryWithRowspan.isFirstInGroup === true;
-                    const rowspan = entryWithRowspan.rowspan && entryWithRowspan.rowspan > 1 ? entryWithRowspan.rowspan : undefined;
-                    
+                    const entryWithRowspan = entry as DayBookEntry & {
+                      rowspan?: number;
+                      isFirstInGroup?: boolean;
+                    };
+                    const showCommonFields =
+                      entryWithRowspan.isFirstInGroup === true;
+                    const rowspan =
+                      entryWithRowspan.rowspan && entryWithRowspan.rowspan > 1
+                        ? entryWithRowspan.rowspan
+                        : undefined;
+
                     return (
                       <tr
                         key={`${entry.id}-${index}`}
@@ -646,20 +796,14 @@ const DayBook: React.FC = () => {
                       >
                         {/* Date - only show for first entry in group */}
                         {showCommonFields ? (
-                          <td 
-                            className="px-4 py-3" 
-                            rowSpan={rowspan}
-                          >
+                          <td className="px-4 py-3" rowSpan={rowspan}>
                             {formatDate(entry.date)}
                           </td>
                         ) : null}
-                        
+
                         {/* Voucher Type - only show for first entry in group */}
                         {showCommonFields ? (
-                          <td 
-                            className="px-4 py-3" 
-                            rowSpan={rowspan}
-                          >
+                          <td className="px-4 py-3" rowSpan={rowspan}>
                             <span
                               className={`px-2 py-1 rounded-full text-xs ${
                                 entry.voucherType === "sales"
@@ -678,23 +822,17 @@ const DayBook: React.FC = () => {
                             </span>
                           </td>
                         ) : null}
-                        
+
                         {/* Voucher No - only show for first entry in group */}
                         {showCommonFields ? (
-                          <td 
-                            className="px-4 py-3 font-mono" 
-                            rowSpan={rowspan}
-                          >
+                          <td className="px-4 py-3 font-mono" rowSpan={rowspan}>
                             {entry.voucherNo}
                           </td>
                         ) : null}
-                        
+
                         {/* Particulars - only show for first entry in group */}
                         {showCommonFields ? (
-                          <td 
-                            className="px-4 py-3" 
-                            rowSpan={rowspan}
-                          >
+                          <td className="px-4 py-3" rowSpan={rowspan}>
                             {entry.particulars}
                             {entry.narration && (
                               <div className="text-xs text-gray-500 mt-1">
@@ -703,15 +841,17 @@ const DayBook: React.FC = () => {
                             )}
                           </td>
                         ) : null}
-                        
+
                         {/* Debit - always show */}
                         <td className="px-4 py-3 text-right font-mono">
                           {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
                         </td>
-                        
+
                         {/* Credit - always show */}
                         <td className="px-4 py-3 text-right font-mono">
-                          {entry.credit > 0 ? formatCurrency(entry.credit) : "-"}
+                          {entry.credit > 0
+                            ? formatCurrency(entry.credit)
+                            : "-"}
                         </td>
                       </tr>
                     );

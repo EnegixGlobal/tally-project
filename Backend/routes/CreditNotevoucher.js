@@ -1,6 +1,6 @@
 const express = require('express');
 const router = express.Router();
-const db = require('../db'); // mysql2/promise pool
+const db = require('../db'); 
 
 // Insert Credit Voucher
 router.post('/', async (req, res) => {
