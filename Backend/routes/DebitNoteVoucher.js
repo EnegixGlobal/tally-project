@@ -33,7 +33,11 @@ router.post("/", async (req, res) => {
     ========================= */
     let finalNarration = narration || "";
 
-    if (mode !== "item-invoice" && Array.isArray(entries)) {
+    // ✅ FIX: as-voucher + accounting-invoice BOTH SUPPORTED
+    if (
+      (mode === "accounting-invoice" || mode === "as-voucher") &&
+      Array.isArray(entries)
+    ) {
       const cleanAccountingEntries = entries
         .filter(
           (e) =>
@@ -49,11 +53,12 @@ router.post("/", async (req, res) => {
 
       finalNarration = JSON.stringify({
         accountingEntries: cleanAccountingEntries,
+        note: narration || "",
       });
     }
 
     /* =========================
-       1️⃣ INSERT VOUCHER
+       INSERT INTO SAME TABLE
     ========================= */
     const [voucherResult] = await db.query(
       `
@@ -74,39 +79,10 @@ router.post("/", async (req, res) => {
       ]
     );
 
-    const voucherId = voucherResult.insertId;
-
-    /* =========================
-       2️⃣ ITEM-INVOICE ENTRIES ONLY
-    ========================= */
-    if (mode === "item-invoice" && Array.isArray(entries)) {
-      for (const entry of entries) {
-        if (!entry.itemId || Number(entry.quantity) <= 0) continue;
-
-        await db.query(
-          `
-          INSERT INTO debit_note_entries
-          (voucher_id, item_id, hsn_code, quantity, unit, rate, discount, amount)
-          VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-          `,
-          [
-            voucherId,
-            Number(entry.itemId),
-            entry.hsnCode || "",
-            Number(entry.quantity),
-            entry.unit || "",
-            Number(entry.rate || 0),
-            Number(entry.discount || 0),
-            Number(entry.amount || 0),
-          ]
-        );
-      }
-    }
-
     res.status(200).json({
       success: true,
       message: "Debit Note saved successfully",
-      voucherId,
+      voucherId: voucherResult.insertId,
     });
   } catch (error) {
     console.error("Error saving debit note:", error);
@@ -152,111 +128,56 @@ router.get("/", async (req, res) => {
     const [rows] = await db.query(
       `
       SELECT
-        dnv.id AS voucherId,
+        dnv.id,
         dnv.date,
         dnv.number,
         dnv.mode,
         dnv.party_id AS partyId,
         dnv.sales_ledger_id AS salesLedgerId,
-        dnv.narration,
-
-        dne.id AS entryId,
-        dne.item_id,
-        dne.hsn_code,
-        dne.quantity,
-        dne.unit,
-        dne.rate,
-        dne.discount,
-        dne.amount
-
+        dnv.narration
       FROM debit_note_vouchers dnv
-      LEFT JOIN debit_note_entries dne
-        ON dne.voucher_id = dnv.id
-
       ${whereClause}
       ORDER BY dnv.date DESC, dnv.id DESC
       `,
       params
     );
 
-    const map = {};
+    const data = rows.map((r) => {
+      let entries = [];
+      let narrationText = "";
 
-    rows.forEach((r) => {
-      /* ============================
-         1️⃣ INIT VOUCHER
-      ============================ */
-      if (!map[r.voucherId]) {
-        map[r.voucherId] = {
-          id: r.voucherId,
-          date: r.date,
-          number: r.number,
-          mode: r.mode,
-          partyId: r.partyId,
-          salesLedgerId: r.salesLedgerId,
-          narration: "",
-          entries: [],
-          total: 0,
-        };
-
-        /* ============================
-           2️⃣ ACCOUNTING / AS-VOUCHER
-        ============================ */
-        if (r.mode !== "item-invoice" && r.narration) {
-          try {
-            const parsed = JSON.parse(r.narration);
-
-            const accountingEntries = Array.isArray(
-              parsed.accountingEntries
-            )
-              ? parsed.accountingEntries
-              : [];
-
-            map[r.voucherId].entries = accountingEntries.map((e) => ({
-              ledgerId: e.ledgerId,
-              type: e.type,
-              amount: Number(e.amount || 0),
-            }));
-
-            map[r.voucherId].total = map[
-              r.voucherId
-            ].entries.reduce(
-              (sum, e) => sum + Number(e.amount || 0),
-              0
-            );
-
-            map[r.voucherId].narration = parsed.text || "";
-          } catch (err) {
-            // fallback if narration is plain text
-            map[r.voucherId].narration = r.narration;
-          }
-        } else {
-          map[r.voucherId].narration = r.narration || "";
+      if (
+        (r.mode === "accounting-invoice" || r.mode === "as-voucher") &&
+        r.narration
+      ) {
+        try {
+          const parsed = JSON.parse(r.narration);
+          entries = parsed.accountingEntries || [];
+          narrationText = parsed.note || "";
+        } catch {
+          narrationText = r.narration;
         }
+      } else {
+        narrationText = r.narration || "";
       }
 
-      /* ============================
-         3️⃣ ITEM-INVOICE ENTRIES
-      ============================ */
-      if (r.mode === "item-invoice" && r.entryId) {
-        map[r.voucherId].entries.push({
-          id: r.entryId,
-          itemId: r.item_id,
-          hsnCode: r.hsn_code,
-          quantity: Number(r.quantity || 0),
-          unit: r.unit,
-          rate: Number(r.rate || 0),
-          discount: Number(r.discount || 0),
-          amount: Number(r.amount || 0),
-        });
-
-        map[r.voucherId].total += Number(r.amount || 0);
-      }
+      return {
+        id: r.id,
+        date: r.date,
+        number: r.number,
+        mode: r.mode,
+        partyId: r.partyId,
+        salesLedgerId: r.salesLedgerId,
+        narration: narrationText,
+        entries,
+        total: entries.reduce((s, e) => s + Number(e.amount || 0), 0),
+      };
     });
 
     res.json({
       success: true,
-      data: Object.values(map),
-      count: Object.keys(map).length,
+      data,
+      count: data.length,
     });
   } catch (error) {
     console.error("Error fetching debit notes:", error);
@@ -268,6 +189,100 @@ router.get("/", async (req, res) => {
   }
 });
 
+router.get("/:id", async (req, res) => {
+  const { companyId, ownerType, ownerId } = req.query;
 
+  if (!companyId || !ownerType || !ownerId) {
+    return res.status(400).json({
+      success: false,
+      message: "companyId, ownerType, ownerId required",
+    });
+  }
+
+  const [rows] = await db.query(
+    `
+    SELECT *
+    FROM debit_note_vouchers
+    WHERE id = ?
+      AND company_id = ?
+      AND owner_type = ?
+      AND owner_id = ?
+    `,
+    [req.params.id, companyId, ownerType, ownerId]
+  );
+
+  if (!rows.length) {
+    return res.status(404).json({ success: false, message: "Not found" });
+  }
+
+  const v = rows[0];
+  let entries = [];
+  let narrationText = "";
+
+  try {
+    const parsed = JSON.parse(v.narration);
+    entries = parsed.accountingEntries || [];
+    narrationText = parsed.note || "";
+  } catch {
+    narrationText = v.narration;
+  }
+
+  res.json({
+    success: true,
+    data: {
+      ...v,
+      narration: narrationText,
+      entries,
+    },
+  });
+});
+
+router.put("/:id", async (req, res) => {
+  const { companyId, ownerType, ownerId, narration, entries } = req.body;
+
+  if (!companyId || !ownerType || !ownerId) {
+    return res.status(400).json({ success: false });
+  }
+
+  const finalNarration = JSON.stringify({
+    accountingEntries: entries || [],
+    note: narration || "",
+  });
+
+  await db.query(
+    `
+    UPDATE debit_note_vouchers
+    SET narration = ?
+    WHERE id = ?
+      AND company_id = ?
+      AND owner_type = ?
+      AND owner_id = ?
+    `,
+    [finalNarration, req.params.id, companyId, ownerType, ownerId]
+  );
+
+  res.json({ success: true, message: "Debit Note updated" });
+});
+
+router.delete("/:id", async (req, res) => {
+  const { companyId, ownerType, ownerId } = req.query;
+
+  if (!companyId || !ownerType || !ownerId) {
+    return res.status(400).json({ success: false });
+  }
+
+  await db.query(
+    `
+    DELETE FROM debit_note_vouchers
+    WHERE id = ?
+      AND company_id = ?
+      AND owner_type = ?
+      AND owner_id = ?
+    `,
+    [req.params.id, companyId, ownerType, ownerId]
+  );
+
+  res.json({ success: true, message: "Debit Note deleted" });
+});
 
 module.exports = router;

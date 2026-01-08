@@ -228,6 +228,7 @@ import GstrB2cl from "./components/modules/gst/Gstr1/GstrB2cl";
 import GstrB2cs from "./components/modules/gst/Gstr1/GstrB2cs";
 import HSNSummary from "./components/modules/gst/Gstr1/HSNSummary";
 import PurchaseOrderRegister from "./components/voucherRegister/PurchaseOrderRegister";
+import DebitNoteRegiser from "./components/voucherRegister/DebitNoteRegiser";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -900,6 +901,14 @@ function App() {
                 element={
                   <RequireCompany>
                     <SalesRegister />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="voucher-register/debit-note"
+                element={
+                  <RequireCompany>
+                    <DebitNoteRegiser />
                   </RequireCompany>
                 }
               />

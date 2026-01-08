@@ -553,44 +553,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       };
     }
 
-    // ---------------------- DEBIT NOTE ----------------------
-    // ---------------------- DEBIT NOTE ----------------------
-    if (voucherType === "debit_note") {
-      const entries = Array.isArray(p.entries) ? p.entries : [];
-
-      const debit = entries
-        .filter((e: any) => e.type === "debit")
-        .reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
-
-      const credit = entries
-        .filter((e: any) => e.type === "credit")
-        .reduce((s: number, e: any) => s + Number(e.amount || 0), 0);
-
-      const total = Math.max(debit, credit);
-
-      return {
-        id: String(p.id),
-        date: p.date,
-        number: p.number,
-        referenceNo: "",
-        narration: p.narration || "",
-        type: "debit_note",
-
-        supplierInvoiceDate: p.date,
-        subtotal: total,
-        cgstTotal: 0,
-        sgstTotal: 0,
-        igstTotal: 0,
-        total,
-
-        // 🔥 REAL accounting entries FROM BACKEND
-        entries: entries.map((e: any) => ({
-          ledgerId: e.ledgerId,
-          type: e.type,
-          amount: Number(e.amount || 0),
-        })),
-      };
-    }
+  
 
     // ---------------------- RECEIPT ----------------------
     if (voucherType === "receipt") {
@@ -1060,11 +1023,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           url = `${
             import.meta.env.VITE_API_URL
           }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=journal`;
-        } else if (voucherType === "debit_note") {
-          url = `${
-            import.meta.env.VITE_API_URL
-          }/api/DebitNoteVoucher?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
-        } else {
+        } 
+         else {
           console.warn("Unknown voucherType:", voucherType);
           return;
         }
