@@ -1454,7 +1454,7 @@ const ExtractSales: React.FC = () => {
                                 : "")}
                           </p>
                         </div>
-                        {extractData && (
+                        {/* {extractData && (
                           <div className="ml-auto text-sm opacity-70">
                             {new Date(extractData.fromDate).toLocaleDateString(
                               "en-IN",
@@ -1474,7 +1474,7 @@ const ExtractSales: React.FC = () => {
                               }
                             )}
                           </div>
-                        )}
+                        )} */}
                       </div>
                     </div>
 

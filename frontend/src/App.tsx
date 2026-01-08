@@ -36,6 +36,8 @@ import GodownList from "./components/masters/godown/GodownList";
 import GodownForm from "./components/masters/godown/GodownForm";
 import ScenarioList from "./components/masters/scenario/ScenarioList";
 import ScenarioForm from "./components/masters/scenario/ScenarioForm";
+import SalesTypeList from "./components/masters/salesTypes/SalesTypeList";
+import SalesTypeForm from "./components/masters/salesTypes/SalesTypeForm";
 
 // // Vouchers Components
 import VouchersIndex from "./components/vouchers/VouchersIndex";
@@ -581,6 +583,30 @@ function App() {
                 element={
                   <RequireCompany>
                     <ScenarioForm />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="masters/sales-types"
+                element={
+                  <RequireCompany>
+                    <SalesTypeList />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="masters/sales-types/create"
+                element={
+                  <RequireCompany>
+                    <SalesTypeForm />
+                  </RequireCompany>
+                }
+              />
+              <Route
+                path="masters/sales-types/edit/:id"
+                element={
+                  <RequireCompany>
+                    <SalesTypeForm />
                   </RequireCompany>
                 }
               />

@@ -38,6 +38,15 @@ const MastersIndex: React.FC = () => {
     items: [
       {
         icon: <Settings size={20} />,
+        name: 'Sales Types',
+        path: '/app/masters/sales-types',
+        color: theme === 'dark' ? 'bg-gray-900/50 hover:bg-gray-800/50' : 'bg-gray-50 hover:bg-gray-100',
+        iconBg: theme === 'dark' ? 'bg-gray-800/70' : 'bg-gray-100',
+        description: 'Manage Sales Voucher types',
+        category: 'import'
+      },
+      {
+        icon: <Settings size={20} />,
         name: 'Manage Types',
         path: '/app/vouchers/types',
         color: theme === 'dark' ? 'bg-gray-900/50 hover:bg-gray-800/50' : 'bg-gray-50 hover:bg-gray-100',

@@ -53,6 +53,8 @@ router.post("/", async (req, res) => {
 
       entries,
       items,
+      sales_type_id,
+      bill_no,
     } = req.body;
 
     // 🔐 Required checks
@@ -74,7 +76,60 @@ router.post("/", async (req, res) => {
     const dispatchThrough = dispatchDetails?.through || null;
     const destination = dispatchDetails?.destination || null;
 
+    // ================= CHECK & ADD COLUMNS IF MISSING =================
+    try {
+      // Check if sales_type_id column exists
+      const [salesTypeIdCheck] = await db.execute(
+        `SELECT COLUMN_NAME
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'sales_vouchers'
+           AND COLUMN_NAME = 'sales_type_id'`
+      );
+
+      if (salesTypeIdCheck.length === 0) {
+        await db.execute(
+          `ALTER TABLE sales_vouchers ADD COLUMN sales_type_id INT NULL`
+        );
+        console.log("✅ Added sales_type_id column to sales_vouchers");
+      }
+
+      // Check if bill_no column exists
+      const [billNoCheck] = await db.execute(
+        `SELECT COLUMN_NAME
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'sales_vouchers'
+           AND COLUMN_NAME = 'bill_no'`
+      );
+
+      if (billNoCheck.length === 0) {
+        await db.execute(
+          `ALTER TABLE sales_vouchers ADD COLUMN bill_no VARCHAR(100) NULL`
+        );
+        console.log("✅ Added bill_no column to sales_vouchers");
+      }
+    } catch (colErr) {
+      console.error("Column check/add error (non-fatal):", colErr);
+      // Continue even if column check fails
+    }
+
+    // ================= AUTO-INCREMENT current_no IN sales_types =================
+    if (sales_type_id) {
+      try {
+        await db.execute(
+          `UPDATE sales_types SET current_no = current_no + 1 WHERE id = ?`,
+          [sales_type_id]
+        );
+        console.log(`✅ Incremented current_no for sales_type_id: ${sales_type_id}`);
+      } catch (incErr) {
+        console.error("Error incrementing current_no:", incErr);
+        // Continue even if increment fails
+      }
+    }
+
     // 🚫 PROFIT COMPLETELY REMOVED
+    // Always include sales_type_id and bill_no columns (they'll be added if missing)
     const insertVoucherSQL = `
       INSERT INTO sales_vouchers (
         number,
@@ -97,9 +152,11 @@ router.post("/", async (req, res) => {
         supplierInvoiceDate,
         company_id,
         owner_type,
-        owner_id
+        owner_id,
+        sales_type_id,
+        bill_no
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const voucherValues = [
@@ -124,6 +181,8 @@ router.post("/", async (req, res) => {
       companyId,
       ownerType,
       ownerId,
+      sales_type_id ?? null,
+      bill_no ?? null,
     ];
 
     const [voucherResult] = await db.execute(
@@ -282,7 +341,7 @@ router.get("/sale-history", async (req, res) => {
 
 // get sales vouchers
 router.get("/", async (req, res) => {
-  const { owner_type, owner_id, company_id } = req.query;
+  const { owner_type, owner_id, company_id, isQuotation } = req.query;
 
   if (!owner_type || !owner_id) {
     return res.status(400).json({
@@ -293,9 +352,11 @@ router.get("/", async (req, res) => {
   try {
     let sql = `
       SELECT 
-        id, number, date, partyId, referenceNo, supplierInvoiceDate,
-        subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total,
-        salesLedgerId, company_id
+        id, number, date, narration, partyId, referenceNo, dispatchDocNo,
+        dispatchThrough, destination, subtotal, profit, cgstTotal, sgstTotal,
+        igstTotal, discountTotal, total, createdAt, company_id, owner_type,
+        owner_id, type, isQuotation, salesLedgerId, supplierInvoiceDate,
+        sales_type_id, bill_no
       FROM sales_vouchers
       WHERE owner_type = ? AND owner_id = ?
     `;
@@ -305,6 +366,12 @@ router.get("/", async (req, res) => {
     if (company_id) {
       sql += " AND company_id = ?";
       params.push(company_id);
+    }
+
+    // Filter by isQuotation if provided
+    if (isQuotation !== undefined) {
+      sql += " AND isQuotation = ?";
+      params.push(isQuotation === "true" || isQuotation === "1" ? 1 : 0);
     }
 
     sql += " ORDER BY id DESC";
@@ -436,10 +503,46 @@ router.put("/:id", async (req, res) => {
     entries,
     isQuotation,
     salesLedgerId,
+    sales_type_id,
+    bill_no,
   } = req.body;
 
   try {
+    // ================= CHECK & ADD COLUMNS IF MISSING (for UPDATE route too) =================
+    try {
+      const [salesTypeIdCheck] = await db.execute(
+        `SELECT COLUMN_NAME
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'sales_vouchers'
+           AND COLUMN_NAME = 'sales_type_id'`
+      );
+
+      if (salesTypeIdCheck.length === 0) {
+        await db.execute(
+          `ALTER TABLE sales_vouchers ADD COLUMN sales_type_id INT NULL`
+        );
+      }
+
+      const [billNoCheck] = await db.execute(
+        `SELECT COLUMN_NAME
+         FROM INFORMATION_SCHEMA.COLUMNS
+         WHERE TABLE_SCHEMA = DATABASE()
+           AND TABLE_NAME = 'sales_vouchers'
+           AND COLUMN_NAME = 'bill_no'`
+      );
+
+      if (billNoCheck.length === 0) {
+        await db.execute(
+          `ALTER TABLE sales_vouchers ADD COLUMN bill_no VARCHAR(100) NULL`
+        );
+      }
+    } catch (colErr) {
+      console.error("Column check/add error (non-fatal):", colErr);
+    }
+
     // ---- 1) UPDATE MAIN TABLE ----
+    // Always include sales_type_id and bill_no (columns will be added if missing)
     await db.execute(
       `UPDATE sales_vouchers
        SET 
@@ -458,7 +561,9 @@ router.put("/:id", async (req, res) => {
          discountTotal = ?, 
          total = ?, 
          isQuotation = ?, 
-         salesLedgerId = ?
+         salesLedgerId = ?,
+         sales_type_id = ?,
+         bill_no = ?
        WHERE id = ?`,
       [
         date,
@@ -477,6 +582,8 @@ router.put("/:id", async (req, res) => {
         total,
         isQuotation ? 1 : 0,
         salesLedgerId,
+        sales_type_id ?? null,
+        bill_no ?? null,
         voucherId,
       ]
     );

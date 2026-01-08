@@ -123,14 +123,16 @@ export type VoucherEntryLine = {
   batchExpiryDate?: string;
   batchManufacturingDate?: string;
 
+  // Stock/unit helpers used across vouchers
+  unitId?: any;
+  unitLabel?: string;
+  availableQty?: number;
+
   unitName?: string;
 
   unit?: string;
-  batches?: {
-    batchName: string;
-    expiryDate?: string;
-    manufacturingDate?: string;
-  }[];
+  // Batch objects vary by API (batchQuantity/quantity/rate/openingRate/etc), so keep loose.
+  batches?: any[];
 
   discount?: any;
   hsnCode?: string;
@@ -138,6 +140,9 @@ export type VoucherEntryLine = {
   costCentreId?: string;
   bankName?: string;
   chequeNumber?: string;
+
+  // Allow dynamic assignment like entry[name] = value in form handlers
+  [key: string]: any;
 };
 
 export type VoucherEntry = {
@@ -184,6 +189,8 @@ export type StockItem = {
   name: string;
 
   unit: string;
+  unitId?: string | number;
+  unit_id?: string | number;
   unitName?: string;
   secondaryUnit?: string;
   maintainInPieces?: boolean;
@@ -226,6 +233,9 @@ export type StockItem = {
     expiryDate?: string;
     manufacturingDate?: string;
   }[];
+
+  // Backend may send a `batches` field (stringified JSON or array)
+  batches?: any;
 };
 
 
@@ -247,6 +257,17 @@ export type UnitOfMeasurement = {
 export type Godown = {
   id: string;
   name: string;
+};
+
+export type SalesType = {
+  id: string | number;
+  sales_type: string;
+  type: string;
+  prefix: string;
+  suffix: string;
+  current_no: number;
+  created_at?: string;
+  updated_at?: string;
 };
 
 export type LedgerEntry = {

@@ -25,6 +25,7 @@ interface LedgerTransaction {
   reference?: string;
   isOpening?: boolean;
   isClosing?: boolean;
+  isQuotation?: boolean;
 }
 interface LedgerApiResponse {
   success: boolean;
@@ -708,7 +709,11 @@ const LedgerReport: React.FC = () => {
 
                               {/* Voucher Type */}
                               <td className="px-4 py-3 text-sm">
-                                {i === 0 ? first.voucherType : ""}
+                                {i === 0
+                                  ? first.isQuotation
+                                    ? "Quotation"
+                                    : first.voucherType
+                                  : ""}
                               </td>
 
                               {/* Voucher No */}
@@ -1103,11 +1108,16 @@ const LedgerReport: React.FC = () => {
                 <button
                   onClick={() => {
                     // Navigate to voucher details page
-                    navigate(
-                      `/app/vouchers/${selectedVoucher.voucherType.toLowerCase()}/${
-                        selectedVoucher.id
-                      }`
-                    );
+                    // If it's a quotation, navigate to sales edit page
+                    if (selectedVoucher.voucherType === "Quotation") {
+                      navigate(`/app/vouchers/sales/edit/${selectedVoucher.id}`);
+                    } else {
+                      navigate(
+                        `/app/vouchers/${selectedVoucher.voucherType.toLowerCase()}/${
+                          selectedVoucher.id
+                        }`
+                      );
+                    }
                   }}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
                 >

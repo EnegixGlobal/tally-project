@@ -52,11 +52,23 @@ router.get("/report", async (req, res) => {
        3️⃣ SALES VOUCHERS → CREDIT
     =============================== */
     const [salesVouchers] = await connection.execute(
-      `SELECT id, number, date, narration, partyId, total
+      `SELECT id, number, date, narration, partyId, total, isQuotation
        FROM sales_vouchers
        WHERE partyId = ?
          AND type = 'sales'
          AND isQuotation = 0
+       ORDER BY date ASC, id ASC`,
+      [ledgerId]
+    );
+
+    /* ===============================
+       3️⃣A QUOTATIONS → CREDIT
+    =============================== */
+    const [quotations] = await connection.execute(
+      `SELECT id, number, date, narration, partyId, total, isQuotation
+       FROM sales_vouchers
+       WHERE partyId = ?
+         AND isQuotation = 1
        ORDER BY date ASC, id ASC`,
       [ledgerId]
     );
@@ -120,6 +132,7 @@ router.get("/report", async (req, res) => {
     =============================== */
     const [txns] = await connection.execute(
       `SELECT
+         vm.id AS voucher_id,
          vm.voucher_type,
          vm.voucher_number,
          vm.date,
@@ -147,6 +160,7 @@ router.get("/report", async (req, res) => {
       balance += debit - credit;
 
       transactions.push({
+        id: String(row.voucher_id || `voucher_${row.voucher_number}`),
         date: row.date,
         voucherType: row.voucher_type,
         voucherNo: row.voucher_number,
@@ -163,6 +177,7 @@ router.get("/report", async (req, res) => {
       balance += debit;
 
       transactions.push({
+        id: String(pv.id),
         date: pv.date,
         voucherType: "Purchase",
         voucherNo: pv.number,
@@ -179,6 +194,7 @@ router.get("/report", async (req, res) => {
       balance -= credit;
 
       transactions.push({
+        id: String(sv.id),
         date: sv.date,
         voucherType: "Sales",
         voucherNo: sv.number,
@@ -186,6 +202,24 @@ router.get("/report", async (req, res) => {
         debit: 0,
         credit,
         balance,
+      });
+    });
+
+    // Quotations → Credit
+    quotations.forEach((qt) => {
+      const credit = Number(qt.total || 0);
+      balance -= credit;
+
+      transactions.push({
+        id: String(qt.id),
+        date: qt.date,
+        voucherType: "Quotation",
+        voucherNo: qt.number,
+        particulars: qt.partyId.toString(),
+        debit: 0,
+        credit,
+        balance,
+        isQuotation: true,
       });
     });
 
@@ -230,6 +264,7 @@ router.get("/report", async (req, res) => {
       balance -= credit;
 
       transactions.push({
+        id: String(so.id),
         date: so.date,
         voucherType: "Sales Order",
         voucherNo: so.number,
@@ -281,6 +316,7 @@ router.get("/report", async (req, res) => {
       balance += debit;
 
       transactions.push({
+        id: String(po.id),
         date: po.date,
         voucherType: "Purchase Order",
         voucherNo: po.number,
