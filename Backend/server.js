@@ -82,6 +82,9 @@ app.use("/api/godowns", godownRoutes);
 const stockItemRoutes = require("./routes/stockItems");
 app.use("/api/stock-items", stockItemRoutes);
 
+const salesTypesRoutes = require("./routes/salesTypes");
+app.use("/api/sales-types", salesTypesRoutes);
+
 const signupRoute = require("./routes/SignUp");
 app.use("/api/SignUp", signupRoute);
 

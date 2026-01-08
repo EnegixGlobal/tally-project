@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from "react";
+import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -6,6 +6,7 @@ import type {
   Ledger,
   Godown,
   LedgerWithGroup,
+  SalesType,
 } from "../../../types";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 
@@ -66,6 +67,8 @@ const SalesVoucher: React.FC = () => {
   );
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
   const [selectedPartyState, setSelectedPartyState] = useState<string>(""); // Store selected party's state
+  const [salesTypes, setSalesTypes] = useState<SalesType[]>([]);
+  const [selectedSalesTypeId, setSelectedSalesTypeId] = useState<string>("");
 
   // Robust detection for party ledgers — backend may return different field names
 
@@ -149,6 +152,58 @@ const SalesVoucher: React.FC = () => {
       fetchCompanyInfo();
     }
   }, [companyId, companyInfo, setCompanyInfo]);
+
+  // Fetch Sales Types for voucher type dropdown
+  useEffect(() => {
+    const fetchSalesTypes = async () => {
+      try {
+        let url = `${import.meta.env.VITE_API_URL}/api/sales-types`;
+        
+        // Add tenant filters if available
+        if (companyId && ownerType && ownerId) {
+          url += `?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        }
+
+        const res = await fetch(url);
+        const json = await res.json();
+        if (json?.success) {
+          setSalesTypes(json?.data || []);
+          // Auto-select default Sales type (id=1) if not in edit mode
+          if (!isEditMode && !selectedSalesTypeId) {
+            setSelectedSalesTypeId("1");
+          }
+        } else {
+          setSalesTypes([]);
+        }
+      } catch (err) {
+        console.error("Error fetching sales types:", err);
+        setSalesTypes([]);
+      }
+    };
+    fetchSalesTypes();
+  }, []);
+
+  // Bill No. preview based on selected sales type (prefix + (current_no+1) + suffix)
+  const selectedSalesType = useMemo(() => {
+    if (!selectedSalesTypeId) return null;
+    return (
+      salesTypes.find((st) => String(st.id) === String(selectedSalesTypeId)) ||
+      null
+    );
+  }, [salesTypes, selectedSalesTypeId]);
+
+  const billNoPreview = useMemo(() => {
+    if (!selectedSalesType) return "";
+
+    const prefix = (selectedSalesType.prefix || "").trim();
+    const suffix = (selectedSalesType.suffix || "").trim();
+    const nextNo = Number(selectedSalesType.current_no || 0) + 1;
+
+    // If both prefix and suffix are empty -> show only next number
+    if (!prefix && !suffix) return String(nextNo);
+    // If one side missing, it will just concatenate the available parts
+    return `${prefix}${nextNo}${suffix}`;
+  }, [selectedSalesType]);
 
   // Check localStorage for companyInfo as fallback
   useEffect(() => {
@@ -349,7 +404,7 @@ const SalesVoucher: React.FC = () => {
         const v = data.voucher;
 
         // Prepare entries for frontend
-        const itemEntries = data.items.map((item) => ({
+        const itemEntries = data.items.map((item: any) => ({
           id: "e" + Math.random().toString(36).substr(2, 9),
           itemId: item.itemId,
           quantity: item.quantity,
@@ -365,7 +420,7 @@ const SalesVoucher: React.FC = () => {
           type: "debit",
         }));
 
-        const ledgerEntries = data.ledgerEntries.map((l) => ({
+        const ledgerEntries = data.ledgerEntries.map((l: any) => ({
           id: "e" + Math.random().toString(36).substr(2, 9),
           ledgerId: l.ledger_id,
           amount: l.amount,
@@ -415,8 +470,9 @@ const SalesVoucher: React.FC = () => {
       console.log("🔍 All Party Keys:", party ? Object.keys(party) : []);
 
       // Try multiple possible field names for state
+      const partyAny = party as any;
       const partyState =
-        party?.state || party?.state_name || party?.State || "";
+        partyAny?.state || partyAny?.state_name || partyAny?.State || "";
       setSelectedPartyState(partyState);
 
       // Debug logging for state matching
@@ -521,7 +577,12 @@ const SalesVoucher: React.FC = () => {
         const selectedParty = ledgers.find(
           (l) => String(l.id) === String(value)
         );
-        const partyState = selectedParty?.state || "";
+        const selectedAny = selectedParty as any;
+        const partyState =
+          selectedAny?.state ||
+          selectedAny?.state_name ||
+          selectedAny?.State ||
+          "";
         setSelectedPartyState(partyState);
 
         // Update GST rates for all existing entries when party changes
@@ -1212,6 +1273,10 @@ const SalesVoucher: React.FC = () => {
 
       entries: entriesWithGST,
 
+      // Sales Type and Bill No.
+      sales_type_id: selectedSalesTypeId ? Number(selectedSalesTypeId) : null,
+      bill_no: billNoPreview || null,
+
       // Ensure totals are properly formatted as numbers with 2 decimal places
       subtotal: Number(totals.subtotal.toFixed(2)),
       cgstTotal: Number(totals.cgstTotal.toFixed(2)),
@@ -1306,7 +1371,7 @@ const SalesVoucher: React.FC = () => {
 
       // ================= SALE HISTORY SAVE =================
       const historyPayload = formData.entries.map((entry) => {
-        const item = getItemDetails(entry.itemId);
+        const item = getItemDetails(entry.itemId || "");
 
         return {
           itemName: item.name,
@@ -1414,6 +1479,7 @@ const SalesVoucher: React.FC = () => {
       return {
         name: "-",
         hsnCode: "",
+        unit: "-",
         unitId: "",
         unitLabel: "",
         gstRate: 0,
@@ -1441,23 +1507,24 @@ const SalesVoucher: React.FC = () => {
     return {
       name: item.name,
       hsnCode: item.hsnCode || "",
+      unit: unitLabel, // for components expecting `unit`
       unitId, // id (1,2,3…)
       unitLabel, // "Nos" / "Kg" / "Mtr"
-      gstRate: parseFloat(item.gstRate) || 0,
+      gstRate: Number(item.gstRate) || 0,
 
       rate:
-        parseFloat(item.standardSaleRate) ||
-        parseFloat(item.sellingRate) ||
-        parseFloat(item.sellingPrice) ||
-        parseFloat(item.saleRate) ||
-        parseFloat(item.rate) ||
-        parseFloat(item.mrp) ||
+        Number(item.standardSaleRate) ||
+        Number(item.sellingRate) ||
+        Number(item.sellingPrice) ||
+        Number(item.saleRate) ||
+        Number(item.rate) ||
+        Number(item.mrp) ||
         0,
 
       mrp:
-        parseFloat(item.mrp) ||
-        parseFloat(item.MRP) ||
-        parseFloat(item.sellingPrice) ||
+        Number(item.mrp) ||
+        Number(item.MRP) ||
+        Number(item.sellingPrice) ||
         0,
 
       batches: (() => {
@@ -1539,7 +1606,7 @@ const SalesVoucher: React.FC = () => {
   );
 
   // 🔹 Fetch units from backend
-  const [unitss, setUnits] = useState([]);
+  const [unitss, setUnits] = useState<any[]>([]);
   useEffect(() => {
     const fetchUnits = async () => {
       try {
@@ -1585,14 +1652,39 @@ const SalesVoucher: React.FC = () => {
             </h1>
           </div>
 
-          {/* RIGHT SIDE - ⚙ SETTINGS ICON */}
-          <button
-            onClick={() => setShowConfig(true)}
-            className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
-            title="Voucher Display Settings"
-          >
-            <Settings size={22} />
-          </button>
+          {/* RIGHT SIDE - Sales Type + ⚙ SETTINGS ICON */}
+          <div className="flex items-center gap-3">
+            <select
+              name="salesType"
+              value={selectedSalesTypeId}
+              onChange={(e) => {
+                const v = e.target.value;
+                if (v === "add-new") {
+                  navigate("/app/masters/sales-types");
+                  return;
+                }
+                setSelectedSalesTypeId(v);
+              }}
+              className={`${FORM_STYLES.select(theme)} min-w-[120px] text-sm`}
+              title="Sales Voucher Type"
+            >
+              <option value="">Select Sales Type</option>
+              {salesTypes.map((s) => (
+                <option key={String(s.id)} value={String(s.id)}>
+                  {s.sales_type}
+                </option>
+              ))}
+              <option value="add-new">+ Add Sales Voucher Type</option>
+            </select>
+
+            <button
+              onClick={() => setShowConfig(true)}
+              className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
+              title="Voucher Display Settings"
+            >
+              <Settings size={22} />
+            </button>
+          </div>
         </div>
 
         <div
@@ -1601,7 +1693,7 @@ const SalesVoucher: React.FC = () => {
           }`}
         >
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
               <div>
                 <label
                   className="block text-sm font-medium mb-1"
@@ -1622,6 +1714,26 @@ const SalesVoucher: React.FC = () => {
                 {errors.date && (
                   <p className="text-red-500 text-xs mt-1">{errors.date}</p>
                 )}
+              </div>
+
+              {/* Bill No. (Preview from Sales Type) */}
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Bill No.
+                </label>
+                <input
+                  type="text"
+                  value={
+                    selectedSalesTypeId
+                      ? billNoPreview || "N/A"
+                      : "Select Sales Type"
+                  }
+                  readOnly
+                  title="Bill No. (Prefix + Next No + Suffix)"
+                  className={`${FORM_STYLES.input(theme)} ${
+                    theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                  } font-mono`}
+                />
               </div>
               <div>
                 <label
@@ -2925,7 +3037,6 @@ const SalesVoucher: React.FC = () => {
             getGstRateInfo={getGstRateInfo}
             companyInfo={safeCompanyInfo}
             ledgers={safeLedgers}
-            getLedgerName={getLedgerName}
           />
         )}
 

@@ -379,6 +379,83 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       };
     }
 
+    // ---------------------- QUOTATION ----------------------
+    if (voucherType === "quotation") {
+      const partyId =
+        p.partyId || p.customerId || p.party_id || p.customer_id || null;
+
+      const supplierInvoiceDate =
+        p.invoiceDate ||
+        p.invoice_date ||
+        p.billDate ||
+        p.bill_date ||
+        p.supplierInvoiceDate ||
+        p.date ||
+        "";
+
+      const referenceNo =
+        p.referenceNo ||
+        p.reference_no ||
+        p.invoiceNo ||
+        p.invoice_no ||
+        p.refNo ||
+        p.bill_no ||
+        "";
+
+      const subtotal =
+        Number(p.subtotal) ||
+        Number(p.sub_total) ||
+        Number(p.beforeTax) ||
+        Number(p.totalAmount) -
+          (Number(p.cgstTotal || 0) +
+            Number(p.sgstTotal || 0) +
+            Number(p.igstTotal || 0)) ||
+        0;
+
+      const cgst = Number(p.cgstTotal || p.cgst || 0);
+      const sgst = Number(p.sgstTotal || p.sgst || 0);
+      const igst = Number(p.igstTotal || p.igst || 0);
+      const total = subtotal + cgst + sgst + igst;
+
+      return {
+        id: String(p.id),
+        date: p.date,
+        number: p.number,
+        referenceNo,
+        narration: p.narration || "",
+        type: "quotation",
+        isQuotation: p.isQuotation || true,
+
+        supplierInvoiceDate,
+        subtotal,
+        cgstTotal: cgst,
+        sgstTotal: sgst,
+        igstTotal: igst,
+        total,
+        profit: Number(p.profit || 0),
+        dispatchDetails: p.dispatchDocNo || p.dispatchThrough || p.destination
+          ? {
+              docNo: p.dispatchDocNo || "",
+              through: p.dispatchThrough || "",
+              destination: p.destination || "",
+            }
+          : undefined,
+
+        entries: [
+          {
+            ledgerId: partyId,
+            type: "debit",
+            amount: total,
+          },
+          {
+            ledgerId: p.salesLedgerId || p.salesLedger || "Sales A/c",
+            type: "credit",
+            amount: total,
+          },
+        ],
+      };
+    }
+
     // ---------------------- SALES ORDER ----------------------
     if (voucherType === "sales_order") {
       const partyId =
@@ -450,7 +527,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         id: String(p.id),
         date: orderDate,
         number: p.number,
-        referenceNo: p.reference_no || null,
+        referenceNo: referenceNo || null,
         type: "purchase_order",
 
         supplierInvoiceDate: orderDate,
@@ -909,6 +986,13 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           url = `${
             import.meta.env.VITE_API_URL
           }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        }
+
+        // --- QUOTATIONS ---
+        else if (voucherType === "quotation") {
+          url = `${
+            import.meta.env.VITE_API_URL
+          }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&isQuotation=1`;
         }
 
         // --- PURCHASE VOUCHERS ---
