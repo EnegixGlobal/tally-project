@@ -17,26 +17,11 @@ const JournalVoucher: React.FC = () => {
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
-  console.log(companyId, ownerType, ownerId);
-  const generateVoucherNumber = () => {
-    const prefix = "JV";
-    const lastVoucher = vouchers
-      .filter((v) => v.type === "journal")
-      .sort(
-        (a, b) =>
-          parseInt(b.number.replace("JV", "") || "0") -
-          parseInt(a.number.replace("JV", "") || "0")
-      )[0];
-    const newNumber = lastVoucher
-      ? parseInt(lastVoucher.number.replace("JV", "")) + 1
-      : 1;
-    return `${prefix}${newNumber.toString().padStart(6, "0")}`;
-  };
 
   const initialFormData: Omit<VoucherEntry, "id"> = {
     date: new Date().toISOString().split("T")[0],
     type: "journal",
-    number: isEditMode ? "" : generateVoucherNumber(),
+    number: "",
     narration: "",
     entries: [
       { id: "1", ledgerId: "", amount: 0, type: "debit", narration: "" },
@@ -59,6 +44,38 @@ const JournalVoucher: React.FC = () => {
     showCostCentre: false,
     showEntryNarration: false,
   });
+
+  //get voucher number
+  useEffect(() => {
+    if (isEditMode) return;
+    if (!companyId || !ownerType || !ownerId) return;
+
+    const fetchNextJournalNumber = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/vouchers/next-number` +
+            `?company_id=${companyId}` +
+            `&owner_type=${ownerType}` +
+            `&owner_id=${ownerId}` +
+            `&voucherType=journal` +
+            `&date=${formData.date}`
+        );
+
+        const data = await res.json();
+
+        if (data.success) {
+          setFormData((prev) => ({
+            ...prev,
+            number: data.voucherNumber,
+          }));
+        }
+      } catch (err) {
+        console.error("Next journal number fetch failed", err);
+      }
+    };
+
+    fetchNextJournalNumber();
+  }, [formData.date]);
 
   // Mock cost centres
   const costCentres = useMemo(
@@ -873,12 +890,6 @@ const JournalVoucher: React.FC = () => {
                         ...prev,
                         autoNumbering: e.target.checked,
                       }));
-                      if (e.target.checked && !isEditMode) {
-                        setFormData((prev) => ({
-                          ...prev,
-                          number: generateVoucherNumber(),
-                        }));
-                      }
                     }}
                     className={`mr-2 ${
                       theme === "dark" ? "bg-gray-600" : "bg-white"

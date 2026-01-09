@@ -1,6 +1,9 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const {generateVoucherNumber} = require('../utils/generateVoucherNumber')
+const { getFinancialYear } = require("../utils/financialYear");
+
 
 //purchase history
 router.get("/purchase-history", async (req, res) => {
@@ -97,8 +100,59 @@ router.get("/items", async (req, res) => {
   }
 });
 
-// POST Purchase Voucher
+// next voucher count
+router.get("/next-number", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id, voucherType, date } = req.query;
+    console.log("hit hua baba");
 
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({ success: false });
+    }
+
+    const fy = getFinancialYear(date);
+    const month = String(new Date(date).getMonth() + 1).padStart(2, "0");
+
+    // 🔥 LAST VOUCHER FETCH
+    const [rows] = await db.execute(
+      `SELECT number FROM purchase_vouchers
+       WHERE company_id=? AND owner_type=? AND owner_id=?
+         AND number LIKE ?
+       ORDER BY id DESC
+       LIMIT 1`,
+      [
+        company_id,
+        owner_type,
+        owner_id,
+        `${voucherType}/${fy}/${month}/%`
+      ]
+    );
+
+    let nextNo = 1;
+
+    if (rows.length > 0) {
+      const lastNumber = rows[0].number; // PRV/25-26/01/000001
+      const lastSeq = Number(lastNumber.split("/").pop());
+      nextNo = lastSeq + 1;
+    }
+
+    const voucherNumber =
+      `${voucherType}/${fy}/${month}/${String(nextNo).padStart(6, "0")}`;
+
+    console.log("voucherNumber:", voucherNumber);
+
+    return res.json({
+      success: true,
+      voucherNumber
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+});
+
+
+// POST Purchase Voucher
 router.post("/", async (req, res) => {
   const {
     number,
@@ -147,6 +201,15 @@ router.post("/", async (req, res) => {
   let insertVoucherValues = [];
   let voucherId;
 
+  const voucherNumber = await generateVoucherNumber({
+  companyId: finalCompanyId,
+  ownerType: finalOwnerType,
+  ownerId: finalOwnerId,
+  voucherType: "PRV",
+  date
+});
+
+
   try {
     if (mode === "item-invoice") {
       insertVoucherSql = `
@@ -159,7 +222,7 @@ router.post("/", async (req, res) => {
       `;
 
       insertVoucherValues = [
-        number ?? null,
+       voucherNumber,
         date ?? null,
         supplierInvoiceDate ?? null,
         narration ?? null,
@@ -240,6 +303,7 @@ router.post("/", async (req, res) => {
 
     return res.status(200).json({
       success: true,
+       voucherNumber,
       message: "Purchase voucher saved successfully",
       id: voucherId,
     });
