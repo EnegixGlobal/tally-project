@@ -129,16 +129,20 @@ const LedgerReport: React.FC = () => {
   const handleVoucherClick = (transaction: LedgerTransaction) => {
     if (transaction.isOpening || transaction.isClosing) return;
 
+    const resolvedParticulars =
+      ledgerIdNameMap[transaction.particulars] || transaction.particulars;
+
     const voucherDetail: VoucherDetail = {
       id: transaction.id,
       voucherNo: transaction.voucherNo,
       voucherType: transaction.voucherType,
       date: transaction.date,
       amount: Math.max(transaction.debit, transaction.credit),
-      particulars: transaction.particulars,
+      particulars: resolvedParticulars,
       narration: transaction.narration || "",
       reference: transaction.reference,
     };
+
     setSelectedVoucher(voucherDetail);
   };
 
@@ -1110,7 +1114,9 @@ const LedgerReport: React.FC = () => {
                     // Navigate to voucher details page
                     // If it's a quotation, navigate to sales edit page
                     if (selectedVoucher.voucherType === "Quotation") {
-                      navigate(`/app/vouchers/sales/edit/${selectedVoucher.id}`);
+                      navigate(
+                        `/app/vouchers/sales/edit/${selectedVoucher.id}`
+                      );
                     } else {
                       navigate(
                         `/app/vouchers/${selectedVoucher.voucherType.toLowerCase()}/${

@@ -406,7 +406,6 @@ const CreditNoteVoucher: React.FC = () => {
           <h1 className="text-2xl font-bold">
             {isEditMode ? "Edit Credit Note" : "Credit Note Voucher"}
           </h1>
-          <p className="text-sm text-gray-500">To Debtor</p>
         </div>
       </div>
 
