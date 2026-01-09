@@ -18,6 +18,7 @@ interface VoucherEntry {
   number: string;
   type: string;
   date: string;
+  mode?: string;
   referenceNo?: string;
   narration?: string;
   entries: VoucherEntryLine[];
@@ -149,7 +150,6 @@ const DebitNoteRegiser: React.FC = () => {
 
     return { debit, credit };
   };
-
 
   useEffect(() => {
     const fetchLedgers = async () => {
@@ -284,16 +284,29 @@ const DebitNoteRegiser: React.FC = () => {
           setError("Invalid response from server");
         }
         setLoading(false);
-      })
+      }) 
       .catch(() => {
         setError("Failed to load vouchers");
         setLoading(false);
       });
   }, [companyId, ownerType, ownerId]);
 
+  const formatMode = (mode?: string) => {
+    if (!mode) return "-";
 
-
-  
+    switch (mode) {
+      case "accounting-invoice":
+        return "Accounting Invoice";
+      case "as-voucher":
+        return "As Voucher";
+      case "cash":
+        return "Cash";
+      case "bank":
+        return "Bank";
+      default:
+        return mode;
+    }
+  };
 
   // Filter vouchers based on search, filters, and view type
   const filteredVouchers = (() => {
@@ -338,7 +351,6 @@ const DebitNoteRegiser: React.FC = () => {
   //delete handler
 
   const deleteHandler = async (id: string) => {
-    // ID check
     if (!id) {
       Swal.fire({
         icon: "error",
@@ -348,61 +360,54 @@ const DebitNoteRegiser: React.FC = () => {
       return;
     }
 
-    // Confirmation popup
     const result = await Swal.fire({
       title: "Are you sure?",
-      text: "Do you really want to delete this voucher?",
+      text: "Do you really want to delete this Debit Note?",
       icon: "warning",
       showCancelButton: true,
       confirmButtonText: "Yes, delete it",
       cancelButtonText: "Cancel",
     });
 
-    if (!result.isConfirmed) {
-      Swal.fire({
-        icon: "info",
-        title: "Cancelled",
-        text: "Voucher was not deleted.",
-      });
-      return;
-    }
+    if (!result.isConfirmed) return;
 
     try {
-      // DELETE API call
       const response = await fetch(
         `${
           import.meta.env.VITE_API_URL
-        }/api/vouchers/${id}?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`,
+        }/api/DebitNoteVoucher/${id}?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`,
         {
           method: "DELETE",
         }
       );
 
-      if (!response.ok) {
-        throw new Error("Delete request failed");
+      const data = await response.json();
+
+      if (!response.ok || !data.success) {
+        throw new Error(data.message || "Delete failed");
       }
 
       Swal.fire({
         icon: "success",
         title: "Deleted!",
-        text: "Voucher has been deleted successfully.",
+        text: "Debit Note deleted successfully.",
       });
 
+      // ✅ UI se bhi remove
       setVouchers((prev) => prev.filter((v) => v.id !== id));
     } catch (error) {
+      console.error("Delete error:", error);
       Swal.fire({
         icon: "error",
         title: "Error",
-        text: "Failed to delete voucher.",
+        text: "Failed to delete Debit Note.",
       });
-      console.error("Delete error:", error);
     }
   };
 
   // Edit Handler
 
-  const editHandler = async (id: string) => {
-    // ID check
+  const editHandler = (id: string) => {
     if (!id) {
       Swal.fire({
         icon: "error",
@@ -412,7 +417,7 @@ const DebitNoteRegiser: React.FC = () => {
       return;
     }
 
-    navigate(`/app/vouchers/payment/edit/${id}`);
+    navigate(`/app/vouchers/debit-note/edit/${id}`);
   };
 
   const statusCounts = filteredVouchers.reduce((acc, voucher) => {
@@ -771,6 +776,9 @@ const DebitNoteRegiser: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Particulars
                 </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Mode
+                </th>
                 <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Debit Amount
                 </th>
@@ -805,6 +813,11 @@ const DebitNoteRegiser: React.FC = () => {
                     >
                       {particulars}
                     </td>
+
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {formatMode(voucher.mode)}
+                    </td>
+
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 text-right font-medium">
                       {debit > 0 ? formatCurrency(debit) : "-"}
                     </td>
@@ -822,17 +835,7 @@ const DebitNoteRegiser: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex space-x-2">
-                        {hasPermission("view") && (
-                          <button
-                            onClick={() =>
-                              console.log("View voucher:", voucher.id)
-                            }
-                            className="text-blue-600 hover:text-blue-900"
-                            title="View voucher"
-                          >
-                            View
-                          </button>
-                        )}
+                        
                         {hasPermission("edit") && (
                           <button
                             onClick={() => editHandler(voucher.id)}

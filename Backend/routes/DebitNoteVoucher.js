@@ -238,30 +238,93 @@ router.get("/:id", async (req, res) => {
 });
 
 router.put("/:id", async (req, res) => {
-  const { companyId, ownerType, ownerId, narration, entries } = req.body;
+  try {
+    const {
+      companyId,
+      ownerType,
+      ownerId,
+      date,
+      number,
+      mode,
+      narration,
+      entries,
+    } = req.body;
 
-  if (!companyId || !ownerType || !ownerId) {
-    return res.status(400).json({ success: false });
+    if (!companyId || !ownerType || !ownerId || !mode) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required fields",
+      });
+    }
+
+    /* =========================
+       🧠 PREPARE FINAL NARRATION
+    ========================= */
+    let finalNarration = narration || "";
+
+    if (
+      (mode === "accounting-invoice" || mode === "as-voucher") &&
+      Array.isArray(entries)
+    ) {
+      const cleanAccountingEntries = entries
+        .filter(
+          (e) =>
+            e.ledgerId &&
+            Number(e.amount) > 0 &&
+            (e.type === "debit" || e.type === "credit")
+        )
+        .map((e) => ({
+          ledgerId: Number(e.ledgerId),
+          type: e.type,
+          amount: Number(e.amount),
+        }));
+
+      finalNarration = JSON.stringify({
+        accountingEntries: cleanAccountingEntries,
+        note: narration || "",
+      });
+    }
+
+    /* =========================
+       ✅ UPDATE ALL FIELDS
+    ========================= */
+    await db.query(
+      `
+      UPDATE debit_note_vouchers
+      SET
+        date = ?,
+        number = ?,
+        mode = ?,
+        narration = ?
+      WHERE id = ?
+        AND company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+      `,
+      [
+        date,
+        number || null,
+        mode,
+        finalNarration,
+        req.params.id,
+        companyId,
+        ownerType,
+        ownerId,
+      ]
+    );
+
+    res.json({
+      success: true,
+      message: "Debit Note updated successfully",
+    });
+  } catch (error) {
+    console.error("Error updating debit note:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to update Debit Note",
+      error: error.message,
+    });
   }
-
-  const finalNarration = JSON.stringify({
-    accountingEntries: entries || [],
-    note: narration || "",
-  });
-
-  await db.query(
-    `
-    UPDATE debit_note_vouchers
-    SET narration = ?
-    WHERE id = ?
-      AND company_id = ?
-      AND owner_type = ?
-      AND owner_id = ?
-    `,
-    [finalNarration, req.params.id, companyId, ownerType, ownerId]
-  );
-
-  res.json({ success: true, message: "Debit Note updated" });
 });
 
 router.delete("/:id", async (req, res) => {
