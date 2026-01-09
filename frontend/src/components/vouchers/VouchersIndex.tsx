@@ -17,7 +17,7 @@ interface VoucherType {
   color: string;
   iconBg: string;
   description: string;
-  category: 'accounting' | 'trading' | 'inventory' | 'import';
+  category: 'accounting' | 'trading' | 'inventory' | 'import' ;
 }
 
 interface VoucherSection {
@@ -191,6 +191,7 @@ const VouchersIndex: React.FC = () => {
           description: 'Credit adjustments',
           category: 'trading'
         },
+        
         // {
         //   id: 'sales-return',
         //   icon: <RotateCcw size={20} />,

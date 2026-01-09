@@ -5,7 +5,7 @@ const db = require("../db");
 router.get("/report", async (req, res) => {
   const { ledgerId } = req.query;
 
-  console.log("REQ LEDGER:", ledgerId);
+  // console.log("REQ LEDGER:", ledgerId);
 
   if (!ledgerId) {
     return res.status(400).json({
@@ -131,26 +131,32 @@ router.get("/report", async (req, res) => {
        6️⃣ NORMAL LEDGER ENTRIES
     =============================== */
     const [txns] = await connection.execute(
-      `SELECT
-         vm.id AS voucher_id,
-         vm.voucher_type,
-         vm.voucher_number,
-         vm.date,
-         ve.entry_type,
-         ve.amount,
-         ve.narration
-       FROM voucher_entries ve
-       JOIN voucher_main vm ON vm.id = ve.voucher_id
-       WHERE ve.ledger_id = ?
-       ORDER BY vm.date ASC`,
+      `
+  SELECT
+    vm.id AS voucher_id,
+    vm.voucher_type,
+    vm.voucher_number,
+    vm.date,
+
+    ve.entry_type,
+    ve.amount,
+    ve.narration AS entry_narration,
+
+    ve.ledger_id,
+    l.name AS ledger_name
+
+  FROM voucher_entries ve
+  JOIN voucher_main vm ON vm.id = ve.voucher_id
+  LEFT JOIN ledgers l ON l.id = ve.ledger_id
+  WHERE ve.ledger_id = ?
+  ORDER BY vm.date ASC
+  `,
       [ledgerId]
     );
 
     /* ===============================
    6️⃣A DEBIT / CREDIT NOTES 🔥 (NEW)
-/* ===============================
-   DEBIT / CREDIT NOTES (FIXED)
-=============================== */
+*/
     const [dcNotes] = await connection.execute(
       `
   SELECT id, date, number, party_id, narration
@@ -158,6 +164,22 @@ router.get("/report", async (req, res) => {
   WHERE narration IS NOT NULL
   ORDER BY date ASC, id ASC
   `
+    );
+
+    /* ===============================
+   6️⃣B CREDIT NOTES 🔥
+=============================== */
+    const [creditNotes] = await connection.execute(
+      `
+  SELECT id, date, number, mode, narration
+  FROM credit_vouchers
+  WHERE narration IS NOT NULL
+    AND company_id = ?
+    AND owner_type = ?
+    AND owner_id = ?
+  ORDER BY date ASC, id ASC
+  `,
+      [ledger.company_id, ledger.owner_type, ledger.owner_id]
     );
 
     /* ===============================
@@ -178,7 +200,9 @@ router.get("/report", async (req, res) => {
         date: row.date,
         voucherType: row.voucher_type,
         voucherNo: row.voucher_number,
-        particulars: row.narration || "-",
+
+        particulars: row.ledger_name || String(row.ledger_id),
+
         debit,
         credit,
         balance,
@@ -198,25 +222,57 @@ router.get("/report", async (req, res) => {
       if (!Array.isArray(parsed.accountingEntries)) return;
 
       parsed.accountingEntries.forEach((entry) => {
+        // ✅ LEDGER FILTER
+        if (String(entry.ledgerId) !== String(ledgerId)) return;
+
         const debit = entry.type === "debit" ? Number(entry.amount || 0) : 0;
         const credit = entry.type === "credit" ? Number(entry.amount || 0) : 0;
 
-        // ⚠ balance sirf tab update karo jab ledger match ho
-        if (String(entry.ledgerId) === String(ledgerId)) {
-          balance += debit - credit;
-        }
+        balance += debit - credit;
 
         transactions.push({
           id: `DN-${note.id}-${entry.ledgerId}`,
           date: note.date,
-          voucherType: entry.type === "credit" ? "Debit Note" : "Debit Note",
+          voucherType: "Debit Note",
           voucherNo: note.number,
-          particulars: `${entry.ledgerId}`,
+          particulars: String(entry.ledgerId),
           debit,
           credit,
-          balance:
-            String(entry.ledgerId) === String(ledgerId) ? balance : balance,
-          isContra: String(entry.ledgerId) !== String(ledgerId),
+          balance,
+        });
+      });
+    });
+
+    // Credit Notes
+    creditNotes.forEach((note) => {
+      let parsed;
+
+      try {
+        parsed = JSON.parse(note.narration);
+      } catch {
+        return;
+      }
+
+      if (!Array.isArray(parsed.accountingEntries)) return;
+
+      parsed.accountingEntries.forEach((entry) => {
+        if (String(entry.ledgerId) !== String(ledgerId)) return;
+
+        const debit = entry.type === "debit" ? Number(entry.amount || 0) : 0;
+        const credit = entry.type === "credit" ? Number(entry.amount || 0) : 0;
+
+        balance += debit - credit;
+
+        transactions.push({
+          id: `CN-${note.id}-${entry.ledgerId}`,
+          date: note.date,
+          voucherType: "Credit Note",
+          voucherNo: note.number,
+          referenceNo: note.mode,
+          particulars: String(entry.ledgerId),
+          debit,
+          credit,
+          balance,
         });
       });
     });

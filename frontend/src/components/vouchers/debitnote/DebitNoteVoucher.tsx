@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "../../../context/AppContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useParams } from "react-router-dom";
 import type {
   VoucherEntry,
   Ledger,
@@ -16,6 +16,9 @@ import Swal from "sweetalert2";
 const DebitNoteVoucher: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const isEditMode = Boolean(id);
+
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");
@@ -28,6 +31,55 @@ const DebitNoteVoucher: React.FC = () => {
     const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit
     return `${prefix}${randomNumber}`;
   };
+
+  useEffect(() => {
+    if (!isEditMode || !id) return;
+
+    const fetchDebitNote = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/DebitNoteVoucher/${id}?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`
+        );
+
+        const result = await res.json();
+
+        if (!result.success) {
+          Swal.fire("Error", "Debit Note not found", "error");
+          return;
+        }
+
+        const v = result.data;
+
+        setFormData({
+          date: v.date ? v.date.split("T")[0] : "",
+          type: "debit-note",
+          number: v.number,
+          narration: v.narration || "",
+          mode: v.mode || "accounting-invoice",
+          entries:
+            v.entries?.length > 0
+              ? v.entries.map((e: any, i: number) => ({
+                  id: String(i + 1),
+                  ledgerId: e.ledgerId,
+                  amount: Number(e.amount) || 0,
+                  type: e.type,
+                }))
+              : [
+                  { id: "1", ledgerId: "", amount: 0, type: "debit" },
+                  { id: "2", ledgerId: "", amount: 0, type: "credit" },
+                ],
+        });
+      } catch (err) {
+        console.error(err);
+        Swal.fire("Error", "Failed to load Debit Note", "error");
+      }
+    };
+
+    fetchDebitNote();
+  }, [isEditMode, id, companyId, ownerType, ownerId]);
+
   useEffect(() => {
     const fetchLedgers = async () => {
       try {
@@ -105,16 +157,19 @@ const DebitNoteVoucher: React.FC = () => {
   ) => {
     const { name, value } = e.target;
 
-    // Only accounting/as-voucher modes supported — keep entries shape consistent
     if (name === "mode") {
       const newMode = value as "accounting-invoice" | "as-voucher";
+
       setFormData((prev) => ({
         ...prev,
         mode: newMode,
-        entries: [
-          { id: "1", ledgerId: "", amount: 0, type: "debit" },
-          { id: "2", ledgerId: "", amount: 0, type: "credit" },
-        ],
+
+        entries: isEditMode
+          ? prev.entries
+          : [
+              { id: "1", ledgerId: "", amount: 0, type: "debit" },
+              { id: "2", ledgerId: "", amount: 0, type: "credit" },
+            ],
       }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -275,19 +330,17 @@ const DebitNoteVoucher: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    // ✅ Validation for accounting/as-voucher mode
     if (!isBalanced) {
-      alert("Total debit must equal total credit");
+      Swal.fire("Error", "Debit & Credit must be equal", "error");
       return;
     }
 
     try {
       if (!ownerId) {
-        alert("Owner ID not found. Please login again.");
+        Swal.fire("Error", "Owner ID missing", "error");
         return;
       }
 
-      // ✅ Prepare payload for API
       const payload = {
         companyId,
         ownerType,
@@ -296,46 +349,43 @@ const DebitNoteVoucher: React.FC = () => {
         number: formData.number,
         mode: formData.mode,
         narration: formData.narration,
-        entries: formData.entries.map((entry) => ({
-          ledgerId: entry.ledgerId,
-          amount: entry.amount,
-          type: entry.type,
+        entries: formData.entries.map((e) => ({
+          ledgerId: e.ledgerId,
+          amount: e.amount,
+          type: e.type,
         })),
       };
 
-      console.log("Payload:", payload);
+      const url = isEditMode
+        ? `${import.meta.env.VITE_API_URL}/api/DebitNoteVoucher/${id}`
+        : `${import.meta.env.VITE_API_URL}/api/DebitNoteVoucher`;
 
-      // ✅ Send to backend
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/DebitNoteVoucher`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const method = isEditMode ? "PUT" : "POST";
 
-      const result = await response.json();
-      if (result.success) {
-        Swal.fire({
-          icon: "success",
-          title: "Success",
-          text: "Debit Note saved successfully",
-        }).then(() => {
-          navigate("/app/vouchers"); // or your route to go back
-        });
-      } else {
-        Swal.fire("Error", result.message || "Something went wrong", "error");
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+
+      const result = await res.json();
+
+      if (!result.success) {
+        throw new Error(result.message || "Failed");
       }
-    } catch (error) {
-      console.error("Error saving debit note:", error);
-      Swal.fire(
-        "Error",
-        "Error saving debit note. Check console for details.",
-        "error"
-      );
+
+      Swal.fire({
+        icon: "success",
+        title: isEditMode ? "Updated" : "Saved",
+        text: isEditMode
+          ? "Debit Note updated successfully"
+          : "Debit Note created successfully",
+      }).then(() => {
+        navigate(-1);
+      });
+    } catch (err) {
+      console.error(err);
+      Swal.fire("Error", "Save failed", "error");
     }
   };
 
@@ -343,15 +393,21 @@ const DebitNoteVoucher: React.FC = () => {
     <div className="pt-[56px] px-4 ">
       <div className="flex items-center mb-6">
         <button
-          title="Back to Vouchers"
-          onClick={() => navigate("/app/vouchers")}
+          title="Back"
+          onClick={() => navigate(-1)}
           className={`mr-4 p-2 rounded-full ${
             theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
           }`}
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold">Debit Note Voucher</h1>
+
+        <div>
+          <h1 className="text-2xl font-bold">
+            {isEditMode ? "Edit Debit Note" : "Debit Note Voucher"}
+          </h1>
+         
+        </div>
       </div>
 
       <div
@@ -666,7 +722,7 @@ const DebitNoteVoucher: React.FC = () => {
               }`}
             >
               <Save size={18} className="mr-1" />
-              Save
+              {isEditMode ? "Update" : "Save"}
             </button>
           </div>
         </form>

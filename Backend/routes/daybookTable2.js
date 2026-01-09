@@ -174,170 +174,141 @@ router.get("/", async (req, res) => {
     });
 
     /* =====================================================
-   4️⃣ SALES ORDERS → CREDIT (WITH ITEMS TOTAL) ✅ FIXED
+   4️⃣ DEBIT NOTE VOUCHERS (Debit Note Register)
 ===================================================== */
-    const [salesOrderRows] = await db.query(
+    const [debitNoteRows] = await db.query(
       `
   SELECT
-    so.id,
-    so.number,
-    so.date,
-    so.narration,
-    so.referenceNo,
-    so.salesLedgerId,
-    so.company_id,
-    so.owner_type,
-    so.owner_id,
-    l.name AS ledger_name,
-
-    SUM(soi.amount) AS totalAmount
-  FROM sales_orders so
-  LEFT JOIN sales_order_items soi 
-    ON soi.salesOrderId = so.id
-  LEFT JOIN ledgers l 
-    ON l.id = so.salesLedgerId
-  WHERE so.company_id = ?
-    AND so.owner_type = ?
-    AND so.owner_id = ?
-  GROUP BY so.id
+    dnv.id,
+    dnv.date,
+    dnv.number,
+    dnv.mode,
+    dnv.narration,
+    dnv.company_id,
+    dnv.owner_type,
+    dnv.owner_id
+  FROM debit_note_vouchers dnv
+  WHERE dnv.company_id = ?
+    AND dnv.owner_type = ?
+    AND dnv.owner_id = ?
+  ORDER BY dnv.date DESC, dnv.id DESC
   `,
       [company_id, owner_type, owner_id]
     );
 
-    salesOrderRows.forEach((so) => {
-      vouchers[`SO-${so.id}`] = {
-        id: `SO-${so.id}`,
-        voucher_type: "Sales Order",
-        voucher_number: so.number,
-        date: so.date,
-        narration: so.narration,
-        reference_no: so.referenceNo,
+    for (const dn of debitNoteRows) {
+      let entries = [];
+
+      if (dn.narration) {
+        try {
+          const parsed = JSON.parse(dn.narration);
+
+          if (Array.isArray(parsed.accountingEntries)) {
+            // 🔹 Ledger names fetch
+            const ledgerIds = parsed.accountingEntries.map((e) => e.ledgerId);
+
+            let ledgerMap = {};
+            if (ledgerIds.length) {
+              const [ledgerRows] = await db.query(
+                `SELECT id, name FROM ledgers WHERE id IN (?)`,
+                [ledgerIds]
+              );
+              ledgerRows.forEach((l) => {
+                ledgerMap[l.id] = l.name;
+              });
+            }
+
+            entries = parsed.accountingEntries.map((e, idx) => ({
+              id: `DN-E-${dn.id}-${idx + 1}`,
+              ledger_id: e.ledgerId,
+              ledger_name: ledgerMap[e.ledgerId] || `Ledger ${e.ledgerId}`,
+              amount: e.amount,
+              entry_type: e.type, // debit / credit
+              narration: parsed.note || "",
+              item_id: null,
+            }));
+          }
+        } catch (err) {
+          console.warn("Debit note narration JSON parse failed", err);
+        }
+      }
+
+      vouchers[`DN-${dn.id}`] = {
+        id: `DN-${dn.id}`,
+        voucher_type: "Debit Note",
+        voucher_number: dn.number,
+        date: dn.date,
+        narration: "",
+        reference_no: dn.mode,
         supplier_invoice_date: null,
-        company_id: so.company_id,
-        owner_type: so.owner_type,
-        owner_id: so.owner_id,
-        entries: [
-          {
-            id: `SO-E-${so.id}`,
-            ledger_id: so.salesLedgerId,
-            ledger_name: so.ledger_name,
-            amount: Number(so.totalAmount || 0),
-            entry_type: "credit",
-            narration: so.narration,
-            item_id: null,
-          },
-        ],
+        company_id: dn.company_id,
+        owner_type: dn.owner_type,
+        owner_id: dn.owner_id,
+        entries,
       };
-    });
+    }
 
     /* =====================================================
-   5️⃣ PURCHASE ORDERS → DEBIT (WITH ITEMS TOTAL) ✅
+   4️⃣ CREDIT NOTE VOUCHERS
 ===================================================== */
-    const [purchaseOrderRows] = await db.query(
+    const [creditRows] = await db.query(
       `
   SELECT
-    po.id,
-    po.number,
-    po.date,
-    po.narration,
-    po.reference_no,
-    po.party_id,
-    po.purchase_ledger_id,
-    po.company_id,
-    po.owner_type,
-    po.owner_id,
-    l.name AS ledger_name,
-
-    SUM(poi.amount) AS totalAmount
-  FROM purchase_orders po
-  LEFT JOIN purchase_order_items poi
-    ON poi.purchase_order_id = po.id
-  LEFT JOIN ledgers l
-    ON l.id = po.purchase_ledger_id
-  WHERE po.company_id = ?
-    AND po.owner_type = ?
-    AND po.owner_id = ?
-  GROUP BY po.id
+    cv.id,
+    cv.date,
+    cv.number,
+    cv.mode,
+    cv.partyId,
+    cv.narration,
+    cv.company_id,
+    cv.owner_type,
+    cv.owner_id
+  FROM credit_vouchers cv
+  WHERE cv.company_id = ?
+    AND cv.owner_type = ?
+    AND cv.owner_id = ?
+  ORDER BY cv.date DESC, cv.id DESC
   `,
       [company_id, owner_type, owner_id]
     );
 
-    purchaseOrderRows.forEach((po) => {
-      vouchers[`PO-${po.id}`] = {
-        id: `PO-${po.id}`,
-        voucher_type: "Purchase Order",
-        voucher_number: po.number,
-        date: po.date,
-        narration: po.narration,
-        reference_no: po.reference_no,
-        supplier_invoice_date: null,
-        company_id: po.company_id,
-        owner_type: po.owner_type,
-        owner_id: po.owner_id,
-        entries: [
-          {
-            id: `PO-E-${po.id}`,
-            ledger_id: po.purchase_ledger_id,
-            ledger_name: po.ledger_name,
-            amount: Number(po.totalAmount || 0),
-            entry_type: "debit",
-            narration: po.narration,
-            item_id: null,
-          },
-        ],
-      };
-    });
+    creditRows.forEach((cv) => {
+      let entries = [];
+      let narrationText = "";
 
-    /* =====================================================
-   4️⃣A QUOTATIONS → CREDIT (sales_vouchers, isQuotation = 1)
-===================================================== */
-    const [quotationRows] = await db.query(
-      `
-  SELECT
-    sv.id,
-    sv.number,
-    sv.date,
-    sv.narration,
-    sv.referenceNo,
-    sv.salesLedgerId,
-    sv.total,
-    sv.company_id,
-    sv.owner_type,
-    sv.owner_id,
-    l.name AS ledger_name
-  FROM sales_vouchers sv
-  LEFT JOIN ledgers l ON l.id = sv.salesLedgerId
-  WHERE sv.company_id = ?
-    AND sv.owner_type = ?
-    AND sv.owner_id = ?
-    AND sv.isQuotation = 1
-  `,
-      [company_id, owner_type, owner_id]
-    );
+      if (cv.narration) {
+        try {
+          const parsed = JSON.parse(cv.narration);
+          entries = parsed.accountingEntries || [];
+          narrationText = parsed.note || "";
+        } catch {
+          narrationText = cv.narration;
+        }
+      }
 
-    quotationRows.forEach((qt) => {
-      vouchers[`QT-${qt.id}`] = {
-        id: `QT-${qt.id}`,
-        voucher_type: "Quotation",
-        voucher_number: qt.number,
-        date: qt.date,
-        narration: qt.narration,
-        reference_no: qt.referenceNo,
+      vouchers[`CRN-${cv.id}`] = {
+        id: `CRN-${cv.id}`,
+        voucher_type: "Credit Note",
+        voucher_number: cv.number,
+        date: cv.date,
+        narration: narrationText,
+
+        reference_no: cv.mode,
+
         supplier_invoice_date: null,
-        company_id: qt.company_id,
-        owner_type: qt.owner_type,
-        owner_id: qt.owner_id,
-        entries: [
-          {
-            id: `QT-E-${qt.id}`,
-            ledger_id: qt.salesLedgerId,
-            ledger_name: qt.ledger_name,
-            amount: Number(qt.total || 0),
-            entry_type: "credit",
-            narration: qt.narration,
-            item_id: null,
-          },
-        ],
+        company_id: cv.company_id,
+        owner_type: cv.owner_type,
+        owner_id: cv.owner_id,
+
+        entries: entries.map((e, index) => ({
+          id: `CRN-E-${cv.id}-${index}`,
+          ledger_id: e.ledgerId,
+          ledger_name: null, // optional (ledger join chaho to kar sakte ho)
+          amount: e.amount,
+          entry_type: e.type, // debit / credit
+          narration: narrationText,
+          item_id: null,
+        })),
       };
     });
 
