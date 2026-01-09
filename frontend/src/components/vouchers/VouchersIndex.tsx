@@ -17,7 +17,7 @@ interface VoucherType {
   color: string;
   iconBg: string;
   description: string;
-  category: 'accounting' | 'trading' | 'inventory' | 'import';
+  category: 'accounting' | 'trading' | 'inventory' | 'import' | 'From Creditor' | 'To Debtor';
 }
 
 interface VoucherSection {
@@ -179,7 +179,7 @@ const VouchersIndex: React.FC = () => {
           color: theme === 'dark' ? 'bg-rose-900/50 hover:bg-rose-800/50' : 'bg-rose-50 hover:bg-rose-100',
           iconBg: theme === 'dark' ? 'bg-rose-800/70' : 'bg-rose-100',
           description: 'Debit adjustments',
-          category: 'trading'
+          category: 'From Creditor'
         },
         {
           id: 'credit-note',
@@ -189,7 +189,7 @@ const VouchersIndex: React.FC = () => {
           color: theme === 'dark' ? 'bg-teal-900/50 hover:bg-teal-800/50' : 'bg-teal-50 hover:bg-teal-100',
           iconBg: theme === 'dark' ? 'bg-teal-800/70' : 'bg-teal-100',
           description: 'Credit adjustments',
-          category: 'trading'
+          category: 'To Debtor'
         },
         // {
         //   id: 'sales-return',

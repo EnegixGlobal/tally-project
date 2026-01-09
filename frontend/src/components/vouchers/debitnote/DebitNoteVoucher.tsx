@@ -393,17 +393,21 @@ const DebitNoteVoucher: React.FC = () => {
     <div className="pt-[56px] px-4 ">
       <div className="flex items-center mb-6">
         <button
-          title="Back to Vouchers"
-          onClick={() => navigate("/app/vouchers")}
+          title="Back"
+          onClick={() => navigate(-1)}
           className={`mr-4 p-2 rounded-full ${
             theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
           }`}
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold">
-          {isEditMode ? "Edit Debit Note" : "Debit Note Voucher"}
-        </h1>
+
+        <div>
+          <h1 className="text-2xl font-bold">
+            {isEditMode ? "Edit Debit Note" : "Debit Note Voucher"}
+          </h1>
+          <p className="text-sm text-gray-500">From Creditor</p>
+        </div>
       </div>
 
       <div

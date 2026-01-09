@@ -944,14 +944,7 @@ function App() {
                   </RequireCompany>
                 }
               />
-              <Route
-                path="voucher-register/debit-note"
-                element={
-                  <RequireCompany>
-                    <DebitNoteRegister />
-                  </RequireCompany>
-                }
-              />
+             
               <Route
                 path="voucher-register/sales-order"
                 element={
