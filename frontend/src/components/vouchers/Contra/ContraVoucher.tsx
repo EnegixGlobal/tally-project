@@ -25,16 +25,10 @@ const ContraVoucher: React.FC = () => {
 
   console.log(companyId, ownerType, ownerId);
 
-  const generateVoucherNumber = () => {
-    const prefix = "CV";
-    const randomNumber = Math.floor(100000 + Math.random() * 900000);
-    return `${prefix}${randomNumber}`;
-  };
-
   const initialFormData: Omit<VoucherEntry, "id"> = {
     date: new Date().toISOString().split("T")[0],
     type: "contra",
-    number: isEditMode ? "" : generateVoucherNumber(),
+    number: "",
     narration: "",
     entries: [
       { id: "1", ledgerId: "", amount: 0, type: "debit", narration: "" },
@@ -59,6 +53,38 @@ const ContraVoucher: React.FC = () => {
     showCostCentre: false,
     showEntryNarration: false,
   });
+
+  //voucher number get
+  useEffect(() => {
+    if (isEditMode) return;
+    if (!companyId || !ownerType || !ownerId) return;
+
+    const fetchNextNumber = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/vouchers/next-number` +
+            `?company_id=${companyId}` +
+            `&owner_type=${ownerType}` +
+            `&owner_id=${ownerId}` +
+            `&voucherType=contra` +
+            `&date=${formData.date}`
+        );
+
+        const data = await res.json();
+
+        if (data.success) {
+          setFormData((prev) => ({
+            ...prev,
+            number: data.voucherNumber,
+          }));
+        }
+      } catch (err) {
+        console.error("Next contra number fetch failed", err);
+      }
+    };
+
+    fetchNextNumber();
+  }, [formData.date]);
 
   // Mock cost centres
   const costCentres = useMemo(
@@ -1157,12 +1183,6 @@ const ContraVoucher: React.FC = () => {
                         ...prev,
                         autoNumbering: e.target.checked,
                       }));
-                      if (e.target.checked && !isEditMode) {
-                        setFormData((prev) => ({
-                          ...prev,
-                          number: generateVoucherNumber(),
-                        }));
-                      }
                     }}
                     className={`mr-2 ${
                       theme === "dark" ? "bg-gray-600" : "bg-white"

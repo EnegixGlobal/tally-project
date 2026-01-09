@@ -327,15 +327,10 @@ const PurchaseVoucher: React.FC = () => {
     panNumber: "N/A",
   };
 
-  const generateVoucherNumber = () => {
-    const prefix = "PRV";
-    const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit
-    return `${prefix}${randomNumber}`;
-  };
   const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>({
     date: new Date().toISOString().split("T")[0],
     type: "purchase",
-    number: generateVoucherNumber(),
+    number: "",
     narration: "",
     referenceNo: "", // This will be used for Supplier Invoice Number
     supplierInvoiceDate: new Date().toISOString().split("T")[0], // New field for supplier invoice date
@@ -704,6 +699,36 @@ const PurchaseVoucher: React.FC = () => {
     }));
   };
 
+  useEffect(() => {
+    if (isEditMode) return;
+
+    const fetchNextVoucherNumber = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/purchase-vouchers/next-number` +
+            `?company_id=${companyId}` +
+            `&owner_type=${ownerType}` +
+            `&owner_id=${ownerId}` +
+            `&voucherType=PRV` +
+            `&date=${formData.date}`
+        );
+
+        const data = await res.json();
+
+        if (data.success && data.voucherNumber) {
+          setFormData((prev) => ({
+            ...prev,
+            number: data.voucherNumber,
+          }));
+        }
+      } catch (err) {
+        console.error("Next voucher number error:", err);
+      }
+    };
+
+    fetchNextVoucherNumber();
+  }, [formData.date]);
+
   const removeEntry = (index: number) => {
     if (formData.entries.length <= 1) return;
     const updatedEntries = [...formData.entries];
@@ -872,6 +897,12 @@ const PurchaseVoucher: React.FC = () => {
       });
 
       const data = await res.json();
+      if (data.voucherNumber) {
+        setFormData((prev) => ({
+          ...prev,
+          number: data.voucherNumber,
+        }));
+      }
       if (!res.ok) {
         Swal.fire("Error", data.message || "Voucher save failed", "error");
         return;

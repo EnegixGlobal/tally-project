@@ -2,12 +2,14 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db"); // mysql2/promise pool
 
+const { getFinancialYear } = require("../utils/financialYear");
+const { generateVoucherNumber } = require("../utils/generateVoucherNumber");
+
 router.post("/", async (req, res) => {
   let {
     type,
     mode,
     date,
-    number,
     narration,
     referenceNo,
     supplierInvoiceDate,
@@ -26,25 +28,13 @@ router.post("/", async (req, res) => {
     !owner_id ||
     !companyId
   ) {
-    console.warn("⚠ Missing required fields:", {
-      type,
-      date,
-      entries: entries.length,
-      owner_type,
-      owner_id,
-      companyId,
-    });
     return res.status(400).json({ message: "Missing required fields" });
   }
 
-  // ---------------------------------------------------------
-  // SINGLE ENTRY AUTO BALANCE FIX (if only one entry comes)
-  // ---------------------------------------------------------
+  // SINGLE ENTRY AUTO BALANCE FIX
   if (mode === "single-entry" && entries.length === 1) {
     const e = entries[0];
-
     entries.push({
-      id: "AUTO",
       ledgerId: e.ledgerId,
       ledgerName: e.ledgerName || null,
       amount: e.amount,
@@ -60,52 +50,43 @@ router.post("/", async (req, res) => {
   await conn.beginTransaction();
 
   try {
-    // ---------------------------------------------------------
-    // FIX: CHECK IF ledger_name COLUMN EXISTS (MySQL 5.7 SAFE)
-    // ---------------------------------------------------------
-    const [colCheck] = await conn.query(`
-      SELECT COUNT(*) AS count
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_NAME = 'voucher_entries'
-        AND COLUMN_NAME = 'ledger_name'
-        AND TABLE_SCHEMA = DATABASE();
-    `);
+    // 🔐 Generate voucher number (FINAL)
+    const voucherNumber = await generateVoucherNumber({
+      companyId: Number(companyId),
+      ownerType: String(owner_type),
+      ownerId: Number(owner_id),
+      voucherType: type, // payment / receipt / contra / journal
+      date,
+    });
 
-    if (colCheck[0].count === 0) {
-      console.log("🔧 Adding column: ledger_name");
-      await conn.query(`
-        ALTER TABLE voucher_entries
-        ADD COLUMN ledger_name VARCHAR(255) NULL;
-      `);
+    if (!voucherNumber) {
+      throw new Error("Voucher number generation failed");
     }
 
-    // ---------------------------------------------------------
-    // INSERT INTO voucher_main
-    // ---------------------------------------------------------
+    // INSERT voucher_main (✅ PERFECT ORDER)
     const [mainResult] = await conn.execute(
       `
-      INSERT INTO voucher_main 
-      (voucher_type, voucher_number, date, narration, reference_no, supplier_invoice_date, owner_type, owner_id, company_id)
+      INSERT INTO voucher_main
+      (voucher_type, voucher_number, date, narration, reference_no,
+       supplier_invoice_date, owner_type, owner_id, company_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
       `,
       [
         type,
-        number || null,
+        voucherNumber,
         date,
         narration || null,
         referenceNo || null,
         supplierInvoiceDate || null,
         owner_type,
-        owner_id,
-        companyId,
+        Number(owner_id),
+        Number(companyId),
       ]
     );
 
     const voucherId = mainResult.insertId;
 
-    // ---------------------------------------------------------
-    // INSERT voucher entries
-    // ---------------------------------------------------------
+    // INSERT voucher_entries
     const entryValues = entries.map((e) => [
       voucherId,
       Number(e.ledgerId),
@@ -120,8 +101,9 @@ router.post("/", async (req, res) => {
 
     await conn.query(
       `
-      INSERT INTO voucher_entries 
-      (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id)
+      INSERT INTO voucher_entries
+      (voucher_id, ledger_id, ledger_name, amount, entry_type,
+       narration, bank_name, cheque_number, cost_centre_id)
       VALUES ?
       `,
       [entryValues]
@@ -133,6 +115,7 @@ router.post("/", async (req, res) => {
     return res.status(200).json({
       success: true,
       message: "Voucher saved successfully",
+      voucherNumber,
       voucherId,
     });
   } catch (err) {
@@ -140,12 +123,72 @@ router.post("/", async (req, res) => {
     conn.release();
 
     console.error("❌ Insert Failed:", err);
-
     return res.status(500).json({
       success: false,
       message: "Failed to save voucher",
       error: err.message,
     });
+  }
+});
+
+// next voucher number get
+router.get("/next-number", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id, voucherType, date } = req.query;
+
+    const prefixMap = {
+      payment: "PV",
+      receipt: "RV",
+      contra: "CV",
+      journal: "JV",
+    };
+
+    const prefix = prefixMap[voucherType];
+    if (!prefix) return res.status(400).json({ success: false });
+
+    const fy = getFinancialYear(date);
+    const month = String(new Date(date).getMonth() + 1).padStart(2, "0");
+
+    const [rows] = await db.execute(
+      `
+      SELECT voucher_number
+      FROM voucher_main
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+        AND voucher_type = ?
+        AND voucher_number LIKE ?
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [
+        company_id,
+        owner_type,
+        owner_id,
+        voucherType,
+        `${prefix}/${fy}/${month}/%`,
+      ]
+    );
+
+    let nextNo = 1;
+    if (rows.length > 0) {
+      nextNo = Number(rows[0].voucher_number.split("/").pop()) + 1;
+    }
+
+    console.log(
+      "Next Voucher Number:",
+      `${prefix}/${fy}/${month}/${String(nextNo).padStart(6, "0")}`
+    );
+    return res.json({
+      success: true,
+      voucherNumber: `${prefix}/${fy}/${month}/${String(nextNo).padStart(
+        6,
+        "0"
+      )}`,
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false });
   }
 });
 
@@ -228,7 +271,6 @@ router.get("/", async (req, res) => {
         .filter((e) => e.voucher_id === voucher.id)
         .map(({ voucher_id, ...rest }) => rest),
     }));
-
 
     return res.json({ data: result });
   } catch (error) {

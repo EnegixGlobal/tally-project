@@ -26,16 +26,10 @@ const PaymentVoucher: React.FC = () => {
     ownerType === "employee" ? "employee_id" : "user_id"
   );
 
-  const generateVoucherNumber = () => {
-    const prefix = "PV";
-    const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit
-    return `${prefix}${randomNumber}`;
-  };
-
   const initialFormData: Omit<VoucherEntry, "id"> = {
     date: new Date().toISOString().split("T")[0],
     type: "payment",
-    number: generateVoucherNumber(),
+    number: "",
     narration: "",
     entries: [
       { id: "1", ledgerId: "", amount: 0, type: "debit", narration: "" },
@@ -51,6 +45,34 @@ const PaymentVoucher: React.FC = () => {
       ? vouchers.find((v) => v.id === id) || initialFormData
       : initialFormData
   );
+
+  //auto voucher number fill
+
+  useEffect(() => {
+    if (isEditMode) return;
+    if (!companyId || !ownerType || !ownerId) return;
+
+    const fetchNextNumber = async () => {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/vouchers/next-number` +
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}` +
+          `&voucherType=payment` +
+          `&date=${formData.date}`
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        setFormData((prev) =>
+          prev.number ? prev : { ...prev, number: data.voucherNumber }
+        );
+      }
+    };
+
+    fetchNextNumber();
+  }, [formData.date, companyId, ownerType, ownerId]);
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showConfigPanel, setShowConfigPanel] = useState(false);
@@ -155,7 +177,7 @@ const PaymentVoucher: React.FC = () => {
 
     // ===== HEADER LEVEL =====
     if (!formData.date) addError("date", "Voucher Date is required");
-    if (!formData.number) addError("number", "Voucher Number is required");
+    // if (!formData.number) addError("number", "Voucher Number is required");
 
     // ===== SUPPLIER INVOICE DATE (MANDATORY) =====
     if (!formData.supplierInvoiceDate) {
