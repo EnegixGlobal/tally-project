@@ -137,6 +137,21 @@ const DayBook: React.FC = () => {
     fetchData();
   }, []);
 
+  const allowEntryByVoucherType = (
+    voucherType: string,
+    entryType: "debit" | "credit"
+  ) => {
+    if (voucherType === "payment") return entryType === "debit";
+    if (voucherType === "receipt") return entryType === "credit";
+    if (voucherType === "contra") return entryType === "debit";
+    if (voucherType === "journal") return entryType === "debit";
+    return true; // sales, purchase etc
+  };
+
+  const [rawVoucherEntries, setRawVoucherEntries] = useState<
+    Record<string, DayBookEntry[]>
+  >({});
+
   useEffect(() => {
     const company_id = localStorage.getItem("company_id");
     const owner_type = localStorage.getItem("supplier");
@@ -153,10 +168,15 @@ const DayBook: React.FC = () => {
       .then((data) => {
         const grouped: Record<string, VoucherGroup> = {};
 
+        // 🔹 RAW entries for Detailed view
+        const allDetailedEntriesRaw: DayBookEntry[] = [];
+
+        // 🔹 RAW entries voucher-wise (for modal)
+        const voucherWiseRawEntries: Record<string, DayBookEntry[]> = {};
+
         data.forEach((voucher: any) => {
           const id = voucher.id;
 
-          // Create base group if not exists
           if (!grouped[id]) {
             grouped[id] = {
               voucherId: id,
@@ -172,17 +192,16 @@ const DayBook: React.FC = () => {
             };
           }
 
-          // 🔥 LOOP actual entries inside voucher
           voucher.entries.forEach((entry: any) => {
             const amount = parseFloat(entry.amount || 0);
             const isDebit = entry.entry_type === "debit";
             const isCredit = entry.entry_type === "credit";
 
-            // Add totals properly
-            if (isDebit) grouped[id].totalDebit += amount;
-            if (isCredit) grouped[id].totalCredit += amount;
+            /* ==========================
+             🔹 RAW DATA (NO FILTER)
+          ========================== */
 
-            grouped[id].entries.push({
+            const rawEntry: DayBookEntry = {
               id: entry.id,
               date: voucher.date,
               voucherType: voucher.voucher_type,
@@ -194,33 +213,70 @@ const DayBook: React.FC = () => {
               voucherId: id,
               narration: entry.entry_narration,
               itemId: entry.item_id,
+            };
+
+            allDetailedEntriesRaw.push(rawEntry);
+
+            if (!voucherWiseRawEntries[id]) {
+              voucherWiseRawEntries[id] = [];
+            }
+            voucherWiseRawEntries[id].push(rawEntry);
+
+            /* ==========================
+             🔹 GROUPED DATA (FILTERED)
+          ========================== */
+
+            if (
+              isDebit &&
+              allowEntryByVoucherType(voucher.voucher_type, "debit")
+            ) {
+              grouped[id].totalDebit += amount;
+            }
+
+            if (
+              isCredit &&
+              allowEntryByVoucherType(voucher.voucher_type, "credit")
+            ) {
+              grouped[id].totalCredit += amount;
+            }
+
+            grouped[id].entries.push({
+              ...rawEntry,
+              debit:
+                isDebit &&
+                allowEntryByVoucherType(voucher.voucher_type, "debit")
+                  ? amount
+                  : 0,
+              credit:
+                isCredit &&
+                allowEntryByVoucherType(voucher.voucher_type, "credit")
+                  ? amount
+                  : 0,
             });
 
-            grouped[id].entriesCount++;
+            if (
+              allowEntryByVoucherType(voucher.voucher_type, entry.entry_type)
+            ) {
+              grouped[id].entriesCount++;
+            }
           });
         });
 
-        // Convert object → array
+        /* ==========================
+         🔹 GROUPED STATE
+      ========================== */
         const groupedArray = Object.values(grouped);
+        setGroupedVouchers(groupedArray);
+        setAllGroupedVouchers(groupedArray);
 
-        // Create detailed entries list
-        const detailedEntries = groupedArray.flatMap((v) =>
-          v.entries.map((e) => ({
-            ...e,
-            date: v.date,
-            voucherType: v.voucherType,
-            voucherNo: v.voucherNo,
-          }))
-        );
-
-        // Group entries with same date, voucher type, voucher no, and particulars
+        /* ==========================
+         🔹 DETAILED VIEW (ROWSPAN)
+      ========================== */
         const entryGroups: DayBookEntry[][] = [];
         const groupMap = new Map<string, number>();
 
-        detailedEntries.forEach((entry) => {
-          // Create a key from common fields
+        allDetailedEntriesRaw.forEach((entry) => {
           const key = `${entry.date}|${entry.voucherType}|${entry.voucherNo}|${entry.particulars}`;
-
           if (!groupMap.has(key)) {
             groupMap.set(key, entryGroups.length);
             entryGroups.push([]);
@@ -228,30 +284,32 @@ const DayBook: React.FC = () => {
           entryGroups[groupMap.get(key)!].push(entry);
         });
 
-        // Flatten with rowspan info
         const processedWithRowspan: (DayBookEntry & {
           rowspan?: number;
           isFirstInGroup?: boolean;
         })[] = [];
+
         entryGroups.forEach((group) => {
           group.forEach((entry, index) => {
             processedWithRowspan.push({
               ...entry,
-              rowspan: index === 0 ? group.length : 0, // 0 means don't render this cell
+              rowspan: index === 0 ? group.length : 0,
               isFirstInGroup: index === 0,
             });
           });
         });
 
-        // Save original data
-        setAllGroupedVouchers(groupedArray);
+        setProcessedEntries(processedWithRowspan);
         setAllProcessedEntries(processedWithRowspan);
 
-        // Initially show all
-        setGroupedVouchers(groupedArray);
-        setProcessedEntries(processedWithRowspan);
+        /* ==========================
+         🔹 MODAL RAW DATA
+      ========================== */
+        setRawVoucherEntries(voucherWiseRawEntries);
 
-        // Summary totals
+        /* ==========================
+         🔹 TOTALS
+      ========================== */
         const totalDebit = groupedArray.reduce(
           (sum, v) => sum + v.totalDebit,
           0
@@ -268,7 +326,7 @@ const DayBook: React.FC = () => {
           vouchersCount: groupedArray.length,
         });
       })
-      .catch((err) => console.error("DayBook  Error:", err));
+      .catch((err) => console.error("DayBook Error:", err));
   }, []);
 
   const getLocalDate = (dateStr: string) => {
@@ -769,7 +827,7 @@ const DayBook: React.FC = () => {
                       colSpan={6}
                       className="px-4 py-8 text-center opacity-70"
                     >
-                      No entries found for the selected criteria
+                      No entries found
                     </td>
                   </tr>
                 ) : (
@@ -778,8 +836,8 @@ const DayBook: React.FC = () => {
                       rowspan?: number;
                       isFirstInGroup?: boolean;
                     };
-                    const showCommonFields =
-                      entryWithRowspan.isFirstInGroup === true;
+
+                    const showCommon = entryWithRowspan.isFirstInGroup;
                     const rowspan =
                       entryWithRowspan.rowspan && entryWithRowspan.rowspan > 1
                         ? entryWithRowspan.rowspan
@@ -790,64 +848,57 @@ const DayBook: React.FC = () => {
                         key={`${entry.id}-${index}`}
                         className={`${
                           theme === "dark"
-                            ? "border-b border-gray-700 hover:bg-gray-700"
-                            : "border-b border-gray-200 hover:bg-gray-50"
+                            ? "border-b border-gray-700"
+                            : "border-b border-gray-200"
                         }`}
                       >
-                        {/* Date - only show for first entry in group */}
-                        {showCommonFields ? (
-                          <td className="px-4 py-3" rowSpan={rowspan}>
+                        {/* DATE */}
+                        {showCommon && (
+                          <td rowSpan={rowspan} className="px-4 py-3">
                             {formatDate(entry.date)}
                           </td>
-                        ) : null}
+                        )}
 
-                        {/* Voucher Type - only show for first entry in group */}
-                        {showCommonFields ? (
-                          <td className="px-4 py-3" rowSpan={rowspan}>
-                            <span
-                              className={`px-2 py-1 rounded-full text-xs ${
-                                entry.voucherType === "sales"
-                                  ? "bg-green-100 text-green-800"
-                                  : entry.voucherType === "purchase"
-                                  ? "bg-blue-100 text-blue-800"
-                                  : entry.voucherType === "receipt"
-                                  ? "bg-purple-100 text-purple-800"
-                                  : entry.voucherType === "payment"
-                                  ? "bg-red-100 text-red-800"
-                                  : "bg-gray-100 text-gray-800"
-                              }`}
-                            >
-                              {entry.voucherType.charAt(0).toUpperCase() +
-                                entry.voucherType.slice(1)}
-                            </span>
+                        {/* VOUCHER TYPE */}
+                        {showCommon && (
+                          <td
+                            rowSpan={rowspan}
+                            className="px-4 py-3 capitalize"
+                          >
+                            {entry.voucherType}
                           </td>
-                        ) : null}
+                        )}
 
-                        {/* Voucher No - only show for first entry in group */}
-                        {showCommonFields ? (
-                          <td className="px-4 py-3 font-mono" rowSpan={rowspan}>
+                        {/* VOUCHER NO */}
+                        {showCommon && (
+                          <td rowSpan={rowspan} className="px-4 py-3 font-mono">
                             {entry.voucherNo}
                           </td>
-                        ) : null}
+                        )}
 
-                        {/* Particulars - only show for first entry in group */}
-                        {showCommonFields ? (
-                          <td className="px-4 py-3" rowSpan={rowspan}>
-                            {entry.particulars}
-                            {entry.narration && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                {entry.narration}
-                              </div>
-                            )}
-                          </td>
-                        ) : null}
+                        {/* PARTICULARS (LEDGER / ITEM NAME) */}
+                        <td className="px-4 py-3">
+                          <div className="font-medium">
+                            {entry.itemId
+                              ? getItemName(entry.itemId)
+                              : entry.ledgerName}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {entry.itemId ? "Item" : "Ledger"}
+                          </div>
+                          {entry.narration && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              {entry.narration}
+                            </div>
+                          )}
+                        </td>
 
-                        {/* Debit - always show */}
+                        {/* DEBIT */}
                         <td className="px-4 py-3 text-right font-mono">
                           {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
                         </td>
 
-                        {/* Credit - always show */}
+                        {/* CREDIT */}
                         <td className="px-4 py-3 text-right font-mono">
                           {entry.credit > 0
                             ? formatCurrency(entry.credit)
@@ -858,23 +909,28 @@ const DayBook: React.FC = () => {
                   })
                 )}
               </tbody>
+
               {processedEntries.length > 0 && (
                 <tfoot>
                   <tr
-                    className={`${
+                    className={`font-bold ${
                       theme === "dark"
                         ? "border-t-2 border-gray-600 bg-gray-700"
                         : "border-t-2 border-gray-400 bg-gray-50"
                     }`}
                   >
-                    <td colSpan={4} className="px-4 py-3 font-bold">
+                    <td colSpan={4} className="px-4 py-3">
                       Total:
                     </td>
-                    <td className="px-4 py-3 text-right font-bold font-mono">
-                      {formatCurrency(totals.totalDebit)}
+                    <td className="px-4 py-3 text-right font-mono">
+                      {formatCurrency(
+                        processedEntries.reduce((sum, e) => sum + e.debit, 0)
+                      )}
                     </td>
-                    <td className="px-4 py-3 text-right font-bold font-mono">
-                      {formatCurrency(totals.totalCredit)}
+                    <td className="px-4 py-3 text-right font-mono">
+                      {formatCurrency(
+                        processedEntries.reduce((sum, e) => sum + e.credit, 0)
+                      )}
                     </td>
                   </tr>
                 </tfoot>
@@ -963,69 +1019,71 @@ const DayBook: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {(selectedVoucher.entries ?? []).map((entry, index) => (
-                        <tr
-                          key={index}
-                          className={`border-t ${
-                            theme === "dark"
-                              ? "border-gray-600"
-                              : "border-gray-200"
-                          }`}
-                        >
-                          {/* ITEM / LEDGER NAME */}
-                          <td className="px-3 py-2">
-                            {entry.itemId ? (
-                              <div>
-                                <div className="font-medium">
-                                  {getItemName(entry.itemId)}
+                      {(rawVoucherEntries[selectedVoucher.voucherId] ?? []).map(
+                        (entry, index) => (
+                          <tr
+                            key={index}
+                            className={`border-t ${
+                              theme === "dark"
+                                ? "border-gray-600"
+                                : "border-gray-200"
+                            }`}
+                          >
+                            {/* ITEM / LEDGER NAME */}
+                            <td className="px-3 py-2">
+                              {entry.itemId ? (
+                                <div>
+                                  <div className="font-medium">
+                                    {getItemName(entry.itemId)}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Item
+                                  </div>
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  Item
+                              ) : (
+                                <div>
+                                  <div className="font-medium">
+                                    {entry.ledgerName}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Ledger
+                                  </div>
                                 </div>
-                              </div>
-                            ) : (
-                              <div>
-                                <div className="font-medium">
-                                  {entry.ledgerName}
+                              )}
+
+                              {entry.narration && (
+                                <div className="text-xs text-gray-500 mt-1">
+                                  {entry.narration}
                                 </div>
-                                <div className="text-xs text-gray-500">
-                                  Ledger
-                                </div>
-                              </div>
-                            )}
+                              )}
+                            </td>
 
-                            {entry.narration && (
-                              <div className="text-xs text-gray-500 mt-1">
-                                {entry.narration}
-                              </div>
-                            )}
-                          </td>
+                            {/* VOUCHER NO */}
+                            <td className="px-3 py-2 text-right font-mono">
+                              {entry.voucherNo}
+                            </td>
 
-                          {/* VOUCHER NO */}
-                          <td className="px-3 py-2 text-right font-mono">
-                            {entry.voucherNo}
-                          </td>
+                            {/* VOUCHER TYPE */}
+                            <td className="px-3 py-2 text-right capitalize">
+                              {entry.voucherType}
+                            </td>
 
-                          {/* VOUCHER TYPE */}
-                          <td className="px-3 py-2 text-right capitalize">
-                            {entry.voucherType}
-                          </td>
+                            {/* DEBIT */}
+                            <td className="px-3 py-2 text-right font-mono">
+                              {entry.debit > 0
+                                ? formatCurrency(entry.debit)
+                                : "-"}
+                            </td>
 
-                          {/* DEBIT */}
-                          <td className="px-3 py-2 text-right font-mono">
-                            {entry.debit > 0
-                              ? formatCurrency(entry.debit)
-                              : "-"}
-                          </td>
-
-                          {/* CREDIT */}
-                          <td className="px-3 py-2 text-right font-mono">
-                            {entry.credit > 0
-                              ? formatCurrency(entry.credit)
-                              : "-"}
-                          </td>
-                        </tr>
-                      ))}
+                            {/* CREDIT */}
+                            <td className="px-3 py-2 text-right font-mono">
+                              {entry.credit > 0
+                                ? formatCurrency(entry.credit)
+                                : "-"}
+                            </td>
+                          </tr>
+                        )
+                      )}
 
                       {/* TOTAL ROW */}
                       <tr
@@ -1039,10 +1097,18 @@ const DayBook: React.FC = () => {
                           Total:
                         </td>
                         <td className="px-3 py-2 text-right font-mono">
-                          {formatCurrency(selectedVoucher.totalDebit)}
+                          {formatCurrency(
+                            (
+                              rawVoucherEntries[selectedVoucher.voucherId] ?? []
+                            ).reduce((sum, e) => sum + e.debit, 0)
+                          )}
                         </td>
                         <td className="px-3 py-2 text-right font-mono">
-                          {formatCurrency(selectedVoucher.totalCredit)}
+                          {formatCurrency(
+                            (
+                              rawVoucherEntries[selectedVoucher.voucherId] ?? []
+                            ).reduce((sum, e) => sum + e.credit, 0)
+                          )}
                         </td>
                       </tr>
                     </tbody>
