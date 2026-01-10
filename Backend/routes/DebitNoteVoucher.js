@@ -189,6 +189,63 @@ router.get("/", async (req, res) => {
   }
 });
 
+//  GET NEXT DEBIT NOTE NUMBER
+router.get("/next-number", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id, date } = req.query;
+
+    if (!company_id || !owner_type || !owner_id || !date) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required parameters",
+      });
+    }
+
+    const { getFinancialYear } = require("../utils/financialYear");
+
+    const fy = getFinancialYear(date);
+    const month = String(new Date(date).getMonth() + 1).padStart(2, "0");
+    const prefix = "DNV";
+
+    const [rows] = await db.query(
+      `
+      SELECT number
+      FROM debit_note_vouchers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+        AND number LIKE ?
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [company_id, owner_type, owner_id, `${prefix}/${fy}/${month}/%`]
+    );
+
+    let nextNo = 1;
+
+    if (rows.length > 0 && rows[0].number) {
+      const lastSeq = Number(rows[0].number.split("/").pop());
+      nextNo = lastSeq + 1;
+    }
+
+    const voucherNumber = `${prefix}/${fy}/${month}/${String(nextNo).padStart(
+      6,
+      "0"
+    )}`;
+
+    res.json({
+      success: true,
+      voucherNumber,
+    });
+  } catch (err) {
+    console.error("Debit Note next-number error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate Debit Note number",
+    });
+  }
+});
+
 router.get("/:id", async (req, res) => {
   const { companyId, ownerType, ownerId } = req.query;
 

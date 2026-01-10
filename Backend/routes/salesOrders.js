@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // Your DB connection file
+const { genrateVoucherNumber } = require("../utils/generateVoucherNumber");
+const { getFinancialYear } = require("../utils/financialYear");
 
 router.post("/", async (req, res) => {
   const {
@@ -27,7 +29,6 @@ router.post("/", async (req, res) => {
     !ownerType ||
     !ownerId ||
     !date ||
-    !number ||
     !partyId ||
     !salesLedgerId ||
     !items ||
@@ -144,6 +145,64 @@ router.get("/", async (req, res) => {
   } catch (err) {
     console.error("Error fetching sales orders:", err);
     res.status(500).json({ success: false, message: "Error fetching orders" });
+  }
+});
+
+//get voucher number
+router.get("/next-number", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id, date } = req.query;
+
+    if (!company_id || !owner_type || !owner_id || !date) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required parameters",
+      });
+    }
+
+    const fy = getFinancialYear(date);
+    const month = String(new Date(date).getMonth() + 1).padStart(2, "0");
+
+    const prefix = "SO";
+
+    // 🔒 last sales order of same FY + month
+    const [rows] = await db.query(
+      `
+      SELECT number
+      FROM sales_orders
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+        AND number LIKE ?
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [company_id, owner_type, owner_id, `${prefix}/${fy}/${month}/%`]
+    );
+
+    let nextNo = 1;
+
+    if (rows.length > 0) {
+      const lastNumber = rows[0].number;
+      const lastSeq = Number(lastNumber.split("/").pop());
+      nextNo = lastSeq + 1;
+    }
+
+    const voucherNumber = `${prefix}/${fy}/${month}/${String(nextNo).padStart(
+      6,
+      "0"
+    )}`;
+
+    return res.json({
+      success: true,
+      voucherNumber,
+    });
+  } catch (err) {
+    console.error("Sales Order next-number error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate sales order number",
+    });
   }
 });
 
@@ -282,7 +341,6 @@ router.put("/:id", async (req, res) => {
 
     await conn.commit();
     res.json({ success: true, message: "Order updated successfully" });
-
   } catch (err) {
     await conn.rollback();
     console.error("Order update error:", err.message);
@@ -291,7 +349,6 @@ router.put("/:id", async (req, res) => {
     conn.release();
   }
 });
-
 
 // DELETE ORDER (DELETE /api/sales-orders/:id)
 router.delete("/:id", async (req, res) => {

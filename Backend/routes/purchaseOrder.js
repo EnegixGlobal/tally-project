@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // mysql2/promise pool
+const { getFinancialYear } = require("../utils/financialYear");
+const { generateVoucherNumber } = require("../utils/generateVoucherNumber");
 
 // Create Purchase Order
 router.post("/", async (req, res) => {
@@ -117,91 +119,7 @@ router.post("/", async (req, res) => {
   }
 });
 
-// Get Purchase Order by ID
-router.get("/:id", async (req, res) => {
-  const { id } = req.params;
 
-
-  try {
-    // 🔥 SAME COLUMNS AS LIST GET
-    const [orderRows] = await db.execute(
-      `
-      SELECT
-        po.id,
-        po.date,
-        po.number,
-        po.reference_no,
-        po.status,
-        po.narration,
-        po.expected_delivery_date AS expectedDeliveryDate,
-
-        po.party_id           AS partyId,
-        po.purchase_ledger_id AS purchaseLedgerId,
-
-        supplier.name       AS party_name,
-        supplier.gst_number AS party_gst,
-
-        purchaseLedger.name AS purchase_ledger_name,
-
-        COALESCE(SUM(poi.amount), 0) AS totalAmount
-
-      FROM purchase_orders po
-
-      LEFT JOIN ledgers supplier
-        ON po.party_id = supplier.id
-
-      LEFT JOIN ledgers purchaseLedger
-        ON po.purchase_ledger_id = purchaseLedger.id
-
-      LEFT JOIN purchase_order_items poi
-        ON po.id = poi.purchase_order_id
-
-      WHERE po.id = ?
-      GROUP BY po.id
-      `,
-      [id]
-    );
-
-    if (orderRows.length === 0) {
-      return res.status(404).json({ message: "Purchase Order not found" });
-    }
-
-    // 🔥 ITEMS (NO extra columns)
-    const [itemRows] = await db.execute(
-      `
-      SELECT
-        poi.id,
-        poi.item_id,
-        poi.hsn_code,
-        poi.quantity,
-        poi.rate,
-        poi.discount,
-        poi.amount,
-        poi.godown_id,
-
-        si.name AS item_name,
-        si.unit
-
-      FROM purchase_order_items poi
-      LEFT JOIN stock_items si ON poi.item_id = si.id
-      WHERE poi.purchase_order_id = ?
-      ORDER BY poi.id
-      `,
-      [id]
-    );
-
-    res.json({
-      ...orderRows[0],   // 🔥 same as list
-      items: itemRows,   // 🔥 extra only here
-    });
-  } catch (err) {
-    console.error("Error fetching Purchase Order:", err);
-    res.status(500).json({
-      message: "Failed to fetch Purchase Order",
-      error: err.message,
-    });
-  }
-});
 
 
 // Get all Purchase Orders with filters (FIXED)
@@ -327,6 +245,155 @@ router.get("/", async (req, res) => {
   }
 });
 
+// get voucher number
+
+router.get("/next-number", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id, date } = req.query;
+
+    if (!company_id || !owner_type || !owner_id || !date) {
+      return res.status(400).json({
+        success: false,
+        message: "Missing required parameters",
+      });
+    }
+
+    const fy = getFinancialYear(date);
+    const month = String(new Date(date).getMonth() + 1).padStart(2, "0");
+
+    const prefix = "PO";
+
+    const [rows] = await db.query(
+      `
+      SELECT number
+      FROM purchase_orders
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+        AND number LIKE ?
+      ORDER BY id DESC
+      LIMIT 1
+      `,
+      [
+        company_id,
+        owner_type,
+        owner_id,
+        `${prefix}/${fy}/${month}/%`,
+      ]
+    );
+
+    let nextNo = 1;
+
+    if (rows.length > 0) {
+      const lastNumber = rows[0].number;
+      const lastSeq = Number(lastNumber.split("/").pop());
+      nextNo = lastSeq + 1;
+    }
+
+    const voucherNumber = `${prefix}/${fy}/${month}/${String(nextNo).padStart(
+      6,
+      "0"
+    )}`;
+
+    res.json({
+      success: true,
+      voucherNumber,
+    });
+  } catch (err) {
+    console.error("PO next-number error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Failed to generate PO number",
+    });
+  }
+});
+
+
+// Get Purchase Order by ID
+router.get("/:id", async (req, res) => {
+  const { id } = req.params;
+
+
+  try {
+    // 🔥 SAME COLUMNS AS LIST GET
+    const [orderRows] = await db.execute(
+      `
+      SELECT
+        po.id,
+        po.date,
+        po.number,
+        po.reference_no,
+        po.status,
+        po.narration,
+        po.expected_delivery_date AS expectedDeliveryDate,
+
+        po.party_id           AS partyId,
+        po.purchase_ledger_id AS purchaseLedgerId,
+
+        supplier.name       AS party_name,
+        supplier.gst_number AS party_gst,
+
+        purchaseLedger.name AS purchase_ledger_name,
+
+        COALESCE(SUM(poi.amount), 0) AS totalAmount
+
+      FROM purchase_orders po
+
+      LEFT JOIN ledgers supplier
+        ON po.party_id = supplier.id
+
+      LEFT JOIN ledgers purchaseLedger
+        ON po.purchase_ledger_id = purchaseLedger.id
+
+      LEFT JOIN purchase_order_items poi
+        ON po.id = poi.purchase_order_id
+
+      WHERE po.id = ?
+      GROUP BY po.id
+      `,
+      [id]
+    );
+
+    if (orderRows.length === 0) {
+      return res.status(404).json({ message: "Purchase Order not found" });
+    }
+
+    // 🔥 ITEMS (NO extra columns)
+    const [itemRows] = await db.execute(
+      `
+      SELECT
+        poi.id,
+        poi.item_id,
+        poi.hsn_code,
+        poi.quantity,
+        poi.rate,
+        poi.discount,
+        poi.amount,
+        poi.godown_id,
+
+        si.name AS item_name,
+        si.unit
+
+      FROM purchase_order_items poi
+      LEFT JOIN stock_items si ON poi.item_id = si.id
+      WHERE poi.purchase_order_id = ?
+      ORDER BY poi.id
+      `,
+      [id]
+    );
+
+    res.json({
+      ...orderRows[0],   // 🔥 same as list
+      items: itemRows,   // 🔥 extra only here
+    });
+  } catch (err) {
+    console.error("Error fetching Purchase Order:", err);
+    res.status(500).json({
+      message: "Failed to fetch Purchase Order",
+      error: err.message,
+    });
+  }
+});
 
 
 // Update Purchase Order status

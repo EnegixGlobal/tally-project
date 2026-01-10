@@ -170,8 +170,6 @@ const PurchaseOrderVoucher: React.FC = () => {
         );
         const data = await res.json();
 
-  
-
         // ✅ CORRECT PARSING
         if (Array.isArray(data.data)) {
           setGodowns(data.data);
@@ -215,7 +213,6 @@ const PurchaseOrderVoucher: React.FC = () => {
         );
         const data = await res.json();
 
-
         if (Array.isArray(data.data)) {
           setStockItems(data.data); // ✔ Correct location
         } else {
@@ -249,15 +246,9 @@ const PurchaseOrderVoucher: React.FC = () => {
     }
   };
 
-  const generateOrderNumber = () => {
-    const prefix = "PO";
-    const randomNumber = Math.floor(100000 + Math.random() * 900000);
-    return `${prefix}${randomNumber}`;
-  };
-
   const initialFormData: PurchaseOrderData = {
     date: new Date().toISOString().split("T")[0],
-    number: isEditMode ? "" : generateOrderNumber(),
+    number: "",
     partyId: "",
     purchaseLedgerId: "",
     referenceNo: "",
@@ -293,6 +284,37 @@ const PurchaseOrderVoucher: React.FC = () => {
     showHSN: true,
     showDiscount: true,
   });
+
+  // get voucher number get
+  useEffect(() => {
+    if (isEditMode) return;
+    if (!companyId || !ownerType || !ownerId || !formData.date) return;
+
+    const fetchNextPONumber = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/purchase-orders/next-number` +
+            `?company_id=${companyId}` +
+            `&owner_type=${ownerType}` +
+            `&owner_id=${ownerId}` +
+            `&date=${formData.date}`
+        );
+
+        const data = await res.json();
+
+        if (data.success) {
+          setFormData((prev) => ({
+            ...prev,
+            number: data.voucherNumber,
+          }));
+        }
+      } catch (err) {
+        console.error("PO number fetch failed", err);
+      }
+    };
+
+    fetchNextPONumber();
+  }, [formData.date, companyId, ownerType, ownerId, isEditMode]);
 
   // Get selected party details
   const selectedParty = useMemo(() => {
