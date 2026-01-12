@@ -1,51 +1,198 @@
 const express = require("express");
 const router = express.Router();
-const db = require("../db"); // assumes you have mysql2 setup
+const db = require("../db");
 
-// ✅ Define 'safe' to prevent undefined values in SQL
-function safe(val) {
-  return val === undefined ? null : val;
-}
-
-router.post("/", async (req, res) => {
-  const data = req.body;
-
-  console.log("GSTR-3B Form Submission Payload:", data);
-
+router.get("/", async (req, res) => {
   try {
-    const [result] = await db.execute(
-      `INSERT INTO tbGstr3bReturns (
-        employeeId, gstin, returnPeriod, outwardSupplies, interstateSupplies, 
-        otherOutwardSupplies, nilRatedSupplies, inwardReverseCharge, nonGstSupplies, 
-        inputTaxCreditEligible, inputTaxCreditIneligible, interestLateFees, taxPayable, taxPaid
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-      [
-        safe(data.employeeId),
-        safe(data.basicInfo?.gstin),
-        safe(JSON.stringify(data.returnPeriod)),
-        safe(JSON.stringify(data.outwardSupplies)),
-        safe(JSON.stringify(data.interstateSupplies || {})),
-        safe(JSON.stringify(data.otherOutwardSupplies || {})),
-        safe(JSON.stringify(data.nilRatedSupplies || {})),
-        safe(JSON.stringify(data.inwardSupplies?.reverseCharge || {})),
-        safe(JSON.stringify(data.exemptNilNonGst || {})),
-        safe(JSON.stringify(data.eligibleItc || {})),
-        safe(JSON.stringify(data.itcReversed || {})),
-        safe(JSON.stringify(data.interestLateFee || {})),
-        safe(JSON.stringify(data.taxPayable || {})),
-        safe(JSON.stringify(data.taxPaid || {})),
-      ]
+    const { company_id, owner_type, owner_id } = req.query;
+
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id, owner_type and owner_id are required",
+      });
+    }
+
+    /* ---------------------------------------------------
+       STEP 1: GET Nil / Exempted / Zero Rated LEDGERS
+    --------------------------------------------------- */
+    const [ledgerRows] = await db.query(
+      `
+      SELECT id, LOWER(TRIM(name)) AS name
+      FROM ledgers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+        AND LOWER(TRIM(name)) IN ('nil rated', 'exempted', 'zero rated')
+      `,
+      [company_id, owner_type, owner_id]
     );
 
-    res.status(200).json({
-      message: "GSTR-3B return submitted successfully",
-      returnId: result.insertId,
+    const ledgerIds = {
+      nil: [],
+      exempted: [],
+      zero: [],
+      all: [],
+    };
+
+    ledgerRows.forEach((l) => {
+      ledgerIds.all.push(l.id);
+      if (l.name === "nil rated") ledgerIds.nil.push(l.id);
+      if (l.name === "exempted") ledgerIds.exempted.push(l.id);
+      if (l.name === "zero rated") ledgerIds.zero.push(l.id);
     });
+
+
+    /* ---------------------------------------------------
+       A SECTION: TAXABLE (EXCEPT NIL / EXEMPTED / ZERO)
+    --------------------------------------------------- */
+    const [aItems] = await db.query(
+      `
+      SELECT
+        svi.quantity,
+        svi.rate,
+        svi.cgstRate,
+        svi.sgstRate,
+        svi.igstRate
+      FROM sales_voucher_items svi
+      JOIN sales_vouchers sv ON sv.id = svi.voucherId
+      WHERE sv.company_id = ?
+        AND sv.owner_type = ?
+        AND sv.owner_id = ?
+        AND sv.type = 'sales'
+        ${ledgerIds.all.length ? "AND sv.salesLedgerId NOT IN (?)" : ""}
+      `,
+      ledgerIds.all.length
+        ? [company_id, owner_type, owner_id, ledgerIds.all]
+        : [company_id, owner_type, owner_id]
+    );
+
+    const a = aItems.reduce(
+      (acc, i) => {
+        acc.taxable_value += Number(i.quantity) * Number(i.rate);
+        acc.integrated_tax += Number(i.igstRate);
+        acc.central_tax += Number(i.cgstRate);
+        acc.state_tax += Number(i.sgstRate);
+        return acc;
+      },
+      {
+        taxable_value: 0,
+        integrated_tax: 0,
+        central_tax: 0,
+        state_tax: 0,
+      }
+    );
+
+  
+      /* ---------------------------------------------------
+         B SECTION: ZERO RATED -> match ledgerIds.zero to partyId
+      --------------------------------------------------- */
+      let b = { total: 0, byVoucher: [] };
+      if (ledgerIds.zero.length) {
+        const [zeroVouchers] = await db.query(
+          `
+          SELECT id
+          FROM sales_vouchers
+          WHERE company_id = ?
+            AND owner_type = ?
+            AND owner_id = ?
+            AND type = 'sales'
+            AND partyId IN (?)
+          `,
+          [company_id, owner_type, owner_id, ledgerIds.zero]
+        );
+
+        const voucherIds = zeroVouchers.map((v) => v.id);
+        if (voucherIds.length) {
+          const [bItems] = await db.query(
+            `
+            SELECT voucherId, quantity, rate
+            FROM sales_voucher_items
+            WHERE voucherId IN (?)
+            `,
+            [voucherIds]
+          );
+
+          const byVoucherMap = {};
+          bItems.forEach((item) => {
+            const val = Number(item.quantity) * Number(item.rate);
+            b.total += val;
+            byVoucherMap[item.voucherId] = (byVoucherMap[item.voucherId] || 0) + val;
+          });
+
+          b.byVoucher = Object.keys(byVoucherMap).map((vId) => ({
+            voucherId: Number(vId),
+            value: byVoucherMap[vId],
+          }));
+        }
+      }
+
+
+      /* ---------------------------------------------------
+         C SECTION: NIL & EXEMPTED -> match ledgerIds.nil/exempted to partyId
+      --------------------------------------------------- */
+      const computeCFor = async (ledgerIdArray) => {
+        const result = { total: 0, byVoucher: [] };
+        if (!ledgerIdArray || !ledgerIdArray.length) return result;
+
+        const [vouchers] = await db.query(
+          `
+          SELECT id
+          FROM sales_vouchers
+          WHERE company_id = ?
+            AND owner_type = ?
+            AND owner_id = ?
+            AND type = 'sales'
+            AND partyId IN (?)
+          `,
+          [company_id, owner_type, owner_id, ledgerIdArray]
+        );
+
+        const voucherIds = vouchers.map((v) => v.id);
+        if (!voucherIds.length) return result;
+
+        const [items] = await db.query(
+          `
+          SELECT voucherId, quantity, rate
+          FROM sales_voucher_items
+          WHERE voucherId IN (?)
+          `,
+          [voucherIds]
+        );
+
+        const byVoucherMap = {};
+        items.forEach((it) => {
+          const val = Number(it.quantity) * Number(it.rate);
+          result.total += val;
+          byVoucherMap[it.voucherId] = (byVoucherMap[it.voucherId] || 0) + val;
+        });
+
+        result.byVoucher = Object.keys(byVoucherMap).map((vId) => ({
+          voucherId: Number(vId),
+          value: byVoucherMap[vId],
+        }));
+
+        return result;
+      };
+
+      const c = {
+        nil: await computeCFor(ledgerIds.nil),
+        exempted: await computeCFor(ledgerIds.exempted),
+      };
+
+      res.json({
+        success: true,
+        a,
+        b,
+        c,
+      });
   } catch (error) {
-    console.error("Database insert error:", error);
-    res.status(500).json({ error: "Failed to submit GSTR-3B return" });
+    console.error("GSTR calculation error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Database error",
+    });
   }
 });
-
 
 module.exports = router;

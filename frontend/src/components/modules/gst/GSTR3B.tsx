@@ -38,6 +38,13 @@ const GSTR3B: React.FC = () => {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [isCalculating, setIsCalculating] = useState(false);
 
+  // get company Information
+  const companyId = localStorage.getItem("company_id");
+  const ownerType = localStorage.getItem("supplier");
+  const ownerId = localStorage.getItem(
+    ownerType === "employee" ? "employee_id" : "user_id"
+  );
+
   // New state variables for enhanced features
   const [showDraftPreview, setShowDraftPreview] = useState(false);
   const [showPreviewMode, setShowPreviewMode] = useState(false);
@@ -45,85 +52,177 @@ const GSTR3B: React.FC = () => {
   const [generatedArn, setGeneratedArn] = useState("");
   const [draftData, setDraftData] = useState<any | null>(null);
 
-  // Reusable Number Input Component
-  const NumberInput: React.FC<{
-    value: number;
-    onChange: (value: number) => void;
-    placeholder?: string;
-    className?: string;
-  }> = ({ value, onChange, placeholder, className = "" }) => (
-    <input
-      type="number"
-      step="0.01"
-      value={value || ""}
-      onChange={(e) => onChange(parseFloat(e.target.value) || 0)}
-      placeholder={placeholder}
-      className={`w-full p-2 text-right font-mono rounded border ${
-        theme === "dark"
-          ? "bg-gray-700 border-gray-600 text-white"
-          : "bg-white border-gray-300"
-      } ${className}`}
-    />
-  );
+  // get basedata
+  const baseGroups = [
+    { id: -1, name: "Branch Accounts", nature: "Assets", isSystem: true },
+    { id: -2, name: "Branch OD A/c", nature: "Assets", isSystem: true },
+    { id: -3, name: "Branch/Division", nature: "Assets", isSystem: true },
+    { id: -4, name: "Capital Account", nature: "Liabilities", isSystem: true },
+    { id: -5, name: "Current Assets", nature: "Assets", isSystem: true },
+    {
+      id: -6,
+      name: "Current Liabilities",
+      nature: "Liabilities",
+      isSystem: true,
+    },
+    { id: -7, name: "Direct Expenses", nature: "Expenses", isSystem: true },
+    { id: -8, name: "Direct Income", nature: "Income", isSystem: true },
+    { id: -9, name: "Fixed Assets", nature: "Assets", isSystem: true },
+    { id: -10, name: "Indirect Expenses", nature: "Expenses", isSystem: true },
+    { id: -11, name: "Indirect Income", nature: "Income", isSystem: true },
+    { id: -12, name: "Investments", nature: "Assets", isSystem: true },
+    { id: -13, name: "Loan(Liability)", nature: "Liabilities", isSystem: true },
+    {
+      id: -14,
+      name: "Misc expenses (Assets)",
+      nature: "Assets",
+      isSystem: true,
+    },
+    { id: -15, name: "Purchase Accounts", nature: "Expenses", isSystem: true },
+    { id: -16, name: "Sales Accounts", nature: "Income", isSystem: true },
+    { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },
+  ];
 
-  // Reusable Table Row Component
-  const TaxTableRow: React.FC<{
-    label: string;
-    data: TaxableSupplyEntry;
-    onUpdate: (field: string, value: number) => void;
-    showTaxableValue?: boolean;
-  }> = ({ label, data, onUpdate, showTaxableValue = true }) => (
-    <tr
-      className={`${
-        theme === "dark"
-          ? "border-b border-gray-700"
-          : "border-b border-gray-200"
-      }`}
-    >
-      <td className="px-4 py-3">{label}</td>
-      {showTaxableValue && (
-        <td className="px-4 py-3">
-          <NumberInput
-            value={data.taxableValue}
-            onChange={(value) => onUpdate("taxableValue", value)}
-          />
-        </td>
-      )}
-      <td className="px-4 py-3">
-        <NumberInput
-          value={data.igst}
-          onChange={(value) => onUpdate("igst", value)}
-        />
-      </td>
-      <td className="px-4 py-3">
-        <NumberInput
-          value={data.cgst}
-          onChange={(value) => onUpdate("cgst", value)}
-        />
-      </td>
-      <td className="px-4 py-3">
-        <NumberInput
-          value={data.sgst}
-          onChange={(value) => onUpdate("sgst", value)}
-        />
-      </td>
-      <td className="px-4 py-3">
-        <NumberInput
-          value={data.cess}
-          onChange={(value) => onUpdate("cess", value)}
-        />
-      </td>
-    </tr>
-  );
+  const [threepointone, setThreepointone] = useState({
+    a: {
+      taxableValue: 0,
+      integratedTax: 0,
+      centralTax: 0,
+      stateUTTax: 0,
+      cess: 0,
+    },
+    b: {
+      taxableValue: 0,
+      integratedTax: 0,
+      centralTax: 0,
+      stateUTTax: 0,
+      cess: 0,
+    },
+    c: {
+      taxableValue: 0,
+      integratedTax: 0,
+      centralTax: 0,
+      stateUTTax: 0,
+      cess: 0,
+    },
+  });
+
+  // get ledger data
+  const [Data, setData] = useState<any[]>([]);
+
+  // const filterledger = 'Nill Rated' ,'Exempted','Zero Rated'
+
+ useEffect(() => {
+  let isMounted = true; // 🔥 VERY IMPORTANT
+
+  (async () => {
+    try {
+      if (!companyId || !ownerType || !ownerId) return;
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/gstr3b?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      );
+
+      const json = await res.json();
+      if (!isMounted) return;
+
+      const a = json?.a;
+      const b = json?.b;
+      const c = json?.c;
+
+      const nilTotal = c?.nil?.total ?? 0;
+      const exemptedTotal = c?.exempted?.total ?? 0;
+
+      setThreepointone({
+        a: {
+          taxableValue: a?.taxable_value ?? 0,
+          integratedTax: a?.integrated_tax ?? 0,
+          centralTax: a?.central_tax ?? 0,
+          stateUTTax: a?.state_tax ?? 0,
+          cess: 0,
+        },
+        b: {
+          taxableValue: b?.total ?? 0,
+          integratedTax: 0,
+          centralTax: 0,
+          stateUTTax: 0,
+          cess: 0,
+        },
+        c: {
+          taxableValue: nilTotal + exemptedTotal, // ✅ STAYS 200
+          integratedTax: 0,
+          centralTax: 0,
+          stateUTTax: 0,
+          cess: 0,
+        },
+      });
+    } catch (err) {
+      console.error("GSTR3B error", err);
+    }
+  })();
+
+  return () => {
+    isMounted = false; // 🔥 STRICTMODE SAFE
+  };
+}, []);
 
 
 
+  console.log("leder", threepointone.a);
 
-  // get purchase resport 
+  // sales data get
+  const [saledata, setSalesdata] = useState<any[]>([]);
 
+  useEffect(() => {
+    (async () => {
+      try {
+        if (!companyId || !ownerType || !ownerId) return;
 
+        const url = `${
+          import.meta.env.VITE_API_URL
+        }/api/gstr3b?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
+        const res = await fetch(url);
+        const json = await res.json();
 
+        console.log("GSTR-3B API:", json);
+
+        const a = json?.a;
+        const b = json?.b;
+
+        setThreepointone({
+          a: {
+            taxableValue: a?.taxable_value ?? 0,
+            integratedTax: a?.integrated_tax ?? 0,
+            centralTax: a?.central_tax ?? 0,
+            stateUTTax: a?.state_tax ?? 0,
+            cess: 0,
+          },
+
+          // ✅ B SECTION FIX
+          b: {
+            taxableValue: b?.total ?? 0, // 👈 MAIN FIX
+            integratedTax: 0,
+            centralTax: 0,
+            stateUTTax: 0,
+            cess: 0,
+          },
+
+          c: {
+            taxableValue: 0,
+            integratedTax: 0,
+            centralTax: 0,
+            stateUTTax: 0,
+            cess: 0,
+          },
+        });
+      } catch (err) {
+        console.error("❌ GSTR3B Fetch Error:", err);
+      }
+    })();
+  }, []);
+
+  console.log("saled", saledata);
 
   return (
     <div className="pt-[56px] px-4">
@@ -388,38 +487,59 @@ const GSTR3B: React.FC = () => {
 
               <tbody>
                 {/* Row A */}
+
                 <tr>
                   <td className="px-4 py-3">
                     (a) Outward taxable supplies (other than zero rated, nil
                     rated and exempted)
                   </td>
+
+                  {/* Taxable Value */}
                   <td className="px-4 py-3">
                     <input
                       type="number"
+                      value={threepointone?.a?.taxableValue ?? 0}
+                      readOnly
                       className="w-full p-2 text-right border rounded"
                     />
                   </td>
+
+                  {/* Integrated Tax */}
                   <td className="px-4 py-3">
                     <input
                       type="number"
+                      value={threepointone?.a?.integratedTax ?? 0}
+                      readOnly
                       className="w-full p-2 text-right border rounded"
                     />
                   </td>
+
+                  {/* Central Tax */}
                   <td className="px-4 py-3">
                     <input
                       type="number"
+                      value={threepointone?.a?.centralTax ?? 0}
+                      readOnly
                       className="w-full p-2 text-right border rounded"
                     />
                   </td>
+
+                  {/* State / UT Tax */}
                   <td className="px-4 py-3">
                     <input
                       type="number"
+                      value={threepointone?.a?.stateUTTax ?? 0}
+                      readOnly
                       className="w-full p-2 text-right border rounded"
                     />
                   </td>
+
+                  {/* Cess */}
                   <td className="px-4 py-3">
                     <input
                       type="number"
+                      value={threepointone?.a?.cess ?? 0}
+                      readOnly
                       className="w-full p-2 text-right border rounded"
                     />
                   </td>
@@ -430,33 +550,12 @@ const GSTR3B: React.FC = () => {
                   <td className="px-4 py-3">
                     (b) Outward taxable supplies (zero rated)
                   </td>
+
                   <td className="px-4 py-3">
                     <input
                       type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
+                      value={threepointone.b.taxableValue}
+                      readOnly
                       className="w-full p-2 text-right border rounded"
                     />
                   </td>
@@ -467,33 +566,12 @@ const GSTR3B: React.FC = () => {
                   <td className="px-4 py-3">
                     (c) Other outward supplies (Nil rated, exempted)
                   </td>
+
                   <td className="px-4 py-3">
                     <input
                       type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
+                      value={threepointone.c.taxableValue}
+                      readOnly
                       className="w-full p-2 text-right border rounded"
                     />
                   </td>
