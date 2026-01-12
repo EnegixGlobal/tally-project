@@ -5,6 +5,20 @@ import { Edit, Trash2, Plus, Search, ArrowLeft } from "lucide-react";
 import Swal from "sweetalert2";
 import type { SalesType } from "../../../types";
 
+// 🔒 System defined sales types (negative id)
+
+const baseSalesTypes = [
+  {
+    id: -1,
+    sales_type: "Sales",
+    type: "Sales",
+    prefix: "",
+    suffix: "",
+    current_no: null,
+    isSystem: true,
+  },
+];
+
 const SalesTypeList: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
@@ -21,17 +35,19 @@ const SalesTypeList: React.FC = () => {
       );
 
       let url = `${import.meta.env.VITE_API_URL}/api/sales-types`;
-      
-      // Add tenant filters if available
+
       if (companyId && ownerType && ownerId) {
         url += `?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
       }
 
       const res = await fetch(url);
       const json = await res.json();
-      setSalesTypes(json?.data || []);
+
+      const apiData = Array.isArray(json?.data) ? json.data : [];
+      setSalesTypes(apiData); // ✅ ONLY DB DATA
     } catch (error) {
       console.error("Failed to fetch sales types:", error);
+      setSalesTypes([]);
     }
   };
 
@@ -59,7 +75,11 @@ const SalesTypeList: React.FC = () => {
         return;
       }
 
-      Swal.fire("Deleted!", result?.message || "Deleted successfully", "success");
+      Swal.fire(
+        "Deleted!",
+        result?.message || "Deleted successfully",
+        "success"
+      );
       fetchSalesTypes();
     } catch (error) {
       console.error("Delete sales type failed:", error);
@@ -74,11 +94,12 @@ const SalesTypeList: React.FC = () => {
   const filtered = salesTypes.filter((s) => {
     const q = searchTerm.toLowerCase().trim();
     if (!q) return true;
+
     return (
-      s.sales_type?.toLowerCase().includes(q) ||
-      s.type?.toLowerCase().includes(q) ||
-      s.prefix?.toLowerCase().includes(q) ||
-      s.suffix?.toLowerCase().includes(q)
+      (s.sales_type || "").toLowerCase().includes(q) ||
+      (s.type || "").toLowerCase().includes(q) ||
+      (s.prefix || "").toLowerCase().includes(q) ||
+      (s.suffix || "").toLowerCase().includes(q)
     );
   });
 
@@ -157,6 +178,25 @@ const SalesTypeList: React.FC = () => {
               </tr>
             </thead>
             <tbody>
+              {/* 🔒 STATIC SYSTEM ROW */}
+              <tr
+                className={`${
+                  theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b border-gray-200"
+                } `}
+              >
+                <td className="px-4 py-3 font-medium">Sales</td>
+                <td className="px-4 py-3">Sales</td>
+                <td className="px-4 py-3 font-mono">—</td>
+                <td className="px-4 py-3 font-mono">—</td>
+                <td className="px-4 py-3 text-right font-mono">—</td>
+                <td className="px-4 py-3 text-center opacity-50">
+                  {/* ❌ No Actions */}
+                </td>
+              </tr>
+
+              {/* 🔓 DB DATA ROWS */}
               {filtered.map((s) => (
                 <tr
                   key={String(s.id)}
@@ -168,8 +208,8 @@ const SalesTypeList: React.FC = () => {
                 >
                   <td className="px-4 py-3">{s.sales_type}</td>
                   <td className="px-4 py-3">{s.type}</td>
-                  <td className="px-4 py-3 font-mono">{s.prefix}</td>
-                  <td className="px-4 py-3 font-mono">{s.suffix}</td>
+                  <td className="px-4 py-3 font-mono">{s.prefix || "—"}</td>
+                  <td className="px-4 py-3 font-mono">{s.suffix || "—"}</td>
                   <td className="px-4 py-3 text-right font-mono">
                     {Number(s.current_no ?? 0)}
                   </td>
@@ -188,28 +228,18 @@ const SalesTypeList: React.FC = () => {
                       >
                         <Edit size={16} />
                       </button>
-                      {/* Disable delete button for default Sales type (id = 1) */}
-                      {Number(s.id) === 1 ? (
-                        <button
-                          title="Cannot delete default Sales type"
-                          disabled
-                          className={`p-1 rounded opacity-40 cursor-not-allowed`}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      ) : (
-                        <button
-                          title="Delete"
-                          onClick={() => handleDelete(s.id)}
-                          className={`p-1 rounded ${
-                            theme === "dark"
-                              ? "hover:bg-gray-700"
-                              : "hover:bg-gray-100"
-                          }`}
-                        >
-                          <Trash2 size={16} />
-                        </button>
-                      )}
+
+                      <button
+                        title="Delete"
+                        onClick={() => handleDelete(s.id)}
+                        className={`p-1 rounded ${
+                          theme === "dark"
+                            ? "hover:bg-gray-700"
+                            : "hover:bg-gray-100"
+                        }`}
+                      >
+                        <Trash2 size={16} />
+                      </button>
                     </div>
                   </td>
                 </tr>
@@ -229,5 +259,3 @@ const SalesTypeList: React.FC = () => {
 };
 
 export default SalesTypeList;
-
-

@@ -248,7 +248,6 @@ const PurchaseVoucher: React.FC = () => {
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
-
         setLedgers(data);
       } catch (err) {
         console.error("Failed to fetch ledgers:", err);
@@ -1306,6 +1305,16 @@ const PurchaseVoucher: React.FC = () => {
     return unit?.name || "-";
   };
 
+  // 🔹 Selected Party Ledger (Party Name ke liye)
+  const selectedPartyLedger = safeLedgers.find(
+    (l) => String(l.id) === String(formData.partyId)
+  );
+
+  // 🔹 GST Charge Type
+  const isRegularCharge =
+    selectedPartyLedger?.gstNumber &&
+    String(selectedPartyLedger.gstNumber).trim() !== "";
+
   return (
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
@@ -1504,6 +1513,25 @@ const PurchaseVoucher: React.FC = () => {
                       + Add New Ledger
                     </option>
                   </select>
+
+                  {selectedPartyLedger && (
+                    <div
+                      className={`mt-1 text-xs font-medium ${
+                        isRegularCharge ? "text-green-600" : "text-orange-600"
+                      }`}
+                    >
+                      {isRegularCharge ? (
+                        <>
+                          Regular Charge
+                          <span className="ml-2 text-gray-600">
+                            (GSTIN: {selectedPartyLedger.gstNumber})
+                          </span>
+                        </>
+                      ) : (
+                        <>Inward supplies liable to reverse charge</>
+                      )}
+                    </div>
+                  )}
 
                   {errors.partyId && (
                     <p className="text-red-500 text-xs mt-1">

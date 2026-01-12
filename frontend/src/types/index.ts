@@ -265,9 +265,10 @@ export type SalesType = {
   type: string;
   prefix: string;
   suffix: string;
-  current_no: number;
+  current_no?: number | null;
   created_at?: string;
   updated_at?: string;
+  isSystem?: boolean;
 };
 
 export type LedgerEntry = {

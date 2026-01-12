@@ -26,11 +26,6 @@ const DebitNoteVoucher: React.FC = () => {
     ownerType === "employee" ? "employee_id" : "user_id"
   );
   // Purchase Ledger dropdown should show ledgers with group indicating purchase ledgers or expense ledgers
-  const generateVoucherNumber = () => {
-    const prefix = "DNV";
-    const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit
-    return `${prefix}${randomNumber}`;
-  };
 
   useEffect(() => {
     if (!isEditMode || !id) return;
@@ -118,7 +113,7 @@ const DebitNoteVoucher: React.FC = () => {
   const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>({
     date: new Date().toISOString().split("T")[0],
     type: "debit-note",
-    number: generateVoucherNumber(),
+    number: "",
     narration: "",
     mode: "accounting-invoice",
     entries: [
@@ -126,6 +121,37 @@ const DebitNoteVoucher: React.FC = () => {
       { id: "2", ledgerId: "", amount: 0, type: "credit" },
     ],
   });
+
+  // get voucher number
+  useEffect(() => {
+    if (isEditMode) return;
+    if (!companyId || !ownerType || !ownerId || !formData.date) return;
+
+    const fetchNextDNVNumber = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/DebitNoteVoucher/next-number` +
+            `?company_id=${companyId}` +
+            `&owner_type=${ownerType}` +
+            `&owner_id=${ownerId}` +
+            `&date=${formData.date}`
+        );
+
+        const data = await res.json();
+
+        if (data.success) {
+          setFormData((prev) => ({
+            ...prev,
+            number: data.voucherNumber,
+          }));
+        }
+      } catch (err) {
+        console.error("Debit Note number fetch failed", err);
+      }
+    };
+
+    fetchNextDNVNumber();
+  }, [formData.date, companyId, ownerType, ownerId, isEditMode]);
 
   // Print-related state
   const [showPrintOptions, setShowPrintOptions] = useState(false);
@@ -406,7 +432,6 @@ const DebitNoteVoucher: React.FC = () => {
           <h1 className="text-2xl font-bold">
             {isEditMode ? "Edit Debit Note" : "Debit Note Voucher"}
           </h1>
-         
         </div>
       </div>
 
@@ -448,13 +473,14 @@ const DebitNoteVoucher: React.FC = () => {
                 id="number"
                 name="number"
                 value={formData.number}
-                onChange={handleChange}
+                readOnly
+                disabled
                 placeholder="Auto"
-                className={`w-full p-2 rounded border ${
+                className={`w-full p-2 rounded border cursor-not-allowed opacity-70 ${
                   theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
+                    ? "bg-gray-700 border-gray-600 text-gray-300"
+                    : "bg-gray-100 border-gray-300 text-gray-600"
+                }`}
               />
             </div>
 
