@@ -5,7 +5,19 @@ import { ArrowLeft, Save } from "lucide-react";
 import Swal from "sweetalert2";
 import type { SalesType } from "../../../types";
 
-type FormState = Omit<SalesType, "id" | "created_at" | "updated_at">;
+type FormState = Omit<SalesType, "id" | "created_at" | "updated_at" | "type">;
+
+const baseSalesTypes = [
+  {
+    id: -1,
+    sales_type: "Sales",
+    type: "Sales",
+    prefix: "",
+    suffix: "",
+    current_no: null,
+    isSystem: true,
+  },
+];
 
 const SalesTypeForm: React.FC = () => {
   const { theme } = useAppContext();
@@ -13,9 +25,14 @@ const SalesTypeForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = Boolean(id);
 
+  const companyId = localStorage.getItem("company_id");
+  const ownerType = localStorage.getItem("supplier");
+  const ownerId = localStorage.getItem(
+    ownerType === "employee" ? "employee_id" : "user_id"
+  );
+
   const [formData, setFormData] = useState<FormState>({
     sales_type: "",
-    type: "",
     prefix: "",
     suffix: "",
     current_no: 1,
@@ -27,15 +44,17 @@ const SalesTypeForm: React.FC = () => {
     const fetchOne = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/sales-types/${id}`
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/sales-types/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const json = await res.json();
-        if (!res.ok || !json?.success) throw new Error(json?.message || "Not found");
+        if (!res.ok || !json?.success)
+          throw new Error(json?.message || "Not found");
 
         const s: SalesType = json.data;
         setFormData({
           sales_type: s.sales_type || "",
-          type: s.type || "",
           prefix: s.prefix || "",
           suffix: s.suffix || "",
           current_no: Number(s.current_no ?? 1),
@@ -78,6 +97,7 @@ const SalesTypeForm: React.FC = () => {
 
     const payload = {
       ...formData,
+      type: "Sales", // 🔒 ALWAYS SALES
       company_id: companyId,
       owner_type: ownerType,
       owner_id: ownerId,
@@ -140,7 +160,10 @@ const SalesTypeForm: React.FC = () => {
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div>
-              <label className="block text-sm font-medium mb-1" htmlFor="sales_type">
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="sales_type"
+              >
                 Sales Type *
               </label>
               <input
@@ -165,9 +188,9 @@ const SalesTypeForm: React.FC = () => {
               <input
                 id="type"
                 name="type"
-                value={formData.type}
-                onChange={handleChange}
+                value={"Sales"}
                 required
+                readOnly
                 placeholder="e.g., sales"
                 className={`w-full p-2 rounded border ${
                   theme === "dark"
@@ -180,7 +203,10 @@ const SalesTypeForm: React.FC = () => {
 
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div>
-              <label className="block text-sm font-medium mb-1" htmlFor="prefix">
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="prefix"
+              >
                 Prefix
               </label>
               <input
@@ -198,7 +224,10 @@ const SalesTypeForm: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1" htmlFor="suffix">
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="suffix"
+              >
                 Suffix
               </label>
               <input
@@ -216,7 +245,10 @@ const SalesTypeForm: React.FC = () => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium mb-1" htmlFor="current_no">
+              <label
+                className="block text-sm font-medium mb-1"
+                htmlFor="current_no"
+              >
                 Current No
               </label>
               <input
@@ -266,5 +298,3 @@ const SalesTypeForm: React.FC = () => {
 };
 
 export default SalesTypeForm;
-
-

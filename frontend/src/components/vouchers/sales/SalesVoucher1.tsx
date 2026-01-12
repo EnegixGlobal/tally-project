@@ -1,4 +1,10 @@
-import React, { useState, useEffect, useCallback, useMemo, useRef } from "react";
+import React, {
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  useRef,
+} from "react";
 import { useAppContext } from "../../../context/AppContext";
 import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import type {
@@ -158,7 +164,7 @@ const SalesVoucher: React.FC = () => {
     const fetchSalesTypes = async () => {
       try {
         let url = `${import.meta.env.VITE_API_URL}/api/sales-types`;
-        
+
         // Add tenant filters if available
         if (companyId && ownerType && ownerId) {
           url += `?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
@@ -1522,10 +1528,7 @@ const SalesVoucher: React.FC = () => {
         0,
 
       mrp:
-        Number(item.mrp) ||
-        Number(item.MRP) ||
-        Number(item.sellingPrice) ||
-        0,
+        Number(item.mrp) || Number(item.MRP) || Number(item.sellingPrice) || 0,
 
       batches: (() => {
         if (!item.batches) return [];
