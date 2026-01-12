@@ -78,12 +78,6 @@ const SalesVoucher: React.FC = () => {
 
   // Robust detection for party ledgers — backend may return different field names
 
-  const generateVoucherNumber = useCallback(() => {
-    const prefix = "SLSV";
-    const randomNumber = Math.floor(100000 + Math.random() * 900000);
-    return `${prefix}${randomNumber}`;
-  }, []);
-
   const isPartyLedger = (l: any) => {
     const groupName =
       l.groupName || l.group_name || (l.group && l.group.name) || "";
@@ -145,8 +139,6 @@ const SalesVoucher: React.FC = () => {
             return;
           }
           const data = await res.json();
-          console.log("🔍 Fetched Company Info from API:", data);
-          console.log("🔍 Company State from API:", data?.state);
           // Update context with fetched company info
           if (data) {
             setCompanyInfo(data);
@@ -218,8 +210,6 @@ const SalesVoucher: React.FC = () => {
         const storedCompanyInfo = localStorage.getItem("companyInfo");
         if (storedCompanyInfo) {
           const parsed = JSON.parse(storedCompanyInfo);
-          console.log("🔍 CompanyInfo from localStorage:", parsed);
-          console.log("🔍 Company State from localStorage:", parsed?.state);
           if (setCompanyInfo && parsed) {
             setCompanyInfo(parsed);
           }
@@ -230,15 +220,7 @@ const SalesVoucher: React.FC = () => {
     }
   }, [companyInfo, setCompanyInfo]);
 
-  // Debug: Log companyInfo to see what we have
-  useEffect(() => {
-    console.log("🔍 CompanyInfo from Context:", companyInfo);
-    console.log("🔍 CompanyInfo State Field:", companyInfo?.state);
-    console.log(
-      "🔍 CompanyInfo Keys:",
-      companyInfo ? Object.keys(companyInfo) : []
-    );
-  }, [companyInfo]);
+ 
 
   const safeCompanyInfo = companyInfo || {
     name: "Your Company Name",
@@ -277,7 +259,7 @@ const SalesVoucher: React.FC = () => {
       date: new Date().toISOString().split("T")[0],
       type: isQuotation ? "quotation" : "sales",
       // number: `${isQuotation ? "QT" : "XYZ"}0001`, // Will be updated by useEffect
-      number: generateVoucherNumber(),
+      number: "",
       narration: "",
       referenceNo: "",
       partyId: "",
@@ -385,11 +367,11 @@ const SalesVoucher: React.FC = () => {
     if (!isEditMode) {
       setFormData((prev) => ({
         ...prev,
-        number: generateVoucherNumber(),
+        number: "",
         type: isQuotation ? "quotation" : "sales",
       }));
     }
-  }, [isQuotation, isEditMode, generateVoucherNumber]);
+  }, [isQuotation, isEditMode]);
 
   // Load voucher in edit mode
   useEffect(() => {
@@ -463,6 +445,28 @@ const SalesVoucher: React.FC = () => {
     loadSingleVoucher();
   }, [isEditMode, id]);
 
+  // voucher no logic
+  useEffect(() => {
+    if (!selectedSalesType) return;
+
+    const prefix = (selectedSalesType.prefix || "").trim();
+    const suffix = (selectedSalesType.suffix || "").trim();
+    const nextNo = Number(selectedSalesType.current_no || 0) + 1;
+
+    let voucherNo = "";
+
+    if (!prefix && !suffix) {
+      voucherNo = String(nextNo);
+    } else {
+      voucherNo = `${prefix}${nextNo}${suffix}`;
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      number: voucherNo,
+    }));
+  }, [selectedSalesType]);
+
   // Set party state when ledgers are loaded and party is selected
   useEffect(() => {
     if (formData.partyId && ledgers.length > 0) {
@@ -470,10 +474,7 @@ const SalesVoucher: React.FC = () => {
         (l) => String(l.id) === String(formData.partyId)
       );
 
-      // Debug: Log full party object to see all available fields
-      console.log("🔍 Full Party Object:", party);
-      console.log("🔍 Party State Field:", party?.state);
-      console.log("🔍 All Party Keys:", party ? Object.keys(party) : []);
+  
 
       // Try multiple possible field names for state
       const partyAny = party as any;
@@ -488,14 +489,7 @@ const SalesVoucher: React.FC = () => {
         partyState &&
         companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
 
-      console.log("🔍 State Matching Check:", {
-        companyState: companyState || "Not Set",
-        partyState: partyState || "Not Set",
-        statesMatch: statesMatch,
-        gstType: statesMatch ? "CGST + SGST" : partyState ? "IGST" : "Unknown",
-        partyName: party?.name || "Unknown",
-        partyId: formData.partyId,
-      });
+     
     } else {
       setSelectedPartyState("");
     }
@@ -1292,30 +1286,7 @@ const SalesVoucher: React.FC = () => {
       total: Number(grandTotal.toFixed(2)),
     };
 
-    console.log("Saving voucher to database with GST details:", {
-      mode: formData.mode,
-      isQuotation: isQuotation,
-      entriesCount: entriesWithGST.length,
-      totals: {
-        subtotal: payload.subtotal,
-        cgstTotal: payload.cgstTotal,
-        sgstTotal: payload.sgstTotal,
-        igstTotal: payload.igstTotal,
-        discountTotal: payload.discountTotal,
-        total: payload.total,
-      },
-      sampleEntry: entriesWithGST[0]
-        ? {
-            itemId: entriesWithGST[0].itemId,
-            cgstRate: entriesWithGST[0].cgstRate,
-            sgstRate: entriesWithGST[0].sgstRate,
-            igstRate: entriesWithGST[0].igstRate,
-            quantity: entriesWithGST[0].quantity,
-            rate: entriesWithGST[0].rate,
-            amount: entriesWithGST[0].amount,
-          }
-        : null,
-    });
+   
 
     try {
       let voucherSaved = false;
@@ -1720,24 +1691,7 @@ const SalesVoucher: React.FC = () => {
               </div>
 
               {/* Bill No. (Preview from Sales Type) */}
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Bill No.
-                </label>
-                <input
-                  type="text"
-                  value={
-                    selectedSalesTypeId
-                      ? billNoPreview || "N/A"
-                      : "Select Sales Type"
-                  }
-                  readOnly
-                  title="Bill No. (Prefix + Next No + Suffix)"
-                  className={`${FORM_STYLES.input(theme)} ${
-                    theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                  } font-mono`}
-                />
-              </div>
+
               <div>
                 <label
                   className="block text-sm font-medium mb-1"
