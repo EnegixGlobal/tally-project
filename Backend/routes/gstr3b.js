@@ -42,7 +42,6 @@ router.get("/", async (req, res) => {
       if (l.name === "zero rated") ledgerIds.zero.push(l.id);
     });
 
-
     /* ---------------------------------------------------
        A SECTION: TAXABLE (EXCEPT NIL / EXEMPTED / ZERO)
     --------------------------------------------------- */
@@ -83,14 +82,13 @@ router.get("/", async (req, res) => {
       }
     );
 
-  
-      /* ---------------------------------------------------
+    /* ---------------------------------------------------
          B SECTION: ZERO RATED -> match ledgerIds.zero to partyId
       --------------------------------------------------- */
-      let b = { total: 0, byVoucher: [] };
-      if (ledgerIds.zero.length) {
-        const [zeroVouchers] = await db.query(
-          `
+    let b = { total: 0, byVoucher: [] };
+    if (ledgerIds.zero.length) {
+      const [zeroVouchers] = await db.query(
+        `
           SELECT id
           FROM sales_vouchers
           WHERE company_id = ?
@@ -99,44 +97,44 @@ router.get("/", async (req, res) => {
             AND type = 'sales'
             AND partyId IN (?)
           `,
-          [company_id, owner_type, owner_id, ledgerIds.zero]
-        );
+        [company_id, owner_type, owner_id, ledgerIds.zero]
+      );
 
-        const voucherIds = zeroVouchers.map((v) => v.id);
-        if (voucherIds.length) {
-          const [bItems] = await db.query(
-            `
+      const voucherIds = zeroVouchers.map((v) => v.id);
+      if (voucherIds.length) {
+        const [bItems] = await db.query(
+          `
             SELECT voucherId, quantity, rate
             FROM sales_voucher_items
             WHERE voucherId IN (?)
             `,
-            [voucherIds]
-          );
+          [voucherIds]
+        );
 
-          const byVoucherMap = {};
-          bItems.forEach((item) => {
-            const val = Number(item.quantity) * Number(item.rate);
-            b.total += val;
-            byVoucherMap[item.voucherId] = (byVoucherMap[item.voucherId] || 0) + val;
-          });
+        const byVoucherMap = {};
+        bItems.forEach((item) => {
+          const val = Number(item.quantity) * Number(item.rate);
+          b.total += val;
+          byVoucherMap[item.voucherId] =
+            (byVoucherMap[item.voucherId] || 0) + val;
+        });
 
-          b.byVoucher = Object.keys(byVoucherMap).map((vId) => ({
-            voucherId: Number(vId),
-            value: byVoucherMap[vId],
-          }));
-        }
+        b.byVoucher = Object.keys(byVoucherMap).map((vId) => ({
+          voucherId: Number(vId),
+          value: byVoucherMap[vId],
+        }));
       }
+    }
 
-
-      /* ---------------------------------------------------
+    /* ---------------------------------------------------
          C SECTION: NIL & EXEMPTED -> match ledgerIds.nil/exempted to partyId
       --------------------------------------------------- */
-      const computeCFor = async (ledgerIdArray) => {
-        const result = { total: 0, byVoucher: [] };
-        if (!ledgerIdArray || !ledgerIdArray.length) return result;
+    const computeCFor = async (ledgerIdArray) => {
+      const result = { total: 0, byVoucher: [] };
+      if (!ledgerIdArray || !ledgerIdArray.length) return result;
 
-        const [vouchers] = await db.query(
-          `
+      const [vouchers] = await db.query(
+        `
           SELECT id
           FROM sales_vouchers
           WHERE company_id = ?
@@ -145,47 +143,47 @@ router.get("/", async (req, res) => {
             AND type = 'sales'
             AND partyId IN (?)
           `,
-          [company_id, owner_type, owner_id, ledgerIdArray]
-        );
+        [company_id, owner_type, owner_id, ledgerIdArray]
+      );
 
-        const voucherIds = vouchers.map((v) => v.id);
-        if (!voucherIds.length) return result;
+      const voucherIds = vouchers.map((v) => v.id);
+      if (!voucherIds.length) return result;
 
-        const [items] = await db.query(
-          `
+      const [items] = await db.query(
+        `
           SELECT voucherId, quantity, rate
           FROM sales_voucher_items
           WHERE voucherId IN (?)
           `,
-          [voucherIds]
-        );
+        [voucherIds]
+      );
 
-        const byVoucherMap = {};
-        items.forEach((it) => {
-          const val = Number(it.quantity) * Number(it.rate);
-          result.total += val;
-          byVoucherMap[it.voucherId] = (byVoucherMap[it.voucherId] || 0) + val;
-        });
-
-        result.byVoucher = Object.keys(byVoucherMap).map((vId) => ({
-          voucherId: Number(vId),
-          value: byVoucherMap[vId],
-        }));
-
-        return result;
-      };
-
-      const c = {
-        nil: await computeCFor(ledgerIds.nil),
-        exempted: await computeCFor(ledgerIds.exempted),
-      };
-
-      res.json({
-        success: true,
-        a,
-        b,
-        c,
+      const byVoucherMap = {};
+      items.forEach((it) => {
+        const val = Number(it.quantity) * Number(it.rate);
+        result.total += val;
+        byVoucherMap[it.voucherId] = (byVoucherMap[it.voucherId] || 0) + val;
       });
+
+      result.byVoucher = Object.keys(byVoucherMap).map((vId) => ({
+        voucherId: Number(vId),
+        value: byVoucherMap[vId],
+      }));
+
+      return result;
+    };
+
+    const c = {
+      nil: await computeCFor(ledgerIds.nil),
+      exempted: await computeCFor(ledgerIds.exempted),
+    };
+
+    res.json({
+      success: true,
+      a,
+      b,
+      c,
+    });
   } catch (error) {
     console.error("GSTR calculation error:", error);
     res.status(500).json({

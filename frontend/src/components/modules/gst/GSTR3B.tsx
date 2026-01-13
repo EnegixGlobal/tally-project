@@ -83,6 +83,33 @@ const GSTR3B: React.FC = () => {
     { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },
   ];
 
+  //basic information
+  const [basicInfo, setBasicInfo] = useState({
+    gstin: "",
+    legalName: "",
+    tradeName: "",
+    arn: "",
+  });
+
+  useEffect(() => {
+    const companyRaw = localStorage.getItem("companyInfo");
+
+    if (!companyRaw) return;
+
+    try {
+      const company = JSON.parse(companyRaw);
+
+      setBasicInfo({
+        gstin: company.gst_number || "",
+        legalName: company.name || "",
+        tradeName: company.name || "",
+        arn: "",
+      });
+    } catch (error) {
+      console.error("Company data parse error", error);
+    }
+  }, []);
+
   const [threepointone, setThreepointone] = useState({
     a: {
       taxableValue: 0,
@@ -93,17 +120,9 @@ const GSTR3B: React.FC = () => {
     },
     b: {
       taxableValue: 0,
-      integratedTax: 0,
-      centralTax: 0,
-      stateUTTax: 0,
-      cess: 0,
     },
     c: {
       taxableValue: 0,
-      integratedTax: 0,
-      centralTax: 0,
-      stateUTTax: 0,
-      cess: 0,
     },
   });
 
@@ -112,61 +131,53 @@ const GSTR3B: React.FC = () => {
 
   // const filterledger = 'Nill Rated' ,'Exempted','Zero Rated'
 
- useEffect(() => {
-  let isMounted = true; // 🔥 VERY IMPORTANT
+  useEffect(() => {
+    let isMounted = true;
 
-  (async () => {
-    try {
-      if (!companyId || !ownerType || !ownerId) return;
+    (async () => {
+      try {
+        if (!companyId || !ownerType || !ownerId) return;
 
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/gstr3b?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-      );
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/gstr3b?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
 
-      const json = await res.json();
-      if (!isMounted) return;
+        const json = await res.json();
+        if (!isMounted) return;
 
-      const a = json?.a;
-      const b = json?.b;
-      const c = json?.c;
+        const a = json?.a;
+        const b = json?.b;
+        const c = json?.c;
 
-      const nilTotal = c?.nil?.total ?? 0;
-      const exemptedTotal = c?.exempted?.total ?? 0;
+        const nilTotal = c?.nil?.total ?? 0;
+        const exemptedTotal = c?.exempted?.total ?? 0;
 
-      setThreepointone({
-        a: {
-          taxableValue: a?.taxable_value ?? 0,
-          integratedTax: a?.integrated_tax ?? 0,
-          centralTax: a?.central_tax ?? 0,
-          stateUTTax: a?.state_tax ?? 0,
-          cess: 0,
-        },
-        b: {
-          taxableValue: b?.total ?? 0,
-          integratedTax: 0,
-          centralTax: 0,
-          stateUTTax: 0,
-          cess: 0,
-        },
-        c: {
-          taxableValue: nilTotal + exemptedTotal, // ✅ STAYS 200
-          integratedTax: 0,
-          centralTax: 0,
-          stateUTTax: 0,
-          cess: 0,
-        },
-      });
-    } catch (err) {
-      console.error("GSTR3B error", err);
-    }
-  })();
+        setThreepointone({
+          a: {
+            taxableValue: a?.taxable_value ?? 0,
+            integratedTax: a?.integrated_tax ?? 0,
+            centralTax: a?.central_tax ?? 0,
+            stateUTTax: a?.state_tax ?? 0,
+            cess: 0,
+          },
+          b: {
+            taxableValue: b?.total ?? 0,
+          },
+          c: {
+            taxableValue: nilTotal + exemptedTotal,
+          },
+        });
+      } catch (err) {
+        console.error("GSTR3B error", err);
+      }
+    })();
 
-  return () => {
-    isMounted = false; // 🔥 STRICTMODE SAFE
-  };
-}, []);
-
-
+    return () => {
+      isMounted = false; // 🔥 STRICTMODE SAFE
+    };
+  }, []);
 
   console.log("leder", threepointone.a);
 
@@ -189,6 +200,10 @@ const GSTR3B: React.FC = () => {
 
         const a = json?.a;
         const b = json?.b;
+        const c = json?.c;
+
+        const nilTotal = c?.nil?.total ?? 0;
+        const exemptedTotal = c?.exempted?.total ?? 0;
 
         setThreepointone({
           a: {
@@ -201,19 +216,12 @@ const GSTR3B: React.FC = () => {
 
           // ✅ B SECTION FIX
           b: {
-            taxableValue: b?.total ?? 0, // 👈 MAIN FIX
-            integratedTax: 0,
-            centralTax: 0,
-            stateUTTax: 0,
-            cess: 0,
+            taxableValue: b?.total ?? 0,
           },
 
+          // ✅ C SECTION: combine nil + exempted totals
           c: {
-            taxableValue: 0,
-            integratedTax: 0,
-            centralTax: 0,
-            stateUTTax: 0,
-            cess: 0,
+            taxableValue: nilTotal + exemptedTotal,
           },
         });
       } catch (err) {
@@ -394,16 +402,10 @@ const GSTR3B: React.FC = () => {
                 GSTIN of Supplier *
               </label>
               <input
-                title="Enter GSTIN"
                 type="text"
-                value={"hello"}
-                placeholder="Enter GSTIN"
-                maxLength={15}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300"
-                }`}
+                value={basicInfo.gstin}
+                readOnly
+                className="w-full p-2 rounded border"
               />
             </div>
             <div>
@@ -411,15 +413,10 @@ const GSTR3B: React.FC = () => {
                 Legal Name of Registered Person *
               </label>
               <input
-                title="Enter Legal Name"
                 type="text"
-                value={"legal name"}
-                placeholder="Enter Legal Name"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300"
-                }`}
+                value={basicInfo.legalName}
+                readOnly
+                className="w-full p-2 rounded border"
               />
             </div>
             <div>
@@ -427,29 +424,20 @@ const GSTR3B: React.FC = () => {
                 Trade Name (if any)
               </label>
               <input
-                title="Enter Trade Name"
                 type="text"
-                value={"basic detail"}
-                placeholder="Enter Trade Name"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300"
-                }`}
+                value={basicInfo.tradeName}
+                readOnly
+                className="w-full p-2 rounded border"
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-2">ARN</label>
               <input
                 type="text"
-                value={"hello"}
+                value={basicInfo.arn}
                 readOnly
                 placeholder="Auto-generated after submission"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-600 border-gray-600 text-gray-400"
-                    : "bg-gray-100 border-gray-300 text-gray-500"
-                }`}
+                className="w-full p-2 rounded border"
               />
             </div>
           </div>
@@ -581,30 +569,6 @@ const GSTR3B: React.FC = () => {
                 <tr>
                   <td className="px-4 py-3">
                     (d) Inward supplies (liable to reverse charge)
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
                   </td>
                   <td className="px-4 py-3">
                     <input
