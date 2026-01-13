@@ -227,13 +227,7 @@ const GodownAllocationField: React.FC<GodownAllocationFieldProps> = ({
 };
 
 const StockItemForm = () => {
-  const {
-    theme,
-    gstClassifications = [],
-    units = [],
-    godowns = [],
-    companyInfo,
-  } = useAppContext();
+  const { theme, gstClassifications = [], companyInfo } = useAppContext();
 
   const navigate = useNavigate();
   const companyId = localStorage.getItem("company_id");
@@ -411,14 +405,12 @@ const StockItemForm = () => {
     unit: string;
     openingBalance: number;
     openingValue: number;
-    hsnSacOption: "as-per-company" | "specify-details" | "use-classification";
+
     hsnCode: string;
-    gstRateOption: "as-per-company" | "specify-details" | "use-classification";
     gstRate: string;
-    gstClassification: string;
+
     taxType: "Taxable" | "Exempt" | "Nil-rated";
-    standardPurchaseRate: number;
-    standardSaleRate: number;
+
     enableBatchTracking: boolean;
     batchName: string;
     batchExpiryDate: string;
@@ -439,14 +431,12 @@ const StockItemForm = () => {
     unit: "",
     openingBalance: 0,
     openingValue: 0,
-    hsnSacOption: "as-per-company",
+
     hsnCode: "",
-    gstRateOption: "as-per-company",
     gstRate: "",
-    gstClassification: "",
+
     taxType: "Taxable",
-    standardPurchaseRate: 0,
-    standardSaleRate: 0,
+
     enableBatchTracking: false,
     batchName: "",
     batchExpiryDate: "",
@@ -497,38 +487,39 @@ const StockItemForm = () => {
     ]);
   };
   const removeBatchRow = async (index: number) => {
-  const batchToDelete = batchRows[index];
+    const batchToDelete = batchRows[index];
 
-  // UI optimistic update
-  setBatchRows((prev) => prev.filter((_, i) => i !== index));
+    // UI optimistic update
+    setBatchRows((prev) => prev.filter((_, i) => i !== index));
 
-  try {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/stock-items/${id}/batch?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-      {
-        method: "DELETE",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          batchName: batchToDelete.batchName,
-        }),
+    try {
+      const res = await fetch(
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/stock-items/${id}/batch?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            batchName: batchToDelete.batchName,
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to delete batch");
       }
-    );
 
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.message || "Failed to delete batch");
+      console.log("✅ Batch deleted:", data);
+    } catch (err) {
+      console.error("❌ Delete batch error:", err);
+      Swal.fire("Error", "Failed to delete batch", "error");
     }
-
-    console.log("✅ Batch deleted:", data);
-  } catch (err) {
-    console.error("❌ Delete batch error:", err);
-    Swal.fire("Error", "Failed to delete batch", "error");
-  }
-};
-
+  };
 
   const updateBatchRow = (index: number, field: string, value: string) => {
     setBatchRows((prev) =>
@@ -556,62 +547,54 @@ const StockItemForm = () => {
   // --- End batch rows ---
 
   const validateForm = () => {
-    const newErrors: Errors = {};
+  const newErrors: Errors = {};
 
-    if (!formData.name) newErrors.name = "Name is required";
-    if (!formData.categoryId) newErrors.categoryId = "Category is required";
-    if (!formData.unit) newErrors.unit = "Unit is required";
-    if (!formData.taxType) newErrors.taxType = "Tax Type is required";
+  if (!formData.name) newErrors.name = "Name is required";
+  if (!formData.categoryId) newErrors.categoryId = "Category is required";
+  if (!formData.unit) newErrors.unit = "Unit is required";
+  if (!formData.taxType) newErrors.taxType = "Tax Type is required";
 
-    if (formData.openingValue < 0)
-      newErrors.openingValue = "Opening Value cannot be negative";
-    if (formData.standardPurchaseRate < 0)
-      newErrors.standardPurchaseRate = "Purchase Rate cannot be negative";
-    if (formData.standardSaleRate < 0)
-      newErrors.standardSaleRate = "Sale Rate cannot be negative";
+  if (formData.openingValue < 0) {
+    newErrors.openingValue = "Opening Value cannot be negative";
+  }
 
-    if (formData.hsnSacOption === "specify-details" && !formData.hsnCode) {
-      newErrors.hsnCode = "HSN/SAC Code is required";
-    } else if (formData.hsnSacOption === "specify-details") {
-      const turnover = companyInfo?.turnover || 0;
-      const hsnLength = (formData.hsnCode || "").toString().length;
-      const requiredLength =
-        turnover <= 50000000 ? 4 : turnover <= 150000000 ? 6 : 8;
-      if (!/^\d{4,8}$/.test(formData.hsnCode) || hsnLength < requiredLength) {
-        newErrors.hsnCode = `HSN/SAC must be at least ${requiredLength} digits for turnover ₹${(
-          turnover / 10000000
-        ).toFixed(1)} crore`;
-      }
+  // ---- HSN / SAC Code ----
+  if (!formData.hsnCode) {
+    newErrors.hsnCode = "HSN / SAC Code is required";
+  } else {
+    const hsn = formData.hsnCode.toString();
+    const turnover = companyInfo?.turnover || 0;
+
+    const requiredLength =
+      turnover <= 50000000 ? 4 : turnover <= 150000000 ? 6 : 8;
+
+    if (!/^\d+$/.test(hsn) || hsn.length < requiredLength) {
+      newErrors.hsnCode = `HSN / SAC must be at least ${requiredLength} digits`;
     }
+  }
 
-    if (formData.gstRateOption === "specify-details" && !formData.gstRate) {
-      newErrors.gstRate = "GST Rate is required";
-    } else if (
-      formData.gstRateOption === "specify-details" &&
-      (Number(formData.gstRate) < 0 || Number(formData.gstRate) > 28)
-    ) {
+  // ---- GST Rate (%) ----
+  if (!formData.gstRate) {
+    newErrors.gstRate = "GST Rate is required";
+  } else {
+    const rate = Number(formData.gstRate);
+    if (isNaN(rate) || rate < 0 || rate > 28) {
       newErrors.gstRate = "GST Rate must be between 0 and 28%";
     }
+  }
 
-    godownAllocations.forEach((alloc: GodownAllocation, index: number) => {
-      if (!alloc.godownId) newErrors[`godown-${index}`] = "Godown is required";
-      if (alloc.quantity < 0)
-        newErrors[`quantity-${index}`] = "Quantity cannot be negative";
-      if (alloc.value < 0)
-        newErrors[`value-${index}`] = "Value cannot be negative";
+  // ---- Batch validation ----
+  if (formData.enableBatchTracking) {
+    batchRows.forEach((batch, index) => {
+      if (!batch.batchName) {
+        newErrors[`batchName-${index}`] = "Batch Name is required";
+      }
     });
+  }
 
-    // --- Batch validation ---
-    if (formData.enableBatchTracking) {
-      batchRows.forEach((batch, index) => {
-        if (!batch.batchName)
-          newErrors[`batchName-${index}`] = "Batch Name is required";
-      });
-    }
-
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -629,13 +612,21 @@ const StockItemForm = () => {
 
     // Construct stockItem object
     const stockItem = {
-      ...formData,
+      name: formData.name,
+      stockGroupId: formData.stockGroupId,
+      categoryId: formData.categoryId,
+      unit: formData.unit,
+
+      hsnCode: formData.hsnCode,
+      gstRate: Number(formData.gstRate),
+      taxType: formData.taxType,
+
       batches: batchRows,
       godownAllocations,
+      barcode,
       company_id: companyId,
       owner_type: ownerType,
       owner_id: ownerId,
-      barcode,
     };
 
     // Determine if we're updating or creating a new record
@@ -801,92 +792,26 @@ const StockItemForm = () => {
               required
               error={errors.taxType}
             />
-            <SelectField
-              id="hsnSacOption"
-              name="hsnSacOption"
-              label="HSN/SAC Option"
-              value={formData.hsnSacOption}
-              onChange={handleChange}
-              options={hsnSacOptions}
-              required
-              error={errors.hsnSacOption}
-            />
-            {formData.hsnSacOption === "specify-details" && (
-              <InputField
-                id="hsnCode"
-                name="hsnCode"
-                label="HSN/SAC Code"
-                value={formData.hsnCode}
-                onChange={handleChange}
-                required
-                error={errors.hsnCode}
-                key="hsnCode"
-              />
-            )}
-            {formData.hsnSacOption === "use-classification" && (
-              <SelectField
-                id="gstClassification"
-                name="gstClassification"
-                label="GST Classification"
-                value={formData.gstClassification}
-                onChange={handleChange}
-                options={gstClassificationOptions}
-                error={errors.gstClassification}
-                key="gstClassification-hsn"
-              />
-            )}
-            <SelectField
-              id="gstRateOption"
-              name="gstRateOption"
-              label="GST Rate Option"
-              value={formData.gstRateOption}
-              onChange={handleChange}
-              options={gstRateOptions}
-              required
-              error={errors.gstRateOption}
-            />
-            {formData.gstRateOption === "specify-details" && (
-              <InputField
-                id="gstRate"
-                name="gstRate"
-                label="GST Rate (%)"
-                type="number"
-                value={formData.gstRate}
-                onChange={handleChange}
-                required
-                error={errors.gstRate}
-                key="gstRate"
-              />
-            )}
-            {formData.gstRateOption === "use-classification" && (
-              <SelectField
-                id="gstClassification"
-                name="gstClassification"
-                label="GST Classification"
-                value={formData.gstClassification}
-                onChange={handleChange}
-                options={gstClassificationOptions}
-                error={errors.gstClassification}
-                key="gstClassification-rate"
-              />
-            )}
+
             <InputField
-              id="standardPurchaseRate"
-              name="standardPurchaseRate"
-              label="Standard Purchase Rate"
-              type="number"
-              value={formData.standardPurchaseRate}
+              id="hsnCode"
+              name="hsnCode"
+              label="HSN / SAC Code"
+              value={formData.hsnCode}
               onChange={handleChange}
-              error={errors.standardPurchaseRate}
+              required
+              error={errors.hsnCode}
             />
+
             <InputField
-              id="standardSaleRate"
-              name="standardSaleRate"
-              label="Standard Sale Rate"
+              id="gstRate"
+              name="gstRate"
+              label="GST Rate (%)"
               type="number"
-              value={formData.standardSaleRate}
+              value={formData.gstRate}
               onChange={handleChange}
-              error={errors.standardSaleRate}
+              required
+              error={errors.gstRate}
             />
 
             {/* ----------------- Batch Tracking Dynamic Rows ----------------- */}
@@ -919,7 +844,7 @@ const StockItemForm = () => {
             <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
               {batchRows.map((row, index) => (
                 <div
-                 key={row.batchName + index}
+                  key={row.batchName + index}
                   className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end w-full"
                 >
                   {formData.enableBatchTracking && (

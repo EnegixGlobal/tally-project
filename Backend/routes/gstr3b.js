@@ -193,4 +193,27 @@ router.get("/", async (req, res) => {
   }
 });
 
+// router.get("/purchase", async (req, res) => {
+//   try {
+//     const { company_id, owner_type, owner_id } = req.query;
+
+//     if (!company_id || !owner_type || !owner_id) {
+//       return res.status(400).json({
+//         success: false,
+//         message: "company_id, owner_type and owner_id are required",
+//       });
+//     }
+
+//     //get all value 
+
+//     const [rows] = await db.query(
+//       `SELECT `
+//     )
+
+
+
+
+//   } catch (error) {}
+// });
+
 module.exports = router;

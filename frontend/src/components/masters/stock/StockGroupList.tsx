@@ -37,7 +37,6 @@ const StockGroupList: React.FC = () => {
           `${import.meta.env.VITE_API_URL}/api/stock-categories?${queryParams}`
         );
         const data = await res.json();
-        console.log("dddd", data);
 
         setCategories(data);
       } catch (err) {
@@ -165,21 +164,7 @@ const StockGroupList: React.FC = () => {
         render: (row: StockGroup) =>
           row.shouldQuantitiesBeAdded ? "Yes" : "No",
       },
-      {
-        header: "HSN/SAC Code",
-        accessor: "hsnCode",
-        align: "left" as const,
-        render: (row: StockGroup) => row.hsnSacDetails?.hsnCode || "N/A",
-      },
-      {
-        header: "GST Rate",
-        accessor: "integratedTaxRate",
-        align: "right" as const,
-        render: (row: StockGroup) =>
-          row.gstDetails?.integratedTaxRate
-            ? `${row.gstDetails.integratedTaxRate}%`
-            : "N/A",
-      },
+
       {
         header: "Actions",
         accessor: "actions",
@@ -200,13 +185,7 @@ const StockGroupList: React.FC = () => {
             <button
               title="Delete Stock Group"
               onClick={() => {
-                if (
-                  window.confirm(
-                    "Are you sure you want to delete this stock group?"
-                  )
-                ) {
-                  deleteStockGroup(row.id);
-                }
+                deleteStockGroup(row.id);
               }}
               className={`p-1 rounded ${
                 theme === "dark" ? "hover:bg-red-700" : "hover:bg-red-200"

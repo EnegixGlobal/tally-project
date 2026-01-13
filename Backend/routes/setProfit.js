@@ -2,123 +2,159 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
-// Auto Create Table If Not Exists
-const createTableQuery = `
-CREATE TABLE IF NOT EXISTS set_profit (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  customer_type VARCHAR(50) NOT NULL,
-  method VARCHAR(50) NOT NULL,
-  value DECIMAL(10) NOT NULL,
-  owner_type VARCHAR(50) NOT NULL,
-  owner_id INT NOT NULL,
-  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-);`;
-
-(async () => {
+/* ======================================================
+   🔥 AUTO MIGRATION (SERVER START PE)
+====================================================== */
+const ensureTableAndColumns = async () => {
   try {
-    await db.query(createTableQuery);
-  } catch (err) {
-    console.error("❌ Table creation error:", err);
-  }
-})();
+    // 1️⃣ Table exist check
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS set_profit (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        owner_type VARCHAR(50) NOT NULL,
+        owner_id INT NOT NULL,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+      );
+    `);
 
-// 🔥 Update OR Insert Set Profit
+    // 2️⃣ Existing columns fetch
+    const [columns] = await db.query(`
+      SHOW COLUMNS FROM set_profit;
+    `);
+
+    const columnNames = columns.map((c) => c.Field);
+
+    // 3️⃣ Required columns list
+    const requiredColumns = [
+      { name: "wholesale_method", type: "VARCHAR(50)" },
+      { name: "wholesale_value", type: "DECIMAL(10,2)" },
+      { name: "retailer_method", type: "VARCHAR(50)" },
+      { name: "retailer_value", type: "DECIMAL(10,2)" },
+    ];
+
+    // 4️⃣ Add missing columns automatically
+    for (const col of requiredColumns) {
+      if (!columnNames.includes(col.name)) {
+        await db.query(`
+          ALTER TABLE set_profit
+          ADD COLUMN ${col.name} ${col.type};
+        `);
+     
+      }
+    }
+
+    // 5️⃣ Ensure unique index on owner_type + owner_id so we can upsert
+    try {
+      const [existingIndex] = await db.query(
+        "SHOW INDEX FROM set_profit WHERE Key_name = 'uq_owner'"
+      );
+      if (!existingIndex || existingIndex.length === 0) {
+        await db.query(
+          `ALTER TABLE set_profit ADD UNIQUE KEY uq_owner (owner_type, owner_id)`
+        );
+  
+      }
+    } catch (err) {
+      // If index exists or any error, just log and continue
+      console.log("ℹ️ uq_owner index check/create skipped or failed:", err.message || err);
+    }
+
+  } catch (err) {
+    console.error("❌ Migration error:", err);
+  }
+};
+
+// 🔥 RUN MIGRATION ON SERVER START
+ensureTableAndColumns();
+
+/* ======================================================
+   🔥 SAVE / UPDATE PROFIT (WHOLESALE + RETAILER)
+====================================================== */
 router.put("/", async (req, res) => {
   try {
-    const { customerType, method, value, ownerType, ownerId } = req.body;
+    let {
+      wholesale_method,
+      wholesale_value,
+      retailer_method,
+      retailer_value,
+      ownerType,
+      ownerId,
+    } = req.body;
 
-    if (
-      !customerType ||
-      !method ||
-      value === "" ||
-      value === undefined ||
-      value === null ||
-      !ownerType ||
-      !ownerId
-    ) {
+    if (!ownerType || !ownerId) {
       return res.status(400).json({
         success: false,
-        message: "All fields are required!",
+        message: "Owner information missing",
       });
     }
 
-    // Check existing record
-    const [existing] = await db.query(
-      `SELECT id FROM set_profit WHERE owner_id = ? AND owner_type = ?`,
-      [ownerId, ownerType]
+    // Normalize values: empty string -> null for methods, numeric parse for values
+    wholesale_method = wholesale_method || null;
+    retailer_method = retailer_method || null;
+
+    const parseNumeric = (v) => {
+      if (v === null || v === undefined || v === "") return 0;
+      const n = Number(v);
+      return Number.isFinite(n) ? n : 0;
+    };
+
+    wholesale_value = parseNumeric(wholesale_value);
+    retailer_value = parseNumeric(retailer_value);
+
+    // Use INSERT ... ON DUPLICATE KEY UPDATE to upsert both wholesale & retailer values atomically
+    await db.query(
+      `INSERT INTO set_profit (wholesale_method, wholesale_value, retailer_method, retailer_value, owner_type, owner_id)
+       VALUES (?, ?, ?, ?, ?, ?)
+       ON DUPLICATE KEY UPDATE
+         wholesale_method = VALUES(wholesale_method),
+         wholesale_value = VALUES(wholesale_value),
+         retailer_method = VALUES(retailer_method),
+         retailer_value = VALUES(retailer_value)`,
+      [
+        wholesale_method,
+        wholesale_value,
+        retailer_method,
+        retailer_value,
+        ownerType,
+        ownerId,
+      ]
     );
 
-    if (existing.length > 0) {
-      // 🔄 Update
-      const recordId = existing[0].id;
-
-      await db.query(
-        `UPDATE set_profit 
-         SET customer_type = ?, method = ?, value = ? 
-         WHERE id = ?`,
-        [customerType, method, value, recordId]
-      );
-
-      return res.json({
-        success: true,
-        message: "Profit updated successfully!",
-        updated: true,
-      });
-    } else {
-      // ➕ Insert new record
-      await db.query(
-        `INSERT INTO set_profit 
-        (customer_type, method, value, owner_type, owner_id) 
-        VALUES (?, ?, ?, ?, ?)`,
-        [customerType, method, value, ownerType, ownerId]
-      );
-
-      return res.status(201).json({
-        success: true,
-        message: "Profit saved successfully!",
-        inserted: true,
-      });
-    }
+    return res.json({ success: true, message: "Profit configuration saved successfully" });
   } catch (error) {
-    console.error("🔥 Error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error, please try again later",
-    });
+    console.error("🔥 Save error:", error);
+    return res.status(500).json({ success: false, message: "Server error" });
   }
 });
 
-// 🔍 Get Profit Settings by Owner
+/* ======================================================
+   🔍 GET PROFIT CONFIG (VOUCHER KE LIYE)
+====================================================== */
 router.get("/:ownerId/:ownerType", async (req, res) => {
   try {
     const { ownerId, ownerType } = req.params;
 
     const [rows] = await db.query(
-      `SELECT customer_type, method, value 
-       FROM set_profit 
+      `SELECT
+        wholesale_method,
+        wholesale_value,
+        retailer_method,
+        retailer_value
+       FROM set_profit
        WHERE owner_id = ? AND owner_type = ?
        LIMIT 1`,
       [ownerId, ownerType]
     );
 
-    if (rows.length === 0) {
-      return res.json({
-        success: true,
-        message: "No configuration found",
-        data: null,
-      });
-    }
-
     return res.json({
       success: true,
-      message: "Profit configuration fetched successfully",
-      data: rows[0],
+      data: rows[0] || null,
     });
   } catch (error) {
-    console.error("🔥 GET API Error:", error);
+    console.error("🔥 Fetch error:", error);
     return res.status(500).json({
       success: false,
-      message: "Server error while fetching data",
+      message: "Server error",
     });
   }
 });
