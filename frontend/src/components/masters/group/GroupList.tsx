@@ -14,7 +14,7 @@ const GroupList: React.FC = () => {
   const [groups, setGroups] = useState<LedgerGroup[]>([]);
   const [gstClassifications] = useState<GstClassification[]>([]);
   const { user, companyId: authCompanyId } = useAuth();
-  const [del, setDel]= useState(false)
+  const [del, setDel] = useState(false);
 
   const baseGroups = [
     { id: -1, name: "Branch Accounts", nature: "Assets", isSystem: true },
@@ -290,42 +290,7 @@ const GroupList: React.FC = () => {
                     theme === "dark" ? "text-gray-300" : "text-gray-700"
                   }`}
                 >
-                  Nature
-                </th>
-                <th
-                  className={`px-4 py-3 text-left ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Allocation Method
-                </th>
-                <th
-                  className={`px-4 py-3 text-left ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  GST Classification
-                </th>
-                <th
-                  className={`px-4 py-3 text-left ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  HSN/SAC
-                </th>
-                <th
-                  className={`px-4 py-3 text-left ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Taxability
-                </th>
-                <th
-                  className={`px-4 py-3 text-left ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Actions
+                  Alias
                 </th>
               </tr>
             </thead>
@@ -359,36 +324,9 @@ const GroupList: React.FC = () => {
                       theme === "dark" ? "text-gray-100" : "text-gray-900"
                     }`}
                   >
-                    {group.nature || "-"}
+                    {group.alias}
                   </td>
-                  <td
-                    className={`px-4 py-3 ${
-                      theme === "dark" ? "text-gray-100" : "text-gray-900"
-                    }`}
-                  >
-                    {group.allocationMethod || "-"}
-                  </td>
-                  <td
-                    className={`px-4 py-3 ${
-                      theme === "dark" ? "text-gray-100" : "text-gray-900"
-                    }`}
-                  >
-                    {group.gstClassificationId}
-                  </td>
-                  <td
-                    className={`px-4 py-3 ${
-                      theme === "dark" ? "text-gray-100" : "text-gray-900"
-                    }`}
-                  >
-                    {group.hsnCode || "-"}
-                  </td>
-                  <td
-                    className={`px-4 py-3 ${
-                      theme === "dark" ? "text-gray-100" : "text-gray-900"
-                    }`}
-                  >
-                    {group.taxability || "-"}
-                  </td>
+
                   <td className="px-4 py-3">
                     <div className="flex justify-center space-x-2">
                       {ownerType !== "user" && (
@@ -433,10 +371,7 @@ const GroupList: React.FC = () => {
                                 : "hover:bg-gray-100"
                             }`}
                           >
-                            {
-                              del &&  <Trash2 size={16} />
-                            }
-                           
+                            {del && <Trash2 size={16} />}
                           </button>
                         </>
                       )}

@@ -89,6 +89,9 @@ const PurchaseVoucher: React.FC = () => {
       gst: true,
       batch: true,
       godown: true,
+      receiptDocNo: true,
+      receiptThrough: true,
+      origin: true,
     }
   );
 
@@ -118,7 +121,6 @@ const PurchaseVoucher: React.FC = () => {
             destination: data.destination || "",
           },
 
-          // ⭐⭐⭐ ITEMS + BATCH + HSN + GST AUTO LOAD ⭐⭐⭐
           entries:
             data.entries?.map((e: any, idx: number) => {
               const stockItem = stockItems.find(
@@ -1355,6 +1357,9 @@ const PurchaseVoucher: React.FC = () => {
               { key: "batch", label: "Show Batch Column" },
               { key: "gst", label: "Show GST Column" },
               { key: "godown", label: "Show Godown Column" },
+              { key: "receiptDocNo", label: "Show Receipt Doc No." },
+              { key: "receiptThrough", label: "Show Receipt Through" },
+              { key: "origin", label: "Show Origin" },
             ].map(({ key, label }) => (
               <label
                 key={key}
@@ -1605,74 +1610,62 @@ const PurchaseVoucher: React.FC = () => {
               </div>
             )}
 
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="dispatchDetails.docNo"
-              >
-                Receipt Doc No.
-              </label>{" "}
-              <input
-                type="text"
-                id="dispatchDetails.docNo"
-                name="dispatchDetails.docNo"
-                value={formData.dispatchDetails?.docNo ?? ""}
-                onChange={handleChange}
-                className={getInputClasses(theme)}
-              />
-            </div>
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="dispatchDetails.through"
-              >
-                Receipt Through
-              </label>{" "}
-              <input
-                type="text"
-                id="dispatchDetails.through"
-                name="dispatchDetails.through"
-                value={formData.dispatchDetails?.through ?? ""}
-                onChange={handleChange}
-                className={getInputClasses(theme)}
-              />
-            </div>
-          </div>
+            {visibleColumns.receiptDocNo && (
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="dispatchDetails.docNo"
+                >
+                  Receipt Doc No.
+                </label>
+                <input
+                  type="text"
+                  id="dispatchDetails.docNo"
+                  name="dispatchDetails.docNo"
+                  value={formData.dispatchDetails?.docNo ?? ""}
+                  onChange={handleChange}
+                  className={getInputClasses(theme)}
+                />
+              </div>
+            )}
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="dispatchDetails.destination"
-              >
-                Origin
-              </label>{" "}
-              <input
-                type="text"
-                id="dispatchDetails.destination"
-                name="dispatchDetails.destination"
-                value={formData.dispatchDetails?.destination ?? ""}
-                onChange={handleChange}
-                className={getInputClasses(theme)}
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1" htmlFor="mode">
-                Voucher Mode
-              </label>{" "}
-              <select
-                title="Select Voucher Mode"
-                id="mode"
-                name="mode"
-                value={formData.mode}
-                onChange={handleChange}
-                className={getSelectClasses(theme)}
-              >
-                <option value="item-invoice">Item Invoice</option>
-                <option value="accounting-invoice">Accounting Invoice</option>
-                <option value="as-voucher">As Voucher</option>
-              </select>
-            </div>
+            {visibleColumns.receiptThrough && (
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="dispatchDetails.through"
+                >
+                  Receipt Through
+                </label>
+                <input
+                  type="text"
+                  id="dispatchDetails.through"
+                  name="dispatchDetails.through"
+                  value={formData.dispatchDetails?.through ?? ""}
+                  onChange={handleChange}
+                  className={getInputClasses(theme)}
+                />
+              </div>
+            )}
+
+            {visibleColumns.origin && (
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="dispatchDetails.destination"
+                >
+                  Origin
+                </label>
+                <input
+                  type="text"
+                  id="dispatchDetails.destination"
+                  name="dispatchDetails.destination"
+                  value={formData.dispatchDetails?.destination ?? ""}
+                  onChange={handleChange}
+                  className={getInputClasses(theme)}
+                />
+              </div>
+            )}
           </div>
 
           <div

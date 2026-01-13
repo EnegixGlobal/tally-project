@@ -65,28 +65,6 @@ const StockGroupForm: React.FC = () => {
     []
   );
 
-  useEffect(() => {
-    const companyId = localStorage.getItem("company_id");
-    const ownerType = localStorage.getItem("supplier");
-    const ownerId = localStorage.getItem(
-      ownerType === "employee" ? "employee_id" : "user_id"
-    );
-    if (!companyId || !ownerType || !ownerId) return;
-
-    const params = new URLSearchParams({
-      company_id: companyId,
-      owner_type: ownerType,
-      owner_id: ownerId,
-    });
-
-    fetch(`${import.meta.env.VITE_API_URL}/api/stock-categories?${params.toString()}`)
-      .then((res) => res.json())
-      .then((categoriesData) => {
-        setCategories(Array.isArray(categoriesData) ? categoriesData : []);
-      })
-      .catch(() => setCategories([]));
-  }, []);
-
   const [formData, setFormData] = useState<StockGroupFormData>(
     isEditMode
       ? {
@@ -170,7 +148,9 @@ const StockGroupForm: React.FC = () => {
   useEffect(() => {
     if (isEditMode && id) {
       fetch(
-        `${import.meta.env.VITE_API_URL}/api/stock-groups/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        `${
+          import.meta.env.VITE_API_URL
+        }/api/stock-groups/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
       )
         .then((res) => res.json())
         .then((data) => {
@@ -188,60 +168,72 @@ const StockGroupForm: React.FC = () => {
     }
   }, [id, isEditMode]);
 
-const handleSubmit = useCallback(async () => {
-  if (!validateForm()) return;
+  const handleSubmit = useCallback(async () => {
+    if (!validateForm()) return;
 
-  const stockGroupData = {
-    ...formData
-    // ❌ companyId, ownerType, ownerId body me nahi bhejna
-  };
+    const stockGroupData = {
+      ...formData,
+      // ❌ companyId, ownerType, ownerId body me nahi bhejna
+    };
 
-  const params = new URLSearchParams({
-    company_id: companyId!,
-    owner_type: ownerType!,
-    owner_id: ownerId!,
-  }).toString();
+    const params = new URLSearchParams({
+      company_id: companyId!,
+      owner_type: ownerType!,
+      owner_id: ownerId!,
+    }).toString();
 
-  try {
-    const url = isEditMode
-      ? `${import.meta.env.VITE_API_URL}/api/stock-groups/${formData.id}?${params}`
-      : `${import.meta.env.VITE_API_URL}/api/stock-groups?${params}`;
+    try {
+      const url = isEditMode
+        ? `${import.meta.env.VITE_API_URL}/api/stock-groups/${
+            formData.id
+          }?${params}`
+        : `${import.meta.env.VITE_API_URL}/api/stock-groups?${params}`;
 
-    const method = isEditMode ? 'PUT' : 'POST';
+      const method = isEditMode ? "PUT" : "POST";
 
-    const response = await fetch(url, {
-      method,
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(stockGroupData),
-    });
+      const response = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(stockGroupData),
+      });
 
-    const result = await response.json();
+      const result = await response.json();
 
-    if (response.ok) {
+      if (response.ok) {
+        Swal.fire({
+          icon: "success",
+          title: "Success!",
+          text:
+            result.message ||
+            (isEditMode
+              ? "Stock Group updated successfully"
+              : "Stock Group saved successfully"),
+        }).then(() => navigate("/app/masters/stock-group"));
+      } else {
+        Swal.fire({
+          icon: "error",
+          title: "Error",
+          text: result.message || "Something went wrong.",
+        });
+      }
+    } catch (error) {
       Swal.fire({
-        icon: 'success',
-        title: 'Success!',
-        text: result.message || (isEditMode ? 'Stock Group updated successfully' : 'Stock Group saved successfully'),
-      }).then(() => navigate('/app/masters/stock-group'));
-    } else {
-      Swal.fire({
-        icon: 'error',
-        title: 'Error',
-        text: result.message || 'Something went wrong.',
+        icon: "error",
+        title: "Error",
+        text: "Something went wrong!",
       });
     }
-  } catch (error) {
-    Swal.fire({
-      icon: 'error',
-      title: 'Error',
-      text: 'Something went wrong!',
-    });
-  }
-}, [formData, isEditMode, navigate, validateForm, companyId, ownerType, ownerId]);
+  }, [
+    formData,
+    isEditMode,
+    navigate,
+    validateForm,
+    companyId,
+    ownerType,
+    ownerId,
+  ]);
 
-console.log('formdata', formData)
-
-
+  console.log("formdata", formData);
 
   const handlePrint = useCallback(() => {
     const printWindow = window.open("", "_blank");
@@ -470,229 +462,6 @@ console.log('formdata', formData)
               <option value="No">No</option>
             </select>
           </div>
-          <div className="md:col-span-2">
-            <label
-              className={`block text-sm font-medium mb-1 ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
-              Set/Alter HSN/SAC Details
-            </label>
-            <input
-              type="checkbox"
-              title="Set/Alter HSN/SAC Details"
-              checked={formData.hsnSacDetails?.setAlterHSNSAC}
-              onChange={(e) =>
-                handleCheckboxChange(e, "hsnSacDetails", "setAlterHSNSAC")
-              }
-              className={`p-2 rounded border ${
-                theme === "dark"
-                  ? "bg-gray-700 border-gray-600"
-                  : "bg-white border-gray-300"
-              }`}
-            />
-          </div>
-          {formData.hsnSacDetails?.setAlterHSNSAC && (
-            <>
-              <div>
-                <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Source of HSN/SAC Details
-                </label>
-                <select
-                  name="hsnSacClassificationId"
-                  title="Source of HSN/SAC Details"
-                  value={formData.hsnSacDetails?.hsnSacClassificationId}
-                  onChange={(e) => handleChange(e, "hsnSacDetails")}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
-                >
-                  <option value="">Manual</option>
-                  {gstClassifications
-                    .concat(mockGstClassifications)
-                    .map((classification) => (
-                      <option key={classification.id} value={classification.id}>
-                        {classification.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div>
-                <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  HSN/SAC Code
-                </label>
-                <input
-                  type="text"
-                  name="hsnCode"
-                  value={formData.hsnSacDetails?.hsnCode}
-                  onChange={(e) => handleChange(e, "hsnSacDetails")}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
-                  placeholder="Enter HSN/SAC code"
-                />
-                {errors.hsnCode && (
-                  <p className="text-red-500 text-sm mt-1">{errors.hsnCode}</p>
-                )}
-              </div>
-              <div className="md:col-span-2">
-                <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  HSN/SAC Description
-                </label>
-                <textarea
-                  name="description"
-                  value={formData.hsnSacDetails?.description}
-                  onChange={(e) => handleChange(e, "hsnSacDetails")}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
-                  placeholder="Enter HSN/SAC description"
-                />
-              </div>
-            </>
-          )}
-          <div className="md:col-span-2">
-            <label
-              className={`block text-sm font-medium mb-1 ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
-            >
-              Set/Alter GST Details
-            </label>
-            <input
-              type="checkbox"
-              title="Set/Alter GST Details"
-              checked={formData.gstDetails?.setAlterGST}
-              onChange={(e) =>
-                handleCheckboxChange(e, "gstDetails", "setAlterGST")
-              }
-              className={`p-2 rounded border ${
-                theme === "dark"
-                  ? "bg-gray-700 border-gray-600"
-                  : "bg-white border-gray-300"
-              }`}
-            />
-          </div>
-          {formData.gstDetails?.setAlterGST && (
-            <>
-              <div>
-                <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Source of GST Details
-                </label>
-                <select
-                  name="gstClassificationId"
-                  title="Source of GST Details"
-                  value={formData.gstDetails?.gstClassificationId}
-                  onChange={(e) => handleChange(e, "gstDetails")}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
-                >
-                  <option value="">Manual</option>
-                  {gstClassifications
-                    .concat(mockGstClassifications)
-                    .map((classification) => (
-                      <option key={classification.id} value={classification.id}>
-                        {classification.name}
-                      </option>
-                    ))}
-                </select>
-              </div>
-              <div>
-                <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Taxability
-                </label>
-                <select
-                  name="taxability"
-                  title="Taxability"
-                  value={formData.gstDetails?.taxability}
-                  onChange={(e) => handleChange(e, "gstDetails")}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
-                >
-                  <option value="Taxable">Taxable</option>
-                  <option value="Exempt">Exempt</option>
-                  <option value="Nil-rated">Nil-rated</option>
-                </select>
-              </div>
-              <div>
-                <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  GST Rate (%)
-                </label>
-                <input
-                  type="number"
-                  name="integratedTaxRate"
-                  value={formData.gstDetails?.integratedTaxRate}
-                  onChange={(e) => handleChange(e, "gstDetails")}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
-                  placeholder="Enter GST rate"
-                />
-                {errors.gstRate && (
-                  <p className="text-red-500 text-sm mt-1">{errors.gstRate}</p>
-                )}
-              </div>
-              <div>
-                <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
-                >
-                  Cess (%)
-                </label>
-                <input
-                  type="number"
-                  name="cess"
-                  value={formData.gstDetails?.cess}
-                  onChange={(e) => handleChange(e, "gstDetails")}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
-                  placeholder="Enter cess rate"
-                />
-              </div>
-            </>
-          )}
         </div>
       </div>
 

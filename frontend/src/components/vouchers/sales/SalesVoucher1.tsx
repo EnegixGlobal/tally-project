@@ -50,6 +50,9 @@ const FORM_STYLES = {
     } outline-none transition-colors`,
 };
 
+
+
+
 const SalesVoucher: React.FC = () => {
   const {
     theme,
@@ -71,10 +74,13 @@ const SalesVoucher: React.FC = () => {
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
+
+
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
   const [selectedPartyState, setSelectedPartyState] = useState<string>(""); // Store selected party's state
   const [salesTypes, setSalesTypes] = useState<SalesType[]>([]);
   const [selectedSalesTypeId, setSelectedSalesTypeId] = useState<string>("");
+  
 
   // Robust detection for party ledgers — backend may return different field names
 
@@ -120,7 +126,9 @@ const SalesVoucher: React.FC = () => {
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
 
   // Check if quotation mode is requested via URL
-  const isQuotationMode = searchParams.get("mode") === "quotation";
+
+const isQuotationMode = searchParams.get("mode") === "quotation";
+
 
   // Safe fallbacks for context data - Remove demo data and use only from context
   const safeStockItems = stockItems || [];
@@ -220,8 +228,6 @@ const SalesVoucher: React.FC = () => {
     }
   }, [companyInfo, setCompanyInfo]);
 
- 
-
   const safeCompanyInfo = companyInfo || {
     name: "Your Company Name",
     address: "Your Company Address",
@@ -257,7 +263,7 @@ const SalesVoucher: React.FC = () => {
     }
     return {
       date: new Date().toISOString().split("T")[0],
-      type: isQuotation ? "quotation" : "sales",
+      type: isQuotationMode ? "quotation" : "sales",
       // number: `${isQuotation ? "QT" : "XYZ"}0001`, // Will be updated by useEffect
       number: "",
       narration: "",
@@ -300,6 +306,11 @@ const SalesVoucher: React.FC = () => {
     showBatch: true,
     showDiscount: true,
     showGST: true,
+
+    // 🔥 NEW HEADER FIELD CONTROLS
+    showDestination: true,
+    showDispatchThrough: true,
+    showDispatchDocNo: true,
   });
 
   //wholsell or retailer
@@ -321,7 +332,6 @@ const SalesVoucher: React.FC = () => {
     const ownerId = localStorage.getItem("employee_id") || 1;
     const ownerType = localStorage.getItem("supplier") || "admin";
 
-    // nothing selected → no message, no API call
     if (!profitConfig.customerType || !profitConfig.method) {
       setStatusMsg("");
       return;
@@ -332,34 +342,46 @@ const SalesVoucher: React.FC = () => {
     )
       .then((res) => res.json())
       .then((data) => {
-        if (data.success && data.data) {
-          const saved = data.data;
+        if (!data.success || !data.data) {
+          setStatusMsg("Not Set");
+          setStatusColor("text-red-600 font-semibold");
+          return;
+        }
 
-          if (
-            saved.customer_type === profitConfig.customerType &&
-            saved.method === profitConfig.method
-          ) {
-            setPricingRule({
-              customerType: saved.customer_type, // wholesale / retailer
-              method: saved.method, // profit_percentage
-              value: Number(saved.value), // 2.00
-            });
+        const saved = data.data;
 
-            setStatusMsg(
-              `Value: ${saved.customer_type} Profit Percentage ${saved.value}%`
-            );
+        let savedMethod = "";
+        let savedValue = "";
 
-            setStatusColor("text-green-600 font-semibold");
-          } else {
-            setStatusMsg("Not Set");
-            setStatusColor("text-red-600 font-semibold");
-          }
+        // 🔥 IMPORTANT MAPPING
+        if (profitConfig.customerType === "wholesale") {
+          savedMethod = saved.wholesale_method;
+          savedValue = saved.wholesale_value;
+        } else if (profitConfig.customerType === "retailer") {
+          savedMethod = saved.retailer_method;
+          savedValue = saved.retailer_value;
+        }
+
+        if (savedMethod === profitConfig.method && Number(savedValue) > 0) {
+          setPricingRule({
+            customerType: profitConfig.customerType as any,
+            method: savedMethod as any,
+            value: Number(savedValue),
+          });
+
+          setStatusMsg(
+            `Value: ${profitConfig.customerType} Profit Percentage ${savedValue}%`
+          );
+          setStatusColor("text-green-600 font-semibold");
         } else {
           setStatusMsg("Not Set");
           setStatusColor("text-red-600 font-semibold");
         }
       })
-      .catch((error) => console.error("❌ Fetch failed:", error));
+      .catch(() => {
+        setStatusMsg("Not Set");
+        setStatusColor("text-red-600 font-semibold");
+      });
   }, [profitConfig.customerType, profitConfig.method]);
 
   // Regenerate voucher number when quotation mode changes
@@ -474,8 +496,6 @@ const SalesVoucher: React.FC = () => {
         (l) => String(l.id) === String(formData.partyId)
       );
 
-  
-
       // Try multiple possible field names for state
       const partyAny = party as any;
       const partyState =
@@ -488,8 +508,6 @@ const SalesVoucher: React.FC = () => {
         companyState &&
         partyState &&
         companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
-
-     
     } else {
       setSelectedPartyState("");
     }
@@ -1286,8 +1304,6 @@ const SalesVoucher: React.FC = () => {
       total: Number(grandTotal.toFixed(2)),
     };
 
-   
-
     try {
       let voucherSaved = false;
 
@@ -1834,62 +1850,52 @@ const SalesVoucher: React.FC = () => {
                   className={FORM_STYLES.input(theme)}
                 />
               </div>
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="dispatchDetails.docNo"
-                >
-                  Dispatch Doc No.
-                </label>
-                <input
-                  type="text"
-                  id="dispatchDetails.docNo"
-                  name="dispatchDetails.docNo"
-                  value={formData.dispatchDetails?.docNo ?? ""}
-                  onChange={handleChange}
-                  title="Dispatch Document Number"
-                  placeholder="Enter dispatch document number"
-                  className={FORM_STYLES.input(theme)}
-                />
-              </div>
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="dispatchDetails.through"
-                >
-                  Dispatch Through
-                </label>
-                <input
-                  type="text"
-                  id="dispatchDetails.through"
-                  name="dispatchDetails.through"
-                  value={formData.dispatchDetails?.through ?? ""}
-                  onChange={handleChange}
-                  title="Dispatch Through"
-                  placeholder="Enter dispatch method"
-                  className={FORM_STYLES.input(theme)}
-                />
-              </div>
+              {columnSettings.showDispatchDocNo && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Dispatch Doc No.
+                  </label>
+                  <input
+                    type="text"
+                    name="dispatchDetails.docNo"
+                    value={formData.dispatchDetails?.docNo ?? ""}
+                    onChange={handleChange}
+                    className={FORM_STYLES.input(theme)}
+                  />
+                </div>
+              )}
+
+              {columnSettings.showDispatchThrough && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Dispatch Through
+                  </label>
+                  <input
+                    type="text"
+                    name="dispatchDetails.through"
+                    value={formData.dispatchDetails?.through ?? ""}
+                    onChange={handleChange}
+                    className={FORM_STYLES.input(theme)}
+                  />
+                </div>
+              )}
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="dispatchDetails.destination"
-                >
-                  Destination
-                </label>
-                <input
-                  type="text"
-                  id="dispatchDetails.destination"
-                  name="dispatchDetails.destination"
-                  value={formData.dispatchDetails?.destination ?? ""}
-                  onChange={handleChange}
-                  title="Destination"
-                  placeholder="Enter destination"
-                  className={FORM_STYLES.input(theme)}
-                />
-              </div>
+              {columnSettings.showDestination && (
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    Destination
+                  </label>
+                  <input
+                    type="text"
+                    name="dispatchDetails.destination"
+                    value={formData.dispatchDetails?.destination ?? ""}
+                    onChange={handleChange}
+                    className={FORM_STYLES.input(theme)}
+                  />
+                </div>
+              )}
+
               <div>
                 <label
                   className="block text-sm font-medium mb-1"
@@ -1912,33 +1918,19 @@ const SalesVoucher: React.FC = () => {
               </div>
             </div>
             {/* Quotation Mode Checkbox - Similar to Tally Prime */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              <div className="flex items-center space-x-2">
-                <input
-                  type="checkbox"
-                  id="quotationMode"
-                  checked={isQuotation}
-                  onChange={(e) => setIsQuotation(e.target.checked)}
-                  title="Convert to Quotation Voucher"
-                  className={`h-4 w-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500 ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600"
-                      : "bg-white border-gray-300"
-                  }`}
-                />
-                <label
-                  htmlFor="quotationMode"
-                  className="text-sm font-medium cursor-pointer"
-                >
-                  {isQuotation ? "📋 Quotation Mode" : "📝 Sales Mode"}
-                </label>
-                <span className="text-xs text-gray-500">
-                  {isQuotation
-                    ? "(This will be treated as a quotation)"
-                    : "(Check to convert to quotation)"}
-                </span>
-              </div>
-            </div>
+           {isQuotationMode && (
+  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+    <div className="flex items-center space-x-2">
+      <span className="text-sm font-medium">
+        📋 Quotation Mode
+      </span>
+      <span className="text-xs text-gray-500">
+        (This will be treated as a quotation)
+      </span>
+    </div>
+  </div>
+)}
+
             {/* Sales Ledger selection for item-invoice mode */}
             {formData.mode === "item-invoice" && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
@@ -2928,27 +2920,117 @@ const SalesVoucher: React.FC = () => {
 
         {/* Configuration Modal (F12) */}
         {showConfig && (
-          <div className="fixed inset-0 bg-black/40  flex items-center justify-center z-50">
-            <div
-              className={`p-6 rounded-lg ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
-            >
+          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+            <div className="bg-white  p-6 rounded-lg w-96 shadow-xl">
               <h2 className="text-xl font-bold mb-4">
-                Configure Sales Voucher
+                Voucher Display Settings
               </h2>
-              <p className="mb-4">
-                Configure GST settings, invoice format, etc.
-              </p>
-              <div className="flex justify-end">
+
+              <div className="space-y-4">
+                <label className="flex justify-between items-center">
+                  <span>Enable Godown Selection</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showGodown}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showGodown: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
+                <label className="flex justify-between items-center">
+                  <span>Enable Batch Column</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showBatch}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showBatch: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
+                <label className="flex justify-between items-center">
+                  <span>Enable Discount Column</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showDiscount}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showDiscount: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
+                <label className="flex justify-between items-center">
+                  <span>Enable GST Column</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showGST}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showGST: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
+                {/* Dispatch-related header controls */}
+                <label className="flex justify-between items-center">
+                  <span>Show Dispatch Doc No.</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showDispatchDocNo}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showDispatchDocNo: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
+                <label className="flex justify-between items-center">
+                  <span>Show Dispatch Through</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showDispatchThrough}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showDispatchThrough: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
+                <label className="flex justify-between items-center">
+                  <span>Show Destination</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showDestination}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showDestination: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+              </div>
+
+              <div className="flex justify-end mt-6">
                 <button
+                  className="px-4 py-2 bg-gray-200  rounded"
                   onClick={() => setShowConfig(false)}
-                  title="Close Configuration"
-                  className={`px-4 py-2 rounded ${
-                    theme === "dark"
-                      ? "bg-gray-700 hover:bg-gray-600"
-                      : "bg-gray-200 hover:bg-gray-300"
-                  }`}
                 >
                   Close
                 </button>
@@ -3008,87 +3090,6 @@ const SalesVoucher: React.FC = () => {
             Esc to cancel.
           </p>
         </div>
-
-        {showConfig && (
-          <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96 shadow-xl">
-              <h2 className="text-xl font-bold mb-4">
-                Voucher Display Settings
-              </h2>
-
-              <div className="space-y-4">
-                {/* Godown Toggle */}
-                <label className="flex justify-between items-center">
-                  <span>Enable Godown Selection</span>
-                  <input
-                    type="checkbox"
-                    checked={columnSettings.showGodown}
-                    onChange={(e) =>
-                      setColumnSettings((prev) => ({
-                        ...prev,
-                        showGodown: e.target.checked,
-                      }))
-                    }
-                  />
-                </label>
-
-                {/* Batch Toggle */}
-                <label className="flex justify-between items-center">
-                  <span>Enable Batch Column</span>
-                  <input
-                    type="checkbox"
-                    checked={columnSettings.showBatch}
-                    onChange={(e) =>
-                      setColumnSettings((prev) => ({
-                        ...prev,
-                        showBatch: e.target.checked,
-                      }))
-                    }
-                  />
-                </label>
-
-                {/* Discount Toggle */}
-                <label className="flex justify-between items-center">
-                  <span>Enable Discount Column</span>
-                  <input
-                    type="checkbox"
-                    checked={columnSettings.showDiscount}
-                    onChange={(e) =>
-                      setColumnSettings((prev) => ({
-                        ...prev,
-                        showDiscount: e.target.checked,
-                      }))
-                    }
-                  />
-                </label>
-
-                {/* GST Toggle */}
-                <label className="flex justify-between items-center">
-                  <span>Enable GST Column</span>
-                  <input
-                    type="checkbox"
-                    checked={columnSettings.showGST}
-                    onChange={(e) =>
-                      setColumnSettings((prev) => ({
-                        ...prev,
-                        showGST: e.target.checked,
-                      }))
-                    }
-                  />
-                </label>
-              </div>
-
-              <div className="flex justify-end mt-6">
-                <button
-                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 rounded"
-                  onClick={() => setShowConfig(false)}
-                >
-                  Close
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
       </div>
     </React.Fragment>
   );

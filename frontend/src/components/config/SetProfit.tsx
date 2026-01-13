@@ -59,9 +59,15 @@ const SetProfit: React.FC = () => {
 
   /*  wholsel and retailer section state */
   const [profitConfig, setProfitConfig] = useState({
-    customerType: "",
-    method: "",
-    value: "",
+    customerType: "wholesale",
+    wholesale: {
+      method: "",
+      value: "",
+    },
+    retailer: {
+      method: "",
+      value: "",
+    },
   });
 
   const [isLoading] = useState(false);
@@ -128,11 +134,10 @@ const SetProfit: React.FC = () => {
     fetchAllData();
   }, [companyId, ownerType, ownerId]);
 
-
-
   const handleSave = async () => {
-    const ownerId = localStorage.getItem("employee_id") || 1;
     const ownerType = localStorage.getItem("supplier") || "admin";
+    const ownerId =
+      localStorage.getItem("employee_id") || localStorage.getItem("user_id");
 
     try {
       const response = await fetch(
@@ -141,9 +146,12 @@ const SetProfit: React.FC = () => {
           method: "PUT",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
-            customerType: profitConfig.customerType,
-            method: profitConfig.method,
-            value: profitConfig.value || 0, // default 0
+            wholesale_method: profitConfig.wholesale.method,
+            wholesale_value: profitConfig.wholesale.value,
+
+            retailer_method: profitConfig.retailer.method,
+            retailer_value: profitConfig.retailer.value,
+
             ownerType,
             ownerId,
           }),
@@ -152,9 +160,7 @@ const SetProfit: React.FC = () => {
 
       const data = await response.json();
 
-      if (!data.success) {
-        throw new Error(data.message);
-      }
+      if (!data.success) throw new Error(data.message);
 
       Swal.fire({
         icon: "success",
@@ -163,11 +169,10 @@ const SetProfit: React.FC = () => {
         showConfirmButton: false,
       });
     } catch (error) {
-      console.error("❌ Save failed:", error);
       Swal.fire({
         icon: "error",
-        title: "Failed!",
-        text: (error as Error).message || "Unable to save profit settings",
+        title: "Failed",
+        text: "Unable to save profit settings",
       });
     }
   };
@@ -317,9 +322,8 @@ const SetProfit: React.FC = () => {
                     checked={profitConfig.customerType === "wholesale"}
                     onChange={(e) =>
                       setProfitConfig({
+                        ...profitConfig,
                         customerType: e.target.value,
-                        method: "",
-                        value: "",
                       })
                     }
                     className="h-4 w-4 text-blue-600"
@@ -336,9 +340,8 @@ const SetProfit: React.FC = () => {
                     checked={profitConfig.customerType === "retailer"}
                     onChange={(e) =>
                       setProfitConfig({
+                        ...profitConfig,
                         customerType: e.target.value,
-                        method: "",
-                        value: "",
                       })
                     }
                     className="h-4 w-4 text-blue-600"
@@ -360,21 +363,40 @@ const SetProfit: React.FC = () => {
                         type="radio"
                         name="wholesaleMethod"
                         value="profit_percentage"
-                        checked={profitConfig.method === "profit_percentage"}
+                        checked={
+                          profitConfig.wholesale.method === "profit_percentage"
+                        }
                         onChange={(e) =>
                           setProfitConfig({
                             ...profitConfig,
-                            method: e.target.value,
-                            value: "", // value enter karni hogi
+                            wholesale: {
+                              method: e.target.value,
+                              value: "",
+                            },
                           })
                         }
                         className="h-4 w-4"
                       />
                       <span className="text-sm">Profit Percentage %</span>
                     </label>
-
-                  
                   </div>
+
+                  {/* Wholesale Value Input */}
+                  <input
+                    type="number"
+                    placeholder="Enter wholesale percentage"
+                    value={profitConfig.wholesale.value}
+                    onChange={(e) =>
+                      setProfitConfig({
+                        ...profitConfig,
+                        wholesale: {
+                          ...profitConfig.wholesale,
+                          value: e.target.value,
+                        },
+                      })
+                    }
+                    className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                  />
                 </>
               )}
 
@@ -386,17 +408,22 @@ const SetProfit: React.FC = () => {
                   </label>
 
                   <div className="flex items-center gap-6 mb-3 flex-wrap">
+                    {/* Profit Percentage */}
                     <label className="flex items-center gap-2">
                       <input
                         type="radio"
                         name="retailerMethod"
                         value="profit_percentage"
-                        checked={profitConfig.method === "profit_percentage"}
+                        checked={
+                          profitConfig.retailer.method === "profit_percentage"
+                        }
                         onChange={(e) =>
                           setProfitConfig({
                             ...profitConfig,
-                            method: e.target.value,
-                            value: "",
+                            retailer: {
+                              method: e.target.value,
+                              value: "",
+                            },
                           })
                         }
                         className="h-4 w-4"
@@ -404,20 +431,20 @@ const SetProfit: React.FC = () => {
                       <span className="text-sm">Profit Percentage %</span>
                     </label>
 
-                   
-
                     {/* On MRP — auto 0 */}
                     <label className="flex items-center gap-2">
                       <input
                         type="radio"
                         name="retailerMethod"
                         value="on_mrp"
-                        checked={profitConfig.method === "on_mrp"}
-                        onChange={(e) =>
+                        checked={profitConfig.retailer.method === "on_mrp"}
+                        onChange={() =>
                           setProfitConfig({
                             ...profitConfig,
-                            method: e.target.value,
-                            value: "0", // 👈 auto-set
+                            retailer: {
+                              method: "on_mrp",
+                              value: "0",
+                            },
                           })
                         }
                         className="h-4 w-4"
@@ -425,23 +452,26 @@ const SetProfit: React.FC = () => {
                       <span className="text-sm">On MRP</span>
                     </label>
                   </div>
-                </>
-              )}
 
-              {/* Input show only when NOT 'on_mrp' */}
-              {profitConfig.method && profitConfig.method !== "on_mrp" && (
-                <input
-                  type="number"
-                  placeholder="Enter percentage"
-                  value={profitConfig.value}
-                  onChange={(e) =>
-                    setProfitConfig({
-                      ...profitConfig,
-                      value: e.target.value,
-                    })
-                  }
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg"
-                />
+                  {/* Retailer Value Input (hide when on_mrp) */}
+                  {profitConfig.retailer.method !== "on_mrp" && (
+                    <input
+                      type="number"
+                      placeholder="Enter retailer percentage"
+                      value={profitConfig.retailer.value}
+                      onChange={(e) =>
+                        setProfitConfig({
+                          ...profitConfig,
+                          retailer: {
+                            ...profitConfig.retailer,
+                            value: e.target.value,
+                          },
+                        })
+                      }
+                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                    />
+                  )}
+                </>
               )}
             </div>
 
@@ -659,13 +689,13 @@ const SetProfit: React.FC = () => {
                 <th className="border border-gray-300 px-4 py-2 text-left">
                   Name
                 </th>
-                 <th className="border border-gray-300 px-4 py-2 text-left">
+                <th className="border border-gray-300 px-4 py-2 text-left">
                   Parent Categories
                 </th>
                 <th className="border border-gray-300 px-4 py-2 text-left">
                   Description
                 </th>
-               
+
                 <th className="border border-gray-300 px-4 py-2 text-left">
                   Value
                 </th>
@@ -691,7 +721,6 @@ const SetProfit: React.FC = () => {
                     {row.categoryName}
                   </td>
 
-
                   {/* Parent Category */}
                   <td className="border border-gray-300 px-4 py-2">
                     {row.groupName}
@@ -702,12 +731,8 @@ const SetProfit: React.FC = () => {
                     {row.description}
                   </td>
 
-                  
-
                   {/* Value */}
-                  <td className="border border-gray-300 px-4 py-2">
-
-                  </td>
+                  <td className="border border-gray-300 px-4 py-2"></td>
 
                   {/* Categories */}
                   <td className="border border-gray-300 px-4 py-2">
@@ -715,9 +740,7 @@ const SetProfit: React.FC = () => {
                   </td>
 
                   {/* Quantity Range */}
-                  <td className="border border-gray-300 px-4 py-2">
-
-                  </td>
+                  <td className="border border-gray-300 px-4 py-2"></td>
 
                   {/* Status */}
                   <td className="border border-gray-300 px-4 py-2">Active</td>
