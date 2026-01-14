@@ -121,7 +121,9 @@ router.post("/", async (req, res) => {
           `UPDATE sales_types SET current_no = current_no + 1 WHERE id = ?`,
           [sales_type_id]
         );
-        console.log(`✅ Incremented current_no for sales_type_id: ${sales_type_id}`);
+        console.log(
+          `✅ Incremented current_no for sales_type_id: ${sales_type_id}`
+        );
       } catch (incErr) {
         console.error("Error incrementing current_no:", incErr);
         // Continue even if increment fails
@@ -185,10 +187,7 @@ router.post("/", async (req, res) => {
       bill_no ?? null,
     ];
 
-    const [voucherResult] = await db.execute(
-      insertVoucherSQL,
-      voucherValues
-    );
+    const [voucherResult] = await db.execute(insertVoucherSQL, voucherValues);
 
     const voucherId = voucherResult.insertId;
 
@@ -248,8 +247,6 @@ router.post("/", async (req, res) => {
     });
   }
 });
-
-
 
 // GET Sale History (Only fetch existing data, no table creation)
 // router.get("/sale-history", async (req, res) => {
@@ -353,7 +350,7 @@ router.get("/", async (req, res) => {
     let sql = `
       SELECT 
         id, number, date, narration, partyId, referenceNo, dispatchDocNo,
-        dispatchThrough, destination, subtotal, profit, cgstTotal, sgstTotal,
+        dispatchThrough, destination, subtotal, cgstTotal, sgstTotal,
         igstTotal, discountTotal, total, createdAt, company_id, owner_type,
         owner_id, type, isQuotation, salesLedgerId, supplierInvoiceDate,
         sales_type_id, bill_no
@@ -403,27 +400,21 @@ router.delete("/:id", async (req, res) => {
     const voucherNumber = row.number;
 
     // 2️⃣ sales_history se delete (✨ यही extra line है)
-    await db.execute(
-      "DELETE FROM sale_history WHERE voucherNumber = ?",
-      [voucherNumber]
-    );
+    await db.execute("DELETE FROM sale_history WHERE voucherNumber = ?", [
+      voucherNumber,
+    ]);
 
     // 3️⃣ voucher related tables
-    await db.execute(
-      "DELETE FROM sales_voucher_items WHERE voucherId = ?",
-      [voucherId]
-    );
+    await db.execute("DELETE FROM sales_voucher_items WHERE voucherId = ?", [
+      voucherId,
+    ]);
 
-    await db.execute(
-      "DELETE FROM voucher_entries WHERE voucher_id = ?",
-      [voucherId]
-    );
+    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [
+      voucherId,
+    ]);
 
     // 4️⃣ main voucher delete
-    await db.execute(
-      "DELETE FROM sales_vouchers WHERE id = ?",
-      [voucherId]
-    );
+    await db.execute("DELETE FROM sales_vouchers WHERE id = ?", [voucherId]);
 
     return res.json({
       message: "Sales voucher deleted successfully",
@@ -433,7 +424,6 @@ router.delete("/:id", async (req, res) => {
     return res.status(500).json({ message: err.message });
   }
 });
-
 
 //single get
 router.get("/:id", async (req, res) => {
@@ -677,7 +667,7 @@ router.post("/sale-history", async (req, res) => {
       rate: "DECIMAL(10,2)",
       movementDate: "DATE",
       voucherNumber: "VARCHAR(100)",
-      godownId: "INT",                
+      godownId: "INT",
       companyId: "VARCHAR(100)",
       ownerType: "VARCHAR(50)",
       ownerId: "VARCHAR(100)",
@@ -699,9 +689,7 @@ router.post("/sale-history", async (req, res) => {
       );
 
       if (rows.length === 0) {
-        await db.execute(
-          `ALTER TABLE sale_history ADD COLUMN ${col} ${def}`
-        );
+        await db.execute(`ALTER TABLE sale_history ADD COLUMN ${col} ${def}`);
       }
     }
 
@@ -770,7 +758,5 @@ router.post("/sale-history", async (req, res) => {
     });
   }
 });
-
-
 
 module.exports = router;

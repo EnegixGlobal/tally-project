@@ -50,9 +50,6 @@ const FORM_STYLES = {
     } outline-none transition-colors`,
 };
 
-
-
-
 const SalesVoucher: React.FC = () => {
   const {
     theme,
@@ -75,12 +72,10 @@ const SalesVoucher: React.FC = () => {
     ownerType === "employee" ? "employee_id" : "user_id"
   );
 
-
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
   const [selectedPartyState, setSelectedPartyState] = useState<string>(""); // Store selected party's state
   const [salesTypes, setSalesTypes] = useState<SalesType[]>([]);
   const [selectedSalesTypeId, setSelectedSalesTypeId] = useState<string>("");
-  
 
   // Robust detection for party ledgers — backend may return different field names
 
@@ -127,8 +122,7 @@ const SalesVoucher: React.FC = () => {
 
   // Check if quotation mode is requested via URL
 
-const isQuotationMode = searchParams.get("mode") === "quotation";
-
+  const isQuotationMode = searchParams.get("mode") === "quotation";
 
   // Safe fallbacks for context data - Remove demo data and use only from context
   const safeStockItems = stockItems || [];
@@ -1918,18 +1912,16 @@ const isQuotationMode = searchParams.get("mode") === "quotation";
               </div>
             </div>
             {/* Quotation Mode Checkbox - Similar to Tally Prime */}
-           {isQuotationMode && (
-  <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-    <div className="flex items-center space-x-2">
-      <span className="text-sm font-medium">
-        📋 Quotation Mode
-      </span>
-      <span className="text-xs text-gray-500">
-        (This will be treated as a quotation)
-      </span>
-    </div>
-  </div>
-)}
+            {isQuotationMode && (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm font-medium">📋 Quotation Mode</span>
+                  <span className="text-xs text-gray-500">
+                    (This will be treated as a quotation)
+                  </span>
+                </div>
+              </div>
+            )}
 
             {/* Sales Ledger selection for item-invoice mode */}
             {formData.mode === "item-invoice" && (
