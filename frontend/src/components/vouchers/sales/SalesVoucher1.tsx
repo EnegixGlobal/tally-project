@@ -797,7 +797,7 @@ const SalesVoucher: React.FC = () => {
       }
 
       // 2️⃣ BATCH SELECT
-      // 2️⃣ BATCH SELECT (AUTO QTY + AUTO RATE + AUTO CALCULATION)
+
       if (name === "batchNumber") {
         const selected = entry.batches?.find(
           (b: any) => String(b.batchName) === String(value)
@@ -1617,6 +1617,15 @@ const SalesVoucher: React.FC = () => {
 
     return unit?.name || "-";
   };
+
+  // 🔹 Resolve Party & Sales Ledger for Invoice Print
+  const partyLedger = safeLedgers.find(
+    (l) => String(l.id) === String(formData.partyId)
+  );
+
+  const salesLedger = safeLedgers.find(
+    (l) => String(l.id) === String(formData.salesLedgerId)
+  );
 
   return (
     <React.Fragment>
@@ -3062,7 +3071,9 @@ const SalesVoucher: React.FC = () => {
             voucherData={formData}
             isQuotation={isQuotation}
             onClose={() => setShowInvoicePrint(false)}
-            getPartyName={getPartyName}
+            // 🔥 DIRECT DATA (IMPORTANT)
+            partyLedger={partyLedger}
+            salesLedger={salesLedger}
             getItemDetails={getItemDetails}
             calculateTotals={calculateTotals}
             getGstRateInfo={getGstRateInfo}

@@ -315,9 +315,11 @@ const StockItemForm = () => {
 
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
-          }/api/stock-items/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/stock-items/${id}` +
+            `?company_id=${companyId}` +
+            `&owner_type=${ownerType}` +
+            `&owner_id=${ownerId}` +
+            `&mode=opening`
         );
 
         const data = await res.json();
@@ -371,6 +373,7 @@ const StockItemForm = () => {
                   batchExpiryDate: b.batchExpiryDate || "",
                   batchManufacturingDate: b.batchManufacturingDate || "",
                   openingValue: Number(b.openingValue) || rate * qty, // Always calculated
+                  mode: b.mode,
                 };
               })
             );
@@ -547,55 +550,54 @@ const StockItemForm = () => {
   // --- End batch rows ---
 
   const validateForm = () => {
-  const newErrors: Errors = {};
+    const newErrors: Errors = {};
 
-  if (!formData.name) newErrors.name = "Name is required";
-  if (!formData.categoryId) newErrors.categoryId = "Category is required";
-  if (!formData.unit) newErrors.unit = "Unit is required";
-  if (!formData.taxType) newErrors.taxType = "Tax Type is required";
+    if (!formData.name) newErrors.name = "Name is required";
+    if (!formData.categoryId) newErrors.categoryId = "Category is required";
+    if (!formData.unit) newErrors.unit = "Unit is required";
+    if (!formData.taxType) newErrors.taxType = "Tax Type is required";
 
-  if (formData.openingValue < 0) {
-    newErrors.openingValue = "Opening Value cannot be negative";
-  }
-
-  // ---- HSN / SAC Code ----
-  if (!formData.hsnCode) {
-    newErrors.hsnCode = "HSN / SAC Code is required";
-  } else {
-    const hsn = formData.hsnCode.toString();
-    const turnover = companyInfo?.turnover || 0;
-
-    const requiredLength =
-      turnover <= 50000000 ? 4 : turnover <= 150000000 ? 6 : 8;
-
-    if (!/^\d+$/.test(hsn) || hsn.length < requiredLength) {
-      newErrors.hsnCode = `HSN / SAC must be at least ${requiredLength} digits`;
+    if (formData.openingValue < 0) {
+      newErrors.openingValue = "Opening Value cannot be negative";
     }
-  }
 
-  // ---- GST Rate (%) ----
-  if (!formData.gstRate) {
-    newErrors.gstRate = "GST Rate is required";
-  } else {
-    const rate = Number(formData.gstRate);
-    if (isNaN(rate) || rate < 0 || rate > 28) {
-      newErrors.gstRate = "GST Rate must be between 0 and 28%";
-    }
-  }
+    // ---- HSN / SAC Code ----
+    if (!formData.hsnCode) {
+      newErrors.hsnCode = "HSN / SAC Code is required";
+    } else {
+      const hsn = formData.hsnCode.toString();
+      const turnover = companyInfo?.turnover || 0;
 
-  // ---- Batch validation ----
-  if (formData.enableBatchTracking) {
-    batchRows.forEach((batch, index) => {
-      if (!batch.batchName) {
-        newErrors[`batchName-${index}`] = "Batch Name is required";
+      const requiredLength =
+        turnover <= 50000000 ? 4 : turnover <= 150000000 ? 6 : 8;
+
+      if (!/^\d+$/.test(hsn) || hsn.length < requiredLength) {
+        newErrors.hsnCode = `HSN / SAC must be at least ${requiredLength} digits`;
       }
-    });
-  }
+    }
 
-  setErrors(newErrors);
-  return Object.keys(newErrors).length === 0;
-};
+    // ---- GST Rate (%) ----
+    if (!formData.gstRate) {
+      newErrors.gstRate = "GST Rate is required";
+    } else {
+      const rate = Number(formData.gstRate);
+      if (isNaN(rate) || rate < 0 || rate > 28) {
+        newErrors.gstRate = "GST Rate must be between 0 and 28%";
+      }
+    }
 
+    // ---- Batch validation ----
+    if (formData.enableBatchTracking) {
+      batchRows.forEach((batch, index) => {
+        if (!batch.batchName) {
+          newErrors[`batchName-${index}`] = "Batch Name is required";
+        }
+      });
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -621,7 +623,13 @@ const StockItemForm = () => {
       gstRate: Number(formData.gstRate),
       taxType: formData.taxType,
 
-      batches: batchRows,
+      batches: batchRows.map((b) => ({
+        ...b,
+        mode: "opening",
+        batchQuantity: Number(b.batchQuantity) || 0,
+        batchRate: Number(b.batchRate) || 0,
+        openingRate: Number(b.batchRate || 0) * Number(b.batchQuantity || 0),
+      })),
       godownAllocations,
       barcode,
       company_id: companyId,

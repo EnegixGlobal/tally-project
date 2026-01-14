@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useReactToPrint } from "react-to-print";
 import { Printer, X, MapPin } from "lucide-react";
 import type { VoucherEntry } from "../../../types";
@@ -101,7 +101,11 @@ interface InvoicePrintProps {
   voucherData: Omit<VoucherEntry, "id">;
   isQuotation: boolean;
   onClose: () => void;
-  getPartyName: (partyId: string) => string;
+
+  // 🔥 NEW DIRECT DATA
+  partyLedger?: Ledger;
+  salesLedger?: Ledger;
+
   getItemDetails: (itemId: string) => ItemDetails;
   calculateTotals: () => TotalCalculation;
   getGstRateInfo: () => {
@@ -119,7 +123,6 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
   voucherData,
   isQuotation,
   onClose,
-  getPartyName,
   getItemDetails,
   calculateTotals,
   getGstRateInfo,
@@ -139,7 +142,35 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
     phone: "",
   });
 
+  // 🔹 Party Ledger (single source of truth)
+  const partyLedger = React.useMemo(() => {
+    if (!voucherData.partyId) return null;
+
+    return ledgers.find((l) => String(l.id) === String(voucherData.partyId));
+  }, [ledgers, voucherData.partyId]);
+
+  useEffect(() => {
+    if (partyLedger && !shippingAddress.name) {
+      setShippingAddress({
+        name: partyLedger.name,
+        address: partyLedger.address || "",
+        city: "",
+        state: partyLedger.state || "",
+        pinCode: "",
+        gstin: partyLedger.gstNumber || "",
+        phone: "",
+      });
+    }
+  }, [partyLedger]);
+
   const [showShippingForm, setShowShippingForm] = useState(false);
+
+  // 🔹 Decide IGST or CGST + SGST
+  const isIgstInvoice =
+    !!companyInfo?.state &&
+    !!partyLedger?.state &&
+    companyInfo.state.toLowerCase().trim() !==
+      partyLedger.state.toLowerCase().trim();
 
   // Handle shipping address changes
   const handleShippingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -149,22 +180,21 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
 
   // Auto-fill shipping address with billing address
   const fillBillingAddress = () => {
-    const partyLedger = ledgers.find((l) => l.id === voucherData.partyId);
-    if (partyLedger) {
-      setShippingAddress({
-        name: partyLedger.name,
-        address: partyLedger.address || "",
-        city: "Party City",
-        state: partyLedger.state || "",
-        pinCode: "Party PIN",
-        gstin: partyLedger.gstNumber || "",
-        phone: "Party Phone",
-      });
-    }
+    if (!partyLedger) return;
+
+    setShippingAddress({
+      name: partyLedger.name,
+      address: partyLedger.address || "",
+      city: "Party City",
+      state: partyLedger.state || "",
+      pinCode: "Party PIN",
+      gstin: partyLedger.gstNumber || "",
+      phone: "Party Phone",
+    });
   };
 
   // ================= GST SUMMARY CALCULATION =================
-  // ================= GST SUMMARY (CGST / SGST / IGST) =================
+
   const gstSummary = (() => {
     const map: Record<
       string,
@@ -246,14 +276,6 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
       );
       console.log("Selected items for print:", selectedItems.length);
 
-      console.log("Print data:", {
-        party: voucherData.partyId
-          ? getPartyName(voucherData.partyId)
-          : "No Party",
-        items: selectedItems.length,
-        totals: calculateTotals(),
-      });
-
       return Promise.resolve();
     },
     onAfterPrint: () => {
@@ -297,7 +319,6 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
   const selectedItems = voucherData.entries.filter(
     (entry) => entry.itemId && entry.itemId !== "" && entry.itemId !== "select"
   );
-  const partyLedger = ledgers.find((l) => l.id === voucherData.partyId);
 
   return (
     <div className={PRINT_STYLES.container}>
@@ -586,12 +607,10 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                   <div className={PRINT_STYLES.invoice.partyDetails}>
                     <div>
                       <strong>
-                        {voucherData.partyId
-                          ? getPartyName(voucherData.partyId)
-                          : "No Party Selected"}
+                        {partyLedger?.name || "Party Not Selected"}
                       </strong>
                     </div>
-                    {voucherData.partyId && partyLedger && (
+                    {partyLedger && (
                       <>
                         <div className="mt-1">
                           {partyLedger.address || "N/A"}
@@ -618,7 +637,8 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                         <div>
                           <strong>
                             {shippingAddress.name ||
-                              getPartyName(voucherData.partyId || "")}
+                              partyLedger?.name ||
+                              "Party Not Selected"}
                           </strong>
                         </div>
                         <div className="mt-1">
@@ -640,11 +660,11 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                     ) : (
                       <>
                         <div>
-                          <strong>
+                          {/* <strong>
                             {voucherData.partyId
                               ? getPartyName(voucherData.partyId)
                               : "No Party Selected"}
-                          </strong>
+                          </strong> */}
                         </div>
                         {voucherData.partyId && partyLedger && (
                           <>
