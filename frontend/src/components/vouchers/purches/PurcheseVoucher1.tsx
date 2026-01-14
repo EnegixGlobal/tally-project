@@ -926,6 +926,7 @@ const PurchaseVoucher: React.FC = () => {
               batchRate: entry.batchMeta.rate,
               batchExpiryDate: entry.batchMeta.expDate || null,
               batchManufacturingDate: entry.batchMeta.mfgDate || null,
+              mode: "purchase",
               company_id: companyId,
               owner_type: ownerType,
               owner_id: ownerId,
@@ -1212,8 +1213,10 @@ const PurchaseVoucher: React.FC = () => {
     setFormData((prev) => {
       const entries = [...prev.entries];
       const entry = entries[index];
-
       if (!entry) return prev;
+
+      const qty = pb.batchQuantity ?? entry.quantity ?? 0;
+      const rate = pb.batchRate ?? entry.rate ?? 0;
 
       // 🔒 prevent duplicate batch name in same row
       const alreadyExists = (entry.batches || []).some(
@@ -1222,10 +1225,11 @@ const PurchaseVoucher: React.FC = () => {
 
       const tempBatch = {
         batchName: pb.batchName,
-        batchQuantity: pb.batchQuantity ?? entry.quantity ?? 0,
-        batchRate: pb.batchRate ?? entry.rate ?? 0,
+        batchQuantity: qty,
+        batchRate: rate,
         batchManufacturingDate: pb.batchManufacturingDate || null,
         batchExpiryDate: pb.batchExpiryDate || null,
+        mode: "purchase", // ✅ HARD CODED
       };
 
       entries[index] = {
@@ -1235,8 +1239,8 @@ const PurchaseVoucher: React.FC = () => {
         batchNumber: pb.batchName,
 
         // ✅ autofill row fields
-        quantity: pb.batchQuantity ?? entry.quantity ?? 0,
-        rate: pb.batchRate ?? entry.rate ?? 0,
+        quantity: qty,
+        rate: rate,
 
         // ✅ dropdown options (TEMP – UI only)
         batches: alreadyExists
@@ -1246,10 +1250,11 @@ const PurchaseVoucher: React.FC = () => {
         // ✅ hidden meta (FINAL SAVE pe kaam aayega)
         batchMeta: {
           batchName: pb.batchName,
-          quantity: pb.batchQuantity ?? entry.quantity ?? 0,
-          rate: pb.batchRate ?? entry.rate ?? 0,
+          quantity: qty,
+          rate: rate,
           mfgDate: pb.batchManufacturingDate || null,
           expDate: pb.batchExpiryDate || null,
+          mode: "purchase", // ✅ HARD CODED
           isNew: true, // 🔥 IMPORTANT FLAG
         },
       };
@@ -1268,6 +1273,7 @@ const PurchaseVoucher: React.FC = () => {
         batchRate: 0,
         batchExpiryDate: "",
         batchManufacturingDate: "",
+        mode: "purchase", // ✅ HARD CODED
       },
     });
 

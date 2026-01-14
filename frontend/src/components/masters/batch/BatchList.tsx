@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../../context/AppContext";
+import swl from "sweetalert2";
 import {
   ArrowLeft,
   Calendar,
@@ -33,6 +34,7 @@ interface StockItem {
     batchRate?: number | null;
     openingRate?: number | null;
     batchType?: string;
+    mode?: string;
   }>;
 }
 
@@ -47,7 +49,7 @@ const BatchList: React.FC = () => {
     "all" | "active" | "expiring" | "expired"
   >("all");
   const [filterStockItem, setFilterStockItem] = useState("");
-  const [openFormItemId, setOpenFormItemId] = useState<string | null>(null);
+  const [openFormRowIndex, setOpenFormRowIndex] = useState<number | null>(null);
 
   const [batchForm, setBatchForm] = useState({
     batchName: "",
@@ -57,6 +59,11 @@ const BatchList: React.FC = () => {
     batchExpiryDate: "",
   });
 
+  const [editingBatch, setEditingBatch] = useState<{
+    itemId: string;
+    batchName: string;
+  } | null>(null);
+
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setBatchForm({
       ...batchForm,
@@ -64,13 +71,145 @@ const BatchList: React.FC = () => {
     });
   };
 
-  console.log('batch number', batchForm)
+  console.log("batch number", batchForm);
 
-  // get purchase history
-  const [purchaseData, setPurchaseData] = useState<any[]>([]);
-  
-  // Load purchase history data
-  const loadPurchaseData = async () => {
+  const handleSaveBatch = async (itemId: string) => {
+    const company_id = localStorage.getItem("company_id");
+    const owner_type = localStorage.getItem("supplier");
+    const owner_id = localStorage.getItem(
+      owner_type === "employee" ? "employee_id" : "user_id"
+    );
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            batchName: batchForm.batchName,
+            batchQuantity: Number(batchForm.batchQuantity),
+            batchRate: Number(batchForm.batchRate),
+            batchExpiryDate: batchForm.batchExpiryDate || null,
+            batchManufacturingDate: batchForm.batchManufacturingDate || null,
+            mode: "purchase",
+            company_id,
+            owner_type,
+            owner_id,
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert("Batch Added Successfully ✅");
+
+        setBatchForm({
+          batchName: "",
+          batchQuantity: "",
+          batchRate: "",
+          batchManufacturingDate: "",
+          batchExpiryDate: "",
+        });
+
+        setOpenFormRowIndex(null);
+        await loadStockItems();
+      } else {
+        alert(data.message || "Failed to add batch");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error adding batch");
+    }
+  };
+
+  const handleDeleteBatch = async (itemId: string, batchName: string) => {
+    const company_id = localStorage.getItem("company_id");
+    const owner_type = localStorage.getItem("supplier");
+    const owner_id = localStorage.getItem(
+      owner_type === "employee" ? "employee_id" : "user_id"
+    );
+
+    if (!company_id || !owner_type || !owner_id) {
+      alert("Missing auth details");
+      return;
+    }
+
+    if (!window.confirm(`Delete batch "${batchName}" ?`)) return;
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batch` +
+          `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ batchName }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert("Batch deleted successfully ✅");
+        await loadStockItems(); // 🔥 refresh UI
+      } else {
+        alert(data.message || "Failed to delete batch");
+      }
+    } catch (err) {
+      console.error("Delete batch error:", err);
+      alert("Error deleting batch");
+    }
+  };
+
+  const handleUpdateBatch = async () => {
+    if (!editingBatch) return;
+
+    const company_id = localStorage.getItem("company_id");
+    const owner_type = localStorage.getItem("supplier");
+    const owner_id = localStorage.getItem(
+      owner_type === "employee" ? "employee_id" : "user_id"
+    );
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stock-items/${
+          editingBatch.itemId
+        }/batches` +
+          `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`,
+        {
+          method: "PATCH",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            batchName: editingBatch.batchName,
+            quantity: Number(batchForm.batchQuantity),
+            rate: Number(batchForm.batchRate),
+          }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert("Batch updated successfully ✅");
+        setEditingBatch(null);
+        setEditingBatch(null);
+        setOpenFormRowIndex(null);
+        await loadStockItems();
+      } else {
+        alert(data.message || "Update failed");
+      }
+    } catch (err) {
+      console.error("Update batch error:", err);
+      alert("Error updating batch");
+    }
+  };
+
+  // Load stock items
+  const loadStockItems = async () => {
     const company_id = localStorage.getItem("company_id");
     const owner_type = localStorage.getItem("supplier");
     const owner_id = localStorage.getItem(
@@ -85,158 +224,15 @@ const BatchList: React.FC = () => {
       owner_id,
     });
 
-    const response = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?${params.toString()}`
-    );
-
-    const json = await response.json();
-    console.log("Json", json);
-
-    const formatted = Array.isArray(json.data)
-      ? json.data.map((v: any) => ({
-          id: v.id,
-          itemName: v.itemName,
-          hsnCode: v.hsnCode,
-          batchNumber: v.batchNumber,
-          qty: v.purchaseQuantity,
-          date: v.purchaseDate,
-          type: v.type || "purchase",
-          rate: v.rate || null,
-        }))
-      : [];
-
-    setPurchaseData(formatted);
-  };
-
-  // Load purchase data on mount
-  useEffect(() => {
-    loadPurchaseData();
-  }, []);
-
-  const handleSaveBatch = async (itemId: string) => {
-    const company_id = localStorage.getItem("company_id");
-    const owner_type = localStorage.getItem("supplier");
-    const owner_id = localStorage.getItem(
-      owner_type === "employee" ? "employee_id" : "user_id"
-    );
-
-    // Find the item to get its details from stockItems
-    const item = stockItems.find((i) => String(i.id) === String(itemId));
-    
-    if (!item) {
-      alert("Item not found");
-      return;
-    }
-
-    // Structure batch data as an array (as expected by the API)
-    const batches = [{
-      batchName: batchForm.batchName || null,
-      batchQuantity: Number(batchForm.batchQuantity) || 0,
-      batchRate: Number(batchForm.batchRate) || 0,
-      batchExpiryDate: batchForm.batchExpiryDate || null,
-      batchManufacturingDate: batchForm.batchManufacturingDate || null,
-    }];
-
-    const payload = {
-      itemId,
-      name: item.name,
-      unit: item.unit || "",
-      taxType: (item as any).taxType || (item as any).gstClassification || "GST", // Try to get taxType from item
-      hsnCode: item.hsnCode || null,
-      batches: batches,
-      company_id,
-      owner_type,
-      owner_id,
-    };
-
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stock-items/purchase-batch`,
-        {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        }
+        `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
       );
 
       const data = await res.json();
-
-      if (data.success) {
-        alert("Batch Added Successfully!");
-
-        // Reset form
-        setBatchForm({
-          batchName: "",
-          batchQuantity: "",
-          batchRate: "",
-          batchManufacturingDate: "",
-          batchExpiryDate: "",
-        });
-
-        // Close form
-        setOpenFormItemId(null);
-
-        // Reload purchase data and stock items to show the new batch
-        await loadPurchaseData();
-        await loadStockItems();
-      } else {
-        alert(data.message || "Failed to add batch");
-      }
-    } catch (error) {
-      console.error("Error saving batch:", error);
-      alert("Error saving batch. Please try again.");
-    }
-  };
-
-
-
-  // Load stock items
-  const loadStockItems = async () => {
-    const company_id = localStorage.getItem("company_id");
-    const owner_type = localStorage.getItem("supplier");
-    const owner_id = localStorage.getItem(
-      owner_type === "employee" ? "employee_id" : "user_id"
-    );
-
-    if (!company_id || !owner_type || !owner_id) {
-      console.log("Missing auth params");
-      return;
-    }
-
-    const params = new URLSearchParams({ company_id, owner_type, owner_id });
-
-    try {
-      const [res1, res2] = await Promise.all([
-        fetch(
-          `${
-            import.meta.env.VITE_API_URL
-          }/api/stock-items/purchase-batch?${params.toString()}`
-        ),
-        fetch(
-          `${
-            import.meta.env.VITE_API_URL
-          }/api/stock-items?${params.toString()}`
-        ),
-      ]);
-
-      const data1 = await res1.json();
-      const data2 = await res2.json();
-
-      // Mark items from purchase-batch endpoint with type "purchase"
-      const purchaseItems = (data1.success ? data1.data : []).map((item: any) => ({
-        ...item,
-        type: item.type || "purchase", // Ensure purchase items have type "purchase"
-      }));
-
-      const regularItems = data2.success ? data2.data : [];
-
-      const mergedData = [
-        ...purchaseItems,
-        ...regularItems,
-      ];
-      setStockItems(mergedData);
-    } catch (error) {
-      console.error("Error loading stock items:", error);
+      setStockItems(data.success ? data.data : []);
+    } catch (err) {
+      console.error("Error loading stock items", err);
       setStockItems([]);
     }
   };
@@ -263,14 +259,14 @@ const BatchList: React.FC = () => {
   // Helper function to get batch status
   const getBatchStatus = (batch: any): "active" | "expiring" | "expired" => {
     if (!batch.batchExpiryDate) return "active";
-    
+
     const days = Math.ceil(
       (new Date(batch.batchExpiryDate).getTime() - Date.now()) /
         (1000 * 60 * 60 * 24)
     );
 
     if (days < 0) return "expired";
-    if (days <= 30) return "expiring";
+    if (days <= 7) return "expiring";
     return "active";
   };
 
@@ -291,100 +287,18 @@ const BatchList: React.FC = () => {
 
   // Merge stock items with purchase history data
   const mergedStockItems = useMemo(() => {
-    // Create a map of items by name for quick lookup
-    const itemsMap = new Map<string, StockItem>();
-    
-    // Add all stock items to the map
-    stockItems.forEach((item) => {
-      const itemName = item.name.toLowerCase();
-      // Determine batch type: if item type is "purchase", mark batches as "purchase", otherwise "opening"
-      const itemType = (item as any).type || "";
-      const batchType = itemType.toLowerCase() === "purchase" ? "purchase" : "opening";
-      
-      // Add batchType to batches (only if not already set)
-      const typedBatches = (item.batches || []).map((batch: any) => ({
+    return stockItems.map((item) => {
+      const batches = (item.batches || []).map((batch: any) => ({
         ...batch,
-        batchType: batch.batchType || batchType, // Use existing batchType if available, otherwise use determined type
-        // Add timestamp for purchase batches for sorting (newest at bottom)
-        date: batch.date || (batchType === "purchase" ? ((item as any).createdAt ? new Date((item as any).createdAt).getTime() : Date.now()) : undefined),
-        id: batch.id || (item as any).id,
+        batchType: batch.batchType || batch.mode || "opening",
       }));
 
-      if (!itemsMap.has(itemName)) {
-        itemsMap.set(itemName, {
-          ...item,
-          batches: typedBatches,
-        });
-      } else {
-        // Merge batches if item already exists
-        const existing = itemsMap.get(itemName)!;
-        existing.batches = [
-          ...(existing.batches || []),
-          ...typedBatches,
-        ];
-      }
-    });
-
-    // Add purchase history batches to matching items
-    purchaseData.forEach((purchase: any) => {
-      const itemName = purchase.itemName.toLowerCase();
-      const purchaseBatch = {
-        batchName: purchase.batchNumber || "—",
-        batchQuantity: purchase.qty || 0,
-        batchRate: purchase.rate || null,
-        batchManufacturingDate: null,
-        batchExpiryDate: null,
-        batchType: purchase.type || "purchase",
-        date: purchase.date ? new Date(purchase.date).getTime() : Date.now(), // Add timestamp for sorting
-        id: purchase.id, // Keep ID for sorting fallback
-      };
-
-      if (itemsMap.has(itemName)) {
-        // Add to existing item - purchase batches go at the bottom
-        const item = itemsMap.get(itemName)!;
-        item.batches = [...(item.batches || []), purchaseBatch];
-      } else {
-        // Create new item for purchase-only items
-        itemsMap.set(itemName, {
-          id: `purchase-${purchase.id}`,
-          name: purchase.itemName,
-          unit: "",
-          openingBalance: 0,
-          hsnCode: purchase.hsnCode,
-          enableBatchTracking: true,
-          type: purchase.type || "purchase",
-          batches: [purchaseBatch],
-        });
-      }
-    });
-
-    // Sort batches within each item: opening first, then purchase (newest at bottom)
-    const sortedItems = Array.from(itemsMap.values()).map((item) => {
-      const batches = item.batches || [];
-      
-      // Separate opening and purchase batches
-      const openingBatches = batches.filter((b: any) => (b.batchType || "opening") === "opening");
-      const purchaseBatches = batches.filter((b: any) => (b.batchType || "opening") === "purchase");
-      
-      // Sort purchase batches by date/id (newest at bottom)
-      purchaseBatches.sort((a: any, b: any) => {
-        // Use date timestamp if available, otherwise use ID, otherwise use 0
-        const aDate = a.date || (a.id ? Number(a.id) : 0) || 0;
-        const bDate = b.date || (b.id ? Number(b.id) : 0) || 0;
-        return aDate - bDate; // Ascending: older first, newer at bottom
-      });
-      
-      // Combine: opening first, then purchase (newest at bottom)
-      const sortedBatches = [...openingBatches, ...purchaseBatches];
-      
       return {
         ...item,
-        batches: sortedBatches,
+        batches,
       };
     });
-
-    return sortedItems;
-  }, [stockItems, purchaseData]);
+  }, [stockItems]);
 
   // NEW: filtered stock items with filtered batches
   const filteredStockItems = useMemo(() => {
@@ -392,51 +306,59 @@ const BatchList: React.FC = () => {
 
     return mergedStockItems
       .filter((item) => {
-        // First filter by stock item if specified - this is the primary filter
-        // Convert both to string for comparison to handle type mismatches
-        if (filterStockItem && String(filterStockItem) !== String(item.id)) {
+        // Filter by selected stock item (if any)
+        if (filterStockItem && String(item.id) !== String(filterStockItem)) {
           return false;
         }
         return true;
       })
       .map((item) => {
-        // Filter batches within each item
-        const filteredBatches = (item.batches || []).filter((batch: any) => {
-          // Search filter: check batch name or item name (only if search term is provided)
-          const matchesSearch =
-            !q || // If no search term, show all batches
-            item.name.toLowerCase().includes(q) ||
-            batch.batchName?.toLowerCase().includes(q);
+        const batches = item.batches || [];
 
-          // Status filter: check individual batch status
-          const batchStatus = getBatchStatus(batch);
+        // Filter batches of this item
+        const filteredBatches = batches.filter((batch: any) => {
+          // 🔍 Search filter (item name OR batch name)
+          const matchesSearch =
+            !q ||
+            item.name.toLowerCase().includes(q) ||
+            (batch.batchName || "").toLowerCase().includes(q);
+
+          // 📦 Status filter
+          const status = getBatchStatus(batch);
           const matchesStatus =
-            filterStatus === "all" || filterStatus === batchStatus;
+            filterStatus === "all" || filterStatus === status;
 
           return matchesSearch && matchesStatus;
         });
 
-        // If stock item is specifically selected, show it even if no batches match other filters
-        // Otherwise, only show if there are matching batches
-        if (filteredBatches.length === 0) {
-          // If a specific stock item is selected, show it with empty batches list
-          // so user can see the item exists but has no matching batches
-          if (filterStockItem && String(filterStockItem) === String(item.id)) {
-            return {
-              ...item,
-              batches: [],
-            };
-          }
+        // ❌ If no batches match & no specific item selected → hide item
+        if (filteredBatches.length === 0 && !filterStockItem) {
           return null;
         }
 
+        // ✅ Keep item with filtered batches
         return {
           ...item,
           batches: filteredBatches,
         };
       })
-      .filter((item) => item !== null) as StockItem[];
+      .filter(Boolean) as StockItem[];
   }, [mergedStockItems, searchTerm, filterStatus, filterStockItem]);
+
+  const batchRows = useMemo(() => {
+    const rows: {
+      item: StockItem;
+      batch: any;
+    }[] = [];
+
+    filteredStockItems.forEach((item) => {
+      (item.batches || []).forEach((batch) => {
+        rows.push({ item, batch });
+      });
+    });
+
+    return rows;
+  }, [filteredStockItems]);
 
   // NEW: Stats based on merged items
   const stats = useMemo(() => {
@@ -456,33 +378,6 @@ const BatchList: React.FC = () => {
 
     return { total, active, expiring, expired };
   }, [mergedStockItems]);
-
-  // Utility functions for UI
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "active":
-        return "bg-green-100 text-green-800";
-      case "expiring":
-        return "bg-yellow-100 text-yellow-800";
-      case "expired":
-        return "bg-red-100 text-red-800";
-      default:
-        return "bg-gray-100 text-gray-800";
-    }
-  };
-
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case "active":
-        return <Package size={16} className="text-green-600" />;
-      case "expiring":
-        return <AlertTriangle size={16} className="text-yellow-600" />;
-      case "expired":
-        return <AlertTriangle size={16} className="text-red-600" />;
-      default:
-        return <Package size={16} className="text-gray-600" />;
-    }
-  };
 
   if (loading) {
     return <div className="pt-[56px] px-4">Loading...</div>;
@@ -680,7 +575,8 @@ const BatchList: React.FC = () => {
           <div className="flex justify-between items-center">
             <h2 className="text-xl font-semibold">Batch Details</h2>
             <span className="text-sm text-gray-500">
-              Showing {filteredStockItems.length} of {mergedStockItems.length} items
+              Showing {filteredStockItems.length} of {mergedStockItems.length}{" "}
+              items
             </span>
           </div>
         </div>
@@ -735,22 +631,30 @@ const BatchList: React.FC = () => {
                 theme === "dark" ? "divide-gray-700" : "divide-gray-200"
               }`}
             >
-              {filteredStockItems.length === 0 ? (
+              {batchRows.length === 0 ? (
                 <tr>
                   <td
                     colSpan={11}
                     className="px-4 py-8 text-center text-gray-500"
                   >
-                    No batches found matching your criteria
+                    No batches found
                   </td>
                 </tr>
               ) : (
-                filteredStockItems.map((item) => {
-                  const batches = item.batches || [];
+                batchRows.map(({ item, batch }, index) => {
+                  const status = getBatchStatus(batch);
+
+                  const days = batch.batchExpiryDate
+                    ? Math.ceil(
+                        (new Date(batch.batchExpiryDate).getTime() -
+                          Date.now()) /
+                          (1000 * 60 * 60 * 24)
+                      )
+                    : null;
 
                   return (
-                    <React.Fragment key={item.id}>
-                      {/* ================= MAIN ROW ================= */}
+                    <React.Fragment key={`${item.id}-${index}`}>
+                      {/* ================= BATCH ROW ================= */}
                       <tr
                         className={`${
                           theme === "dark"
@@ -759,186 +663,138 @@ const BatchList: React.FC = () => {
                         }`}
                       >
                         {/* STATUS */}
-                        <td className="px-4 py-4 align-top whitespace-nowrap">
-                          {(() => {
-                            const status = getOverallStatus(batches);
-                            return (
-                              <div className="flex items-center">
-                                {getStatusIcon(status)}
-                                <span
-                                  className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusColor(
-                                    status
-                                  )}`}
-                                >
-                                  {status.toUpperCase()}
-                                </span>
-                              </div>
-                            );
-                          })()}
+                        <td className="px-4 py-3">
+                          <span
+                            className={`px-2 py-1 text-xs font-semibold rounded-full ${
+                              status === "active"
+                                ? "bg-green-100 text-green-800"
+                                : status === "expiring"
+                                ? "bg-yellow-100 text-yellow-800"
+                                : "bg-red-100 text-red-800"
+                            }`}
+                          >
+                            {status.toUpperCase()}
+                          </span>
                         </td>
 
-                        {/* ITEM NAME */}
-                        <td className="px-4 py-4 align-top">
-                          <div className="font-medium">{item.name}</div>
-                          <div className="text-sm text-gray-500">
+                        {/* STOCK ITEM */}
+                        <td className="px-4 py-3 font-medium">
+                          {item.name}
+                          <div className="text-xs text-gray-500">
                             Unit: {item.unit}
                           </div>
                         </td>
 
-                         {/* TYPE - Show batch type for each batch */}
-                         <td className="px-4 py-4 align-top">
-                          <div className="space-y-2">
-                            {batches.map((b: any, i: number) => (
-                              <div key={i} className="font-medium leading-5 min-h-[20px]">
-                                <span className="inline-block px-1 text-xs font-semibold text-green-800 bg-green-100 rounded-full">
-                                  {b.batchType || "opening"}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
+                        {/* TYPE / MODE */}
+                        <td className="px-4 py-3">
+                          <span className="px-2 py-1 text-xs rounded bg-blue-100 text-blue-800">
+                            {batch.mode || batch.batchType || "opening"}
+                          </span>
                         </td>
 
                         {/* HSN */}
-                        <td className="px-4 py-4 align-top whitespace-nowrap">
-                          {item.hsnCode || "—"}
+                        <td className="px-4 py-3">{item.hsnCode || "—"}</td>
+
+                        {/* BATCH NO */}
+                        <td className="px-4 py-3">{batch.batchName}</td>
+
+                        {/* QTY */}
+                        <td className="px-4 py-3">{batch.batchQuantity}</td>
+
+                        {/* RATE */}
+                        <td className="px-4 py-3">
+                          {batch.batchRate ?? batch.openingRate ?? "—"}
                         </td>
 
-                        {/* BATCH NAME LIST */}
-                        <td className="px-4 py-4 align-top">
-                          <div className="space-y-2">
-                            {batches.map((b: any, i: number) => (
-                              <div key={i} className="font-medium break-words leading-5 min-h-[20px]">
-                                {b.batchName}
-                              </div>
-                            ))}
-                          </div>
+                        {/* MFG DATE */}
+                        <td className="px-4 py-3">
+                          {batch.batchManufacturingDate
+                            ? new Date(
+                                batch.batchManufacturingDate
+                              ).toLocaleDateString()
+                            : "—"}
                         </td>
 
-                        {/* QTY LIST */}
-                        <td className="px-4 py-4 align-top">
-                          <div className="space-y-2">
-                            {batches.map((b: any, i: number) => (
-                              <div key={i} className="leading-5 min-h-[20px]">{b.batchQuantity}</div>
-                            ))}
-                          </div>
+                        {/* EXP DATE */}
+                        <td className="px-4 py-3">
+                          {batch.batchExpiryDate
+                            ? new Date(
+                                batch.batchExpiryDate
+                              ).toLocaleDateString()
+                            : "—"}
                         </td>
 
-                        {/* RATE LIST */}
-                        <td className="px-4 py-4 align-top">
-                          <div className="space-y-2">
-                            {batches.map((b: any, i: number) => (
-                              <div key={i} className="leading-5 min-h-[20px]">
-                                {b.batchRate !== null && b.batchRate !== undefined
-                                  ? b.batchRate
-                                  : b.openingRate !== null && b.openingRate !== undefined
-                                  ? b.openingRate
-                                  : "—"}
-                              </div>
-                            ))}
-                          </div>
+                        {/* DAYS TO EXPIRY */}
+                        <td className="px-4 py-3">
+                          {days === null
+                            ? "—"
+                            : days < 0
+                            ? `Expired ${Math.abs(days)} days`
+                            : `${days} days`}
                         </td>
 
-                        {/* MFG DATE LIST */}
-                        <td className="px-4 py-4 align-top">
-                          <div className="space-y-2">
-                            {batches.map((b: any, i: number) => (
-                              <div key={i} className="flex items-center min-h-[20px]">
-                                <Calendar
-                                  size={14}
-                                  className="mr-1 text-gray-400 flex-shrink-0"
-                                />
-                                <span className="text-sm leading-5">
-                                  {b.batchManufacturingDate
-                                    ? new Date(
-                                        b.batchManufacturingDate
-                                      ).toLocaleDateString()
-                                    : "—"}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </td>
-
-                        {/* EXP DATE LIST */}
-                        <td className="px-4 py-4 align-top">
-                          <div className="space-y-2">
-                            {batches.map((b: any, i: number) => (
-                              <div key={i} className="flex items-center min-h-[20px]">
-                                <Calendar
-                                  size={14}
-                                  className="mr-1 text-gray-400 flex-shrink-0"
-                                />
-                                <span className="text-sm leading-5">
-                                  {b.batchExpiryDate
-                                    ? new Date(
-                                        b.batchExpiryDate
-                                      ).toLocaleDateString()
-                                    : "—"}
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </td>
-
-                        {/* DAYS LEFT */}
-                        <td className="px-4 py-4 align-top">
-                          <div className="space-y-2">
-                            {batches.map((b: any, i: number) => {
-                              if (!b.batchExpiryDate)
-                                return (
-                                  <div key={i} className="text-gray-500 min-h-[20px] leading-5">
-                                    —
-                                  </div>
-                                );
-
-                              const days = Math.ceil(
-                                (new Date(b.batchExpiryDate).getTime() -
-                                  Date.now()) /
-                                  (1000 * 60 * 60 * 24)
-                              );
-
-                              return (
-                                <div
-                                  key={i}
-                                  className={`font-medium text-sm leading-5 min-h-[20px] ${
-                                    days < 0
-                                      ? "text-red-600"
-                                      : days <= 30
-                                      ? "text-yellow-600"
-                                      : "text-green-600"
-                                  }`}
-                                >
-                                  {days < 0
-                                    ? `Expired ${Math.abs(days)} days ago`
-                                    : `${days} days`}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </td>
-
-                        {/* ACTION BUTTON */}
-                        <td className="px-4 py-4 align-top whitespace-nowrap">
+                        {/* ACTIONS */}
+                        <td className="px-4 py-3 space-x-2">
+                          {/* ADD BATCH */}
                           <button
-                            onClick={() =>
-                              setOpenFormItemId(
-                                openFormItemId === item.id ? null : item.id
-                              )
-                            }
-                            className="px-3 py-1 rounded-full bg-blue-600 text-white hover:bg-blue-700 text-sm"
+                            className="px-2 py-1 text-xs bg-green-600 text-white rounded"
+                            onClick={() => {
+                              setOpenFormRowIndex(index);
+                              setBatchForm({
+                                batchName: "",
+                                batchQuantity: "",
+                                batchRate: "",
+                                batchManufacturingDate: "",
+                                batchExpiryDate: "",
+                              });
+                            }}
                           >
-                            {openFormItemId === item.id
-                              ? "Close"
-                              : "Add Purchase"}
+                            + Add Batch
+                          </button>
+
+                          {/* EDIT */}
+                          <button
+                            className="px-2 py-1 text-xs bg-yellow-500 text-white rounded"
+                            onClick={() => {
+                              setOpenFormRowIndex(index);
+
+                              setEditingBatch({
+                                itemId: item.id,
+                                batchName: batch.batchName,
+                              });
+
+                              setBatchForm({
+                                batchName: batch.batchName || "",
+                                batchQuantity: String(
+                                  batch.batchQuantity ?? ""
+                                ),
+                                batchRate: String(batch.batchRate ?? ""),
+                                batchManufacturingDate:
+                                  batch.batchManufacturingDate || "",
+                                batchExpiryDate: batch.batchExpiryDate || "",
+                              });
+                            }}
+                          >
+                            Edit
+                          </button>
+
+                          {/* DELETE */}
+                          <button
+                            className="px-2 py-1 text-xs bg-red-600 text-white rounded"
+                            onClick={() =>
+                              handleDeleteBatch(item.id, batch.batchName)
+                            }
+                          >
+                            Delete
                           </button>
                         </td>
                       </tr>
 
-                      {/* ================= FORM ROW (ONLY ONE PER ITEM) ================= */}
-                      {openFormItemId === item.id && (
+                      {/* ================= ADD BATCH FORM ================= */}
+                      {openFormRowIndex === index && (
                         <tr>
-                          <td 
-                            colSpan={11} 
+                          <td
+                            colSpan={11}
                             className={`p-4 ${
                               theme === "dark" ? "bg-gray-700" : "bg-gray-100"
                             }`}
@@ -950,11 +806,7 @@ const BatchList: React.FC = () => {
                                 value={batchForm.batchName}
                                 onChange={handleChange}
                                 placeholder="Batch Number"
-                                className={`p-2 border rounded ${
-                                  theme === "dark"
-                                    ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400"
-                                    : "bg-white border-gray-300"
-                                }`}
+                                className="p-2 border rounded"
                               />
 
                               <input
@@ -963,11 +815,7 @@ const BatchList: React.FC = () => {
                                 value={batchForm.batchQuantity}
                                 onChange={handleChange}
                                 placeholder="Quantity"
-                                className={`p-2 border rounded ${
-                                  theme === "dark"
-                                    ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400"
-                                    : "bg-white border-gray-300"
-                                }`}
+                                className="p-2 border rounded"
                               />
 
                               <input
@@ -976,11 +824,7 @@ const BatchList: React.FC = () => {
                                 value={batchForm.batchRate}
                                 onChange={handleChange}
                                 placeholder="Rate"
-                                className={`p-2 border rounded ${
-                                  theme === "dark"
-                                    ? "bg-gray-600 border-gray-500 text-white placeholder-gray-400"
-                                    : "bg-white border-gray-300"
-                                }`}
+                                className="p-2 border rounded"
                               />
 
                               <input
@@ -988,11 +832,7 @@ const BatchList: React.FC = () => {
                                 name="batchManufacturingDate"
                                 value={batchForm.batchManufacturingDate}
                                 onChange={handleChange}
-                                className={`p-2 border rounded ${
-                                  theme === "dark"
-                                    ? "bg-gray-600 border-gray-500 text-white"
-                                    : "bg-white border-gray-300"
-                                }`}
+                                className="p-2 border rounded"
                               />
 
                               <input
@@ -1000,20 +840,29 @@ const BatchList: React.FC = () => {
                                 name="batchExpiryDate"
                                 value={batchForm.batchExpiryDate}
                                 onChange={handleChange}
-                                className={`p-2 border rounded ${
-                                  theme === "dark"
-                                    ? "bg-gray-600 border-gray-500 text-white"
-                                    : "bg-white border-gray-300"
-                                }`}
+                                className="p-2 border rounded"
                               />
                             </div>
 
-                            <div className="text-right mt-4">
+                            <div className="mt-4 flex justify-end space-x-2">
                               <button
-                                onClick={() => handleSaveBatch(item.id)}
+                                onClick={() => setOpenFormRowIndex(null)}
+                                className="px-4 py-2 bg-gray-400 text-white rounded"
+                              >
+                                Cancel
+                              </button>
+
+                              <button
+                                onClick={() => {
+                                  if (editingBatch) {
+                                    handleUpdateBatch();
+                                  } else {
+                                    handleSaveBatch(item.id);
+                                  }
+                                }}
                                 className="px-4 py-2 bg-green-600 text-white rounded"
                               >
-                                Save Batch
+                                {editingBatch ? "Update Batch" : "Save Batch"}
                               </button>
                             </div>
                           </td>

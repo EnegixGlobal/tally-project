@@ -58,8 +58,6 @@ router.get("/", async (req, res) => {
       batches: item.batches ? JSON.parse(item.batches) : [],
     }));
 
-    // console.log(formattedRows);
-
     return res.json({
       success: true,
       data: formattedRows,
@@ -334,7 +332,7 @@ router.post("/", async (req, res) => {
       );
 
       if (rows[0].count === 0) {
-        console.log(`⚠️ Adding missing column: ${column}`);
+      
         await connection.execute(
           `ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`
         );
@@ -349,11 +347,7 @@ router.post("/", async (req, res) => {
       "openingValue",
       "DECIMAL(10,2) DEFAULT 0"
     );
-    await ensureColumn(
-      "stock_items",
-      "type",
-      "VARCHAR(50) DEFAULT 'opening'"
-    );
+    await ensureColumn("stock_items", "type", "VARCHAR(50) DEFAULT 'opening'");
     await ensureColumn(
       "stock_items",
       "createdAt",
@@ -394,8 +388,7 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const sanitize = (v) =>
-      v === "" || v === undefined ? null : v;
+    const sanitize = (v) => (v === "" || v === undefined ? null : v);
 
     /* ===============================
        📦 BATCH CALCULATION
@@ -416,9 +409,8 @@ router.post("/", async (req, res) => {
         openingRate: rate,
         openingValue,
         batchExpiryDate: sanitize(b.batchExpiryDate),
-        batchManufacturingDate: sanitize(
-          b.batchManufacturingDate
-        ),
+        batchManufacturingDate: sanitize(b.batchManufacturingDate),
+        mode: "opening",
       };
     });
 
@@ -493,8 +485,7 @@ router.post("/", async (req, res) => {
         values[i] === null &&
         col.Field !== "id"
       ) {
-        values[i] =
-          col.Field === "createdAt" ? new Date() : "";
+        values[i] = col.Field === "createdAt" ? new Date() : "";
       }
     });
 
@@ -505,10 +496,7 @@ router.post("/", async (req, res) => {
       VALUES (${placeholders})
     `;
 
-    const [result] = await connection.execute(
-      insertQuery,
-      values
-    );
+    const [result] = await connection.execute(insertQuery, values);
 
     const stockItemId = result.insertId;
 
@@ -552,7 +540,6 @@ router.post("/", async (req, res) => {
     connection.release();
   }
 });
-
 
 // stock purchase item
 
@@ -752,7 +739,7 @@ router.get("/purchase-batch", async (req, res) => {
       batches: row.batches ? JSON.parse(row.batches) : [],
     }));
 
-    console.log("formattedRow", formattedRows);
+  
 
     res.json({
       success: true,
@@ -801,7 +788,7 @@ router.get("/barcode/:barcode", async (req, res) => {
 });
 
 // POST add a single batch to existing stock item
-router.post('/:id/batches', async (req, res) => {
+router.post("/:id/batches", async (req, res) => {
   const connection = await db.getConnection();
   try {
     await connection.beginTransaction();
@@ -813,13 +800,16 @@ router.post('/:id/batches', async (req, res) => {
       batchRate = 0,
       batchExpiryDate = null,
       batchManufacturingDate = null,
+      mode = "purchase",
       company_id,
       owner_type,
       owner_id,
     } = req.body;
 
     if (!id || !batchName) {
-      return res.status(400).json({ success: false, message: 'Missing item id or batchName' });
+      return res
+        .status(400)
+        .json({ success: false, message: "Missing item id or batchName" });
     }
 
     // Fetch existing item
@@ -829,18 +819,24 @@ router.post('/:id/batches', async (req, res) => {
     );
 
     if (!rows || rows.length === 0) {
-      return res.status(404).json({ success: false, message: 'Stock item not found' });
+      return res
+        .status(404)
+        .json({ success: false, message: "Stock item not found" });
     }
 
     const item = rows[0];
 
     // Optional access control: if company/owner provided, verify
     if (company_id && String(item.company_id) !== String(company_id)) {
-      return res.status(403).json({ success: false, message: 'Company mismatch' });
+      return res
+        .status(403)
+        .json({ success: false, message: "Company mismatch" });
     }
 
     if (owner_id && String(item.owner_id) !== String(owner_id)) {
-      return res.status(403).json({ success: false, message: 'Owner mismatch' });
+      return res
+        .status(403)
+        .json({ success: false, message: "Owner mismatch" });
     }
 
     let batches = [];
@@ -856,6 +852,7 @@ router.post('/:id/batches', async (req, res) => {
       batchQuantity: Number(batchQuantity) || 0,
       batchRate: Number(batchRate) || 0,
       batchExpiryDate: batchExpiryDate || null,
+      mode: mode || "purchase",
       batchManufacturingDate: batchManufacturingDate || null,
     };
 
@@ -868,11 +865,20 @@ router.post('/:id/batches', async (req, res) => {
 
     await connection.commit();
 
-    res.json({ success: true, message: 'Batch added', batch: newBatch, batches });
+    res.json({
+      success: true,
+      message: "Batch added",
+      batch: newBatch,
+      batches,
+    });
   } catch (err) {
-    console.error('🔥 Error adding batch:', err);
+    console.error("🔥 Error adding batch:", err);
     await connection.rollback();
-    res.status(500).json({ success: false, message: 'Error adding batch', error: err.message });
+    res.status(500).json({
+      success: false,
+      message: "Error adding batch",
+      error: err.message,
+    });
   } finally {
     connection.release();
   }
@@ -957,10 +963,7 @@ router.delete("/:id", async (req, res) => {
     );
 
     // 🔹 4. Delete stock item
-    await connection.execute(
-      "DELETE FROM stock_items WHERE id = ?",
-      [id]
-    );
+    await connection.execute("DELETE FROM stock_items WHERE id = ?", [id]);
 
     await connection.commit();
 
@@ -979,7 +982,6 @@ router.delete("/:id", async (req, res) => {
     connection.release();
   }
 });
-
 
 //put item
 router.put("/:id", async (req, res) => {
@@ -1007,7 +1009,7 @@ router.put("/:id", async (req, res) => {
       );
 
       if (rows[0].count === 0) {
-        console.log(`⚠️ Adding missing column: ${column}`);
+        
         await connection.execute(
           `ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`
         );
@@ -1077,6 +1079,7 @@ router.put("/:id", async (req, res) => {
         openingValue,
         batchExpiryDate: sanitize(b.batchExpiryDate),
         batchManufacturingDate: sanitize(b.batchManufacturingDate),
+        mode: "opening",
       };
     });
 
@@ -1160,13 +1163,7 @@ router.put("/:id", async (req, res) => {
 
 router.get("/:id", async (req, res) => {
   const { id } = req.params;
-  const { company_id, owner_type, owner_id } = req.query;
-
-  if (!id) {
-    return res
-      .status(400)
-      .json({ success: false, message: "Stock item ID is required" });
-  }
+  const { company_id, owner_type, owner_id, mode } = req.query;
 
   const connection = await db.getConnection();
   try {
@@ -1214,25 +1211,32 @@ router.get("/:id", async (req, res) => {
     if (!rows.length) {
       return res.status(404).json({
         success: false,
-        message: "No stock item found for this tenant",
+        message: "No stock item found",
       });
     }
 
     const item = rows[0];
 
+    // 🔥 batches parse
+    let batches = item.batches ? JSON.parse(item.batches) : [];
+
+    // 🔥 MODE FILTER (opening / purchase)
+    if (mode) {
+      batches = batches.filter(
+        (b) => b.mode && b.mode.toLowerCase() === mode.toLowerCase()
+      );
+    }
+   
     res.json({
       success: true,
       data: {
         ...item,
-        batches: item.batches ? JSON.parse(item.batches) : [],
+        batches,
       },
     });
   } catch (err) {
-    console.error("🔥 Error fetching single stock item:", err);
-    return res.status(500).json({
-      success: false,
-      message: "Error fetching stock item",
-    });
+    console.error("🔥 Error:", err);
+    res.status(500).json({ success: false, message: "Server error" });
   } finally {
     connection.release();
   }
@@ -1244,72 +1248,57 @@ router.patch("/:id/batches", async (req, res) => {
   const { company_id, owner_type, owner_id } = req.query;
   const { batchName, quantity, rate } = req.body;
 
-  // Accept empty string or null batchName — only quantity is strictly required
   if (quantity === undefined) {
     return res.status(400).json({
       success: false,
-      message: "quantity required",
+      message: "quantity is required",
     });
   }
 
   const connection = await db.getConnection();
   try {
     const [rows] = await connection.execute(
-      `SELECT batches FROM stock_items WHERE id=? AND company_id=? AND owner_type=? AND owner_id=?`,
+      `SELECT batches FROM stock_items
+       WHERE id=? AND company_id=? AND owner_type=? AND owner_id=?`,
       [id, company_id, owner_type, owner_id]
     );
 
     if (!rows.length) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Item not found" });
+      return res.status(404).json({
+        success: false,
+        message: "Stock item not found",
+      });
     }
 
     let batches = JSON.parse(rows[0].batches || "[]");
-    const diffQty = Number(quantity); // +ve Purchase, -ve Sales
 
-    // 🔍 Find batch — treat null and empty string as equivalent so
-    // frontend sending "" will match stored null/"" batches
-    const targetName = batchName == null ? "" : String(batchName);
     const index = batches.findIndex(
-      (b) => String(b.batchName ?? "") === targetName
+      (b) => String(b.batchName ?? "") === String(batchName ?? "")
     );
 
-    if (index >= 0) {
-      let currentQty = Number(batches[index].batchQuantity || 0);
-      let updatedQty = currentQty + diffQty;
-
-      // ❌ Prevent Negative Stock
-      if (updatedQty < 0) {
-        return res.status(400).json({
-          success: false,
-          message: `Not enough stock in batch! Available: ${currentQty}`,
-        });
-      }
-
-      // 🔥 Update quantity
-      batches[index].batchQuantity = updatedQty;
-
-      // 🔥 Update rate only if positive showing purchase
-      if (Number(diffQty) > 0 && Number(rate) > 0) {
-        batches[index].batchRate = Number(rate);
-      }
-    } else {
-      // 🆕 New batch creation only if purchase / positive qty
-      if (diffQty < 0) {
-        return res.status(404).json({
-          success: false,
-          message: "Batch not found for Sales",
-        });
-      }
-
-      batches.push({
-        batchName,
-        batchQuantity: diffQty,
-        batchRate: Number(rate) || 0,
-        batchExpiryDate: null,
-        batchManufacturingDate: null,
+    if (index === -1) {
+      return res.status(404).json({
+        success: false,
+        message: "Batch not found",
       });
+    }
+
+    // =========================
+    // ✅ PURE REPLACE LOGIC
+    // =========================
+    const newQty = Number(quantity);
+
+    if (newQty < 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Quantity cannot be negative",
+      });
+    }
+
+    batches[index].batchQuantity = newQty;
+
+    if (rate !== undefined) {
+      batches[index].batchRate = Number(rate);
     }
 
     await connection.execute(`UPDATE stock_items SET batches=? WHERE id=?`, [
@@ -1317,17 +1306,16 @@ router.patch("/:id/batches", async (req, res) => {
       id,
     ]);
 
-    return res.json({
+    res.json({
       success: true,
       message: "Batch updated successfully",
-      updatedBatches: batches,
+      updatedBatch: batches[index],
     });
   } catch (err) {
     console.error("🔥 Batch Update Error:", err);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
-      message: "Failed to update batch stock",
-      error: err.message,
+      message: "Failed to update batch",
     });
   } finally {
     connection.release();
@@ -1398,8 +1386,5 @@ router.delete("/:id/batch", async (req, res) => {
     connection.release();
   }
 });
-
-
-
 
 module.exports = router;
