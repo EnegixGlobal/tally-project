@@ -80,6 +80,10 @@ const BatchList: React.FC = () => {
       owner_type === "employee" ? "employee_id" : "user_id"
     );
 
+    // Get the mode from the first batch of this item, or default to 'purchase'
+    const item = mergedStockItems.find(i => String(i.id) === String(itemId));
+    const batchMode = (item?.batches?.[0]?.mode) || "purchase";
+
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches`,
@@ -92,7 +96,7 @@ const BatchList: React.FC = () => {
             batchRate: Number(batchForm.batchRate),
             batchExpiryDate: batchForm.batchExpiryDate || null,
             batchManufacturingDate: batchForm.batchManufacturingDate || null,
-            mode: "purchase",
+            mode: batchMode,
             company_id,
             owner_type,
             owner_id,
@@ -174,6 +178,11 @@ const BatchList: React.FC = () => {
       owner_type === "employee" ? "employee_id" : "user_id"
     );
 
+    // Find the current batch to get its mode
+    const item = mergedStockItems.find(i => String(i.id) === String(editingBatch.itemId));
+    const currentBatch = item?.batches?.find(b => b.batchName === editingBatch.batchName);
+    const batchMode = currentBatch?.mode || "purchase";
+
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/stock-items/${
@@ -187,6 +196,7 @@ const BatchList: React.FC = () => {
             batchName: editingBatch.batchName,
             quantity: Number(batchForm.batchQuantity),
             rate: Number(batchForm.batchRate),
+            mode: batchMode,
           }),
         }
       );
