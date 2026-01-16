@@ -52,37 +52,6 @@ const GSTR3B: React.FC = () => {
   const [generatedArn, setGeneratedArn] = useState("");
   const [draftData, setDraftData] = useState<any | null>(null);
 
-  // get basedata
-  const baseGroups = [
-    { id: -1, name: "Branch Accounts", nature: "Assets", isSystem: true },
-    { id: -2, name: "Branch OD A/c", nature: "Assets", isSystem: true },
-    { id: -3, name: "Branch/Division", nature: "Assets", isSystem: true },
-    { id: -4, name: "Capital Account", nature: "Liabilities", isSystem: true },
-    { id: -5, name: "Current Assets", nature: "Assets", isSystem: true },
-    {
-      id: -6,
-      name: "Current Liabilities",
-      nature: "Liabilities",
-      isSystem: true,
-    },
-    { id: -7, name: "Direct Expenses", nature: "Expenses", isSystem: true },
-    { id: -8, name: "Direct Income", nature: "Income", isSystem: true },
-    { id: -9, name: "Fixed Assets", nature: "Assets", isSystem: true },
-    { id: -10, name: "Indirect Expenses", nature: "Expenses", isSystem: true },
-    { id: -11, name: "Indirect Income", nature: "Income", isSystem: true },
-    { id: -12, name: "Investments", nature: "Assets", isSystem: true },
-    { id: -13, name: "Loan(Liability)", nature: "Liabilities", isSystem: true },
-    {
-      id: -14,
-      name: "Misc expenses (Assets)",
-      nature: "Assets",
-      isSystem: true,
-    },
-    { id: -15, name: "Purchase Accounts", nature: "Expenses", isSystem: true },
-    { id: -16, name: "Sales Accounts", nature: "Income", isSystem: true },
-    { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },
-  ];
-
   //basic information
   const [basicInfo, setBasicInfo] = useState({
     gstin: "",
@@ -126,8 +95,7 @@ const GSTR3B: React.FC = () => {
     },
   });
 
-  // get ledger data
-  const [Data, setData] = useState<any[]>([]);
+
 
   // const filterledger = 'Nill Rated' ,'Exempted','Zero Rated'
 
@@ -175,63 +143,11 @@ const GSTR3B: React.FC = () => {
     })();
 
     return () => {
-      isMounted = false; // 🔥 STRICTMODE SAFE
+      isMounted = false;
     };
   }, []);
 
-  console.log("leder", threepointone.a);
-
-  // sales data get
-  const [saledata, setSalesdata] = useState<any[]>([]);
-
-  useEffect(() => {
-    (async () => {
-      try {
-        if (!companyId || !ownerType || !ownerId) return;
-
-        const url = `${
-          import.meta.env.VITE_API_URL
-        }/api/gstr3b?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
-
-        const res = await fetch(url);
-        const json = await res.json();
-
-        console.log("GSTR-3B API:", json);
-
-        const a = json?.a;
-        const b = json?.b;
-        const c = json?.c;
-
-        const nilTotal = c?.nil?.total ?? 0;
-        const exemptedTotal = c?.exempted?.total ?? 0;
-
-        setThreepointone({
-          a: {
-            taxableValue: a?.taxable_value ?? 0,
-            integratedTax: a?.integrated_tax ?? 0,
-            centralTax: a?.central_tax ?? 0,
-            stateUTTax: a?.state_tax ?? 0,
-            cess: 0,
-          },
-
-          // ✅ B SECTION FIX
-          b: {
-            taxableValue: b?.total ?? 0,
-          },
-
-          // ✅ C SECTION: combine nil + exempted totals
-          c: {
-            taxableValue: nilTotal + exemptedTotal,
-          },
-        });
-      } catch (err) {
-        console.error("❌ GSTR3B Fetch Error:", err);
-      }
-    })();
-  }, []);
-
-  console.log("saled", saledata);
-
+ 
   return (
     <div className="pt-[56px] px-4">
       {/* Header */}

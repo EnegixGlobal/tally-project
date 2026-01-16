@@ -84,46 +84,76 @@ router.get("/", async (req, res) => {
     /* =====================================================
        2️⃣ PURCHASE VOUCHERS → DEBIT
     ===================================================== */
+
     const [purchaseRows] = await db.query(
       `
-      SELECT
-        pv.id, pv.number, pv.date, pv.narration, pv.referenceNo,
-        pv.supplierInvoiceDate, pv.purchaseLedgerId, pv.total,
-        pv.company_id, pv.owner_type, pv.owner_id,
-        l.name AS ledger_name
-      FROM purchase_vouchers pv
-      LEFT JOIN ledgers l ON l.id = pv.purchaseLedgerId
-      WHERE pv.company_id = ?
-        AND pv.owner_type = ?
-        AND pv.owner_id = ?
-      `,
+  SELECT
+    pv.partyId,
+    party.name AS party_name,
+    pv.purchaseLedgerId,
+    pv.number AS voucher_number,
+    pl.name AS purchase_ledger_name,
+    SUM(pv.total) AS total_amount
+  FROM purchase_vouchers pv
+  LEFT JOIN ledgers party ON party.id = pv.partyId
+  LEFT JOIN ledgers pl ON pl.id = pv.purchaseLedgerId
+  WHERE pv.company_id = ?
+    AND pv.owner_type = ?
+    AND pv.owner_id = ?
+  GROUP BY pv.partyId, pv.purchaseLedgerId
+  `,
       [company_id, owner_type, owner_id]
     );
 
-    purchaseRows.forEach((pv) => {
-      vouchers[`PUR-${pv.id}`] = {
-        id: `PUR-${pv.id}`,
-        voucher_type: "Purchase",
-        voucher_number: pv.number,
-        date: pv.date,
-        narration: pv.narration,
-        reference_no: pv.referenceNo,
-        supplier_invoice_date: pv.supplierInvoiceDate,
-        company_id: pv.company_id,
-        owner_type: pv.owner_type,
-        owner_id: pv.owner_id,
-        entries: [
-          {
-            id: `PUR-E-${pv.id}`,
-            ledger_id: pv.purchaseLedgerId,
-            ledger_name: pv.ledger_name,
-            amount: pv.total,
-            entry_type: "debit",
-            narration: pv.narration,
-            item_id: null,
-          },
-        ],
-      };
+    purchaseRows.forEach((row) => {
+      const key = `PUR-${row.partyId}`;
+
+      // 🟢 CREATE VOUCHER ONCE PER PARTY
+      if (!vouchers[key]) {
+        vouchers[key] = {
+          id: key,
+          voucher_type: "Purchase Register",
+          voucher_number: row.voucher_number,
+          date: null,
+          narration: null,
+          reference_no: null,
+          supplier_invoice_date: null,
+          company_id,
+          owner_type,
+          owner_id,
+          partyId: row.partyId,
+          partyName: row.party_name,
+          entries: [],
+        };
+
+        // 🔴 PARTY ENTRY → CREDIT
+        vouchers[key].entries.push({
+          id: `PUR-P-${row.partyId}`,
+          ledger_id: row.partyId,
+          ledger_name: row.party_name,
+          amount: 0, // total later
+          entry_type: "credit",
+          narration: "Purchase Register",
+          isParty: true,
+        });
+      }
+
+      // 🟡 PURCHASE LEDGER → DEBIT
+      vouchers[key].entries.push({
+        id: `PUR-L-${row.partyId}-${row.purchaseLedgerId}`,
+        ledger_id: row.purchaseLedgerId,
+        ledger_name: row.purchase_ledger_name,
+        amount: Number(row.total_amount),
+        entry_type: "debit",
+        narration: null,
+        isParty: false,
+      });
+
+      // 🔵 UPDATE PARTY CREDIT TOTAL
+      const partyEntry = vouchers[key].entries.find((e) => e.isParty);
+      if (partyEntry) {
+        partyEntry.amount += Number(row.total_amount);
+      }
     });
 
     /* =====================================================
@@ -131,46 +161,75 @@ router.get("/", async (req, res) => {
     ===================================================== */
     const [salesRows] = await db.query(
       `
-      SELECT
-        sv.id, sv.number, sv.date, sv.narration, sv.referenceNo,
-        sv.supplierInvoiceDate, sv.salesLedgerId, sv.total,
-        sv.company_id, sv.owner_type, sv.owner_id,
-        l.name AS ledger_name
-      FROM sales_vouchers sv
-      LEFT JOIN ledgers l ON l.id = sv.salesLedgerId
-      WHERE sv.company_id = ?
-        AND sv.owner_type = ?
-        AND sv.owner_id = ?
-        AND sv.type = 'sales'
-        AND sv.isQuotation = 0
-      `,
+  SELECT
+    sv.partyId,
+    party.name AS party_name,
+    sv.salesLedgerId,
+    sv.number AS voucher_number,
+    sl.name AS sales_ledger_name,
+    SUM(sv.total) AS total_amount
+  FROM sales_vouchers sv
+  LEFT JOIN ledgers party ON party.id = sv.partyId
+  LEFT JOIN ledgers sl ON sl.id = sv.salesLedgerId
+  WHERE sv.company_id = ?
+    AND sv.owner_type = ?
+    AND sv.owner_id = ?
+    AND sv.type = 'sales'
+    AND sv.isQuotation = 0
+  GROUP BY sv.partyId, sv.salesLedgerId
+  `,
       [company_id, owner_type, owner_id]
     );
 
-    salesRows.forEach((sv) => {
-      vouchers[`SAL-${sv.id}`] = {
-        id: `SAL-${sv.id}`,
-        voucher_type: "Sales",
-        voucher_number: sv.number,
-        date: sv.date,
-        narration: sv.narration,
-        reference_no: sv.referenceNo,
-        supplier_invoice_date: sv.supplierInvoiceDate,
-        company_id: sv.company_id,
-        owner_type: sv.owner_type,
-        owner_id: sv.owner_id,
-        entries: [
-          {
-            id: `SAL-E-${sv.id}`,
-            ledger_id: sv.salesLedgerId,
-            ledger_name: sv.ledger_name,
-            amount: sv.total,
-            entry_type: "credit",
-            narration: sv.narration,
-            item_id: null,
-          },
-        ],
-      };
+    salesRows.forEach((row) => {
+      const key = `SAL-${row.partyId}`;
+
+      // 🟢 CREATE VOUCHER ONCE PER PARTY
+      if (!vouchers[key]) {
+        vouchers[key] = {
+          id: key,
+          voucher_type: "Sales Register",
+          voucher_number: row.voucher_number,
+          date: null,
+          narration: null,
+          reference_no: null,
+          supplier_invoice_date: null,
+          company_id,
+          owner_type,
+          owner_id,
+          partyId: row.partyId,
+          partyName: row.party_name,
+          entries: [],
+        };
+
+        // 🔴 PARTY → DEBIT
+        vouchers[key].entries.push({
+          id: `SAL-P-${row.partyId}`,
+          ledger_id: row.partyId,
+          ledger_name: row.party_name,
+          amount: 0,
+          entry_type: "debit",
+          narration: "Sales Register",
+          isParty: true,
+        });
+      }
+
+      // 🟡 SALES LEDGER → CREDIT
+      vouchers[key].entries.push({
+        id: `SAL-L-${row.partyId}-${row.salesLedgerId}`,
+        ledger_id: row.salesLedgerId,
+        ledger_name: row.sales_ledger_name,
+        amount: Number(row.total_amount),
+        entry_type: "credit",
+        narration: null,
+        isParty: false,
+      });
+
+      // 🔵 UPDATE PARTY DEBIT TOTAL
+      const partyEntry = vouchers[key].entries.find((e) => e.isParty);
+      if (partyEntry) {
+        partyEntry.amount += Number(row.total_amount);
+      }
     });
 
     /* =====================================================
@@ -272,16 +331,42 @@ router.get("/", async (req, res) => {
       [company_id, owner_type, owner_id]
     );
 
-    creditRows.forEach((cv) => {
+    for (const cv of creditRows) {
       let entries = [];
       let narrationText = "";
 
       if (cv.narration) {
         try {
           const parsed = JSON.parse(cv.narration);
-          entries = parsed.accountingEntries || [];
           narrationText = parsed.note || "";
-        } catch {
+
+          if (Array.isArray(parsed.accountingEntries)) {
+            const ledgerIds = parsed.accountingEntries.map((e) => e.ledgerId);
+
+            // 🔹 FETCH LEDGER NAMES
+            let ledgerMap = {};
+            if (ledgerIds.length > 0) {
+              const [ledgerRows] = await db.query(
+                `SELECT id, name FROM ledgers WHERE id IN (?)`,
+                [ledgerIds]
+              );
+
+              ledgerRows.forEach((l) => {
+                ledgerMap[l.id] = l.name;
+              });
+            }
+
+            entries = parsed.accountingEntries.map((e, index) => ({
+              id: `CRN-E-${cv.id}-${index}`,
+              ledger_id: e.ledgerId,
+              ledger_name: ledgerMap[e.ledgerId] || `Ledger ${e.ledgerId}`,
+              amount: Number(e.amount),
+              entry_type: e.type, // debit / credit
+              narration: narrationText,
+              item_id: null,
+            }));
+          }
+        } catch (err) {
           narrationText = cv.narration;
         }
       }
@@ -292,25 +377,14 @@ router.get("/", async (req, res) => {
         voucher_number: cv.number,
         date: cv.date,
         narration: narrationText,
-
         reference_no: cv.mode,
-
         supplier_invoice_date: null,
         company_id: cv.company_id,
         owner_type: cv.owner_type,
         owner_id: cv.owner_id,
-
-        entries: entries.map((e, index) => ({
-          id: `CRN-E-${cv.id}-${index}`,
-          ledger_id: e.ledgerId,
-          ledger_name: null, // optional (ledger join chaho to kar sakte ho)
-          amount: e.amount,
-          entry_type: e.type, // debit / credit
-          narration: narrationText,
-          item_id: null,
-        })),
+        entries,
       };
-    });
+    }
 
     /* =====================================================
        FINAL RESPONSE
