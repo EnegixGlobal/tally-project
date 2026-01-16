@@ -38,39 +38,69 @@ router.get("/report", async (req, res) => {
     const ledger = ledRows[0];
 
     /* ===============================
-       2️⃣ PURCHASE VOUCHERS → DEBIT
+       2️⃣ PURCHASE VOUCHERS → DEBIT/CREDIT
     =============================== */
     const [purchaseVouchers] = await connection.execute(
-      `SELECT id, number, date, narration, partyId, total
-       FROM purchase_vouchers
-       WHERE partyId = ?
-       ORDER BY date ASC, id ASC`,
-      [ledgerId]
+      `SELECT pv.id, pv.number, pv.date, pv.narration, pv.partyId, pv.purchaseLedgerId, pv.total,
+              CASE 
+                WHEN pv.purchaseLedgerId = ? THEN pv.partyId
+                ELSE pv.purchaseLedgerId
+              END AS otherLedgerId,
+              CASE 
+                WHEN pv.purchaseLedgerId = ? THEN l_party.name
+                ELSE l_purchase.name
+              END AS partyName
+       FROM purchase_vouchers pv
+       LEFT JOIN ledgers l_party ON l_party.id = pv.partyId
+       LEFT JOIN ledgers l_purchase ON l_purchase.id = pv.purchaseLedgerId
+       WHERE pv.purchaseLedgerId = ? OR pv.partyId = ?
+       ORDER BY pv.date ASC, pv.id ASC`,
+      [ledgerId, ledgerId, ledgerId, ledgerId]
     );
 
     /* ===============================
-       3️⃣ SALES VOUCHERS → CREDIT
+       3️⃣ SALES VOUCHERS → CREDIT/DEBIT
     =============================== */
     const [salesVouchers] = await connection.execute(
-      `SELECT id, number, date, narration, partyId, total, isQuotation
-       FROM sales_vouchers
-       WHERE partyId = ?
-         AND type = 'sales'
-         AND isQuotation = 0
-       ORDER BY date ASC, id ASC`,
-      [ledgerId]
+      `SELECT sv.id, sv.number, sv.date, sv.narration, sv.partyId, sv.salesLedgerId, sv.total, sv.isQuotation,
+              CASE 
+                WHEN sv.salesLedgerId = ? THEN sv.partyId
+                ELSE sv.salesLedgerId
+              END AS otherLedgerId,
+              CASE 
+                WHEN sv.salesLedgerId = ? THEN l_party.name
+                ELSE l_sales.name
+              END AS partyName
+       FROM sales_vouchers sv
+       LEFT JOIN ledgers l_party ON l_party.id = sv.partyId
+       LEFT JOIN ledgers l_sales ON l_sales.id = sv.salesLedgerId
+       WHERE (sv.salesLedgerId = ? OR sv.partyId = ?)
+         AND sv.type = 'sales'
+         AND sv.isQuotation = 0
+       ORDER BY sv.date ASC, sv.id ASC`,
+      [ledgerId, ledgerId, ledgerId, ledgerId]
     );
 
     /* ===============================
-       3️⃣A QUOTATIONS → CREDIT
+       3️⃣A QUOTATIONS → CREDIT/DEBIT
     =============================== */
     const [quotations] = await connection.execute(
-      `SELECT id, number, date, narration, partyId, total, isQuotation
-       FROM sales_vouchers
-       WHERE partyId = ?
-         AND isQuotation = 1
-       ORDER BY date ASC, id ASC`,
-      [ledgerId]
+      `SELECT sv.id, sv.number, sv.date, sv.narration, sv.partyId, sv.salesLedgerId, sv.total, sv.isQuotation,
+              CASE 
+                WHEN sv.salesLedgerId = ? THEN sv.partyId
+                ELSE sv.salesLedgerId
+              END AS otherLedgerId,
+              CASE 
+                WHEN sv.salesLedgerId = ? THEN l_party.name
+                ELSE l_sales.name
+              END AS partyName
+       FROM sales_vouchers sv
+       LEFT JOIN ledgers l_party ON l_party.id = sv.partyId
+       LEFT JOIN ledgers l_sales ON l_sales.id = sv.salesLedgerId
+       WHERE (sv.salesLedgerId = ? OR sv.partyId = ?)
+         AND sv.isQuotation = 1
+       ORDER BY sv.date ASC, sv.id ASC`,
+      [ledgerId, ledgerId, ledgerId, ledgerId]
     );
 
     /* ===============================
@@ -287,7 +317,7 @@ router.get("/report", async (req, res) => {
         date: pv.date,
         voucherType: "Purchase",
         voucherNo: pv.number,
-        particulars: pv.partyId.toString(),
+        particulars: pv.partyName || pv.partyId.toString(),
         debit,
         credit: 0,
         balance,
@@ -304,7 +334,7 @@ router.get("/report", async (req, res) => {
         date: sv.date,
         voucherType: "Sales",
         voucherNo: sv.number,
-        particulars: sv.partyId.toString(),
+        particulars: sv.partyName || sv.partyId.toString(),
         debit: 0,
         credit,
         balance,
@@ -321,7 +351,7 @@ router.get("/report", async (req, res) => {
         date: qt.date,
         voucherType: "Quotation",
         voucherNo: qt.number,
-        particulars: qt.partyId.toString(),
+        particulars: qt.partyName || qt.partyId.toString(),
         debit: 0,
         credit,
         balance,
