@@ -350,48 +350,47 @@ const DayBook: React.FC = () => {
   }, [selectedDate]);
 
   const getGroupedAmounts = (voucher: VoucherGroup) => {
-  const total = voucher.totalDebit + voucher.totalCredit;
-  const type = voucher.voucherType.toLowerCase();
+    const total = voucher.totalDebit + voucher.totalCredit;
+    const type = voucher.voucherType.toLowerCase();
 
-  // 🟡 PURCHASE → CREDIT
-  if (type.includes("purchase")) {
+    // 🟡 PURCHASE → CREDIT
+    if (type.includes("purchase")) {
+      return {
+        debit: 0,
+        credit: total,
+      };
+    }
+
+    // 🟢 SALES → DEBIT
+    if (type.includes("sales")) {
+      return {
+        debit: total,
+        credit: 0,
+      };
+    }
+
+    // 🔵 DEBIT NOTE → DEBIT ONLY
+    if (type.includes("debit")) {
+      return {
+        debit: total,
+        credit: 0,
+      };
+    }
+
+    // 🟣 CREDIT NOTE → CREDIT ONLY
+    if (type.includes("credit")) {
+      return {
+        debit: 0,
+        credit: total,
+      };
+    }
+
+    // ⚪ DEFAULT (payment, receipt, journal, contra)
     return {
-      debit: 0,
-      credit: total,
+      debit: voucher.totalDebit,
+      credit: voucher.totalCredit,
     };
-  }
-
-  // 🟢 SALES → DEBIT
-  if (type.includes("sales")) {
-    return {
-      debit: total,
-      credit: 0,
-    };
-  }
-
-  // 🔵 DEBIT NOTE → DEBIT ONLY
-  if (type.includes("debit")) {
-    return {
-      debit: total,
-      credit: 0,
-    };
-  }
-
-  // 🟣 CREDIT NOTE → CREDIT ONLY
-  if (type.includes("credit")) {
-    return {
-      debit: 0,
-      credit: total,
-    };
-  }
-
-  // ⚪ DEFAULT (payment, receipt, journal, contra)
-  return {
-    debit: voucher.totalDebit,
-    credit: voucher.totalCredit,
   };
-};
-
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -721,11 +720,7 @@ const DayBook: React.FC = () => {
                       onClick={() => handleVoucherClick(voucher)}
                     >
                       <td className="px-4 py-3">
-                        {formatDate(
-                          typeof voucher.date === "string"
-                            ? voucher.date
-                            : String(voucher.date)
-                        )}
+                        {voucher.date ? formatDate(String(voucher.date)) : "—"}
                       </td>
 
                       <td className="px-4 py-3">
