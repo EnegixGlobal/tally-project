@@ -91,52 +91,6 @@ const DayBook: React.FC = () => {
   //  const [entries, setEntries] = useState([]);
   //  const [entries, setEntries] = useState<DayBookEntry[]>([]);
 
-  //get all ledger
-  const [ledgers, setLedgers] = useState<any[]>([]);
-
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const companyId =
-          localStorage.getItem("company_id") ||
-          localStorage.getItem("company_id");
-        const ownerType = localStorage.getItem("supplier");
-        const ownerId =
-          ownerType === "employee"
-            ? localStorage.getItem("employee_id") ||
-              localStorage.getItem("employee_id")
-            : localStorage.getItem("user_id") ||
-              localStorage.getItem("user_id");
-
-        if (!companyId || !ownerType || !ownerId) {
-          console.error("Missing required identifiers for ledger GET");
-          setLedgers([]);
-          return;
-        }
-
-        // Fetch ledgers scoped to company & owner
-        const ledgerRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
-          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-        );
-        const ledgerData = await ledgerRes.json();
-
-        if (ledgerRes.ok) {
-          setLedgers(Array.isArray(ledgerData) ? ledgerData : []);
-        } else {
-          console.error(ledgerData.message || "Failed to fetch ledgers");
-          setLedgers([]);
-        }
-      } catch (err) {
-        console.error("Failed to load data", err);
-        setLedgers([]);
-      }
-    };
-
-    fetchData();
-  }, []);
-
   const allowEntryByVoucherType = (
     voucherType: string,
     entryType: "debit" | "credit"
@@ -167,7 +121,7 @@ const DayBook: React.FC = () => {
       .then((res) => res.json())
       .then((data) => {
         const grouped: Record<string, VoucherGroup> = {};
-
+        console.log("this is data", data);
         // 🔹 RAW entries for Detailed view
         const allDetailedEntriesRaw: DayBookEntry[] = [];
 
@@ -394,6 +348,50 @@ const DayBook: React.FC = () => {
       vouchersCount: filteredGrouped.length,
     });
   }, [selectedDate]);
+
+  const getGroupedAmounts = (voucher: VoucherGroup) => {
+  const total = voucher.totalDebit + voucher.totalCredit;
+  const type = voucher.voucherType.toLowerCase();
+
+  // 🟡 PURCHASE → CREDIT
+  if (type.includes("purchase")) {
+    return {
+      debit: 0,
+      credit: total,
+    };
+  }
+
+  // 🟢 SALES → DEBIT
+  if (type.includes("sales")) {
+    return {
+      debit: total,
+      credit: 0,
+    };
+  }
+
+  // 🔵 DEBIT NOTE → DEBIT ONLY
+  if (type.includes("debit")) {
+    return {
+      debit: total,
+      credit: 0,
+    };
+  }
+
+  // 🟣 CREDIT NOTE → CREDIT ONLY
+  if (type.includes("credit")) {
+    return {
+      debit: 0,
+      credit: total,
+    };
+  }
+
+  // ⚪ DEFAULT (payment, receipt, journal, contra)
+  return {
+    debit: voucher.totalDebit,
+    credit: voucher.totalCredit,
+  };
+};
+
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -762,12 +760,22 @@ const DayBook: React.FC = () => {
                       <td className="px-4 py-3">
                         {voucher.entriesCount} entries
                       </td>
-                      <td className="px-4 py-3 text-right font-mono">
-                        {formatCurrency(voucher.totalDebit)}
-                      </td>
-                      <td className="px-4 py-3 text-right font-mono">
-                        {formatCurrency(voucher.totalCredit)}
-                      </td>
+                      {(() => {
+                        const amt = getGroupedAmounts(voucher);
+                        return (
+                          <>
+                            <td className="px-4 py-3 text-right font-mono">
+                              {amt.debit > 0 ? formatCurrency(amt.debit) : "-"}
+                            </td>
+                            <td className="px-4 py-3 text-right font-mono">
+                              {amt.credit > 0
+                                ? formatCurrency(amt.credit)
+                                : "-"}
+                            </td>
+                          </>
+                        );
+                      })()}
+
                       <td className="px-4 py-3 text-center">
                         <button
                           onClick={(e) => {
@@ -1026,98 +1034,62 @@ const DayBook: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {(rawVoucherEntries[selectedVoucher.voucherId] ?? []).map(
-                        (entry, index) => (
-                          <tr
-                            key={index}
-                            className={`border-t ${
-                              theme === "dark"
-                                ? "border-gray-600"
-                                : "border-gray-200"
-                            }`}
-                          >
-                            {/* ITEM / LEDGER NAME */}
-                            <td className="px-3 py-2">
-                              {entry.itemId ? (
-                                <div>
-                                  <div className="font-medium">
-                                    {getItemName(entry.itemId)}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    Item
-                                  </div>
-                                </div>
-                              ) : (
-                                <div>
-                                  <div className="font-medium">
-                                    {entry.ledgerName}
-                                  </div>
-                                  <div className="text-xs text-gray-500">
-                                    Ledger
-                                  </div>
-                                </div>
-                              )}
+                      {(() => {
+                        const entries =
+                          rawVoucherEntries[selectedVoucher.voucherId] ?? [];
 
-                              {entry.narration && (
-                                <div className="text-xs text-gray-500 mt-1">
-                                  {entry.narration}
-                                </div>
-                              )}
-                            </td>
+                        const partyEntry = entries.find((e) => e.isParty);
+                        const ledgerEntries = entries.filter((e) => !e.isParty);
 
-                            {/* VOUCHER NO */}
-                            <td className="px-3 py-2 text-right font-mono">
-                              {entry.voucherNo}
-                            </td>
+                        return (
+                          <>
+                            {/* PARTY (PARENT) */}
+                            {partyEntry && (
+                              <tr className="font-semibold bg-gray-100 dark:bg-gray-700">
+                                <td className="px-3 py-2">
+                                  {partyEntry.ledgerName}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono">
+                                  {selectedVoucher.voucherNo}
+                                </td>
+                                <td className="px-3 py-2 text-right capitalize">
+                                  {selectedVoucher.voucherType}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono">
+                                  {formatCurrency(partyEntry.amount)}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono">
+                                  -
+                                </td>
+                              </tr>
+                            )}
 
-                            {/* VOUCHER TYPE */}
-                            <td className="px-3 py-2 text-right capitalize">
-                              {entry.voucherType}
-                            </td>
-
-                            {/* DEBIT */}
-                            <td className="px-3 py-2 text-right font-mono">
-                              {entry.debit > 0
-                                ? formatCurrency(entry.debit)
-                                : "-"}
-                            </td>
-
-                            {/* CREDIT */}
-                            <td className="px-3 py-2 text-right font-mono">
-                              {entry.credit > 0
-                                ? formatCurrency(entry.credit)
-                                : "-"}
-                            </td>
-                          </tr>
-                        )
-                      )}
-
-                      {/* TOTAL ROW */}
-                      <tr
-                        className={`border-t-2 font-bold ${
-                          theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                        }`}
-                      >
-                        <td colSpan={3} className="px-3 py-2">
-                          Total:
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">
-                          {formatCurrency(
-                            (
-                              rawVoucherEntries[selectedVoucher.voucherId] ?? []
-                            ).reduce((sum, e) => sum + e.debit, 0)
-                          )}
-                        </td>
-                        <td className="px-3 py-2 text-right font-mono">
-                          {formatCurrency(
-                            (
-                              rawVoucherEntries[selectedVoucher.voucherId] ?? []
-                            ).reduce((sum, e) => sum + e.credit, 0)
-                          )}
-                        </td>
-                      </tr>
+                            {/* LEDGER BREAKUP */}
+                            {ledgerEntries.map((entry, index) => (
+                              <tr
+                                key={index}
+                                className="border-t border-gray-200 dark:border-gray-600"
+                              >
+                                <td className="px-3 py-2 pl-8">
+                                  {entry.ledgerName}
+                                </td>
+                                <td></td>
+                                <td></td>
+                                <td className="px-3 py-2 text-right font-mono">
+                                  {entry.debit > 0
+                                    ? formatCurrency(entry.debit)
+                                    : "-"}
+                                </td>
+                                <td className="px-3 py-2 text-right font-mono">
+                                  {entry.credit > 0
+                                    ? formatCurrency(entry.credit)
+                                    : "-"}
+                                </td>
+                              </tr>
+                            ))}
+                          </>
+                        );
+                      })()}
                     </tbody>
                   </table>
                 </div>

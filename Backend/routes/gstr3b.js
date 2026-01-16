@@ -193,27 +193,45 @@ router.get("/", async (req, res) => {
   }
 });
 
-// router.get("/purchase", async (req, res) => {
-//   try {
-//     const { company_id, owner_type, owner_id } = req.query;
+router.get("/purchase", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id } = req.query;
 
-//     if (!company_id || !owner_type || !owner_id) {
-//       return res.status(400).json({
-//         success: false,
-//         message: "company_id, owner_type and owner_id are required",
-//       });
-//     }
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id, owner_type and owner_id are required",
+      });
+    }
 
-//     //get all value 
+    //get all value
 
-//     const [rows] = await db.query(
-//       `SELECT `
-//     )
+    const [rows] = await db.query(
+      `SELECT SUM(subtotal) AS totalSubtotal
+   FROM purchase_vouchers
+   WHERE company_id = ?
+     AND owner_type = ?
+     AND owner_id = ?`,
+      [company_id, owner_type, owner_id]
+    );
 
+    const totalSubtotal = rows[0]?.totalSubtotal || 0;
 
-
-
-//   } catch (error) {}
-// });
+    res.json({
+      success: true,
+      // a,
+      // b
+      // c,
+      // d,
+      e: totalSubtotal,
+    });
+  } catch (error) {
+    console.error("GSTR calculation error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Database error",
+    });
+  }
+});
 
 module.exports = router;
