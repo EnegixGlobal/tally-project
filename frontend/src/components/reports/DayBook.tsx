@@ -691,6 +691,7 @@ const DayBook: React.FC = () => {
                   }`}
                 >
                   <th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-left">Particulars</th>
                   <th className="px-4 py-3 text-left">Voucher Type</th>
                   <th className="px-4 py-3 text-left">Voucher No.</th>
                   <th className="px-4 py-3 text-left">Entries</th>
@@ -727,6 +728,14 @@ const DayBook: React.FC = () => {
                             ? voucher.date
                             : String(voucher.date)
                         )}
+                      </td>
+
+                      <td className="px-4 py-3">
+                        <div className="font-medium">
+                          {voucher.entries?.[0]?.itemId
+                            ? getItemName(voucher.entries[0].itemId)
+                            : voucher.entries?.[0]?.ledgerName || "—"}
+                        </div>
                       </td>
 
                       <td className="px-4 py-3">
@@ -813,9 +822,9 @@ const DayBook: React.FC = () => {
                   }`}
                 >
                   <th className="px-4 py-3 text-left">Date</th>
+                  <th className="px-4 py-3 text-left">Particulars</th>
                   <th className="px-4 py-3 text-left">Voucher Type</th>
                   <th className="px-4 py-3 text-left">Voucher No.</th>
-                  <th className="px-4 py-3 text-left">Reference No.</th>
                   <th className="px-4 py-3 text-right">Debit</th>
                   <th className="px-4 py-3 text-right">Credit</th>
                 </tr>
@@ -859,6 +868,21 @@ const DayBook: React.FC = () => {
                           </td>
                         )}
 
+                        {/* PARTICULARS (LEDGER / ITEM NAME) */}
+                        <td className="px-4 py-3">
+                          <div className="font-medium">
+                            {entry.itemId
+                              ? getItemName(entry.itemId)
+                              : entry.ledgerName}
+                          </div>
+
+                          {entry.narration && (
+                            <div className="text-xs text-gray-400 mt-1">
+                              {entry.narration}
+                            </div>
+                          )}
+                        </td>
+
                         {/* VOUCHER TYPE */}
                         {showCommon && (
                           <td
@@ -875,23 +899,6 @@ const DayBook: React.FC = () => {
                             {entry.voucherNo}
                           </td>
                         )}
-
-                        {/* PARTICULARS (LEDGER / ITEM NAME) */}
-                        <td className="px-4 py-3">
-                          <div className="font-medium">
-                            {entry.itemId
-                              ? getItemName(entry.itemId)
-                              : entry.ledgerName}
-                          </div>
-                          <div className="text-xs text-gray-500">
-                            {entry.itemId ? "Item" : "Ledger"}
-                          </div>
-                          {entry.narration && (
-                            <div className="text-xs text-gray-400 mt-1">
-                              {entry.narration}
-                            </div>
-                          )}
-                        </td>
 
                         {/* DEBIT */}
                         <td className="px-4 py-3 text-right font-mono">

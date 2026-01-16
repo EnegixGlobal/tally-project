@@ -532,7 +532,7 @@ const PurchaseVoucher: React.FC = () => {
           sgstRate: Number(selected?.gstRate) / 2 || 0,
           igstRate: 0,
 
-          // Batch list load karo, lekin quantity mat छेड़ो
+          // Batch list load karo, lekin quantity mat
           batches: selected?.batches || [],
           batchNumber: "",
           batchExpiryDate: "",
@@ -561,15 +561,16 @@ const PurchaseVoucher: React.FC = () => {
         updatedEntries[index] = {
           ...entry,
           batchNumber: value,
-          // sirf dates set
+
+          // 🔥 store base quantity of batch
+          batchBaseQuantity: availableQty,
+
           batchExpiryDate:
             selectedBatch?.expiryDate ?? selectedBatch?.batchExpiryDate ?? "",
           batchManufacturingDate:
             selectedBatch?.manufacturingDate ??
             selectedBatch?.batchManufacturingDate ??
             "",
-          // optional: UI ke liye show karne ko
-          availableBatchQuantity: availableQty,
         };
 
         setFormData((prev) => ({ ...prev, entries: updatedEntries }));
@@ -590,7 +591,11 @@ const PurchaseVoucher: React.FC = () => {
         setFormData((prev) => ({ ...prev, entries: updatedEntries }));
 
         if (name === "quantity") {
-          const diffQty = newVal - oldQty; // yahi actual add qty hai
+          const baseQty = Number(entry.batchBaseQuantity ?? 0);
+          const diffQty = newVal - oldQty;
+
+          // 🔥 Final batch quantity = base + entered
+          const finalBatchQty = baseQty + newVal;
 
           const itemId = entry.itemId;
           const batchName = entry.batchNumber;
@@ -622,7 +627,7 @@ const PurchaseVoucher: React.FC = () => {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                   batchName: batchToSend,
-                  quantity: diffQty, // sirf diff jaa raha hai (e.g. +50, +10, -5)
+                  quantity: finalBatchQty,
                 }),
               }
             )

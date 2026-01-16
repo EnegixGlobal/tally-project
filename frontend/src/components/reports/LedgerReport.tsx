@@ -677,9 +677,7 @@ const LedgerReport: React.FC = () => {
                       <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider">
                         Credit
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider">
-                        Balance
-                      </th>
+                      
                     </tr>
                   </thead>
                   <tbody className=" ">
@@ -737,11 +735,7 @@ const LedgerReport: React.FC = () => {
                                   : ""}
                               </td>
 
-                              {/* Balance */}
-                              <td className="px-4 py-3 text-sm text-right font-mono font-medium">
-                                {/* {formatCurrency(Math.abs(txn.balance))}{" "}
-                                {txn.balance >= 0 ? "Dr" : "Cr"} */}
-                              </td>
+                             
                             </tr>
                           ))}
                         </React.Fragment>
