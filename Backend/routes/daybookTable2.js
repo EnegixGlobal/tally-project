@@ -84,153 +84,188 @@ router.get("/", async (req, res) => {
     /* =====================================================
        2️⃣ PURCHASE VOUCHERS → DEBIT
     ===================================================== */
-
-    const [purchaseRows] = await db.query(
-      `
+const [purchaseRows] = await db.query(
+  `
   SELECT
     pv.partyId,
     party.name AS party_name,
-    pv.purchaseLedgerId,
+
     pv.number AS voucher_number,
+    pv.date AS voucher_date,
+
+    pv.purchaseLedgerId,
     pl.name AS purchase_ledger_name,
+
     SUM(pv.total) AS total_amount
+
   FROM purchase_vouchers pv
   LEFT JOIN ledgers party ON party.id = pv.partyId
   LEFT JOIN ledgers pl ON pl.id = pv.purchaseLedgerId
+
   WHERE pv.company_id = ?
     AND pv.owner_type = ?
     AND pv.owner_id = ?
-  GROUP BY pv.partyId, pv.purchaseLedgerId
+
+  GROUP BY
+    pv.partyId,
+    pv.number,
+    pv.date,
+    pv.purchaseLedgerId
   `,
-      [company_id, owner_type, owner_id]
-    );
+  [company_id, owner_type, owner_id]
+);
 
-    purchaseRows.forEach((row) => {
-      const key = `PUR-${row.partyId}`;
+purchaseRows.forEach((row) => {
+  // 🔑 UNIQUE VOUCHER PER PARTY + VOUCHER NO
+  const key = `PUR-${row.partyId}-${row.voucher_number}`;
 
-      // 🟢 CREATE VOUCHER ONCE PER PARTY
-      if (!vouchers[key]) {
-        vouchers[key] = {
-          id: key,
-          voucher_type: "Purchase Register",
-          voucher_number: row.voucher_number,
-          date: null,
-          narration: null,
-          reference_no: null,
-          supplier_invoice_date: null,
-          company_id,
-          owner_type,
-          owner_id,
-          partyId: row.partyId,
-          partyName: row.party_name,
-          entries: [],
-        };
+  /* ================================
+     CREATE VOUCHER (ONCE)
+  ================================= */
+  if (!vouchers[key]) {
+    vouchers[key] = {
+      id: key,
+      voucher_type: "Purchase",
+      voucher_number: row.voucher_number,
+      date: row.voucher_date, // ✅ DATE NOW COMES
+      narration: null,
+      reference_no: null,
+      supplier_invoice_date: null,
+      company_id,
+      owner_type,
+      owner_id,
+      partyId: row.partyId,
+      partyName: row.party_name,
+      entries: [],
+    };
 
-        // 🔴 PARTY ENTRY → CREDIT
-        vouchers[key].entries.push({
-          id: `PUR-P-${row.partyId}`,
-          ledger_id: row.partyId,
-          ledger_name: row.party_name,
-          amount: 0, // total later
-          entry_type: "credit",
-          narration: "Purchase Register",
-          isParty: true,
-        });
-      }
-
-      // 🟡 PURCHASE LEDGER → DEBIT
-      vouchers[key].entries.push({
-        id: `PUR-L-${row.partyId}-${row.purchaseLedgerId}`,
-        ledger_id: row.purchaseLedgerId,
-        ledger_name: row.purchase_ledger_name,
-        amount: Number(row.total_amount),
-        entry_type: "debit",
-        narration: null,
-        isParty: false,
-      });
-
-      // 🔵 UPDATE PARTY CREDIT TOTAL
-      const partyEntry = vouchers[key].entries.find((e) => e.isParty);
-      if (partyEntry) {
-        partyEntry.amount += Number(row.total_amount);
-      }
+    // 🔴 PARTY → CREDIT (PARENT ROW)
+    vouchers[key].entries.push({
+      id: `PUR-P-${row.partyId}-${row.voucher_number}`,
+      ledger_id: row.partyId,
+      ledger_name: row.party_name,
+      amount: 0, // calculated below
+      entry_type: "credit",
+      narration: "Purchase",
+      isParty: true,
     });
+  }
+
+  /* ================================
+     PURCHASE LEDGER → DEBIT
+  ================================= */
+  vouchers[key].entries.push({
+    id: `PUR-L-${row.partyId}-${row.purchaseLedgerId}-${row.voucher_number}`,
+    ledger_id: row.purchaseLedgerId,
+    ledger_name: row.purchase_ledger_name,
+    amount: Number(row.total_amount),
+    entry_type: "debit",
+    narration: null,
+    isParty: false,
+  });
+
+  /* ================================
+     UPDATE PARTY CREDIT TOTAL
+  ================================= */
+  const partyEntry = vouchers[key].entries.find((e) => e.isParty);
+  if (partyEntry) {
+    partyEntry.amount += Number(row.total_amount);
+  }
+});
 
     /* =====================================================
        3️⃣ SALES VOUCHERS → CREDIT
     ===================================================== */
-    const [salesRows] = await db.query(
-      `
+  const [salesRows] = await db.query(
+  `
   SELECT
     sv.partyId,
     party.name AS party_name,
-    sv.salesLedgerId,
+
     sv.number AS voucher_number,
+    sv.date AS voucher_date,
+
+    sv.salesLedgerId,
     sl.name AS sales_ledger_name,
+
     SUM(sv.total) AS total_amount
+
   FROM sales_vouchers sv
   LEFT JOIN ledgers party ON party.id = sv.partyId
   LEFT JOIN ledgers sl ON sl.id = sv.salesLedgerId
+
   WHERE sv.company_id = ?
     AND sv.owner_type = ?
     AND sv.owner_id = ?
     AND sv.type = 'sales'
     AND sv.isQuotation = 0
-  GROUP BY sv.partyId, sv.salesLedgerId
+
+  GROUP BY
+    sv.partyId,
+    sv.number,
+    sv.date,
+    sv.salesLedgerId
   `,
-      [company_id, owner_type, owner_id]
-    );
+  [company_id, owner_type, owner_id]
+);
 
-    salesRows.forEach((row) => {
-      const key = `SAL-${row.partyId}`;
+salesRows.forEach((row) => {
+  // 🔑 UNIQUE PER PARTY + VOUCHER
+  const key = `SAL-${row.partyId}-${row.voucher_number}`;
 
-      // 🟢 CREATE VOUCHER ONCE PER PARTY
-      if (!vouchers[key]) {
-        vouchers[key] = {
-          id: key,
-          voucher_type: "Sales Register",
-          voucher_number: row.voucher_number,
-          date: null,
-          narration: null,
-          reference_no: null,
-          supplier_invoice_date: null,
-          company_id,
-          owner_type,
-          owner_id,
-          partyId: row.partyId,
-          partyName: row.party_name,
-          entries: [],
-        };
+  /* ================================
+     CREATE VOUCHER (ONCE)
+  ================================= */
+  if (!vouchers[key]) {
+    vouchers[key] = {
+      id: key,
+      voucher_type: "Sales",
+      voucher_number: row.voucher_number,
+      date: row.voucher_date, // ✅ DATE FIXED
+      narration: null,
+      reference_no: null,
+      supplier_invoice_date: null,
+      company_id,
+      owner_type,
+      owner_id,
+      partyId: row.partyId,
+      partyName: row.party_name,
+      entries: [],
+    };
 
-        // 🔴 PARTY → DEBIT
-        vouchers[key].entries.push({
-          id: `SAL-P-${row.partyId}`,
-          ledger_id: row.partyId,
-          ledger_name: row.party_name,
-          amount: 0,
-          entry_type: "debit",
-          narration: "Sales Register",
-          isParty: true,
-        });
-      }
-
-      // 🟡 SALES LEDGER → CREDIT
-      vouchers[key].entries.push({
-        id: `SAL-L-${row.partyId}-${row.salesLedgerId}`,
-        ledger_id: row.salesLedgerId,
-        ledger_name: row.sales_ledger_name,
-        amount: Number(row.total_amount),
-        entry_type: "credit",
-        narration: null,
-        isParty: false,
-      });
-
-      // 🔵 UPDATE PARTY DEBIT TOTAL
-      const partyEntry = vouchers[key].entries.find((e) => e.isParty);
-      if (partyEntry) {
-        partyEntry.amount += Number(row.total_amount);
-      }
+    // 🔴 PARTY → DEBIT (PARENT)
+    vouchers[key].entries.push({
+      id: `SAL-P-${row.partyId}-${row.voucher_number}`,
+      ledger_id: row.partyId,
+      ledger_name: row.party_name,
+      amount: 0, // calculated below
+      entry_type: "debit",
+      narration: "Sales",
+      isParty: true,
     });
+  }
+
+  /* ================================
+     SALES LEDGER → CREDIT
+  ================================= */
+  vouchers[key].entries.push({
+    id: `SAL-L-${row.partyId}-${row.salesLedgerId}-${row.voucher_number}`,
+    ledger_id: row.salesLedgerId,
+    ledger_name: row.sales_ledger_name,
+    amount: Number(row.total_amount),
+    entry_type: "credit",
+    narration: null,
+    isParty: false,
+  });
+
+  /* ================================
+     UPDATE PARTY DEBIT TOTAL
+  ================================= */
+  const partyEntry = vouchers[key].entries.find((e) => e.isParty);
+  if (partyEntry) {
+    partyEntry.amount += Number(row.total_amount);
+  }
+});
 
     /* =====================================================
    4️⃣ DEBIT NOTE VOUCHERS (Debit Note Register)
