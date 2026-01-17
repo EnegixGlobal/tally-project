@@ -454,6 +454,7 @@ const StockItemForm = () => {
   >([]);
   const [batchRows, setBatchRows] = useState([
     {
+       id: nanoid(),
       batchName: "",
       batchExpiryDate: "",
       batchManufacturingDate: "",
@@ -481,6 +482,7 @@ const StockItemForm = () => {
     setBatchRows([
       ...batchRows,
       {
+        id: nanoid(), 
         batchName: "",
         batchExpiryDate: "",
         batchManufacturingDate: "",
@@ -550,63 +552,49 @@ const StockItemForm = () => {
   // --- End batch rows ---
 
   const validateForm = () => {
-    const newErrors: Errors = {};
+  const newErrors: Errors = {};
 
-    if (!formData.name) newErrors.name = "Name is required";
-    if (!formData.categoryId) newErrors.categoryId = "Category is required";
-    if (!formData.unit) newErrors.unit = "Unit is required";
-    if (!formData.taxType) newErrors.taxType = "Tax Type is required";
+  if (!formData.name) newErrors.name = "Name is required";
+  if (!formData.categoryId)
+    newErrors.categoryId = "Category is required";
+  if (!formData.unit) newErrors.unit = "Unit is required";
 
-    if (formData.openingValue < 0) {
-      newErrors.openingValue = "Opening Value cannot be negative";
-    }
-
-    // ---- HSN / SAC Code ----
-    if (!formData.hsnCode) {
-      newErrors.hsnCode = "HSN / SAC Code is required";
-    } else {
-      const hsn = formData.hsnCode.toString();
-      const turnover = companyInfo?.turnover || 0;
-
-      const requiredLength =
-        turnover <= 50000000 ? 4 : turnover <= 150000000 ? 6 : 8;
-
-      if (!/^\d+$/.test(hsn) || hsn.length < requiredLength) {
-        newErrors.hsnCode = `HSN / SAC must be at least ${requiredLength} digits`;
-      }
-    }
-
-    // ---- GST Rate (%) ----
-    if (!formData.gstRate) {
-      newErrors.gstRate = "GST Rate is required";
-    } else {
-      const rate = Number(formData.gstRate);
-      if (isNaN(rate) || rate < 0 || rate > 28) {
-        newErrors.gstRate = "GST Rate must be between 0 and 28%";
-      }
-    }
-
-    // ---- Batch validation ----
-   if (formData.enableBatchTracking) {
-  const normalized = batchRows
-    .map(b => (b.batchName || "").trim().toUpperCase())
-    .filter(Boolean);
-
-  const unique = new Set(normalized);
-
-  if (normalized.length !== unique.size) {
-    Swal.fire(
-      "Duplicate Batch",
-      "Same batch name cannot be added more than once.",
-      "error"
-    );
-    return false;
+  // ---- HSN ----
+  if (!formData.hsnCode) {
+    newErrors.hsnCode = "HSN / SAC Code is required";
   }
-}
 
-    setErrors(newErrors);
-    return Object.keys(newErrors).length === 0;
-  };
+  // ---- GST Rate ----
+  if (!formData.gstRate) {
+    newErrors.gstRate = "GST Rate is required";
+  }
+
+  // ---- Batch duplicate validation ----
+  if (formData.enableBatchTracking) {
+    const batchMap: Record<string, number[]> = {};
+
+    batchRows.forEach((b, index) => {
+      const key = (b.batchName || "").trim().toUpperCase();
+      if (!key) return;
+
+      if (!batchMap[key]) batchMap[key] = [];
+      batchMap[key].push(index);
+    });
+
+    Object.values(batchMap).forEach((indexes) => {
+      if (indexes.length > 1) {
+        indexes.forEach((i) => {
+          newErrors[`batchName-${i}`] =
+            "Batch number already exists";
+        });
+      }
+    });
+  }
+
+  setErrors(newErrors);
+  return Object.keys(newErrors).length === 0;
+};
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -861,7 +849,7 @@ const StockItemForm = () => {
             <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
               {batchRows.map((row, index) => (
                 <div
-                  key={row.batchName + index}
+                  key={row.id}
                   className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end w-full"
                 >
                   {formData.enableBatchTracking && (

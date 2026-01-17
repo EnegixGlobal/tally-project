@@ -290,6 +290,42 @@ router.get("/purchase", async (req, res) => {
       }
     );
 
+    // nil rated+exampt    or      non gst
+    const [rowss] = await db.query(
+      `
+  SELECT 
+    TRIM(LOWER(l.name)) AS ledger_name,
+    SUM(pv.subtotal) AS total_subtotal
+  FROM purchase_vouchers pv
+  JOIN ledgers l ON l.id = pv.partyId
+  WHERE pv.company_id = ?
+    AND pv.owner_type = ?
+    AND pv.owner_id = ?
+    AND (
+      TRIM(LOWER(l.name)) = 'nil rated'
+      OR TRIM(LOWER(l.name)) = 'non-gst'
+      OR TRIM(LOWER(l.name)) LIKE 'exempted%'
+    )
+  GROUP BY TRIM(LOWER(l.name))
+  `,
+      [company_id, owner_type, owner_id]
+    );
+
+    const result = {
+      a: 0,
+      b: 0,
+    };
+
+    rowss.forEach((r) => {
+      if (r.ledger_name === "exempted" || r.ledger_name === "nil rated") {
+        result.a += Number(r.total_subtotal) || 0;
+      }
+
+      if (r.ledger_name === "non-gst") {
+        result.b += Number(r.total_subtotal) || 0;
+      }
+    });
+
     res.json({
       success: true,
       // a,
@@ -297,6 +333,7 @@ router.get("/purchase", async (req, res) => {
       c,
       // d,
       e: totalSubtotal,
+      f: result,
     });
   } catch (error) {
     console.error("GSTR calculation error:", error);
