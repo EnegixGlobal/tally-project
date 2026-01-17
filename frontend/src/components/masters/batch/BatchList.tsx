@@ -81,8 +81,8 @@ const BatchList: React.FC = () => {
     );
 
     // Get the mode from the first batch of this item, or default to 'purchase'
-    const item = mergedStockItems.find(i => String(i.id) === String(itemId));
-    const batchMode = (item?.batches?.[0]?.mode) || "purchase";
+    const item = mergedStockItems.find((i) => String(i.id) === String(itemId));
+    const batchMode = item?.batches?.[0]?.mode || "purchase";
 
     try {
       const res = await fetch(
@@ -159,7 +159,7 @@ const BatchList: React.FC = () => {
 
       if (data.success) {
         alert("Batch deleted successfully ✅");
-        await loadStockItems(); // 🔥 refresh UI
+        await loadStockItems();
       } else {
         alert(data.message || "Failed to delete batch");
       }
@@ -179,8 +179,12 @@ const BatchList: React.FC = () => {
     );
 
     // Find the current batch to get its mode
-    const item = mergedStockItems.find(i => String(i.id) === String(editingBatch.itemId));
-    const currentBatch = item?.batches?.find(b => b.batchName === editingBatch.batchName);
+    const item = mergedStockItems.find(
+      (i) => String(i.id) === String(editingBatch.itemId)
+    );
+    const currentBatch = item?.batches?.find(
+      (b) => b.batchName === editingBatch.batchName
+    );
     const batchMode = currentBatch?.mode || "purchase";
 
     try {
@@ -217,6 +221,47 @@ const BatchList: React.FC = () => {
       alert("Error updating batch");
     }
   };
+
+
+  const handleDeleteByHSN = async (itemId: string, hsnCode?: string) => {
+  if (!hsnCode) {
+    alert("HSN Code not found");
+    return;
+  }
+
+  const company_id = localStorage.getItem("company_id");
+  const owner_type = localStorage.getItem("supplier");
+  const owner_id = localStorage.getItem(
+    owner_type === "employee" ? "employee_id" : "user_id"
+  );
+
+  if (!window.confirm(`Delete stock item with HSN ${hsnCode}?`)) return;
+
+  try {
+    const res = await fetch(
+      `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/delete-by-hsn` +
+        `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`,
+      {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ hsnCode }),
+      }
+    );
+
+    const data = await res.json();
+
+    if (data.success) {
+      alert("Stock item deleted successfully ");
+      await loadStockItems();
+    } else {
+      alert(data.message || "Delete failed");
+    }
+  } catch (err) {
+    console.error(err);
+    alert("Error deleting stock item");
+  }
+};
+
 
   // Load stock items
   const loadStockItems = async () => {
@@ -791,9 +836,15 @@ const BatchList: React.FC = () => {
                           {/* DELETE */}
                           <button
                             className="px-2 py-1 text-xs bg-red-600 text-white rounded"
-                            onClick={() =>
-                              handleDeleteBatch(item.id, batch.batchName)
-                            }
+                            onClick={() => {
+                              if (batch?.batchName) {
+                                // normal batch delete
+                                handleDeleteBatch(item.id, batch.batchName);
+                              } else {
+                                // no batch → delete by HSN
+                                handleDeleteByHSN(item.id, item.hsnCode);
+                              }
+                            }}
                           >
                             Delete
                           </button>

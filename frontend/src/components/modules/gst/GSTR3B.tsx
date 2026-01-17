@@ -95,8 +95,6 @@ const GSTR3B: React.FC = () => {
     },
   });
 
-
-
   // const filterledger = 'Nill Rated' ,'Exempted','Zero Rated'
 
   useEffect(() => {
@@ -147,7 +145,37 @@ const GSTR3B: React.FC = () => {
     };
   }, []);
 
- 
+  const [purchaseData, setPurchaseData] = useState({
+    a: "",
+    b: "",
+    c: "",
+    d: "",
+    e: "",
+  });
+  // purchase Data get
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/gstr3b/purchase?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const data = await res.json();
+        console.log("purchase data", data);
+
+        setPurchaseData((prev) => ({
+          ...prev,
+          e: data.e ?? "",
+        }));
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    fetchData();
+  }, []);
+
   return (
     <div className="pt-[56px] px-4">
       {/* Header */}
@@ -868,27 +896,12 @@ const GSTR3B: React.FC = () => {
                 {/* (5) Others */}
                 <tr>
                   <td className="px-4 py-3">(5) All other ITC</td>
+
                   <td className="px-4 py-3">
                     <input
                       type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
-                      className="w-full p-2 text-right border rounded"
-                    />
-                  </td>
-                  <td className="px-4 py-3">
-                    <input
-                      type="number"
+                      value={Number(purchaseData.e)}
+                      readOnly
                       className="w-full p-2 text-right border rounded"
                     />
                   </td>

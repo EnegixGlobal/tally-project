@@ -443,7 +443,7 @@ router.get("/month-wise", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-
+   console.log('this is id', id)
   try {
     // 1️⃣ voucher number nikaalo
     const [rows] = await db.execute(

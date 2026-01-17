@@ -941,6 +941,7 @@ const PurchaseVoucher: React.FC = () => {
       }
 
       // 🔥 4. Purchase history (unchanged)
+      const finalVoucherNumber = data.voucherNumber || formData.number;
       if (formData.mode === "item-invoice") {
         const historyData = formData.entries
           .filter((e) => e.itemId && e.quantity > 0)
@@ -953,7 +954,9 @@ const PurchaseVoucher: React.FC = () => {
             purchaseQuantity: Number(e.quantity),
             rate: Number(e.rate),
             purchaseDate: formData.date,
-            voucherNumber: formData.number,
+
+            voucherNumber: finalVoucherNumber,
+
             godownId: e.godownId ? Number(e.godownId) : null,
             companyId,
             ownerType,
@@ -963,7 +966,7 @@ const PurchaseVoucher: React.FC = () => {
         await fetch(
           `${
             import.meta.env.VITE_API_URL
-          }/api/purchase-vouchers/purchase-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+          }/api/purchase-vouchers/purchase-history`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },

@@ -5,7 +5,7 @@ const db = require("../db");
 router.get("/", async (req, res) => {
   try {
     const { company_id, owner_type, owner_id } = req.query;
-
+    console.log('ye hit hua')
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
         success: false,
@@ -196,7 +196,7 @@ router.get("/", async (req, res) => {
 router.get("/purchase", async (req, res) => {
   try {
     const { company_id, owner_type, owner_id } = req.query;
-
+    
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
         success: false,
@@ -216,7 +216,7 @@ router.get("/purchase", async (req, res) => {
     );
 
     const totalSubtotal = rows[0]?.totalSubtotal || 0;
-
+ 
     res.json({
       success: true,
       // a,
