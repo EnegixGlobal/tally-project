@@ -5,7 +5,6 @@ const db = require("../db");
 router.get("/", async (req, res) => {
   try {
     const { company_id, owner_type, owner_id } = req.query;
-    console.log('ye hit hua')
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
         success: false,
@@ -178,11 +177,49 @@ router.get("/", async (req, res) => {
       exempted: await computeCFor(ledgerIds.exempted),
     };
 
+    // d data
+    const [dRows] = await db.query(
+      `
+  SELECT
+    pv.subtotal,
+    pv.cgstTotal,
+    pv.sgstTotal,
+    pv.igstTotal
+  FROM purchase_vouchers pv
+  JOIN ledgers l ON l.id = pv.partyId
+  WHERE pv.company_id = ?
+    AND pv.owner_type = ?
+    AND pv.owner_id = ?
+    AND (
+      l.gst_number IS NULL
+      OR TRIM(l.gst_number) = ''
+    )
+  `,
+      [company_id, owner_type, owner_id]
+    );
+
+    const d = dRows.reduce(
+      (acc, r) => {
+        acc.taxable_value += Number(r.subtotal) || 0;
+        acc.central_tax += Number(r.cgstTotal) || 0;
+        acc.state_tax += Number(r.sgstTotal) || 0;
+        acc.integrated_tax += Number(r.igstTotal) || 0;
+        return acc;
+      },
+      {
+        taxable_value: 0,
+        central_tax: 0,
+        state_tax: 0,
+        integrated_tax: 0,
+      }
+    );
+
     res.json({
       success: true,
       a,
       b,
       c,
+      d,
     });
   } catch (error) {
     console.error("GSTR calculation error:", error);
@@ -196,7 +233,7 @@ router.get("/", async (req, res) => {
 router.get("/purchase", async (req, res) => {
   try {
     const { company_id, owner_type, owner_id } = req.query;
-    
+
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
         success: false,
@@ -205,23 +242,59 @@ router.get("/purchase", async (req, res) => {
     }
 
     //get all value
-
     const [rows] = await db.query(
       `SELECT SUM(subtotal) AS totalSubtotal
-   FROM purchase_vouchers
-   WHERE company_id = ?
+     FROM purchase_vouchers
+     WHERE company_id = ?
      AND owner_type = ?
      AND owner_id = ?`,
       [company_id, owner_type, owner_id]
     );
 
     const totalSubtotal = rows[0]?.totalSubtotal || 0;
- 
+
+    // c data
+    const [dRows] = await db.query(
+      `
+  SELECT
+    pv.subtotal,
+    pv.cgstTotal,
+    pv.sgstTotal,
+    pv.igstTotal
+  FROM purchase_vouchers pv
+  JOIN ledgers l ON l.id = pv.partyId
+  WHERE pv.company_id = ?
+    AND pv.owner_type = ?
+    AND pv.owner_id = ?
+    AND (
+      l.gst_number IS NULL
+      OR TRIM(l.gst_number) = ''
+    )
+  `,
+      [company_id, owner_type, owner_id]
+    );
+
+    const c = dRows.reduce(
+      (acc, r) => {
+        acc.taxable_value += Number(r.subtotal) || 0;
+        acc.central_tax += Number(r.cgstTotal) || 0;
+        acc.state_tax += Number(r.sgstTotal) || 0;
+        acc.integrated_tax += Number(r.igstTotal) || 0;
+        return acc;
+      },
+      {
+        taxable_value: 0,
+        central_tax: 0,
+        state_tax: 0,
+        integrated_tax: 0,
+      }
+    );
+
     res.json({
       success: true,
       // a,
       // b
-      // c,
+      c,
       // d,
       e: totalSubtotal,
     });
