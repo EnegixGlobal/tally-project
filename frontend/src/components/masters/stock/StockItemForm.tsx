@@ -587,13 +587,22 @@ const StockItemForm = () => {
     }
 
     // ---- Batch validation ----
-    if (formData.enableBatchTracking) {
-      batchRows.forEach((batch, index) => {
-        if (!batch.batchName) {
-          newErrors[`batchName-${index}`] = "Batch Name is required";
-        }
-      });
-    }
+   if (formData.enableBatchTracking) {
+  const normalized = batchRows
+    .map(b => (b.batchName || "").trim().toUpperCase())
+    .filter(Boolean);
+
+  const unique = new Set(normalized);
+
+  if (normalized.length !== unique.size) {
+    Swal.fire(
+      "Duplicate Batch",
+      "Same batch name cannot be added more than once.",
+      "error"
+    );
+    return false;
+  }
+}
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;

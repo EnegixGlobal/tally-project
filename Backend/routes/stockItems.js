@@ -332,7 +332,6 @@ router.post("/", async (req, res) => {
       );
 
       if (rows[0].count === 0) {
-      
         await connection.execute(
           `ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`
         );
@@ -388,11 +387,49 @@ router.post("/", async (req, res) => {
       });
     }
 
+    const batchNames = batches
+      .map((b) => (b.batchName || "").trim().toUpperCase())
+      .filter(Boolean);
+
+    const uniqueBatchNames = new Set(batchNames);
+
+    if (batchNames.length !== uniqueBatchNames.size) {
+      return res.status(400).json({
+        success: false,
+        message: "Duplicate batchName found in request",
+      });
+    }
+
     const sanitize = (v) => (v === "" || v === undefined ? null : v);
 
     /* ===============================
        📦 BATCH CALCULATION
        =============================== */
+
+    for (const batchName of batchNames) {
+      const [rows] = await connection.execute(
+        `
+        SELECT id FROM stock_items
+        WHERE company_id=? AND owner_type=? AND owner_id=?
+        AND JSON_SEARCH(
+          UPPER(batches),
+          'one',
+          ?,
+          NULL,
+          '$[*].batchName'
+        ) IS NOT NULL
+        `,
+        [company_id, owner_type, owner_id, batchName]
+      );
+
+      if (rows.length > 0) {
+        await connection.rollback();
+        return res.status(409).json({
+          success: false,
+          message: `Batch "${batchName}" already exists`,
+        });
+      }
+    }
 
     let totalOpeningValue = 0;
 
@@ -471,7 +508,7 @@ router.post("/", async (req, res) => {
         case "type":
           return "opening";
         case "createdAt":
-          return new Date(); // 🔥 NEVER NULL
+          return new Date();
         default:
           return null;
       }
@@ -739,8 +776,6 @@ router.get("/purchase-batch", async (req, res) => {
       batches: row.batches ? JSON.parse(row.batches) : [],
     }));
 
-  
-
     res.json({
       success: true,
       data: formattedRows,
@@ -855,6 +890,8 @@ router.post("/:id/batches", async (req, res) => {
       mode: mode || "purchase",
       batchManufacturingDate: batchManufacturingDate || null,
     };
+
+    
 
     batches.push(newBatch);
 
@@ -983,6 +1020,52 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+router.delete("/:itemId/delete-by-hsn", async (req, res) => {
+  try {
+    const { itemId } = req.params;
+    const { hsnCode } = req.body;
+    const { company_id, owner_type, owner_id } = req.query;
+
+    if (!itemId || !hsnCode) {
+      return res.status(400).json({
+        success: false,
+        message: "itemId and hsnCode required",
+      });
+    }
+
+    const [result] = await db.query(
+      `
+      DELETE FROM stock_items
+      WHERE id = ?
+        AND hsnCode = ?
+        AND company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+      `,
+      [itemId, hsnCode, company_id, owner_type, owner_id]
+    );
+
+    // 🔑 IMPORTANT PART
+    if (result.affectedRows === 0) {
+      return res.json({
+        success: true,
+        message: "Already deleted",
+      });
+    }
+
+    res.json({
+      success: true,
+      message: "Deleted successfully",
+    });
+  } catch (err) {
+    console.error("Delete error:", err);
+    res.status(500).json({
+      success: false,
+      message: "Delete failed",
+    });
+  }
+});
+
 //put item
 router.put("/:id", async (req, res) => {
   const connection = await db.getConnection();
@@ -1009,7 +1092,6 @@ router.put("/:id", async (req, res) => {
       );
 
       if (rows[0].count === 0) {
-        
         await connection.execute(
           `ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`
         );
@@ -1226,7 +1308,7 @@ router.get("/:id", async (req, res) => {
         (b) => b.mode && b.mode.toLowerCase() === mode.toLowerCase()
       );
     }
-   
+
     res.json({
       success: true,
       data: {
