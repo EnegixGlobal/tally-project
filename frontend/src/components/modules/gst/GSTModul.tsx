@@ -24,10 +24,7 @@ const GSTModule: React.FC = () => {
     {
       title: 'GST Configuration',
       items: [
-        { icon: <Settings size={20} />, name: 'GST Rates', path: '/app/gst/rates' },
-        { icon: <FileText size={20} />, name: 'HSN Codes', path: '/app/gst/hsn-codes' },
-        
-        { icon: <BarChart2 size={20} />, name: 'GST Analysis', path: '/app/gst/gst-analysis' },
+        { icon: <BarChart2 size={20} />, name: 'GST Assisment', path: '/app/gst/gst-analysis' },
         { icon: <Calculator size={20} />, name: 'GST Calculator', path: '/app/gst/calculator' }
       ]
     },

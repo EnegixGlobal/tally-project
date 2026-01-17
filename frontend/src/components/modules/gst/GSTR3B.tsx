@@ -167,7 +167,15 @@ const GSTR3B: React.FC = () => {
       integrated_tax: "",
     },
     d: "",
-    e: "",
+    e:{
+      integratedTax:'',
+      centralTax:'',
+      stateTax:''
+    },
+    f:{
+      nillExampt:'',
+      nongst:''
+    },
   });
   // purchase Data get
   useEffect(() => {
@@ -189,7 +197,15 @@ const GSTR3B: React.FC = () => {
             state_tax: data.c?.state_tax,
             integrated_tax: data.c?.integrated_tax,
           },
-          e: data.e ?? "",
+          e: {
+            integratedTax:data.e?.integrated_tax,
+            centralTax:data.e?.central_tax,
+            stateTax:data.e?.state_tax
+          },
+          f:{
+            nillExampt:data.f?.a,
+            nongst:data.f?.b
+          }
         }));
       } catch (e) {
         console.error(e);
@@ -310,47 +326,8 @@ const GSTR3B: React.FC = () => {
                 ))}
               </select>
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Year</label>
-              {/* <select
-                title="Select Year"
-                value={gstr3bData.returnPeriod.year}
-                onChange={(e) => updateReturnPeriod("year", e.target.value)}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
-              >
-                {Array.from(
-                  { length: 5 },
-                  (_, i) => new Date().getFullYear() - i
-                ).map((year) => (
-                  <option key={year} value={year.toString()}>
-                    {year}
-                  </option>
-                ))}
-              </select> */}
-            </div>
-            {/* <div className="flex items-end">
-              <button
-                onClick={() => {
-                  const currentMonth = (new Date().getMonth() + 1)
-                    .toString()
-                    .padStart(2, "0");
-                  const currentYear = new Date().getFullYear().toString();
-                  updateReturnPeriod("month", currentMonth);
-                  updateReturnPeriod("year", currentYear);
-                }}
-                className={`px-4 py-2 rounded-md ${
-                  theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
-              >
-                Current Period
-              </button>
-            </div> */}
+            
+            
           </div>
         </div>
       )}
@@ -978,7 +955,30 @@ const GSTR3B: React.FC = () => {
                   <td className="px-4 py-3">
                     <input
                       type="number"
-                      value={Number(purchaseData.e)}
+                      value={Number(purchaseData.e?.integratedTax)}
+                      readOnly
+                      className="w-full p-2 text-right border rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="number"
+                      value={Number(purchaseData.e?.centralTax)}
+                      readOnly
+                      className="w-full p-2 text-right border rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="number"
+                      value={Number(purchaseData.e?.stateTax)}
+                      readOnly
+                      className="w-full p-2 text-right border rounded"
+                    />
+                  </td>
+                  <td className="px-4 py-3">
+                    <input
+                      type="number"
                       readOnly
                       className="w-full p-2 text-right border rounded"
                     />
@@ -1121,7 +1121,8 @@ const GSTR3B: React.FC = () => {
               </label>
               <input
                 type="number"
-                placeholder="0.00"
+                value={purchaseData.f?.nillExampt}
+                readOnly
                 className="w-full p-2 text-right border rounded"
               />
             </div>
@@ -1133,7 +1134,8 @@ const GSTR3B: React.FC = () => {
               </label>
               <input
                 type="number"
-                placeholder="0.00"
+                value={purchaseData.f?.nongst}
+                readOnly
                 className="w-full p-2 text-right border rounded"
               />
             </div>
