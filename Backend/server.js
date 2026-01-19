@@ -177,6 +177,8 @@ app.use(ageingAnalysisRouter);
 const godownSummaryRouter = require("./routes/godownSummary");
 app.use(godownSummaryRouter);
 
+
+
 const fifoRouter = require("./routes/fifo");
 app.use(fifoRouter);
 
@@ -257,6 +259,9 @@ const consolidatereport = require("./routes/consolidatereport");
 app.use("/api/", consolidatereport);
 const Header = require("./routes/Header");
 app.use("/api/header/", Header);
+
+const EwayBill = require("./routes/EwayBill");
+app.use("/api/", EwayBill);
 
 // ✅ Local MySQL Connection
 const db = mysql.createConnection({
