@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { useAppContext } from "../../../../context/AppContext";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Filter, Download, Printer } from "lucide-react";
+import { ArrowLeft, Filter, Download, Printer, FileJson } from "lucide-react";
 import * as XLSX from "xlsx";
 
 interface B2CSSupply {
@@ -157,6 +157,18 @@ const GstrB2cs = () => {
     window.print();
   };
 
+  const handleGenerateJSON = (supply: B2CSSupply) => {
+    const jsonData = JSON.stringify(supply, null, 2);
+    const blob = new Blob([jsonData], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `B2CS_${supply.invoiceNumber || "supply"}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   return (
     <div className="pt-[56px] px-4 min-h-screen">
       {/* Header Section */}
@@ -165,9 +177,8 @@ const GstrB2cs = () => {
           title="Back to GSTR-1"
           type="button"
           onClick={() => navigate("/app/gst/gstr-1")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -177,9 +188,8 @@ const GstrB2cs = () => {
             type="button"
             title="Filter"
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Filter size={18} />
           </button>
@@ -187,9 +197,8 @@ const GstrB2cs = () => {
             title="Print Report"
             type="button"
             onClick={handlePrint}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
@@ -197,9 +206,8 @@ const GstrB2cs = () => {
             title="Export"
             type="button"
             onClick={exportToExcel}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Download size={18} />
           </button>
@@ -209,9 +217,8 @@ const GstrB2cs = () => {
       {/* Filter Panel */}
       {showFilterPanel && (
         <div
-          className={`p-4 mb-6 rounded-lg no-print ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 mb-6 rounded-lg no-print ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h3 className="font-semibold mb-4">Date Range Filter</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -225,11 +232,10 @@ const GstrB2cs = () => {
                 onChange={(e) =>
                   setFilters({ ...filters, fromDate: e.target.value })
                 }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600"
                     : "bg-white border-gray-300"
-                }`}
+                  }`}
               />
             </div>
             <div>
@@ -240,22 +246,20 @@ const GstrB2cs = () => {
                 onChange={(e) =>
                   setFilters({ ...filters, toDate: e.target.value })
                 }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600"
                     : "bg-white border-gray-300"
-                }`}
+                  }`}
               />
             </div>
             <div className="flex items-end">
               <button
                 type="button"
                 onClick={fetchB2CSData}
-                className={`px-4 py-2 rounded ${
-                  theme === "dark"
+                className={`px-4 py-2 rounded ${theme === "dark"
                     ? "bg-blue-600 hover:bg-blue-700 text-white"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
+                  }`}
               >
                 Apply Filter
               </button>
@@ -266,19 +270,17 @@ const GstrB2cs = () => {
 
       {/* Main Content */}
       <div
-        className={`mb-6 rounded-lg border-2 ${
-          theme === "dark"
+        className={`mb-6 rounded-lg border-2 ${theme === "dark"
             ? "bg-gray-800 border-gray-600"
             : "bg-white border-gray-300"
-        }`}
+          }`}
       >
         {/* Section Header */}
         <div
-          className={`p-3 border-b-2 ${
-            theme === "dark"
+          className={`p-3 border-b-2 ${theme === "dark"
               ? "bg-blue-900 border-gray-600 text-white"
               : "bg-blue-800 border-gray-300 text-white"
-          }`}
+            }`}
         >
           <h3 className="text-lg font-bold">5B - B2C Small Supplies</h3>
           <p className="text-sm opacity-90">
@@ -304,9 +306,8 @@ const GstrB2cs = () => {
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Invoice Number
@@ -350,17 +351,19 @@ const GstrB2cs = () => {
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
                       Cess Amount
                     </th>
+                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
+                      Action
+                    </th>
                   </tr>
                 </thead>
                 <tbody>
                   {b2csData.map((supply, index) => (
                     <tr
                       key={supply.voucherId || index}
-                      className={`${
-                        theme === "dark"
+                      className={`${theme === "dark"
                           ? "hover:bg-gray-700"
                           : "hover:bg-gray-50"
-                      }`}
+                        }`}
                     >
                       <td className="border border-gray-300 p-2 text-xs font-mono">
                         {supply.invoiceNumber || "-"}
@@ -402,13 +405,22 @@ const GstrB2cs = () => {
                       <td className="border border-gray-300 p-2 text-xs text-right font-mono">
                         ₹{supply.cessAmount?.toLocaleString() || "0"}
                       </td>
+                      <td className="border border-gray-300 p-2 text-xs text-center">
+                        <button
+                          onClick={() => handleGenerateJSON(supply)}
+                          className="flex items-center justify-center space-x-1 bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-[10px]"
+                          title="Generate JSON"
+                        >
+                          <FileJson size={12} />
+                          <span>Generate JSON</span>
+                        </button>
+                      </td>
                     </tr>
                   ))}
                   {b2csData.length > 0 && (
                     <tr
-                      className={`font-bold ${
-                        theme === "dark" ? "bg-gray-600" : "bg-gray-200"
-                      }`}
+                      className={`font-bold ${theme === "dark" ? "bg-gray-600" : "bg-gray-200"
+                        }`}
                     >
                       <td
                         colSpan={5}
@@ -435,6 +447,7 @@ const GstrB2cs = () => {
                       <td className="border border-gray-300 p-2 text-xs text-right font-mono">
                         ₹{totals.cessAmount.toLocaleString()}
                       </td>
+                      <td className="border border-gray-300 p-2 text-xs"></td>
                     </tr>
                   )}
                 </tbody>

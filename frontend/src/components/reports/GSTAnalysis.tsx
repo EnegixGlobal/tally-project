@@ -1,255 +1,307 @@
-import React, { useState } from 'react';
-import { useAppContext } from '../../context/AppContext';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Printer, Download, Filter } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from "react";
+import { useAppContext } from "../../context/AppContext";
+import { useNavigate } from "react-router-dom";
+import { ArrowLeft, Printer } from "lucide-react";
 
 const GSTAnalysis: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
 
-  return (
-    <div className='pt-[56px] px-4 '>
-      <div className="flex items-center mb-6">
-        <button
-        title='Back to Reports'
-          onClick={() => navigate('/app/gst')}
-          className={`mr-4 p-2 rounded-full ${
-            theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-          }`}
-        >
-          <ArrowLeft size={20} />
-        </button>
-        <h1 className="text-2xl font-bold">GST Analysis</h1>
-        <div className="ml-auto flex space-x-2">
+  const months = [
+    "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+    "Oct", "Nov", "Dec", "Jan", "Feb", "Mar",
+  ];
+
+  const monthMap: any = {
+    4: "Apr", 5: "May", 6: "Jun", 7: "Jul",
+    8: "Aug", 9: "Sep", 10: "Oct",
+    11: "Nov", 12: "Dec", 1: "Jan",
+    2: "Feb", 3: "Mar",
+  };
+
+  const purchaseIndex: any = {
+    "0% gst purchase": 0,
+    "3% gst purchase": 1,
+    "5% gst purchase": 2,
+    "12% gst purchase": 3,
+    "18% gst purchase": 4,
+    "28% gst purchase": 5,
+  };
+
+  const salesIndex: any = {
+    "0% gst sales": 0,
+    "3% gst sales": 1,
+    "5% gst sales": 2,
+    "12% gst sales": 3,
+    "18% gst sales": 4,
+    "28% gst sales": 5,
+  };
+
+  const debitNoteIndex: any = {
+    "0% debit notes": 0,
+    "3% debit notes": 1,
+    "5% debit notes": 2,
+    "12% debit notes": 3,
+    "18% debit notes": 4,
+    "28% debit notes": 5,
+  };
+
+  const creditNoteIndex: any = {
+    "0% credit notes": 0,
+    "3% credit notes": 1,
+    "5% credit notes": 2,
+    "12% credit notes": 3,
+    "18% credit notes": 4,
+    "28% credit notes": 5,
+  };
+
+
+
+  const [purchaseRows, setPurchaseRows] = useState<any[]>([]);
+  const [salesRows, setSalesRows] = useState<any[]>([]);
+  const [debitNoteRows, setDebitNoteRows] = useState<any[]>([]);
+  const [creditNoteRows, setCreditNoteRows] = useState<any[]>([]);
+
+
+
+  useEffect(() => {
+    const company_id = localStorage.getItem("company_id");
+    const owner_type = localStorage.getItem("supplier");
+    const owner_id =
+      localStorage.getItem(
+        owner_type === "employee" ? "employee_id" : "user_id"
+      ) || "";
+
+    if (!company_id || !owner_type || !owner_id) return;
+
+    fetch(
+      `${import.meta.env.VITE_API_URL}/api/gst-assessment/purchase?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+    )
+      .then(r => r.json())
+      .then(j => j.success && setPurchaseRows(j.data || []));
+
+    fetch(
+      `${import.meta.env.VITE_API_URL}/api/gst-assessment/sales?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+    )
+      .then(r => r.json())
+      .then(j => j.success && setSalesRows(j.data || []));
+
+    fetch(
+      `${import.meta.env.VITE_API_URL}/api/gst-assessment/debit-notes?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+    )
+      .then(r => r.json())
+      .then(j => j.success && setDebitNoteRows(j.data || []));
+
+    fetch(
+      `${import.meta.env.VITE_API_URL}/api/gst-assessment/credit-notes?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+    )
+      .then(r => r.json())
+      .then(j => j.success && setCreditNoteRows(j.data || []));
+
+
+  }, []);
+
+  const buildTableData = (rows: any[], slabMap: any) => {
+    const data: any = {};
+    months.forEach(m => {
+      data[m] = { intra: Array(6).fill(0), inter: Array(6).fill(0) };
+    });
+
+    rows.forEach(r => {
+      const monthName = monthMap[r.month];
+      if (!monthName) return;
+
+      const idx = slabMap[r.ledgerName];
+      if (idx === undefined) return;
+
+      if (r.supplyType === "INTER") {
+        data[monthName].inter[idx] += Number(r.total || 0);
+      } else {
+        data[monthName].intra[idx] += Number(r.total || 0);
+      }
+    });
+
+    return data;
+  };
+
+  const purchaseTable = useMemo(
+    () => buildTableData(purchaseRows, purchaseIndex),
+    [purchaseRows]
+  );
+
+  const salesTable = useMemo(
+    () => buildTableData(salesRows, salesIndex),
+    [salesRows]
+  );
+
+  const debitNoteTable = useMemo(
+    () => buildTableData(debitNoteRows, debitNoteIndex),
+    [debitNoteRows]
+  );
+
+  const creditNoteTable = useMemo(
+    () => buildTableData(creditNoteRows, creditNoteIndex),
+    [creditNoteRows]
+  );
+
+
+
+
+  const handlePrint = (title: string, elementId: string) => {
+    const printContent = document.getElementById(elementId);
+    if (!printContent) return;
+
+    const win = window.open("", "", "width=800,height=600");
+    if (!win) return;
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            @media print {
+              @page { size: A4; margin: 10mm; }
+              body { font-family: sans-serif; -webkit-print-color-adjust: exact; }
+              table { width: 100%; border-collapse: collapse; font-size: 12px; }
+              th, td { border: 1px solid black; padding: 4px; text-align: right; }
+              th { background-color: #f3f4f6; text-align: center; }
+              h2 { text-align: center; margin-bottom: 20px; }
+            }
+            body { font-family: sans-serif; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+            th { background-color: #f3f4f6; text-align: center; }
+            h2 { text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h2>${title}</h2>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+      win.close();
+    }, 500);
+  };
+
+  const renderGSTTable = (title: string, tableData: any) => {
+    const tableId = `print-${title.replace(/\s+/g, "-").toLowerCase()}`;
+    return (
+      <>
+        <div className="flex items-center justify-center my-6 relative">
+          <h2 className="text-xl font-semibold">{title}</h2>
           <button
-          title='Toggle Filters'
-            type='button'
-            onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-            }`}
+            onClick={() => handlePrint(title, tableId)}
+            className="absolute right-0 p-2 text-gray-600 hover:text-blue-600"
+            title="Print Table"
           >
-            <Filter size={18} />
+            <Printer size={20} />
           </button>
-          <button
-          type='button'
-          title='Print Report'
-            className={`p-2 rounded-md ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-            }`}
-          >
-            <Printer size={18} />
-          </button>
-          <button
-            title='Download Report'
-            type='button'
-            className={`p-2 rounded-md ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-            }`}
-          >
-            <Download size={18} />
-          </button>
-        </div>
-      </div>
-      
-      {showFilterPanel && (
-        <div className={`p-4 mb-6 rounded-lg ${
-          theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-        }`}>
-          <h3 className="font-semibold mb-4">Filters</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Period
-              </label>
-              <select
-              title='Select Period'
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600' 
-                    : 'bg-white border-gray-300'
-                }`}
-              >
-                <option value="current-month">Current Month</option>
-                <option value="current-quarter">Current Quarter</option>
-                <option value="current-year">Current Financial Year</option>
-                <option value="custom">Custom Period</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                GST Rate
-              </label>
-              <select
-              title='Select GST Rate'
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600' 
-                    : 'bg-white border-gray-300'
-                }`}
-              >
-                <option value="">All Rates</option>
-                <option value="0">0%</option>
-                <option value="5">5%</option>
-                <option value="12">12%</option>
-                <option value="18">18%</option>
-                <option value="28">28%</option>
-              </select>
-            </div>
-          </div>
-        </div>
-      )}
-      
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {/* GST Summary Cards */}
-        <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
-          <h3 className="text-lg font-semibold mb-4">Output GST</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>CGST</span>
-              <span className="font-mono">₹ 0.00</span>
-            </div>
-            <div className="flex justify-between">
-              <span>SGST</span>
-              <span className="font-mono">₹ 0.00</span>
-            </div>
-            <div className="flex justify-between">
-              <span>IGST</span>
-              <span className="font-mono">₹ 0.00</span>
-            </div>
-            <div className="flex justify-between font-bold border-t border-gray-300 dark:border-gray-600 pt-2">
-              <span>Total Output GST</span>
-              <span className="font-mono">₹ 0.00</span>
-            </div>
-          </div>
         </div>
 
-        <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
-          <h3 className="text-lg font-semibold mb-4">Input GST</h3>
-          <div className="space-y-2">
-            <div className="flex justify-between">
-              <span>CGST</span>
-              <span className="font-mono">₹ 0.00</span>
-            </div>
-            <div className="flex justify-between">
-              <span>SGST</span>
-              <span className="font-mono">₹ 0.00</span>
-            </div>
-            <div className="flex justify-between">
-              <span>IGST</span>
-              <span className="font-mono">₹ 0.00</span>
-            </div>
-            <div className="flex justify-between font-bold border-t border-gray-300 dark:border-gray-600 pt-2">
-              <span>Total Input GST</span>
-              <span className="font-mono">₹ 0.00</span>
-            </div>
-          </div>
-        </div>
-      </div>
-      
-      <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
-        <div className="mb-4">
-          <h2 className="text-xl font-bold">GST Rate-wise Analysis</h2>
-          <p className="text-sm opacity-75">Breakdown by GST rates for selected period</p>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="w-full">
+        <div id={tableId} className="bg-white rounded-lg shadow border overflow-x-auto mb-10">
+          <table className="w-full border-collapse text-sm">
             <thead>
-              <tr className={`${
-                theme === 'dark' ? 'border-b border-gray-700' : 'border-b-2 border-gray-300'
-              }`}>
-                <th className="px-4 py-3 text-left">GST Rate</th>
-                <th className="px-4 py-3 text-right">Taxable Value</th>
-                <th className="px-4 py-3 text-right">CGST</th>
-                <th className="px-4 py-3 text-right">SGST</th>
-                <th className="px-4 py-3 text-right">IGST</th>
-                <th className="px-4 py-3 text-right">Total Tax</th>
-                <th className="px-4 py-3 text-right">Total Value</th>
+              <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200"}>
+                <th rowSpan={2} className="border p-2">Month</th>
+                <th colSpan={7} className="border p-2  border-gray-600">INTRA STATE</th>
+
+
+                <th colSpan={7} className="border p-2">INTER STATE</th>
+              </tr>
+              <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-100"}>
+                {[...Array(2)].flatMap(() =>
+                  ["0%", "3%", "5%", "12%", "18%", "28%", "Total"]
+                ).map((h, i) => (
+                  <th key={i} className={`border p-2 ${i === 6 ? " border-gray-600" : ""}`}>{h}</th>
+                ))}
               </tr>
             </thead>
+
             <tbody>
-              <tr className={`${
-                theme === 'dark' ? 'border-b border-gray-700' : 'border-b border-gray-200'
-              }`}>
-                <td className="px-4 py-3">0%</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-              </tr>
-              <tr className={`${
-                theme === 'dark' ? 'border-b border-gray-700' : 'border-b border-gray-200'
-              }`}>
-                <td className="px-4 py-3">5%</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-              </tr>
-              <tr className={`${
-                theme === 'dark' ? 'border-b border-gray-700' : 'border-b border-gray-200'
-              }`}>
-                <td className="px-4 py-3">12%</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-              </tr>
-              <tr className={`${
-                theme === 'dark' ? 'border-b border-gray-700' : 'border-b border-gray-200'
-              }`}>
-                <td className="px-4 py-3">18%</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-              </tr>
-              <tr className={`${
-                theme === 'dark' ? 'border-b border-gray-700' : 'border-b border-gray-200'
-              }`}>
-                <td className="px-4 py-3">28%</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
+              {months.map(m => {
+                const intraTotal = tableData[m].intra.reduce((a: number, b: number) => a + b, 0);
+                const interTotal = tableData[m].inter.reduce((a: number, b: number) => a + b, 0);
+
+                return (
+                  <tr key={m}>
+                    <td className="border p-2 text-center">{m}</td>
+
+                    {tableData[m].intra.map((v: number, i: number) => (
+                      <td key={i} className="border p-2 text-right">
+                        {v ? v.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
+                      </td>
+                    ))}
+                    <td className="border p-2 text-right font-semibold  border-gray-600">
+                      {intraTotal ? intraTotal.toLocaleString("en-IN") : ""}
+                    </td>
+
+                    {tableData[m].inter.map((v: number, i: number) => (
+                      <td key={i} className="border p-2 text-right">
+                        {v ? v.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
+                      </td>
+                    ))}
+                    <td className="border p-2 text-right font-semibold">
+                      {interTotal ? interTotal.toLocaleString("en-IN") : ""}
+                    </td>
+                  </tr>
+                );
+              })}
+
+              {/* GRAND TOTAL */}
+              <tr className="font-bold bg-gray-100">
+                <td className="border p-2 text-center">Total</td>
+                {Array(14).fill(0).map((_, i) => {
+                  let sum = 0;
+                  months.forEach(m => {
+                    if (i < 7) {
+                      sum += i < 6
+                        ? tableData[m].intra[i]
+                        : tableData[m].intra.reduce((a: number, b: number) => a + b, 0);
+                    } else {
+                      const idx = i - 7;
+                      sum += idx < 6
+                        ? tableData[m].inter[idx]
+                        : tableData[m].inter.reduce((a: number, b: number) => a + b, 0);
+                    }
+                  });
+                  return (
+                    <td key={i} className={`border p-2 text-right ${i === 6 ? " border-gray-600" : ""}`}>
+                      {sum ? sum.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
+                    </td>
+                  );
+                })}
               </tr>
             </tbody>
-            <tfoot>
-              <tr className={`font-bold ${
-                theme === 'dark' ? 'border-t-2 border-gray-600' : 'border-t-2 border-gray-300'
-              }`}>
-                <td className="px-4 py-3">Total</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-                <td className="px-4 py-3 text-right font-mono">0.00</td>
-              </tr>
-            </tfoot>
           </table>
         </div>
+      </>
+    );
+  };
+
+  return (
+    <div className="pt-[56px] px-4">
+      <div className="flex items-center mb-6">
+        <button onClick={() => navigate(-1)} className="mr-4 p-2">
+          <ArrowLeft size={20} />
+        </button>
+        <h1 className="flex-1 text-center text-2xl font-bold">
+          GST Analysis
+        </h1>
       </div>
-      
-      <div className={`mt-6 p-4 rounded ${
-        theme === 'dark' ? 'bg-gray-800' : 'bg-orange-50'
-      }`}>
-        <p className="text-sm">
-          <span className="font-semibold">GST Analysis:</span> Monitor your GST liability and input tax credit to optimize tax efficiency.
-        </p>
-      </div>
+
+      <hr />
+
+      {renderGSTTable("Purchase Detail", purchaseTable)}
+      {renderGSTTable("Debit Notes Detail", debitNoteTable)}
+      {renderGSTTable("Credit Notes Detail", creditNoteTable)}
+      {renderGSTTable("Sales Detail", salesTable)}
+
     </div>
   );
 };

@@ -82,6 +82,8 @@ const PurchaseVoucher: React.FC = () => {
   const isEditMode = Boolean(id);
 
   const [showTableConfig, setShowTableConfig] = useState(false);
+  const [supplierState, setSupplierState] = useState("");
+
 
   const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
     {
@@ -511,143 +513,157 @@ const PurchaseVoucher: React.FC = () => {
     };
 
     // ⭐ ITEM INVOICE MODE
-    if (formData.mode === "item-invoice") {
-      // 1️⃣ ITEM CHANGE → auto fill from stock master
-      if (name === "itemId") {
-        const selected = stockItems.find(
-          (item) => String(item.id) === String(value)
-        );
+   if (formData.mode === "item-invoice") {
+  // helper: amount calculation
+  const recalcAmount = (ent: any) => {
+    const qty = Number(ent.quantity || 0);
+    const rate = Number(ent.rate || 0);
+    const discount = Number(ent.discount || 0);
 
-        updatedEntries[index] = {
-          ...entry,
-          itemId: value,
-          hsnCode: selected?.hsnCode || "",
-          unitName: selected?.unit || "",
-          // rate ko item master se le sakte ho:
-          rate: Number(
-            selected?.standardPurchaseRate ?? selected?.rate ?? entry.rate ?? 0
-          ),
-          gstRate: Number(selected?.gstRate) || 0,
-          cgstRate: Number(selected?.gstRate) / 2 || 0,
-          sgstRate: Number(selected?.gstRate) / 2 || 0,
-          igstRate: 0,
+    const gstTotal =
+      Number(ent.cgstRate || 0) +
+      Number(ent.sgstRate || 0) +
+      Number(ent.igstRate || 0);
 
-          // Batch list load karo, lekin quantity mat
-          batches: selected?.batches || [],
-          batchNumber: "",
-          batchExpiryDate: "",
-          batchManufacturingDate: "",
-          amount: 0,
-        };
+    const base = qty * rate;
+    const gstAmt = (base * gstTotal) / 100;
+    return base + gstAmt - discount;
+  };
 
-        setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-        return;
-      }
+  // 1️⃣ ITEM CHANGE → auto fill + GST resolve
+  if (name === "itemId") {
+    const selected = stockItems.find(
+      (item) => String(item.id) === String(value)
+    );
 
-      // 2️⃣ BATCH CHANGE → sirf meta info (expiry, mfg), quantity ko mat touch karo
-      if (name === "batchNumber") {
-        const selectedBatch = (entry.batches || []).find(
-          (b: any) =>
-            b &&
-            String(b.batchName ?? b.name ?? b.batch_no ?? b.batchNo ?? b.id) ===
-              String(value)
-        );
+    const gst = Number(selected?.gstRate) || 0;
 
-        // available quantity agar dikhani ho to ek alag field me rakho
-        const availableQty = Number(
-          selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
-        );
+    const gstSplit = resolvePurchaseGst(
+      gst,
+      safeCompanyInfo.state,
+      supplierState
+    );
 
-        updatedEntries[index] = {
-          ...entry,
-          batchNumber: value,
+    updatedEntries[index] = {
+      ...entry,
+      itemId: value,
+      hsnCode: selected?.hsnCode || "",
+      unitName: selected?.unit || "",
+      rate: Number(
+        selected?.standardPurchaseRate ??
+          selected?.rate ??
+          entry.rate ??
+          0
+      ),
+      gstRate: gst,
 
-          // 🔥 store base quantity of batch
-          batchBaseQuantity: availableQty,
+      // 🔥 GST SPLIT
+      ...gstSplit,
 
-          batchExpiryDate:
-            selectedBatch?.expiryDate ?? selectedBatch?.batchExpiryDate ?? "",
-          batchManufacturingDate:
-            selectedBatch?.manufacturingDate ??
-            selectedBatch?.batchManufacturingDate ??
-            "",
-        };
+      // Batch
+      batches: selected?.batches || [],
+      batchNumber: "",
+      batchExpiryDate: "",
+      batchManufacturingDate: "",
 
-        setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-        return;
-      }
+      quantity: 0,
+      discount: 0,
+      amount: 0,
+    };
 
-      // 3️⃣ QUANTITY / RATE / DISCOUNT CHANGE
-      if (["quantity", "rate", "discount"].includes(name)) {
-        const oldQty = Number(entry.quantity || 0);
-        const newVal = Number(value || 0);
+    setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+    return;
+  }
 
-        updatedEntries[index] = {
-          ...entry,
-          [name]: newVal,
-        };
-        updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+  // 2️⃣ BATCH CHANGE → sirf meta info
+  if (name === "batchNumber") {
+    const selectedBatch = (entry.batches || []).find(
+      (b: any) =>
+        b &&
+        String(
+          b.batchName ??
+            b.name ??
+            b.batch_no ??
+            b.batchNo ??
+            b.id
+        ) === String(value)
+    );
 
-        setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+    const availableQty = Number(
+      selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
+    );
 
-        if (name === "quantity") {
-          const baseQty = Number(entry.batchBaseQuantity ?? 0);
-          const diffQty = newVal - oldQty;
+    updatedEntries[index] = {
+      ...entry,
+      batchNumber: value,
+      batchBaseQuantity: availableQty,
+      batchExpiryDate:
+        selectedBatch?.expiryDate ??
+        selectedBatch?.batchExpiryDate ??
+        "",
+      batchManufacturingDate:
+        selectedBatch?.manufacturingDate ??
+        selectedBatch?.batchManufacturingDate ??
+        "",
+    };
 
-          // 🔥 Final batch quantity = base + entered
-          const finalBatchQty = baseQty + newVal;
+    setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+    return;
+  }
 
-          const itemId = entry.itemId;
-          const batchName = entry.batchNumber;
+  // 3️⃣ QUANTITY / RATE / DISCOUNT CHANGE
+  if (["quantity", "rate", "discount"].includes(name)) {
+    const oldQty = Number(entry.quantity || 0);
+    const newVal = Number(value || 0);
 
-          const candidateBatch = (entry.batches || []).find((b: any) => {
-            const nameEmpty =
-              !b?.batchName || String(b.batchName).trim() === "";
-            const hasQtyMeta =
-              (b?.batchQuantity && Number(b.batchQuantity) !== 0) ||
-              (b?.openingRate && Number(b.openingRate) !== 0) ||
-              (b?.openingValue && Number(b.openingValue) !== 0);
-            return nameEmpty && hasQtyMeta;
-          });
+    updatedEntries[index] = {
+      ...entry,
+      [name]: newVal,
+    };
 
-          const shouldSync =
-            itemId && diffQty !== 0 && (batchName || candidateBatch);
+    updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
 
-          if (shouldSync) {
-            const batchToSend =
-              batchName ||
-              (candidateBatch ? candidateBatch.batchName ?? "" : "");
+    setFormData((prev) => ({ ...prev, entries: updatedEntries }));
 
-            fetch(
-              `${
-                import.meta.env.VITE_API_URL
-              }/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-              {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  batchName: batchToSend,
-                  quantity: finalBatchQty,
-                }),
-              }
-            )
-              .then((res) => res.json())
-              .then((d) => console.log("Batch qty synced:", d))
-              .catch((err) => console.error("Batch qty sync error:", err));
+    // 🔥 batch quantity sync
+    if (name === "quantity") {
+      const baseQty = Number(entry.batchBaseQuantity ?? 0);
+      const diffQty = newVal - oldQty;
+      const finalBatchQty = baseQty + newVal;
+
+      const itemId = entry.itemId;
+      const batchName = entry.batchNumber;
+
+      if (itemId && diffQty !== 0 && batchName) {
+        fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+          {
+            method: "PATCH",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              batchName,
+              quantity: finalBatchQty,
+            }),
           }
-        }
-
-        return;
+        ).catch((err) =>
+          console.error("Batch qty sync error:", err)
+        );
       }
-
-      // 4️⃣ Default (baaki fields)
-      updatedEntries[index] = {
-        ...entry,
-        [name]: type === "number" ? Number(value) || 0 : value,
-      };
-      setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-      return;
     }
+
+    return;
+  }
+
+  // 4️⃣ DEFAULT
+  updatedEntries[index] = {
+    ...entry,
+    [name]: type === "number" ? Number(value) || 0 : value,
+  };
+
+  setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+  return;
+}
+
 
     // ⭐ ACCOUNTING / AS-VOUCHER MODES
     if (name === "ledgerId") {
@@ -677,6 +693,34 @@ const PurchaseVoucher: React.FC = () => {
 
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
   };
+
+
+  useEffect(() => {
+  if (!supplierState) return;
+
+  setFormData((prev) => ({
+    ...prev,
+    entries: prev.entries.map((e) => {
+      if (!e.itemId) return e;
+
+      const item = stockItems.find(
+        (i) => String(i.id) === String(e.itemId)
+      );
+
+      const gst = Number(item?.gstRate) || 0;
+
+      return {
+        ...e,
+        ...resolvePurchaseGst(
+          gst,
+          safeCompanyInfo.state,
+          supplierState
+        ),
+      };
+    }),
+  }));
+}, [supplierState]);
+
 
   const addEntry = () => {
     setFormData((prev) => ({
@@ -1325,6 +1369,53 @@ const PurchaseVoucher: React.FC = () => {
   const selectedPartyLedger = safeLedgers.find(
     (l) => String(l.id) === String(formData.partyId)
   );
+
+  useEffect(() => {
+  if (!formData.partyId) {
+    setSupplierState("");
+    return;
+  }
+
+  const supplier = safeLedgers.find(
+    (l) => String(l.id) === String(formData.partyId)
+  );
+
+  const state =
+    supplier?.state ||
+    supplier?.state_name ||
+    supplier?.State ||
+    "";
+
+  setSupplierState(state);
+}, [formData.partyId, safeLedgers]);
+
+
+const resolvePurchaseGst = (
+  gstRate: number,
+  companyState: string,
+  supplierState: string
+) => {
+  const isIntra =
+    companyState &&
+    supplierState &&
+    companyState.toLowerCase().trim() ===
+      supplierState.toLowerCase().trim();
+
+  if (isIntra) {
+    return {
+      cgstRate: gstRate / 2,
+      sgstRate: gstRate / 2,
+      igstRate: 0,
+    };
+  }
+
+  return {
+    cgstRate: 0,
+    sgstRate: 0,
+    igstRate: gstRate,
+  };
+};
+
 
   // 🔹 GST Charge Type
   const isRegularCharge =

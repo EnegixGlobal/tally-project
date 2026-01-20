@@ -64,8 +64,7 @@ const StockSummary: React.FC = () => {
 
       try {
         const groupRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger-groups?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
         );
 
@@ -77,10 +76,10 @@ const StockSummary: React.FC = () => {
 
         const stockGroup = Array.isArray(groupData)
           ? groupData.find(
-              (g: any) =>
-                typeof g?.name === "string" &&
-                g.name.toLowerCase() === "stock-in-hand"
-            )
+            (g: any) =>
+              typeof g?.name === "string" &&
+              g.name.toLowerCase() === "stock-in-hand"
+          )
           : null;
 
         if (!stockGroup) {
@@ -92,8 +91,7 @@ const StockSummary: React.FC = () => {
         const stockGroupId = stockGroup.id;
 
         const ledgerRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
         );
 
@@ -105,8 +103,8 @@ const StockSummary: React.FC = () => {
 
         const filteredLedgers = Array.isArray(ledgerData)
           ? ledgerData.filter(
-              (l: any) => Number(l.groupId) === Number(stockGroupId)
-            )
+            (l: any) => Number(l.groupId) === Number(stockGroupId)
+          )
           : [];
 
         setGroups(filteredLedgers);
@@ -136,17 +134,35 @@ const StockSummary: React.FC = () => {
       // console.log("json", json.data);
       const formatted = Array.isArray(json.data)
         ? json.data.map((item: any) => ({
-            item: {
-              id: item.id,
-              name: item.name,
-              unitName: units.find((u) => u.id === item.unit)?.name ?? "",
-              openingBalance: Number(item.openingBalance || 0),
-              hsnCode: item.hsnCode ?? "",
-              gstRate: Number(item.gstRate || 0),
-              taxType: item.taxType ?? "",
-            },
-          }))
+          itemName: item.name,
+          unitName: units.find((u) => u.id === item.unit)?.name ?? "",
+          hsnCode: item.hsnCode || "",
+          gstRate: Number(item.gstRate || 0),
+          taxType: item.taxType || "",
+          batches:
+            item.batches?.map((b: any) => ({
+              batchName: b.batchName || "Default",
+              opening: {
+                qty: Number(b.batchQuantity || item.openingBalance || 0),
+                rate: Number(b.openingRate || 0),
+                value:
+                  Number(b.batchQuantity || item.openingBalance || 0) *
+                  Number(b.openingRate || 0),
+              },
+            })) ||
+            [
+              {
+                batchName: "Default",
+                opening: {
+                  qty: Number(item.openingBalance || 0),
+                  rate: 0,
+                  value: 0,
+                },
+              },
+            ],
+        }))
         : [];
+
 
       setData(formatted);
     } catch (err: any) {
@@ -170,8 +186,7 @@ const StockSummary: React.FC = () => {
       });
 
       const response = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/purchase-vouchers/purchase-history?${params.toString()}`
       );
 
@@ -181,13 +196,13 @@ const StockSummary: React.FC = () => {
 
       const formatted = Array.isArray(json.data)
         ? json.data.map((v: any) => ({
-            id: v.id,
-            itemName: v.itemName,
-            hsnCode: v.hsnCode,
-            batchNumber: v.batchNumber,
-            qty: v.purchaseQuantity,
-            date: v.purchaseDate,
-          }))
+          id: v.id,
+          itemName: v.itemName,
+          hsnCode: v.hsnCode,
+          batchNumber: v.batchNumber,
+          qty: v.purchaseQuantity,
+          date: v.purchaseDate,
+        }))
         : [];
 
       setData(formatted);
@@ -212,8 +227,7 @@ const StockSummary: React.FC = () => {
       });
 
       const response = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/sales-vouchers/sale-history?${params.toString()}`
       );
 
@@ -223,12 +237,12 @@ const StockSummary: React.FC = () => {
 
       const formatted = Array.isArray(json.data)
         ? json.data.map((v: any) => ({
-            itemName: v.itemName,
-            hsnCode: v.hsnCode,
-            batchNumber: v.batchNumber,
-            qty: Math.abs(v.qtyChange),
-            date: v.movementDate,
-          }))
+          itemName: v.itemName,
+          hsnCode: v.hsnCode,
+          batchNumber: v.batchNumber,
+          qty: Math.abs(v.qtyChange),
+          date: v.movementDate,
+        }))
         : [];
 
       setData(formatted);
@@ -253,13 +267,11 @@ const StockSummary: React.FC = () => {
           `${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`
         ),
         fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/purchase-vouchers/purchase-history?${params.toString()}`
         ),
         fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/sales-vouchers/sale-history?${params.toString()}`
         ),
       ]);
@@ -354,13 +366,11 @@ const StockSummary: React.FC = () => {
       const [stockItemsRes, purchaseRes, salesRes] = await Promise.all([
         fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params}`),
         fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/purchase-vouchers/purchase-history?${params}`
         ),
         fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/sales-vouchers/sale-history?${params}`
         ),
       ]);
@@ -694,8 +704,8 @@ const StockSummary: React.FC = () => {
       reportView === "Opening"
         ? data
         : reportView === "Closing"
-        ? groupedData.flatMap((group) => group.transactions)
-        : groupedData.flatMap((group) => group.transactions);
+          ? groupedData.flatMap((group) => group.transactions)
+          : groupedData.flatMap((group) => group.transactions);
 
     const csv = [
       columns.map((c) => c.header).join(","),
@@ -733,8 +743,7 @@ const StockSummary: React.FC = () => {
   const handleSaveEdit = async (ledgerId: number) => {
     try {
       const res = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/ledger?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`,
         {
           method: "PATCH",
@@ -983,15 +992,70 @@ const StockSummary: React.FC = () => {
           data.length > 0 && (
             <>
               {reportView === "Opening" ? (
-                <ReportTable
-                  theme={theme}
-                  columns={columns}
-                  data={data}
-                  onRowClick={(row: any) => {
-                    let itemId = row.item?.id ?? row.id ?? "";
-                    navigate(`/app/reports/movement-analysis?itemId=${itemId}`);
-                  }}
-                />
+                <div className="overflow-x-auto">
+                  <table className="w-full border-collapse text-sm">
+                    <thead>
+                      <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200"}>
+                        <th className="border p-2 text-left">Stock Item</th>
+                        <th className="border p-2 text-center">Unit</th>
+                        <th className="border p-2 text-center">HSN</th>
+                        <th className="border p-2 text-center">GST</th>
+                        <th className="border p-2 text-center">Tax Type</th>
+                        <th className="border p-2 text-right">Qty</th>
+                        <th className="border p-2 text-right">Rate</th>
+                        <th className="border p-2 text-right">Value</th>
+                      </tr>
+                    </thead>
+
+                    <tbody>
+                      {data.map((item: any, idx: number) => {
+                        const isExpanded = expandedItems.has(item.itemName);
+                        const batches = item.batches || [];
+
+                        return (
+                          <React.Fragment key={idx}>
+                            {/* ITEM ROW */}
+                            <tr
+                              className={`cursor-pointer font-semibold ${theme === "dark" ? "bg-gray-800 text-white" : "bg-gray-50"
+                                }`}
+                              onClick={() => toggleItem(item.itemName)}
+                            >
+                              <td className="border p-2">
+                                {isExpanded ? "▼" : "▶"} {item.itemName}
+                              </td>
+                              <td className="border p-2 text-center">{item.unitName}</td>
+                              <td className="border p-2 text-center">{item.hsnCode}</td>
+                              <td className="border p-2 text-center">{item.gstRate}%</td>
+                              <td className="border p-2 text-center">{item.taxType}</td>
+                              <td className="border"></td>
+                              <td className="border"></td>
+                              <td className="border"></td>
+                            </tr>
+
+                            {/* BATCH ROWS */}
+                            {isExpanded &&
+                              batches.map((b: any, bIdx: number) => (
+                                <tr key={bIdx} className="bg-white hover:bg-yellow-50">
+                                  <td className="border pl-8 italic">{b.batchName}</td>
+                                  <td className="border"></td>
+                                  <td className="border"></td>
+                                  <td className="border"></td>
+                                  <td className="border"></td>
+                                  <td className="border p-2 text-right">{b.opening.qty}</td>
+                                  <td className="border p-2 text-right">
+                                    {formatCurrency(b.opening.rate)}
+                                  </td>
+                                  <td className="border p-2 text-right">
+                                    {formatCurrency(b.opening.value)}
+                                  </td>
+                                </tr>
+                              ))}
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               ) : reportView === "All" ? (
                 <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-sm">
@@ -1005,52 +1069,47 @@ const StockSummary: React.FC = () => {
                       >
                         <th
                           rowSpan={2}
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-2 text-left font-semibold`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-2 text-left font-semibold`}
                           style={{ minWidth: "200px" }}
                         >
                           Particulars
                         </th>
                         <th
                           colSpan={3}
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center font-semibold`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center font-semibold`}
                         >
                           Opening Balance
                         </th>
                         <th
                           colSpan={3}
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center font-semibold`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center font-semibold`}
                         >
                           Inwards
                         </th>
                         <th
                           colSpan={3}
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center font-semibold`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center font-semibold`}
                         >
                           Outwards
                         </th>
                         <th
                           colSpan={3}
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center font-semibold`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center font-semibold`}
                         >
                           Closing Balance
                         </th>
@@ -1064,110 +1123,98 @@ const StockSummary: React.FC = () => {
                         }
                       >
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Quantity
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Rate
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Value
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Quantity
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Rate
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Value
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Quantity
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Rate
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Value
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Quantity
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Rate
                         </th>
                         <th
-                          className={`border ${
-                            theme === "dark"
-                              ? "border-gray-500"
-                              : "border-gray-400"
-                          } p-1 text-center`}
+                          className={`border ${theme === "dark"
+                            ? "border-gray-500"
+                            : "border-gray-400"
+                            } p-1 text-center`}
                         >
                           Value
                         </th>
@@ -1242,11 +1289,10 @@ const StockSummary: React.FC = () => {
                           <React.Fragment key={idx}>
                             {/* ITEM ROW */}
                             <tr
-                              className={`cursor-pointer font-semibold ${
-                                theme === "dark"
-                                  ? "bg-gray-800 text-white hover:bg-gray-700"
-                                  : "bg-gray-50 hover:bg-gray-100"
-                              }`}
+                              className={`cursor-pointer font-semibold ${theme === "dark"
+                                ? "bg-gray-800 text-white hover:bg-gray-700"
+                                : "bg-gray-50 hover:bg-gray-100"
+                                }`}
                               onClick={() => toggleItem(item.itemName)}
                             >
                               <td className="border p-2">
@@ -1308,11 +1354,10 @@ const StockSummary: React.FC = () => {
                                 // >
                                 <tr
                                   key={bIdx}
-                                  className={`cursor-pointer ${
-                                    theme === "dark"
-                                      ? "bg-gray-900"
-                                      : "bg-white"
-                                  } hover:bg-yellow-100`}
+                                  className={`cursor-pointer ${theme === "dark"
+                                    ? "bg-gray-900"
+                                    : "bg-white"
+                                    } hover:bg-yellow-100`}
                                   onClick={() =>
                                     navigate(
                                       `/app/reports/item-monthly-summary?item=${item.itemName}&batch=${b.batchName}`
@@ -1445,11 +1490,10 @@ const StockSummary: React.FC = () => {
                         {columns.map((col) => (
                           <th
                             key={col.accessor}
-                            className={`p-2 border ${
-                              theme === "dark"
-                                ? "border-gray-500"
-                                : "border-gray-400"
-                            } text-${col.align || "left"} font-semibold`}
+                            className={`p-2 border ${theme === "dark"
+                              ? "border-gray-500"
+                              : "border-gray-400"
+                              } text-${col.align || "left"} font-semibold`}
                           >
                             {col.header}
                           </th>
@@ -1463,30 +1507,26 @@ const StockSummary: React.FC = () => {
                           <React.Fragment key={idx}>
                             {/* Group Header Row */}
                             <tr
-                              className={`cursor-pointer ${
-                                theme === "dark"
-                                  ? "hover:bg-gray-600 text-white"
-                                  : "hover:bg-gray-100 text-black"
-                              } ${
-                                theme === "dark" ? "bg-gray-800" : "bg-gray-50"
-                              }`}
+                              className={`cursor-pointer ${theme === "dark"
+                                ? "hover:bg-gray-600 text-white"
+                                : "hover:bg-gray-100 text-black"
+                                } ${theme === "dark" ? "bg-gray-800" : "bg-gray-50"
+                                }`}
                               onClick={() => toggleItem(group.itemName)}
                             >
                               <td
-                                className={`p-2 border ${
-                                  theme === "dark"
-                                    ? "border-gray-500"
-                                    : "border-gray-400"
-                                } text-center`}
+                                className={`p-2 border ${theme === "dark"
+                                  ? "border-gray-500"
+                                  : "border-gray-400"
+                                  } text-center`}
                               >
                                 -
                               </td>
                               <td
-                                className={`p-2 border ${
-                                  theme === "dark"
-                                    ? "border-gray-500"
-                                    : "border-gray-400"
-                                }`}
+                                className={`p-2 border ${theme === "dark"
+                                  ? "border-gray-500"
+                                  : "border-gray-400"
+                                  }`}
                               >
                                 <div className="flex items-center gap-2">
                                   {isExpanded ? (
@@ -1504,52 +1544,47 @@ const StockSummary: React.FC = () => {
                               </td>
                               {reportView === "Closing" && (
                                 <td
-                                  className={`p-2 border ${
-                                    theme === "dark"
-                                      ? "border-gray-500"
-                                      : "border-gray-400"
-                                  } text-center`}
+                                  className={`p-2 border ${theme === "dark"
+                                    ? "border-gray-500"
+                                    : "border-gray-400"
+                                    } text-center`}
                                 >
                                   {group.unitName || "-"}
                                 </td>
                               )}
                               <td
-                                className={`p-2 border ${
-                                  theme === "dark"
-                                    ? "border-gray-500"
-                                    : "border-gray-400"
-                                } text-center`}
+                                className={`p-2 border ${theme === "dark"
+                                  ? "border-gray-500"
+                                  : "border-gray-400"
+                                  } text-center`}
                               >
                                 {group.hsnCode || "-"}
                               </td>
                               {reportView !== "Closing" && (
                                 <td
-                                  className={`p-2 border ${
-                                    theme === "dark"
-                                      ? "border-gray-500"
-                                      : "border-gray-400"
-                                  } text-center`}
+                                  className={`p-2 border ${theme === "dark"
+                                    ? "border-gray-500"
+                                    : "border-gray-400"
+                                    } text-center`}
                                 >
                                   -
                                 </td>
                               )}
                               {reportView === "Closing" && (
                                 <td
-                                  className={`p-2 border ${
-                                    theme === "dark"
-                                      ? "border-gray-500"
-                                      : "border-gray-400"
-                                  } text-center`}
+                                  className={`p-2 border ${theme === "dark"
+                                    ? "border-gray-500"
+                                    : "border-gray-400"
+                                    } text-center`}
                                 >
                                   -
                                 </td>
                               )}
                               <td
-                                className={`p-2 border ${
-                                  theme === "dark"
-                                    ? "border-gray-500"
-                                    : "border-gray-400"
-                                } text-center font-semibold`}
+                                className={`p-2 border ${theme === "dark"
+                                  ? "border-gray-500"
+                                  : "border-gray-400"
+                                  } text-center font-semibold`}
                               >
                                 {group.totalQty}
                               </td>
@@ -1560,11 +1595,10 @@ const StockSummary: React.FC = () => {
                                 (transaction: any, tIdx: number) => (
                                   <tr
                                     key={`${idx}-${tIdx}`}
-                                    className={`${
-                                      theme === "dark"
-                                        ? "bg-gray-900 text-white"
-                                        : "bg-white text-black"
-                                    }`}
+                                    className={`${theme === "dark"
+                                      ? "bg-gray-900 text-white"
+                                      : "bg-white text-black"
+                                      }`}
                                     onClick={(e) => {
                                       e.stopPropagation();
                                       let itemId = transaction.id || "";
@@ -1578,56 +1612,50 @@ const StockSummary: React.FC = () => {
                                     {reportView === "Closing" ? (
                                       <>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center`}
                                         >
                                           {tIdx + 1}
                                         </td>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center pl-8`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center pl-8`}
                                         >
                                           {transaction.itemName}
                                         </td>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center`}
                                         >
                                           {transaction.unitName || "-"}
                                         </td>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center`}
                                         >
                                           {transaction.hsnCode || "-"}
                                         </td>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center`}
                                         >
                                           {transaction.batchNumber || "-"}
                                         </td>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center`}
                                         >
                                           {transaction.closingQty ??
                                             transaction.qty ??
@@ -1637,47 +1665,42 @@ const StockSummary: React.FC = () => {
                                     ) : (
                                       <>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center`}
                                         >
                                           {tIdx + 1}
                                         </td>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center pl-8`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center pl-8`}
                                         >
                                           {transaction.itemName}
                                         </td>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center`}
                                         >
                                           {transaction.hsnCode || "-"}
                                         </td>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center`}
                                         >
                                           {transaction.batchNumber || "-"}
                                         </td>
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center whitespace-nowrap`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center whitespace-nowrap`}
                                         >
                                           {Math.abs(
                                             Number(transaction.qty) || 0
@@ -1685,11 +1708,10 @@ const StockSummary: React.FC = () => {
                                         </td>
 
                                         <td
-                                          className={`p-2 border ${
-                                            theme === "dark"
-                                              ? "border-gray-500"
-                                              : "border-gray-400"
-                                          } text-center`}
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-center`}
                                         >
                                           {formatDate(transaction.date)}
                                         </td>

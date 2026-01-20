@@ -112,8 +112,7 @@ const GSTR3B: React.FC = () => {
         if (!companyId || !ownerType || !ownerId) return;
 
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/gstr3b?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -167,14 +166,14 @@ const GSTR3B: React.FC = () => {
       integrated_tax: "",
     },
     d: "",
-    e:{
-      integratedTax:'',
-      centralTax:'',
-      stateTax:''
+    e: {
+      integratedTax: '',
+      centralTax: '',
+      stateTax: ''
     },
-    f:{
-      nillExampt:'',
-      nongst:''
+    f: {
+      nillExampt: '',
+      nongst: ''
     },
   });
   // purchase Data get
@@ -182,8 +181,7 @@ const GSTR3B: React.FC = () => {
     const fetchData = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/gstr3b/purchase?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
@@ -198,13 +196,13 @@ const GSTR3B: React.FC = () => {
             integrated_tax: data.c?.integrated_tax,
           },
           e: {
-            integratedTax:data.e?.integrated_tax,
-            centralTax:data.e?.central_tax,
-            stateTax:data.e?.state_tax
+            integratedTax: data.e?.integrated_tax,
+            centralTax: data.e?.central_tax,
+            stateTax: data.e?.state_tax
           },
-          f:{
-            nillExampt:data.f?.a,
-            nongst:data.f?.b
+          f: {
+            nillExampt: data.f?.a,
+            nongst: data.f?.b
           }
         }));
       } catch (e) {
@@ -215,17 +213,89 @@ const GSTR3B: React.FC = () => {
     fetchData();
   }, []);
 
+
+  // date create
+  const formatDateTimeIST = () => {
+    return new Date().toLocaleString("en-IN", {
+      timeZone: "Asia/Kolkata",
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+  };
+
+
+  // json download
+  const handleDownloadJSON = () => {
+    const payload = {
+      returnType: "GSTR-3B",
+
+      company: {
+        companyId,
+        ownerType,
+        ownerId,
+      },
+
+      basicInfo: {
+        gstin: basicInfo.gstin,
+        legalName: basicInfo.legalName,
+        tradeName: basicInfo.tradeName,
+      },
+
+      section3_1: {
+        outwardTaxable: threepointone.a,
+        zeroRated: threepointone.b,
+        nilExempted: threepointone.c,
+        reverseCharge: threepointone.d,
+      },
+
+      purchaseITC: {
+        reverseChargeITC: {
+          igst: threepointone.d.integratedTax,
+          cgst: threepointone.d.centralTax,
+          sgst: threepointone.d.stateUTTax,
+          cess: threepointone.d.cess,
+        },
+        otherITC: purchaseData.e,
+      },
+
+      exemptAndNonGST: {
+        exemptNil: purchaseData.f?.nillExampt,
+        nonGST: purchaseData.f?.nongst,
+      },
+
+      generatedAt: formatDateTimeIST(),
+    };
+
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `GSTR3B_${basicInfo.gstin}_${Date.now()}.json`;
+
+    document.body.appendChild(link);
+    link.click();
+
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+
   return (
-    <div className="pt-[56px] px-4">
+    <div className="pt-[56px] px-4 ">
       {/* Header */}
       <div className="flex items-center mb-6">
         <button
           title="Back to Reports"
           type="button"
           onClick={() => navigate("/app/gst")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -233,26 +303,23 @@ const GSTR3B: React.FC = () => {
         <div className="ml-auto flex space-x-2">
           <button
             title="Load Draft"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <FileText size={18} />
           </button>
           <button
             title="Save Draft"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Save size={18} />
           </button>
           <button
             title="Calculate"
-            className={`p-2 rounded-md ${
-              isCalculating ? "animate-pulse" : ""
-            } ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
+            className={`p-2 rounded-md ${isCalculating ? "animate-pulse" : ""
+              } ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
           >
             <Calculator size={18} />
           </button>
@@ -260,36 +327,32 @@ const GSTR3B: React.FC = () => {
             title="Toggle Filters"
             type="button"
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Filter size={18} />
           </button>
           <button
             title="Upload Report"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Upload size={18} />
           </button>
           <button
             title="Print Report"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
           <button
             title="Download Report"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Download size={18} />
           </button>
@@ -299,9 +362,8 @@ const GSTR3B: React.FC = () => {
       {/* Filter Panel */}
       {showFilterPanel && (
         <div
-          className={`p-4 mb-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 mb-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h3 className="font-semibold mb-4">Return Period</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -310,11 +372,10 @@ const GSTR3B: React.FC = () => {
               <select
                 title="Select Month"
                 // onChange={(e) => updateReturnPeriod("month", e.target.value)}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               >
                 {Array.from({ length: 12 }, (_, i) => (
                   <option
@@ -326,8 +387,8 @@ const GSTR3B: React.FC = () => {
                 ))}
               </select>
             </div>
-            
-            
+
+
           </div>
         </div>
       )}
@@ -335,9 +396,8 @@ const GSTR3B: React.FC = () => {
       <div className="space-y-6">
         {/* Basic Information Section */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">Basic Information</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -374,24 +434,14 @@ const GSTR3B: React.FC = () => {
                 className="w-full p-2 rounded border"
               />
             </div>
-            <div>
-              <label className="block text-sm font-medium mb-2">ARN</label>
-              <input
-                type="text"
-                value={basicInfo.arn}
-                readOnly
-                placeholder="Auto-generated after submission"
-                className="w-full p-2 rounded border"
-              />
-            </div>
+
           </div>
         </div>
 
         {/* Section 3.1 - Outward Supplies */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">
             3.1 Details of Outward Supplies and inward supplies liable to
@@ -402,11 +452,10 @@ const GSTR3B: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b-2 border-gray-300"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b-2 border-gray-300"
+                    }`}
                 >
                   <th className="px-4 py-3 text-left">Nature of Supply</th>
                   <th className="px-4 py-3 text-right">Taxable Value</th>
@@ -567,9 +616,8 @@ const GSTR3B: React.FC = () => {
 
         {/* Section 3.1.1 - Amendment to outward supplies */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">
             3.1.1 Amendment to outward supplies reported in returns of earlier
@@ -580,11 +628,10 @@ const GSTR3B: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b-2 border-gray-300"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b-2 border-gray-300"
+                    }`}
                 >
                   <th className="px-4 py-3 text-left">Particulars</th>
                   <th className="px-4 py-3 text-right">Taxable Value</th>
@@ -646,9 +693,8 @@ const GSTR3B: React.FC = () => {
 
         {/* Section 3.2 - Of the supplies shown in 3.1(a) above, details of inter-State supplies */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">
             3.2 Of the supplies shown in 3.1(a) above, details of inter-State
@@ -660,11 +706,10 @@ const GSTR3B: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b-2 border-gray-300"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b-2 border-gray-300"
+                    }`}
                 >
                   <th className="px-4 py-3 text-left">Nature of Supply</th>
                   <th className="px-4 py-3 text-right">Taxable Value</th>
@@ -768,9 +813,8 @@ const GSTR3B: React.FC = () => {
 
         {/* Section 4 - Eligible ITC */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">4. Eligible ITC</h2>
 
@@ -778,11 +822,10 @@ const GSTR3B: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b-2 border-gray-300"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b-2 border-gray-300"
+                    }`}
                 >
                   <th className="px-4 py-3 text-left">Details</th>
                   <th className="px-4 py-3 text-right">Integrated Tax</th>
@@ -795,11 +838,10 @@ const GSTR3B: React.FC = () => {
               <tbody>
                 {/* Header Row */}
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b border-gray-200"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b border-gray-200"
+                    }`}
                 >
                   <td className="px-4 py-3 font-bold">
                     (A) ITC Available (whether in full or part)
@@ -991,9 +1033,8 @@ const GSTR3B: React.FC = () => {
 
         {/* Section 4.1 - ITC Reversed (Option B) */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">4.1 ITC Reversed</h2>
 
@@ -1001,11 +1042,10 @@ const GSTR3B: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b-2 border-gray-300"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b-2 border-gray-300"
+                    }`}
                 >
                   <th className="px-4 py-3 text-left">Details</th>
                   <th className="px-4 py-3 text-right">Integrated Tax</th>
@@ -1018,11 +1058,10 @@ const GSTR3B: React.FC = () => {
               <tbody>
                 {/* Header Row */}
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b border-gray-200"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b border-gray-200"
+                    }`}
                 >
                   <td className="px-4 py-3 font-bold">(B) ITC Reversed</td>
                   <td className="px-4 py-3 text-center font-bold" colSpan={4}>
@@ -1104,9 +1143,8 @@ const GSTR3B: React.FC = () => {
 
         {/* Section 5 - Values of exempt, nil-rated and non-GST inward supplies */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">
             5. Values of exempt, nil-rated and non-GST inward supplies
@@ -1144,9 +1182,8 @@ const GSTR3B: React.FC = () => {
 
         {/* Section 6.1 - Interest & Late Fee */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">
             6.1 Interest & Late fee for previous tax period
@@ -1203,9 +1240,8 @@ const GSTR3B: React.FC = () => {
 
         {/* Section 6.2 - Payment of Tax */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">6.2 Payment of Tax</h2>
 
@@ -1213,11 +1249,10 @@ const GSTR3B: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b-2 border-gray-300"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b-2 border-gray-300"
+                    }`}
                 >
                   <th className="px-4 py-3 text-left">Description</th>
                   <th className="px-4 py-3 text-right">Tax</th>
@@ -1399,9 +1434,8 @@ const GSTR3B: React.FC = () => {
 
         {/* Net Tax Liability Calculation */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">Tax Liability Summary</h2>
 
@@ -1436,9 +1470,8 @@ const GSTR3B: React.FC = () => {
                 </div>
 
                 <hr
-                  className={`my-3 ${
-                    theme === "dark" ? "border-gray-600" : "border-gray-300"
-                  }`}
+                  className={`my-3 ${theme === "dark" ? "border-gray-600" : "border-gray-300"
+                    }`}
                 />
 
                 <div className="flex justify-between items-center text-xl font-bold">
@@ -1474,9 +1507,8 @@ const GSTR3B: React.FC = () => {
 
         {/* Verification Section */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h2 className="text-xl font-bold mb-4">Verification</h2>
 
@@ -1487,11 +1519,10 @@ const GSTR3B: React.FC = () => {
               <input
                 type="date"
                 title="Select verification date"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300"
+                  }`}
               />
             </div>
 
@@ -1503,11 +1534,10 @@ const GSTR3B: React.FC = () => {
               <input
                 type="text"
                 placeholder="Enter signatory name"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300"
+                  }`}
               />
             </div>
 
@@ -1518,11 +1548,10 @@ const GSTR3B: React.FC = () => {
               </label>
               <select
                 title="Select designation or status"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300"
+                  }`}
               >
                 <option value="">Select Designation</option>
                 <option value="Proprietor">Proprietor</option>
@@ -1544,375 +1573,34 @@ const GSTR3B: React.FC = () => {
               <input
                 type="text"
                 placeholder="Enter place"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300"
+                  }`}
               />
             </div>
           </div>
         </div>
       </div>
 
-      {/* Action Buttons */}
-      <div className="flex flex-wrap gap-4 mt-8 justify-center">
-        <button
-          className={`px-6 py-3 rounded-lg flex items-center gap-2 ${
-            theme === "dark"
-              ? "bg-blue-600 hover:bg-blue-700 text-white"
-              : "bg-blue-600 hover:bg-blue-700 text-white"
-          }`}
-        >
-          <Save size={20} />
-          Save Draft
-        </button>
-        <button
-          className={`px-6 py-3 rounded-lg flex items-center gap-2 ${
-            theme === "dark"
-              ? "bg-gray-600 hover:bg-gray-700 text-white"
-              : "bg-gray-600 hover:bg-gray-700 text-white"
-          }`}
-        >
-          <FileText size={20} />
-          Load Draft
-        </button>
-        <button
-          className={`px-6 py-3 rounded-lg flex items-center gap-2 ${
-            theme === "dark"
-              ? "bg-green-600 hover:bg-green-700 text-white"
-              : "bg-green-600 hover:bg-green-700 text-white"
-          }`}
-        >
-          <Calculator size={20} />
-          Validate & Preview
-        </button>
-        <button
-          className={`px-6 py-3 rounded-lg flex items-center gap-2 ${
-            theme === "dark"
-              ? "bg-purple-600 hover:bg-purple-700 text-white"
-              : "bg-purple-600 hover:bg-purple-700 text-white"
-          }`}
-        >
-          <Upload size={20} />
-          Submit Return
-        </button>
-      </div>
-
+      {/* Bottom Action Bar */}
       <div
-        className={`mt-6 p-4 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-orange-50"
-        }`}
+        className={`mt-10 flex justify-end border-t pt-6
+  ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}
       >
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <p className="text-sm">
-              <span className="font-semibold">GST Filing:</span> GSTR-3B is a
-              monthly summary return that must be filed by the 20th of the
-              following month.
-            </p>
-          </div>
-          <div>
-            <p className="text-sm">
-              <span className="font-semibold">Current Period:</span>{" "}
-            </p>
-            <p className="text-sm">
-              <span className="font-semibold">Net Tax Liability:</span> ₹{" "}
-            </p>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={handleDownloadJSON}
+          className="flex items-center gap-2 px-6 py-2 rounded-md
+      bg-blue-600 text-white hover:bg-blue-700 transition"
+        >
+          <Download size={18} />
+          Download JSON
+        </button>
       </div>
 
-      {/* Draft Preview Modal */}
-      {showDraftPreview && draftData && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div
-            className={`max-w-4xl w-full mx-4 max-h-[90vh] overflow-y-auto rounded-lg ${
-              theme === "dark" ? "bg-gray-800" : "bg-white"
-            }`}
-          >
-            <div
-              className={`sticky top-0 px-6 py-4 border-b ${
-                theme === "dark"
-                  ? "border-gray-700 bg-gray-800"
-                  : "border-gray-200 bg-white"
-              }`}
-            >
-              <h3 className="text-lg font-semibold">Draft Preview</h3>
-              <p className="text-sm text-gray-500">
-                Review the draft before loading
-              </p>
-            </div>
-            <div className="p-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div>
-                  <h4 className="font-medium mb-2">Basic Information</h4>
-                  <p>
-                    <span className="font-medium">GSTIN:</span>{" "}
-                    {draftData.basicInfo.gstin || "Not provided"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Legal Name:</span>{" "}
-                    {draftData.basicInfo.legalName || "Not provided"}
-                  </p>
-                  <p>
-                    <span className="font-medium">Return Period:</span>{" "}
-                    {getMonthName(draftData.returnPeriod.month)}{" "}
-                    {draftData.returnPeriod.year}
-                  </p>
-                </div>
-                <div>
-                  <h4 className="font-medium mb-2">Tax Summary</h4>
-                </div>
-              </div>
-            </div>
-            <div
-              className={`sticky bottom-0 px-6 py-4 border-t flex justify-end gap-3 ${
-                theme === "dark"
-                  ? "border-gray-700 bg-gray-800"
-                  : "border-gray-200 bg-white"
-              }`}
-            >
-              <button
-                className={`px-4 py-2 rounded-md ${
-                  theme === "dark"
-                    ? "bg-gray-600 hover:bg-gray-700"
-                    : "bg-gray-300 hover:bg-gray-400"
-                }`}
-              >
-                Cancel
-              </button>
-              <button className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700">
-                Load Draft
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
-      {/* Preview Mode Modal */}
-      {showPreviewMode && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div
-            className={`max-w-6xl w-full mx-4 max-h-[90vh] overflow-y-auto rounded-lg ${
-              theme === "dark" ? "bg-gray-800" : "bg-white"
-            }`}
-          >
-            <div
-              className={`sticky top-0 px-6 py-4 border-b flex justify-between items-center ${
-                theme === "dark"
-                  ? "border-gray-700 bg-gray-800"
-                  : "border-gray-200 bg-white"
-              }`}
-            >
-              <div>
-                <h3 className="text-lg font-semibold">GSTR-3B Preview</h3>
-                <p className="text-sm text-gray-500"></p>
-              </div>
-              <button
-                title="Close Preview"
-                onClick={() => setShowPreviewMode(false)}
-                className={`p-2 rounded-md ${
-                  theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-                }`}
-              >
-                <X size={20} />
-              </button>
-            </div>
-            <div className="p-6 space-y-6">
-              {/* Basic Info Preview */}
-              <div
-                className={`p-4 rounded-lg ${
-                  theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                }`}
-              >
-                <h4 className="font-semibold mb-3">Basic Information</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <p>
-                    <span className="font-medium">GSTIN:</span>{" "}
-                  </p>
-                  <p>
-                    <span className="font-medium">Legal Name:</span>{" "}
-                  </p>
-                  <p>
-                    <span className="font-medium">Trade Name:</span>{" "}
-                  </p>
-                  <p>
-                    <span className="font-medium">Return Period:</span>{" "}
-                  </p>
-                </div>
-              </div>
 
-              {/* Tax Summary Preview */}
-              <div
-                className={`p-4 rounded-lg ${
-                  theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                }`}
-              >
-                <h4 className="font-semibold mb-3">Tax Liability Summary</h4>
-                {(() => {
-                  return (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                      <p>
-                        <span className="font-medium">IGST:</span> ₹
-                      </p>
-                      <p>
-                        <span className="font-medium">CGST:</span> ₹
-                      </p>
-                      <p>
-                        <span className="font-medium">SGST:</span> ₹
-                      </p>
-                      <p>
-                        <span className="font-medium">CESS:</span> ₹
-                      </p>
-                      <p className="font-bold text-lg col-span-full">
-                        <span className="font-medium">Net Tax Liability:</span>{" "}
-                        ₹
-                      </p>
-                    </div>
-                  );
-                })()}
-              </div>
-
-              {/* Verification Preview */}
-              {/* <div
-                className={`p-4 rounded-lg ${
-                  theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                }`}
-              >
-                <h4 className="font-semibold mb-3">Verification</h4>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <p>
-                    <span className="font-medium">Date:</span>{" "}
-                    {gstr3bData.verification.date}
-                  </p>
-                  <p>
-                    <span className="font-medium">Authorized Signatory:</span>{" "}
-                    {gstr3bData.verification.authorizedSignatoryName}
-                  </p>
-                  <p>
-                    <span className="font-medium">Designation:</span>{" "}
-                    {gstr3bData.verification.designation}
-                  </p>
-                  <p>
-                    <span className="font-medium">Place:</span>{" "}
-                    {gstr3bData.verification.place}
-                  </p>
-                </div>
-              </div> */}
-            </div>
-            <div
-              className={`sticky bottom-0 px-6 py-4 border-t flex justify-end gap-3 ${
-                theme === "dark"
-                  ? "border-gray-700 bg-gray-800"
-                  : "border-gray-200 bg-white"
-              }`}
-            >
-              <button
-                onClick={() => setShowPreviewMode(false)}
-                className={`px-4 py-2 rounded-md ${
-                  theme === "dark"
-                    ? "bg-gray-600 hover:bg-gray-700"
-                    : "bg-gray-300 hover:bg-gray-400"
-                }`}
-              >
-                Back to Edit
-              </button>
-              <button className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700">
-                Submit Return
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* ARN Display Modal */}
-      {showArnModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div
-            className={`max-w-md w-full mx-4 rounded-lg ${
-              theme === "dark" ? "bg-gray-800" : "bg-white"
-            }`}
-          >
-            <div
-              className={`px-6 py-4 border-b ${
-                theme === "dark" ? "border-gray-700" : "border-gray-200"
-              }`}
-            >
-              <h3 className="text-lg font-semibold text-green-600">
-                GSTR-3B Submitted Successfully!
-              </h3>
-            </div>
-            <div className="p-6">
-              <div className="text-center">
-                <div className="mb-4">
-                  <svg
-                    className="w-16 h-16 text-green-500 mx-auto"
-                    fill="none"
-                    stroke="currentColor"
-                    viewBox="0 0 24 24"
-                  >
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"
-                    />
-                  </svg>
-                </div>
-                <h4 className="text-lg font-semibold mb-2">
-                  Return Filed Successfully
-                </h4>
-                <p className="text-sm text-gray-600 mb-4">
-                  Your GSTR-3B return has been submitted to the GST portal.
-                </p>
-
-                <div
-                  className={`p-4 rounded-lg ${
-                    theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                  } mb-4`}
-                >
-                  <p className="text-sm font-medium mb-2">
-                    Acknowledgement Reference Number (ARN)
-                  </p>
-                  <p className="text-xl font-mono font-bold text-blue-600">
-                    {generatedArn}
-                  </p>
-                </div>
-
-                <div className="text-sm text-gray-600 space-y-1">
-                  <p>
-                    <span className="font-medium">Return Period:</span>{" "}
-                  </p>
-                  <p>
-                    <span className="font-medium">Filed Date:</span>{" "}
-                    {new Date().toLocaleDateString("en-IN")}
-                  </p>
-                  <p>
-                    <span className="font-medium">Filed Time:</span>{" "}
-                    {new Date().toLocaleTimeString("en-IN")}
-                  </p>
-                </div>
-              </div>
-            </div>
-            <div
-              className={`px-6 py-4 border-t flex justify-center ${
-                theme === "dark" ? "border-gray-700" : "border-gray-200"
-              }`}
-            >
-              <button
-                onClick={() => {
-                  setShowArnModal(false);
-                  setGeneratedArn("");
-                }}
-                className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-              >
-                Close
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
