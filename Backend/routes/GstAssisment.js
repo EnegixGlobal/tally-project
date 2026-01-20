@@ -169,4 +169,224 @@ router.get("/sales", async (req, res) => {
 
 
 
+router.get("/debit-notes", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id } = req.query;
+    console.log("debit notes route hit");
+
+    const GST_RATES = ["0%", "3%", "5%", "12%", "18%", "28%"];
+
+
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id, owner_type and owner_id are required",
+      });
+    }
+
+    /* 🔹 COMPANY STATE */
+    const [companyRows] = await db.query(
+      `SELECT state FROM tbcompanies WHERE id = ?`,
+      [company_id]
+    );
+
+    const companyStateCode =
+      companyRows[0]?.state?.match(/\((\d+)\)/)?.[1] || "";
+
+    /* 🔹 FETCH ALL LEDGERS (for GST % detection) */
+    const [ledgerRows] = await db.query(`
+      SELECT id, LOWER(name) AS name
+      FROM ledgers
+    `);
+
+    const ledgerMap = {};
+    ledgerRows.forEach(l => {
+      ledgerMap[l.id] = l.name;
+    });
+
+    /* 🔹 DEBIT NOTES */
+    const [rows] = await db.query(
+      `
+      SELECT
+        MONTH(dnv.date) AS month,
+        dnv.narration,
+        sl.state AS partyState
+      FROM debit_note_vouchers dnv
+      LEFT JOIN ledgers sl ON sl.id = dnv.party_id
+      WHERE dnv.company_id = ?
+        AND dnv.owner_type = ?
+        AND dnv.owner_id = ?
+      `,
+      [company_id, owner_type, owner_id]
+    );
+
+    const result = [];
+
+    for (const r of rows) {
+      let narration;
+      try {
+        narration = JSON.parse(r.narration || "{}");
+      } catch {
+        continue;
+      }
+
+      const entries = narration.accountingEntries || [];
+
+      for (const e of entries) {
+        if (e.type !== "debit") continue;
+
+        const ledgerName = ledgerMap[e.ledgerId] || "";
+
+        const gstRate = GST_RATES.find(rate =>
+          ledgerName.includes(rate)
+        );
+
+        if (!gstRate) continue;
+
+        const partyStateCode =
+          r.partyState?.match(/\((\d+)\)/)?.[1] || "";
+
+        result.push({
+          ledgerName: `${gstRate} debit notes`,
+          month: r.month,
+          total: Number(e.amount || 0),
+          supplyType:
+            partyStateCode === companyStateCode ? "INTRA" : "INTER",
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: result,
+    });
+
+  } catch (error) {
+    console.error("Debit note GST error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Database error",
+    });
+  }
+});
+
+
+
+router.get("/credit-notes", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id } = req.query;
+    console.log("credit notes route hit");
+
+    const GST_RATES = ["0%", "3%", "5%", "12%", "18%", "28%"];
+
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id, owner_type and owner_id are required",
+      });
+    }
+
+    /* 🔹 COMPANY STATE */
+    const [companyRows] = await db.query(
+      `SELECT state FROM tbcompanies WHERE id = ?`,
+      [company_id]
+    );
+
+    const companyStateCode =
+      companyRows[0]?.state?.match(/\((\d+)\)/)?.[1] || "";
+
+    /* 🔹 LEDGERS */
+    const [ledgerRows] = await db.query(`
+      SELECT id, LOWER(name) AS name
+      FROM ledgers
+    `);
+
+    const ledgerMap = {};
+    ledgerRows.forEach(l => {
+      ledgerMap[l.id] = l.name;
+    });
+
+    /* 🔹 CREDIT NOTES (correct table) */
+    const [rows] = await db.query(
+      `
+      SELECT
+        MONTH(cnv.date) AS month,
+        cnv.narration,
+        sl.state AS partyState
+      FROM credit_vouchers cnv
+      LEFT JOIN ledgers sl ON sl.id = cnv.partyId
+      WHERE cnv.company_id = ?
+        AND cnv.owner_type = ?
+        AND cnv.owner_id = ?
+      `,
+      [company_id, owner_type, owner_id]
+    );
+
+    const result = [];
+
+    for (const r of rows) {
+      let narration;
+      try {
+        narration = JSON.parse(r.narration || "{}");
+      } catch {
+        continue;
+      }
+
+      const entries = narration.accountingEntries || [];
+
+      for (const e of entries) {
+        // ✅ GST LEDGER IS ALWAYS DEBIT
+        if (e.type !== "debit") continue;
+
+        const ledgerName = ledgerMap[e.ledgerId] || "";
+
+        const gstRate = GST_RATES.find(rate =>
+          ledgerName.includes(rate)
+        );
+
+        if (!gstRate) continue;
+
+        const partyStateCode =
+          r.partyState?.match(/\((\d+)\)/)?.[1] || "";
+
+        let supplyType = "UNKNOWN";
+        if (partyStateCode && companyStateCode) {
+          supplyType =
+            partyStateCode === companyStateCode ? "INTRA" : "INTER";
+        }
+
+        result.push({
+          ledgerName: `${gstRate} credit notes`,
+          month: r.month,
+          total: Number(e.amount || 0),
+          supplyType,
+        });
+      }
+    }
+
+    res.json({
+      success: true,
+      data: result,
+    });
+
+  } catch (error) {
+    console.error("Credit note GST error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Database error",
+    });
+  }
+});
+
+
+
+
+
+
+
+
+
+
+
+
 module.exports = router;

@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, Printer } from "lucide-react";
 
 const GSTAnalysis: React.FC = () => {
   const { theme } = useAppContext();
@@ -37,8 +37,32 @@ const GSTAnalysis: React.FC = () => {
     "28% gst sales": 5,
   };
 
+  const debitNoteIndex: any = {
+    "0% debit notes": 0,
+    "3% debit notes": 1,
+    "5% debit notes": 2,
+    "12% debit notes": 3,
+    "18% debit notes": 4,
+    "28% debit notes": 5,
+  };
+
+  const creditNoteIndex: any = {
+    "0% credit notes": 0,
+    "3% credit notes": 1,
+    "5% credit notes": 2,
+    "12% credit notes": 3,
+    "18% credit notes": 4,
+    "28% credit notes": 5,
+  };
+
+
+
   const [purchaseRows, setPurchaseRows] = useState<any[]>([]);
   const [salesRows, setSalesRows] = useState<any[]>([]);
+  const [debitNoteRows, setDebitNoteRows] = useState<any[]>([]);
+  const [creditNoteRows, setCreditNoteRows] = useState<any[]>([]);
+
+
 
   useEffect(() => {
     const company_id = localStorage.getItem("company_id");
@@ -61,6 +85,20 @@ const GSTAnalysis: React.FC = () => {
     )
       .then(r => r.json())
       .then(j => j.success && setSalesRows(j.data || []));
+
+    fetch(
+      `${import.meta.env.VITE_API_URL}/api/gst-assessment/debit-notes?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+    )
+      .then(r => r.json())
+      .then(j => j.success && setDebitNoteRows(j.data || []));
+
+    fetch(
+      `${import.meta.env.VITE_API_URL}/api/gst-assessment/credit-notes?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+    )
+      .then(r => r.json())
+      .then(j => j.success && setCreditNoteRows(j.data || []));
+
+
   }, []);
 
   const buildTableData = (rows: any[], slabMap: any) => {
@@ -96,86 +134,155 @@ const GSTAnalysis: React.FC = () => {
     [salesRows]
   );
 
-  const renderGSTTable = (title: string, tableData: any) => (
-    <>
-      <h2 className="text-xl font-semibold text-center my-6">{title}</h2>
+  const debitNoteTable = useMemo(
+    () => buildTableData(debitNoteRows, debitNoteIndex),
+    [debitNoteRows]
+  );
 
-      <div className="bg-white rounded-lg shadow border overflow-x-auto mb-10">
-        <table className="w-full border-collapse text-sm">
-          <thead>
-            <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200"}>
-              <th rowSpan={2} className="border p-2">Month</th>
-              <th colSpan={7} className="border p-2">INTRA STATE</th>
-              <th colSpan={7} className="border p-2">INTER STATE</th>
-            </tr>
-            <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-100"}>
-              {[...Array(2)].flatMap(() =>
-                ["0%", "3%", "5%", "12%", "18%", "28%", "Total"]
-              ).map((h, i) => (
-                <th key={i} className="border p-2">{h}</th>
-              ))}
-            </tr>
-          </thead>
+  const creditNoteTable = useMemo(
+    () => buildTableData(creditNoteRows, creditNoteIndex),
+    [creditNoteRows]
+  );
 
-          <tbody>
-            {months.map(m => {
-              const intraTotal = tableData[m].intra.reduce((a: number, b: number) => a + b, 0);
-              const interTotal = tableData[m].inter.reduce((a: number, b: number) => a + b, 0);
 
-              return (
-                <tr key={m}>
-                  <td className="border p-2 text-center">{m}</td>
 
-                  {tableData[m].intra.map((v: number, i: number) => (
-                    <td key={i} className="border p-2 text-right">
-                      {v ? v.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
-                    </td>
-                  ))}
-                  <td className="border p-2 text-right font-semibold">
-                    {intraTotal ? intraTotal.toLocaleString("en-IN") : ""}
-                  </td>
 
-                  {tableData[m].inter.map((v: number, i: number) => (
-                    <td key={i} className="border p-2 text-right">
-                      {v ? v.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
-                    </td>
-                  ))}
-                  <td className="border p-2 text-right font-semibold">
-                    {interTotal ? interTotal.toLocaleString("en-IN") : ""}
-                  </td>
-                </tr>
-              );
-            })}
+  const handlePrint = (title: string, elementId: string) => {
+    const printContent = document.getElementById(elementId);
+    if (!printContent) return;
 
-            {/* GRAND TOTAL */}
-            <tr className="font-bold bg-gray-100">
-              <td className="border p-2 text-center">Total</td>
-              {Array(14).fill(0).map((_, i) => {
-                let sum = 0;
-                months.forEach(m => {
-                  if (i < 7) {
-                    sum += i < 6
-                      ? tableData[m].intra[i]
-                      : tableData[m].intra.reduce((a: number, b: number) => a + b, 0);
-                  } else {
-                    const idx = i - 7;
-                    sum += idx < 6
-                      ? tableData[m].inter[idx]
-                      : tableData[m].inter.reduce((a: number, b: number) => a + b, 0);
-                  }
-                });
+    const win = window.open("", "", "width=800,height=600");
+    if (!win) return;
+
+    win.document.write(`
+      <html>
+        <head>
+          <title>${title}</title>
+          <style>
+            @media print {
+              @page { size: A4; margin: 10mm; }
+              body { font-family: sans-serif; -webkit-print-color-adjust: exact; }
+              table { width: 100%; border-collapse: collapse; font-size: 12px; }
+              th, td { border: 1px solid black; padding: 4px; text-align: right; }
+              th { background-color: #f3f4f6; text-align: center; }
+              h2 { text-align: center; margin-bottom: 20px; }
+            }
+            body { font-family: sans-serif; padding: 20px; }
+            table { width: 100%; border-collapse: collapse; margin-top: 20px; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: right; }
+            th { background-color: #f3f4f6; text-align: center; }
+            h2 { text-align: center; }
+          </style>
+        </head>
+        <body>
+          <h2>${title}</h2>
+          ${printContent.innerHTML}
+        </body>
+      </html>
+    `);
+
+    win.document.close();
+    win.focus();
+    setTimeout(() => {
+      win.print();
+      win.close();
+    }, 500);
+  };
+
+  const renderGSTTable = (title: string, tableData: any) => {
+    const tableId = `print-${title.replace(/\s+/g, "-").toLowerCase()}`;
+    return (
+      <>
+        <div className="flex items-center justify-center my-6 relative">
+          <h2 className="text-xl font-semibold">{title}</h2>
+          <button
+            onClick={() => handlePrint(title, tableId)}
+            className="absolute right-0 p-2 text-gray-600 hover:text-blue-600"
+            title="Print Table"
+          >
+            <Printer size={20} />
+          </button>
+        </div>
+
+        <div id={tableId} className="bg-white rounded-lg shadow border overflow-x-auto mb-10">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200"}>
+                <th rowSpan={2} className="border p-2">Month</th>
+                <th colSpan={7} className="border p-2 border-r-4 border-gray-600">INTRA STATE</th>
+
+
+                <th colSpan={7} className="border p-2">INTER STATE</th>
+              </tr>
+              <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-100"}>
+                {[...Array(2)].flatMap(() =>
+                  ["0%", "3%", "5%", "12%", "18%", "28%", "Total"]
+                ).map((h, i) => (
+                  <th key={i} className={`border p-2 ${i === 6 ? "border-r-4 border-gray-600" : ""}`}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+
+            <tbody>
+              {months.map(m => {
+                const intraTotal = tableData[m].intra.reduce((a: number, b: number) => a + b, 0);
+                const interTotal = tableData[m].inter.reduce((a: number, b: number) => a + b, 0);
+
                 return (
-                  <td key={i} className="border p-2 text-right">
-                    {sum ? sum.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
-                  </td>
+                  <tr key={m}>
+                    <td className="border p-2 text-center">{m}</td>
+
+                    {tableData[m].intra.map((v: number, i: number) => (
+                      <td key={i} className="border p-2 text-right">
+                        {v ? v.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
+                      </td>
+                    ))}
+                    <td className="border p-2 text-right font-semibold border-r-4 border-gray-600">
+                      {intraTotal ? intraTotal.toLocaleString("en-IN") : ""}
+                    </td>
+
+                    {tableData[m].inter.map((v: number, i: number) => (
+                      <td key={i} className="border p-2 text-right">
+                        {v ? v.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
+                      </td>
+                    ))}
+                    <td className="border p-2 text-right font-semibold">
+                      {interTotal ? interTotal.toLocaleString("en-IN") : ""}
+                    </td>
+                  </tr>
                 );
               })}
-            </tr>
-          </tbody>
-        </table>
-      </div>
-    </>
-  );
+
+              {/* GRAND TOTAL */}
+              <tr className="font-bold bg-gray-100">
+                <td className="border p-2 text-center">Total</td>
+                {Array(14).fill(0).map((_, i) => {
+                  let sum = 0;
+                  months.forEach(m => {
+                    if (i < 7) {
+                      sum += i < 6
+                        ? tableData[m].intra[i]
+                        : tableData[m].intra.reduce((a: number, b: number) => a + b, 0);
+                    } else {
+                      const idx = i - 7;
+                      sum += idx < 6
+                        ? tableData[m].inter[idx]
+                        : tableData[m].inter.reduce((a: number, b: number) => a + b, 0);
+                    }
+                  });
+                  return (
+                    <td key={i} className={`border p-2 text-right ${i === 6 ? "border-r-4 border-gray-600" : ""}`}>
+                      {sum ? sum.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
+                    </td>
+                  );
+                })}
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </>
+    );
+  };
 
   return (
     <div className="pt-[56px] px-4">
@@ -188,8 +295,13 @@ const GSTAnalysis: React.FC = () => {
         </h1>
       </div>
 
+      <hr />
+
       {renderGSTTable("Purchase Detail", purchaseTable)}
+      {renderGSTTable("Debit Notes Detail", debitNoteTable)}
+      {renderGSTTable("Credit Notes Detail", creditNoteTable)}
       {renderGSTTable("Sales Detail", salesTable)}
+
     </div>
   );
 };
