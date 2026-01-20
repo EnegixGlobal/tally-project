@@ -3,6 +3,43 @@ import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
 import { ArrowLeft, X } from "lucide-react";
 
+
+// state list
+const states = [
+  { code: "37", name: "Andhra Pradesh" },
+  { code: "12", name: "Arunachal Pradesh" },
+  { code: "18", name: "Assam" },
+  { code: "10", name: "Bihar" },
+  { code: "22", name: "Chhattisgarh" },
+  { code: "30", name: "Goa" },
+  { code: "24", name: "Gujarat" },
+  { code: "06", name: "Haryana" },
+  { code: "02", name: "Himachal Pradesh" },
+  { code: "20", name: "Jharkhand" },
+  { code: "29", name: "Karnataka" },
+  { code: "32", name: "Kerala" },
+  { code: "23", name: "Madhya Pradesh" },
+  { code: "27", name: "Maharashtra" },
+  { code: "14", name: "Manipur" },
+  { code: "17", name: "Meghalaya" },
+  { code: "15", name: "Mizoram" },
+  { code: "13", name: "Nagaland" },
+  { code: "21", name: "Odisha" },
+  { code: "03", name: "Punjab" },
+  { code: "08", name: "Rajasthan" },
+  { code: "11", name: "Sikkim" },
+  { code: "33", name: "Tamil Nadu" },
+  { code: "36", name: "Telangana" },
+  { code: "16", name: "Tripura" },
+  { code: "09", name: "Uttar Pradesh" },
+  { code: "05", name: "Uttarakhand" },
+  { code: "19", name: "West Bengal" },
+  { code: "07", name: "Delhi" },
+  { code: "01", name: "Jammu and Kashmir" },
+  { code: "38", name: "Ladakh" },
+];
+
+
 // Main E-Way Bill component
 const EWayBill: React.FC = () => {
   const navigate = useNavigate()
@@ -19,6 +56,26 @@ const EWayBill: React.FC = () => {
   const companyInfo = JSON.parse(
     localStorage.getItem("companyInfo") || "{}"
   );
+
+
+  // state code genrate
+  const extractStateCode = (stateValue: string) => {
+    if (!stateValue) return "";
+
+    // Case 1: Mizoram(15)
+    const match = stateValue.match(/\((\d+)\)/);
+    if (match) return match[1];
+
+    // Case 2: Already code "15"
+    if (/^\d+$/.test(stateValue)) return stateValue;
+
+    // Case 3: State name "Jharkhand"
+    const found = states.find(
+      (s) => s.name.toLowerCase() === stateValue.toLowerCase()
+    );
+    return found ? found.code : "";
+  };
+
 
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [showEWayForm, setShowEWayForm] = useState(false);
@@ -48,7 +105,7 @@ const EWayBill: React.FC = () => {
       address1: companyInfo.address || "",
       address2: "",
       location: companyInfo.address || "",
-      state: companyInfo.state || "",
+      state: extractStateCode(companyInfo.state || ""),
       pincode: companyInfo.pin || "",
       phone: companyInfo.phone_number || "",
       email: companyInfo.email || "",
@@ -81,7 +138,7 @@ const EWayBill: React.FC = () => {
       address1: selectedSale.address || "",
       address2: "",
       location: selectedSale.district || "",
-      state: selectedSale.state || "",
+      state: extractStateCode(selectedSale.state),
       pincode: "",
       phone: selectedSale.phone || "",
       email: selectedSale.email || "",
@@ -144,7 +201,7 @@ const EWayBill: React.FC = () => {
       address: selectedSale.address || "",
       place: selectedSale.district || "",
       pincode: "",
-      state: selectedSale.state || "",
+      state: extractStateCode(selectedSale.state),
     });
 
   }, [selectedSale]);
@@ -220,8 +277,8 @@ const EWayBill: React.FC = () => {
           Addr1: supplier.address1,
           Addr2: supplier.address2 || "",
           Loc: supplier.location,
-          Pin: Number(supplier.pincode),
-          Stcd: supplier.state?.match(/\((\d+)\)/)?.[1] || "",
+          Pin: Number(supplier.pincode || 0),
+          Stcd: supplier.state || "",
           Ph: supplier.phone || null,
           Em: supplier.email || null,
         },
@@ -232,22 +289,23 @@ const EWayBill: React.FC = () => {
           Addr1: recipient.address1,
           Addr2: recipient.address2 || "",
           Loc: recipient.location,
-          Pin: Number(recipient.pincode),
-          Pos: recipient.state?.match(/\((\d+)\)/)?.[1] || "",
-          Stcd: recipient.state?.match(/\((\d+)\)/)?.[1] || "",
+          Pin: Number(recipient.pincode || 0),
+          Pos: recipient.state || "",
+          Stcd: recipient.state || "",
           Ph: recipient.phone || null,
           Em: recipient.email || null,
         },
 
         ShipToDtls: {
-          Gstin: shipping.gstin,
-          LglNm: shipping.legalName,
-          Addr1: shipping.address,
+          Gstin: shipping.gstin || "",
+          LglNm: shipping.legalName || "",
+          Addr1: shipping.address || "",
           Addr2: "",
-          Loc: shipping.place,
-          Pin: Number(shipping.pincode),
-          Stcd: shipping.state?.match(/\((\d+)\)/)?.[1] || "",
+          Loc: shipping.place || "",
+          Pin: Number(shipping.pincode || 0),
+          Stcd: shipping.state || "",
         },
+
 
         ValDtls: {
           AssVal: Number(product.unitPrice || 0) * Number(product.qty || 0),
@@ -334,6 +392,8 @@ const EWayBill: React.FC = () => {
   const nonEWay = salesData.filter(
     (row: any) => Number(row.total) <= 50000
   );
+
+
 
 
 
@@ -652,9 +712,11 @@ const EWayBill: React.FC = () => {
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   >
                     <option value="">Select State</option>
-                    <option>Jharkhand(20)</option>
-                    <option>Maharashtra</option>
-                    <option>Delhi</option>
+                    {states.map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
                   </select>
 
                 </div>
@@ -825,9 +887,11 @@ const EWayBill: React.FC = () => {
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   >
                     <option value="">Select State</option>
-                    <option>Jharkhand(20)</option>
-                    <option>Mizoram(15)</option>
-                    <option>Maharashtra</option>
+                    {states.map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
                   </select>
 
                 </div>
@@ -1174,9 +1238,11 @@ const EWayBill: React.FC = () => {
                     className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   >
                     <option value="">Select State</option>
-                    <option>Jharkhand(20)</option>
-                    <option>Mizoram(15)</option>
-                    <option>Maharashtra</option>
+                    {states.map((s) => (
+                      <option key={s.code} value={s.code}>
+                        {s.name} ({s.code})
+                      </option>
+                    ))}
                   </select>
                 </div>
 
