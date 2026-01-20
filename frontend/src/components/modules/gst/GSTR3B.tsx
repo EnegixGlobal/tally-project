@@ -1554,50 +1554,7 @@ const GSTR3B: React.FC = () => {
           </div>
         </div>
       </div>
-
-      {/* Action Buttons */}
-      <div className="flex flex-wrap gap-4 mt-8 justify-center">
-        <button
-          className={`px-6 py-3 rounded-lg flex items-center gap-2 ${
-            theme === "dark"
-              ? "bg-blue-600 hover:bg-blue-700 text-white"
-              : "bg-blue-600 hover:bg-blue-700 text-white"
-          }`}
-        >
-          <Save size={20} />
-          Save Draft
-        </button>
-        <button
-          className={`px-6 py-3 rounded-lg flex items-center gap-2 ${
-            theme === "dark"
-              ? "bg-gray-600 hover:bg-gray-700 text-white"
-              : "bg-gray-600 hover:bg-gray-700 text-white"
-          }`}
-        >
-          <FileText size={20} />
-          Load Draft
-        </button>
-        <button
-          className={`px-6 py-3 rounded-lg flex items-center gap-2 ${
-            theme === "dark"
-              ? "bg-green-600 hover:bg-green-700 text-white"
-              : "bg-green-600 hover:bg-green-700 text-white"
-          }`}
-        >
-          <Calculator size={20} />
-          Validate & Preview
-        </button>
-        <button
-          className={`px-6 py-3 rounded-lg flex items-center gap-2 ${
-            theme === "dark"
-              ? "bg-purple-600 hover:bg-purple-700 text-white"
-              : "bg-purple-600 hover:bg-purple-700 text-white"
-          }`}
-        >
-          <Upload size={20} />
-          Submit Return
-        </button>
-      </div>
+    
 
       <div
         className={`mt-6 p-4 rounded-lg ${
