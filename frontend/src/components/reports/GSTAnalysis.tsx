@@ -209,7 +209,7 @@ const GSTAnalysis: React.FC = () => {
             <thead>
               <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200"}>
                 <th rowSpan={2} className="border p-2">Month</th>
-                <th colSpan={7} className="border p-2 border-r-4 border-gray-600">INTRA STATE</th>
+                <th colSpan={7} className="border p-2  border-gray-600">INTRA STATE</th>
 
 
                 <th colSpan={7} className="border p-2">INTER STATE</th>
@@ -218,7 +218,7 @@ const GSTAnalysis: React.FC = () => {
                 {[...Array(2)].flatMap(() =>
                   ["0%", "3%", "5%", "12%", "18%", "28%", "Total"]
                 ).map((h, i) => (
-                  <th key={i} className={`border p-2 ${i === 6 ? "border-r-4 border-gray-600" : ""}`}>{h}</th>
+                  <th key={i} className={`border p-2 ${i === 6 ? " border-gray-600" : ""}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -237,7 +237,7 @@ const GSTAnalysis: React.FC = () => {
                         {v ? v.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
                       </td>
                     ))}
-                    <td className="border p-2 text-right font-semibold border-r-4 border-gray-600">
+                    <td className="border p-2 text-right font-semibold  border-gray-600">
                       {intraTotal ? intraTotal.toLocaleString("en-IN") : ""}
                     </td>
 
@@ -271,7 +271,7 @@ const GSTAnalysis: React.FC = () => {
                     }
                   });
                   return (
-                    <td key={i} className={`border p-2 text-right ${i === 6 ? "border-r-4 border-gray-600" : ""}`}>
+                    <td key={i} className={`border p-2 text-right ${i === 6 ? " border-gray-600" : ""}`}>
                       {sum ? sum.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
                     </td>
                   );
