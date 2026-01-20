@@ -421,7 +421,7 @@ const EWayBill: React.FC = () => {
           E-Way Bill Eligible Sales (Amount &gt; ₹50,000)
         </h2>
 
-        {salesData.length > 0 ? (
+        {eWayEligible.length > 0 ? (
           <div className="overflow-x-auto">
             <table className="min-w-full border border-gray-200 text-sm">
               <thead className="bg-gray-100">
@@ -441,7 +441,7 @@ const EWayBill: React.FC = () => {
               </thead>
 
               <tbody>
-                {salesData.map((row: any) => (
+                {eWayEligible.map((row: any) => (
                   <tr
                     key={row.id}
                     className="hover:bg-blue-50 transition"
