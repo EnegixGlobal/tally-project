@@ -130,8 +130,6 @@ const GstrB2cs = () => {
       "CGST Amount": supply.cgstAmount,
       "SGST Rate": `${supply.sgstRate}%`,
       "SGST Amount": supply.sgstAmount,
-      "Cess Rate": `${supply.cessRate}%`,
-      "Cess Amount": supply.cessAmount,
     }));
 
     const ws = XLSX.utils.json_to_sheet(b2csDataForExcel);
@@ -233,8 +231,8 @@ const GstrB2cs = () => {
                   setFilters({ ...filters, fromDate: e.target.value })
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
                   }`}
               />
             </div>
@@ -247,8 +245,8 @@ const GstrB2cs = () => {
                   setFilters({ ...filters, toDate: e.target.value })
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
                   }`}
               />
             </div>
@@ -257,8 +255,8 @@ const GstrB2cs = () => {
                 type="button"
                 onClick={fetchB2CSData}
                 className={`px-4 py-2 rounded ${theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
                   }`}
               >
                 Apply Filter
@@ -271,15 +269,15 @@ const GstrB2cs = () => {
       {/* Main Content */}
       <div
         className={`mb-6 rounded-lg border-2 ${theme === "dark"
-            ? "bg-gray-800 border-gray-600"
-            : "bg-white border-gray-300"
+          ? "bg-gray-800 border-gray-600"
+          : "bg-white border-gray-300"
           }`}
       >
         {/* Section Header */}
         <div
           className={`p-3 border-b-2 ${theme === "dark"
-              ? "bg-blue-900 border-gray-600 text-white"
-              : "bg-blue-800 border-gray-300 text-white"
+            ? "bg-blue-900 border-gray-600 text-white"
+            : "bg-blue-800 border-gray-300 text-white"
             }`}
         >
           <h3 className="text-lg font-bold">5B - B2C Small Supplies</h3>
@@ -345,12 +343,7 @@ const GstrB2cs = () => {
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
                       SGST Amount
                     </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Cess Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
-                    </th>
+
                     <th className="border border-gray-300 p-2 text-xs font-bold text-center">
                       Action
                     </th>
@@ -361,8 +354,8 @@ const GstrB2cs = () => {
                     <tr
                       key={supply.voucherId || index}
                       className={`${theme === "dark"
-                          ? "hover:bg-gray-700"
-                          : "hover:bg-gray-50"
+                        ? "hover:bg-gray-700"
+                        : "hover:bg-gray-50"
                         }`}
                     >
                       <td className="border border-gray-300 p-2 text-xs font-mono">
@@ -399,12 +392,7 @@ const GstrB2cs = () => {
                       <td className="border border-gray-300 p-2 text-xs text-right font-mono">
                         ₹{supply.sgstAmount?.toLocaleString() || "0"}
                       </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.cessRate || 0}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{supply.cessAmount?.toLocaleString() || "0"}
-                      </td>
+
                       <td className="border border-gray-300 p-2 text-xs text-center">
                         <button
                           onClick={() => handleGenerateJSON(supply)}
@@ -444,9 +432,7 @@ const GstrB2cs = () => {
                         ₹{totals.sgstAmount.toLocaleString()}
                       </td>
                       <td className="border border-gray-300 p-2 text-xs"></td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{totals.cessAmount.toLocaleString()}
-                      </td>
+
                       <td className="border border-gray-300 p-2 text-xs"></td>
                     </tr>
                   )}

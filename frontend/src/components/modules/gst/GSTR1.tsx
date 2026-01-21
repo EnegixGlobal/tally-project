@@ -384,9 +384,8 @@ const GSTR1: React.FC = () => {
     <button
       type="button"
       onClick={onClick}
-      className={`flex items-center px-6 py-3 rounded-lg font-medium text-white ${colorClass} ${
-        theme === "dark" ? colorClass : colorClass
-      }`}
+      className={`flex items-center px-6 py-3 rounded-lg font-medium text-white ${colorClass} ${theme === "dark" ? colorClass : colorClass
+        }`}
     >
       <Icon className="mr-2" size={18} />
       {text}
@@ -428,8 +427,7 @@ const GSTR1: React.FC = () => {
       setLoading(true);
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const json = await res.json();
@@ -462,8 +460,7 @@ const GSTR1: React.FC = () => {
     const fetchLedger = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
@@ -488,66 +485,66 @@ const GSTR1: React.FC = () => {
 
   // ================= MAIN LOGIC =================
   useEffect(() => {
-  if (!ledger.length || !saleData.length || !companyStateCode) return;
+    if (!ledger.length || !saleData.length || !companyStateCode) return;
 
-  const gstInter: any[] = [];
-  const gstIntra: any[] = [];
-  const nonGstInter: any[] = [];
-  const nonGstIntra: any[] = [];
+    const gstInter: any[] = [];
+    const gstIntra: any[] = [];
+    const nonGstInter: any[] = [];
+    const nonGstIntra: any[] = [];
 
-  saleData.forEach((sale) => {
-    const l = ledger.find((lg) => lg.id === sale.partyId);
-    if (!l) return;
+    saleData.forEach((sale) => {
+      const l = ledger.find((lg) => lg.id === sale.partyId);
+      if (!l) return;
 
-    // ✅ only allowed ledgers
-    if (!allowedLedgerNames.includes(String(l.name || "").trim())) return;
+      // ✅ only allowed ledgers
+      if (!allowedLedgerNames.includes(String(l.name || "").trim())) return;
 
-    // ✅ GST number check (ONLY THIS decides GST / Non-GST)
-    const hasGst = Boolean(l.gstNumber && String(l.gstNumber).trim());
+      // ✅ GST number check (ONLY THIS decides GST / Non-GST)
+      const hasGst = Boolean(l.gstNumber && String(l.gstNumber).trim());
 
-    // ✅ Ledger state code
-    let ledgerStateCode = "";
+      // ✅ Ledger state code
+      let ledgerStateCode = "";
 
-    if (hasGst) {
-      // GST present → GST number se state
-      ledgerStateCode = l.gstNumber.substring(0, 2);
-    } else {
-      // GST absent → ledger.state se
-      ledgerStateCode = l.state?.match(/\((\d+)\)/)?.[1] || "";
-    }
+      if (hasGst) {
+        // GST present → GST number se state
+        ledgerStateCode = l.gstNumber.substring(0, 2);
+      } else {
+        // GST absent → ledger.state se
+        ledgerStateCode = l.state?.match(/\((\d+)\)/)?.[1] || "";
+      }
 
-    if (!ledgerStateCode) return;
+      if (!ledgerStateCode) return;
 
-    const isSameState = ledgerStateCode === companyStateCode;
+      const isSameState = ledgerStateCode === companyStateCode;
 
-    const finalObj = { ...sale, ledger: l };
+      const finalObj = { ...sale, ledger: l };
 
-    // 1️⃣ GST + Inter
-    if (hasGst && !isSameState) {
-      gstInter.push(finalObj);
-    }
+      // 1️⃣ GST + Inter
+      if (hasGst && !isSameState) {
+        gstInter.push(finalObj);
+      }
 
-    // 2️⃣ GST + Intra
-    else if (hasGst && isSameState) {
-      gstIntra.push(finalObj);
-    }
+      // 2️⃣ GST + Intra
+      else if (hasGst && isSameState) {
+        gstIntra.push(finalObj);
+      }
 
-    // 3️⃣ Non-GST + Inter
-    else if (!hasGst && !isSameState) {
-      nonGstInter.push(finalObj);
-    }
+      // 3️⃣ Non-GST + Inter
+      else if (!hasGst && !isSameState) {
+        nonGstInter.push(finalObj);
+      }
 
-    // 4️⃣ Non-GST + Intra
-    else if (!hasGst && isSameState) {
-      nonGstIntra.push(finalObj);
-    }
-  });
+      // 4️⃣ Non-GST + Intra
+      else if (!hasGst && isSameState) {
+        nonGstIntra.push(finalObj);
+      }
+    });
 
-  setGstInterState(gstInter);
-  setGstIntraState(gstIntra);
-  setNonGstInterState(nonGstInter);
-  setNonGstIntraState(nonGstIntra);
-}, [ledger, saleData, companyStateCode]);
+    setGstInterState(gstInter);
+    setGstIntraState(gstIntra);
+    setNonGstInterState(nonGstInter);
+    setNonGstIntraState(nonGstIntra);
+  }, [ledger, saleData, companyStateCode]);
 
 
 
@@ -615,9 +612,8 @@ const GSTR1: React.FC = () => {
           title="Back to GST Module"
           type="button"
           onClick={() => navigate("/app/gst")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -627,36 +623,32 @@ const GSTR1: React.FC = () => {
             type="button"
             title="Filter"
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Filter size={18} />
           </button>
           <button
             title="Upload"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Upload size={18} />
           </button>
           <button
             title="Print Report"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
           <button
             title="Export"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Download size={18} />
           </button>
@@ -665,9 +657,8 @@ const GSTR1: React.FC = () => {
       {/* Filter Panel */}
       {showFilterPanel && (
         <div
-          className={`p-4 mb-6 rounded-lg no-print ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 mb-6 rounded-lg no-print ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h3 className="font-semibold mb-4">Return Period</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -682,11 +673,10 @@ const GSTR1: React.FC = () => {
                     month: e.target.value,
                   })
                 }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600"
                     : "bg-white border-gray-300"
-                }`}
+                  }`}
               >
                 <option value="01">January</option>
                 <option value="02">February</option>
@@ -710,11 +700,10 @@ const GSTR1: React.FC = () => {
                 onChange={(e) =>
                   setSelectedPeriod({ ...selectedPeriod, year: e.target.value })
                 }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600"
                     : "bg-white border-gray-300"
-                }`}
+                  }`}
               >
                 <option value="2024">2024</option>
                 <option value="2023">2023</option>
@@ -724,11 +713,10 @@ const GSTR1: React.FC = () => {
             <div className="flex items-end">
               <button
                 type="button"
-                className={`px-4 py-2 rounded ${
-                  theme === "dark"
+                className={`px-4 py-2 rounded ${theme === "dark"
                     ? "bg-blue-600 hover:bg-blue-700 text-white"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
+                  }`}
               >
                 Apply Filter
               </button>
@@ -741,19 +729,17 @@ const GSTR1: React.FC = () => {
       <div ref={printRef} id="gstr1-print-content">
         {/* GSTR-1 Form Header - Exact as per screenshot */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           {/* Form Title Header */}
           <div
-            className={`p-4 text-center border-b-2 ${
-              theme === "dark"
+            className={`p-4 text-center border-b-2 ${theme === "dark"
                 ? "bg-gray-700 border-gray-600"
                 : "bg-gray-100 border-gray-300"
-            }`}
+              }`}
           >
             <h2 className="text-xl font-bold">GSTR-1</h2>
             <p className="text-sm">
@@ -801,19 +787,17 @@ const GSTR1: React.FC = () => {
         </div>
         {/* 4A - B2B Supplies Section */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           {/* Section Header */}
           <div
-            className={`p-3 border-b-2 flex items-center justify-between ${
-              theme === "dark"
+            className={`p-3 border-b-2 flex items-center justify-between ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             {/* LEFT SIDE */}
             <div>
@@ -833,200 +817,21 @@ const GSTR1: React.FC = () => {
             </button>
           </div>
 
-          {/* B2B Table */}
-          <div className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
-                  >
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      GSTIN of Recipient
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Receiver Name
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Invoice Number
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Invoice Date
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Invoice Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Place of Supply
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Reverse Charge
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Invoice Type
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      E-Commerce GSTIN
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Taxable Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      IGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      CGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      SGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Cess Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formData.b2bSupplies.map((supply, index) => (
-                    <tr
-                      key={index}
-                      className={`${
-                        theme === "dark"
-                          ? "hover:bg-gray-700"
-                          : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <td className="border border-gray-300 p-2 text-xs font-mono">
-                        {supply.gstin}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">
-                        {supply.receiverName}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs font-mono">
-                        {supply.invoiceNumber}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">
-                        {supply.invoiceDate}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.invoiceValue.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">
-                        {supply.placeOfSupply}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.reverseCharge}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">
-                        {supply.invoiceType}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs font-mono">
-                        {supply.ecommerceGstin}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.taxableValue.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.igstRate}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.igstAmount.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.cgstRate}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.cgstAmount.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.sgstRate}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.sgstAmount.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.cessRate}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.cessAmount.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                  {/* Total Row */}
-                  <tr
-                    className={`font-bold ${
-                      theme === "dark" ? "bg-gray-600" : "bg-gray-200"
-                    }`}
-                  >
-                    <td
-                      colSpan={9}
-                      className="border border-gray-300 p-2 text-xs text-right"
-                    >
-                      Total:
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      {formData.b2bSupplies
-                        .reduce((sum, item) => sum + item.taxableValue, 0)
-                        .toLocaleString()}
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs"></td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      {formData.b2bSupplies
-                        .reduce((sum, item) => sum + item.igstAmount, 0)
-                        .toLocaleString()}
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs"></td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      {formData.b2bSupplies
-                        .reduce((sum, item) => sum + item.cgstAmount, 0)
-                        .toLocaleString()}
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs"></td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      {formData.b2bSupplies
-                        .reduce((sum, item) => sum + item.sgstAmount, 0)
-                        .toLocaleString()}
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs"></td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      {formData.b2bSupplies
-                        .reduce((sum, item) => sum + item.cessAmount, 0)
-                        .toLocaleString()}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+
         </div>
         {/* 5A - B2C Large Supplies Section */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           {/* Section Header */}
           <div
-            className={`p-3 border-b-2 flex items-center justify-between ${
-              theme === "dark"
+            className={`p-3 border-b-2 flex items-center justify-between ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             {/* LEFT */}
             <div>
@@ -1047,173 +852,20 @@ const GSTR1: React.FC = () => {
             </button>
           </div>
 
-          {/* B2C Large Table */}
-          <div className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
-                  >
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Invoice Number
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Invoice Date
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Invoice Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Place of Supply
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Applicable % of Tax Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Taxable Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      IGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      CGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      SGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Cess Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {formData.b2cLargeSupplies.map((supply, index) => (
-                    <tr
-                      key={index}
-                      className={`${
-                        theme === "dark"
-                          ? "hover:bg-gray-700"
-                          : "hover:bg-gray-50"
-                      }`}
-                    >
-                      <td className="border border-gray-300 p-2 text-xs font-mono">
-                        {supply.invoiceNumber}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">
-                        {supply.invoiceDate}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.invoiceValue.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">
-                        {supply.placeOfSupply}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">-</td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.taxableValue.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.igstRate}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.igstAmount.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.cgstRate}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.cgstAmount.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.sgstRate}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.sgstAmount.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.cessRate}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {supply.cessAmount.toLocaleString()}
-                      </td>
-                    </tr>
-                  ))}
-                  {/* Total Row */}
-                  <tr
-                    className={`font-bold ${
-                      theme === "dark" ? "bg-gray-600" : "bg-gray-200"
-                    }`}
-                  >
-                    <td
-                      colSpan={5}
-                      className="border border-gray-300 p-2 text-xs text-right"
-                    >
-                      Total:
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      {formData.b2cLargeSupplies
-                        .reduce((sum, item) => sum + item.taxableValue, 0)
-                        .toLocaleString()}
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs"></td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      {formData.b2cLargeSupplies
-                        .reduce((sum, item) => sum + item.igstAmount, 0)
-                        .toLocaleString()}
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs"></td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      {formData.b2cLargeSupplies
-                        .reduce((sum, item) => sum + item.cgstAmount, 0)
-                        .toLocaleString()}
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs"></td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      {formData.b2cLargeSupplies
-                        .reduce((sum, item) => sum + item.sgstAmount, 0)
-                        .toLocaleString()}
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs"></td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      {formData.b2cLargeSupplies
-                        .reduce((sum, item) => sum + item.cessAmount, 0)
-                        .toLocaleString()}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
+
         </div>
         {/* 5B - B2C Small Supplies Section */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           <div
-            className={`p-3 border-b-2 flex items-center justify-between ${
-              theme === "dark"
+            className={`p-3 border-b-2 flex items-center justify-between ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             {/* LEFT */}
             <div>
@@ -1233,82 +885,19 @@ const GSTR1: React.FC = () => {
               View More →
             </button>
           </div>
-
-          <div className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
-                  >
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Type
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Place of Supply
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Applicable % of Tax Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Taxable Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      IGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      CGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      SGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Cess Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td
-                      colSpan={12}
-                      className="border border-gray-300 p-4 text-center text-sm text-gray-500"
-                    >
-                      No B2C Small Supplies data available
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
         {/* 6A - Exports Section */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           <div
-            className={`p-3 border-b-2 ${
-              theme === "dark"
+            className={`p-3 border-b-2 ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             <h3 className="text-lg font-bold">6A - Exports</h3>
             <p className="text-sm opacity-90">
@@ -1320,9 +909,8 @@ const GSTR1: React.FC = () => {
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Export Type
@@ -1378,18 +966,16 @@ const GSTR1: React.FC = () => {
         </div>
         {/* 7 - Nil Rated, Exempted and Non GST Outward Supplies */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           <div
-            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
-              theme === "dark"
+            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             {/* LEFT */}
             <div className="min-w-0">
@@ -1416,9 +1002,8 @@ const GSTR1: React.FC = () => {
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Description
@@ -1501,18 +1086,16 @@ const GSTR1: React.FC = () => {
         </div>
         {/* 8A - Tax Liability (Advances Received) */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           <div
-            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
-              theme === "dark"
+            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             {/* LEFT */}
             <div className="min-w-0">
@@ -1540,9 +1123,8 @@ const GSTR1: React.FC = () => {
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Place of Supply
@@ -1595,18 +1177,16 @@ const GSTR1: React.FC = () => {
         </div>
         {/* 8B - Tax Liability (Advances Adjusted) */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           <div
-            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
-              theme === "dark"
+            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             {/* LEFT */}
             <div className="min-w-0">
@@ -1634,9 +1214,8 @@ const GSTR1: React.FC = () => {
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Place of Supply
@@ -1689,18 +1268,16 @@ const GSTR1: React.FC = () => {
         </div>
         {/* 9A - Credit/Debit Notes (Registered) */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           <div
-            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
-              theme === "dark"
+            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             {/* LEFT */}
             <div className="min-w-0">
@@ -1727,9 +1304,8 @@ const GSTR1: React.FC = () => {
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       GSTIN of Recipient
@@ -1807,18 +1383,16 @@ const GSTR1: React.FC = () => {
         {/* 9
 B - Credit/Debit Notes (Unregistered) */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           <div
-            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
-              theme === "dark"
+            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             {/* LEFT */}
             <div className="min-w-0">
@@ -1845,9 +1419,8 @@ B - Credit/Debit Notes (Unregistered) */}
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Note Number
@@ -1915,18 +1488,16 @@ B - Credit/Debit Notes (Unregistered) */}
         </div>
         {/* 10 - HSN Summary */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           <div
-            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
-              theme === "dark"
+            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             {/* LEFT */}
             <div className="min-w-0">
@@ -1951,9 +1522,8 @@ B - Credit/Debit Notes (Unregistered) */}
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       HSN
@@ -2050,9 +1620,8 @@ B - Credit/Debit Notes (Unregistered) */}
                   </tr>
                   {/* Total Row */}
                   <tr
-                    className={`font-bold ${
-                      theme === "dark" ? "bg-gray-600" : "bg-gray-200"
-                    }`}
+                    className={`font-bold ${theme === "dark" ? "bg-gray-600" : "bg-gray-200"
+                      }`}
                   >
                     <td
                       colSpan={3}
@@ -2089,18 +1658,16 @@ B - Credit/Debit Notes (Unregistered) */}
         </div>
         {/* 11 - Documents Issued */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           <div
-            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${
-              theme === "dark"
+            className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
                 ? "bg-blue-900 border-gray-600 text-white"
                 : "bg-blue-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             {/* LEFT */}
             <div className="min-w-0">
@@ -2127,9 +1694,8 @@ B - Credit/Debit Notes (Unregistered) */}
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Nature of Document
@@ -2241,18 +1807,16 @@ B - Credit/Debit Notes (Unregistered) */}
         </div>
         {/* Summary Section */}
         <div
-          className={`mb-6 rounded-lg border-2 ${
-            theme === "dark"
+          className={`mb-6 rounded-lg border-2 ${theme === "dark"
               ? "bg-gray-800 border-gray-600"
               : "bg-white border-gray-300"
-          }`}
+            }`}
         >
           <div
-            className={`p-3 border-b-2 ${
-              theme === "dark"
+            className={`p-3 border-b-2 ${theme === "dark"
                 ? "bg-green-900 border-gray-600 text-white"
                 : "bg-green-800 border-gray-300 text-white"
-            }`}
+              }`}
           >
             <h3 className="text-lg font-bold">GSTR-1 Summary</h3>
             <p className="text-sm opacity-90">
@@ -2262,9 +1826,8 @@ B - Credit/Debit Notes (Unregistered) */}
           <div className="p-4">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <div
-                className={`p-4 rounded-lg ${
-                  theme === "dark" ? "bg-gray-700" : "bg-blue-50"
-                }`}
+                className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-blue-50"
+                  }`}
               >
                 <h4 className="text-sm font-bold mb-2">Total Taxable Value</h4>
                 <p className="text-2xl font-bold text-blue-600">
@@ -2272,9 +1835,8 @@ B - Credit/Debit Notes (Unregistered) */}
                 </p>
               </div>
               <div
-                className={`p-4 rounded-lg ${
-                  theme === "dark" ? "bg-gray-700" : "bg-green-50"
-                }`}
+                className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-green-50"
+                  }`}
               >
                 <h4 className="text-sm font-bold mb-2">Total IGST</h4>
                 <p className="text-2xl font-bold text-green-600">
@@ -2282,9 +1844,8 @@ B - Credit/Debit Notes (Unregistered) */}
                 </p>
               </div>
               <div
-                className={`p-4 rounded-lg ${
-                  theme === "dark" ? "bg-gray-700" : "bg-yellow-50"
-                }`}
+                className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-yellow-50"
+                  }`}
               >
                 <h4 className="text-sm font-bold mb-2">Total CGST</h4>
                 <p className="text-2xl font-bold text-yellow-600">
@@ -2292,9 +1853,8 @@ B - Credit/Debit Notes (Unregistered) */}
                 </p>
               </div>
               <div
-                className={`p-4 rounded-lg ${
-                  theme === "dark" ? "bg-gray-700" : "bg-purple-50"
-                }`}
+                className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-700" : "bg-purple-50"
+                  }`}
               >
                 <h4 className="text-sm font-bold mb-2">Total SGST</h4>
                 <p className="text-2xl font-bold text-purple-600">
@@ -2305,9 +1865,8 @@ B - Credit/Debit Notes (Unregistered) */}
 
             <div className="mt-6 grid grid-cols-1 md:grid-cols-3 gap-4">
               <div
-                className={`p-3 rounded ${
-                  theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                }`}
+                className={`p-3 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                  }`}
               >
                 <div className="text-sm font-medium">Total Invoice Value</div>
                 <div className="text-lg font-bold">
@@ -2322,9 +1881,8 @@ B - Credit/Debit Notes (Unregistered) */}
                 </div>
               </div>
               <div
-                className={`p-3 rounded ${
-                  theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                }`}
+                className={`p-3 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                  }`}
               >
                 <div className="text-sm font-medium">Total Tax Amount</div>
                 <div className="text-lg font-bold">
@@ -2338,9 +1896,8 @@ B - Credit/Debit Notes (Unregistered) */}
                 </div>
               </div>
               <div
-                className={`p-3 rounded ${
-                  theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                }`}
+                className={`p-3 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                  }`}
               >
                 <div className="text-sm font-medium">Total Cess</div>
                 <div className="text-lg font-bold">
@@ -2442,11 +1999,10 @@ B - Credit/Debit Notes (Unregistered) */}
 
       {/* Footer Note */}
       <div
-        className={`p-4 rounded-lg border-l-4 no-print ${
-          theme === "dark"
+        className={`p-4 rounded-lg border-l-4 no-print ${theme === "dark"
             ? "bg-yellow-900/20 border-yellow-500 text-yellow-200"
             : "bg-yellow-50 border-yellow-400 text-yellow-700"
-        }`}
+          }`}
       >
         <h4 className="font-semibold text-sm mb-2">📋 Important Notes:</h4>
         <ul className="text-sm space-y-1">
