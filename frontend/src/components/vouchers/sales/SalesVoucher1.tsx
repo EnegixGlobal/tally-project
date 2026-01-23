@@ -25,28 +25,24 @@ import type { StockItem } from "../../../types";
 // DRY Constants for Tailwind Classes
 const FORM_STYLES = {
   input: (theme: string, hasError?: boolean) =>
-    `w-full p-2 rounded border ${
-      theme === "dark"
-        ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-        : "bg-white border-gray-300 focus:border-blue-500"
+    `w-full p-2 rounded border ${theme === "dark"
+      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+      : "bg-white border-gray-300 focus:border-blue-500"
     } outline-none transition-colors ${hasError ? "border-red-500" : ""}`,
   select: (theme: string, hasError?: boolean) =>
-    `w-full p-2 rounded border cursor-pointer ${
-      theme === "dark"
-        ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-        : "bg-white border-gray-300 focus:border-blue-500"
+    `w-full p-2 rounded border cursor-pointer ${theme === "dark"
+      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+      : "bg-white border-gray-300 focus:border-blue-500"
     } outline-none transition-colors ${hasError ? "border-red-500" : ""}`,
   tableInput: (theme: string) =>
-    `w-full p-1 rounded border ${
-      theme === "dark"
-        ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-        : "bg-white border-gray-300 focus:border-blue-500"
+    `w-full p-1 rounded border ${theme === "dark"
+      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+      : "bg-white border-gray-300 focus:border-blue-500"
     } outline-none transition-colors`,
   tableSelect: (theme: string) =>
-    `w-full p-1 rounded border cursor-pointer ${
-      theme === "dark"
-        ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-        : "bg-white border-gray-300 focus:border-blue-500"
+    `w-full p-1 rounded border cursor-pointer ${theme === "dark"
+      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+      : "bg-white border-gray-300 focus:border-blue-500"
     } outline-none transition-colors`,
 };
 
@@ -522,9 +518,8 @@ const SalesVoucher: React.FC = () => {
           return;
         }
 
-        const url = `${
-          import.meta.env.VITE_API_URL
-        }/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        const url = `${import.meta.env.VITE_API_URL
+          }/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
         const res = await fetch(url);
         const data = await res.json();
@@ -558,6 +553,7 @@ const SalesVoucher: React.FC = () => {
       .then((res) => res.json())
       .then((data) => {
         if (data.success) {
+          console.log('stockitem', data.data)
           setStockItems(data.data);
         } else setStockItems([]);
       })
@@ -605,7 +601,16 @@ const SalesVoucher: React.FC = () => {
               companyState &&
               partyState &&
               companyState.toLowerCase().trim() ===
-                partyState.toLowerCase().trim();
+              partyState.toLowerCase().trim();
+
+            // ✅ Extract GST % from ledger names
+            const extractGstPercent = (ledgerId: any) => {
+              if (!ledgerId) return 0;
+              const ledger = safeLedgers.find((l) => String(l.id) === String(ledgerId));
+              if (!ledger?.name) return 0;
+              const match = ledger.name.match(/(\d+(\.\d+)?)/);
+              return match ? Number(match[1]) : 0;
+            };
 
             return {
               ...prev,
@@ -613,25 +618,32 @@ const SalesVoucher: React.FC = () => {
                 if (!entry.itemId) return entry;
 
                 const itemDetails = getItemDetails(entry.itemId);
-                const gstRate = itemDetails.gstRate || 0;
 
                 if (statesMatch) {
-                  // Same state: CGST + SGST (each half of GST%)
+                  // Same state: CGST + SGST (extract from ledger names)
                   return {
                     ...entry,
-                    cgstRate: gstRate / 2,
-                    sgstRate: gstRate / 2,
+                    cgstRate: extractGstPercent(itemDetails.cgstLedgerId),
+                    sgstRate: extractGstPercent(itemDetails.sgstLedgerId),
                     igstRate: 0,
-                    gstRate: gstRate,
+                    // ✅ Update ledger IDs for intra-state
+                    cgstLedgerId: itemDetails.cgstLedgerId || "",
+                    sgstLedgerId: itemDetails.sgstLedgerId || "",
+                    gstLedgerId: "",
+                    igstLedgerId: "",
                   };
                 } else {
-                  // Different state: IGST (full GST%)
+                  // Different state: IGST (extract from ledger name)
                   return {
                     ...entry,
                     cgstRate: 0,
                     sgstRate: 0,
-                    igstRate: gstRate,
-                    gstRate: gstRate,
+                    igstRate: extractGstPercent(itemDetails.gstLedgerId || itemDetails.igstLedgerId),
+                    // ✅ Update ledger IDs for inter-state
+                    gstLedgerId: itemDetails.gstLedgerId || itemDetails.igstLedgerId || "",
+                    igstLedgerId: itemDetails.igstLedgerId || itemDetails.gstLedgerId || "",
+                    cgstLedgerId: "",
+                    sgstLedgerId: "",
                   };
                 }
               }),
@@ -708,15 +720,8 @@ const SalesVoucher: React.FC = () => {
         return {
           ...entry,
           rate: newRate,
-          amount:
-            (entry.quantity || 0) * newRate +
-            ((entry.quantity || 0) *
-              newRate *
-              ((entry.cgstRate || 0) +
-                (entry.sgstRate || 0) +
-                (entry.igstRate || 0))) /
-              100 -
-            (entry.discount || 0),
+          amount: (entry.quantity || 0) * newRate - (entry.discount || 0),
+
         };
       });
 
@@ -736,13 +741,11 @@ const SalesVoucher: React.FC = () => {
       const qty = Number(ent.quantity || 0);
       const rate = Number(ent.rate || 0);
       const discount = Number(ent.discount || 0);
-      const gstTotal =
-        Number(ent.cgstRate || 0) +
-        Number(ent.sgstRate || 0) +
-        Number(ent.igstRate || 0);
 
-      return qty * rate + (qty * rate * gstTotal) / 100 - discount;
+      // ✅ Only base amount (NO GST here)
+      return qty * rate - discount;
     };
+
 
     if (formData.mode === "item-invoice") {
       // 1️⃣ ITEM SELECT
@@ -758,21 +761,35 @@ const SalesVoucher: React.FC = () => {
           partyState &&
           companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
 
+        // ✅ Extract GST % from ledger names (do this once)
+        const extractGstPercent = (ledgerId: any) => {
+          if (!ledgerId) return 0;
+          const ledger = safeLedgers.find((l) => String(l.id) === String(ledgerId));
+          if (!ledger?.name) return 0;
+          const match = ledger.name.match(/(\d+(\.\d+)?)/);
+          return match ? Number(match[1]) : 0;
+        };
+
+        // Extract rates once
+        const extractedCgst = extractGstPercent(details.cgstLedgerId);
+        const extractedSgst = extractGstPercent(details.sgstLedgerId);
+        const extractedIgst = extractGstPercent(details.gstLedgerId || details.igstLedgerId);
+
         // Set GST rates based on state matching
         let cgstRate = 0;
         let sgstRate = 0;
         let igstRate = 0;
 
         if (statesMatch) {
-          // Same state: CGST + SGST (each half of GST%)
-          cgstRate = gst / 2;
-          sgstRate = gst / 2;
+          // Same state: CGST + SGST
+          cgstRate = extractedCgst;
+          sgstRate = extractedSgst;
           igstRate = 0;
         } else {
-          // Different state: IGST (full GST%)
+          // Different state: IGST
           cgstRate = 0;
           sgstRate = 0;
-          igstRate = gst;
+          igstRate = extractedIgst;
         }
 
         updatedEntries[index] = {
@@ -789,7 +806,13 @@ const SalesVoucher: React.FC = () => {
           cgstRate: cgstRate,
           sgstRate: sgstRate,
           igstRate: igstRate,
+          gstLedgerId: details.gstLedgerId || "",
+          cgstLedgerId: details.cgstLedgerId || "",
+          sgstLedgerId: details.sgstLedgerId || "",
+          igstLedgerId: details.igstLedgerId || "",
         };
+
+
 
         updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
         setFormData((p) => ({ ...p, entries: updatedEntries }));
@@ -832,7 +855,6 @@ const SalesVoucher: React.FC = () => {
         return;
       }
 
-      // 3️⃣ QUANTITY UPDATE
       // 3️⃣ QUANTITY UPDATE
       if (name === "quantity") {
         const oldQty = Number(entry.quantity || 0);
@@ -896,8 +918,7 @@ const SalesVoucher: React.FC = () => {
               const adjustedStockDiff = oldQty - adjustedNewQty;
 
               fetch(
-                `${
-                  import.meta.env.VITE_API_URL
+                `${import.meta.env.VITE_API_URL
                 }/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
                 {
                   method: "PATCH",
@@ -917,8 +938,7 @@ const SalesVoucher: React.FC = () => {
 
             // Send the actual stock diff (negative for sale)
             fetch(
-              `${
-                import.meta.env.VITE_API_URL
+              `${import.meta.env.VITE_API_URL
               }/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
               {
                 method: "PATCH",
@@ -1163,11 +1183,11 @@ const SalesVoucher: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
+        console.log('ye hai ledger', data)
         setLedgers(data);
       } catch (error) {
         console.error("Failed to fetch ledgers:", error);
@@ -1341,8 +1361,7 @@ const SalesVoucher: React.FC = () => {
           if (!entry.itemId || !entry.batchNumber) return;
 
           return fetch(
-            `${import.meta.env.VITE_API_URL}/api/stock-items/${
-              entry.itemId
+            `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId
             }/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
             {
               method: "PATCH",
@@ -1453,11 +1472,10 @@ const SalesVoucher: React.FC = () => {
     sgstTotal = 0,
     igstTotal = 0,
     discountTotal = 0,
-    total = 0,
+    total: grandTotal = 0,
   } = calculateTotals();
 
-  const grandTotal =
-    subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
+
 
   // Helper functions for print layout
   const getItemDetails = (itemId: string) => {
@@ -1494,11 +1512,21 @@ const SalesVoucher: React.FC = () => {
     return {
       name: item.name,
       hsnCode: item.hsnCode || "",
-      unit: unitLabel, // for components expecting `unit`
-      unitId, // id (1,2,3…)
-      unitLabel, // "Nos" / "Kg" / "Mtr"
+
+      unit: unitLabel,
+      unitId,
+      unitLabel,
+
+      // ✅ GST %
       gstRate: Number(item.gstRate) || 0,
 
+      // ✅ LEDGER IDS (ADD THIS)
+      gstLedgerId: item.gstLedgerId || "",
+      cgstLedgerId: item.cgstLedgerId || "",
+      sgstLedgerId: item.sgstLedgerId || "",
+      igstLedgerId: item.igstLedgerId || "",
+
+      // ✅ Rate
       rate:
         Number(item.standardSaleRate) ||
         Number(item.sellingRate) ||
@@ -1509,7 +1537,10 @@ const SalesVoucher: React.FC = () => {
         0,
 
       mrp:
-        Number(item.mrp) || Number(item.MRP) || Number(item.sellingPrice) || 0,
+        Number(item.mrp) ||
+        Number(item.MRP) ||
+        Number(item.sellingPrice) ||
+        0,
 
       batches: (() => {
         if (!item.batches) return [];
@@ -1522,6 +1553,18 @@ const SalesVoucher: React.FC = () => {
         }
       })(),
     };
+
+  };
+
+  // ✅ Get Ledger Name by ID and extract GST %
+  const getLedgerNameById = (ledgerId: any) => {
+    if (!ledgerId) return "-";
+    const ledger = safeLedgers.find((l) => String(l.id) === String(ledgerId));
+    if (!ledger?.name) return "-";
+
+    // Extract number from ledger name (e.g., "IGST@12%" → "12")
+    const match = ledger.name.match(/(\d+(\.\d+)?)/);
+    return match ? `${Math.round(Number(match[1]))}%` : ledger.name;
   };
 
   const getPartyName = (partyId: string) => {
@@ -1595,8 +1638,7 @@ const SalesVoucher: React.FC = () => {
     const fetchUnits = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
@@ -1681,9 +1723,8 @@ const SalesVoucher: React.FC = () => {
         </div>
 
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <form onSubmit={handleSubmit}>
             <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
@@ -1725,9 +1766,8 @@ const SalesVoucher: React.FC = () => {
                   value={formData.number}
                   readOnly
                   title="Voucher Number"
-                  className={`${FORM_STYLES.input(theme, !!errors.number)} ${
-                    theme === "dark" ? "bg-gray-700" : "bg-gray-200"
-                  }`}
+                  className={`${FORM_STYLES.input(theme, !!errors.number)} ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"
+                    }`}
                 />
                 {errors.number && (
                   <p className="text-red-500 text-xs mt-1">{errors.number}</p>
@@ -1762,75 +1802,26 @@ const SalesVoucher: React.FC = () => {
                       ))}
                       <option
                         value="add-new"
-                        className={`flex items-center px-4 py-2 rounded ${
-                          theme === "dark"
-                            ? "bg-blue-600 hover:bg-green-700"
-                            : "bg-green-600 hover:bg-green-700 text-white"
-                        }`}
+                        className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                          ? "bg-blue-600 hover:bg-green-700"
+                          : "bg-green-600 hover:bg-green-700 text-white"
+                          }`}
                       >
                         + Add New Ledger
                       </option>
                     </select>
+
+                    {selectedPartyState && (
+                      <p className="mt-1 text-xs text-green-600 font-medium">
+                        State: {selectedPartyState}
+                      </p>
+                    )}
                     {errors.partyId && (
                       <p className="text-red-500 text-xs mt-1">
                         {errors.partyId}
                       </p>
                     )}
-                    {/* State Matching Indicator - Commented out as it's working correctly */}
-                    {/* {formData.partyId && (
-                      <div className={`mt-2 p-2 rounded text-xs ${
-                        theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                      }`}>
-                        <div className="flex items-center gap-2 flex-wrap">
-                          <span className="font-medium">State Check:</span>
-                          <span className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
-                            Company: <strong>{safeCompanyInfo?.state || "Not Set"}</strong>
-                            {safeCompanyInfo?.state === "Default State" && (
-                              <span className="ml-1 text-yellow-600 dark:text-yellow-400 text-xs">
-                                ⚠️ (Using Default - Company Info Not Loaded)
-                              </span>
-                            )}
-                          </span>
-                          <span className="mx-1">|</span>
-                          <span className={theme === "dark" ? "text-gray-300" : "text-gray-700"}>
-                            Party: <strong>{selectedPartyState || "Not Set"}</strong>
-                          </span>
-                          {(() => {
-                            const companyState = safeCompanyInfo?.state || "";
-                            const partyState = selectedPartyState || "";
-                            const isUsingDefault = companyState === "Default State";
-                            const statesMatch = !isUsingDefault && companyState && partyState && 
-                              companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
-                            
-                            if (isUsingDefault) {
-                              return (
-                                <span className="ml-2 text-yellow-600 dark:text-yellow-400 font-semibold">
-                                  ⚠️ Please load company info to check state matching
-                                </span>
-                              );
-                            }
-                            
-                            if (!companyState || !partyState) {
-                              return (
-                                <span className="ml-2 text-yellow-600 dark:text-yellow-400">
-                                  ⚠️ States not available
-                                </span>
-                              );
-                            }
-                            
-                            return statesMatch ? (
-                              <span className="ml-2 text-green-600 dark:text-green-400 font-semibold">
-                                ✅ States Match (CGST + SGST)
-                              </span>
-                            ) : (
-                              <span className="ml-2 text-red-600 dark:text-red-400 font-semibold">
-                                ❌ States Don't Match (IGST)
-                              </span>
-                            );
-                          })()}
-                        </div>
-                      </div>
-                    )} */}
+
                   </div>
                 )}
             </div>
@@ -1962,11 +1953,10 @@ const SalesVoucher: React.FC = () => {
                       ))}
                     <option
                       value="add-new"
-                      className={`flex items-center px-4 py-2 rounded ${
-                        theme === "dark"
-                          ? "bg-blue-600 hover:bg-green-700"
-                          : "bg-green-600 hover:bg-green-700 text-white"
-                      }`}
+                      className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                        ? "bg-blue-600 hover:bg-green-700"
+                        : "bg-green-600 hover:bg-green-700 text-white"
+                        }`}
                     >
                       + Add New Ledger
                     </option>
@@ -2118,9 +2108,8 @@ const SalesVoucher: React.FC = () => {
               )}
 
             <div
-              className={`p-4 mb-6 rounded ${
-                theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-              }`}
+              className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                }`}
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold">
@@ -2132,11 +2121,10 @@ const SalesVoucher: React.FC = () => {
                   title="Add Entry"
                   type="button"
                   onClick={addEntry}
-                  className={`flex items-center text-sm px-2 py-1 rounded ${
-                    theme === "dark"
-                      ? "bg-blue-600 hover:bg-blue-700"
-                      : "bg-blue-600 hover:bg-blue-700 text-white"
-                  }`}
+                  className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                    }`}
                 >
                   <Plus size={16} className="mr-1" />
                   Add {formData.mode === "item-invoice" ? "Item" : "Ledger"}
@@ -2147,11 +2135,10 @@ const SalesVoucher: React.FC = () => {
                   <table className="w-full mb-4">
                     <thead>
                       <tr
-                        className={`${
-                          theme === "dark"
-                            ? "border-b border-gray-600"
-                            : "border-b border-gray-300"
-                        }`}
+                        className={`${theme === "dark"
+                          ? "border-b border-gray-600"
+                          : "border-b border-gray-300"
+                          }`}
                       >
                         <th className="px-4 py-2 text-left">S.No</th>
                         <th className="px-4 py-2 text-left">Item</th>
@@ -2165,51 +2152,36 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-right">Rate</th>
                         {columnSettings.showGST &&
                           (() => {
-                            // Check if party is selected
                             const hasParty = !!formData.partyId;
                             const companyState = safeCompanyInfo?.state || "";
                             const partyState = selectedPartyState || "";
+
                             const statesMatch =
                               hasParty &&
                               companyState &&
                               partyState &&
                               companyState.toLowerCase().trim() ===
-                                partyState.toLowerCase().trim();
+                              partyState.toLowerCase().trim();
 
+                            // ❌ No party selected → show nothing
                             if (!hasParty) {
-                              // No party selected: Show only GST%
-                              return (
-                                <th className="px-4 py-2 text-center">GST%</th>
-                              );
-                            } else if (statesMatch) {
-                              // Party selected and states match: Show CGST and SGST
-                              return (
-                                <>
-                                  <th className="px-4 py-2 text-center">
-                                    GST%
-                                  </th>
-                                  <th className="px-4 py-2 text-center">
-                                    CGST%
-                                  </th>
-                                  <th className="px-4 py-2 text-center">
-                                    SGST%
-                                  </th>
-                                </>
-                              );
-                            } else {
-                              // Party selected but states don't match: Show IGST
+                              return <th className="px-4 py-2 text-center">IGST%</th>;
+                            }
+
+                            // ✅ Same state → CGST + SGST
+                            if (statesMatch) {
                               return (
                                 <>
-                                  <th className="px-4 py-2 text-center">
-                                    GST%
-                                  </th>
-                                  <th className="px-4 py-2 text-center">
-                                    IGST%
-                                  </th>
+                                  <th className="px-4 py-2 text-center">CGST%</th>
+                                  <th className="px-4 py-2 text-center">SGST%</th>
                                 </>
                               );
                             }
+
+                            // ✅ Different state → IGST
+                            return <th className="px-4 py-2 text-center">IGST%</th>;
                           })()}
+
 
                         {columnSettings.showDiscount && <th>Discount</th>}
 
@@ -2238,16 +2210,15 @@ const SalesVoucher: React.FC = () => {
                           companyState &&
                           partyState &&
                           companyState.toLowerCase().trim() ===
-                            partyState.toLowerCase().trim();
+                          partyState.toLowerCase().trim();
 
                         return (
                           <tr
                             key={entry.id}
-                            className={`${
-                              theme === "dark"
-                                ? "border-b border-gray-600"
-                                : "border-b border-gray-300"
-                            }`}
+                            className={`${theme === "dark"
+                              ? "border-b border-gray-600"
+                              : "border-b border-gray-300"
+                              }`}
                           >
                             {/* SR */}
                             <td className="px-1 py-2 text-center min-w-[28px] text-xs">
@@ -2363,56 +2334,31 @@ const SalesVoucher: React.FC = () => {
                             {columnSettings.showGST &&
                               (() => {
                                 if (!hasParty) {
-                                  // No party selected: Show only GST%
                                   return (
                                     <td className="px-1 py-2 text-center min-w-[50px] text-xs">
-                                      {(
-                                        (entry.cgstRate || 0) +
-                                        (entry.sgstRate || 0) +
-                                        (entry.igstRate || 0)
-                                      ).toFixed(2)}
-                                      %
+                                      {getLedgerNameById(entry.gstLedgerId)}
                                     </td>
                                   );
                                 } else if (statesMatch) {
-                                  // Party selected and states match: Show CGST and SGST
                                   return (
                                     <>
                                       <td className="px-1 py-2 text-center min-w-[50px] text-xs">
-                                        {(
-                                          (entry.cgstRate || 0) +
-                                          (entry.sgstRate || 0) +
-                                          (entry.igstRate || 0)
-                                        ).toFixed(2)}
-                                        %
+                                        {getLedgerNameById(entry.cgstLedgerId)}
                                       </td>
                                       <td className="px-1 py-2 text-center min-w-[50px] text-xs">
-                                        {(entry.cgstRate || 0).toFixed(2)}%
-                                      </td>
-                                      <td className="px-1 py-2 text-center min-w-[50px] text-xs">
-                                        {(entry.sgstRate || 0).toFixed(2)}%
+                                        {getLedgerNameById(entry.sgstLedgerId)}
                                       </td>
                                     </>
                                   );
                                 } else {
-                                  // Party selected but states don't match: Show IGST
                                   return (
-                                    <>
-                                      <td className="px-1 py-2 text-center min-w-[50px] text-xs">
-                                        {(
-                                          (entry.cgstRate || 0) +
-                                          (entry.sgstRate || 0) +
-                                          (entry.igstRate || 0)
-                                        ).toFixed(2)}
-                                        %
-                                      </td>
-                                      <td className="px-1 py-2 text-center min-w-[50px] text-xs">
-                                        {(entry.igstRate || 0).toFixed(2)}%
-                                      </td>
-                                    </>
+                                    <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                      {getLedgerNameById(entry.igstLedgerId)}
+                                    </td>
                                   );
                                 }
                               })()}
+
 
                             {/* DISCOUNT */}
                             <td className="px-1 py-2 min-w-[70px]">
@@ -2458,13 +2404,12 @@ const SalesVoucher: React.FC = () => {
                               <button
                                 onClick={() => removeEntry(index)}
                                 disabled={formData.entries.length <= 1}
-                                className={`p-1 rounded ${
-                                  formData.entries.length <= 1
-                                    ? "opacity-50 cursor-not-allowed"
-                                    : theme === "dark"
+                                className={`p-1 rounded ${formData.entries.length <= 1
+                                  ? "opacity-50 cursor-not-allowed"
+                                  : theme === "dark"
                                     ? "hover:bg-gray-600"
                                     : "hover:bg-gray-200"
-                                }`}
+                                  }`}
                               >
                                 <Trash2 size={14} />
                               </button>
@@ -2484,7 +2429,7 @@ const SalesVoucher: React.FC = () => {
                           companyState &&
                           partyState &&
                           companyState.toLowerCase().trim() ===
-                            partyState.toLowerCase().trim();
+                          partyState.toLowerCase().trim();
 
                         // Calculate total columns dynamically
                         let totalCols = 7; // S.No, Item, HSN, Quantity, Unit, Rate, Amount
@@ -2495,11 +2440,11 @@ const SalesVoucher: React.FC = () => {
                             // No party: Only GST% column
                             totalCols += 1;
                           } else if (statesMatch) {
-                            // States match: GST%, CGST%, SGST% (3 columns)
-                            totalCols += 3;
-                          } else {
-                            // States don't match: GST%, IGST% (2 columns)
+                            // States match: CGST%, SGST% (2 columns)
                             totalCols += 2;
+                          } else {
+                            // States don't match: IGST% (1 column)
+                            totalCols += 1;
                           }
                         }
                         if (columnSettings.showDiscount) totalCols += 1; // Discount
@@ -2510,11 +2455,10 @@ const SalesVoucher: React.FC = () => {
                           <>
                             {/* SUBTOTAL */}
                             <tr
-                              className={`font-semibold ${
-                                theme === "dark"
-                                  ? "border-t border-gray-600"
-                                  : "border-t border-gray-300"
-                              }`}
+                              className={`font-semibold ${theme === "dark"
+                                ? "border-t border-gray-600"
+                                : "border-t border-gray-300"
+                                }`}
                             >
                               <td
                                 className="px-4 py-2 text-left"
@@ -2533,11 +2477,10 @@ const SalesVoucher: React.FC = () => {
                               statesMatch &&
                               cgstTotal > 0 && (
                                 <tr
-                                  className={`font-semibold ${
-                                    theme === "dark"
-                                      ? "border-t border-gray-600"
-                                      : "border-t border-gray-300"
-                                  }`}
+                                  className={`font-semibold ${theme === "dark"
+                                    ? "border-t border-gray-600"
+                                    : "border-t border-gray-300"
+                                    }`}
                                 >
                                   <td
                                     className="px-4 py-2 text-left"
@@ -2557,11 +2500,10 @@ const SalesVoucher: React.FC = () => {
                               statesMatch &&
                               sgstTotal > 0 && (
                                 <tr
-                                  className={`font-semibold ${
-                                    theme === "dark"
-                                      ? "border-t border-gray-600"
-                                      : "border-t border-gray-300"
-                                  }`}
+                                  className={`font-semibold ${theme === "dark"
+                                    ? "border-t border-gray-600"
+                                    : "border-t border-gray-300"
+                                    }`}
                                 >
                                   <td
                                     className="px-4 py-2 text-left"
@@ -2581,11 +2523,10 @@ const SalesVoucher: React.FC = () => {
                               !statesMatch &&
                               igstTotal > 0 && (
                                 <tr
-                                  className={`font-semibold ${
-                                    theme === "dark"
-                                      ? "border-t border-gray-600"
-                                      : "border-t border-gray-300"
-                                  }`}
+                                  className={`font-semibold ${theme === "dark"
+                                    ? "border-t border-gray-600"
+                                    : "border-t border-gray-300"
+                                    }`}
                                 >
                                   <td
                                     className="px-4 py-2 text-left"
@@ -2602,11 +2543,10 @@ const SalesVoucher: React.FC = () => {
                             {/* GST TOTAL - Always show when GST is enabled */}
                             {columnSettings.showGST && (
                               <tr
-                                className={`font-semibold ${
-                                  theme === "dark"
-                                    ? "border-t border-gray-600"
-                                    : "border-t border-gray-300"
-                                }`}
+                                className={`font-semibold ${theme === "dark"
+                                  ? "border-t border-gray-600"
+                                  : "border-t border-gray-300"
+                                  }`}
                               >
                                 <td
                                   className="px-4 py-2 text-left"
@@ -2626,11 +2566,10 @@ const SalesVoucher: React.FC = () => {
                             {/* DISCOUNT */}
                             {columnSettings.showDiscount && (
                               <tr
-                                className={`font-semibold ${
-                                  theme === "dark"
-                                    ? "border-t border-gray-600"
-                                    : "border-t border-gray-300"
-                                }`}
+                                className={`font-semibold ${theme === "dark"
+                                  ? "border-t border-gray-600"
+                                  : "border-t border-gray-300"
+                                  }`}
                               >
                                 <td
                                   className="px-4 py-2 text-left"
@@ -2646,11 +2585,10 @@ const SalesVoucher: React.FC = () => {
 
                             {/* GRAND TOTAL */}
                             <tr
-                              className={`font-bold ${
-                                theme === "dark"
-                                  ? "border-t-2 border-gray-500"
-                                  : "border-t-2 border-black"
-                              }`}
+                              className={`font-bold ${theme === "dark"
+                                ? "border-t-2 border-gray-500"
+                                : "border-t-2 border-black"
+                                }`}
                             >
                               <td
                                 className="px-4 py-2 text-left text-lg"
@@ -2671,11 +2609,10 @@ const SalesVoucher: React.FC = () => {
                   <table className="w-full mb-4">
                     <thead>
                       <tr
-                        className={`${
-                          theme === "dark"
-                            ? "border-b border-gray-600"
-                            : "border-b border-gray-300"
-                        }`}
+                        className={`${theme === "dark"
+                          ? "border-b border-gray-600"
+                          : "border-b border-gray-300"
+                          }`}
                       >
                         <th className="px-4 py-2 text-left">S.No</th>
                         <th className="px-4 py-2 text-left">Ledger</th>
@@ -2688,11 +2625,10 @@ const SalesVoucher: React.FC = () => {
                       {formData.entries.map((entry, index) => (
                         <tr
                           key={entry.id}
-                          className={`${
-                            theme === "dark"
-                              ? "border-b border-gray-600"
-                              : "border-b border-gray-300"
-                          }`}
+                          className={`${theme === "dark"
+                            ? "border-b border-gray-600"
+                            : "border-b border-gray-300"
+                            }`}
                         >
                           <td className="px-4 py-2">{index + 1}</td>
                           <td className="px-4 py-2">
@@ -2702,11 +2638,10 @@ const SalesVoucher: React.FC = () => {
                               value={entry.ledgerId ?? ""}
                               onChange={(e) => handleEntryChange(index, e)}
                               required
-                              className={`${FORM_STYLES.tableSelect(theme)} ${
-                                errors[`entry${index}.ledgerId`]
-                                  ? "border-red-500"
-                                  : ""
-                              }`}
+                              className={`${FORM_STYLES.tableSelect(theme)} ${errors[`entry${index}.ledgerId`]
+                                ? "border-red-500"
+                                : ""
+                                }`}
                             >
                               <option value="">Select Ledger</option>
                               {safeLedgers.map((ledger: Ledger) => (
@@ -2716,11 +2651,10 @@ const SalesVoucher: React.FC = () => {
                               ))}
                               <option
                                 value="add-new"
-                                className={`flex items-center px-4 py-2 rounded ${
-                                  theme === "dark"
-                                    ? "bg-blue-600 hover:bg-green-700"
-                                    : "bg-green-600 hover:bg-green-700 text-white"
-                                }`}
+                                className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                                  ? "bg-blue-600 hover:bg-green-700"
+                                  : "bg-green-600 hover:bg-green-700 text-white"
+                                  }`}
                               >
                                 + Add New Ledger
                               </option>
@@ -2743,11 +2677,10 @@ const SalesVoucher: React.FC = () => {
                               step="0.01"
                               className={`${FORM_STYLES.tableInput(
                                 theme
-                              )} text-right ${
-                                errors[`entry${index}.amount`]
-                                  ? "border-red-500"
-                                  : ""
-                              }`}
+                              )} text-right ${errors[`entry${index}.amount`]
+                                ? "border-red-500"
+                                : ""
+                                }`}
                             />
                             {errors[`entry${index}.amount`] && (
                               <p className="text-red-500 text-xs mt-1">
@@ -2773,13 +2706,12 @@ const SalesVoucher: React.FC = () => {
                               type="button"
                               onClick={() => removeEntry(index)}
                               disabled={formData.entries.length <= 1}
-                              className={`p-1 rounded ${
-                                formData.entries.length <= 1
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : theme === "dark"
+                              className={`p-1 rounded ${formData.entries.length <= 1
+                                ? "opacity-50 cursor-not-allowed"
+                                : theme === "dark"
                                   ? "hover:bg-gray-600"
                                   : "hover:bg-gray-300"
-                              }`}
+                                }`}
                             >
                               <Trash2 size={16} />
                             </button>
@@ -2790,11 +2722,10 @@ const SalesVoucher: React.FC = () => {
                     <tfoot>
                       {/* SUBTOTAL */}
                       <tr
-                        className={`${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        } font-semibold`}
+                        className={`${theme === "dark"
+                          ? "border-t border-gray-600"
+                          : "border-t border-gray-300"
+                          } font-semibold`}
                       >
                         <td colSpan={7}></td>
                         <td className="text-right py-2">Subtotal:</td>
@@ -2806,11 +2737,10 @@ const SalesVoucher: React.FC = () => {
 
                       {/* GST TOTAL */}
                       <tr
-                        className={`${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        } font-semibold`}
+                        className={`${theme === "dark"
+                          ? "border-t border-gray-600"
+                          : "border-t border-gray-300"
+                          } font-semibold`}
                       >
                         <td colSpan={7}></td>
                         <td className="text-right py-2">GST Total:</td>
@@ -2822,11 +2752,10 @@ const SalesVoucher: React.FC = () => {
 
                       {/* DISCOUNT */}
                       <tr
-                        className={`${
-                          theme === "dark"
-                            ? "border-t border-gray-600"
-                            : "border-t border-gray-300"
-                        } font-semibold`}
+                        className={`${theme === "dark"
+                          ? "border-t border-gray-600"
+                          : "border-t border-gray-300"
+                          } font-semibold`}
                       >
                         <td colSpan={7}></td>
                         <td className="text-right py-2">Discount:</td>
@@ -2838,11 +2767,10 @@ const SalesVoucher: React.FC = () => {
 
                       {/* GRAND TOTAL */}
                       <tr
-                        className={`${
-                          theme === "dark"
-                            ? "border-t-2 border-gray-500"
-                            : "border-t-2 border-black"
-                        } font-bold`}
+                        className={`${theme === "dark"
+                          ? "border-t-2 border-gray-500"
+                          : "border-t-2 border-black"
+                          } font-bold`}
                       >
                         <td colSpan={7}></td>
                         <td className="text-right py-3 text-lg">
@@ -2882,11 +2810,10 @@ const SalesVoucher: React.FC = () => {
                 title="Cancel (Esc)"
                 type="button"
                 onClick={() => navigate("/app/vouchers")}
-                className={`px-4 py-2 rounded ${
-                  theme === "dark"
-                    ? "bg-gray-700 hover:bg-gray-600"
-                    : "bg-gray-200 hover:bg-gray-300"
-                }`}
+                className={`px-4 py-2 rounded ${theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-200 hover:bg-gray-300"
+                  }`}
               >
                 Cancel
               </button>
@@ -2894,11 +2821,10 @@ const SalesVoucher: React.FC = () => {
                 title="Print"
                 type="button"
                 onClick={handlePrintClick}
-                className={`flex items-center px-4 py-2 rounded ${
-                  theme === "dark"
-                    ? "bg-green-600 hover:bg-green-700"
-                    : "bg-green-600 hover:bg-green-700 text-white"
-                }`}
+                className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-green-600 hover:bg-green-700 text-white"
+                  }`}
               >
                 <Printer size={18} className="mr-1" />
                 Print
@@ -2906,11 +2832,10 @@ const SalesVoucher: React.FC = () => {
               <button
                 title="Save Voucher (F9)"
                 type="submit"
-                className={`flex items-center px-4 py-2 rounded ${
-                  theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
+                className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+                  }`}
               >
                 <Save size={18} className="mr-1" />
                 Save
@@ -3083,9 +3008,8 @@ const SalesVoucher: React.FC = () => {
         )}
 
         <div
-          className={`mt-6 p-4 rounded ${
-            theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-          }`}
+          className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+            }`}
         >
           <p className="text-sm">
             <span className="font-semibold">Note:</span> Use Sales Voucher for

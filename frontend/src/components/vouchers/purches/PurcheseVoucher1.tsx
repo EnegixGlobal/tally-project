@@ -59,8 +59,141 @@ const getSelectClasses = (theme: string, hasError: boolean = false) => {
   return `${baseClasses} ${themeClasses} ${errorClasses}`;
 };
 
+// 🔹 Remove (20) from state name
+const cleanState = (state: string = "") =>
+  state.replace(/\(.*?\)/g, "").trim().toLowerCase();
+
+const resolvePurchaseGst = (
+  gstRate: number,
+  companyState: string,
+  supplierState: string
+) => {
+
+
+  const isIntra =
+    companyState &&
+    supplierState &&
+    cleanState(companyState) === cleanState(supplierState);
+
+  if (isIntra) {
+    return {
+      cgstRate: gstRate / 2,
+      sgstRate: gstRate / 2,
+      igstRate: 0,
+      isIntra: true,
+    };
+  }
+
+  return {
+    cgstRate: 0,
+    sgstRate: 0,
+    igstRate: gstRate,
+    isIntra: false,
+  };
+};
+
+const normalizeGstForSave = (
+  entries: any[],
+  companyState: string,
+  supplierState: string
+) => {
+  const isIntra =
+    cleanState(companyState) &&
+    cleanState(supplierState) &&
+    cleanState(companyState) === cleanState(supplierState);
+
+  return entries.map((e) => {
+    if (!e.itemId) return e;
+
+    const gst = Number(e.gstRate || 0);
+
+    if (isIntra) {
+      // ✅ Same State → CGST + SGST only
+      return {
+        ...e,
+
+        igstRate: 0,
+        gstLedgerId: "",
+
+        cgstRate: gst / 2,
+        sgstRate: gst / 2,
+      };
+    } else {
+      // ✅ Other State → IGST only
+      return {
+        ...e,
+
+        cgstRate: 0,
+        sgstRate: 0,
+        cgstLedgerId: "",
+        sgstLedgerId: "",
+
+        igstRate: gst,
+      };
+    }
+  });
+};
+
+
+const calculateEntryValues = (
+  quantity: number,
+  rate: number,
+  discount: number,
+  gstRate: number,
+  companyState: string,
+  supplierState: string
+) => {
+
+  console.log("CALC ENTRY =>", {
+    quantity,
+    rate,
+    discount,
+    gstRate,
+    companyState,
+    supplierState,
+  });
+  const qty = Number(quantity || 0);
+  const r = Number(rate || 0);
+  const disc = Number(discount || 0);
+
+  const baseAmount = qty * r;
+
+  const { cgstRate, sgstRate, igstRate, isIntra } = resolvePurchaseGst(
+    gstRate,
+    companyState,
+    supplierState
+  );
+
+  const totalTaxRate = cgstRate + sgstRate + igstRate;
+  const gstAmount = (baseAmount * totalTaxRate) / 100;
+
+
+  const totalAmount = baseAmount + gstAmount - disc;
+
+  return {
+    quantity: qty,
+    rate: r,
+    discount: disc,
+    amount: totalAmount,
+    baseAmount,
+    gstAmount,
+    cgstRate,
+    sgstRate,
+    igstRate,
+  };
+};
+
 const PurchaseVoucher: React.FC = () => {
   const { theme, godowns = [], companyInfo, units = [] } = useAppContext();
+
+  //get companyInfo
+  // 🔹 Get Company State from localStorage
+  const companyInfoLS = localStorage.getItem("companyInfo");
+
+  const companyState = companyInfoLS
+    ? JSON.parse(companyInfoLS)?.state || ""
+    : "";
+
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   // Prefer `userType` (set at login) but fall back to legacy `supplier` key
@@ -191,6 +324,8 @@ const PurchaseVoucher: React.FC = () => {
         );
         const data = await res.json();
 
+        console.log('this is data', data)
+
         // Accept multiple response shapes: array, { success, data }, or nested
         let items: any[] = [];
         if (Array.isArray(data)) items = data;
@@ -247,11 +382,11 @@ const PurchaseVoucher: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
+        console.log('led', data)
         setLedgers(data);
       } catch (err) {
         console.error("Failed to fetch ledgers:", err);
@@ -259,6 +394,7 @@ const PurchaseVoucher: React.FC = () => {
     };
     fetchLedgers();
   }, [companyId, ownerType, ownerId]);
+
   // Safe fallbacks for context data
   const safeStockItems = stockItems;
   // Purchase-specific suppliers (sundry-creditors)
@@ -306,8 +442,7 @@ const PurchaseVoucher: React.FC = () => {
     if (!companyId || !ownerType || !ownerId) return;
 
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((res) => res.json())
@@ -352,6 +487,10 @@ const PurchaseVoucher: React.FC = () => {
         cgstRate: 0,
         sgstRate: 0,
         igstRate: 0,
+        gstLedgerId: "",
+        sgstLedgerId: "",
+        cgstLedgerId: "",
+
         godownId: "",
         discount: 0,
         batchNumber: "",
@@ -411,9 +550,8 @@ const PurchaseVoucher: React.FC = () => {
     console.warn("Stock items or ledgers are undefined in AppContext");
     return (
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <h1 className="text-2xl font-bold mb-4">Purchase Voucher</h1>
         <p className="text-red-500">
@@ -498,171 +636,151 @@ const PurchaseVoucher: React.FC = () => {
     const updatedEntries = [...formData.entries];
     const entry = updatedEntries[index];
 
-    const recalcAmount = (ent: any) => {
-      const qty = Number(ent.quantity || 0);
-      const rate = Number(ent.rate || 0);
-      const discount = Number(ent.discount || 0);
-      const gstTotal =
-        Number(ent.cgstRate || 0) +
-        Number(ent.sgstRate || 0) +
-        Number(ent.igstRate || 0);
-
-      const base = qty * rate;
-      const gstAmt = (base * gstTotal) / 100;
-      return base + gstAmt - discount;
-    };
 
     // ⭐ ITEM INVOICE MODE
-   if (formData.mode === "item-invoice") {
-  // helper: amount calculation
-  const recalcAmount = (ent: any) => {
-    const qty = Number(ent.quantity || 0);
-    const rate = Number(ent.rate || 0);
-    const discount = Number(ent.discount || 0);
+    if (formData.mode === "item-invoice") {
 
-    const gstTotal =
-      Number(ent.cgstRate || 0) +
-      Number(ent.sgstRate || 0) +
-      Number(ent.igstRate || 0);
 
-    const base = qty * rate;
-    const gstAmt = (base * gstTotal) / 100;
-    return base + gstAmt - discount;
-  };
-
-  // 1️⃣ ITEM CHANGE → auto fill + GST resolve
-  if (name === "itemId") {
-    const selected = stockItems.find(
-      (item) => String(item.id) === String(value)
-    );
-
-    const gst = Number(selected?.gstRate) || 0;
-
-    const gstSplit = resolvePurchaseGst(
-      gst,
-      safeCompanyInfo.state,
-      supplierState
-    );
-
-    updatedEntries[index] = {
-      ...entry,
-      itemId: value,
-      hsnCode: selected?.hsnCode || "",
-      unitName: selected?.unit || "",
-      rate: Number(
-        selected?.standardPurchaseRate ??
-          selected?.rate ??
-          entry.rate ??
-          0
-      ),
-      gstRate: gst,
-
-      // 🔥 GST SPLIT
-      ...gstSplit,
-
-      // Batch
-      batches: selected?.batches || [],
-      batchNumber: "",
-      batchExpiryDate: "",
-      batchManufacturingDate: "",
-
-      quantity: 0,
-      discount: 0,
-      amount: 0,
-    };
-
-    setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-    return;
-  }
-
-  // 2️⃣ BATCH CHANGE → sirf meta info
-  if (name === "batchNumber") {
-    const selectedBatch = (entry.batches || []).find(
-      (b: any) =>
-        b &&
-        String(
-          b.batchName ??
-            b.name ??
-            b.batch_no ??
-            b.batchNo ??
-            b.id
-        ) === String(value)
-    );
-
-    const availableQty = Number(
-      selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
-    );
-
-    updatedEntries[index] = {
-      ...entry,
-      batchNumber: value,
-      batchBaseQuantity: availableQty,
-      batchExpiryDate:
-        selectedBatch?.expiryDate ??
-        selectedBatch?.batchExpiryDate ??
-        "",
-      batchManufacturingDate:
-        selectedBatch?.manufacturingDate ??
-        selectedBatch?.batchManufacturingDate ??
-        "",
-    };
-
-    setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-    return;
-  }
-
-  // 3️⃣ QUANTITY / RATE / DISCOUNT CHANGE
-  if (["quantity", "rate", "discount"].includes(name)) {
-    const oldQty = Number(entry.quantity || 0);
-    const newVal = Number(value || 0);
-
-    updatedEntries[index] = {
-      ...entry,
-      [name]: newVal,
-    };
-
-    updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-
-    setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-
-    // 🔥 batch quantity sync
-    if (name === "quantity") {
-      const baseQty = Number(entry.batchBaseQuantity ?? 0);
-      const diffQty = newVal - oldQty;
-      const finalBatchQty = baseQty + newVal;
-
-      const itemId = entry.itemId;
-      const batchName = entry.batchNumber;
-
-      if (itemId && diffQty !== 0 && batchName) {
-        fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-          {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              batchName,
-              quantity: finalBatchQty,
-            }),
-          }
-        ).catch((err) =>
-          console.error("Batch qty sync error:", err)
+      // 1️⃣ ITEM CHANGE → auto fill + GST resolve
+      if (name === "itemId") {
+        const selected = stockItems.find(
+          (item) => String(item.id) === String(value)
         );
+
+        const gst = Number(selected?.gstRate || selected?._doc?.gstRate || 0);
+
+        const calculated = calculateEntryValues(
+          0, // quantity
+          Number(selected?.standardPurchaseRate ?? selected?.rate ?? 0),
+          0, // discount
+          gst,
+          safeCompanyInfo.state,
+          supplierState
+        );
+
+        updatedEntries[index] = {
+          ...entry,
+          itemId: value,
+          hsnCode: selected?.hsnCode || "",
+          unitName: selected?.unit || "",
+          gstRate: gst,
+
+          rate: calculated.rate,
+          amount: calculated.amount,
+          cgstRate: calculated.cgstRate,
+          sgstRate: calculated.sgstRate,
+          igstRate: calculated.igstRate,
+
+          // ✅ GST LEDGER IDS
+          gstLedgerId: selected?.gstLedgerId || "",
+          sgstLedgerId: selected?.sgstLedgerId || "",
+          cgstLedgerId: selected?.cgstLedgerId || "",
+          // ... rest
+          batches: selected?.batches || [],
+          batchNumber: "",
+          batchExpiryDate: "",
+          batchManufacturingDate: "",
+          quantity: 0,
+          discount: 0,
+        };
+
+        setFormData(prev => ({ ...prev, entries: updatedEntries }));
+        return;
       }
+
+      // 2️⃣ BATCH CHANGE 
+      if (name === "batchNumber") {
+        const selectedBatch = (entry.batches || []).find(
+          (b: any) =>
+            b &&
+            String(
+              b.batchName ??
+              b.name ??
+              b.batch_no ??
+              b.batchNo ??
+              b.id
+            ) === String(value)
+        );
+        // Batch select generally only sets meta info, not rate/qty unless needed.
+        // Keeping as is, but we ensure amounts are consistent if anything else changed? 
+        // No, batch change doesn't usually change price unless batch specific price exists.
+        // Assuming batch select logic is just meta for now.
+
+        const availableQty = Number(
+          selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
+        );
+
+        updatedEntries[index] = {
+          ...entry,
+          batchNumber: value,
+          batchBaseQuantity: availableQty,
+          batchExpiryDate: selectedBatch?.expiryDate ?? selectedBatch?.batchExpiryDate ?? "",
+          batchManufacturingDate: selectedBatch?.manufacturingDate ?? selectedBatch?.batchManufacturingDate ?? "",
+        };
+        setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+        return;
+      }
+
+      // 3️⃣ QUANTITY / RATE / DISCOUNT CHANGE
+      if (["quantity", "rate", "discount"].includes(name)) {
+        const newVal = Number(value || 0);
+
+        // Prepare inputs for calc
+        let newQty = name === "quantity" ? newVal : Number(entry.quantity || 0);
+        let newRate = name === "rate" ? newVal : Number(entry.rate || 0);
+        let newDisc = name === "discount" ? newVal : Number(entry.discount || 0);
+
+        const gst = Number(entry.gstRate || 0);
+
+        const calculated = calculateEntryValues(
+          newQty,
+          newRate,
+          newDisc,
+          gst,
+          safeCompanyInfo.state,
+          supplierState
+        );
+
+        updatedEntries[index] = {
+          ...entry,
+          [name]: newVal,
+          amount: calculated.amount,
+        };
+
+        setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+
+        // 🔥 batch quantity sync (keep existing logic)
+        if (name === "quantity") {
+          const oldQty = Number(entry.quantity || 0);
+          const baseQty = Number(entry.batchBaseQuantity ?? 0);
+          const diffQty = newVal - oldQty;
+          const finalBatchQty = baseQty + newVal;
+
+          const itemId = entry.itemId;
+          const batchName = entry.batchNumber;
+          if (itemId && diffQty !== 0 && batchName) {
+            fetch(
+              `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+              {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ batchName, quantity: finalBatchQty }),
+              }
+            ).catch(console.error);
+          }
+        }
+        return;
+      }
+
+      // 4️⃣ DEFAULT
+      updatedEntries[index] = {
+        ...entry,
+        [name]: type === "number" ? Number(value) || 0 : value,
+      };
+
+      setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+      return;
     }
-
-    return;
-  }
-
-  // 4️⃣ DEFAULT
-  updatedEntries[index] = {
-    ...entry,
-    [name]: type === "number" ? Number(value) || 0 : value,
-  };
-
-  setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-  return;
-}
 
 
     // ⭐ ACCOUNTING / AS-VOUCHER MODES
@@ -696,30 +814,41 @@ const PurchaseVoucher: React.FC = () => {
 
 
   useEffect(() => {
-  if (!supplierState) return;
+    if (!supplierState) return;
 
-  setFormData((prev) => ({
-    ...prev,
-    entries: prev.entries.map((e) => {
-      if (!e.itemId) return e;
+    setFormData((prev) => ({
+      ...prev,
+      entries: prev.entries.map((e) => {
+        if (!e.itemId) return e;
 
-      const item = stockItems.find(
-        (i) => String(i.id) === String(e.itemId)
-      );
+        const item = safeStockItems.find(
+          (i) => String(i.id) === String(e.itemId)
+        );
 
-      const gst = Number(item?.gstRate) || 0;
+        const gst = Number(item?.gstRate) || 0;
 
-      return {
-        ...e,
-        ...resolvePurchaseGst(
-          gst,
-          safeCompanyInfo.state,
-          supplierState
-        ),
-      };
-    }),
-  }));
-}, [supplierState]);
+        return {
+          ...e,
+          ...resolvePurchaseGst(
+            gst,
+            safeCompanyInfo.state,
+            supplierState
+          ),
+          amount: (() => {
+            const calculated = calculateEntryValues(
+              Number(e.quantity || 0),
+              Number(e.rate || 0),
+              Number(e.discount || 0),
+              gst,
+              safeCompanyInfo.state,
+              supplierState
+            );
+            return calculated.amount;
+          })()
+        };
+      }),
+    }));
+  }, [supplierState, safeStockItems, safeCompanyInfo.state]);
 
 
   const addEntry = () => {
@@ -756,11 +885,11 @@ const PurchaseVoucher: React.FC = () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/purchase-vouchers/next-number` +
-            `?company_id=${companyId}` +
-            `&owner_type=${ownerType}` +
-            `&owner_id=${ownerId}` +
-            `&voucherType=PRV` +
-            `&date=${formData.date}`
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}` +
+          `&voucherType=PRV` +
+          `&date=${formData.date}`
         );
 
         const data = await res.json();
@@ -846,49 +975,138 @@ const PurchaseVoucher: React.FC = () => {
     return Object.keys(newErrors).filter((k) => newErrors[k]).length === 0;
   };
 
+  // get ledget it to name like sgst, cgst,igst
+  // 🔹 Get Ledger Name by ID
+  const getLedgerNameById = (id: any) => {
+    if (!id) return "-";
+
+    const ledger = safeLedgers.find(
+      (l) => String(l.id) === String(id)
+    );
+
+    return ledger?.name || "-";
+  };
+  // ✅ Extract GST % from Ledger Name (like "SGST@9%" → 9)
+  const extractGstPercent = (name = "") => {
+    if (!name) return 0;
+
+    const match = name.match(/(\d+(\.\d+)?)/); // number find karega
+
+    return match ? Number(match[1]) : 0;
+  };
+
+
+
   const calculateTotals = () => {
     if (formData.mode === "item-invoice") {
-      const subtotal = formData.entries.reduce(
-        (sum, e) => sum + (e.quantity ?? 0) * (e.rate ?? 0),
-        0
+      const totals = formData.entries.reduce(
+        (acc, entry) => {
+          const qty = Number(entry.quantity || 0);
+          const rate = Number(entry.rate || 0);
+          const discount = Number(entry.discount || 0);
+
+          // ✅ GST % from Ledger Names
+          const sgst = extractGstPercent(
+            getLedgerNameById(entry.sgstLedgerId)
+          );
+
+          const cgst = extractGstPercent(
+            getLedgerNameById(entry.cgstLedgerId)
+          );
+
+          const igst = extractGstPercent(
+            getLedgerNameById(entry.gstLedgerId)
+          );
+
+          // ✅ Total GST Rate
+          const totalGstRate = sgst + cgst + igst;
+
+          const baseAmount = qty * rate;
+
+          const gstAmount = (baseAmount * totalGstRate) / 100;
+
+          const totalAmount = baseAmount + gstAmount - discount;
+
+          return {
+            subtotal: acc.subtotal + baseAmount,
+
+            cgstTotal: acc.cgstTotal + (baseAmount * cgst) / 100,
+
+            sgstTotal: acc.sgstTotal + (baseAmount * sgst) / 100,
+
+            igstTotal: acc.igstTotal + (baseAmount * igst) / 100,
+
+            discountTotal: acc.discountTotal + discount,
+
+            total: acc.total + totalAmount,
+          };
+        },
+        {
+          subtotal: 0,
+          cgstTotal: 0,
+          sgstTotal: 0,
+          igstTotal: 0,
+          discountTotal: 0,
+          total: 0,
+        }
       );
-      const cgstTotal = formData.entries.reduce((sum, e) => {
-        const baseAmount = (e.quantity ?? 0) * (e.rate ?? 0);
-        return sum + (baseAmount * (e.cgstRate ?? 0)) / 100;
-      }, 0);
-      const sgstTotal = formData.entries.reduce((sum, e) => {
-        const baseAmount = (e.quantity ?? 0) * (e.rate ?? 0);
-        return sum + (baseAmount * (e.sgstRate ?? 0)) / 100;
-      }, 0);
-      const igstTotal = formData.entries.reduce((sum, e) => {
-        const baseAmount = (e.quantity ?? 0) * (e.rate ?? 0);
-        return sum + (baseAmount * (e.igstRate ?? 0)) / 100;
-      }, 0);
-      const gstTotal = cgstTotal + sgstTotal + igstTotal;
-      const discountTotal = formData.entries.reduce(
-        (sum, e) => sum + (e.discount ?? 0),
-        0
-      );
-      const total = subtotal + gstTotal - discountTotal;
+
       return {
-        subtotal,
-        cgstTotal,
-        sgstTotal,
-        igstTotal,
-        gstTotal,
-        discountTotal,
-        total,
+        ...totals,
+        gstTotal: totals.cgstTotal + totals.sgstTotal + totals.igstTotal,
       };
-    } else {
+    }
+    else {
       const debitTotal = formData.entries
         .filter((e) => e.type === "debit")
         .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+
       const creditTotal = formData.entries
         .filter((e) => e.type === "credit")
         .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+
       return { debitTotal, creditTotal, total: debitTotal };
     }
   };
+
+  // ✅ Fix GST before saving (Intra / Inter State Logic)
+
+  const isIntra =
+    cleanState(companyState) &&
+    cleanState(supplierState) &&
+    cleanState(companyState) === cleanState(supplierState);
+
+  // Update entries GST based on state
+  const fixedEntries = formData.entries.map((entry) => {
+    if (!entry.itemId) return entry;
+
+    if (isIntra) {
+      // Same State → SGST + CGST only
+      return {
+        ...entry,
+        igstRate: 0,
+        gstLedgerId: "",
+
+        // keep SGST + CGST
+        sgstRate: entry.sgstRate || 0,
+        cgstRate: entry.cgstRate || 0,
+      };
+    } else {
+      // Other State → IGST only
+      return {
+        ...entry,
+        sgstRate: 0,
+        cgstRate: 0,
+        sgstLedgerId: "",
+        cgstLedgerId: "",
+
+        // keep IGST
+        igstRate: entry.igstRate || entry.gstRate || 0,
+      };
+    }
+  });
+
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -930,12 +1148,10 @@ const PurchaseVoucher: React.FC = () => {
       };
 
       const url = isEditMode
-        ? `${
-            import.meta.env.VITE_API_URL
-          }/api/purchase-vouchers/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-        : `${
-            import.meta.env.VITE_API_URL
-          }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        ? `${import.meta.env.VITE_API_URL
+        }/api/purchase-vouchers/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        : `${import.meta.env.VITE_API_URL
+        }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
       const method = isEditMode ? "PUT" : "POST";
 
@@ -963,8 +1179,7 @@ const PurchaseVoucher: React.FC = () => {
         if (!entry.batchMeta?.isNew) continue;
 
         await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-items/${
-            entry.itemId
+          `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId
           }/batches`,
           {
             method: "POST",
@@ -1008,8 +1223,7 @@ const PurchaseVoucher: React.FC = () => {
           }));
 
         await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/purchase-vouchers/purchase-history`,
           {
             method: "POST",
@@ -1167,9 +1381,8 @@ const PurchaseVoucher: React.FC = () => {
 
     // Save the batch
     try {
-      const url = `${import.meta.env.VITE_API_URL}/api/stock-items/${
-        entry.itemId
-      }/batches`;
+      const url = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId
+        }/batches`;
       const resBatch = await fetch(url, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -1342,8 +1555,7 @@ const PurchaseVoucher: React.FC = () => {
     const fetchUnits = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
@@ -1370,57 +1582,49 @@ const PurchaseVoucher: React.FC = () => {
     (l) => String(l.id) === String(formData.partyId)
   );
 
+  // 🔹 Party State
+  const partyState = selectedPartyLedger?.state || selectedPartyLedger?.state_name || selectedPartyLedger?.State || "";
+
   useEffect(() => {
-  if (!formData.partyId) {
-    setSupplierState("");
-    return;
-  }
+    if (!formData.partyId) {
+      setSupplierState("");
+      return;
+    }
 
-  const supplier = safeLedgers.find(
-    (l) => String(l.id) === String(formData.partyId)
-  );
+    const supplier = safeLedgers.find(
+      (l) => String(l.id) === String(formData.partyId)
+    );
 
-  const state =
-    supplier?.state ||
-    supplier?.state_name ||
-    supplier?.State ||
-    "";
+    const state =
+      supplier?.state ||
+      supplier?.state_name ||
+      supplier?.State ||
+      "";
 
-  setSupplierState(state);
-}, [formData.partyId, safeLedgers]);
+    setSupplierState(state);
+  }, [formData.partyId, safeLedgers]);
 
 
-const resolvePurchaseGst = (
-  gstRate: number,
-  companyState: string,
-  supplierState: string
-) => {
-  const isIntra =
-    companyState &&
-    supplierState &&
-    companyState.toLowerCase().trim() ===
-      supplierState.toLowerCase().trim();
 
-  if (isIntra) {
-    return {
-      cgstRate: gstRate / 2,
-      sgstRate: gstRate / 2,
-      igstRate: 0,
-    };
-  }
 
-  return {
-    cgstRate: 0,
-    sgstRate: 0,
-    igstRate: gstRate,
-  };
-};
 
 
   // 🔹 GST Charge Type
   const isRegularCharge =
     selectedPartyLedger?.gstNumber &&
     String(selectedPartyLedger.gstNumber).trim() !== "";
+
+
+
+
+
+  // 🔹 Intra / Inter State Check
+  const isIntraState =
+    cleanState(companyState) &&
+    cleanState(partyState) &&
+    cleanState(companyState) === cleanState(partyState);
+
+
 
   return (
     <div className="pt-[56px] px-4">
@@ -1450,9 +1654,8 @@ const resolvePurchaseGst = (
           onClick={() => setShowTableConfig(false)} // outside click close
         >
           <div
-            className={`p-6 rounded-lg w-[350px] ${
-              theme === "dark" ? "bg-gray-800 text-white" : "bg-white"
-            } shadow-xl`}
+            className={`p-6 rounded-lg w-[350px] ${theme === "dark" ? "bg-gray-800 text-white" : "bg-white"
+              } shadow-xl`}
             onClick={(e) => e.stopPropagation()} // stop outside close
           >
             <h3 className="text-lg font-semibold mb-4">Table Settings</h3>
@@ -1496,9 +1699,8 @@ const resolvePurchaseGst = (
         </div>
       )}
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -1614,34 +1816,46 @@ const resolvePurchaseGst = (
 
                     <option
                       value="add-new"
-                      className={`flex items-center px-4 py-2 rounded ${
-                        theme === "dark"
-                          ? "bg-blue-600 hover:bg-green-700"
-                          : "bg-green-600 hover:bg-green-700 text-white"
-                      }`}
+                      className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                        ? "bg-blue-600 hover:bg-green-700"
+                        : "bg-green-600 hover:bg-green-700 text-white"
+                        }`}
                     >
                       + Add New Ledger
                     </option>
                   </select>
 
-                  {selectedPartyLedger && (
-                    <div
-                      className={`mt-1 text-xs font-medium ${
-                        isRegularCharge ? "text-green-600" : "text-orange-600"
-                      }`}
-                    >
-                      {isRegularCharge ? (
-                        <>
-                          Regular Charge
-                          <span className="ml-2 text-gray-600">
-                            (GSTIN: {selectedPartyLedger.gstNumber})
-                          </span>
-                        </>
-                      ) : (
-                        <>Inward supplies liable to reverse charge</>
-                      )}
-                    </div>
-                  )}
+                  {selectedPartyLedger && (() => {
+                    const partyState =
+                      selectedPartyLedger.state ||
+                      selectedPartyLedger.state_name ||
+                      selectedPartyLedger.State ||
+                      "N/A";
+
+                    return (
+                      <div
+                        className={`mt-1 text-xs font-medium ${isRegularCharge ? "text-green-600" : "text-orange-600"
+                          }`}
+                      >
+                        {isRegularCharge ? (
+                          <>
+                            Regular Charge
+                            <span className="ml-2 text-gray-600">
+                              (GSTIN: {selectedPartyLedger.gstNumber || "N/A"}, State: {partyState})
+                            </span>
+                          </>
+                        ) : (
+                          <>
+                            Inward supplies liable to reverse charge
+                            <span className="ml-2 text-gray-600">
+                              (State: {partyState})
+                            </span>
+                          </>
+                        )}
+                      </div>
+                    );
+                  })()}
+
 
                   {errors.partyId && (
                     <p className="text-red-500 text-xs mt-1">
@@ -1676,11 +1890,10 @@ const resolvePurchaseGst = (
                 ))}
                 <option
                   value="add-new"
-                  className={`flex items-center px-4 py-2 rounded ${
-                    theme === "dark"
-                      ? "bg-blue-600 hover:bg-green-700"
-                      : "bg-green-600 hover:bg-green-700 text-white"
-                  }`}
+                  className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                    ? "bg-blue-600 hover:bg-green-700"
+                    : "bg-green-600 hover:bg-green-700 text-white"
+                    }`}
                 >
                   + Add New Ledger
                 </option>
@@ -1774,9 +1987,8 @@ const resolvePurchaseGst = (
           </div>
 
           <div
-            className={`p-4 mb-6 rounded ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-            }`}
+            className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+              }`}
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold">
@@ -1786,11 +1998,10 @@ const resolvePurchaseGst = (
                 title="Add Entry"
                 type="button"
                 onClick={addEntry}
-                className={`flex items-center text-sm px-2 py-1 rounded ${
-                  theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
+                className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+                  }`}
               >
                 <Plus size={16} className="mr-1" />
                 Add {formData.mode === "item-invoice" ? "Item" : "Ledger"}
@@ -1802,11 +2013,10 @@ const resolvePurchaseGst = (
                 <table className="w-full mb-4">
                   <thead>
                     <tr
-                      className={`${
-                        theme === "dark"
-                          ? "border-b border-gray-600"
-                          : "border-b border-gray-300"
-                      }`}
+                      className={`${theme === "dark"
+                        ? "border-b border-gray-600"
+                        : "border-b border-gray-300"
+                        }`}
                     >
                       <th className={TABLE_STYLES.headerCenter}>Sr No</th>
                       <th className={TABLE_STYLES.header}>Item</th>
@@ -1825,9 +2035,18 @@ const resolvePurchaseGst = (
                         <th className={TABLE_STYLES.headerRight}>Rate</th>
                       )}
 
-                      {visibleColumns.gst && (
-                        <th className={TABLE_STYLES.headerRight}>GST (%)</th>
+                      {/* GST Header */}
+                      {visibleColumns.gst && isIntraState && (
+                        <>
+                          <th className={TABLE_STYLES.headerRight}>SGST</th>
+                          <th className={TABLE_STYLES.headerRight}>CGST</th>
+                        </>
                       )}
+
+                      {visibleColumns.gst && !isIntraState && (
+                        <th className={TABLE_STYLES.headerRight}>IGST</th>
+                      )}
+
                       <th className={TABLE_STYLES.headerRight}>Discount</th>
                       <th className={TABLE_STYLES.headerRight}>Amount</th>
                       {godownEnabled === "yes" && visibleColumns.godown && (
@@ -1845,11 +2064,10 @@ const resolvePurchaseGst = (
                       return (
                         <tr
                           key={entry.id}
-                          className={`${
-                            theme === "dark"
-                              ? "border-b border-gray-600"
-                              : "border-b border-gray-300"
-                          }`}
+                          className={`${theme === "dark"
+                            ? "border-b border-gray-600"
+                            : "border-b border-gray-300"
+                            }`}
                         >
                           {/* SR */}
                           <td className="px-1 py-2 text-center min-w-[28px] text-xs font-semibold">
@@ -2157,22 +2375,34 @@ const resolvePurchaseGst = (
                             )}
                           </td>
 
-                          {/* GST Single Column */}
-                          {visibleColumns.gst && (
-                            <td
-                              className="px-1 py-2 min-w-[50px] text-center font-semibold text-xs"
-                              title={`CGST: ${entry.cgstRate || 0}%, SGST: ${
-                                entry.sgstRate || 0
-                              }%, IGST: ${entry.igstRate || 0}%`}
-                            >
-                              {(
-                                (entry.cgstRate || 0) +
-                                (entry.sgstRate || 0) +
-                                (entry.igstRate || 0)
-                              ).toFixed(0)}
-                              %
+
+                          {/* GST TOTAL */}
+
+                          {/* GST Columns */}
+
+                          {/* Intra State */}
+                          {visibleColumns.gst && isIntraState && (
+                            <>
+                              <td className="px-1 py-2 text-xs text-center">
+                                {extractGstPercent(getLedgerNameById(entry.sgstLedgerId))}%
+                              </td>
+
+                              <td className="px-1 py-2 text-xs text-center">
+                                {extractGstPercent(getLedgerNameById(entry.cgstLedgerId))}%
+                              </td>
+                            </>
+                          )}
+
+                          {/* Inter State */}
+                          {visibleColumns.gst && !isIntraState && (
+                            <td className="px-1 py-2 text-xs text-center">
+                              {extractGstPercent(getLedgerNameById(entry.gstLedgerId))}%
                             </td>
                           )}
+
+
+
+
 
                           {/* DISCOUNT */}
                           <td className="px-1 py-2 min-w-[70px]">
@@ -2197,13 +2427,11 @@ const resolvePurchaseGst = (
                                 name="godownId"
                                 value={entry.godownId || ""}
                                 onChange={(e) => handleEntryChange(index, e)}
-                                className={`${
-                                  TABLE_STYLES.select
-                                } min-w-[95px] text-xs ${
-                                  errors[`entry${index}.godownId`]
+                                className={`${TABLE_STYLES.select
+                                  } min-w-[95px] text-xs ${errors[`entry${index}.godownId`]
                                     ? "border-red-500"
                                     : ""
-                                }`}
+                                  }`}
                               >
                                 <option value="">Select Godown</option>
                                 {godowndata.map((godown: any) => (
@@ -2236,92 +2464,142 @@ const resolvePurchaseGst = (
                   </tbody>
 
                   <tfoot>
-                    <tr
-                      className={`font-semibold ${
-                        theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
-                      }`}
-                    >
-                      <td
-                        className="px-4 py-2 text-right"
-                        colSpan={COLSPAN_VALUES.ITEM_TABLE_TOTAL}
-                      >
-                        Subtotal:
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {subtotal.toLocaleString()}
-                      </td>
-                    </tr>
-                    <tr
-                      className={`font-semibold ${
-                        theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
-                      }`}
-                    >
-                      <td
-                        className="px-4 py-2 text-right"
-                        colSpan={COLSPAN_VALUES.ITEM_TABLE_TOTAL}
-                      >
-                        GST Total:
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {gstTotal.toLocaleString()}
-                      </td>
+                    {/* Calculate dynamic colspan based on visible columns */}
+                    {(() => {
+                      const colSpanBeforeAmount =
+                        4 + // Sr(1) + Item(1) + Unit(1) + Discount(1)
+                        (visibleColumns.hsn ? 1 : 0) +
+                        (visibleColumns.batch ? 1 : 0) +
+                        (!addBatchModal.visible ? 2 : 0) + // Qty(1) + Rate(1)
+                        (visibleColumns.gst ? (isIntraState ? 2 : 1) : 0);
 
-                      <td className="px-4 py-2"></td>
-                      <td className="px-4 py-2"></td>
-                    </tr>
-                    <tr
-                      className={`font-semibold ${
-                        theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
-                      }`}
-                    >
-                      <td
-                        className="px-4 py-2 text-right"
-                        colSpan={COLSPAN_VALUES.ITEM_TABLE_TOTAL}
-                      >
-                        Discount Total:
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {discountTotal.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-2"></td>
-                      <td className="px-4 py-2"></td>
-                    </tr>
-                    <tr
-                      className={`font-semibold ${
-                        theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
-                      }`}
-                    >
-                      <td
-                        className="px-4 py-2 text-right"
-                        colSpan={COLSPAN_VALUES.ITEM_TABLE_TOTAL}
-                      >
-                        Grand Total:
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {total.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-2"></td>
-                      <td className="px-4 py-2"></td>
-                    </tr>
+                      return (
+                        <>
+                          <tr
+                            className={`font-semibold ${theme === "dark"
+                              ? "border-t border-gray-600"
+                              : "border-t border-gray-300"
+                              }`}
+                          >
+                            <td
+                              className="px-4 py-2 text-right"
+                              colSpan={colSpanBeforeAmount}
+                            >
+                              Subtotal:
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              {subtotal.toLocaleString()}
+                            </td>
+                          </tr>
+                          {isIntraState ? (
+                            <>
+                              <tr
+                                className={`font-semibold ${theme === "dark"
+                                  ? "border-t border-gray-600"
+                                  : "border-t border-gray-300"
+                                  }`}
+                              >
+                                <td
+                                  className="px-4 py-2 text-right"
+                                  colSpan={colSpanBeforeAmount}
+                                >
+                                  SGST Total:
+                                </td>
+                                <td className="px-4 py-2 text-right">
+                                  {sgstTotal.toLocaleString()}
+                                </td>
+                                <td className="px-4 py-2"></td>
+                                <td className="px-4 py-2"></td>
+                              </tr>
+                              <tr
+                                className={`font-semibold ${theme === "dark"
+                                  ? "border-t border-gray-600"
+                                  : "border-t border-gray-300"
+                                  }`}
+                              >
+                                <td
+                                  className="px-4 py-2 text-right"
+                                  colSpan={colSpanBeforeAmount}
+                                >
+                                  CGST Total:
+                                </td>
+                                <td className="px-4 py-2 text-right">
+                                  {cgstTotal.toLocaleString()}
+                                </td>
+                                <td className="px-4 py-2"></td>
+                                <td className="px-4 py-2"></td>
+                              </tr>
+                            </>
+                          ) : (
+                            <tr
+                              className={`font-semibold ${theme === "dark"
+                                ? "border-t border-gray-600"
+                                : "border-t border-gray-300"
+                                }`}
+                            >
+                              <td
+                                className="px-4 py-2 text-right"
+                                colSpan={colSpanBeforeAmount}
+                              >
+                                IGST Total:
+                              </td>
+                              <td className="px-4 py-2 text-right">
+                                {igstTotal.toLocaleString()}
+                              </td>
+
+                              <td className="px-4 py-2"></td>
+                              <td className="px-4 py-2"></td>
+                            </tr>
+                          )}
+                          <tr
+                            className={`font-semibold ${theme === "dark"
+                              ? "border-t border-gray-600"
+                              : "border-t border-gray-300"
+                              }`}
+                          >
+                            <td
+                              className="px-4 py-2 text-right"
+                              colSpan={colSpanBeforeAmount}
+                            >
+                              Discount Total:
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              {discountTotal.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2"></td>
+                            <td className="px-4 py-2"></td>
+                          </tr>
+                          <tr
+                            className={`font-semibold ${theme === "dark"
+                              ? "border-t border-gray-600"
+                              : "border-t border-gray-300"
+                              }`}
+                          >
+                            <td
+                              className="px-4 py-2 text-right"
+                              colSpan={colSpanBeforeAmount}
+                            >
+                              Grand Total:
+                            </td>
+                            <td className="px-4 py-2 text-right">
+                              {total.toLocaleString()}
+                            </td>
+                            <td className="px-4 py-2"></td>
+                            <td className="px-4 py-2"></td>
+                          </tr>
+                        </>
+                      );
+                    })()}
                   </tfoot>
                 </table>
               ) : (
                 <table className="w-full mb-4">
                   <thead>
                     <tr
-                      className={`${
-                        theme === "dark"
-                          ? "border-b border-gray-600"
-                          : "border-b border-gray-300"
-                      }`}
+                      className={`${theme === "dark"
+                        ? "border-b border-gray-600"
+                        : "border-b border-gray-300"
+                        }`}
                     >
                       <th className="px-4 py-2 text-left">Ledger</th>
                       <th className="px-4 py-2 text-right">Amount</th>
@@ -2333,11 +2611,10 @@ const resolvePurchaseGst = (
                     {formData.entries.map((entry) => (
                       <tr
                         key={entry.id}
-                        className={`${
-                          theme === "dark"
-                            ? "border-b border-gray-600"
-                            : "border-b border-gray-300"
-                        }`}
+                        className={`${theme === "dark"
+                          ? "border-b border-gray-600"
+                          : "border-b border-gray-300"
+                          }`}
                       >
                         <td className="px-4 py-2">
                           {" "}
@@ -2355,9 +2632,9 @@ const resolvePurchaseGst = (
                             className={getSelectClasses(
                               theme,
                               !!errors[
-                                `entry${formData.entries.indexOf(
-                                  entry
-                                )}.ledgerId`
+                              `entry${formData.entries.indexOf(
+                                entry
+                              )}.ledgerId`
                               ]
                             )}
                           >
@@ -2372,16 +2649,16 @@ const resolvePurchaseGst = (
                           {errors[
                             `entry${formData.entries.indexOf(entry)}.ledgerId`
                           ] && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {
-                                errors[
+                              <p className="text-red-500 text-xs mt-1">
+                                {
+                                  errors[
                                   `entry${formData.entries.indexOf(
                                     entry
                                   )}.ledgerId`
-                                ]
-                              }
-                            </p>
-                          )}
+                                  ]
+                                }
+                              </p>
+                            )}
                         </td>
                         <td className="px-4 py-2">
                           <input
@@ -2401,23 +2678,23 @@ const resolvePurchaseGst = (
                             className={getInputClasses(
                               theme,
                               !!errors[
-                                `entry${formData.entries.indexOf(entry)}.amount`
+                              `entry${formData.entries.indexOf(entry)}.amount`
                               ]
                             )}
                           />
                           {errors[
                             `entry${formData.entries.indexOf(entry)}.amount`
                           ] && (
-                            <p className="text-red-500 text-xs mt-1">
-                              {
-                                errors[
+                              <p className="text-red-500 text-xs mt-1">
+                                {
+                                  errors[
                                   `entry${formData.entries.indexOf(
                                     entry
                                   )}.amount`
-                                ]
-                              }
-                            </p>
-                          )}
+                                  ]
+                                }
+                              </p>
+                            )}
                         </td>
                         <td className="px-4 py-2">
                           {" "}
@@ -2445,13 +2722,12 @@ const resolvePurchaseGst = (
                               removeEntry(formData.entries.indexOf(entry))
                             }
                             disabled={formData.entries.length <= 1}
-                            className={`p-1 rounded ${
-                              formData.entries.length <= 1
-                                ? "opacity-50 cursor-not-allowed"
-                                : theme === "dark"
+                            className={`p-1 rounded ${formData.entries.length <= 1
+                              ? "opacity-50 cursor-not-allowed"
+                              : theme === "dark"
                                 ? "hover:bg-gray-600"
                                 : "hover:bg-gray-300"
-                            }`}
+                              }`}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -2461,11 +2737,10 @@ const resolvePurchaseGst = (
                   </tbody>
                   <tfoot>
                     <tr
-                      className={`font-semibold ${
-                        theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
-                      }`}
+                      className={`font-semibold ${theme === "dark"
+                        ? "border-t border-gray-600"
+                        : "border-t border-gray-300"
+                        }`}
                     >
                       <td className="px-4 py-2 text-right">Debit Total:</td>
                       <td className="px-4 py-2 text-right">
@@ -2475,11 +2750,10 @@ const resolvePurchaseGst = (
                       <td className="px-4 py-2"></td>
                     </tr>
                     <tr
-                      className={`font-semibold ${
-                        theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
-                      }`}
+                      className={`font-semibold ${theme === "dark"
+                        ? "border-t border-gray-600"
+                        : "border-t border-gray-300"
+                        }`}
                     >
                       <td className="px-4 py-2 text-right">Credit Total:</td>
                       <td className="px-4 py-2 text-right">
@@ -2519,11 +2793,10 @@ const resolvePurchaseGst = (
               title="Cancel (Esc)"
               type="button"
               onClick={() => navigate("/app/vouchers")}
-              className={`px-4 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-gray-200 hover:bg-gray-300"
-              }`}
+              className={`px-4 py-2 rounded ${theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600"
+                : "bg-gray-200 hover:bg-gray-300"
+                }`}
             >
               Cancel
             </button>
@@ -2531,11 +2804,10 @@ const resolvePurchaseGst = (
               title="Print"
               type="button"
               onClick={handlePrint}
-              className={`flex items-center px-4 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "bg-green-600 hover:bg-green-700 text-white"
-              }`}
+              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-green-600 hover:bg-green-700 text-white"
+                }`}
             >
               <Printer size={18} className="mr-1" />
               Print
@@ -2543,11 +2815,10 @@ const resolvePurchaseGst = (
             <button
               title="Save Voucher (F9)"
               type="submit"
-              className={`flex items-center px-4 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
+              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
             >
               <Save size={18} className="mr-1" />
               Save
@@ -2560,9 +2831,8 @@ const resolvePurchaseGst = (
       {showConfig && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
           <div
-            className={`p-6 rounded-lg ${
-              theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-            }`}
+            className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+              }`}
           >
             <h2 className="text-xl font-bold mb-4">
               Configure Purchase Voucher
@@ -2571,11 +2841,10 @@ const resolvePurchaseGst = (
             <div className="flex justify-end">
               <button
                 onClick={() => setShowConfig(false)}
-                className={`px-4 py-2 rounded ${
-                  theme === "dark"
-                    ? "bg-gray-700 hover:bg-gray-600"
-                    : "bg-gray-200 hover:bg-gray-300"
-                }`}
+                className={`px-4 py-2 rounded ${theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-200 hover:bg-gray-300"
+                  }`}
               >
                 Close
               </button>
@@ -2790,44 +3059,44 @@ const resolvePurchaseGst = (
                     entry.itemId !== "" &&
                     entry.itemId !== "select"
                 ).length === 0 && (
-                  <>
-                    <tr>
-                      <td
-                        className="border border-black p-5 text-[10pt] text-center"
-                        colSpan={COLSPAN_VALUES.PRINT_TABLE_NO_ITEMS}
-                      >
-                        No items selected
-                      </td>
-                    </tr>
-                    {Array(3)
-                      .fill(0)
-                      .map((_, index) => (
-                        <tr key={`empty-${index}`}>
-                          <td className="border border-black p-5 text-[10pt]">
-                            &nbsp;
-                          </td>
-                          <td className="border border-black p-5 text-[10pt]">
-                            &nbsp;
-                          </td>
-                          <td className="border border-black p-5 text-[10pt]">
-                            &nbsp;
-                          </td>
-                          <td className="border border-black p-5 text-[10pt]">
-                            &nbsp;
-                          </td>
-                          <td className="border border-black p-5 text-[10pt]">
-                            &nbsp;
-                          </td>
-                          <td className="border border-black p-5 text-[10pt]">
-                            &nbsp;
-                          </td>
-                          <td className="border border-black p-5 text-[10pt]">
-                            &nbsp;
-                          </td>
-                        </tr>
-                      ))}
-                  </>
-                )}
+                    <>
+                      <tr>
+                        <td
+                          className="border border-black p-5 text-[10pt] text-center"
+                          colSpan={COLSPAN_VALUES.PRINT_TABLE_NO_ITEMS}
+                        >
+                          No items selected
+                        </td>
+                      </tr>
+                      {Array(3)
+                        .fill(0)
+                        .map((_, index) => (
+                          <tr key={`empty-${index}`}>
+                            <td className="border border-black p-5 text-[10pt]">
+                              &nbsp;
+                            </td>
+                            <td className="border border-black p-5 text-[10pt]">
+                              &nbsp;
+                            </td>
+                            <td className="border border-black p-5 text-[10pt]">
+                              &nbsp;
+                            </td>
+                            <td className="border border-black p-5 text-[10pt]">
+                              &nbsp;
+                            </td>
+                            <td className="border border-black p-5 text-[10pt]">
+                              &nbsp;
+                            </td>
+                            <td className="border border-black p-5 text-[10pt]">
+                              &nbsp;
+                            </td>
+                            <td className="border border-black p-5 text-[10pt]">
+                              &nbsp;
+                            </td>
+                          </tr>
+                        ))}
+                    </>
+                  )}
 
                 {/* Add empty rows for spacing when items exist */}
                 {formData.entries.filter(
@@ -2846,12 +3115,12 @@ const resolvePurchaseGst = (
                     Math.max(
                       0,
                       4 -
-                        formData.entries.filter(
-                          (entry) =>
-                            entry.itemId &&
-                            entry.itemId !== "" &&
-                            entry.itemId !== "select"
-                        ).length
+                      formData.entries.filter(
+                        (entry) =>
+                          entry.itemId &&
+                          entry.itemId !== "" &&
+                          entry.itemId !== "select"
+                      ).length
                     )
                   )
                     .fill(0)
@@ -3012,49 +3281,49 @@ const resolvePurchaseGst = (
             (entry) =>
               entry.itemId && entry.itemId !== "" && entry.itemId !== "select"
           ).length > 0 && (
-            <div className="border border-black p-2.5 mb-4">
-              <strong className="text-[11pt] mb-2 block">
-                GST Calculation Summary:
-              </strong>
-              <div className="text-[10pt]">
-                {(() => {
-                  const gstInfo = getGstRateInfo();
-                  return (
-                    <div>
-                      <div className="flex justify-between mb-2 font-bold">
-                        <span>Total Items: {gstInfo.totalItems}</span>
-                        <span>
-                          GST Rates Applied: {gstInfo.uniqueGstRatesCount}
-                        </span>
-                      </div>
-                      <div className="text-[9pt] mb-2">
-                        <strong>GST Rates Used:</strong>
-                        {gstInfo.gstRatesUsed.join("%, ")}%
-                      </div>
-                      {Object.entries(gstInfo.breakdown).map(([rate, data]) => (
-                        <div
-                          key={rate}
-                          className="flex justify-between mb-1 border-b border-dotted border-gray-300 pb-0.5"
-                        >
+              <div className="border border-black p-2.5 mb-4">
+                <strong className="text-[11pt] mb-2 block">
+                  GST Calculation Summary:
+                </strong>
+                <div className="text-[10pt]">
+                  {(() => {
+                    const gstInfo = getGstRateInfo();
+                    return (
+                      <div>
+                        <div className="flex justify-between mb-2 font-bold">
+                          <span>Total Items: {gstInfo.totalItems}</span>
                           <span>
-                            GST {rate}%: {data.count} item
-                            {data.count > 1 ? "s" : ""}
+                            GST Rates Applied: {gstInfo.uniqueGstRatesCount}
                           </span>
-                          <span>₹{data.gstAmount.toLocaleString()} GST</span>
                         </div>
-                      ))}
-                      <div className="mt-2 text-center text-[9pt] italic text-gray-600">
-                        This invoice includes {gstInfo.uniqueGstRatesCount}
-                        different GST rate
-                        {gstInfo.uniqueGstRatesCount > 1 ? "s" : ""} as per item
-                        specifications
+                        <div className="text-[9pt] mb-2">
+                          <strong>GST Rates Used:</strong>
+                          {gstInfo.gstRatesUsed.join("%, ")}%
+                        </div>
+                        {Object.entries(gstInfo.breakdown).map(([rate, data]) => (
+                          <div
+                            key={rate}
+                            className="flex justify-between mb-1 border-b border-dotted border-gray-300 pb-0.5"
+                          >
+                            <span>
+                              GST {rate}%: {data.count} item
+                              {data.count > 1 ? "s" : ""}
+                            </span>
+                            <span>₹{data.gstAmount.toLocaleString()} GST</span>
+                          </div>
+                        ))}
+                        <div className="mt-2 text-center text-[9pt] italic text-gray-600">
+                          This invoice includes {gstInfo.uniqueGstRatesCount}
+                          different GST rate
+                          {gstInfo.uniqueGstRatesCount > 1 ? "s" : ""} as per item
+                          specifications
+                        </div>
                       </div>
-                    </div>
-                  );
-                })()}
+                    );
+                  })()}
+                </div>
               </div>
-            </div>
-          )}
+            )}
           {/* Footer Section */}
           <div className="flex justify-between mt-12 pt-4 border-t border-gray-300">
             <div className="flex-1">
@@ -3081,9 +3350,8 @@ const resolvePurchaseGst = (
         </div>
       </div>
       <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <p className="text-sm">
           <span className="font-semibold">Note:</span> Use Purchase Voucher for

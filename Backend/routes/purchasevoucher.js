@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const {generateVoucherNumber} = require('../utils/generateVoucherNumber')
+const { generateVoucherNumber } = require('../utils/generateVoucherNumber')
 const { getFinancialYear } = require("../utils/financialYear");
 
 
@@ -153,6 +153,11 @@ router.get("/next-number", async (req, res) => {
 
 
 // POST Purchase Voucher
+// Helper
+const cleanState = (state = "") =>
+  state.replace(/\(.*?\)/g, "").trim().toLowerCase();
+
+
 router.post("/", async (req, res) => {
   const {
     number,
@@ -173,7 +178,7 @@ router.post("/", async (req, res) => {
     purchaseLedgerId,
     companyId,
     ownerType,
-    ownerId, // ⭐ Frontend se receive
+    ownerId,
   } = req.body;
 
   // ⭐ Accept from query also
@@ -193,24 +198,81 @@ router.post("/", async (req, res) => {
     });
   }
 
-  const dispatchDocNo = dispatchDetails?.docNo || null;
-  const dispatchThrough = dispatchDetails?.through || null;
-  const destination = dispatchDetails?.destination || null;
-
-  let insertVoucherSql = "";
-  let insertVoucherValues = [];
-  let voucherId;
-
-  const voucherNumber = await generateVoucherNumber({
-  companyId: finalCompanyId,
-  ownerType: finalOwnerType,
-  ownerId: finalOwnerId,
-  voucherType: "PRV",
-  date
-});
-
-
   try {
+    // ================= STATE FETCH =================
+
+    let companyState = "";
+    let partyState = "";
+
+    // Company State
+    const [companyRows] = await db.execute(
+      "SELECT state FROM tbcompanies WHERE id = ?",
+      [finalCompanyId]
+    );
+
+    if (companyRows.length) {
+      companyState = companyRows[0].state || "";
+    }
+
+    // Party State
+    const [partyRows] = await db.execute(
+      "SELECT state FROM ledgers WHERE id = ?",
+      [partyId]
+    );
+
+    if (partyRows.length) {
+      partyState = partyRows[0].state || "";
+    }
+
+    const isIntra =
+      cleanState(companyState) &&
+      cleanState(partyState) &&
+      cleanState(companyState) === cleanState(partyState);
+
+    // ===============================================
+
+
+    // ================= FIX TOTAL GST =================
+
+    let finalCgst = Number(cgstTotal || 0);
+    let finalSgst = Number(sgstTotal || 0);
+    let finalIgst = Number(igstTotal || 0);
+
+    if (isIntra) {
+      finalIgst = 0; // ❌ No IGST
+    } else {
+      finalCgst = 0; // ❌ No CGST
+      finalSgst = 0; // ❌ No SGST
+    }
+
+    // ===============================================
+
+
+    const dispatchDocNo = dispatchDetails?.docNo || null;
+    const dispatchThrough = dispatchDetails?.through || null;
+    const destination = dispatchDetails?.destination || null;
+
+
+    // ================= GENERATE VOUCHER =================
+
+    const voucherNumber = await generateVoucherNumber({
+      companyId: finalCompanyId,
+      ownerType: finalOwnerType,
+      ownerId: finalOwnerId,
+      voucherType: "PRV",
+      date,
+    });
+
+    // ================================================
+
+
+    let insertVoucherSql = "";
+    let insertVoucherValues = [];
+    let voucherId;
+
+
+    // ================= INSERT MAIN =================
+
     if (mode === "item-invoice") {
       insertVoucherSql = `
         INSERT INTO purchase_vouchers (
@@ -222,7 +284,7 @@ router.post("/", async (req, res) => {
       `;
 
       insertVoucherValues = [
-       voucherNumber,
+        voucherNumber,
         date ?? null,
         supplierInvoiceDate ?? null,
         narration ?? null,
@@ -232,35 +294,42 @@ router.post("/", async (req, res) => {
         dispatchThrough,
         destination,
         purchaseLedgerId ?? null,
+
         subtotal ?? 0,
-        cgstTotal ?? 0,
-        sgstTotal ?? 0,
-        igstTotal ?? 0,
+
+        // ✅ SAFE GST
+        finalCgst,
+        finalSgst,
+        finalIgst,
+
         discountTotal ?? 0,
         total ?? 0,
+
         finalCompanyId,
         finalOwnerType,
         finalOwnerId,
       ];
     } else {
-      // ⚠ If needed, update this for account invoice mode later
-      insertVoucherSql = `
-        INSERT INTO voucher_main (voucher_number, date, narration)
-        VALUES (?, ?, ?)
-      `;
-      insertVoucherValues = [number ?? null, date ?? null, narration ?? null];
+      return res.status(400).json({
+        success: false,
+        message: "Invalid voucher mode",
+      });
     }
 
     const [voucherResult] = await db.execute(
       insertVoucherSql,
       insertVoucherValues
     );
+
     voucherId = voucherResult.insertId;
 
-    const itemEntries = entries.filter((e) => e.itemId);
-    const ledgerEntries = entries.filter((e) => e.ledgerId);
+    // ================================================
 
-    // ⭐ Insert Items
+
+    // ================= INSERT ITEMS =================
+
+    const itemEntries = entries.filter((e) => e.itemId);
+
     if (itemEntries.length > 0) {
       const insertItemQuery = `
         INSERT INTO purchase_voucher_items (
@@ -268,15 +337,19 @@ router.post("/", async (req, res) => {
           cgstRate, sgstRate, igstRate, amount, godownId
         ) VALUES ?
       `;
+
       const itemValues = itemEntries.map((e) => [
         voucherId,
         e.itemId ?? null,
         e.quantity ?? 0,
         e.rate ?? 0,
         e.discount ?? 0,
-        e.cgstRate ?? 0,
-        e.sgstRate ?? 0,
-        e.igstRate ?? 0,
+
+        // ✅ SAFE GST
+        isIntra ? e.cgstRate ?? 0 : 0,
+        isIntra ? e.sgstRate ?? 0 : 0,
+        isIntra ? 0 : e.igstRate ?? 0,
+
         e.amount ?? 0,
         e.godownId ?? null,
       ]);
@@ -284,34 +357,27 @@ router.post("/", async (req, res) => {
       await db.query(insertItemQuery, [itemValues]);
     }
 
-    // ⭐ Insert Ledger Entries
-    if (ledgerEntries.length > 0) {
-      const insertLedgerQuery = `
-        INSERT INTO voucher_entries (
-          voucher_id, ledger_id, amount, entry_type
-        ) VALUES ?
-      `;
-      const ledgerValues = ledgerEntries.map((e) => [
-        voucherId,
-        e.ledgerId,
-        e.amount,
-        e.type,
-      ]);
+    // ================================================
 
-      await db.query(insertLedgerQuery, [ledgerValues]);
-    }
 
     return res.status(200).json({
       success: true,
-       voucherNumber,
+      voucherNumber,
       message: "Purchase voucher saved successfully",
       id: voucherId,
+      gstType: isIntra ? "INTRA" : "INTER",
     });
+
   } catch (err) {
     console.error("🔥 Purchase voucher save failed:", err);
-    return res.status(500).json({ success: false, error: err.message });
+
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
+
 
 // get ourchase vouncher
 router.get("/", async (req, res) => {
@@ -443,7 +509,7 @@ router.get("/month-wise", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-   console.log('this is id', id)
+  console.log('this is id', id)
   try {
     // 1️⃣ voucher number nikaalo
     const [rows] = await db.execute(
