@@ -146,16 +146,13 @@ router.get("/:ownerId/:ownerType", async (req, res) => {
       [ownerId, ownerType]
     );
 
-    return res.json({
+    res.json({
       success: true,
       data: rows[0] || null,
     });
-  } catch (error) {
-    console.error("🔥 Fetch error:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Server error",
-    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
   }
 });
 

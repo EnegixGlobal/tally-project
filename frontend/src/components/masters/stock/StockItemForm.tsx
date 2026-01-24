@@ -5,7 +5,6 @@ import { useAppContext } from "../../../context/AppContext";
 import type {
   GodownAllocation,
   Godown,
-  UnitOfMeasurement,
   GstClassification,
 } from "../../../types";
 import Swal from "sweetalert2";
@@ -37,13 +36,7 @@ interface SelectFieldProps {
   error?: string;
 }
 
-// Interface for GodownAllocationField props
-interface GodownAllocationFieldProps {
-  allocations: GodownAllocation[];
-  setAllocations: React.Dispatch<React.SetStateAction<GodownAllocation[]>>;
-  godowns: Godown[];
-  errors: Record<string, string>;
-}
+
 
 // Reusable Input component
 const InputField: React.FC<InputFieldProps> = ({
@@ -69,13 +62,12 @@ const InputField: React.FC<InputFieldProps> = ({
         name={name}
         value={value}
         onChange={onChange}
-        className={`w-full p-2 rounded border ${
-          error
-            ? "border-red-500"
-            : theme === "dark"
+        className={`w-full p-2 rounded border ${error
+          ? "border-red-500"
+          : theme === "dark"
             ? "bg-gray-700 border-gray-600 focus:border-blue-500"
             : "bg-white border-gray-300 focus:border-blue-500"
-        } outline-none transition-colors`}
+          } outline-none transition-colors`}
         required={required}
       />
       {error && <p className="text-red-500 text-xs mt-1">{error}</p>}
@@ -106,13 +98,12 @@ const SelectField: React.FC<SelectFieldProps> = ({
         name={name}
         value={value}
         onChange={onChange}
-        className={`w-full p-2 rounded border ${
-          error
-            ? "border-red-500"
-            : theme === "dark"
+        className={`w-full p-2 rounded border ${error
+          ? "border-red-500"
+          : theme === "dark"
             ? "bg-gray-700 border-gray-600 focus:border-blue-500"
             : "bg-white border-gray-300 focus:border-blue-500"
-        } outline-none transition-colors`}
+          } outline-none transition-colors`}
         required={required}
       >
         <option value="">Select {label.toLowerCase()}</option>
@@ -127,107 +118,10 @@ const SelectField: React.FC<SelectFieldProps> = ({
   );
 };
 
-// Reusable Godown Allocation component
-const GodownAllocationField: React.FC<GodownAllocationFieldProps> = ({
-  allocations,
-  setAllocations,
-  godowns,
-  errors,
-}) => {
-  const { theme } = useAppContext();
 
-  const addAllocation = () => {
-    setAllocations([...allocations, { godownId: "", quantity: 0, value: 0 }]);
-  };
-
-  const updateAllocation = (
-    index: number,
-    field: keyof GodownAllocation,
-    value: string | number
-  ) => {
-    setAllocations((prev) =>
-      prev.map((alloc, i) =>
-        i === index
-          ? { ...alloc, [field]: field === "godownId" ? value : Number(value) }
-          : alloc
-      )
-    );
-  };
-
-  const removeAllocation = (index: number) => {
-    setAllocations((prev) => prev.filter((_, i) => i !== index));
-  };
-
-  return (
-    <div className="col-span-2">
-      <label className="block text-sm font-medium mb-1">
-        Godown Allocations
-      </label>
-      {allocations.map((alloc: GodownAllocation, index: number) => (
-        <div key={index} className="flex gap-4 mt-2 items-center">
-          <SelectField
-            id={`godown-${index}`}
-            name={`godown-${index}`}
-            label="Godown"
-            value={alloc.godownId}
-            onChange={(e) =>
-              updateAllocation(index, "godownId", e.target.value)
-            }
-            options={godowns.map((g) => ({ value: g.id, label: g.name }))}
-            error={errors[`godown-${index}`]}
-          />
-          <InputField
-            id={`quantity-${index}`}
-            name={`quantity-${index}`}
-            label="Quantity"
-            type="number"
-            value={alloc.quantity}
-            onChange={(e) =>
-              updateAllocation(index, "quantity", e.target.value)
-            }
-            error={errors[`quantity-${index}`]}
-          />
-          <InputField
-            id={`value-${index}`}
-            name={`value-${index}`}
-            label="Value"
-            type="number"
-            value={alloc.value}
-            onChange={(e) => updateAllocation(index, "value", e.target.value)}
-            error={errors[`value-${index}`]}
-          />
-          <button
-            title="Remove Godown Allocation"
-            type="button"
-            onClick={() => removeAllocation(index)}
-            className={`p-1 rounded mt-6 ${
-              theme === "dark"
-                ? "hover:bg-gray-600 text-red-400 hover:text-red-300"
-                : "hover:bg-gray-300 text-red-600 hover:text-red-700"
-            }`}
-          >
-            <X className="w-4 h-4" />
-          </button>
-        </div>
-      ))}
-      <button
-        type="button"
-        onClick={addAllocation}
-        className={`mt-2 flex items-center gap-2 px-4 py-2 rounded text-sm ${
-          theme === "dark"
-            ? "bg-blue-600 hover:bg-blue-700 text-white"
-            : "bg-blue-600 hover:bg-blue-700 text-white"
-        }`}
-      >
-        <Plus className="w-4 h-4" />
-        Add Godown
-      </button>
-    </div>
-  );
-};
 
 const StockItemForm = () => {
-  const { theme, gstClassifications = [], companyInfo } = useAppContext();
+  const { theme } = useAppContext();
 
   const navigate = useNavigate();
   const companyId = localStorage.getItem("company_id");
@@ -243,6 +137,73 @@ const StockItemForm = () => {
     { value: string; label: string }[]
   >([]);
 
+  const [gstLedgers, setGstLedgers] = useState<{
+    gst: any[];
+    cgst: any[];
+    sgst: any[];
+    igst: any[];
+  }>({
+    gst: [],
+    cgst: [],
+    sgst: [],
+    igst: [],
+  });
+
+
+
+  //get ledgers
+  useEffect(() => {
+    async function fetchGstLedgers() {
+      if (!companyId || !ownerType || !ownerId) return;
+
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-items/ledger` +
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}`
+        );
+
+
+        const data = await res.json();
+
+        if (data.success) {
+          setGstLedgers(data.data);
+        } else {
+          console.error("Ledger API error:", data.message);
+        }
+      } catch (err) {
+        console.error("Failed to fetch GST ledgers", err);
+      }
+    }
+
+    fetchGstLedgers();
+  }, [companyId, ownerType, ownerId]);
+
+
+
+  const gstOptions = [
+    ...gstLedgers.gst,
+    ...gstLedgers.igst,
+  ].map((l) => ({
+    value: l.id.toString(),
+    label: l.name,
+  }));
+
+  const cgstOptions = gstLedgers.cgst.map((l) => ({
+    value: l.id.toString(),
+    label: l.name,
+  }));
+
+  const sgstOptions = gstLedgers.sgst.map((l) => ({
+    value: l.id.toString(),
+    label: l.name,
+  }));
+
+
+
+
+
   // fetch units from database
   const [unitsData, setUnitsData] = useState([]);
 
@@ -252,8 +213,7 @@ const StockItemForm = () => {
 
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -284,8 +244,7 @@ const StockItemForm = () => {
           owner_id: ownerId,
         });
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/stock-categories?${params.toString()}`
         );
         const data = await res.json();
@@ -316,10 +275,10 @@ const StockItemForm = () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/stock-items/${id}` +
-            `?company_id=${companyId}` +
-            `&owner_type=${ownerType}` +
-            `&owner_id=${ownerId}` +
-            `&mode=opening`
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}` +
+          `&mode=opening`
         );
 
         const data = await res.json();
@@ -341,6 +300,10 @@ const StockItemForm = () => {
             gstRate: item.gstRate?.toString() || "",
             gstClassification: "",
             taxType: item.taxType || "Taxable",
+            gstLedgerId: item.gstLedgerId?.toString() || "",
+            cgstLedgerId: item.cgstLedgerId?.toString() || "",
+            sgstLedgerId: item.sgstLedgerId?.toString() || "",
+
             standardPurchaseRate: Number(item.standardPurchaseRate) || 0,
             standardSaleRate: Number(item.standardSaleRate) || 0,
             enableBatchTracking: !!item.enableBatchTracking,
@@ -410,7 +373,13 @@ const StockItemForm = () => {
     openingValue: number;
 
     hsnCode: string;
-    gstRate: string;
+
+
+    gstLedgerId: string;
+    cgstLedgerId: string;
+    sgstLedgerId: string;
+
+
 
     taxType: "Taxable" | "Exempt" | "Nil-rated";
 
@@ -436,9 +405,14 @@ const StockItemForm = () => {
     openingValue: 0,
 
     hsnCode: "",
-    gstRate: "",
+
 
     taxType: "Taxable",
+    gstLedgerId: "",
+    cgstLedgerId: "",
+    sgstLedgerId: "",
+
+
 
     enableBatchTracking: false,
     batchName: "",
@@ -449,12 +423,13 @@ const StockItemForm = () => {
     secondaryUnit: "",
   });
 
+
   const [godownAllocations, setGodownAllocations] = useState<
     GodownAllocation[]
   >([]);
   const [batchRows, setBatchRows] = useState([
     {
-       id: nanoid(),
+      id: nanoid(),
       batchName: "",
       batchExpiryDate: "",
       batchManufacturingDate: "",
@@ -482,7 +457,7 @@ const StockItemForm = () => {
     setBatchRows([
       ...batchRows,
       {
-        id: nanoid(), 
+        id: nanoid(),
         batchName: "",
         batchExpiryDate: "",
         batchManufacturingDate: "",
@@ -499,8 +474,7 @@ const StockItemForm = () => {
 
     try {
       const res = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/stock-items/${id}/batch?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
         {
           method: "DELETE",
@@ -552,48 +526,45 @@ const StockItemForm = () => {
   // --- End batch rows ---
 
   const validateForm = () => {
-  const newErrors: Errors = {};
+    const newErrors: Errors = {};
 
-  if (!formData.name) newErrors.name = "Name is required";
-  if (!formData.categoryId)
-    newErrors.categoryId = "Category is required";
-  if (!formData.unit) newErrors.unit = "Unit is required";
+    if (!formData.name) newErrors.name = "Name is required";
+    if (!formData.categoryId)
+      newErrors.categoryId = "Category is required";
+    if (!formData.unit) newErrors.unit = "Unit is required";
 
-  // ---- HSN ----
-  if (!formData.hsnCode) {
-    newErrors.hsnCode = "HSN / SAC Code is required";
-  }
+    // ---- HSN ----
+    if (!formData.hsnCode) {
+      newErrors.hsnCode = "HSN / SAC Code is required";
+    }
 
-  // ---- GST Rate ----
-  if (!formData.gstRate) {
-    newErrors.gstRate = "GST Rate is required";
-  }
 
-  // ---- Batch duplicate validation ----
-  if (formData.enableBatchTracking) {
-    const batchMap: Record<string, number[]> = {};
 
-    batchRows.forEach((b, index) => {
-      const key = (b.batchName || "").trim().toUpperCase();
-      if (!key) return;
+    // ---- Batch duplicate validation ----
+    if (formData.enableBatchTracking) {
+      const batchMap: Record<string, number[]> = {};
 
-      if (!batchMap[key]) batchMap[key] = [];
-      batchMap[key].push(index);
-    });
+      batchRows.forEach((b, index) => {
+        const key = (b.batchName || "").trim().toUpperCase();
+        if (!key) return;
 
-    Object.values(batchMap).forEach((indexes) => {
-      if (indexes.length > 1) {
-        indexes.forEach((i) => {
-          newErrors[`batchName-${i}`] =
-            "Batch number already exists";
-        });
-      }
-    });
-  }
+        if (!batchMap[key]) batchMap[key] = [];
+        batchMap[key].push(index);
+      });
 
-  setErrors(newErrors);
-  return Object.keys(newErrors).length === 0;
-};
+      Object.values(batchMap).forEach((indexes) => {
+        if (indexes.length > 1) {
+          indexes.forEach((i) => {
+            newErrors[`batchName-${i}`] =
+              "Batch number already exists";
+          });
+        }
+      });
+    }
+
+    setErrors(newErrors);
+    return Object.keys(newErrors).length === 0;
+  };
 
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -619,6 +590,10 @@ const StockItemForm = () => {
       hsnCode: formData.hsnCode,
       gstRate: Number(formData.gstRate),
       taxType: formData.taxType,
+
+      gstLedgerId: formData.gstLedgerId,
+      cgstLedgerId: formData.cgstLedgerId,
+      sgstLedgerId: formData.sgstLedgerId,
 
       batches: batchRows.map((b) => ({
         ...b,
@@ -700,17 +675,7 @@ const StockItemForm = () => {
     }
   };
 
-  const hsnSacOptions = [
-    { value: "as-per-company", label: "As per Company/Group" },
-    { value: "specify-details", label: "Specify Details Here" },
-    { value: "use-classification", label: "Use GST Classification" },
-  ];
 
-  const gstRateOptions = [
-    { value: "as-per-company", label: "As per Company/Group" },
-    { value: "specify-details", label: "Specify Details Here" },
-    { value: "use-classification", label: "Use GST Classification" },
-  ];
 
   const taxTypeOptions = [
     { value: "Taxable", label: "Taxable" },
@@ -721,27 +686,20 @@ const StockItemForm = () => {
   const unitOptions =
     unitsData.length > 0
       ? unitsData.map((unit: any) => ({
-          value: unit.id.toString(),
-          label: unit.name,
-        }))
+        value: unit.id.toString(),
+        label: unit.name,
+      }))
       : [{ value: "", label: "No units available" }];
 
-  const gstClassificationOptions =
-    gstClassifications.length > 0
-      ? gstClassifications.map((classification: GstClassification) => ({
-          value: classification.id,
-          label: `${classification.name} (HSN/SAC: ${classification.hsnCode}, GST: ${classification.gstRate}%)`,
-        }))
-      : [{ value: "", label: "No classifications available" }];
+
 
   return (
     <div className="pt-[56px] px-4 ">
       <div className="flex items-center mb-6">
         <button
           onClick={() => navigate("/app/masters/stock-item")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
           aria-label="Back"
         >
           <ArrowLeft size={20} />
@@ -750,9 +708,8 @@ const StockItemForm = () => {
       </div>
 
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -808,16 +765,34 @@ const StockItemForm = () => {
               error={errors.hsnCode}
             />
 
-            <InputField
-              id="gstRate"
-              name="gstRate"
-              label="GST Rate (%)"
-              type="number"
-              value={formData.gstRate}
+            <SelectField
+              id="gstLedgerId"
+              name="gstLedgerId"
+              label="IGST"
+              value={formData.gstLedgerId}
               onChange={handleChange}
-              required
-              error={errors.gstRate}
+              options={gstOptions}
             />
+
+
+            <SelectField
+              id="cgstLedgerId"
+              name="cgstLedgerId"
+              label="CGST"
+              value={formData.cgstLedgerId}
+              onChange={handleChange}
+              options={cgstOptions}
+            />
+
+            <SelectField
+              id="sgstLedgerId"
+              name="sgstLedgerId"
+              label="SGST"
+              value={formData.sgstLedgerId}
+              onChange={handleChange}
+              options={sgstOptions}
+            />
+
 
             {/* ----------------- Batch Tracking Dynamic Rows ----------------- */}
             <div className="flex justify-between items-center mt-4">
@@ -900,7 +875,7 @@ const StockItemForm = () => {
                       label="Opening Rate"
                       type="number"
                       value={Number(row.batchRate) * Number(row.batchQuantity)}
-                      onChange={() => {}}
+                      onChange={() => { }}
                       error={errors[`openingRate-${index}`]}
                       disabled
                     />
@@ -982,22 +957,20 @@ const StockItemForm = () => {
             <button
               type="button"
               onClick={() => navigate("/app/masters/stock-item")}
-              className={`px-4 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-gray-200 hover:bg-gray-300"
-              }`}
+              className={`px-4 py-2 rounded ${theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600"
+                : "bg-gray-200 hover:bg-gray-300"
+                }`}
             >
               <Trash2 className="w-4 h-4 inline mr-1" />
               Cancel
             </button>
             <button
               type="submit"
-              className={`flex items-center px-4 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
+              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
             >
               <Save className="w-4 h-4 mr-1" />
               Save

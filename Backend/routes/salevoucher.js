@@ -23,10 +23,42 @@ router.get("/items", async (req, res) => {
 });
 
 // POST Sales Voucher
+// 🔹 Helper: Clean State Name
+const cleanState = (state = "") =>
+  state.replace(/\(.*?\)/g, "").trim().toLowerCase();
+
+// ================= AUTO CHECK COLUMN =================
+async function ensureSalesLedgerColumn() {
+  const [rows] = await db.query(
+    `
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'sales_voucher_items'
+      AND COLUMN_NAME = 'salesLedgerId'
+    `
+  );
+
+  if (rows.length === 0) {
+    console.log("⚠️ salesLedgerId missing → creating...");
+
+    await db.query(`
+      ALTER TABLE sales_voucher_items
+      ADD COLUMN salesLedgerId INT NULL
+    `);
+
+    console.log("✅ salesLedgerId column created");
+  }
+}
+
+// ================= SAVE SALES VOUCHER =================
 router.post("/", async (req, res) => {
   console.log("POST /sales-vouchers hit");
 
   try {
+    // ✅ Ensure column exists first
+    await ensureSalesLedgerColumn();
+
     const {
       number,
       date,
@@ -57,81 +89,62 @@ router.post("/", async (req, res) => {
       bill_no,
     } = req.body;
 
-    // 🔐 Required checks
+    // ================= AUTH =================
     if (!companyId || !ownerType || !ownerId) {
       return res.status(400).json({
         success: false,
-        message: "companyId, ownerType & ownerId are required",
+        message: "companyId, ownerType & ownerId required",
       });
     }
 
-    // 🧾 Entries safety
+    // ================= ENTRIES =================
     const receivedEntries = Array.isArray(entries)
       ? entries
       : Array.isArray(items)
-      ? items
-      : [];
+        ? items
+        : [];
 
+    // ================= STATE =================
+    let companyState = "";
+    let partyState = "";
+
+    const [companyRows] = await db.execute(
+      "SELECT state FROM tbcompanies WHERE id=?",
+      [companyId]
+    );
+
+    if (companyRows.length) companyState = companyRows[0].state || "";
+
+    const [partyRows] = await db.execute(
+      "SELECT state FROM ledgers WHERE id=?",
+      [partyId]
+    );
+
+    if (partyRows.length) partyState = partyRows[0].state || "";
+
+    const isIntra =
+      cleanState(companyState) &&
+      cleanState(partyState) &&
+      cleanState(companyState) === cleanState(partyState);
+
+    // ================= GST TOTAL FIX =================
+    let finalCgst = Number(cgstTotal || 0);
+    let finalSgst = Number(sgstTotal || 0);
+    let finalIgst = Number(igstTotal || 0);
+
+    if (isIntra) {
+      finalIgst = 0;
+    } else {
+      finalCgst = 0;
+      finalSgst = 0;
+    }
+
+    // ================= DISPATCH =================
     const dispatchDocNo = dispatchDetails?.docNo || null;
     const dispatchThrough = dispatchDetails?.through || null;
     const destination = dispatchDetails?.destination || null;
 
-    // ================= CHECK & ADD COLUMNS IF MISSING =================
-    try {
-      // Check if sales_type_id column exists
-      const [salesTypeIdCheck] = await db.execute(
-        `SELECT COLUMN_NAME
-         FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = 'sales_vouchers'
-           AND COLUMN_NAME = 'sales_type_id'`
-      );
-
-      if (salesTypeIdCheck.length === 0) {
-        await db.execute(
-          `ALTER TABLE sales_vouchers ADD COLUMN sales_type_id INT NULL`
-        );
-        console.log("✅ Added sales_type_id column to sales_vouchers");
-      }
-
-      // Check if bill_no column exists
-      const [billNoCheck] = await db.execute(
-        `SELECT COLUMN_NAME
-         FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = 'sales_vouchers'
-           AND COLUMN_NAME = 'bill_no'`
-      );
-
-      if (billNoCheck.length === 0) {
-        await db.execute(
-          `ALTER TABLE sales_vouchers ADD COLUMN bill_no VARCHAR(100) NULL`
-        );
-        console.log("✅ Added bill_no column to sales_vouchers");
-      }
-    } catch (colErr) {
-      console.error("Column check/add error (non-fatal):", colErr);
-      // Continue even if column check fails
-    }
-
-    // ================= AUTO-INCREMENT current_no IN sales_types =================
-    if (sales_type_id) {
-      try {
-        await db.execute(
-          `UPDATE sales_types SET current_no = current_no + 1 WHERE id = ?`,
-          [sales_type_id]
-        );
-        console.log(
-          `✅ Incremented current_no for sales_type_id: ${sales_type_id}`
-        );
-      } catch (incErr) {
-        console.error("Error incrementing current_no:", incErr);
-        // Continue even if increment fails
-      }
-    }
-
-    // 🚫 PROFIT COMPLETELY REMOVED
-    // Always include sales_type_id and bill_no columns (they'll be added if missing)
+    // ================= INSERT VOUCHER =================
     const insertVoucherSQL = `
       INSERT INTO sales_vouchers (
         number,
@@ -158,7 +171,7 @@ router.post("/", async (req, res) => {
         sales_type_id,
         bill_no
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `;
 
     const voucherValues = [
@@ -167,48 +180,85 @@ router.post("/", async (req, res) => {
       narration ?? "",
       partyId ?? null,
       referenceNo ?? null,
+
       dispatchDocNo,
       dispatchThrough,
       destination,
+
       subtotal ?? 0,
-      cgstTotal ?? 0,
-      sgstTotal ?? 0,
-      igstTotal ?? 0,
+
+      finalCgst,
+      finalSgst,
+      finalIgst,
+
       discountTotal ?? 0,
       total ?? 0,
+
       type || "sales",
       isQuotation ? 1 : 0,
       salesLedgerId ?? null,
       supplierInvoiceDate ?? null,
+
       companyId,
       ownerType,
       ownerId,
+
       sales_type_id ?? null,
       bill_no ?? null,
     ];
 
-    const [voucherResult] = await db.execute(insertVoucherSQL, voucherValues);
+    const [voucherResult] = await db.execute(
+      insertVoucherSQL,
+      voucherValues
+    );
 
     const voucherId = voucherResult.insertId;
 
-    // ================= ITEM ENTRIES =================
+    // ================= INSERT ITEMS =================
     const itemEntries = receivedEntries.filter((e) => e.itemId);
 
     if (itemEntries.length > 0) {
-      const itemValues = itemEntries.map((e) => [
-        voucherId,
-        e.itemId,
-        e.quantity ?? 0,
-        e.rate ?? 0,
-        e.amount ?? 0,
-        e.cgstRate ?? 0,
-        e.sgstRate ?? 0,
-        e.igstRate ?? 0,
-        e.discount ?? 0,
-        e.hsnCode ?? "",
-        e.batchNumber ?? "",
-        e.godownId ?? null,
-      ]);
+      const itemValues = itemEntries.map((e) => {
+        if (isIntra) {
+          return [
+            voucherId,
+            e.itemId,
+            Number(e.quantity || 0),
+            Number(e.rate || 0),
+            Number(e.amount || 0),
+
+            Number(e.cgstLedgerId || 0),
+            Number(e.sgstLedgerId || 0),
+            0,
+
+            Number(e.discount || 0),
+            e.hsnCode ?? "",
+            e.batchNumber ?? "",
+            e.godownId ?? null,
+
+            Number(e.salesLedgerId || 0),
+          ];
+        }
+
+        return [
+          voucherId,
+          e.itemId,
+          Number(e.quantity || 0),
+          Number(e.rate || 0),
+          Number(e.amount || 0),
+
+          0,
+          0,
+          Number(e.gstLedgerId || e.igstLedgerId || 0),
+
+          Number(e.discount || 0),
+          e.hsnCode ?? "",
+          e.batchNumber ?? "",
+          e.godownId ?? null,
+
+          Number(e.salesLedgerId || 0),
+        ];
+      });
 
       await db.query(
         `
@@ -225,7 +275,8 @@ router.post("/", async (req, res) => {
           discount,
           hsnCode,
           batchNumber,
-          godownId
+          godownId,
+          salesLedgerId
         )
         VALUES ?
         `,
@@ -233,20 +284,25 @@ router.post("/", async (req, res) => {
       );
     }
 
+    // ================= DONE =================
     return res.status(200).json({
       success: true,
-      message: "Voucher saved successfully",
+      message: "Sales voucher saved successfully",
       id: voucherId,
+      gstType: isIntra ? "INTRA" : "INTER",
     });
   } catch (err) {
-    console.error("❌ Voucher save failed:", err);
+    console.error("❌ Sales voucher save failed:", err);
+
     return res.status(500).json({
       success: false,
-      message: "Error saving voucher",
+      message: "Server error",
       error: err.message,
     });
   }
 });
+
+
 
 // GET Sale History (Only fetch existing data, no table creation)
 // router.get("/sale-history", async (req, res) => {

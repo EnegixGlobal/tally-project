@@ -99,29 +99,53 @@ router.get("/sales", async (req, res) => {
       });
     }
 
-    // 🔹 COMPANY STATE
-    const [companyRows] = await db.query(
-      `SELECT state FROM tbcompanies WHERE id = ?`,
-      [company_id]
-    );
+    /*
+      LOGIC:
+      - voucherId → sales_vouchers.id
+      - tax decision ONLY from sales_voucher_items
+      - IGST → igstRate
+      - CGST+SGST → cgstRate + sgstRate
+    */
 
-    const companyStateRaw = companyRows[0]?.state || "";
-    const companyStateCode = companyStateRaw.match(/\((\d+)\)/)?.[1];
-
-    const [rows] = await db.query(
-      `
+    const [rows] = await db.query(`
       SELECT
         LOWER(gl.name) AS ledgerName,
         MONTH(sv.date) AS month,
-        SUM(sv.total) AS total,
-        cl.state AS customerState
+
+        -- decide taxable amount
+        SUM(
+          CASE
+            WHEN svi.igstRate > 0 THEN sv.igstTotal
+            WHEN (svi.cgstRate + svi.sgstRate) > 0
+              THEN (sv.cgstTotal + sv.sgstTotal)
+            ELSE 0
+          END
+        ) AS taxAmount,
+
+        -- identify tax type
+        MAX(
+          CASE
+            WHEN svi.igstRate > 0 THEN 'IGST'
+            ELSE 'GST'
+          END
+        ) AS taxType,
+
+        -- extract effective GST rate
+        MAX(
+          CASE
+            WHEN svi.igstRate > 0 THEN svi.igstRate
+            ELSE (svi.cgstRate + svi.sgstRate)
+          END
+        ) AS gstRate
+
       FROM sales_vouchers sv
 
-      -- GST SALES LEDGER
+      -- SALES GST LEDGER
       JOIN ledgers gl ON gl.id = sv.salesLedgerId
 
-      -- CUSTOMER LEDGER
-      JOIN ledgers cl ON cl.id = sv.partyId
+      -- SALES ITEMS (TAX SOURCE)
+      JOIN sales_voucher_items svi
+        ON svi.voucherId = sv.id
 
       WHERE sv.company_id = ?
         AND sv.owner_type = ?
@@ -135,20 +159,28 @@ router.get("/sales", async (req, res) => {
           '18% gst sales',
           '28% gst sales'
         )
-      GROUP BY gl.name, MONTH(sv.date), cl.state
-      `,
-      [company_id, owner_type, owner_id]
-    );
 
-    // 🔹 INTRA / INTER DECISION
+      GROUP BY
+        gl.name,
+        MONTH(sv.date)
+    `, [company_id, owner_type, owner_id]);
+
+    /*
+      FINAL NORMALIZED OUTPUT
+      - 12% IGST → "12% igst sales"
+      - 6+6 GST → "12% gst sales"
+    */
+
     const finalData = rows.map(r => {
-      const customerStateCode =
-        r.customerState?.match(/\((\d+)\)/)?.[1];
+      const rate = Number(r.gstRate || 0);
 
       return {
-        ...r,
-        supplyType:
-          customerStateCode === companyStateCode ? "INTRA" : "INTER",
+        ledgerName:
+          r.taxType === "IGST"
+            ? `${rate}% igst sales`
+            : `${rate}% gst sales`,
+        month: r.month,
+        total: Number(r.taxAmount || 0),
       };
     });
 
@@ -165,6 +197,7 @@ router.get("/sales", async (req, res) => {
     });
   }
 });
+
 
 
 

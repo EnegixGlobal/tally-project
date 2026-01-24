@@ -29,13 +29,23 @@ const GSTAnalysis: React.FC = () => {
   };
 
   const salesIndex: any = {
+    // GST (CGST+SGST)
     "0% gst sales": 0,
     "3% gst sales": 1,
     "5% gst sales": 2,
     "12% gst sales": 3,
     "18% gst sales": 4,
     "28% gst sales": 5,
+
+    // IGST
+    "0% igst sales": 0,
+    "3% igst sales": 1,
+    "5% igst sales": 2,
+    "12% igst sales": 3,
+    "18% igst sales": 4,
+    "28% igst sales": 5,
   };
+
 
   const debitNoteIndex: any = {
     "0% debit notes": 0,
@@ -111,10 +121,12 @@ const GSTAnalysis: React.FC = () => {
       const monthName = monthMap[r.month];
       if (!monthName) return;
 
-      const idx = slabMap[r.ledgerName];
+      const key = r.ledgerName?.toLowerCase();
+      const idx = slabMap[key];
       if (idx === undefined) return;
 
-      if (r.supplyType === "INTER") {
+      // 🔥 NEW LOGIC
+      if (key.includes("igst")) {
         data[monthName].inter[idx] += Number(r.total || 0);
       } else {
         data[monthName].intra[idx] += Number(r.total || 0);
@@ -123,6 +135,7 @@ const GSTAnalysis: React.FC = () => {
 
     return data;
   };
+
 
   const purchaseTable = useMemo(
     () => buildTableData(purchaseRows, purchaseIndex),
@@ -215,10 +228,11 @@ const GSTAnalysis: React.FC = () => {
                 <th colSpan={7} className="border p-2">INTER STATE</th>
               </tr>
               <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-100"}>
-                {[...Array(2)].flatMap(() =>
-                  ["0%", "3%", "5%", "12%", "18%", "28%", "Total"]
-                ).map((h, i) => (
-                  <th key={i} className={`border p-2 ${i === 6 ? " border-gray-600" : ""}`}>{h}</th>
+                {[
+                  "0% gst", "3% gst", "5% gst", "12% gst", "18% gst", "28% gst", "Total",
+                  "0% igst", "3% igst", "5% igst", "12% igst", "18% igst", "28% igst", "Total"
+                ].map((h, i) => (
+                  <th key={i} className={`border p-2 min-w-[100px] ${i === 6 ? " border-gray-600" : ""}`}>{h}</th>
                 ))}
               </tr>
             </thead>
@@ -284,6 +298,167 @@ const GSTAnalysis: React.FC = () => {
     );
   };
 
+  const renderTaxBreakdownTable = (title: string, tableData: any) => {
+    const tableId = `print-${title.replace(/\s+/g, "-").toLowerCase()}`;
+    const taxRates = [0, 0.03, 0.05, 0.12, 0.18, 0.28]; // Mapped to indices 0-5
+
+    return (
+      <>
+        <div className="flex items-center justify-center my-6 relative">
+          <h2 className="text-xl font-semibold">{title}</h2>
+          <button
+            onClick={() => handlePrint(title, tableId)}
+            className="absolute right-0 p-2 text-gray-600 hover:text-blue-600"
+            title="Print Table"
+          >
+            <Printer size={20} />
+          </button>
+        </div>
+
+        <div id={tableId} className="bg-white rounded-lg shadow border overflow-x-auto mb-10">
+          <table className="w-full border-collapse text-sm">
+            <thead>
+              <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200"}>
+                <th rowSpan={2} className="border p-2">Month</th>
+                <th colSpan={12} className="border p-2 border-gray-600">
+                  GST Tax Breakup (CGST + SGST)
+                </th>
+
+              </tr>
+              <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-100"}>
+                {/* CGST headers */}
+                {[3, 5, 12, 18, 28].map(rate => (
+                  <th key={`cgst-${rate}`} className="border p-2 min-w-[90px]">
+                    {rate / 2}% CGST
+                  </th>
+                ))}
+                <th className="border p-2 font-semibold border-gray-600">
+                  CGST Total
+                </th>
+
+                {/* SGST headers */}
+                {[3, 5, 12, 18, 28].map(rate => (
+                  <th key={`sgst-${rate}`} className="border p-2 min-w-[90px]">
+                    {rate / 2}% SGST
+                  </th>
+                ))}
+                <th className="border p-2 font-semibold">
+                  SGST Total
+                </th>
+              </tr>
+
+
+            </thead>
+
+            <tbody>
+              {months.map((m) => {
+                let cgstTotal = 0;
+                let sgstTotal = 0;
+
+                return (
+                  <React.Fragment key={m}>
+                    <tr>
+                      <td className="border p-2 text-center">{m}</td>
+
+                      {/* ===== CGST ===== */}
+                      {[1, 2, 3, 4, 5].map(idx => {
+                        const cgst = tableData[m].intra[idx] / 2;
+                        const sgst = tableData[m].intra[idx] / 2;
+
+                        cgstTotal += cgst;
+
+                        return (
+                          <td key={`cgst-${idx}`} className="border p-2 text-right">
+                            {cgst ? cgst.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "-"}
+                          </td>
+                        );
+                      })}
+
+                      <td className="border p-2 text-right font-semibold border-gray-600">
+                        {cgstTotal ? cgstTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "-"}
+                      </td>
+
+                      {/* ===== SGST ===== */}
+                      {[1, 2, 3, 4, 5].map(idx => {
+                        const cgst = tableData[m].intra[idx] / 2;
+                        const sgst = tableData[m].intra[idx] / 2;
+
+                        sgstTotal += sgst;
+
+                        return (
+                          <td key={`sgst-${idx}`} className="border p-2 text-right">
+                            {sgst ? sgst.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "-"}
+                          </td>
+                        );
+                      })}
+
+                      <td className="border p-2 text-right font-semibold">
+                        {sgstTotal ? sgstTotal.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "-"}
+                      </td>
+                    </tr>
+
+                    {/* 🔹 HORIZONTAL DIVIDER LINE */}
+                    <tr>
+                      <td colSpan={12} className="border-t-2 border-gray-400"></td>
+                    </tr>
+                  </React.Fragment>
+                );
+              })}
+
+              {/* ===== GRAND TOTAL ===== */}
+              <tr className="font-bold bg-gray-100">
+                <td className="border p-2 text-center">Total</td>
+
+                {[1, 2, 3, 4, 5].map(idx => {
+                  let total = 0;
+                  months.forEach(m => {
+                    total += (tableData[m].intra[idx] || 0) * taxRates[idx] / 2;
+                  });
+                  return (
+                    <td key={`cgst-t-${idx}`} className="border p-2 text-right">
+                      {total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                  );
+                })}
+
+                <td className="border p-2 text-right font-semibold border-gray-600">
+                  {months.reduce((acc, m) =>
+                    acc + [1, 2, 3, 4, 5].reduce(
+                      (s, i) => s + (tableData[m].intra[i] || 0) * taxRates[i] / 2, 0
+                    ), 0
+                  ).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </td>
+
+                {[1, 2, 3, 4, 5].map(idx => {
+                  let total = 0;
+                  months.forEach(m => {
+                    total += (tableData[m].intra[idx] || 0) * taxRates[idx] / 2;
+                  });
+                  return (
+                    <td key={`sgst-t-${idx}`} className="border p-2 text-right">
+                      {total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                  );
+                })}
+
+                <td className="border p-2 text-right font-semibold">
+                  {months.reduce((acc, m) =>
+                    acc + [1, 2, 3, 4, 5].reduce(
+                      (s, i) => s + (tableData[m].intra[i] || 0) * taxRates[i] / 2, 0
+                    ), 0
+                  ).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                </td>
+              </tr>
+            </tbody>
+
+
+
+          </table>
+        </div>
+      </>
+    );
+  };
+
   return (
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
@@ -298,9 +473,16 @@ const GSTAnalysis: React.FC = () => {
       <hr />
 
       {renderGSTTable("Purchase Detail", purchaseTable)}
+      {renderTaxBreakdownTable("Purchase Tax Detail", purchaseTable)}
+
       {renderGSTTable("Debit Notes Detail", debitNoteTable)}
+      {renderTaxBreakdownTable("Debit Notes Tax Detail", debitNoteTable)}
+
       {renderGSTTable("Credit Notes Detail", creditNoteTable)}
+      {renderTaxBreakdownTable("Credit Notes Tax Detail", creditNoteTable)}
+
       {renderGSTTable("Sales Detail", salesTable)}
+      {renderTaxBreakdownTable("Sales Tax Detail", salesTable)}
 
     </div>
   );

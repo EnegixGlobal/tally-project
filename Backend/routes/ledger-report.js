@@ -5,7 +5,6 @@ const db = require("../db");
 router.get("/report", async (req, res) => {
   const { ledgerId } = req.query;
 
-  // console.log("REQ LEDGER:", ledgerId);
 
   if (!ledgerId) {
     return res.status(400).json({
@@ -41,44 +40,97 @@ router.get("/report", async (req, res) => {
        2️⃣ PURCHASE VOUCHERS → DEBIT/CREDIT
     =============================== */
     const [purchaseVouchers] = await connection.execute(
-      `SELECT pv.id, pv.number, pv.date, pv.narration, pv.partyId, pv.purchaseLedgerId, pv.total,
-              CASE 
-                WHEN pv.purchaseLedgerId = ? THEN pv.partyId
-                ELSE pv.purchaseLedgerId
-              END AS otherLedgerId,
-              CASE 
-                WHEN pv.purchaseLedgerId = ? THEN l_party.name
-                ELSE l_purchase.name
-              END AS partyName
-       FROM purchase_vouchers pv
-       LEFT JOIN ledgers l_party ON l_party.id = pv.partyId
-       LEFT JOIN ledgers l_purchase ON l_purchase.id = pv.purchaseLedgerId
-       WHERE pv.purchaseLedgerId = ? OR pv.partyId = ?
-       ORDER BY pv.date ASC, pv.id ASC`,
-      [ledgerId, ledgerId, ledgerId, ledgerId]
+      `
+SELECT
+  pv.id,
+  pv.number,
+  pv.date,
+  pv.partyId,
+
+  pv.subtotal,
+  pv.cgstTotal,
+  pv.sgstTotal,
+  pv.igstTotal,
+  pv.total,
+
+  pvi.purchaseLedgerId,
+  pvi.cgstRate,
+  pvi.sgstRate,
+  pvi.igstRate,
+
+  l_party.name    AS partyName,
+  l_purchase.name AS purchaseLedgerName
+
+FROM purchase_vouchers pv
+
+JOIN purchase_voucher_items pvi
+  ON pvi.voucherId = pv.id
+
+LEFT JOIN ledgers l_party
+  ON l_party.id = pv.partyId
+
+LEFT JOIN ledgers l_purchase
+  ON l_purchase.id = pvi.purchaseLedgerId
+
+WHERE
+     pv.partyId = ?
+  OR pvi.purchaseLedgerId = ?
+  OR pvi.cgstRate = ?
+  OR pvi.sgstRate = ?
+  OR pvi.igstRate = ?
+
+ORDER BY pv.date ASC
+`,
+      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
     );
 
     /* ===============================
        3️⃣ SALES VOUCHERS → CREDIT/DEBIT
     =============================== */
     const [salesVouchers] = await connection.execute(
-      `SELECT sv.id, sv.number, sv.date, sv.narration, sv.partyId, sv.salesLedgerId, sv.total, sv.isQuotation,
-              CASE 
-                WHEN sv.salesLedgerId = ? THEN sv.partyId
-                ELSE sv.salesLedgerId
-              END AS otherLedgerId,
-              CASE 
-                WHEN sv.salesLedgerId = ? THEN l_party.name
-                ELSE l_sales.name
-              END AS partyName
-       FROM sales_vouchers sv
-       LEFT JOIN ledgers l_party ON l_party.id = sv.partyId
-       LEFT JOIN ledgers l_sales ON l_sales.id = sv.salesLedgerId
-       WHERE (sv.salesLedgerId = ? OR sv.partyId = ?)
-         AND sv.type = 'sales'
-         AND sv.isQuotation = 0
-       ORDER BY sv.date ASC, sv.id ASC`,
-      [ledgerId, ledgerId, ledgerId, ledgerId]
+      `
+  SELECT
+    sv.id,
+    sv.number,
+    sv.date,
+    sv.partyId,
+    sv.subtotal,
+    sv.cgstTotal,
+    sv.sgstTotal,
+    sv.igstTotal,
+    sv.total,
+
+    MAX(svi.salesLedgerId) AS salesLedgerId,
+    MAX(svi.cgstRate) AS cgstRate,
+    MAX(svi.sgstRate) AS sgstRate,
+    MAX(svi.igstRate) AS igstRate,
+
+    l_party.name  AS partyName,
+    l_sales.name  AS salesLedgerName
+
+  FROM sales_vouchers sv
+
+  JOIN sales_voucher_items svi
+    ON svi.voucherId = sv.id
+
+  LEFT JOIN ledgers l_party
+    ON l_party.id = sv.partyId
+
+  LEFT JOIN ledgers l_sales
+    ON l_sales.id = svi.salesLedgerId
+
+  WHERE
+       sv.partyId = ?
+    OR svi.salesLedgerId = ?
+    OR svi.cgstRate = ?
+    OR svi.sgstRate = ?
+    OR svi.igstRate = ?
+
+  GROUP BY sv.id
+
+  ORDER BY sv.date ASC
+  `,
+      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
     );
 
     /* ===============================
@@ -308,34 +360,122 @@ router.get("/report", async (req, res) => {
     });
 
     // Purchase Voucher → Debit
+    // Purchase Voucher → Proper Accounting
     purchaseVouchers.forEach((pv) => {
-      const debit = Number(pv.total || 0);
-      balance += debit;
+      let debit = 0;
+      let credit = 0;
+      let particulars = "";
+
+      const currentLedger = Number(ledgerId);
+
+      /* ========= PURCHASE ========= */
+      if (currentLedger === Number(pv.purchaseLedgerId)) {
+        debit = Number(pv.subtotal || 0);
+        particulars = pv.partyName;
+      }
+
+      /* ========= PARTY ========= */
+      else if (currentLedger === Number(pv.partyId)) {
+        credit = Number(pv.total || 0);
+        particulars = pv.purchaseLedgerName;
+      }
+
+      /* ========= IGST ========= */
+      else if (currentLedger === Number(pv.igstRate)) {
+        debit = Number(pv.igstTotal || 0);
+        particulars = pv.partyName;
+      }
+
+      /* ========= CGST ========= */
+      else if (currentLedger === Number(pv.cgstRate)) {
+        debit = Number(pv.cgstTotal || 0);
+        particulars = pv.partyName;
+      }
+
+      /* ========= SGST ========= */
+      else if (currentLedger === Number(pv.sgstRate)) {
+        debit = Number(pv.sgstTotal || 0);
+        particulars = pv.partyName;
+      }
+
+      if (debit === 0 && credit === 0) return;
+
+      // Balance sirf party + purchase pe
+      if (
+        currentLedger === Number(pv.partyId) ||
+        currentLedger === Number(pv.purchaseLedgerId)
+      ) {
+        balance += debit - credit;
+      }
 
       transactions.push({
         id: String(pv.id),
         date: pv.date,
         voucherType: "Purchase",
         voucherNo: pv.number,
-        particulars: pv.partyName || pv.partyId.toString(),
+        particulars,
         debit,
-        credit: 0,
+        credit,
         balance,
       });
     });
 
+
     // Sales Voucher → Credit
     salesVouchers.forEach((sv) => {
-      const credit = Number(sv.total || 0);
-      balance -= credit;
+      let debit = 0;
+      let credit = 0;
+      let particulars = "";
+
+      const currentLedger = Number(ledgerId);
+
+      /* ========= SALES LEDGER ========= */
+      if (currentLedger === Number(sv.salesLedgerId)) {
+        credit = Number(sv.subtotal || 0);
+        particulars = sv.partyName; // ✅ Party
+      }
+
+      /* ========= PARTY ========= */
+      else if (currentLedger === Number(sv.partyId)) {
+        debit = Number(sv.total || 0);
+        particulars = sv.salesLedgerName; // ✅ Sales
+      }
+
+      /* ========= IGST ========= */
+      else if (currentLedger === Number(sv.igstRate)) {
+        credit = Number(sv.igstTotal || 0);
+        particulars = sv.partyName; // ✅ Party
+      }
+
+      /* ========= CGST ========= */
+      else if (currentLedger === Number(sv.cgstRate)) {
+        credit = Number(sv.cgstTotal || 0);
+        particulars = sv.partyName; // ✅ Party
+      }
+
+      /* ========= SGST ========= */
+      else if (currentLedger === Number(sv.sgstRate)) {
+        credit = Number(sv.sgstTotal || 0);
+        particulars = sv.partyName; // ✅ Party
+      }
+
+      if (debit === 0 && credit === 0) return;
+
+      // Balance sirf Party + Sales pe
+      if (
+        currentLedger === Number(sv.partyId) ||
+        currentLedger === Number(sv.salesLedgerId)
+      ) {
+        balance += debit - credit;
+      }
 
       transactions.push({
         id: String(sv.id),
         date: sv.date,
         voucherType: "Sales",
         voucherNo: sv.number,
-        particulars: sv.partyName || sv.partyId.toString(),
-        debit: 0,
+        particulars,
+        debit,
         credit,
         balance,
       });
@@ -473,6 +613,7 @@ router.get("/report", async (req, res) => {
     =============================== */
     const totalDebit = transactions.reduce((s, r) => s + r.debit, 0);
     const totalCredit = transactions.reduce((s, r) => s + r.credit, 0);
+
 
     return res.json({
       success: true,

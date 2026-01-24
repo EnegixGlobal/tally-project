@@ -34,9 +34,8 @@ const Gstr2B2b = () => {
     const loadSalesVouchers = async () => {
       setLoading(true);
       try {
-        const url = `${
-          import.meta.env.VITE_API_URL
-        }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        const url = `${import.meta.env.VITE_API_URL
+          }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
         const res = await fetch(url);
         const json = await res.json();
@@ -71,8 +70,7 @@ const Gstr2B2b = () => {
     const fetchLedger = async () => {
       try {
         const ledgerRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const ledgerData = await ledgerRes.json();
@@ -198,6 +196,45 @@ const Gstr2B2b = () => {
     );
   };
 
+  const generateRowJSON = (row: any) => {
+    const ledger = row.ledger;
+
+    const payload = {
+      type: "GSTR-1",
+      section: "B2B",
+      invoice: {
+        gstin: ledger?.gstNumber || "",
+        receiverName: ledger?.name || "",
+        invoiceNumber: row.number,
+        invoiceDate: row.date,
+        placeOfSupply: ledger?.state || "",
+        invoiceValue: Number(row.total || 0),
+      },
+      tax: {
+        taxableValue: Number(row.subtotal || 0),
+        igst: Number(row.igstTotal || 0),
+        cgst: Number(row.cgstTotal || 0),
+        sgst: Number(row.sgstTotal || 0),
+        cess: 0,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `B2B_${row.number}.json`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+
   const handlePrint = () => {
     window.print();
   };
@@ -210,9 +247,8 @@ const Gstr2B2b = () => {
           title="Back to GSTR-1"
           type="button"
           onClick={() => navigate("/app/gst/gstr-1")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -222,9 +258,8 @@ const Gstr2B2b = () => {
             type="button"
             title="Filter"
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Filter size={18} />
           </button>
@@ -232,9 +267,8 @@ const Gstr2B2b = () => {
             title="Print Report"
             type="button"
             onClick={handlePrint}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
@@ -242,9 +276,8 @@ const Gstr2B2b = () => {
             title="Export"
             type="button"
             onClick={exportToExcel}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Download size={18} />
           </button>
@@ -254,9 +287,8 @@ const Gstr2B2b = () => {
       {/* Filter Panel */}
       {showFilterPanel && (
         <div
-          className={`p-4 mb-6 rounded-lg no-print ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 mb-6 rounded-lg no-print ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h3 className="font-semibold mb-4">Date Range Filter</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -270,11 +302,10 @@ const Gstr2B2b = () => {
                 onChange={(e) =>
                   setFilters({ ...filters, fromDate: e.target.value })
                 }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               />
             </div>
             <div>
@@ -285,11 +316,10 @@ const Gstr2B2b = () => {
                 onChange={(e) =>
                   setFilters({ ...filters, toDate: e.target.value })
                 }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               />
             </div>
             <div className="flex items-end">
@@ -298,11 +328,10 @@ const Gstr2B2b = () => {
                 onClick={() => {
                   // Data will reload automatically via useEffect
                 }}
-                className={`px-4 py-2 rounded ${
-                  theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
+                className={`px-4 py-2 rounded ${theme === "dark"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+                  }`}
               >
                 Apply Filter
               </button>
@@ -313,19 +342,17 @@ const Gstr2B2b = () => {
 
       {/* Main Content */}
       <div
-        className={`mb-6 rounded-lg border-2 ${
-          theme === "dark"
-            ? "bg-gray-800 border-gray-600"
-            : "bg-white border-gray-300"
-        }`}
+        className={`mb-6 rounded-lg border-2 ${theme === "dark"
+          ? "bg-gray-800 border-gray-600"
+          : "bg-white border-gray-300"
+          }`}
       >
         {/* Section Header */}
         <div
-          className={`p-3 border-b-2 ${
-            theme === "dark"
-              ? "bg-blue-900 border-gray-600 text-white"
-              : "bg-blue-800 border-gray-300 text-white"
-          }`}
+          className={`p-3 border-b-2 ${theme === "dark"
+            ? "bg-blue-900 border-gray-600 text-white"
+            : "bg-blue-800 border-gray-300 text-white"
+            }`}
         >
           <h3 className="text-lg font-bold">4A - B2B Supplies</h3>
           <p className="text-sm opacity-90">
@@ -348,9 +375,8 @@ const Gstr2B2b = () => {
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       GSTIN of Recipient
@@ -401,25 +427,20 @@ const Gstr2B2b = () => {
                       SGST Amount
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Cess Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
+                      Action
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {matchedSales.map((row: any, index: number) => {
                     const ledger = row.ledger;
-
                     return (
                       <tr
                         key={index}
-                        className={`${
-                          theme === "dark"
-                            ? "hover:bg-gray-700"
-                            : "hover:bg-gray-50"
-                        }`}
+                        className={`${theme === "dark"
+                          ? "hover:bg-gray-700"
+                          : "hover:bg-gray-50"
+                          }`}
                       >
                         <td className="border border-gray-300 p-2 text-xs font-mono">
                           {ledger?.gstNumber || "-"}
@@ -470,10 +491,14 @@ const Gstr2B2b = () => {
                           ₹{Number(row.sgstTotal || 0).toLocaleString()}
                         </td>
                         <td className="border border-gray-300 p-2 text-xs text-center">
-                          0%
-                        </td>
-                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                          ₹0
+                          <button
+                            type="button"
+                            onClick={() => generateRowJSON(row)}
+                            className="px-2 py-1 text-xs rounded
+      bg-blue-600 text-white hover:bg-blue-700"
+                          >
+                             JSON 
+                          </button>
                         </td>
                       </tr>
                     );
@@ -482,9 +507,8 @@ const Gstr2B2b = () => {
                   {/* Total Row */}
                   {matchedSales.length > 0 && (
                     <tr
-                      className={`font-bold ${
-                        theme === "dark" ? "bg-gray-600" : "bg-gray-200"
-                      }`}
+                      className={`font-bold ${theme === "dark" ? "bg-gray-600" : "bg-gray-200"
+                        }`}
                     >
                       <td
                         colSpan={9}
@@ -508,9 +532,6 @@ const Gstr2B2b = () => {
                         ₹{totals.sgstAmount.toLocaleString()}
                       </td>
                       <td className="border border-gray-300 p-2 text-xs"></td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{totals.cessAmount.toLocaleString()}
-                      </td>
                     </tr>
                   )}
                 </tbody>

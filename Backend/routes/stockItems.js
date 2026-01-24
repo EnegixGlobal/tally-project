@@ -18,8 +18,13 @@ router.get("/", async (req, res) => {
         u.name AS unitName,
         s.openingBalance,
         s.hsnCode,
-        s.gstRate,
         s.taxType,
+
+     
+        s.gstLedgerId,
+        s.cgstLedgerId,
+        s.sgstLedgerId,
+
         s.barcode,
         s.batches,
         s.type,
@@ -72,6 +77,7 @@ router.get("/", async (req, res) => {
     connection.release();
   }
 });
+
 
 // POST save stock item (scoped)
 // router.post('/', async (req, res) => {
@@ -352,6 +358,10 @@ router.post("/", async (req, res) => {
       "createdAt",
       "DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP"
     );
+    await ensureColumn("stock_items", "gstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
+
 
     /* ===============================
        📥 REQUEST DATA
@@ -366,6 +376,11 @@ router.post("/", async (req, res) => {
       hsnCode,
       gstRate,
       taxType,
+
+      gstLedgerId,
+      cgstLedgerId,
+      sgstLedgerId,
+
       standardPurchaseRate,
       standardSaleRate,
       enableBatchTracking,
@@ -379,6 +394,8 @@ router.post("/", async (req, res) => {
       owner_type,
       owner_id,
     } = req.body;
+
+    console.log('gst', gstLedgerId, cgstLedgerId, sgstLedgerId)
 
     if (!name || !unit || !taxType) {
       return res.status(400).json({
@@ -454,86 +471,75 @@ router.post("/", async (req, res) => {
     /* ===============================
        🧠 SAFE DYNAMIC INSERT
        =============================== */
-
-    const [columnsResult] = await connection.execute(
-      "SHOW COLUMNS FROM stock_items"
-    );
-
-    const columnNames = columnsResult
-      .filter((c) => c.Field !== "id")
-      .map((c) => c.Field);
-
-    const values = columnNames.map((column) => {
-      switch (column) {
-        case "name":
-          return name;
-        case "stockGroupId":
-          return sanitize(stockGroupId);
-        case "categoryId":
-          return sanitize(categoryId);
-        case "unit":
-          return sanitize(unit);
-        case "openingBalance":
-          return openingBalance ?? 0;
-        case "openingValue":
-          return totalOpeningValue ?? 0;
-        case "hsnCode":
-          return sanitize(hsnCode);
-        case "gstRate":
-          return gstRate ?? 0;
-        case "taxType":
-          return taxType;
-        case "standardPurchaseRate":
-          return standardPurchaseRate ?? 0;
-        case "standardSaleRate":
-          return standardSaleRate ?? 0;
-        case "enableBatchTracking":
-          return enableBatchTracking ? 1 : 0;
-        case "allowNegativeStock":
-          return allowNegativeStock ? 1 : 0;
-        case "maintainInPieces":
-          return maintainInPieces ? 1 : 0;
-        case "secondaryUnit":
-          return sanitize(secondaryUnit);
-        case "barcode":
-          return sanitize(barcode);
-        case "company_id":
-          return sanitize(company_id);
-        case "owner_type":
-          return sanitize(owner_type);
-        case "owner_id":
-          return sanitize(owner_id);
-        case "batches":
-          return JSON.stringify(batchData);
-        case "type":
-          return "opening";
-        case "createdAt":
-          return new Date();
-        default:
-          return null;
-      }
-    });
-
-    // 🔐 FAIL-SAFE FOR FUTURE NOT-NULL COLUMNS
-    columnsResult.forEach((col, i) => {
-      if (
-        col.Null === "NO" &&
-        col.Default === null &&
-        values[i] === null &&
-        col.Field !== "id"
-      ) {
-        values[i] = col.Field === "createdAt" ? new Date() : "";
-      }
-    });
-
-    const placeholders = columnNames.map(() => "?").join(", ");
+    /* ===============================
+       ✅ EXPLICIT & SAFE INSERT
+       =============================== */
 
     const insertQuery = `
-      INSERT INTO stock_items (${columnNames.join(", ")})
-      VALUES (${placeholders})
-    `;
+  INSERT INTO stock_items (
+    name,
+    stockGroupId,
+    categoryId,
+    unit,
+    openingBalance,
+    openingValue,
+    hsnCode,
+    gstRate,
+    taxType,
+
+    gstLedgerId,
+    cgstLedgerId,
+    sgstLedgerId,
+
+    enableBatchTracking,
+    allowNegativeStock,
+    maintainInPieces,
+    secondaryUnit,
+    barcode,
+    batches,
+    company_id,
+    owner_type,
+    owner_id,
+    type
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+`;
+
+    const values = [
+      name,
+      sanitize(stockGroupId),
+      sanitize(categoryId),
+      sanitize(unit),
+      openingBalance ?? 0,
+      totalOpeningValue ?? 0,
+      sanitize(hsnCode),
+      gstRate ?? 0,
+      taxType,
+
+      // 🔥 LEDGER IDS — AB 100% SAVE HONGE
+      sanitize(gstLedgerId),
+      sanitize(cgstLedgerId),
+      sanitize(sgstLedgerId),
+
+      enableBatchTracking ? 1 : 0,
+      allowNegativeStock ? 1 : 0,
+      maintainInPieces ? 1 : 0,
+      sanitize(secondaryUnit),
+      sanitize(barcode),
+      JSON.stringify(batchData),
+      sanitize(company_id),
+      sanitize(owner_type),
+      sanitize(owner_id),
+      "opening"
+    ];
+
+    console.log("SAVING LEDGERS =>", {
+      gstLedgerId,
+      cgstLedgerId,
+      sgstLedgerId,
+    });
 
     const [result] = await connection.execute(insertQuery, values);
+
 
     const stockItemId = result.insertId;
 
@@ -822,6 +828,78 @@ router.get("/barcode/:barcode", async (req, res) => {
   }
 });
 
+// ledger get and filter sgst, cgst, igst
+router.get("/ledger", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id } = req.query;
+
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id, owner_type and owner_id are required",
+      });
+    }
+
+    // ✅ Case-insensitive search (upper/lower dono chalega)
+    const [rows] = await db.query(
+      `
+      SELECT id, name
+      FROM ledgers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+        AND (
+          LOWER(name) LIKE '%gst%'
+          OR LOWER(name) LIKE '%cgst%'
+          OR LOWER(name) LIKE '%sgst%'
+          OR LOWER(name) LIKE '%igst%'
+        )
+      `,
+      [company_id, owner_type, owner_id]
+    );
+
+    const result = {
+      gst: [],
+      cgst: [],
+      sgst: [],
+      igst: [],
+    };
+
+    rows.forEach((ledger) => {
+      const lname = ledger.name.toLowerCase(); // ✅ sab lowercase
+
+      if (lname.includes("igst")) {
+        result.igst.push(ledger);
+      }
+      else if (lname.includes("cgst")) {
+        result.cgst.push(ledger);
+      }
+      else if (lname.includes("sgst")) {
+        result.sgst.push(ledger);
+      }
+      else if (lname.includes("gst")) {
+        result.gst.push(ledger);
+      }
+    });
+
+    console.log('data', result)
+    res.json({
+      success: true,
+      data: result,
+    });
+
+  } catch (error) {
+    console.error("Ledger fetch error:", error);
+
+    res.status(500).json({
+      success: false,
+      message: "Failed to fetch ledgers",
+    });
+  }
+});
+
+
+
 // POST add a single batch to existing stock item
 router.post("/:id/batches", async (req, res) => {
   const connection = await db.getConnection();
@@ -891,7 +969,7 @@ router.post("/:id/batches", async (req, res) => {
       batchManufacturingDate: batchManufacturingDate || null,
     };
 
-    
+
 
     batches.push(newBatch);
 
@@ -1106,6 +1184,10 @@ router.put("/:id", async (req, res) => {
       "openingValue",
       "DECIMAL(10,2) DEFAULT 0"
     );
+    await ensureColumn("stock_items", "gstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
+
 
     /* ===============================
        📥 REQUEST DATA
@@ -1119,6 +1201,11 @@ router.put("/:id", async (req, res) => {
       openingBalance,
       hsnCode,
       gstRate,
+
+      gstLedgerId,
+      cgstLedgerId,
+      sgstLedgerId,
+
       taxType,
       standardPurchaseRate,
       standardSaleRate,
@@ -1179,6 +1266,9 @@ router.put("/:id", async (req, res) => {
         openingValue = ?,
         hsnCode = ?,
         gstRate = ?,
+          gstLedgerId = ?,
+  cgstLedgerId = ?,
+  sgstLedgerId = ?,
         taxType = ?,
         standardPurchaseRate = ?,
         standardSaleRate = ?,
@@ -1197,12 +1287,15 @@ router.put("/:id", async (req, res) => {
     const values = [
       sanitize(name),
       sanitize(stockGroupId),
-      sanitize(categoryId), // ✅ FIXED
+      sanitize(categoryId),
       sanitize(unit),
       openingBalance ?? 0,
       totalOpeningValue ?? 0,
       sanitize(hsnCode),
       gstRate ?? 0,
+      sanitize(gstLedgerId),
+      sanitize(cgstLedgerId),
+      sanitize(sgstLedgerId),
       taxType ?? "Taxable",
       standardPurchaseRate ?? 0,
       standardSaleRate ?? 0,
@@ -1261,6 +1354,9 @@ router.get("/:id", async (req, res) => {
         s.openingBalance,
         s.hsnCode,
         s.gstRate,
+        s.gstLedgerId,
+        s.cgstLedgerId,
+        s.sgstLedgerId,
         s.taxType,
         s.barcode,
         s.batches,
