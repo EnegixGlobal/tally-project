@@ -217,7 +217,6 @@ const LedgerReport: React.FC = () => {
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
-        console.log("this is ledger", data);
 
         setLedgers(data);
       } catch (err) {

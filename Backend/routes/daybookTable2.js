@@ -84,115 +84,230 @@ router.get("/", async (req, res) => {
     /* =====================================================
        2️⃣ PURCHASE VOUCHERS → DEBIT
     ===================================================== */
-const [purchaseRows] = await db.query(
-  `
+
+
+    const [purchaseRows] = await db.query(
+      `
   SELECT
+    pv.id AS voucher_id,
+
     pv.partyId,
     party.name AS party_name,
 
     pv.number AS voucher_number,
     pv.date AS voucher_date,
 
-    pv.purchaseLedgerId,
-    pl.name AS purchase_ledger_name,
+    pv.subtotal,
+    pv.cgstTotal,
+    pv.sgstTotal,
+    pv.igstTotal,
+    pv.total,
 
-    SUM(pv.total) AS total_amount
+    pi.purchaseLedgerId,
+    l.name AS purchase_ledger_name,
+
+    pi.amount AS item_amount
 
   FROM purchase_vouchers pv
-  LEFT JOIN ledgers party ON party.id = pv.partyId
-  LEFT JOIN ledgers pl ON pl.id = pv.purchaseLedgerId
+
+  LEFT JOIN purchase_voucher_items pi
+    ON pi.voucherId = pv.id
+
+  LEFT JOIN ledgers l
+    ON l.id = pi.purchaseLedgerId
+
+  LEFT JOIN ledgers party
+    ON party.id = pv.partyId
 
   WHERE pv.company_id = ?
     AND pv.owner_type = ?
     AND pv.owner_id = ?
 
-  GROUP BY
-    pv.partyId,
-    pv.number,
-    pv.date,
-    pv.purchaseLedgerId
+  GROUP BY pv.id, pi.id
   `,
-  [company_id, owner_type, owner_id]
-);
+      [company_id, owner_type, owner_id]
+    );
 
-purchaseRows.forEach((row) => {
-  // 🔑 UNIQUE VOUCHER PER PARTY + VOUCHER NO
-  const key = `PUR-${row.partyId}-${row.voucher_number}`;
+    purchaseRows.forEach((row) => {
 
-  /* ================================
-     CREATE VOUCHER (ONCE)
-  ================================= */
-  if (!vouchers[key]) {
-    vouchers[key] = {
-      id: key,
-      voucher_type: "Purchase",
-      voucher_number: row.voucher_number,
-      date: row.voucher_date, // ✅ DATE NOW COMES
-      narration: null,
-      reference_no: null,
-      supplier_invoice_date: null,
-      company_id,
-      owner_type,
-      owner_id,
-      partyId: row.partyId,
-      partyName: row.party_name,
-      entries: [],
-    };
+      const key = `PUR-${row.voucher_id}`;
 
-    // 🔴 PARTY → CREDIT (PARENT ROW)
-    vouchers[key].entries.push({
-      id: `PUR-P-${row.partyId}-${row.voucher_number}`,
-      ledger_id: row.partyId,
-      ledger_name: row.party_name,
-      amount: 0, // calculated below
-      entry_type: "credit",
-      narration: "Purchase",
-      isParty: true,
+      /* ================================
+         CREATE VOUCHER
+      ================================= */
+      if (!vouchers[key]) {
+        vouchers[key] = {
+          id: key,
+          voucher_type: "purchase",
+          voucher_number: row.voucher_number,
+          date: row.voucher_date,
+
+          subtotal: row.subtotal,
+          cgstTotal: row.cgstTotal,
+          sgstTotal: row.sgstTotal,
+          igstTotal: row.igstTotal,
+          total: row.total,
+
+          partyId: row.partyId,
+          partyName: row.party_name,
+
+          entries: [],
+        };
+
+        /* 🔴 PARTY → CREDIT */
+        vouchers[key].entries.push({
+          id: `PUR-P-${row.voucher_id}`,
+
+          ledger_id: row.partyId,
+          ledger_name: row.party_name,
+
+          amount: Number(row.total),
+
+          entry_type: "credit",
+
+          narration: "Purchase Party",
+
+          isParty: true,
+        });
+      }
+
+      /* ================================
+         PURCHASE LEDGER → DEBIT (REAL LEDGER)
+      ================================= */
+      if (row.purchaseLedgerId) {
+        vouchers[key].entries.push({
+          id: `PUR-L-${row.voucher_id}-${row.purchaseLedgerId}`,
+
+          ledger_id: row.purchaseLedgerId,
+
+          // ✅ REAL LEDGER NAME (18% Purchase etc.)
+          ledger_name: row.purchase_ledger_name,
+
+          // ✅ ITEM AMOUNT (not full subtotal)
+          amount: Number(row.item_amount),
+
+          entry_type: "debit",
+
+          narration: row.purchase_ledger_name,
+
+          isParty: false,
+
+          isChild: true,
+        });
+      }
+
+      /* ================================
+         GST BREAKUP
+      ================================= */
+
+      // IGST
+      if (Number(row.igstTotal) > 0) {
+        const igstRate = ((row.igstTotal / row.subtotal) * 100).toFixed(2);
+
+        vouchers[key].entries.push({
+          id: `PUR-IGST-${row.voucher_id}`,
+
+          ledger_id: null,
+
+          ledger_name: `IGST @ ${igstRate}%`,
+
+          amount: Number(row.igstTotal),
+
+          entry_type: "debit",
+
+          narration: "IGST",
+
+          isParty: false,
+
+          isChild: true,
+        });
+      }
+
+      // CGST
+      if (Number(row.cgstTotal) > 0) {
+        const cgstRate = ((row.cgstTotal / row.subtotal) * 100).toFixed(2);
+
+        vouchers[key].entries.push({
+          id: `PUR-CGST-${row.voucher_id}`,
+
+          ledger_id: null,
+
+          ledger_name: `CGST @ ${cgstRate}%`,
+
+          amount: Number(row.cgstTotal),
+
+          entry_type: "debit",
+
+          narration: "CGST",
+
+          isParty: false,
+
+          isChild: true,
+        });
+      }
+
+      // SGST
+      if (Number(row.sgstTotal) > 0) {
+        const sgstRate = ((row.sgstTotal / row.subtotal) * 100).toFixed(2);
+
+        vouchers[key].entries.push({
+          id: `PUR-SGST-${row.voucher_id}`,
+
+          ledger_id: null,
+
+          ledger_name: `SGST @ ${sgstRate}%`,
+
+          amount: Number(row.sgstTotal),
+
+          entry_type: "debit",
+
+          narration: "SGST",
+
+          isParty: false,
+
+          isChild: true,
+        });
+      }
+
     });
-  }
-
-  /* ================================
-     PURCHASE LEDGER → DEBIT
-  ================================= */
-  vouchers[key].entries.push({
-    id: `PUR-L-${row.partyId}-${row.purchaseLedgerId}-${row.voucher_number}`,
-    ledger_id: row.purchaseLedgerId,
-    ledger_name: row.purchase_ledger_name,
-    amount: Number(row.total_amount),
-    entry_type: "debit",
-    narration: null,
-    isParty: false,
-  });
-
-  /* ================================
-     UPDATE PARTY CREDIT TOTAL
-  ================================= */
-  const partyEntry = vouchers[key].entries.find((e) => e.isParty);
-  if (partyEntry) {
-    partyEntry.amount += Number(row.total_amount);
-  }
-});
 
     /* =====================================================
        3️⃣ SALES VOUCHERS → CREDIT
     ===================================================== */
-  const [salesRows] = await db.query(
-  `
+
+
+    const [salesRows] = await db.query(
+      `
   SELECT
+    sv.id AS voucher_id,
+
     sv.partyId,
     party.name AS party_name,
 
     sv.number AS voucher_number,
     sv.date AS voucher_date,
 
-    sv.salesLedgerId,
-    sl.name AS sales_ledger_name,
+    sv.subtotal,
+    sv.cgstTotal,
+    sv.sgstTotal,
+    sv.igstTotal,
+    sv.total,
 
-    SUM(sv.total) AS total_amount
+    si.salesLedgerId,
+    l.name AS sales_ledger_name,
+
+    si.amount AS item_amount
 
   FROM sales_vouchers sv
-  LEFT JOIN ledgers party ON party.id = sv.partyId
-  LEFT JOIN ledgers sl ON sl.id = sv.salesLedgerId
+
+  LEFT JOIN sales_voucher_items si
+    ON si.voucherId = sv.id
+
+  LEFT JOIN ledgers l
+    ON l.id = si.salesLedgerId
+
+  LEFT JOIN ledgers party
+    ON party.id = sv.partyId
 
   WHERE sv.company_id = ?
     AND sv.owner_type = ?
@@ -200,72 +315,153 @@ purchaseRows.forEach((row) => {
     AND sv.type = 'sales'
     AND sv.isQuotation = 0
 
-  GROUP BY
-    sv.partyId,
-    sv.number,
-    sv.date,
-    sv.salesLedgerId
+  GROUP BY sv.id, si.id
   `,
-  [company_id, owner_type, owner_id]
-);
+      [company_id, owner_type, owner_id]
+    );
 
-salesRows.forEach((row) => {
-  // 🔑 UNIQUE PER PARTY + VOUCHER
-  const key = `SAL-${row.partyId}-${row.voucher_number}`;
+    salesRows.forEach((row) => {
 
-  /* ================================
-     CREATE VOUCHER (ONCE)
-  ================================= */
-  if (!vouchers[key]) {
-    vouchers[key] = {
-      id: key,
-      voucher_type: "Sales",
-      voucher_number: row.voucher_number,
-      date: row.voucher_date, // ✅ DATE FIXED
-      narration: null,
-      reference_no: null,
-      supplier_invoice_date: null,
-      company_id,
-      owner_type,
-      owner_id,
-      partyId: row.partyId,
-      partyName: row.party_name,
-      entries: [],
-    };
+      const key = `SAL-${row.voucher_id}`;
 
-    // 🔴 PARTY → DEBIT (PARENT)
-    vouchers[key].entries.push({
-      id: `SAL-P-${row.partyId}-${row.voucher_number}`,
-      ledger_id: row.partyId,
-      ledger_name: row.party_name,
-      amount: 0, // calculated below
-      entry_type: "debit",
-      narration: "Sales",
-      isParty: true,
+      /* ================================
+         CREATE VOUCHER
+      ================================= */
+      if (!vouchers[key]) {
+        vouchers[key] = {
+          id: key,
+          voucher_type: "sales",
+          voucher_number: row.voucher_number,
+          date: row.voucher_date,
+
+          subtotal: row.subtotal,
+          cgstTotal: row.cgstTotal,
+          sgstTotal: row.sgstTotal,
+          igstTotal: row.igstTotal,
+          total: row.total,
+
+          partyId: row.partyId,
+          partyName: row.party_name,
+
+          entries: [],
+        };
+
+        /* 🔴 PARTY → DEBIT */
+        vouchers[key].entries.push({
+          id: `SAL-P-${row.voucher_id}`,
+
+          ledger_id: row.partyId,
+          ledger_name: row.party_name,
+
+          amount: Number(row.total),
+
+          entry_type: "debit",
+
+          narration: "Sales Party",
+
+          isParty: true,
+        });
+      }
+
+      /* ================================
+         SALES LEDGER → CREDIT (REAL LEDGER)
+      ================================= */
+      if (row.salesLedgerId) {
+        vouchers[key].entries.push({
+          id: `SAL-L-${row.voucher_id}-${row.salesLedgerId}`,
+
+          ledger_id: row.salesLedgerId,
+
+          // ✅ REAL LEDGER NAME
+          ledger_name: row.sales_ledger_name,
+
+          // ✅ ITEM AMOUNT
+          amount: Number(row.item_amount),
+
+          entry_type: "credit",
+
+          narration: row.sales_ledger_name,
+
+          isParty: false,
+
+          isChild: true,
+        });
+      }
+
+      /* ================================
+         GST BREAKUP
+      ================================= */
+
+      // IGST
+      if (Number(row.igstTotal) > 0) {
+        const igstRate = ((row.igstTotal / row.subtotal) * 100).toFixed(2);
+
+        vouchers[key].entries.push({
+          id: `SAL-IGST-${row.voucher_id}`,
+
+          ledger_id: null,
+
+          ledger_name: `IGST @ ${igstRate}%`,
+
+          amount: Number(row.igstTotal),
+
+          entry_type: "credit",
+
+          narration: "IGST",
+
+          isParty: false,
+
+          isChild: true,
+        });
+      }
+
+      // CGST
+      if (Number(row.cgstTotal) > 0) {
+        const cgstRate = ((row.cgstTotal / row.subtotal) * 100).toFixed(2);
+
+        vouchers[key].entries.push({
+          id: `SAL-CGST-${row.voucher_id}`,
+
+          ledger_id: null,
+
+          ledger_name: `CGST @ ${cgstRate}%`,
+
+          amount: Number(row.cgstTotal),
+
+          entry_type: "credit",
+
+          narration: "CGST",
+
+          isParty: false,
+
+          isChild: true,
+        });
+      }
+
+      // SGST
+      if (Number(row.sgstTotal) > 0) {
+        const sgstRate = ((row.sgstTotal / row.subtotal) * 100).toFixed(2);
+
+        vouchers[key].entries.push({
+          id: `SAL-SGST-${row.voucher_id}`,
+
+          ledger_id: null,
+
+          ledger_name: `SGST @ ${sgstRate}%`,
+
+          amount: Number(row.sgstTotal),
+
+          entry_type: "credit",
+
+          narration: "SGST",
+
+          isParty: false,
+
+          isChild: true,
+        });
+      }
+
     });
-  }
-
-  /* ================================
-     SALES LEDGER → CREDIT
-  ================================= */
-  vouchers[key].entries.push({
-    id: `SAL-L-${row.partyId}-${row.salesLedgerId}-${row.voucher_number}`,
-    ledger_id: row.salesLedgerId,
-    ledger_name: row.sales_ledger_name,
-    amount: Number(row.total_amount),
-    entry_type: "credit",
-    narration: null,
-    isParty: false,
-  });
-
-  /* ================================
-     UPDATE PARTY DEBIT TOTAL
-  ================================= */
-  const partyEntry = vouchers[key].entries.find((e) => e.isParty);
-  if (partyEntry) {
-    partyEntry.amount += Number(row.total_amount);
-  }
-});
 
     /* =====================================================
    4️⃣ DEBIT NOTE VOUCHERS (Debit Note Register)

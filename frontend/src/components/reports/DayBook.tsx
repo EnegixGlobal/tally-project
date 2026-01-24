@@ -114,8 +114,7 @@ const DayBook: React.FC = () => {
     if (!company_id || !owner_type || !owner_id) return;
 
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/daybookTable2?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
     )
       .then((res) => res.json())
@@ -161,9 +160,17 @@ const DayBook: React.FC = () => {
               voucherType: voucher.voucher_type,
               voucherNo: voucher.voucher_number,
               particulars: voucher.reference_no || "—",
-              ledgerName: entry.ledger_name || "",
+
+              // ✅ GST / SUBTOTAL NAME FIX
+              ledgerName:
+                entry.ledger_name ||
+                entry.ledgerName ||
+                entry.narration ||
+                "",
+
               debit: isDebit ? amount : 0,
               credit: isCredit ? amount : 0,
+
               voucherId: id,
               narration: entry.entry_narration,
               itemId: entry.item_id,
@@ -198,12 +205,12 @@ const DayBook: React.FC = () => {
               ...rawEntry,
               debit:
                 isDebit &&
-                allowEntryByVoucherType(voucher.voucher_type, "debit")
+                  allowEntryByVoucherType(voucher.voucher_type, "debit")
                   ? amount
                   : 0,
               credit:
                 isCredit &&
-                allowEntryByVoucherType(voucher.voucher_type, "credit")
+                  allowEntryByVoucherType(voucher.voucher_type, "credit")
                   ? amount
                   : 0,
             });
@@ -350,42 +357,41 @@ const DayBook: React.FC = () => {
   }, [selectedDate]);
 
   const getGroupedAmounts = (voucher: VoucherGroup) => {
-    const total = voucher.totalDebit + voucher.totalCredit;
     const type = voucher.voucherType.toLowerCase();
 
-    // 🟡 PURCHASE → CREDIT
+    // 🟡 PURCHASE → ONLY CREDIT (NO ADDING)
     if (type.includes("purchase")) {
       return {
         debit: 0,
-        credit: total,
+        credit: voucher.totalCredit, // ✅ ONLY CREDIT
       };
     }
 
-    // 🟢 SALES → DEBIT
+    // 🟢 SALES → ONLY DEBIT
     if (type.includes("sales")) {
       return {
-        debit: total,
+        debit: voucher.totalDebit,
         credit: 0,
       };
     }
 
-    // 🔵 DEBIT NOTE → DEBIT ONLY
+    // 🔵 DEBIT NOTE
     if (type.includes("debit")) {
       return {
-        debit: total,
+        debit: voucher.totalDebit,
         credit: 0,
       };
     }
 
-    // 🟣 CREDIT NOTE → CREDIT ONLY
+    // 🟣 CREDIT NOTE
     if (type.includes("credit")) {
       return {
         debit: 0,
-        credit: total,
+        credit: voucher.totalCredit,
       };
     }
 
-    // ⚪ DEFAULT (payment, receipt, journal, contra)
+    // ⚪ DEFAULT
     return {
       debit: voucher.totalDebit,
       credit: voucher.totalCredit,
@@ -426,9 +432,8 @@ const DayBook: React.FC = () => {
           type="button"
           title="Back to Reports"
           onClick={() => navigate("/app/reports")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -438,26 +443,23 @@ const DayBook: React.FC = () => {
             title="Toggle Filters"
             type="button"
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Filter size={18} />
           </button>
           <button
             title="Print Report"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
           <button
             title="Download Report"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Download size={18} />
           </button>
@@ -466,9 +468,8 @@ const DayBook: React.FC = () => {
 
       {showFilterPanel && (
         <div
-          className={`p-4 mb-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 mb-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h3 className="font-semibold mb-4">Filters & Options</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
@@ -480,11 +481,10 @@ const DayBook: React.FC = () => {
                 title="Select Date Range"
                 value={selectedDateRange}
                 onChange={(e) => handleDateRangeChange(e.target.value)}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               >
                 <option value="today">Today</option>
                 <option value="yesterday">Yesterday</option>
@@ -501,11 +501,10 @@ const DayBook: React.FC = () => {
                 title="Select Voucher Type"
                 value={selectedVoucherType}
                 onChange={(e) => setSelectedVoucherType(e.target.value)}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               >
                 <option value="">All Types</option>
                 <option value="payment">Payment</option>
@@ -525,11 +524,10 @@ const DayBook: React.FC = () => {
                 onChange={(e) =>
                   setViewMode(e.target.value as "detailed" | "grouped")
                 }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               >
                 <option value="grouped">Grouped by Voucher</option>
                 <option value="detailed">Detailed Entries</option>
@@ -545,11 +543,10 @@ const DayBook: React.FC = () => {
                   title="Select Date"
                   value={selectedDate}
                   onChange={(e) => setSelectedDate(e.target.value)}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600"
-                      : "bg-white border-gray-300"
-                  }`}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600"
+                    : "bg-white border-gray-300"
+                    }`}
                 />
               </div>
             )}
@@ -560,9 +557,8 @@ const DayBook: React.FC = () => {
       {/* Summary Cards */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div
-          className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <div className="text-sm text-gray-500">Total Debit</div>
           <div className="text-xl font-bold text-blue-600">
@@ -570,9 +566,8 @@ const DayBook: React.FC = () => {
           </div>
         </div>
         <div
-          className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <div className="text-sm text-gray-500">Total Credit</div>
           <div className="text-xl font-bold text-purple-600">
@@ -580,25 +575,22 @@ const DayBook: React.FC = () => {
           </div>
         </div>
         <div
-          className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <div className="text-sm text-gray-500">Net Difference</div>
           <div
-            className={`text-xl font-bold ${
-              totals.totalDebit - totals.totalCredit >= 0
-                ? "text-green-600"
-                : "text-red-600"
-            }`}
+            className={`text-xl font-bold ${totals.totalDebit - totals.totalCredit >= 0
+              ? "text-green-600"
+              : "text-red-600"
+              }`}
           >
             {formatCurrency(Math.abs(totals.totalDebit - totals.totalCredit))}
           </div>
         </div>
         <div
-          className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <div className="text-sm text-gray-500">Vouchers</div>
           <div className="text-xl font-bold text-gray-600">
@@ -614,15 +606,14 @@ const DayBook: React.FC = () => {
           <button
             key={mode}
             onClick={() => setViewMode(mode as "detailed" | "grouped")}
-            className={`px-4 py-2 rounded-t-lg text-sm font-medium ${
-              viewMode === mode
-                ? theme === "dark"
-                  ? "bg-gray-800 text-white"
-                  : "bg-white text-blue-600 shadow"
-                : theme === "dark"
+            className={`px-4 py-2 rounded-t-lg text-sm font-medium ${viewMode === mode
+              ? theme === "dark"
+                ? "bg-gray-800 text-white"
+                : "bg-white text-blue-600 shadow"
+              : theme === "dark"
                 ? "bg-gray-700 text-gray-300 hover:bg-gray-600"
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
-            }`}
+              }`}
           >
             {mode === "grouped" ? "Grouped by Voucher" : "Detailed Entries"}
           </button>
@@ -630,9 +621,8 @@ const DayBook: React.FC = () => {
       </div>
 
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <div className="mb-4 flex justify-between items-center">
           <div>
@@ -641,8 +631,8 @@ const DayBook: React.FC = () => {
               {selectedDateRange === "custom"
                 ? `For ${formatDate(selectedDate)}`
                 : selectedDateRange === "today"
-                ? `For ${formatDate(new Date().toISOString().split("T")[0])}`
-                : `For ${selectedDateRange.replace("-", " ")}`}
+                  ? `For ${formatDate(new Date().toISOString().split("T")[0])}`
+                  : `For ${selectedDateRange.replace("-", " ")}`}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -655,11 +645,10 @@ const DayBook: React.FC = () => {
                 setSelectedDate(e.target.value);
                 setSelectedDateRange("custom");
               }}
-              className={`text-sm px-2 py-1 rounded border outline-none ${
-                theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-white"
-                  : "bg-white border-gray-300 text-gray-700"
-              }`}
+              className={`text-sm px-2 py-1 rounded border outline-none ${theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "bg-white border-gray-300 text-gray-700"
+                }`}
             />
 
             {selectedDate && (
@@ -681,11 +670,10 @@ const DayBook: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b-2 border-gray-300"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b-2 border-gray-300"
+                    }`}
                 >
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-left">Particulars</th>
@@ -699,7 +687,7 @@ const DayBook: React.FC = () => {
               </thead>
               <tbody>
                 {!Array.isArray(groupedVouchers) ||
-                groupedVouchers.length === 0 ? (
+                  groupedVouchers.length === 0 ? (
                   <tr>
                     <td
                       colSpan={7}
@@ -712,11 +700,10 @@ const DayBook: React.FC = () => {
                   groupedVouchers.map((voucher) => (
                     <tr
                       key={voucher.voucherId}
-                      className={`${
-                        theme === "dark"
-                          ? "border-b border-gray-700 hover:bg-gray-700"
-                          : "border-b border-gray-200 hover:bg-gray-50"
-                      } cursor-pointer`}
+                      className={`${theme === "dark"
+                        ? "border-b border-gray-700 hover:bg-gray-700"
+                        : "border-b border-gray-200 hover:bg-gray-50"
+                        } cursor-pointer`}
                       onClick={() => handleVoucherClick(voucher)}
                     >
                       <td className="px-4 py-3">
@@ -733,17 +720,16 @@ const DayBook: React.FC = () => {
 
                       <td className="px-4 py-3">
                         <span
-                          className={`px-2 py-1 rounded-full text-xs ${
-                            voucher.voucherType === "sales"
-                              ? "bg-green-100 text-green-800"
-                              : voucher.voucherType === "purchase"
+                          className={`px-2 py-1 rounded-full text-xs ${voucher.voucherType === "sales"
+                            ? "bg-green-100 text-green-800"
+                            : voucher.voucherType === "purchase"
                               ? "bg-blue-100 text-blue-800"
                               : voucher.voucherType === "receipt"
-                              ? "bg-purple-100 text-purple-800"
-                              : voucher.voucherType === "payment"
-                              ? "bg-red-100 text-red-800"
-                              : "bg-gray-100 text-gray-800"
-                          }`}
+                                ? "bg-purple-100 text-purple-800"
+                                : voucher.voucherType === "payment"
+                                  ? "bg-red-100 text-red-800"
+                                  : "bg-gray-100 text-gray-800"
+                            }`}
                         >
                           {voucher.voucherType.charAt(0).toUpperCase() +
                             voucher.voucherType.slice(1)}
@@ -777,11 +763,10 @@ const DayBook: React.FC = () => {
                             e.stopPropagation();
                             handleVoucherClick(voucher);
                           }}
-                          className={`p-1 rounded ${
-                            theme === "dark"
-                              ? "hover:bg-gray-600"
-                              : "hover:bg-gray-200"
-                          }`}
+                          className={`p-1 rounded ${theme === "dark"
+                            ? "hover:bg-gray-600"
+                            : "hover:bg-gray-200"
+                            }`}
                           title="View Details"
                         >
                           <Eye size={16} />
@@ -794,11 +779,10 @@ const DayBook: React.FC = () => {
               {groupedVouchers?.length > 0 && (
                 <tfoot>
                   <tr
-                    className={`${
-                      theme === "dark"
-                        ? "border-t-2 border-gray-600 bg-gray-700"
-                        : "border-t-2 border-gray-400 bg-gray-50"
-                    }`}
+                    className={`${theme === "dark"
+                      ? "border-t-2 border-gray-600 bg-gray-700"
+                      : "border-t-2 border-gray-400 bg-gray-50"
+                      }`}
                   >
                     <td colSpan={4} className="px-4 py-3 font-bold">
                       Total:
@@ -818,11 +802,10 @@ const DayBook: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b-2 border-gray-300"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b-2 border-gray-300"
+                    }`}
                 >
                   <th className="px-4 py-3 text-left">Date</th>
                   <th className="px-4 py-3 text-left">Particulars</th>
@@ -858,11 +841,10 @@ const DayBook: React.FC = () => {
                     return (
                       <tr
                         key={`${entry.id}-${index}`}
-                        className={`${
-                          theme === "dark"
-                            ? "border-b border-gray-700"
-                            : "border-b border-gray-200"
-                        }`}
+                        className={`${theme === "dark"
+                          ? "border-b border-gray-700"
+                          : "border-b border-gray-200"
+                          }`}
                       >
                         {/* DATE */}
                         {showCommon && (
@@ -874,9 +856,7 @@ const DayBook: React.FC = () => {
                         {/* PARTICULARS (LEDGER / ITEM NAME) */}
                         <td className="px-4 py-3">
                           <div className="font-medium">
-                            {entry.itemId
-                              ? getItemName(entry.itemId)
-                              : entry.ledgerName}
+                            {entry.ledgerName}
                           </div>
 
                           {entry.narration && (
@@ -923,11 +903,10 @@ const DayBook: React.FC = () => {
               {processedEntries.length > 0 && (
                 <tfoot>
                   <tr
-                    className={`font-bold ${
-                      theme === "dark"
-                        ? "border-t-2 border-gray-600 bg-gray-700"
-                        : "border-t-2 border-gray-400 bg-gray-50"
-                    }`}
+                    className={`font-bold ${theme === "dark"
+                      ? "border-t-2 border-gray-600 bg-gray-700"
+                      : "border-t-2 border-gray-400 bg-gray-50"
+                      }`}
                   >
                     <td colSpan={4} className="px-4 py-3">
                       Total:
@@ -954,21 +933,22 @@ const DayBook: React.FC = () => {
       {selectedVoucher && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
           <div
-            className={`w-full max-w-4xl max-h-[90vh] rounded-lg overflow-hidden flex flex-col ${
-              theme === "dark" ? "bg-gray-800" : "bg-white"
-            }`}
+            className={`w-full max-w-4xl max-h-[90vh] rounded-lg overflow-hidden flex flex-col ${theme === "dark" ? "bg-gray-800" : "bg-white"
+              }`}
           >
-            {/* Header - Fixed */}
+            {/* Header */}
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">
                   Voucher Details - {selectedVoucher.voucherNo}
                 </h3>
+
                 <button
                   onClick={() => setSelectedVoucher(null)}
-                  className={`p-2 rounded-full ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
-                  }`}
+                  className={`p-2 rounded-full ${theme === "dark"
+                    ? "hover:bg-gray-700"
+                    : "hover:bg-gray-100"
+                    }`}
                 >
                   ×
                 </button>
@@ -979,8 +959,11 @@ const DayBook: React.FC = () => {
                   <label className="block text-sm font-medium mb-1">
                     Voucher No
                   </label>
-                  <div className="font-mono">{selectedVoucher.voucherNo}</div>
+                  <div className="font-mono">
+                    {selectedVoucher.voucherNo}
+                  </div>
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Voucher Type
@@ -989,93 +972,136 @@ const DayBook: React.FC = () => {
                     {selectedVoucher.voucherType}
                   </div>
                 </div>
+
                 <div>
-                  <label className="block text-sm font-medium mb-1">Date</label>
+                  <label className="block text-sm font-medium mb-1">
+                    Date
+                  </label>
                   <div>{formatDate(selectedVoucher.date)}</div>
                 </div>
+
                 <div>
                   <label className="block text-sm font-medium mb-1">
                     Entries
                   </label>
                   <div>
-                    {selectedVoucher && selectedVoucher.entries
-                      ? selectedVoucher.entries.length
-                      : 0}{" "}
-                    entries
+                    {selectedVoucher.entries?.length || 0} entries
                   </div>
                 </div>
               </div>
             </div>
 
-            {/* Scrollable Content */}
+            {/* Body */}
             <div className="flex-1 overflow-y-auto p-6">
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-2">
                   Voucher Entries
                 </label>
+
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead
-                      className={`${
-                        theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                      }`}
+                      className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                        }`}
                     >
                       <tr>
-                        <th className="px-3 py-2 text-left">Item/Ledger</th>
-                        <th className="px-3 py-2 text-right">Voucher No.</th>
-                        <th className="px-3 py-2 text-right">Voucher Type</th>
-                        <th className="px-3 py-2 text-right">Debit</th>
-                        <th className="px-3 py-2 text-right">Credit</th>
+                        <th className="px-3 py-2 text-left">
+                          Item / Ledger
+                        </th>
+                        <th className="px-3 py-2 text-right">
+                          Voucher No.
+                        </th>
+                        <th className="px-3 py-2 text-right">
+                          Voucher Type
+                        </th>
+                        <th className="px-3 py-2 text-right">
+                          Debit
+                        </th>
+                        <th className="px-3 py-2 text-right">
+                          Credit
+                        </th>
                       </tr>
                     </thead>
+
                     <tbody>
                       {(() => {
                         const entries =
-                          rawVoucherEntries[selectedVoucher.voucherId] ?? [];
+                          rawVoucherEntries[selectedVoucher.voucherId] ??
+                          [];
 
-                        const partyEntry = entries.find((e) => e.isParty);
-                        const ledgerEntries = entries.filter((e) => !e.isParty);
+                        const partyEntry = entries.find(
+                          (e) => e.isParty
+                        );
+
+                        const otherEntries = entries.filter(
+                          (e) => !e.isParty
+                        );
 
                         return (
                           <>
-                            {/* PARTY (PARENT) */}
+                            {/* PARTY ROW */}
                             {partyEntry && (
                               <tr className="font-semibold bg-gray-100 dark:bg-gray-700">
                                 <td className="px-3 py-2">
                                   {partyEntry.ledgerName}
                                 </td>
+
                                 <td className="px-3 py-2 text-right font-mono">
                                   {selectedVoucher.voucherNo}
                                 </td>
+
                                 <td className="px-3 py-2 text-right capitalize">
                                   {selectedVoucher.voucherType}
                                 </td>
-                                <td className="px-3 py-2 text-right font-mono">
-                                  {formatCurrency(partyEntry.amount)}
-                                </td>
+
                                 <td className="px-3 py-2 text-right font-mono">
                                   -
+                                </td>
+
+                                <td className="px-3 py-2 text-right font-mono">
+                                  {formatCurrency(partyEntry.amount)}
                                 </td>
                               </tr>
                             )}
 
-                            {/* LEDGER BREAKUP */}
-                            {ledgerEntries.map((entry, index) => (
+                            {/* SUBTOTAL + GST ROWS */}
+                            {otherEntries.map((entry, index) => (
                               <tr
                                 key={index}
                                 className="border-t border-gray-200 dark:border-gray-600"
                               >
-                                <td className="px-3 py-2 pl-8">
+                                {/* Particulars */}
+                                <td
+                                  className={`px-3 py-2 ${entry.isChild
+                                    ? "pl-10 text-gray-600"
+                                    : ""
+                                    }`}
+                                >
                                   {entry.ledgerName}
                                 </td>
+
                                 <td></td>
                                 <td></td>
-                                <td className="px-3 py-2 text-right font-mono">
+
+                                {/* Debit */}
+                                <td
+                                  className={`px-3 py-2 text-right font-mono ${entry.isChild
+                                    ? "text-sm text-gray-600"
+                                    : ""
+                                    }`}
+                                >
                                   {entry.debit > 0
                                     ? formatCurrency(entry.debit)
                                     : "-"}
                                 </td>
-                                <td className="px-3 py-2 text-right font-mono">
+
+                                {/* Credit */}
+                                <td
+                                  className={`px-3 py-2 text-right font-mono ${entry.isChild
+                                    ? "text-sm text-gray-600"
+                                    : ""
+                                    }`}
+                                >
                                   {entry.credit > 0
                                     ? formatCurrency(entry.credit)
                                     : "-"}
@@ -1090,11 +1116,13 @@ const DayBook: React.FC = () => {
                 </div>
               </div>
 
+              {/* Narration */}
               {selectedVoucher.narration && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium mb-1">
                     Narration
                   </label>
+
                   <div className="text-gray-600 dark:text-gray-400">
                     {selectedVoucher.narration}
                   </div>
@@ -1102,32 +1130,26 @@ const DayBook: React.FC = () => {
               )}
             </div>
 
-            {/* Footer - Fixed */}
+            {/* Footer */}
             <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setSelectedVoucher(null)}
-                  className={`px-4 py-2 rounded ${
-                    theme === "dark"
-                      ? "bg-gray-700 hover:bg-gray-600"
-                      : "bg-gray-100 hover:bg-gray-200"
-                  }`}
+                  className={`px-4 py-2 rounded ${theme === "dark"
+                    ? "bg-gray-700 hover:bg-gray-600"
+                    : "bg-gray-100 hover:bg-gray-200"
+                    }`}
                 >
                   Close
                 </button>
+
                 <button
                   onClick={() => {
-                    // Navigate to edit if the route exists, otherwise show create form
                     try {
                       navigate(
                         `/app/vouchers/${selectedVoucher.voucherType}/edit/${selectedVoucher.voucherId}`
                       );
                     } catch (error) {
-                      // Fallback to create route if edit is not available
-                      console.warn(
-                        "Edit route not available, redirecting to create:",
-                        error
-                      );
                       navigate(
                         `/app/vouchers/${selectedVoucher.voucherType}/create`
                       );
@@ -1144,9 +1166,8 @@ const DayBook: React.FC = () => {
       )}
 
       <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <p className="text-sm">
           <span className="font-semibold">Pro Tip:</span> Press F5 to refresh,
