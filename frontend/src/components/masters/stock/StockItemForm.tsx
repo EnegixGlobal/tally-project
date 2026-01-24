@@ -768,7 +768,7 @@ const StockItemForm = () => {
             <SelectField
               id="gstLedgerId"
               name="gstLedgerId"
-              label="GST Ledger"
+              label="IGST"
               value={formData.gstLedgerId}
               onChange={handleChange}
               options={gstOptions}
@@ -778,7 +778,7 @@ const StockItemForm = () => {
             <SelectField
               id="cgstLedgerId"
               name="cgstLedgerId"
-              label="CGST Ledger"
+              label="CGST"
               value={formData.cgstLedgerId}
               onChange={handleChange}
               options={cgstOptions}
@@ -787,7 +787,7 @@ const StockItemForm = () => {
             <SelectField
               id="sgstLedgerId"
               name="sgstLedgerId"
-              label="SGST Ledger"
+              label="SGST"
               value={formData.sgstLedgerId}
               onChange={handleChange}
               options={sgstOptions}

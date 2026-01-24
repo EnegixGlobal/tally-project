@@ -92,8 +92,7 @@ const SetProfit: React.FC = () => {
       try {
         // 1️⃣ Fetch stock groups
         const groupRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/stock-groups/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const groups = await groupRes.json();
@@ -101,8 +100,7 @@ const SetProfit: React.FC = () => {
 
         // 2️⃣ Fetch stock categories
         const catRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/stock-categories?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const categories = await catRes.json();
@@ -133,6 +131,45 @@ const SetProfit: React.FC = () => {
 
     fetchAllData();
   }, [companyId, ownerType, ownerId]);
+
+
+  //get setProfit
+  // 🔽 Load saved profit from backend
+  const fetchProfitConfig = async () => {
+    if (!ownerId || !ownerType) return;
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/set-profit/${ownerId}/${ownerType}`
+      );
+
+      const result = await res.json();
+
+      if (result.success && result.data) {
+        const d = result.data;
+
+        setProfitConfig({
+          customerType: d.wholesale_method ? "wholesale" : "retailer",
+
+          wholesale: {
+            method: d.wholesale_method || "",
+            value: d.wholesale_value?.toString() || "",
+          },
+
+          retailer: {
+            method: d.retailer_method || "",
+            value: d.retailer_value?.toString() || "",
+          },
+        });
+      }
+    } catch (err) {
+      console.error("Fetch profit failed:", err);
+    }
+  };
+
+  useEffect(() => {
+    fetchProfitConfig();
+  }, [ownerId, ownerType]);
 
   const handleSave = async () => {
     const ownerType = localStorage.getItem("supplier") || "admin";

@@ -1844,7 +1844,7 @@ const PurchaseVoucher: React.FC = () => {
                       >
                         {isRegularCharge ? (
                           <>
-                            Regular Charge
+                            Regular
                             <span className="ml-2 text-gray-600">
                               (GSTIN: {selectedPartyLedger.gstNumber || "N/A"}, State: {partyState})
                             </span>
