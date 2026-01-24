@@ -274,6 +274,7 @@ const SalesVoucher: React.FC = () => {
           sgstRate: 0,
           igstRate: 0,
           godownId: "",
+          salesLedgerId: "",
           discount: 0,
           hsnCode: "",
         },
@@ -417,6 +418,7 @@ const SalesVoucher: React.FC = () => {
           hsnCode: item.hsnCode,
           batchNumber: item.batchNumber,
           godownId: item.godownId,
+          salesLedgerId: item.salesLedgerId?.toString() || v.salesLedgerId?.toString() || "",
           type: "debit",
         }));
 
@@ -1082,6 +1084,7 @@ const SalesVoucher: React.FC = () => {
           sgstRate: 0,
           igstRate: 0,
           godownId: "",
+          salesLedgerId: "",
           discount: 0,
           hsnCode: "", // Add HSN code for manual editing
         },
@@ -1113,9 +1116,6 @@ const SalesVoucher: React.FC = () => {
     // Only validate item-invoice specific fields when mode is item-invoice
     if (formData.mode === "item-invoice") {
       if (!formData.partyId) pushError("partyId", "Party is required");
-      if (!formData.salesLedgerId) {
-        pushError("salesLedgerId", "Sales Ledger is required");
-      }
     }
 
     // ===== ENTRY LEVEL VALIDATION =====
@@ -1129,6 +1129,9 @@ const SalesVoucher: React.FC = () => {
       if (formData.mode === "item-invoice") {
         if (!entry.itemId)
           pushError(`entry.${index}.itemId`, `Row ${row}: Item is required`);
+
+        if (!entry.salesLedgerId)
+          pushError(`entry.${index}.salesLedgerId`, `Row ${row}: Sales Ledger is required`);
 
         if ((entry.quantity ?? 0) <= 0)
           pushError(
@@ -1923,75 +1926,30 @@ const SalesVoucher: React.FC = () => {
               </div>
             )}
 
-            {/* Sales Ledger selection for item-invoice mode */}
-            {formData.mode === "item-invoice" && (
+            {/* Sales Ledger selection for item-invoice mode removed from here */}
+            {/* Godown Enable/Disable toggle */}
+            {formData.mode === "item-invoice" && columnSettings.showGodown && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
                 <div>
                   <label
                     className="block text-sm font-medium mb-1"
-                    htmlFor="salesLedgerId"
+                    htmlFor="godownEnabled"
                   >
-                    Sales Ledger <span className="text-red-500">*</span>
+                    Enable Godown Selection
                   </label>
+
                   <select
-                    name="salesLedgerId"
-                    value={formData.salesLedgerId || ""}
-                    onChange={handleChange}
-                    required
-                    className={FORM_STYLES.select(
-                      theme,
-                      !!errors.salesLedgerId
-                    )}
+                    id="godownEnabled"
+                    value={godownEnabled}
+                    onChange={(e) =>
+                      setGodownEnabled(e.target.value as "yes" | "no")
+                    }
+                    className={FORM_STYLES.select(theme)}
                   >
-                    <option value="">-- Select Sales Ledger --</option>
-                    {ledgers
-                      .filter((l) => l.name.toLowerCase().includes("sales"))
-                      .map((ledger) => (
-                        <option key={ledger.id} value={ledger.id}>
-                          {ledger.name}
-                        </option>
-                      ))}
-                    <option
-                      value="add-new"
-                      className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                        ? "bg-blue-600 hover:bg-green-700"
-                        : "bg-green-600 hover:bg-green-700 text-white"
-                        }`}
-                    >
-                      + Add New Ledger
-                    </option>
+                    <option value="yes">Yes</option>
+                    <option value="no">No</option>
                   </select>
-
-                  {errors.salesLedgerId && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors.salesLedgerId}
-                    </p>
-                  )}
                 </div>
-
-                {/* Godown Enable/Disable toggle */}
-                {columnSettings.showGodown && (
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      htmlFor="godownEnabled"
-                    >
-                      Enable Godown Selection
-                    </label>
-
-                    <select
-                      id="godownEnabled"
-                      value={godownEnabled}
-                      onChange={(e) =>
-                        setGodownEnabled(e.target.value as "yes" | "no")
-                      }
-                      className={FORM_STYLES.select(theme)}
-                    >
-                      <option value="yes">Yes</option>
-                      <option value="no">No</option>
-                    </select>
-                  </div>
-                )}
               </div>
             )}
             {/* ///whollsell or retailer */}
@@ -2189,6 +2147,7 @@ const SalesVoucher: React.FC = () => {
                         {godownEnabled === "yes" && (
                           <th className="px-4 py-2 text-left">Godown</th>
                         )}
+                        <th className="px-4 py-2 text-left">Sales Ledger</th>
                         <th className="px-4 py-2 text-center">Action</th>
                       </tr>
                     </thead>
@@ -2399,6 +2358,30 @@ const SalesVoucher: React.FC = () => {
                               </td>
                             )}
 
+                            {/* SALES LEDGER */}
+                            <td className="px-1 py-2 min-w-[120px]">
+                              <select
+                                name="salesLedgerId"
+                                value={entry.salesLedgerId || ""}
+                                onChange={(e) => handleEntryChange(index, e)}
+                                className={`${FORM_STYLES.tableSelect(theme)} min-w-[120px] text-xs ${errors[`entry.${index}.salesLedgerId`] ? "border-red-500" : ""}`}
+                              >
+                                <option value="">Select Ledger</option>
+                                {ledgers
+                                  .filter((l) => l.name.toLowerCase().includes("sales"))
+                                  .map((ledger) => (
+                                    <option key={ledger.id} value={ledger.id}>
+                                      {ledger.name}
+                                    </option>
+                                  ))}
+                              </select>
+                              {errors[`entry.${index}.salesLedgerId`] && (
+                                <p className="text-red-500 text-xs mt-1">
+                                  {errors[`entry.${index}.salesLedgerId`]}
+                                </p>
+                              )}
+                            </td>
+
                             {/* DELETE */}
                             <td className="px-1 py-2 text-center min-w-[40px]">
                               <button
@@ -2449,6 +2432,7 @@ const SalesVoucher: React.FC = () => {
                         }
                         if (columnSettings.showDiscount) totalCols += 1; // Discount
                         if (godownEnabled === "yes") totalCols += 1; // Godown
+                        totalCols += 1; // Sales Ledger
                         // Action column is separate, so colspan = totalCols - 1 (excluding Action)
                         const colspan = totalCols - 1;
                         return (

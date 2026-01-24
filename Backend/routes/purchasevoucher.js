@@ -154,13 +154,38 @@ router.get("/next-number", async (req, res) => {
 
 // POST Purchase Voucher
 // Helper
+// ================= UTILS =================
+
 const cleanState = (state = "") =>
   state.replace(/\(.*?\)/g, "").trim().toLowerCase();
 
 
+// ✅ AUTO CREATE COLUMN (RUNS ON EVERY HIT – SAFE)
+const ensurePurchaseLedgerColumn = async () => {
+  const [rows] = await db.execute(`
+    SHOW COLUMNS
+    FROM purchase_voucher_items
+    LIKE 'purchaseLedgerId'
+  `);
+
+  if (rows.length === 0) {
+    console.log("⚙️ Creating purchaseLedgerId column...");
+
+    await db.execute(`
+      ALTER TABLE purchase_voucher_items
+      ADD COLUMN purchaseLedgerId INT NULL
+    `);
+
+    console.log("✅ purchaseLedgerId column created");
+  }
+};
+
+
+
+// ================= ROUTE =================
+
 router.post("/", async (req, res) => {
   const {
-    number,
     date,
     narration,
     partyId,
@@ -173,40 +198,37 @@ router.post("/", async (req, res) => {
     igstTotal,
     discountTotal,
     total,
-    entries,
+    entries = [],
     mode,
-    purchaseLedgerId,
+    purchaseLedgerId, // header
     companyId,
     ownerType,
     ownerId,
   } = req.body;
 
-  // ⭐ Accept from query also
-  const qCompanyId = req.query.company_id;
-  const qOwnerType = req.query.owner_type;
-  const qOwnerId = req.query.owner_id;
+  // ================= QUERY FALLBACK =================
 
-  const finalCompanyId = companyId || qCompanyId;
-  const finalOwnerType = ownerType || qOwnerType;
-  const finalOwnerId = ownerId || qOwnerId;
+  const finalCompanyId = companyId || req.query.company_id;
+  const finalOwnerType = ownerType || req.query.owner_type;
+  const finalOwnerId = ownerId || req.query.owner_id;
 
-  // 🔐 Security Check
+  // ================= AUTH =================
+
   if (!finalCompanyId || !finalOwnerType || !finalOwnerId) {
     return res.status(401).json({
       success: false,
-      message: "Unauthorized: Missing company or owner info",
+      message: "Unauthorized",
     });
   }
 
   try {
-    // ================= STATE FETCH =================
+    // ================= FETCH STATES =================
 
     let companyState = "";
     let partyState = "";
 
-    // Company State
     const [companyRows] = await db.execute(
-      "SELECT state FROM tbcompanies WHERE id = ?",
+      "SELECT state FROM tbcompanies WHERE id=?",
       [finalCompanyId]
     );
 
@@ -214,9 +236,8 @@ router.post("/", async (req, res) => {
       companyState = companyRows[0].state || "";
     }
 
-    // Party State
     const [partyRows] = await db.execute(
-      "SELECT state FROM ledgers WHERE id = ?",
+      "SELECT state FROM ledgers WHERE id=?",
       [partyId]
     );
 
@@ -229,31 +250,26 @@ router.post("/", async (req, res) => {
       cleanState(partyState) &&
       cleanState(companyState) === cleanState(partyState);
 
-    // ===============================================
-
-
-    // ================= FIX TOTAL GST =================
+    // ================= GST TOTAL FIX =================
 
     let finalCgst = Number(cgstTotal || 0);
     let finalSgst = Number(sgstTotal || 0);
     let finalIgst = Number(igstTotal || 0);
 
     if (isIntra) {
-      finalIgst = 0; // ❌ No IGST
+      finalIgst = 0;
     } else {
-      finalCgst = 0; // ❌ No CGST
-      finalSgst = 0; // ❌ No SGST
+      finalCgst = 0;
+      finalSgst = 0;
     }
 
-    // ===============================================
-
+    // ================= DISPATCH =================
 
     const dispatchDocNo = dispatchDetails?.docNo || null;
     const dispatchThrough = dispatchDetails?.through || null;
     const destination = dispatchDetails?.destination || null;
 
-
-    // ================= GENERATE VOUCHER =================
+    // ================= GENERATE NUMBER =================
 
     const voucherNumber = await generateVoucherNumber({
       companyId: finalCompanyId,
@@ -263,120 +279,180 @@ router.post("/", async (req, res) => {
       date,
     });
 
-    // ================================================
+    // ================= VALIDATION =================
 
+    if (mode !== "item-invoice") {
+      return res.status(400).json({
+        success: false,
+        message: "Invalid mode",
+      });
+    }
 
-    let insertVoucherSql = "";
-    let insertVoucherValues = [];
-    let voucherId;
+    if (!entries.length) {
+      return res.status(400).json({
+        success: false,
+        message: "No items found",
+      });
+    }
 
+    // ================= INSERT VOUCHER =================
 
-    // ================= INSERT MAIN =================
-
-    if (mode === "item-invoice") {
-      insertVoucherSql = `
-        INSERT INTO purchase_vouchers (
-          number, date, supplierInvoiceDate, narration, partyId, referenceNo,
-          dispatchDocNo, dispatchThrough, destination, purchaseLedgerId,
-          subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total,
-          company_id, owner_type, owner_id
-        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-      `;
-
-      insertVoucherValues = [
-        voucherNumber,
-        date ?? null,
-        supplierInvoiceDate ?? null,
-        narration ?? null,
-        partyId ?? null,
-        referenceNo ?? null,
+    const insertVoucherSql = `
+      INSERT INTO purchase_vouchers (
+        number,
+        date,
+        supplierInvoiceDate,
+        narration,
+        partyId,
+        referenceNo,
         dispatchDocNo,
         dispatchThrough,
         destination,
-        purchaseLedgerId ?? null,
+        purchaseLedgerId,
+        subtotal,
+        cgstTotal,
+        sgstTotal,
+        igstTotal,
+        discountTotal,
+        total,
+        company_id,
+        owner_type,
+        owner_id
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+    `;
 
-        subtotal ?? 0,
+    const insertVoucherValues = [
+      voucherNumber,
+      date ?? null,
+      supplierInvoiceDate ?? null,
+      narration ?? null,
+      partyId ?? null,
+      referenceNo ?? null,
 
-        // ✅ SAFE GST
-        finalCgst,
-        finalSgst,
-        finalIgst,
+      dispatchDocNo,
+      dispatchThrough,
+      destination,
 
-        discountTotal ?? 0,
-        total ?? 0,
+      purchaseLedgerId ?? null,
 
-        finalCompanyId,
-        finalOwnerType,
-        finalOwnerId,
-      ];
-    } else {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid voucher mode",
-      });
-    }
+      subtotal ?? 0,
+      finalCgst,
+      finalSgst,
+      finalIgst,
+      discountTotal ?? 0,
+      total ?? 0,
+
+      finalCompanyId,
+      finalOwnerType,
+      finalOwnerId,
+    ];
 
     const [voucherResult] = await db.execute(
       insertVoucherSql,
       insertVoucherValues
     );
 
-    voucherId = voucherResult.insertId;
-
-    // ================================================
-
+    const voucherId = voucherResult.insertId;
 
     // ================= INSERT ITEMS =================
 
-    const itemEntries = entries.filter((e) => e.itemId);
+    const validItems = entries.filter((e) => e.itemId);
 
-    if (itemEntries.length > 0) {
-      const insertItemQuery = `
-        INSERT INTO purchase_voucher_items (
-          voucherId, itemId, quantity, rate, discount,
-          cgstRate, sgstRate, igstRate, amount, godownId
-        ) VALUES ?
-      `;
-
-      const itemValues = itemEntries.map((e) => [
-        voucherId,
-        e.itemId ?? null,
-        e.quantity ?? 0,
-        e.rate ?? 0,
-        e.discount ?? 0,
-
-        // ✅ SAFE GST
-        isIntra ? e.cgstRate ?? 0 : 0,
-        isIntra ? e.sgstRate ?? 0 : 0,
-        isIntra ? 0 : e.igstRate ?? 0,
-
-        e.amount ?? 0,
-        e.godownId ?? null,
-      ]);
-
-      await db.query(insertItemQuery, [itemValues]);
+    if (!validItems.length) {
+      return res.status(400).json({
+        success: false,
+        message: "No valid items",
+      });
     }
 
-    // ================================================
+    const insertItemSql = `
+      INSERT INTO purchase_voucher_items (
+        voucherId,
+        itemId,
+        quantity,
+        rate,
+        discount,
+        cgstRate,
+        sgstRate,
+        igstRate,
+        amount,
+        godownId,
+        purchaseLedgerId
+      ) VALUES ?
+    `;
 
+    // 🔥 MAIN FIX: LEDGER ID SAVE IN GST COLUMNS
+
+    const itemValues = validItems.map((e) => {
+
+      // ================= INTRA =================
+      if (isIntra) {
+        return [
+          voucherId,
+
+          e.itemId,
+          Number(e.quantity || 0),
+          Number(e.rate || 0),
+          Number(e.discount || 0),
+
+          // ✅ LEDGER ID
+          Number(e.cgstLedgerId || 0),
+          Number(e.sgstLedgerId || 0),
+          0,
+
+          Number(e.amount || 0),
+          e.godownId || null,
+
+          e.purchaseLedgerId || purchaseLedgerId || null,
+        ];
+      }
+
+      // ================= INTER =================
+      return [
+        voucherId,
+
+        e.itemId,
+        Number(e.quantity || 0),
+        Number(e.rate || 0),
+        Number(e.discount || 0),
+
+        0,
+        0,
+
+        // ✅ IGST LEDGER ID
+        Number(e.gstLedgerId || 0),
+
+        Number(e.amount || 0),
+        e.godownId || null,
+
+        e.purchaseLedgerId || purchaseLedgerId || null,
+      ];
+    });
+
+    await db.query(insertItemSql, [itemValues]);
+
+    // ================= SUCCESS =================
 
     return res.status(200).json({
       success: true,
+      voucherId,
       voucherNumber,
-      message: "Purchase voucher saved successfully",
-      id: voucherId,
       gstType: isIntra ? "INTRA" : "INTER",
+      message: "Purchase voucher saved successfully",
     });
 
   } catch (err) {
-    console.error("🔥 Purchase voucher save failed:", err);
+    console.error("🔥 Purchase voucher error:", err);
 
     return res.status(500).json({
       success: false,
+      message: "Server error",
       error: err.message,
     });
   }
 });
+
+
 
 
 // get ourchase vouncher

@@ -840,6 +840,7 @@ router.get("/ledger", async (req, res) => {
       });
     }
 
+    // ✅ Case-insensitive search (upper/lower dono chalega)
     const [rows] = await db.query(
       `
       SELECT id, name
@@ -847,7 +848,12 @@ router.get("/ledger", async (req, res) => {
       WHERE company_id = ?
         AND owner_type = ?
         AND owner_id = ?
-        AND LOWER(name) LIKE '%gst%'
+        AND (
+          LOWER(name) LIKE '%gst%'
+          OR LOWER(name) LIKE '%cgst%'
+          OR LOWER(name) LIKE '%sgst%'
+          OR LOWER(name) LIKE '%igst%'
+        )
       `,
       [company_id, owner_type, owner_id]
     );
@@ -856,34 +862,35 @@ router.get("/ledger", async (req, res) => {
       gst: [],
       cgst: [],
       sgst: [],
+      igst: [],
     };
 
     rows.forEach((ledger) => {
-      const lname = ledger.name.toLowerCase();
+      const lname = ledger.name.toLowerCase(); // ✅ sab lowercase
 
-      // 👉 IGST ko bhi GST me daal do
-      if (
-        lname.includes("%gst") ||
-        lname.includes("igst")
-      ) {
-        result.gst.push(ledger);
+      if (lname.includes("igst")) {
+        result.igst.push(ledger);
       }
-
-      if (lname.includes("cgst")) {
+      else if (lname.includes("cgst")) {
         result.cgst.push(ledger);
       }
-
-      if (lname.includes("sgst")) {
+      else if (lname.includes("sgst")) {
         result.sgst.push(ledger);
+      }
+      else if (lname.includes("gst")) {
+        result.gst.push(ledger);
       }
     });
 
+    console.log('data', result)
     res.json({
       success: true,
       data: result,
     });
+
   } catch (error) {
     console.error("Ledger fetch error:", error);
+
     res.status(500).json({
       success: false,
       message: "Failed to fetch ledgers",

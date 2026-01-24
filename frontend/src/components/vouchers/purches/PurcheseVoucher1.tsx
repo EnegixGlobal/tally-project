@@ -292,6 +292,7 @@ const PurchaseVoucher: React.FC = () => {
 
                 // Ledger Mode Support
                 ledgerId: e.ledgerId || "",
+                purchaseLedgerId: e.purchaseLedgerId || data.purchaseLedgerId || "",
                 type: e.type || "debit",
               };
             }) || [],
@@ -497,6 +498,7 @@ const PurchaseVoucher: React.FC = () => {
         batchExpiryDate: "",
         batchManufacturingDate: "",
         batches: [],
+        purchaseLedgerId: "",
       },
     ],
   });
@@ -872,7 +874,9 @@ const PurchaseVoucher: React.FC = () => {
           batchNumber: "",
           batchExpiryDate: "",
           batchManufacturingDate: "",
+          batchManufacturingDate: "",
           batches: [],
+          purchaseLedgerId: "",
         },
       ],
     }));
@@ -927,14 +931,15 @@ const PurchaseVoucher: React.FC = () => {
         newErrors.referenceNo = "Supplier Invoice number is required";
       if (!formData.supplierInvoiceDate)
         newErrors.supplierInvoiceDate = "Supplier Invoice date is required";
-      if (!formData.purchaseLedgerId)
-        newErrors.purchaseLedgerId = "Purchase Ledger is required";
     }
 
     if (formData.mode === "item-invoice") {
       formData.entries.forEach((entry, index) => {
         if (!entry.itemId)
           newErrors[`entry${index}.itemId`] = "Item is required";
+
+        if (!entry.purchaseLedgerId)
+          newErrors[`entry${index}.purchaseLedgerId`] = "Purchase Ledger is required";
 
         if ((entry.quantity ?? 0) <= 0)
           newErrors[`entry${index}.quantity`] =
@@ -1364,7 +1369,7 @@ const PurchaseVoucher: React.FC = () => {
       return;
     }
 
-    if (!formData.purchaseLedgerId) {
+    if (!entry.purchaseLedgerId) {
       Swal.fire("Error", "Purchase ledger is required", "error");
       return;
     }
@@ -1866,45 +1871,8 @@ const PurchaseVoucher: React.FC = () => {
               )}
           </div>
 
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="purchaseLedgerId"
-              >
-                Purchase Ledger
-              </label>
-              <select
-                id="purchaseLedgerId"
-                name="purchaseLedgerId"
-                value={formData.purchaseLedgerId}
-                onChange={handlePurchaseLedgerChange}
-                className={getSelectClasses(theme, !!errors.purchaseLedgerId)}
-              >
-                <option value="">-- Select Purchase Ledger --</option>
-
-                {purchaseLedgers.map((ledger) => (
-                  <option key={ledger.id} value={ledger.id}>
-                    {ledger.name}
-                  </option>
-                ))}
-                <option
-                  value="add-new"
-                  className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                    ? "bg-blue-600 hover:bg-green-700"
-                    : "bg-green-600 hover:bg-green-700 text-white"
-                    }`}
-                >
-                  + Add New Ledger
-                </option>
-              </select>
-              {errors.purchaseLedgerId && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.purchaseLedgerId}
-                </p>
-              )}
-            </div>
-
             {/* Godown Enable/Disable dropdown */}
             {visibleColumns.godown && (
               <div>
@@ -2052,6 +2020,7 @@ const PurchaseVoucher: React.FC = () => {
                       {godownEnabled === "yes" && visibleColumns.godown && (
                         <th className={TABLE_STYLES.header}>Godown</th>
                       )}
+                      <th className={TABLE_STYLES.header}>Purchase Ledger</th>
                       <th className={TABLE_STYLES.headerCenter}>Action</th>
                     </tr>
                   </thead>
@@ -2448,6 +2417,31 @@ const PurchaseVoucher: React.FC = () => {
                             </td>
                           )}
 
+                          {/* Purchase Ledger */}
+                          <td className="px-1 py-2 min-w-[120px]">
+                            <select
+                              name="purchaseLedgerId"
+                              value={entry.purchaseLedgerId || ""}
+                              onChange={(e) => handleEntryChange(index, e)}
+                              className={`${TABLE_STYLES.select} min-w-[120px] text-xs ${errors[`entry${index}.purchaseLedgerId`]
+                                  ? "border-red-500"
+                                  : ""
+                                }`}
+                            >
+                              <option value="">Select Ledger</option>
+                              {purchaseLedgers.map((ledger) => (
+                                <option key={ledger.id} value={ledger.id}>
+                                  {ledger.name}
+                                </option>
+                              ))}
+                            </select>
+                            {errors[`entry${index}.purchaseLedgerId`] && (
+                              <p className="text-red-500 text-xs mt-1">
+                                {errors[`entry${index}.purchaseLedgerId`]}
+                              </p>
+                            )}
+                          </td>
+
                           {/* ACTION */}
                           <td className="px-1 py-2 text-center min-w-[40px]">
                             <button
@@ -2471,7 +2465,9 @@ const PurchaseVoucher: React.FC = () => {
                         (visibleColumns.hsn ? 1 : 0) +
                         (visibleColumns.batch ? 1 : 0) +
                         (!addBatchModal.visible ? 2 : 0) + // Qty(1) + Rate(1)
-                        (visibleColumns.gst ? (isIntraState ? 2 : 1) : 0);
+                        (visibleColumns.gst ? (isIntraState ? 2 : 1) : 0) +
+                        ((godownEnabled === "yes" && visibleColumns.godown) ? 1 : 0) +
+                        1; // Purchase Ledger
 
                       return (
                         <>
@@ -2825,34 +2821,36 @@ const PurchaseVoucher: React.FC = () => {
             </button>
           </div>
         </form>
-      </div>
+      </div >
       {/* Inline Add-Batch now rendered per-entry inside table; no global modal */}
       {/* Configuration Modal (F12) */}
-      {showConfig && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div
-            className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
-          >
-            <h2 className="text-xl font-bold mb-4">
-              Configure Purchase Voucher
-            </h2>
-            <p className="mb-4">Configure GST settings, invoice format, etc.</p>
-            <div className="flex justify-end">
-              <button
-                onClick={() => setShowConfig(false)}
-                className={`px-4 py-2 rounded ${theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-gray-200 hover:bg-gray-300"
-                  }`}
-              >
-                Close
-              </button>
+      {
+        showConfig && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div
+              className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+                }`}
+            >
+              <h2 className="text-xl font-bold mb-4">
+                Configure Purchase Voucher
+              </h2>
+              <p className="mb-4">Configure GST settings, invoice format, etc.</p>
+              <div className="flex justify-end">
+                <button
+                  onClick={() => setShowConfig(false)}
+                  className={`px-4 py-2 rounded ${theme === "dark"
+                    ? "bg-gray-700 hover:bg-gray-600"
+                    : "bg-gray-200 hover:bg-gray-300"
+                    }`}
+                >
+                  Close
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}{" "}
-      {/* Print Layout */}{" "}
+        )
+      } {" "}
+      {/* Print Layout */} {" "}
       <div className="absolute -left-[9999px] -top-[9999px] w-[210mm] min-h-[297mm]">
         <div
           ref={printRef}
@@ -3359,7 +3357,7 @@ const PurchaseVoucher: React.FC = () => {
           Esc to cancel.
         </p>
       </div>
-    </div>
+    </div >
   );
 };
 

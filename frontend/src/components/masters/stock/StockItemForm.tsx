@@ -141,10 +141,12 @@ const StockItemForm = () => {
     gst: any[];
     cgst: any[];
     sgst: any[];
+    igst: any[];
   }>({
     gst: [],
     cgst: [],
     sgst: [],
+    igst: [],
   });
 
 
@@ -180,7 +182,10 @@ const StockItemForm = () => {
 
 
 
-  const gstOptions = gstLedgers.gst.map((l) => ({
+  const gstOptions = [
+    ...gstLedgers.gst,
+    ...gstLedgers.igst,
+  ].map((l) => ({
     value: l.id.toString(),
     label: l.name,
   }));
