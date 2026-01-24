@@ -161,23 +161,35 @@ const cleanState = (state = "") =>
 
 
 // ✅ AUTO CREATE COLUMN (RUNS ON EVERY HIT – SAFE)
+let isPurchaseLedgerChecked = false;
+
+
 const ensurePurchaseLedgerColumn = async () => {
+  if (isPurchaseLedgerChecked) return;
+
+
   const [rows] = await db.execute(`
-    SHOW COLUMNS
-    FROM purchase_voucher_items
-    LIKE 'purchaseLedgerId'
-  `);
+SHOW COLUMNS
+FROM purchase_voucher_items
+LIKE 'purchaseLedgerId'
+`);
+
 
   if (rows.length === 0) {
     console.log("⚙️ Creating purchaseLedgerId column...");
 
+
     await db.execute(`
-      ALTER TABLE purchase_voucher_items
-      ADD COLUMN purchaseLedgerId INT NULL
-    `);
+ALTER TABLE purchase_voucher_items
+ADD COLUMN purchaseLedgerId INT NULL
+`);
+
 
     console.log("✅ purchaseLedgerId column created");
   }
+
+
+  isPurchaseLedgerChecked = true;
 };
 
 
@@ -223,6 +235,7 @@ router.post("/", async (req, res) => {
 
   try {
     // ================= FETCH STATES =================
+    await ensurePurchaseLedgerColumn();
 
     let companyState = "";
     let partyState = "";
