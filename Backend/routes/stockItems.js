@@ -429,30 +429,45 @@ router.post("/", async (req, res) => {
        📦 BATCH CALCULATION
        =============================== */
 
-    for (const batchName of batchNames) {
+    for (const rawName of batchNames) {
+
+
+      // Always sanitize + uppercase (double safety)
+      const batchName = String(rawName || "").trim().toUpperCase();
+
+
+      if (!batchName) continue;
+
+
       const [rows] = await connection.execute(
         `
-        SELECT id FROM stock_items
-        WHERE company_id=? AND owner_type=? AND owner_id=?
-        AND JSON_SEARCH(
-UPPER(
+SELECT id
+FROM stock_items
+WHERE company_id = ?
+AND owner_type = ?
+AND owner_id = ?
+
+
+AND JSON_SEARCH(
 CASE
 WHEN batches IS NOT NULL AND JSON_VALID(batches)
 THEN batches
 ELSE '[]'
-END
-),
+END,
 'one',
-?,
+UPPER(?),
 NULL,
 '$[*].batchName'
 ) IS NOT NULL
-        `,
+`,
         [company_id, owner_type, owner_id, batchName]
       );
 
+
       if (rows.length > 0) {
         await connection.rollback();
+
+
         return res.status(409).json({
           success: false,
           message: `Batch "${batchName}" already exists`,
