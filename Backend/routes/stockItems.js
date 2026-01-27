@@ -429,49 +429,51 @@ router.post("/", async (req, res) => {
        📦 BATCH CALCULATION
        =============================== */
 
+    /* ===============================
+   ✅ SAFE DUPLICATE BATCH CHECK (NODE SIDE)
+   =============================== */
+
+    const [existingItems] = await connection.execute(
+      `
+  SELECT id, batches
+  FROM stock_items
+  WHERE company_id = ?
+    AND owner_type = ?
+    AND owner_id = ?
+  `,
+      [company_id, owner_type, owner_id]
+    );
+
     for (const rawName of batchNames) {
-
-
-      // Always sanitize + uppercase (double safety)
       const batchName = String(rawName || "").trim().toUpperCase();
-
 
       if (!batchName) continue;
 
+      for (const item of existingItems) {
+        let dbBatches = [];
 
-      const [rows] = await connection.execute(
-        `
-SELECT id
-FROM stock_items
-WHERE company_id = ?
-AND owner_type = ?
-AND owner_id = ?
+        try {
+          dbBatches = item.batches ? JSON.parse(item.batches) : [];
+          if (!Array.isArray(dbBatches)) dbBatches = [];
+        } catch {
+          dbBatches = [];
+        }
 
+        const found = dbBatches.some(
+          (b) =>
+            String(b.batchName || "")
+              .trim()
+              .toUpperCase() === batchName
+        );
 
-AND JSON_SEARCH(
-CASE
-WHEN batches IS NOT NULL AND JSON_VALID(batches)
-THEN batches
-ELSE '[]'
-END,
-'one',
-UPPER(?),
-NULL,
-'$[*].batchName'
-) IS NOT NULL
-`,
-        [company_id, owner_type, owner_id, batchName]
-      );
+        if (found) {
+          await connection.rollback();
 
-
-      if (rows.length > 0) {
-        await connection.rollback();
-
-
-        return res.status(409).json({
-          success: false,
-          message: `Batch "${batchName}" already exists`,
-        });
+          return res.status(409).json({
+            success: false,
+            message: `Batch "${batchName}" already exists`,
+          });
+        }
       }
     }
 
