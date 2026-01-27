@@ -2,6 +2,21 @@ const express = require('express');
 const router = express.Router();
 const pool = require('../db');
 
+
+
+
+router.get('/api/group', (req, res) => {
+  try {
+    console.log('hiting url')
+    res.status(200).send({
+      message: "run"
+    }
+    )
+  } catch (error) {
+
+  }
+})
+
 // GET /api/group-summary
 router.get("/api/group-summary", async (req, res) => {
   const { groupType, company_id, owner_type, owner_id } = req.query;
@@ -104,6 +119,7 @@ router.get("/api/group-summary", async (req, res) => {
     res.status(500).json({ error: "Internal Server Error" });
   }
 });
+
 
 
 module.exports = router;

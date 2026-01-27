@@ -6,7 +6,6 @@ interface Ledger {
   id: number;
   name: string;
   group_id: number;
-  openingBalance: number;
   balanceType: "debit" | "credit";
   groupName: string | null;
   groupType: string | null;
@@ -19,6 +18,9 @@ interface Ledger {
   gstNumber?: string;
   panNumber?: string;
   groupId?: number;
+  debit?:number;
+  credit?:number;
+  
 }
 
 const GroupSummary: React.FC = () => {
@@ -76,8 +78,7 @@ const GroupSummary: React.FC = () => {
 
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -105,8 +106,7 @@ const GroupSummary: React.FC = () => {
 
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -115,7 +115,7 @@ const GroupSummary: React.FC = () => {
         }
 
         const data = await res.json();
-        // console.log("this is ledger data", data);
+
         const groupIdFromUrl = Number(groupType);
 
         let resolvedName = "Unknown Group";
@@ -152,6 +152,7 @@ const GroupSummary: React.FC = () => {
           (item: any) => Number(item.groupId) === groupIdFromUrl
         );
 
+        console.log('ledger', filteredLedgers)
         setLedgers(filteredLedgers);
       } catch (err: any) {
         console.error(err);
@@ -166,6 +167,36 @@ const GroupSummary: React.FC = () => {
   }, [groupType, companyId, ownerType, ownerId, groups]);
 
   // console.log("ledgers", ledgers);
+
+
+  //  useEffect(() => {
+  //   const fetchLedgerGroups = async () => {
+  //     if (!companyId || !ownerType || !ownerId) {
+  //       setGroups([]);
+  //       return;
+  //     }
+
+  //     try {
+  //       const res = await fetch(
+  //         `${import.meta.env.VITE_API_URL
+  //         }/api/group?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+  //       );
+
+  //       if (!res.ok) {
+  //         throw new Error("Failed to fetch ledger groups");
+  //       }
+
+  //       const data = await res.json();
+  //       // console.log("this is ledger groups data", data);
+  //       setGroups(data || []);
+  //     } catch (err) {
+  //       console.error("Failed to load ledger groups", err);
+  //       setGroups([]);
+  //     }
+  //   };
+
+  //   fetchLedgerGroups();
+  // }, [companyId, ownerType, ownerId]);
 
   // Resolve `groupType` param to a numeric group id.
   const resolveGroupId = (param?: string | null): number | null => {
@@ -196,15 +227,13 @@ const GroupSummary: React.FC = () => {
   const groupLedgers =
     resolvedGroupId !== null
       ? ledgers.filter(
-          (ledger) => Number(ledger.groupId || ledger.group_id) === Number(resolvedGroupId)
-        )
+        (ledger) => Number(ledger.groupId || ledger.group_id) === Number(resolvedGroupId)
+      )
       : [];
 
-  // Sum up opening balances of the group ledgers
-  const groupTotal = ledgers.reduce(
-    (sum, ledger) => sum + Number(ledger.openingBalance || 0),
-    0
-  );
+
+
+
 
   // Generate monthly-wise data based on creation date
   const generateMonthlyData = (ledger: any) => {
@@ -224,14 +253,14 @@ const GroupSummary: React.FC = () => {
     ];
 
     const opening = Number(ledger.openingBalance) || 0;
-    
+
     // If no createdAt, show opening balance in first month (Apr)
     let creationMonthIndex = 0;
-    
+
     if (ledger.createdAt) {
       const createdDate = new Date(ledger.createdAt);
       const createdMonth = createdDate.getMonth(); // 0-11 (Jan-Dec)
-      
+
       // Map calendar months to financial year months (Apr-Mar)
       // Jan (0) -> 9, Feb (1) -> 10, Mar (2) -> 11
       // Apr (3) -> 0, May (4) -> 1, ..., Dec (11) -> 8
@@ -259,6 +288,16 @@ const GroupSummary: React.FC = () => {
     });
   };
 
+  const totalDebit = ledgers.reduce(
+    (sum, ledger) => sum + Number(ledger.debit || 0),
+    0
+  );
+
+  const totalCredit = ledgers.reduce(
+    (sum, ledger) => sum + Number(ledger.credit || 0),
+    0
+  );
+
   // You can replace this with your actual theme logic or context
   const [theme] = useState<"light" | "dark">("light");
 
@@ -269,9 +308,8 @@ const GroupSummary: React.FC = () => {
           title="Back to Group Summary"
           type="button"
           onClick={() => navigate("/app/reports/group-summary")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -284,27 +322,24 @@ const GroupSummary: React.FC = () => {
             title="Toggle Filters"
             type="button"
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Filter size={18} />
           </button>
           <button
             title="Print Report"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
           <button
             title="Download Report"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Download size={18} />
           </button>
@@ -313,9 +348,8 @@ const GroupSummary: React.FC = () => {
 
       {showFilterPanel && (
         <div
-          className={`p-4 mb-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 mb-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h3 className="font-semibold mb-4">Filters</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -327,22 +361,20 @@ const GroupSummary: React.FC = () => {
                 title="Select Date"
                 type="date"
                 defaultValue={new Date().toISOString().split("T")[0]}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               />
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Period</label>
               <select
                 title="Select Period"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               >
                 <option value="current-year">Current Financial Year</option>
                 <option value="previous-year">Previous Financial Year</option>
@@ -355,38 +387,35 @@ const GroupSummary: React.FC = () => {
 
       {/* View Mode Controls */}
       <div
-        className={`mb-6 flex items-center justify-between p-4 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`mb-6 flex items-center justify-between p-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <div className="flex items-center space-x-4">
           <span className="font-semibold">View Mode:</span>
           <div className="flex space-x-2">
             <button
               onClick={() => setViewMode("consolidated")}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                viewMode === "consolidated"
-                  ? theme === "dark"
-                    ? "bg-blue-600 text-white"
-                    : "bg-blue-600 text-white"
-                  : theme === "dark"
+              className={`px-4 py-2 rounded-md transition-colors ${viewMode === "consolidated"
+                ? theme === "dark"
+                  ? "bg-blue-600 text-white"
+                  : "bg-blue-600 text-white"
+                : theme === "dark"
                   ? "bg-gray-700 hover:bg-gray-600"
                   : "bg-gray-200 hover:bg-gray-300"
-              }`}
+                }`}
             >
               Without Monthly-wise
             </button>
             <button
               onClick={() => setViewMode("monthly")}
-              className={`px-4 py-2 rounded-md transition-colors ${
-                viewMode === "monthly"
-                  ? theme === "dark"
-                    ? "bg-blue-600 text-white"
-                    : "bg-blue-600 text-white"
-                  : theme === "dark"
+              className={`px-4 py-2 rounded-md transition-colors ${viewMode === "monthly"
+                ? theme === "dark"
+                  ? "bg-blue-600 text-white"
+                  : "bg-blue-600 text-white"
+                : theme === "dark"
                   ? "bg-gray-700 hover:bg-gray-600"
                   : "bg-gray-200 hover:bg-gray-300"
-              }`}
+                }`}
             >
               Monthly-wise
             </button>
@@ -401,9 +430,8 @@ const GroupSummary: React.FC = () => {
 
       {/* Group Summary Table */}
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <div className="mb-4">
           <h2 className="text-xl font-bold mb-2">
@@ -421,23 +449,25 @@ const GroupSummary: React.FC = () => {
             <table className="w-full">
               <thead>
                 <tr
-                  className={`${
-                    theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b-2 border-gray-300"
-                  }`}
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b-2 border-gray-300"
+                    }`}
                 >
                   <th className="px-4 py-3 text-left">Ledger Name</th>
                   <th className="px-4 py-3 text-left">Group</th>
-                  <th className="px-4 py-3 text-right">Opening Balance</th>
+                  <th className="px-4 py-3 text-right">Debit</th>
+                  <th className="px-4 py-3 text-right">Credit</th>
                   <th className="px-4 py-3 text-right">Closing Balance</th>
-                  <th className="px-4 py-3 text-center">Type</th>
                 </tr>
               </thead>
               <tbody>
                 {ledgers.map((ledger) => (
                   <tr
                     key={ledger.id}
+                    onClick={() =>
+                      navigate(`/app/reports/ledger/${ledger.id}`)
+                    }
                     className="border-b border-gray-200 cursor-pointer hover:bg-gray-100"
                   >
                     {/* Ledger Name */}
@@ -448,27 +478,19 @@ const GroupSummary: React.FC = () => {
                       {resolvedGroupName || `Group ${groupType}`}
                     </td>
 
-                    {/* Opening Balance */}
+                    {/* Debit */}
                     <td className="px-4 py-3 text-right font-mono">
-                      {Number(ledger.openingBalance).toLocaleString()}
+                      {Number(ledger.debit || 0).toLocaleString()}
                     </td>
 
-                    {/* Closing Balance */}
+                    {/* Credit */}
                     <td className="px-4 py-3 text-right font-mono">
-                      {Number(ledger.closingBalance ?? ledger.openingBalance).toLocaleString()}
+                      {Number(ledger.credit || 0).toLocaleString()}
                     </td>
 
-                    {/* Type */}
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`px-2 py-1 rounded text-xs ${
-                          ledger.balanceType === "debit"
-                            ? "bg-green-100 text-green-800"
-                            : "bg-red-100 text-red-800"
-                        }`}
-                      >
-                        {ledger.balanceType.toUpperCase()}
-                      </span>
+                    {/* Closing */}
+                    <td className="px-4 py-3 text-right font-mono">
+                      {Number(ledger.closingBalance || 0).toLocaleString()}
                     </td>
                   </tr>
                 ))}
@@ -476,20 +498,22 @@ const GroupSummary: React.FC = () => {
 
               <tfoot>
                 <tr
-                  className={`font-bold ${
-                    theme === "dark"
-                      ? "border-t-2 border-gray-600"
-                      : "border-t-2 border-gray-300"
-                  }`}
+                  className={`font-bold ${theme === "dark"
+                    ? "border-t-2 border-gray-600"
+                    : "border-t-2 border-gray-300"
+                    }`}
                 >
                   <td className="px-4 py-3">Total</td>
                   <td className="px-4 py-3"></td>
                   <td className="px-4 py-3 text-right font-mono">
-                    {groupTotal.toLocaleString()}
+                    {totalDebit.toLocaleString()}
                   </td>
+
                   <td className="px-4 py-3 text-right font-mono">
-                    {groupTotal.toLocaleString()}
+                    {totalCredit.toLocaleString()}
                   </td>
+
+                  <td className="px-4 py-3 text-right font-mono"></td>
                   <td className="px-4 py-3 text-right font-mono"></td>
                   <td className="px-4 py-3"></td>
                 </tr>
@@ -515,9 +539,8 @@ const GroupSummary: React.FC = () => {
                       <table className="w-full text-sm">
                         <thead>
                           <tr
-                            className={`${
-                              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                            }`}
+                            className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                              }`}
                           >
                             <th className="px-3 py-2 text-left">Month</th>
                             <th className="px-3 py-2 text-right">Opening</th>
@@ -529,11 +552,10 @@ const GroupSummary: React.FC = () => {
                           {monthlyData.map((monthData, index) => (
                             <tr
                               key={index}
-                              className={`${
-                                theme === "dark"
-                                  ? "border-b border-gray-700"
-                                  : "border-b border-gray-200"
-                              }`}
+                              className={`${theme === "dark"
+                                ? "border-b border-gray-700"
+                                : "border-b border-gray-200"
+                                }`}
                             >
                               <td className="px-3 py-2">{monthData.month}</td>
                               <td className="px-3 py-2 text-right font-mono">
@@ -560,29 +582,26 @@ const GroupSummary: React.FC = () => {
 
       {/* Group Totals Summary */}
       <div
-        className={`mt-6 p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`mt-6 p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
-        <div className="text-center">
+        <div className="flex justify-between">
           <h2 className="text-xl font-bold mb-4">Group Summary</h2>
-          <div className="grid grid-cols-3 gap-4">
-            <div>
-              <p className="text-sm opacity-75">Opening Balance</p>
-              <p className="text-xl font-bold">
-                ₹ {groupTotal.toLocaleString()}
-              </p>
-            </div>
-            <div>
-              <p className="text-sm opacity-75">Current Period</p>
-              <p className="text-xl font-bold">₹ 0</p>
-            </div>
-            <div>
-              <p className="text-sm opacity-75">Closing Balance</p>
-              <p className="text-xl font-bold">
-                ₹ {groupTotal.toLocaleString()}
-              </p>
-            </div>
+          <div>
+            <p className="text-sm opacity-75">Total Debit</p>
+            <p className="text-xl font-bold">₹ {totalDebit.toLocaleString()}</p>
+          </div>
+
+          <div>
+            <p className="text-sm opacity-75">Total Credit</p>
+            <p className="text-xl font-bold">₹ {totalCredit.toLocaleString()}</p>
+          </div>
+
+          <div>
+            <p className="text-sm opacity-75">Closing Balance</p>
+            <p className="text-xl font-bold">
+              ₹ {(totalDebit - totalCredit).toLocaleString()}
+            </p>
           </div>
           <div className="mt-4">
             <p className="text-sm opacity-75">
@@ -593,9 +612,8 @@ const GroupSummary: React.FC = () => {
       </div>
 
       <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <p className="text-sm">
           <span className="font-semibold">Pro Tip:</span> Click on any ledger to
