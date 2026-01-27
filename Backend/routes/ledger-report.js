@@ -2,6 +2,31 @@ const express = require("express");
 const router = express.Router();
 const db = require("../db");
 
+// ✅ Auto-create salesLedgerId column if missing
+async function ensureSalesLedgerColumn(connection) {
+  try {
+    const [rows] = await connection.execute(`
+      SHOW COLUMNS FROM sales_voucher_items
+      LIKE 'salesLedgerId'
+    `);
+
+    if (rows.length === 0) {
+      console.log("⚠️ salesLedgerId missing → creating...");
+
+      await connection.execute(`
+        ALTER TABLE sales_voucher_items
+        ADD COLUMN salesLedgerId INT AFTER voucherId
+      `);
+
+      console.log("✅ salesLedgerId created");
+    }
+  } catch (err) {
+    if (!err.message.includes("Duplicate column")) {
+      throw err;
+    }
+  }
+}
+
 router.get("/report", async (req, res) => {
   const { ledgerId } = req.query;
 
@@ -16,6 +41,9 @@ router.get("/report", async (req, res) => {
   const connection = await db.getConnection();
 
   try {
+
+    await ensureSalesLedgerColumn(connection);
+
     /* ===============================
        1️⃣ LEDGER MASTER
     =============================== */
