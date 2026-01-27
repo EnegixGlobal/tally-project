@@ -260,7 +260,7 @@ const SalesVoucher: React.FC = () => {
       referenceNo: "",
       partyId: "",
       mode: "item-invoice",
-      dispatchDetails: { docNo: "", through: "", destination: "" },
+      dispatchDetails: { docNo: "", through: "", destination: "", approxDistance: "", },
       salesLedgerId: "", // Add sales ledger field
       entries: [
         {
@@ -444,6 +444,7 @@ const SalesVoucher: React.FC = () => {
             docNo: v.dispatchDocNo,
             through: v.dispatchThrough,
             destination: v.destination,
+            approxDistance: v.approxDistance || "",
           },
           narration: v.narration,
           entries: mergedEntries,
@@ -569,13 +570,15 @@ const SalesVoucher: React.FC = () => {
   ) => {
     const { name, value } = e.target;
     if (name.startsWith("dispatchDetails.")) {
-      const field = name.split(".")[1] as keyof typeof formData.dispatchDetails;
+      const field = name.split(".")[1];
+
       setFormData((prev) => ({
         ...prev,
         dispatchDetails: {
           docNo: prev.dispatchDetails?.docNo || "",
           through: prev.dispatchDetails?.through || "",
           destination: prev.dispatchDetails?.destination || "",
+          approxDistance: prev.dispatchDetails?.approxDistance || "",
           [field]: value,
         },
       }));
@@ -1304,6 +1307,7 @@ const SalesVoucher: React.FC = () => {
         docNo: formData.dispatchDetails?.docNo || "",
         through: formData.dispatchDetails?.through || "",
         destination: formData.dispatchDetails?.destination || "",
+        approxDistance: formData.dispatchDetails?.approxDistance || "",
       },
 
       entries: entriesWithGST,
@@ -1891,7 +1895,23 @@ const SalesVoucher: React.FC = () => {
                     className={FORM_STYLES.input(theme)}
                   />
                 </div>
+
               )}
+
+
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Approximate Distance (KM)
+                </label>
+                <input
+                  type="text"
+                  name="dispatchDetails.approxDistance"
+                  value={formData.dispatchDetails?.approxDistance ?? ""}
+                  onChange={handleChange}
+                  placeholder="e.g. 120"
+                  className={FORM_STYLES.input(theme)}
+                />
+              </div>
 
               <div>
                 <label

@@ -1025,6 +1025,16 @@ function App() {
                   </RequireCompany>
                 }
               />
+
+              <Route
+                path="reports/ledger/:id"
+                element={
+                  <RequireCompany>
+                    <LedgerReport />
+                  </RequireCompany>
+                }
+              />
+
               <Route
                 path="reports/trial-balance"
                 element={

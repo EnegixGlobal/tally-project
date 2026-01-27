@@ -170,6 +170,7 @@ export type VoucherEntry = {
     docNo: string;
     through: string;
     destination: string;
+    approxDistance: string;
   };
   orderRef?: string;
   termsOfDelivery?: string;
