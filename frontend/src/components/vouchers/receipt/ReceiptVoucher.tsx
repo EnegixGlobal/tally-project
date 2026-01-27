@@ -16,7 +16,6 @@ const ReceiptVoucher: React.FC = () => {
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
   );
-  console.log(companyId, ownerType, ownerId);
 
   const [cashBankLedgers, setCashBankLedgers] = useState<Ledger[]>([]);
   const [allLedgers, setAllLedgers] = useState<Ledger[]>([]);
@@ -394,22 +393,7 @@ const ReceiptVoucher: React.FC = () => {
 
     const fetchData = async () => {
       try {
-        // 1) Cash / Bank Ledgers
-        const cashRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
-          }/api/ledger/cash-bank?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-        );
-        let cashData = await cashRes.json();
-
-        cashData = cashData.map((item: any) => ({
-          ...item,
-          type: item.name?.toLowerCase(),
-        }));
-
-        setCashBankLedgers(cashData);
-
-        // 2) All Ledgers
+       
         const allRes = await fetch(
           `${
             import.meta.env.VITE_API_URL
@@ -432,7 +416,7 @@ const ReceiptVoucher: React.FC = () => {
     fetchData();
   }, []);
 
-  console.log("data", cashBankLedgers);
+  
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -918,7 +902,7 @@ const ReceiptVoucher: React.FC = () => {
                     <option value="">Select Cash/Bank Ledger</option>
 
                     {/* 🔥 Real database cash/bank ledgers */}
-                    {cashBankLedgers.map((l) => (
+                    {allLedgers.map((l) => (
                       <option key={l.id} value={String(l.id)}>
                         {l.name}
                       </option>

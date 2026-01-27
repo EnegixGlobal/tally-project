@@ -51,6 +51,40 @@ async function ensureSalesLedgerColumn() {
   }
 }
 
+// ================= AUTO CHECK DISPATCH COLUMNS =================
+async function ensureDispatchColumns() {
+  const columns = [
+    { name: "dispatchDocNo", type: "VARCHAR(100)" },
+    { name: "dispatchThrough", type: "VARCHAR(100)" },
+    { name: "destination", type: "VARCHAR(255)" },
+    { name: "approxDistance", type: "VARCHAR(50)" }, 
+  ];
+
+  for (const col of columns) {
+    const [rows] = await db.query(
+      `
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'sales_vouchers'
+        AND COLUMN_NAME = ?
+      `,
+      [col.name]
+    );
+
+    if (rows.length === 0) {
+      console.log(`⚠️ ${col.name} missing → creating...`);
+
+      await db.query(`
+        ALTER TABLE sales_vouchers
+        ADD COLUMN ${col.name} ${col.type} NULL
+      `);
+
+      console.log(`✅ ${col.name} column created`);
+    }
+  }
+}
+
 // ================= SAVE SALES VOUCHER =================
 router.post("/", async (req, res) => {
   console.log("POST /sales-vouchers hit");
@@ -58,6 +92,7 @@ router.post("/", async (req, res) => {
   try {
     // ✅ Ensure column exists first
     await ensureSalesLedgerColumn();
+    await ensureDispatchColumns();
 
     const {
       number,
@@ -143,6 +178,7 @@ router.post("/", async (req, res) => {
     const dispatchDocNo = dispatchDetails?.docNo || null;
     const dispatchThrough = dispatchDetails?.through || null;
     const destination = dispatchDetails?.destination || null;
+    const approxDistance = dispatchDetails?.approxDistance || null;
 
     // ================= INSERT VOUCHER =================
     const insertVoucherSQL = `
@@ -155,6 +191,7 @@ router.post("/", async (req, res) => {
         dispatchDocNo,
         dispatchThrough,
         destination,
+        approxDistance,
         subtotal,
         cgstTotal,
         sgstTotal,
@@ -171,7 +208,7 @@ router.post("/", async (req, res) => {
         sales_type_id,
         bill_no
       )
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `;
 
     const voucherValues = [
@@ -184,7 +221,7 @@ router.post("/", async (req, res) => {
       dispatchDocNo,
       dispatchThrough,
       destination,
-
+      approxDistance,
       subtotal ?? 0,
 
       finalCgst,
@@ -554,6 +591,8 @@ router.put("/:id", async (req, res) => {
   } = req.body;
 
   try {
+
+    await ensureDispatchColumns();
     // ================= CHECK & ADD COLUMNS IF MISSING (for UPDATE route too) =================
     try {
       const [salesTypeIdCheck] = await db.execute(

@@ -63,11 +63,11 @@ const ContraVoucher: React.FC = () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/vouchers/next-number` +
-            `?company_id=${companyId}` +
-            `&owner_type=${ownerType}` +
-            `&owner_id=${ownerId}` +
-            `&voucherType=contra` +
-            `&date=${formData.date}`
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}` +
+          `&voucherType=contra` +
+          `&date=${formData.date}`
         );
 
         const data = await res.json();
@@ -215,8 +215,7 @@ const ContraVoucher: React.FC = () => {
   };
   useEffect(() => {
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((res) => res.json())
@@ -293,21 +292,18 @@ const ContraVoucher: React.FC = () => {
             <table>
               <tr><th>Voucher No.</th><td>${formData.number}</td></tr>
               <tr><th>Date</th><td>${formData.date}</td></tr>
-              <tr><th>Mode</th><td>${
-                formData.mode === "double-entry"
-                  ? "Double Entry"
-                  : "Single Entry"
-              }</td></tr>
-              ${
-                formData.referenceNo
-                  ? `<tr><th>Reference No.</th><td>${formData.referenceNo}</td></tr>`
-                  : ""
-              }
-              ${
-                formData.supplierInvoiceDate
-                  ? `<tr><th>Reference Date</th><td>${formData.supplierInvoiceDate}</td></tr>`
-                  : ""
-              }
+              <tr><th>Mode</th><td>${formData.mode === "double-entry"
+          ? "Double Entry"
+          : "Single Entry"
+        }</td></tr>
+              ${formData.referenceNo
+          ? `<tr><th>Reference No.</th><td>${formData.referenceNo}</td></tr>`
+          : ""
+        }
+              ${formData.supplierInvoiceDate
+          ? `<tr><th>Reference Date</th><td>${formData.supplierInvoiceDate}</td></tr>`
+          : ""
+        }
               <tr><th>Narration</th><td>${formData.narration || "N/A"}</td></tr>
             </table>
             <h2>Entries</h2>
@@ -324,57 +320,51 @@ const ContraVoucher: React.FC = () => {
               </thead>
               <tbody>
                 ${formData.entries
-                  .map(
-                    (entry) => `
+          .map(
+            (entry) => `
                   <tr>
-                    <td>${
-                      ledgers.find((l) => l.id === entry.ledgerId)?.name ||
-                      "N/A"
-                    }</td>
+                    <td>${ledgers.find((l) => l.id === entry.ledgerId)?.name ||
+              "N/A"
+              }</td>
                     <td>${entry.type === "debit" ? "Dr" : "Cr"}</td>
                     <td>${entry.amount.toLocaleString()}</td>
-                    ${
-                      config.showEntryNarration
-                        ? `<td>${entry.narration || "N/A"}</td>`
-                        : ""
-                    }
-                    ${
-                      config.showCostCentre
-                        ? `<td>${
-                            entry.costCentreId
-                              ? costCentres.find(
-                                  (c) => c.id === entry.costCentreId
-                                )?.name || "N/A"
-                              : "N/A"
-                          }</td>`
-                        : ""
-                    }
-                    ${
-                      config.showBankDetails &&
-                      ledgers.find((l) => l.id === entry.ledgerId)?.type ===
-                        "bank"
-                        ? `<td>${entry.bankName || ""} ${
-                            entry.chequeNumber || ""
-                          }</td>`
-                        : ""
-                    }
+                    ${config.showEntryNarration
+                ? `<td>${entry.narration || "N/A"}</td>`
+                : ""
+              }
+                    ${config.showCostCentre
+                ? `<td>${entry.costCentreId
+                  ? costCentres.find(
+                    (c) => c.id === entry.costCentreId
+                  )?.name || "N/A"
+                  : "N/A"
+                }</td>`
+                : ""
+              }
+                    ${config.showBankDetails &&
+                ledgers.find((l) => l.id === entry.ledgerId)?.type ===
+                "bank"
+                ? `<td>${entry.bankName || ""} ${entry.chequeNumber || ""
+                }</td>`
+                : ""
+              }
                   </tr>
                 `
-                  )
-                  .join("")}
+          )
+          .join("")}
               </tbody>
               <tfoot>
                 <tr>
                   <td>Totals</td>
                   <td></td>
                   <td>Dr: ${formData.entries
-                    .filter((e) => e.type === "debit")
-                    .reduce((sum, e) => sum + e.amount, 0)
-                    .toLocaleString()}<br/>
+          .filter((e) => e.type === "debit")
+          .reduce((sum, e) => sum + e.amount, 0)
+          .toLocaleString()}<br/>
                       Cr: ${formData.entries
-                        .filter((e) => e.type === "credit")
-                        .reduce((sum, e) => sum + e.amount, 0)
-                        .toLocaleString()}</td>
+          .filter((e) => e.type === "credit")
+          .reduce((sum, e) => sum + e.amount, 0)
+          .toLocaleString()}</td>
                   ${config.showEntryNarration ? "<td></td>" : ""}
                   ${config.showCostCentre ? "<td></td>" : ""}
                   ${config.showBankDetails ? "<td></td>" : ""}
@@ -393,7 +383,7 @@ const ContraVoucher: React.FC = () => {
     (e: KeyboardEvent) => {
       if (e.ctrlKey && e.key === "s") {
         e.preventDefault();
-        handleSubmit({ preventDefault: () => {} } as React.FormEvent);
+        handleSubmit({ preventDefault: () => { } } as React.FormEvent);
       } else if (e.ctrlKey && e.key === "p") {
         e.preventDefault();
         handlePrint();
@@ -422,25 +412,22 @@ const ContraVoucher: React.FC = () => {
 
   return (
     <div
-      className={`pt-[56px] px-4 ${
-        theme === "dark" ? "bg-gray-900" : "bg-gray-50"
-      }`}
+      className={`pt-[56px] px-4 ${theme === "dark" ? "bg-gray-900" : "bg-gray-50"
+        }`}
     >
       <div className="flex items-center mb-6">
         <button
           title="Back to Vouchers"
           type="button"
           onClick={() => navigate("/app/vouchers")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
         <h1
-          className={`text-2xl font-bold ${
-            theme === "dark" ? "text-gray-100" : "text-gray-900"
-          }`}
+          className={`text-2xl font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"
+            }`}
         >
           {isEditMode ? "Edit Contra Voucher" : "New Contra Voucher"}
         </h1>
@@ -448,11 +435,10 @@ const ContraVoucher: React.FC = () => {
           <button
             title="Save Voucher"
             onClick={handleSubmit}
-            className={`p-2 rounded-md ${
-              theme === "dark"
+            className={`p-2 rounded-md ${theme === "dark"
                 ? "bg-blue-600 hover:bg-blue-700"
                 : "bg-blue-500 hover:bg-blue-600"
-            } text-white flex items-center`}
+              } text-white flex items-center`}
             disabled={!isBalanced}
           >
             <Save size={18} className="mr-2" /> Save
@@ -460,18 +446,16 @@ const ContraVoucher: React.FC = () => {
           <button
             title="Print Voucher"
             onClick={handlePrint}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
           <button
             title="Configure"
             onClick={() => setShowConfigPanel(!showConfigPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Settings size={18} />
           </button>
@@ -479,17 +463,15 @@ const ContraVoucher: React.FC = () => {
       </div>
 
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Date
               </label>
@@ -500,11 +482,10 @@ const ContraVoucher: React.FC = () => {
                 onChange={handleChange}
                 required
                 title="Select voucher date"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500`}
+                  } focus:border-blue-500 focus:ring-blue-500`}
               />
               {errors.date && (
                 <p className="text-red-500 text-sm mt-1">{errors.date}</p>
@@ -512,9 +493,8 @@ const ContraVoucher: React.FC = () => {
             </div>
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Voucher No.
               </label>
@@ -526,13 +506,11 @@ const ContraVoucher: React.FC = () => {
                 readOnly={config.autoNumbering}
                 required
                 title="Voucher number"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500 ${
-                  config.autoNumbering ? "opacity-50" : ""
-                }`}
+                  } focus:border-blue-500 focus:ring-blue-500 ${config.autoNumbering ? "opacity-50" : ""
+                  }`}
                 placeholder={
                   config.autoNumbering ? "Auto" : "Enter voucher number"
                 }
@@ -543,9 +521,8 @@ const ContraVoucher: React.FC = () => {
             </div>
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Mode
               </label>
@@ -563,29 +540,28 @@ const ContraVoucher: React.FC = () => {
                     entries:
                       mode === "single-entry"
                         ? [
-                            {
-                              id: "1",
-                              ledgerId: "",
-                              amount: 0,
-                              type: "debit",
-                              narration: "",
-                            },
-                            {
-                              id: "2",
-                              ledgerId: "",
-                              amount: 0,
-                              type: "credit",
-                              narration: "",
-                            },
-                          ]
+                          {
+                            id: "1",
+                            ledgerId: "",
+                            amount: 0,
+                            type: "debit",
+                            narration: "",
+                          },
+                          {
+                            id: "2",
+                            ledgerId: "",
+                            amount: 0,
+                            type: "credit",
+                            narration: "",
+                          },
+                        ]
                         : prev.entries,
                   }));
                 }}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500`}
+                  } focus:border-blue-500 focus:ring-blue-500`}
               >
                 <option value="double-entry">Double Entry</option>
                 <option value="single-entry">Single Entry</option>
@@ -595,9 +571,8 @@ const ContraVoucher: React.FC = () => {
               <>
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-1 ${
-                      theme === "dark" ? "text-gray-300" : "text-gray-700"
-                    }`}
+                    className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                      }`}
                   >
                     Reference No.
                   </label>
@@ -607,19 +582,17 @@ const ContraVoucher: React.FC = () => {
                     value={formData.referenceNo}
                     onChange={handleChange}
                     title="Reference number"
-                    className={`w-full p-2 rounded border ${
-                      theme === "dark"
+                    className={`w-full p-2 rounded border ${theme === "dark"
                         ? "bg-gray-700 border-gray-600 text-gray-100"
                         : "bg-white border-gray-300 text-gray-900"
-                    } focus:border-blue-500 focus:ring-blue-500`}
+                      } focus:border-blue-500 focus:ring-blue-500`}
                     placeholder="Enter reference number"
                   />
                 </div>
                 <div>
                   <label
-                    className={`block text-sm font-medium mb-1 ${
-                      theme === "dark" ? "text-gray-300" : "text-gray-700"
-                    }`}
+                    className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                      }`}
                   >
                     Reference Date
                   </label>
@@ -629,11 +602,10 @@ const ContraVoucher: React.FC = () => {
                     value={formData.supplierInvoiceDate}
                     onChange={handleChange}
                     title="Reference date"
-                    className={`w-full p-2 rounded border ${
-                      theme === "dark"
+                    className={`w-full p-2 rounded border ${theme === "dark"
                         ? "bg-gray-700 border-gray-600 text-gray-100"
                         : "bg-white border-gray-300 text-gray-900"
-                    } focus:border-blue-500 focus:ring-blue-500`}
+                      } focus:border-blue-500 focus:ring-blue-500`}
                   />
                 </div>
               </>
@@ -644,9 +616,8 @@ const ContraVoucher: React.FC = () => {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
               <div>
                 <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                 >
                   Account Ledger (Cash/Bank)
                 </label>
@@ -656,11 +627,10 @@ const ContraVoucher: React.FC = () => {
                   onChange={(e) => handleEntryChange(0, e)}
                   required
                   title="Select account ledger (Cash/Bank)"
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
+                  className={`w-full p-2 rounded border ${theme === "dark"
                       ? "bg-gray-700 border-gray-600 text-gray-100"
                       : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
+                    } focus:border-blue-500 focus:ring-blue-500`}
                 >
                   <option value="">Select Cash/Bank Ledger</option>
                   {cashBankLedgers.map((ledger) => (
@@ -670,11 +640,10 @@ const ContraVoucher: React.FC = () => {
                   ))}
                   <option
                     value="add-new"
-                    className={`flex items-center px-4 py-2 rounded ${
-                      theme === "dark"
+                    className={`flex items-center px-4 py-2 rounded ${theme === "dark"
                         ? "bg-blue-600 hover:bg-green-700"
                         : "bg-green-600 hover:bg-green-700 text-white"
-                    }`}
+                      }`}
                   >
                     + Add New Ledger
                   </option>
@@ -688,23 +657,21 @@ const ContraVoucher: React.FC = () => {
               </div>
               <div>
                 <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                 >
-                  Party Ledger (Cash/Bank)
+                  Cash/Bank
                 </label>
                 <select
                   name="ledgerId"
                   value={formData.entries[1].ledgerId}
                   onChange={(e) => handleEntryChange(1, e)}
                   required
-                  title="Select party ledger (Cash/Bank)"
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
+                  title="Select  ledger (Cash/Bank)"
+                  className={`w-full p-2 rounded border ${theme === "dark"
                       ? "bg-gray-700 border-gray-600 text-gray-100"
                       : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
+                    } focus:border-blue-500 focus:ring-blue-500`}
                 >
                   <option value="">Select Cash/Bank Ledger</option>
                   {cashBankLedgers.map((ledger) => (
@@ -714,11 +681,10 @@ const ContraVoucher: React.FC = () => {
                   ))}
                   <option
                     value="add-new"
-                    className={`flex items-center px-4 py-2 rounded ${
-                      theme === "dark"
+                    className={`flex items-center px-4 py-2 rounded ${theme === "dark"
                         ? "bg-blue-600 hover:bg-green-700"
                         : "bg-green-600 hover:bg-green-700 text-white"
-                    }`}
+                      }`}
                   >
                     + Add New Ledger
                   </option>{" "}
@@ -732,9 +698,8 @@ const ContraVoucher: React.FC = () => {
               </div>
               <div>
                 <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                 >
                   Amount
                 </label>
@@ -762,11 +727,10 @@ const ContraVoucher: React.FC = () => {
                   step="0.01"
                   title="Enter amount"
                   placeholder="0.00"
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
+                  className={`w-full p-2 rounded border ${theme === "dark"
                       ? "bg-gray-700 border-gray-600 text-gray-100"
                       : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
+                    } focus:border-blue-500 focus:ring-blue-500`}
                 />
                 {errors.amount0 && (
                   <p className="text-red-500 text-sm mt-1">{errors.amount0}</p>
@@ -779,9 +743,8 @@ const ContraVoucher: React.FC = () => {
                   <>
                     <div>
                       <label
-                        className={`block text-sm font-medium mb-1 ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Bank Name
                       </label>
@@ -790,19 +753,17 @@ const ContraVoucher: React.FC = () => {
                         name="bankName"
                         value={formData.entries[0].bankName || ""}
                         onChange={(e) => handleEntryChange(0, e)}
-                        className={`w-full p-2 rounded border ${
-                          theme === "dark"
+                        className={`w-full p-2 rounded border ${theme === "dark"
                             ? "bg-gray-700 border-gray-600 text-gray-100"
                             : "bg-white border-gray-300 text-gray-900"
-                        } focus:border-blue-500 focus:ring-blue-500`}
+                          } focus:border-blue-500 focus:ring-blue-500`}
                         placeholder="Enter bank name"
                       />
                     </div>
                     <div>
                       <label
-                        className={`block text-sm font-medium mb-1 ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Cheque/Transaction ID
                       </label>
@@ -811,11 +772,10 @@ const ContraVoucher: React.FC = () => {
                         name="chequeNumber"
                         value={formData.entries[0].chequeNumber || ""}
                         onChange={(e) => handleEntryChange(0, e)}
-                        className={`w-full p-2 rounded border ${
-                          theme === "dark"
+                        className={`w-full p-2 rounded border ${theme === "dark"
                             ? "bg-gray-700 border-gray-600 text-gray-100"
                             : "bg-white border-gray-300 text-gray-900"
-                        } focus:border-blue-500 focus:ring-blue-500`}
+                          } focus:border-blue-500 focus:ring-blue-500`}
                         placeholder="Enter cheque number or transaction ID"
                       />
                     </div>
@@ -828,9 +788,8 @@ const ContraVoucher: React.FC = () => {
                   <>
                     <div>
                       <label
-                        className={`block text-sm font-medium mb-1 ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Bank Name (Credit)
                       </label>
@@ -839,19 +798,17 @@ const ContraVoucher: React.FC = () => {
                         name="bankName"
                         value={formData.entries[1].bankName || ""}
                         onChange={(e) => handleEntryChange(1, e)}
-                        className={`w-full p-2 rounded border ${
-                          theme === "dark"
+                        className={`w-full p-2 rounded border ${theme === "dark"
                             ? "bg-gray-700 border-gray-600 text-gray-100"
                             : "bg-white border-gray-300 text-gray-900"
-                        } focus:border-blue-500 focus:ring-blue-500`}
+                          } focus:border-blue-500 focus:ring-blue-500`}
                         placeholder="Enter bank name"
                       />
                     </div>
                     <div>
                       <label
-                        className={`block text-sm font-medium mb-1 ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         Cheque/Transaction ID (Credit)
                       </label>
@@ -860,11 +817,10 @@ const ContraVoucher: React.FC = () => {
                         name="chequeNumber"
                         value={formData.entries[1].chequeNumber || ""}
                         onChange={(e) => handleEntryChange(1, e)}
-                        className={`w-full p-2 rounded border ${
-                          theme === "dark"
+                        className={`w-full p-2 rounded border ${theme === "dark"
                             ? "bg-gray-700 border-gray-600 text-gray-100"
                             : "bg-white border-gray-300 text-gray-900"
-                        } focus:border-blue-500 focus:ring-blue-500`}
+                          } focus:border-blue-500 focus:ring-blue-500`}
                         placeholder="Enter cheque number or transaction ID"
                       />
                     </div>
@@ -875,20 +831,18 @@ const ContraVoucher: React.FC = () => {
 
           {formData.mode === "double-entry" && (
             <div
-              className={`p-4 mb-6 rounded ${
-                theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-              }`}
+              className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                }`}
             >
               <div className="flex justify-between items-center mb-4">
                 <h3 className="font-semibold">Entries</h3>
                 <button
                   type="button"
                   onClick={addEntry}
-                  className={`flex items-center text-sm px-2 py-1 rounded ${
-                    theme === "dark"
+                  className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
                       ? "bg-blue-600 hover:bg-blue-700"
                       : "bg-blue-600 hover:bg-blue-700 text-white"
-                  }`}
+                    }`}
                 >
                   <Plus size={16} className="mr-1" /> Add Line
                 </button>
@@ -897,11 +851,10 @@ const ContraVoucher: React.FC = () => {
                 <table className="w-full mb-4">
                   <thead>
                     <tr
-                      className={`${
-                        theme === "dark"
+                      className={`${theme === "dark"
                           ? "border-b border-gray-600"
                           : "border-b border-gray-300"
-                      }`}
+                        }`}
                     >
                       <th className="px-4 py-2 text-left">Ledger Account</th>
                       <th className="px-4 py-2 text-left">Dr/Cr</th>
@@ -919,11 +872,10 @@ const ContraVoucher: React.FC = () => {
                     {formData.entries.map((entry, index) => (
                       <tr
                         key={index}
-                        className={`${
-                          theme === "dark"
+                        className={`${theme === "dark"
                             ? "border-b border-gray-600"
                             : "border-b border-gray-300"
-                        }`}
+                          }`}
                       >
                         <td className="px-4 py-2">
                           <select
@@ -932,11 +884,10 @@ const ContraVoucher: React.FC = () => {
                             onChange={(e) => handleEntryChange(index, e)}
                             required
                             title="Select ledger account (Cash/Bank)"
-                            className={`w-full p-2 rounded border ${
-                              theme === "dark"
+                            className={`w-full p-2 rounded border ${theme === "dark"
                                 ? "bg-gray-700 border-gray-600 text-gray-100"
                                 : "bg-white border-gray-300 text-gray-900"
-                            } focus:border-blue-500 focus:ring-blue-500`}
+                              } focus:border-blue-500 focus:ring-blue-500`}
                           >
                             <option value="">Select Cash/Bank Ledger</option>
                             {cashBankLedgers && cashBankLedgers.length > 0 ? (
@@ -952,11 +903,10 @@ const ContraVoucher: React.FC = () => {
                             )}
                             <option
                               value="add-new"
-                              className={`flex items-center px-4 py-2 rounded ${
-                                theme === "dark"
+                              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
                                   ? "bg-blue-600 hover:bg-green-700"
                                   : "bg-green-600 hover:bg-green-700 text-white"
-                              }`}
+                                }`}
                             >
                               + Add New Ledger
                             </option>{" "}
@@ -974,11 +924,10 @@ const ContraVoucher: React.FC = () => {
                             value={entry.type}
                             onChange={(e) => handleEntryChange(index, e)}
                             title="Select debit or credit"
-                            className={`w-full p-2 rounded border ${
-                              theme === "dark"
+                            className={`w-full p-2 rounded border ${theme === "dark"
                                 ? "bg-gray-700 border-gray-600 text-gray-100"
                                 : "bg-white border-gray-300 text-gray-900"
-                            } focus:border-blue-500 focus:ring-blue-500`}
+                              } focus:border-blue-500 focus:ring-blue-500`}
                           >
                             <option value="debit">Dr</option>
                             <option value="credit">Cr</option>
@@ -995,11 +944,10 @@ const ContraVoucher: React.FC = () => {
                             step="0.01"
                             title="Enter amount"
                             placeholder="0.00"
-                            className={`w-full p-2 rounded border text-right ${
-                              theme === "dark"
+                            className={`w-full p-2 rounded border text-right ${theme === "dark"
                                 ? "bg-gray-700 border-gray-600 text-gray-100"
                                 : "bg-white border-gray-300 text-gray-900"
-                            } focus:border-blue-500 focus:ring-blue-500`}
+                              } focus:border-blue-500 focus:ring-blue-500`}
                           />
                           {errors[`amount${index}`] && (
                             <p className="text-red-500 text-sm mt-1">
@@ -1014,11 +962,10 @@ const ContraVoucher: React.FC = () => {
                               value={entry.costCentreId || ""}
                               onChange={(e) => handleEntryChange(index, e)}
                               title="Select cost centre"
-                              className={`w-full p-2 rounded border ${
-                                theme === "dark"
+                              className={`w-full p-2 rounded border ${theme === "dark"
                                   ? "bg-gray-700 border-gray-600 text-gray-100"
                                   : "bg-white border-gray-300 text-gray-900"
-                              } focus:border-blue-500 focus:ring-blue-500`}
+                                } focus:border-blue-500 focus:ring-blue-500`}
                             >
                               <option value="">None</option>
                               {costCentres.map((cc) => (
@@ -1036,11 +983,10 @@ const ContraVoucher: React.FC = () => {
                               name="narration"
                               value={entry.narration || ""}
                               onChange={(e) => handleEntryChange(index, e)}
-                              className={`w-full p-2 rounded border ${
-                                theme === "dark"
+                              className={`w-full p-2 rounded border ${theme === "dark"
                                   ? "bg-gray-700 border-gray-600 text-gray-100"
                                   : "bg-white border-gray-300 text-gray-900"
-                              } focus:border-blue-500 focus:ring-blue-500`}
+                                } focus:border-blue-500 focus:ring-blue-500`}
                               placeholder="Entry narration"
                             />
                           </td>
@@ -1055,13 +1001,12 @@ const ContraVoucher: React.FC = () => {
                                 ? "Cannot remove - minimum 2 entries required"
                                 : "Remove entry"
                             }
-                            className={`p-1 rounded ${
-                              formData.entries.length <= 2
+                            className={`p-1 rounded ${formData.entries.length <= 2
                                 ? "opacity-50 cursor-not-allowed"
                                 : theme === "dark"
-                                ? "hover:bg-gray-600"
-                                : "hover:bg-gray-300"
-                            }`}
+                                  ? "hover:bg-gray-600"
+                                  : "hover:bg-gray-300"
+                              }`}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -1071,11 +1016,10 @@ const ContraVoucher: React.FC = () => {
                   </tbody>
                   <tfoot>
                     <tr
-                      className={`font-semibold ${
-                        theme === "dark"
+                      className={`font-semibold ${theme === "dark"
                           ? "border-t border-gray-600"
                           : "border-t border-gray-300"
-                      }`}
+                        }`}
                     >
                       <td className="px-4 py-2 text-right" colSpan={2}>
                         Totals:
@@ -1092,27 +1036,25 @@ const ContraVoucher: React.FC = () => {
                           config.showCostCentre && config.showEntryNarration
                             ? 3
                             : config.showCostCentre || config.showEntryNarration
-                            ? 2
-                            : 1
+                              ? 2
+                              : 1
                         }
                       >
                         {isBalanced ? (
                           <span
-                            className={`px-2 py-1 rounded text-xs ${
-                              theme === "dark"
+                            className={`px-2 py-1 rounded text-xs ${theme === "dark"
                                 ? "bg-green-900 text-green-200"
                                 : "bg-green-100 text-green-800"
-                            }`}
+                              }`}
                           >
                             Balanced
                           </span>
                         ) : (
                           <span
-                            className={`px-2 py-1 rounded text-xs ${
-                              theme === "dark"
+                            className={`px-2 py-1 rounded text-xs ${theme === "dark"
                                 ? "bg-red-900 text-red-200"
                                 : "bg-red-100 text-red-800"
-                            }`}
+                              }`}
                           >
                             Unbalanced
                           </span>
@@ -1127,8 +1069,8 @@ const ContraVoucher: React.FC = () => {
                               ? 5
                               : config.showCostCentre ||
                                 config.showEntryNarration
-                              ? 4
-                              : 3
+                                ? 4
+                                : 3
                           }
                         >
                           <p className="text-red-500 text-sm mt-1">
@@ -1145,9 +1087,8 @@ const ContraVoucher: React.FC = () => {
 
           <div className="mb-6">
             <label
-              className={`block text-sm font-medium mb-1 ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               Narration
             </label>
@@ -1158,19 +1099,17 @@ const ContraVoucher: React.FC = () => {
               rows={3}
               title="Enter narration"
               placeholder="Enter voucher narration"
-              className={`w-full p-2 rounded border ${
-                theme === "dark"
+              className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 text-gray-100"
                   : "bg-white border-gray-300 text-gray-900"
-              } focus:border-blue-500 focus:ring-blue-500`}
+                } focus:border-blue-500 focus:ring-blue-500`}
             />
           </div>
 
           {showConfigPanel && (
             <div
-              className={`p-4 mb-6 rounded ${
-                theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-              }`}
+              className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                }`}
             >
               <h3 className="font-semibold mb-4">Configuration (F12)</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -1184,9 +1123,8 @@ const ContraVoucher: React.FC = () => {
                         autoNumbering: e.target.checked,
                       }));
                     }}
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Auto Numbering
                 </label>
@@ -1200,9 +1138,8 @@ const ContraVoucher: React.FC = () => {
                         showReference: e.target.checked,
                       }))
                     }
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Show Reference Fields
                 </label>
@@ -1216,9 +1153,8 @@ const ContraVoucher: React.FC = () => {
                         showBankDetails: e.target.checked,
                       }))
                     }
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Show Bank Details
                 </label>
@@ -1232,9 +1168,8 @@ const ContraVoucher: React.FC = () => {
                         showCostCentre: e.target.checked,
                       }))
                     }
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Show Cost Centre
                 </label>
@@ -1248,9 +1183,8 @@ const ContraVoucher: React.FC = () => {
                         showEntryNarration: e.target.checked,
                       }))
                     }
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Show Narration per Entry
                 </label>
@@ -1261,9 +1195,8 @@ const ContraVoucher: React.FC = () => {
       </div>
 
       <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <p className="text-sm text-gray-700 dark:text-gray-300">
           <span className="font-semibold">Note:</span> Contra vouchers are used

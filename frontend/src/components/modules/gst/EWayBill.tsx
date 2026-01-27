@@ -151,9 +151,9 @@ const EWayBill: React.FC = () => {
     isService: "",
     hsn: "",
     unit: "",
-    unitPrice: "",
+    unitPrice: 0,   
     gst: "",
-    qty: "",
+    qty: 0,        
   });
 
 
@@ -163,12 +163,18 @@ const EWayBill: React.FC = () => {
     setProduct({
       description: selectedSale.itemName || "",
       isService: "No",
+
       hsn: selectedSale.hsnCode || "",
       unit: "PCS",
-      unitPrice: selectedSale.rate || "",
-      gst: selectedSale.igstTotal ? "IGST" : "",
-      qty: selectedSale.qtyChange || "",
+
+      // qtyChange is negative in DB → abs
+      qty: Math.abs(Number(selectedSale.qtyChange || 0)),
+
+      unitPrice: Number(selectedSale.rate || 0),
+
+      gst: selectedSale.igstTotal > 0 ? "IGST" : "CGST+SGST",
     });
+
   }, [selectedSale]);
 
   // transport data
@@ -180,6 +186,23 @@ const EWayBill: React.FC = () => {
     transporterName: "",
     distance: "",
   });
+
+  // transport data
+  useEffect(() => {
+    if (!selectedSale) return;
+
+    setTransport({
+      mode: "Road",
+      vehicleType: "Regular",
+
+      // MAP FROM DISPATCH
+      vehicleNo: selectedSale.destination || "",
+      transporterId: selectedSale.dispatchDocNo || "",
+      transporterName: selectedSale.dispatchThrough || "",
+      distance: selectedSale.approxDistance || "",
+    });
+
+  }, [selectedSale]);
 
   // shipping data
   const [shipping, setShipping] = useState({
@@ -1188,111 +1211,112 @@ const EWayBill: React.FC = () => {
 
 
             {/* Shipping Address (if different from billing) */}
-            <div className="bg-white mt-5 rounded-lg shadow-sm border border-gray-200 p-6">
-              <h2 className="text-lg font-semibold text-gray-800 mb-6">
-                Shipping Address (if different billing)
-              </h2>
+            {generateEWay && (
+              <div className="bg-white mt-5 rounded-lg shadow-sm border border-gray-200 p-6">
+                <h2 className="text-lg font-semibold text-gray-800 mb-6">
+                  Shipping Address (if different billing)
+                </h2>
 
-              {/* Row 1 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Ship To Name
-                  </label>
-                  <input
-                    type="text"
-                    value={shipping.legalName}
-                    onChange={(e) =>
-                      setShipping({ ...shipping, legalName: e.target.value })
-                    }
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
+                {/* Row 1 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Ship To Name
+                    </label>
+                    <input
+                      type="text"
+                      value={shipping.legalName}
+                      onChange={(e) =>
+                        setShipping({ ...shipping, legalName: e.target.value })
+                      }
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Ship To GSTIN
+                    </label>
+                    <input
+                      type="text"
+                      value={shipping.gstin}
+                      onChange={(e) =>
+                        setShipping({ ...shipping, gstin: e.target.value })
+                      }
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Ship To GSTIN
-                  </label>
-                  <input
-                    type="text"
-                    value={shipping.gstin}
-                    onChange={(e) =>
-                      setShipping({ ...shipping, gstin: e.target.value })
-                    }
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
+                {/* Row 2 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Ship To State Code
+                    </label>
+                    <select
+                      value={shipping.state}
+                      onChange={(e) =>
+                        setShipping({ ...shipping, state: e.target.value })
+                      }
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    >
+                      <option value="">Select State</option>
+                      {states.map((s) => (
+                        <option key={s.code} value={s.code}>
+                          {s.name} ({s.code})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Ship To Place
+                    </label>
+                    <input
+                      type="text"
+                      value={shipping.place}
+                      onChange={(e) =>
+                        setShipping({ ...shipping, place: e.target.value })
+                      }
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+                </div>
+
+                {/* Row 3 */}
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Ship To Address
+                    </label>
+                    <input
+                      type="text"
+                      value={shipping.address}
+                      onChange={(e) =>
+                        setShipping({ ...shipping, address: e.target.value })
+                      }
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-600 mb-1">
+                      Ship To PIN Code
+                    </label>
+                    <input
+                      type="text"
+                      value={shipping.pincode}
+                      onChange={(e) =>
+                        setShipping({ ...shipping, pincode: e.target.value })
+                      }
+                      className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+                    />
+                  </div>
                 </div>
               </div>
-
-              {/* Row 2 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Ship To State Code
-                  </label>
-                  <select
-                    value={shipping.state}
-                    onChange={(e) =>
-                      setShipping({ ...shipping, state: e.target.value })
-                    }
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  >
-                    <option value="">Select State</option>
-                    {states.map((s) => (
-                      <option key={s.code} value={s.code}>
-                        {s.name} ({s.code})
-                      </option>
-                    ))}
-                  </select>
-                </div>
-
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Ship To Place
-                  </label>
-                  <input
-                    type="text"
-                    value={shipping.place}
-                    onChange={(e) =>
-                      setShipping({ ...shipping, place: e.target.value })
-                    }
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-
-              {/* Row 3 */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Ship To Address
-                  </label>
-                  <input
-                    type="text"
-                    value={shipping.address}
-                    onChange={(e) =>
-                      setShipping({ ...shipping, address: e.target.value })
-                    }
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-gray-600 mb-1">
-                    Ship To PIN Code
-                  </label>
-                  <input
-                    type="text"
-                    value={shipping.pincode}
-                    onChange={(e) =>
-                      setShipping({ ...shipping, pincode: e.target.value })
-                    }
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-                  />
-                </div>
-              </div>
-            </div>
+            )}
 
 
 
