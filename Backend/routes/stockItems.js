@@ -60,7 +60,13 @@ router.get("/", async (req, res) => {
 
     const formattedRows = rows.map((item) => ({
       ...item,
-      batches: item.batches ? JSON.parse(item.batches) : [],
+      batches: (() => {
+        try {
+          return item.batches ? JSON.parse(item.batches) : [];
+        } catch {
+          return [];
+        }
+      })(),
     }));
 
     return res.json({
@@ -429,12 +435,18 @@ router.post("/", async (req, res) => {
         SELECT id FROM stock_items
         WHERE company_id=? AND owner_type=? AND owner_id=?
         AND JSON_SEARCH(
-          UPPER(batches),
-          'one',
-          ?,
-          NULL,
-          '$[*].batchName'
-        ) IS NOT NULL
+UPPER(
+CASE
+WHEN batches IS NOT NULL AND JSON_VALID(batches)
+THEN batches
+ELSE '[]'
+END
+),
+'one',
+?,
+NULL,
+'$[*].batchName'
+) IS NOT NULL
         `,
         [company_id, owner_type, owner_id, batchName]
       );
@@ -1396,7 +1408,13 @@ router.get("/:id", async (req, res) => {
     const item = rows[0];
 
     // 🔥 batches parse
-    let batches = item.batches ? JSON.parse(item.batches) : [];
+    let batches = [];
+
+    try {
+      batches = item.batches ? JSON.parse(item.batches) : [];
+    } catch {
+      batches = [];
+    }
 
     // 🔥 MODE FILTER (opening / purchase)
     if (mode) {
