@@ -9,7 +9,9 @@ const PurchaseAddDetails: React.FC = () => {
   const [searchParams] = useSearchParams();
 
   const ledgerName = searchParams.get("ledger");
+  console.log('ledgerName', ledgerName)
   const groupId = Number(searchParams.get("groupId"));
+  console.log('id', groupId)
 
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");
@@ -36,127 +38,68 @@ const PurchaseAddDetails: React.FC = () => {
   ];
 
   /* ===================== STATES ===================== */
-  const [purchase, setPurchase] = useState<any[]>([]);
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
-  const [parties, setParties] = useState<any[]>([]);
+  /* ===================== MONTH WISE + RUNNING CLOSING ===================== */
+  const [monthData, setMonthData] = useState<any[]>([]);
 
-  /* ===================== FETCH PURCHASE ===================== */
+  /* ================= FETCH MONTH DATA ================= */
   useEffect(() => {
     const fetchPurchaseData = async () => {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-        );
-        const data = await res.json();
-        setPurchase(data.data || []);
-      } catch (err) {
-        console.error("Purchase fetch error:", err);
-      }
-    };
+        if (!groupId) return;
 
-    if (companyId && ownerType && ownerId) {
-      fetchPurchaseData();
-    }
-  }, [companyId, ownerType, ownerId]);
-
-  /* ===================== FETCH LEDGERS (PARTIES) ===================== */
-  useEffect(() => {
-    const fetchParties = async () => {
-      try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/purchase/${groupId}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
         const data = await res.json();
 
-        // ✅ IMPORTANT FIX (LedgerList jaisa)
-        setParties(Array.isArray(data) ? data : data.data || []);
-      } catch (err) {
-        console.error("Party fetch error:", err);
-      }
-    };
-
-    if (companyId && ownerType && ownerId) {
-      fetchParties();
-    }
-  }, [companyId, ownerType, ownerId]);
-
-  /* ===================== PARTY MAP (FAST LOOKUP) ===================== */
-  const partyMap = useMemo(() => {
-    const map: Record<number, string> = {};
-    parties.forEach((p: any) => {
-      map[Number(p.id)] = p.name;
-    });
-    return map;
-  }, [parties]);
-
-  const getPartyNameById = (partyId: number | string) =>
-    partyMap[Number(partyId)] || "-";
-
-  /* ===================== MONTH WISE DEBIT ===================== */
-  const getMonthWiseDebit = () => {
-    const totals: Record<string, number> = {};
-    MONTHS.forEach((m) => (totals[m] = 0));
-
-    purchase
-      .filter((p) => Number(p.purchaseLedgerId) === groupId)
-      .forEach((p) => {
-        const d = new Date(p.date);
-        const monthName = [
-          "January",
-          "February",
-          "March",
-          "April",
-          "May",
-          "June",
-          "July",
-          "August",
-          "September",
-          "October",
-          "November",
-          "December",
-        ][d.getMonth()];
-
-        if (totals[monthName] !== undefined) {
-          totals[monthName] += Number(p.total || 0);
+        if (data.success) {
+          setMonthData(data.data);
         }
-      });
 
-    return totals;
-  };
+        console.log("Month API:", data);
+      } catch (error) {
+        console.error("Purchase API Error:", error);
+      }
+    };
 
-  const monthWiseDebit = getMonthWiseDebit();
+    fetchPurchaseData();
+  }, [companyId, ownerId, ownerType, groupId]);
 
-  /* ===================== MONTH FILTER ===================== */
-  const monthIndexMap: Record<string, number> = {
-    January: 0,
-    February: 1,
-    March: 2,
-    April: 3,
-    May: 4,
-    June: 5,
-    July: 6,
-    August: 7,
-    September: 8,
-    October: 9,
-    November: 10,
-    December: 11,
-  };
+  const monthSummary = useMemo(() => {
+    let runningTotal = 0;
+    const mysqlMonthMap: Record<string, number> = {
+      April: 4,
+      May: 5,
+      June: 6,
+      July: 7,
+      August: 8,
+      September: 9,
+      October: 10,
+      November: 11,
+      December: 12,
+      January: 1,
+      February: 2,
+      March: 3,
+    };
 
-  const selectedMonthData = selectedMonth
-    ? purchase.filter((p) => {
-        const d = new Date(p.date);
-        return (
-          d.getMonth() === monthIndexMap[selectedMonth] &&
-          Number(p.purchaseLedgerId) === groupId
-        );
-      })
-    : [];
+    return MONTHS.map((monthName) => {
+      const mysqlMonth = mysqlMonthMap[monthName];
+      // Backend returns rows with monthNo (1-12)
+      const data = monthData.find((d) => d.monthNo === mysqlMonth);
+      const debit = data ? Number(data.total) : 0;
+      const credit = 0;
+      runningTotal += debit - credit;
 
-  const selectedMonthTotal = selectedMonthData.reduce(
-    (sum, r) => sum + Number(r.total || 0),
-    0
-  );
+      return {
+        month: monthName,
+        debit,
+        credit,
+        closing: runningTotal,
+      };
+    });
+  }, [monthData, MONTHS]);
 
   /* ===================== UI ===================== */
   return (
@@ -165,14 +108,13 @@ const PurchaseAddDetails: React.FC = () => {
       <div className="flex items-center mb-6">
         <button
           onClick={() => navigate(-1)}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
 
-        <h1 className="text-2xl font-bold">Purchase Account</h1>
+        <h1 className="text-2xl font-bold">Purchase Account:-  {ledgerName}</h1>
 
         <div className="ml-auto flex gap-2">
           <button
@@ -191,88 +133,60 @@ const PurchaseAddDetails: React.FC = () => {
       </div>
 
       {/* ================= MONTH SUMMARY ================= */}
-      {!selectedMonth && (
-        <div>
-          <div className="bg-gray-100 border-b text-center py-3">
-            <div className="text-lg font-semibold">Purchase Account</div>
-            <div className="text-sm text-gray-600">{ledgerName}</div>
-          </div>
+      {monthSummary.map((row) => {
+        const hasData = row.debit > 0;
 
-          <div className="grid grid-cols-3 font-semibold bg-gray-50 border-b">
-            <div className="px-3 py-2">Month</div>
-            <div className="px-3 py-2 text-center">Debit</div>
-            <div className="px-3 py-2 text-center">Credit</div>
-          </div>
-
-          {MONTHS.map((month) => (
-            <div
-              key={month}
-              onClick={() => setSelectedMonth(month)}
-              className="grid grid-cols-3 border-b cursor-pointer hover:bg-blue-50"
-            >
-              <div className="px-3 py-2">{month}</div>
-              <div className="px-3 py-2 text-center font-mono">
-                {monthWiseDebit[month]
-                  ? monthWiseDebit[month].toLocaleString()
-                  : "0"}
-              </div>
-              <div className="px-3 py-2 text-center">0</div>
+        return (
+          <div
+            key={row.month}
+            onClick={() => hasData && setSelectedMonth(row.month)}
+            className={`grid grid-cols-4 py-2 px-2 cursor-pointer
+        ${hasData ? "hover:bg-blue-50" : "opacity-50 cursor-default"}
+      `}
+          >
+            {/* Month */}
+            <div className="text-lg font-medium">
+              {row.month}
             </div>
-          ))}
+
+            {/* Debit */}
+            <div className="text-center font-mono text-lg">
+              {hasData ? row.debit.toLocaleString() : ""}
+            </div>
+
+            {/* Credit */}
+            <div className="text-center text-lg text-gray-400">
+              {hasData ? "0" : ""}
+            </div>
+
+            {/* Closing */}
+            <div className="text-center font-mono text-lg">
+              {hasData ? row.closing.toLocaleString() : ""}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* ================= GRAND TOTAL ================= */}
+      <div className="grid grid-cols-4 mt-3 pt-2 border-t text-lg font-semibold bg-gray-50">
+        <div className="px-2">Grand Total</div>
+        <div className="text-center font-mono">
+          {monthSummary
+            .reduce((sum, r) => sum + r.debit, 0)
+            .toLocaleString()}
         </div>
-      )}
 
-      {/* ================= MONTH DETAILS ================= */}
-      {selectedMonth && (
-        <div className="mt-4">
-          <div className="flex items-center bg-gray-100 p-3 border-b relative">
-            <button
-              onClick={() => setSelectedMonth(null)}
-              className="text-lg font-semibold"
-            >
-              ← Back
-            </button>
+        <div className="text-center text-gray-400">0</div>
 
-            <div className="absolute left-1/2 -translate-x-1/2 font-semibold">
-              Ledger: {ledgerName} | {selectedMonth}
-            </div>
-          </div>
-
-          <div className="grid grid-cols-6 font-semibold bg-gray-50 border-b">
-            <div className="px-3 py-2">Date</div>
-            <div className="px-3 py-2">Particular</div>
-            <div className="px-3 py-2">Voucher Type</div>
-            <div className="px-3 py-2">Voucher No</div>
-            <div className="px-3 py-2 text-right">Debit</div>
-            <div className="px-3 py-2 text-right">Credit</div>
-          </div>
-
-          {selectedMonthData.map((row, i) => (
-            <div key={i} className="grid grid-cols-6 border-b text-sm">
-              <div className="px-3 py-2">
-                {new Date(row.date).toLocaleDateString()}
-              </div>
-              <div className="px-3 py-2">
-                {getPartyNameById(row.partyId)}
-              </div>
-              <div className="px-3 py-2">Purchase</div>
-              <div className="px-3 py-2">{row.number}</div>
-              <div className="px-3 py-2 text-right font-mono">
-                {Number(row.total).toLocaleString()}
-              </div>
-              <div className="px-3 py-2 text-right"></div>
-            </div>
-          ))}
-
-          <div className="grid grid-cols-6 bg-gray-100 font-semibold">
-            <div className="col-span-4 px-3 py-2 text-right">Total :</div>
-            <div className="px-3 py-2 text-right font-mono">
-              {selectedMonthTotal.toLocaleString()}
-            </div>
-            <div></div>
-          </div>
+        <div className="text-center font-mono">
+          {monthSummary.length
+            ? monthSummary[monthSummary.length - 1].closing.toLocaleString()
+            : ""}
         </div>
-      )}
+
+      </div>
+
+
     </div>
   );
 };

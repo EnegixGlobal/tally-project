@@ -18,9 +18,9 @@ interface Ledger {
   gstNumber?: string;
   panNumber?: string;
   groupId?: number;
-  debit?:number;
-  credit?:number;
-  
+  debit?: number;
+  credit?: number;
+
 }
 
 const GroupSummary: React.FC = () => {
@@ -29,6 +29,7 @@ const GroupSummary: React.FC = () => {
   const groupIdFromUrl = Number(groupType);
 
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
+  const [taxData, setTaxData] = useState<Record<number, { debit: number; credit: number }>>({});
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [, setLoading] = useState(false);
   const [, setError] = useState<string | null>(null);
@@ -115,6 +116,7 @@ const GroupSummary: React.FC = () => {
         }
 
         const data = await res.json();
+        // console.log('this is ledger', data)
 
         const groupIdFromUrl = Number(groupType);
 
@@ -152,7 +154,6 @@ const GroupSummary: React.FC = () => {
           (item: any) => Number(item.groupId) === groupIdFromUrl
         );
 
-        console.log('ledger', filteredLedgers)
         setLedgers(filteredLedgers);
       } catch (err: any) {
         console.error(err);
@@ -166,37 +167,57 @@ const GroupSummary: React.FC = () => {
     fetchGroupSummary();
   }, [groupType, companyId, ownerType, ownerId, groups]);
 
-  // console.log("ledgers", ledgers);
 
 
-  //  useEffect(() => {
-  //   const fetchLedgerGroups = async () => {
-  //     if (!companyId || !ownerType || !ownerId) {
-  //       setGroups([]);
-  //       return;
-  //     }
+  useEffect(() => {
 
-  //     try {
-  //       const res = await fetch(
-  //         `${import.meta.env.VITE_API_URL
-  //         }/api/group?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-  //       );
+    const fetchTaxData = async () => {
 
-  //       if (!res.ok) {
-  //         throw new Error("Failed to fetch ledger groups");
-  //       }
+      if (!companyId || !ownerType || !ownerId || !ledgers.length) {
+        return;
+      }
 
-  //       const data = await res.json();
-  //       // console.log("this is ledger groups data", data);
-  //       setGroups(data || []);
-  //     } catch (err) {
-  //       console.error("Failed to load ledger groups", err);
-  //       setGroups([]);
-  //     }
-  //   };
+      try {
 
-  //   fetchLedgerGroups();
-  // }, [companyId, ownerType, ownerId]);
+        // Ledger IDs
+        const ledgerIds = ledgers.map(item => item.id).join(",");
+
+        const url =
+          `${import.meta.env.VITE_API_URL}/api/group` +
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}` +
+          `&ledgerIds=${ledgerIds}`;
+
+        const res = await fetch(url);
+
+        if (!res.ok) {
+          throw new Error("API Failed");
+        }
+
+        const data = await res.json();
+
+
+        // ✅ Normalize keys (e.g., "113.00" -> 113)
+        const normalizedData: Record<number, { debit: number; credit: number }> = {};
+        if (data.data) {
+          Object.keys(data.data).forEach((key) => {
+            normalizedData[Number(key)] = data.data[key];
+          });
+        }
+        // console.log('nor', normalizedData)
+        setTaxData(normalizedData);
+
+      } catch (err) {
+
+        console.error("API Error:", err);
+
+      }
+    };
+
+    fetchTaxData();
+
+  }, [companyId, ownerType, ownerId, ledgers]);
 
   // Resolve `groupType` param to a numeric group id.
   const resolveGroupId = (param?: string | null): number | null => {
@@ -252,7 +273,9 @@ const GroupSummary: React.FC = () => {
       "Mar",
     ];
 
-    const opening = Number(ledger.openingBalance) || 0;
+    const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
+    const ledgerTax = taxData[Number(ledger.id)] || { debit: 0, credit: 0 };
+    const currentTotal = ledgerTax.debit - ledgerTax.credit;
 
     // If no createdAt, show opening balance in first month (Apr)
     let creationMonthIndex = 0;
@@ -261,40 +284,36 @@ const GroupSummary: React.FC = () => {
       const createdDate = new Date(ledger.createdAt);
       const createdMonth = createdDate.getMonth(); // 0-11 (Jan-Dec)
 
-      // Map calendar months to financial year months (Apr-Mar)
-      // Jan (0) -> 9, Feb (1) -> 10, Mar (2) -> 11
-      // Apr (3) -> 0, May (4) -> 1, ..., Dec (11) -> 8
       if (createdMonth >= 3) {
-        // Apr to Dec (months 3-11) map to indices 0-8
         creationMonthIndex = createdMonth - 3;
       } else {
-        // Jan to Mar (months 0-2) map to indices 9-11
         creationMonthIndex = createdMonth + 9;
       }
     }
 
     return months.map((month, index) => {
-      // Only show opening balance in the month when ledger was created
       const isCreationMonth = index === creationMonthIndex;
       const monthOpening = isCreationMonth ? opening : 0;
-      const monthClosing = isCreationMonth ? opening : 0;
+      const monthCurrent = isCreationMonth ? currentTotal : 0;
+      const monthClosing = isCreationMonth ? Math.abs(monthOpening - monthCurrent) : 0;
 
       return {
         month,
         opening: monthOpening,
-        current: 0,
+        current: monthCurrent,
         closing: monthClosing,
       };
     });
   };
 
-  const totalDebit = ledgers.reduce(
-    (sum, ledger) => sum + Number(ledger.debit || 0),
+  const totalDebit = Object.values(taxData).reduce(
+    (sum: number, t: any) => sum + (t.debit || 0),
     0
   );
 
-  const totalCredit = ledgers.reduce(
-    (sum, ledger) => sum + Number(ledger.credit || 0),
+
+  const totalCredit = Object.values(taxData).reduce(
+    (sum: number, t: any) => sum + (t.credit || 0),
     0
   );
 
@@ -478,19 +497,20 @@ const GroupSummary: React.FC = () => {
                       {resolvedGroupName || `Group ${groupType}`}
                     </td>
 
-                    {/* Debit */}
-                    <td className="px-4 py-3 text-right font-mono">
-                      {Number(ledger.debit || 0).toLocaleString()}
+                    <td className="px-4 py-3 text-right font-mono text-green-600">
+                      ₹ {(taxData[Number(ledger.id)]?.debit || 0).toLocaleString()}
                     </td>
 
-                    {/* Credit */}
-                    <td className="px-4 py-3 text-right font-mono">
-                      {Number(ledger.credit || 0).toLocaleString()}
+                    <td className="px-4 py-3 text-right font-mono text-red-600">
+                      ₹ {(taxData[Number(ledger.id)]?.credit || 0).toLocaleString()}
                     </td>
 
                     {/* Closing */}
-                    <td className="px-4 py-3 text-right font-mono">
-                      {Number(ledger.closingBalance || 0).toLocaleString()}
+                    <td className="px-4 py-3 text-right font-mono font-semibold">
+                      ₹ {Math.abs(
+                        (taxData[Number(ledger.id)]?.debit || 0) -
+                        (taxData[Number(ledger.id)]?.credit || 0)
+                      ).toLocaleString()}
                     </td>
                   </tr>
                 ))}
@@ -503,19 +523,16 @@ const GroupSummary: React.FC = () => {
                     : "border-t-2 border-gray-300"
                     }`}
                 >
-                  <td className="px-4 py-3">Total</td>
-                  <td className="px-4 py-3"></td>
+                  <td className="px-4 py-3" colSpan={2}>Total</td>
                   <td className="px-4 py-3 text-right font-mono">
-                    {totalDebit.toLocaleString()}
+                    ₹ {totalDebit.toLocaleString()}
                   </td>
-
                   <td className="px-4 py-3 text-right font-mono">
-                    {totalCredit.toLocaleString()}
+                    ₹ {totalCredit.toLocaleString()}
                   </td>
-
-                  <td className="px-4 py-3 text-right font-mono"></td>
-                  <td className="px-4 py-3 text-right font-mono"></td>
-                  <td className="px-4 py-3"></td>
+                  <td className="px-4 py-3 text-right font-mono font-bold">
+                    ₹ {Math.abs(totalDebit - totalCredit).toLocaleString()}
+                  </td>
                 </tr>
               </tfoot>
             </table>
@@ -524,7 +541,6 @@ const GroupSummary: React.FC = () => {
             <div className="space-y-6">
               {ledgers.map((ledger: Ledger) => {
                 const monthlyData = generateMonthlyData(ledger);
-                console.log("this is month", monthlyData);
                 return (
                   <div key={ledger.id} className="border rounded-lg p-4">
                     <h3
@@ -600,7 +616,7 @@ const GroupSummary: React.FC = () => {
           <div>
             <p className="text-sm opacity-75">Closing Balance</p>
             <p className="text-xl font-bold">
-              ₹ {(totalDebit - totalCredit).toLocaleString()}
+              ₹ {Math.abs(totalDebit - totalCredit).toLocaleString()}
             </p>
           </div>
           <div className="mt-4">

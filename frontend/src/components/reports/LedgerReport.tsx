@@ -7,8 +7,6 @@ import {
   Download,
   Filter,
   Calendar,
-  ChevronDown,
-  ChevronRight,
 } from "lucide-react";
 import type { Ledger } from "../../types";
 
@@ -29,7 +27,8 @@ interface LedgerTransaction {
 }
 interface LedgerApiResponse {
   success: boolean;
-  ledger: any; // or your Ledger type if you have it
+  ledger: Ledger;
+  message?: string;
   transactions: LedgerTransaction[];
   summary: {
     openingBalance: number;
@@ -40,14 +39,7 @@ interface LedgerApiResponse {
   };
 }
 
-interface MonthlyBalance {
-  month: string;
-  openingBalance: number;
-  totalDebit: number;
-  totalCredit: number;
-  closingBalance: number;
-  transactionCount: number;
-}
+
 
 interface VoucherDetail {
   id: string;
@@ -64,26 +56,40 @@ const LedgerReport: React.FC = () => {
   const { theme, ledgerGroups } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams();
-  // const [searchParams] = useSearchParams();
-  // const [selectedLedger, setSelectedLedger] = useState('');
+
+  // Financial Year Months (April → March)
+  const financialMonths = [
+    { key: "04", name: "April" },
+    { key: "05", name: "May" },
+    { key: "06", name: "June" },
+    { key: "07", name: "July" },
+    { key: "08", name: "August" },
+    { key: "09", name: "September" },
+    { key: "10", name: "October" },
+    { key: "11", name: "November" },
+    { key: "12", name: "December" },
+    { key: "01", name: "January" },
+    { key: "02", name: "February" },
+    { key: "03", name: "March" },
+  ];
+
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [viewMode, setViewMode] = useState<"detailed" | "summary" | "monthly">(
+  const [viewMode, setViewMode] = useState<"detailed" | "monthly">(
     "detailed"
   );
   const [selectedDateRange, setSelectedDateRange] = useState("current-year");
   const [fromDate, setFromDate] = useState("2024-04-01");
   const [toDate, setToDate] = useState("2025-08-31");
   const [showClosingBalances, setShowClosingBalances] = useState(true);
-  const [expandedMonths, setExpandedMonths] = useState<Set<string>>(new Set());
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherDetail | null>(
     null
   );
   const [includeOpening] = useState(true);
   const [includeClosing] = useState(true);
   // To drive output
-  const [, setLoading] = useState(false);
+  const [, setLoading] = useState<boolean>(false);
   const [ledgerData, setLedgerData] = useState<LedgerApiResponse | null>(null);
-  const [, setError] = useState(null);
+  const [, setError] = useState<string | null>(null);
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [ledgerId, setLedgerId] = useState(id || ""); // default
   const companyId = localStorage.getItem("company_id");
@@ -112,35 +118,7 @@ const LedgerReport: React.FC = () => {
     );
   };
 
-  const toggleMonth = (monthKey: string) => {
-    const newExpanded = new Set(expandedMonths);
-    if (newExpanded.has(monthKey)) {
-      newExpanded.delete(monthKey);
-    } else {
-      newExpanded.add(monthKey);
-    }
-    setExpandedMonths(newExpanded);
-  };
 
-  const handleVoucherClick = (transaction: LedgerTransaction) => {
-    if (transaction.isOpening || transaction.isClosing) return;
-
-    const resolvedParticulars =
-      ledgerIdNameMap[transaction.particulars] || transaction.particulars;
-
-    const voucherDetail: VoucherDetail = {
-      id: transaction.id,
-      voucherNo: transaction.voucherNo,
-      voucherType: transaction.voucherType,
-      date: transaction.date,
-      amount: Math.max(transaction.debit, transaction.credit),
-      particulars: resolvedParticulars,
-      narration: transaction.narration || "",
-      reference: transaction.reference,
-    };
-
-    setSelectedVoucher(voucherDetail);
-  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -211,7 +189,7 @@ const LedgerReport: React.FC = () => {
           `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
-        const data = await res.json();
+        const data: Ledger[] = await res.json();
 
         setLedgers(data);
       } catch (err) {
@@ -222,7 +200,7 @@ const LedgerReport: React.FC = () => {
     fetchLedgers();
   }, []);
   // Fetch when ledger or date range changes
-  const ledgerIdNameMap = useMemo(() => {
+  const ledgerIdNameMap = useMemo<Record<string, string>>(() => {
     const map: Record<string, string> = {};
     ledgers.forEach((l) => {
       map[String(l.id)] = l.name;
@@ -244,7 +222,7 @@ const LedgerReport: React.FC = () => {
   const ledgerTransactions = ledgerData ? ledgerData.transactions : [];
 
   // filtring and show only one time
-  const groupedByVoucher = useMemo(() => {
+  const groupedByVoucher = useMemo<LedgerTransaction[][]>(() => {
     const map: Record<string, LedgerTransaction[]> = {};
 
     ledgerTransactions.forEach((txn) => {
@@ -268,7 +246,7 @@ const LedgerReport: React.FC = () => {
       }/api/ledger-report/report?ledgerId=${ledgerId}&fromDate=${fromDate}&toDate=${toDate}&includeOpening=${includeOpening}&includeClosing=${includeClosing}`
     )
       .then((res) => res.json())
-      .then((data) => {
+      .then((data: LedgerApiResponse) => {
         if (data.success) {
           setLedgerData(data);
         } else {
@@ -279,44 +257,68 @@ const LedgerReport: React.FC = () => {
       .finally(() => setLoading(false));
   }, [ledgerId, fromDate, toDate, includeOpening, includeClosing]);
 
+  interface MonthlyEntry {
+    debit: number;
+    credit: number;
+    closing: number;
+  }
+
+  type MonthlySummary = Record<string, MonthlyEntry>;
+
   // Group transactions by month for monthly view
-  const groupTransactionsByMonth = (transactions: LedgerTransaction[]) => {
-    const grouped: { [key: string]: LedgerTransaction[] } = {};
-    const monthlyBalances: { [key: string]: MonthlyBalance } = {};
+  const getMonthlySummary = (transactions: LedgerTransaction[]): MonthlySummary => {
+    const monthly: MonthlySummary = {};
 
-    transactions.forEach((txn) => {
-      if (txn.isOpening || txn.isClosing) return;
+    let runningBalance = 0;
 
-      const monthKey = txn.date.substring(0, 7); // YYYY-MM
-      const monthName = new Date(txn.date).toLocaleDateString("en-US", {
-        year: "numeric",
-        month: "long",
-      });
+    // Date wise sort (important for closing balance)
+    const sorted = [...transactions].sort(
+      (a, b) =>
+        new Date(a.date).getTime() -
+        new Date(b.date).getTime()
+    );
 
-      if (!grouped[monthKey]) {
-        grouped[monthKey] = [];
-        monthlyBalances[monthKey] = {
-          month: monthName,
-          openingBalance: 0,
-          totalDebit: 0,
-          totalCredit: 0,
-          closingBalance: 0,
-          transactionCount: 0,
+    sorted.forEach((txn) => {
+      if (txn.isOpening) {
+        runningBalance = txn.debit - txn.credit;
+        return;
+      }
+
+      if (txn.isClosing) return;
+
+      const month = txn.date.split("-")[1]; // MM
+
+      if (!monthly[month]) {
+        monthly[month] = {
+          debit: 0,
+          credit: 0,
+          closing: 0,
         };
       }
 
-      grouped[monthKey].push(txn);
-      monthlyBalances[monthKey].totalDebit += txn.debit;
-      monthlyBalances[monthKey].totalCredit += txn.credit;
-      monthlyBalances[monthKey].transactionCount++;
+      monthly[month].debit += txn.debit;
+      monthly[month].credit += txn.credit;
+
+      runningBalance += txn.debit - txn.credit;
+
+      monthly[month].closing = runningBalance;
     });
 
-    return { grouped, monthlyBalances };
+    return monthly;
   };
 
-  const { grouped: monthlyGrouped, monthlyBalances } =
-    groupTransactionsByMonth(ledgerTransactions);
-  const summaryTotals = useMemo(
+
+
+  const monthlySummary = useMemo(() => {
+    return getMonthlySummary(ledgerTransactions);
+  }, [ledgerTransactions]);
+  const summaryTotals = useMemo<{
+    openingBalance: number;
+    totalDebit: number;
+    totalCredit: number;
+    closingBalance: number;
+    transactionCount: number;
+  }>(
     () =>
       ledgerData
         ? ledgerData.summary
@@ -329,6 +331,20 @@ const LedgerReport: React.FC = () => {
         },
     [ledgerData]
   );
+
+  const grandTotal = useMemo<{ debit: number; credit: number; closing: number }>(() => {
+    let debit = 0;
+    let credit = 0;
+    let closing = 0;
+
+    Object.values(monthlySummary).forEach((m) => {
+      debit += m.debit;
+      credit += m.credit;
+      closing = m.closing;
+    });
+
+    return { debit, credit, closing };
+  }, [monthlySummary]);
 
   return (
     <div className="pt-[56px] px-4 ">
@@ -420,7 +436,7 @@ const LedgerReport: React.FC = () => {
                 value={viewMode}
                 onChange={(e) =>
                   setViewMode(
-                    e.target.value as "detailed" | "summary" | "monthly"
+                    e.target.value as "detailed" | "monthly"
                   )
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
@@ -429,7 +445,6 @@ const LedgerReport: React.FC = () => {
                   }`}
               >
                 <option value="detailed">Detailed View</option>
-                <option value="summary">Summary View</option>
                 <option value="monthly">Monthly View</option>
               </select>
             </div>
@@ -594,11 +609,11 @@ const LedgerReport: React.FC = () => {
 
           {/* View Mode Tabs */}
           <div className="flex space-x-1 mb-4">
-            {["detailed", "summary", "monthly"].map((mode) => (
+            {["detailed", "monthly"].map((mode) => (
               <button
                 key={mode}
                 onClick={() =>
-                  setViewMode(mode as "detailed" | "summary" | "monthly")
+                  setViewMode(mode as "detailed" | "monthly")
                 }
                 className={`px-4 py-2 rounded-t-lg text-sm font-medium ${viewMode === mode
                   ? theme === "dark"
@@ -621,36 +636,47 @@ const LedgerReport: React.FC = () => {
           >
             {viewMode === "detailed" && (
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="w-full border-collapse">
+
+                  {/* Header */}
                   <thead
-                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                    className={`${theme === "dark"
+                        ? "bg-gray-700 text-gray-200"
+                        : "bg-gray-50 text-gray-700"
                       }`}
                   >
                     <tr>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                         Date
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                         Particulars
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                         Voucher Type
                       </th>
-                      <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">
+
+                      <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider">
                         Voucher No
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider">
+
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">
                         Debit
                       </th>
-                      <th className="px-4 py-3 text-right text-xs font-medium uppercase tracking-wider">
+
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">
                         Credit
                       </th>
-
                     </tr>
                   </thead>
-                  <tbody className=" ">
-                    {groupedByVoucher.map((voucherGroup) => {
+
+                  {/* Body */}
+                  <tbody>
+                    {groupedByVoucher.map((voucherGroup: LedgerTransaction[]) => {
                       const first = voucherGroup[0];
+
                       const voucherKey = `${first.date}_${first.voucherNo}_${first.voucherType}`;
 
                       return (
@@ -659,11 +685,11 @@ const LedgerReport: React.FC = () => {
                             <tr
                               key={txn.id}
                               className={`${theme === "dark"
-                                ? "hover:bg-gray-700"
-                                : "hover:bg-gray-50"
-                                }`}
+                                  ? "hover:bg-gray-700"
+                                  : "hover:bg-gray-50"
+                                } transition`}
                             >
-                              {/* Date – only first row */}
+                              {/* Date */}
                               <td className="px-4 py-3 text-sm">
                                 {i === 0 ? formatDate(first.date) : ""}
                               </td>
@@ -692,7 +718,9 @@ const LedgerReport: React.FC = () => {
 
                               {/* Debit */}
                               <td className="px-4 py-3 text-sm text-right font-mono">
-                                {txn.debit > 0 ? formatCurrency(txn.debit) : ""}
+                                {txn.debit > 0
+                                  ? formatCurrency(txn.debit)
+                                  : ""}
                               </td>
 
                               {/* Credit */}
@@ -701,279 +729,162 @@ const LedgerReport: React.FC = () => {
                                   ? formatCurrency(txn.credit)
                                   : ""}
                               </td>
-
-
                             </tr>
                           ))}
                         </React.Fragment>
                       );
                     })}
+
+                    {/* ================= Grand Total ================= */}
+                    <tr
+                      className={`border-t font-semibold ${theme === "dark"
+                          ? "bg-gray-700 text-white"
+                          : "bg-gray-100 text-gray-800"
+                        }`}
+                    >
+                      <td className="px-4 py-4" colSpan={4}>
+                        Grand Total
+                      </td>
+
+                      <td className="px-4 py-4 text-right font-mono">
+                        {formatCurrency(summaryTotals.totalDebit)}
+                      </td>
+
+                      <td className="px-4 py-4 text-right font-mono">
+                        {formatCurrency(summaryTotals.totalCredit)}
+                      </td>
+                    </tr>
                   </tbody>
                 </table>
               </div>
             )}
 
-            {viewMode === "summary" && (
-              <div className="p-6">
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">
-                      Account Summary
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span>Opening Balance:</span>
-                        <span
-                          className={`font-medium ${summaryTotals.openingBalance >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
-                            }`}
-                        >
-                          {formatCurrency(
-                            Math.abs(summaryTotals.openingBalance)
-                          )}
-                          {summaryTotals.openingBalance >= 0 ? " Dr" : " Cr"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span>Total Debits:</span>
-                        <span className="font-medium text-blue-600">
-                          {formatCurrency(summaryTotals.totalDebit)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span>Total Credits:</span>
-                        <span className="font-medium text-purple-600">
-                          {formatCurrency(summaryTotals.totalCredit)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span>Net Effect:</span>
-                        <span className="font-medium">
-                          {formatCurrency(
-                            Math.abs(
-                              summaryTotals.totalDebit -
-                              summaryTotals.totalCredit
-                            )
-                          )}
-                          {summaryTotals.totalDebit >= summaryTotals.totalCredit
-                            ? " Dr"
-                            : " Cr"}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 font-bold text-lg">
-                        <span>Closing Balance:</span>
-                        <span
-                          className={`${summaryTotals.closingBalance >= 0
-                            ? "text-green-600"
-                            : "text-red-600"
-                            }`}
-                        >
-                          {formatCurrency(
-                            Math.abs(summaryTotals.closingBalance)
-                          )}
-                          {summaryTotals.closingBalance >= 0 ? " Dr" : " Cr"}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <h3 className="text-lg font-semibold mb-4">
-                      Transaction Analysis
-                    </h3>
-                    <div className="space-y-3">
-                      <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span>Total Transactions:</span>
-                        <span className="font-medium">
-                          {summaryTotals.transactionCount}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span>Period:</span>
-                        <span className="font-medium">
-                          {formatDate(fromDate)} to {formatDate(toDate)}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span>Ledger Group:</span>
-                        <span className="font-medium">
-                          {selectedLedgerGroup?.name}
-                        </span>
-                      </div>
-                      <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
-                        <span>Balance Type:</span>
-                        <span className="font-medium capitalize">
-                          {selectedLedgerData?.balanceType}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            )}
 
             {viewMode === "monthly" && (
-              <div className="p-6">
-                <h3 className="text-lg font-semibold mb-4">
-                  Monthly Breakdown
-                </h3>
-                {Object.entries(monthlyBalances).length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">
-                    No transactions found for the selected period
-                  </p>
-                ) : (
-                  <div className="space-y-4">
-                    {Object.entries(monthlyBalances).map(
-                      ([monthKey, monthData]) => (
-                        <div
-                          key={monthKey}
-                          className={`border rounded-lg ${theme === "dark"
-                            ? "border-gray-700"
-                            : "border-gray-200"
-                            }`}
+              <div className="overflow-x-auto rounded-lg shadow-sm">
+                <table className="w-full border-collapse">
+
+                  {/* Header */}
+                  <thead
+                    className={`${theme === "dark"
+                      ? "bg-gray-800 text-gray-200"
+                      : "bg-gray-100 text-gray-700"
+                      }`}
+                  >
+                    <tr>
+                      <th className="px-4 py-4 text-left text-base font-semibold">
+                        Month
+                      </th>
+                      <th className="px-4 py-4 text-right text-base font-semibold">
+                        Debit
+                      </th>
+                      <th className="px-4 py-4 text-right text-base font-semibold">
+                        Credit
+                      </th>
+                      <th className="px-4 py-4 text-right text-base font-semibold">
+                        Closing Balance
+                      </th>
+                    </tr>
+                  </thead>
+
+                  {/* Body */}
+                  <tbody>
+                    {financialMonths.map((m: { key: string; name: string }) => {
+                      const data = monthlySummary[m.key];
+
+                      const hasData =
+                        data &&
+                        (data.debit !== 0 ||
+                          data.credit !== 0 ||
+                          data.closing !== 0);
+
+                      return (
+                        <tr
+                          key={m.key}
+                          className={`${theme === "dark"
+                            ? "hover:bg-gray-700"
+                            : "hover:bg-gray-50"
+                            } transition`}
                         >
-                          <div
-                            className={`p-4 cursor-pointer flex items-center justify-between ${theme === "dark"
-                              ? "hover:bg-gray-700"
-                              : "hover:bg-gray-50"
+                          {/* Month */}
+                          <td className="px-4 py-3 font-medium text-sm">
+                            {m.name}
+                          </td>
+
+                          {/* Debit */}
+                          <td className="px-4 py-3 text-right text-sm">
+                            {hasData && data?.debit
+                              ? formatCurrency(data.debit)
+                              : ""}
+                          </td>
+
+                          {/* Credit */}
+                          <td className="px-4 py-3 text-right text-sm">
+                            {hasData && data?.credit
+                              ? formatCurrency(data.credit)
+                              : ""}
+                          </td>
+
+                          {/* Closing */}
+                          <td
+                            className={`px-4 py-3 text-right text-sm font-medium ${hasData && data?.closing >= 0
+                              ? "text-green-600"
+                              : hasData && data?.closing < 0
+                                ? "text-red-600"
+                                : ""
                               }`}
-                            onClick={() => toggleMonth(monthKey)}
                           >
-                            <div className="flex items-center">
-                              {expandedMonths.has(monthKey) ? (
-                                <ChevronDown size={16} className="mr-2" />
-                              ) : (
-                                <ChevronRight size={16} className="mr-2" />
-                              )}
-                              <span className="font-medium">
-                                {monthData.month}
-                              </span>
-                              <span className="ml-2 text-sm text-gray-500">
-                                ({monthData.transactionCount} transactions)
-                              </span>
-                            </div>
-                            <div className="text-right">
-                              <div className="text-sm text-gray-500">
-                                Net Effect
-                              </div>
-                              <div
-                                className={`font-medium ${monthData.totalDebit -
-                                  monthData.totalCredit >=
-                                  0
-                                  ? "text-green-600"
-                                  : "text-red-600"
-                                  }`}
-                              >
-                                {formatCurrency(
-                                  Math.abs(
-                                    monthData.totalDebit - monthData.totalCredit
-                                  )
-                                )}
-                                {monthData.totalDebit - monthData.totalCredit >=
-                                  0
-                                  ? " Dr"
-                                  : " Cr"}
-                              </div>
-                            </div>
-                          </div>
+                            {hasData
+                              ? `${formatCurrency(
+                                Math.abs(data.closing)
+                              )} ${data.closing >= 0 ? "Dr" : "Cr"}`
+                              : ""}
+                          </td>
+                        </tr>
+                      );
+                    })}
 
-                          {expandedMonths.has(monthKey) && (
-                            <div
-                              className={`px-4 pb-4 ${theme === "dark" ? "bg-gray-800" : "bg-gray-50"
-                                }`}
-                            >
-                              <div className="grid grid-cols-3 gap-4 mb-4">
-                                <div className="text-center">
-                                  <div className="text-sm text-gray-500">
-                                    Total Debit
-                                  </div>
-                                  <div className="text-blue-600 font-medium">
-                                    {formatCurrency(monthData.totalDebit)}
-                                  </div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-sm text-gray-500">
-                                    Total Credit
-                                  </div>
-                                  <div className="text-purple-600 font-medium">
-                                    {formatCurrency(monthData.totalCredit)}
-                                  </div>
-                                </div>
-                                <div className="text-center">
-                                  <div className="text-sm text-gray-500">
-                                    Transactions
-                                  </div>
-                                  <div className="font-medium">
-                                    {monthData.transactionCount}
-                                  </div>
-                                </div>
-                              </div>
+                    {/* Grand Total */}
+                    <tr
+                      className={`${theme === "dark"
+                        ? "bg-gray-700 text-white"
+                        : "bg-gray-200 text-gray-800"
+                        } font-semibold`}
+                    >
+                      <td className="px-4 py-4">
+                        Grand Total
+                      </td>
 
-                              <div className="max-h-60 overflow-y-auto">
-                                <table className="w-full text-sm">
-                                  <thead>
-                                    <tr
-                                      className={`${theme === "dark"
-                                        ? "bg-gray-700"
-                                        : "bg-gray-100"
-                                        }`}
-                                    >
-                                      <th className="px-3 py-2 text-left">
-                                        Date
-                                      </th>
-                                      <th className="px-3 py-2 text-left">
-                                        Particulars
-                                      </th>
-                                      <th className="px-3 py-2 text-right">
-                                        Debit
-                                      </th>
-                                      <th className="px-3 py-2 text-right">
-                                        Credit
-                                      </th>
-                                    </tr>
-                                  </thead>
-                                  <tbody>
-                                    {monthlyGrouped[monthKey]?.map((txn) => (
-                                      <tr
-                                        key={txn.id}
-                                        className={`border-t ${theme === "dark"
-                                          ? "border-gray-600 hover:bg-gray-700"
-                                          : "border-gray-200 hover:bg-white"
-                                          } cursor-pointer`}
-                                        onClick={() => handleVoucherClick(txn)}
-                                      >
-                                        <td className="px-3 py-2">
-                                          {formatDate(txn.date)}
-                                        </td>
-                                        <td className="px-3 py-2">
-                                          {ledgerIdNameMap[txn.particulars] ||
-                                            txn.particulars}
-                                        </td>
-                                        <td className="px-3 py-2 text-right font-mono">
-                                          {txn.debit > 0
-                                            ? formatCurrency(txn.debit)
-                                            : "-"}
-                                        </td>
-                                        <td className="px-3 py-2 text-right font-mono">
-                                          {txn.credit > 0
-                                            ? formatCurrency(txn.credit)
-                                            : "-"}
-                                        </td>
-                                      </tr>
-                                    ))}
-                                  </tbody>
-                                </table>
-                              </div>
-                            </div>
-                          )}
-                        </div>
-                      )
-                    )}
-                  </div>
-                )}
+                      <td className="px-4 py-4 text-right">
+                        {grandTotal.debit
+                          ? formatCurrency(grandTotal.debit)
+                          : ""}
+                      </td>
+
+                      <td className="px-4 py-4 text-right">
+                        {grandTotal.credit
+                          ? formatCurrency(grandTotal.credit)
+                          : ""}
+                      </td>
+
+                      <td
+                        className={`px-4 py-4 text-right ${grandTotal.closing >= 0
+                          ? "text-green-600"
+                          : "text-red-600"
+                          }`}
+                      >
+                        {grandTotal.closing
+                          ? `${formatCurrency(
+                            Math.abs(grandTotal.closing)
+                          )} ${grandTotal.closing >= 0 ? "Dr" : "Cr"}`
+                          : ""}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
               </div>
             )}
+
           </div>
         </>
       )}

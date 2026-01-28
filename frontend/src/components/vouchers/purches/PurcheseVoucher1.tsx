@@ -874,7 +874,6 @@ const PurchaseVoucher: React.FC = () => {
           batchNumber: "",
           batchExpiryDate: "",
           batchManufacturingDate: "",
-          batchManufacturingDate: "",
           batches: [],
           purchaseLedgerId: "",
         },

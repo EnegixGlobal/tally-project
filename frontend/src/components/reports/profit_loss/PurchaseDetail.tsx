@@ -16,39 +16,85 @@ const PurchaseDetail: React.FC = () => {
 
   /* ===================== PURCHASE LEDGERS ===================== */
   const [purchaseLedgers, setPurchaseLedgers] = useState<any[]>([]);
+  const [purchaseIds, setPurchaseIds] = useState([]);
+  const [purchaseTotals, setPurchaseTotals] = useState<Record<number, string>>({});
 
   useEffect(() => {
-    fetch(
-      `${
-        import.meta.env.VITE_API_URL
-      }/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-    )
-      .then((res) => res.json())
-      .then((data) => {
+    const fetchPurchaseLedgers = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+
+        const data = await res.json();
+
         const ledgers = data.ledgers || [];
 
         const purchases = ledgers
           .filter((l: any) => String(l.group_id) === "-15")
           .map((l: any) => ({
+            id: l.id,
             name: l.name,
             opening_balance: l.opening_balance,
             balance_type: l.balance_type,
             group_id: l.id,
           }));
 
+        const ids = purchases.map((p: any) => p.id);
+
+        console.log("Purchase:", purchases);
+        console.log("IDs:", ids);
+
         setPurchaseLedgers(purchases);
-      })
-      .catch(() => setPurchaseLedgers([]));
+        setPurchaseIds(ids);
+      } catch (error) {
+        console.error("Group Summary Error:", error);
+        setPurchaseLedgers([]);
+        setPurchaseIds([]);
+      }
+    };
+
+    fetchPurchaseLedgers();
   }, [companyId, ownerId, ownerType]);
+
+  useEffect(() => {
+    const fetchPurchaseData = async () => {
+      try {
+        if (purchaseIds.length === 0) return;
+
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/purchase?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&ids=${purchaseIds.join(",")}`
+        );
+
+        const data = await res.json();
+
+        if (data.success) {
+          setPurchaseTotals(data.data);
+        }
+
+        console.log("Purchase API Data:", data);
+
+      } catch (error) {
+        console.error("Purchase API Error:", error);
+      }
+    };
+
+    fetchPurchaseData();
+  }, [companyId, ownerId, ownerType, purchaseIds]);
 
   /* ===================== ROW DATA ===================== */
   const getPurchaseAccountRows = () => {
     return purchaseLedgers.map((l: any) => {
-      const amount = Number(l.opening_balance || 0);
+
+      // ✅ TS safe access
+      const apiAmount = purchaseTotals[l.id as number];
+
+      const amount = apiAmount ? Number(apiAmount) : 0;
 
       return {
         name: l.name,
         groupId: Number(l.group_id),
+
         debit: l.balance_type === "debit" ? amount : "",
         credit: l.balance_type === "credit" ? amount : "",
       };
@@ -71,9 +117,8 @@ const PurchaseDetail: React.FC = () => {
       <div className="flex items-center mb-6">
         <button
           onClick={() => navigate(-1)}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -117,7 +162,7 @@ const PurchaseDetail: React.FC = () => {
             onClick={() => handleRowClick(row.name, row.groupId)}
             className="grid grid-cols-3 text-sm border-b border-gray-200 hover:bg-gray-50 cursor-pointer"
           >
-            <div className="px-3 py-2 text-center border-r border-gray-300 text-blue-600">
+            <div className="px-3 py-2 text-center  border-r border-gray-300 text-blue-600">
               {row.name}
             </div>
 
