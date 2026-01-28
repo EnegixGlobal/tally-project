@@ -16,11 +16,12 @@ const SalesDetail: React.FC = () => {
 
   /* ===================== SALES LEDGERS ===================== */
   const [salesLedgers, setSalesLedgers] = useState<any[]>([]);
+  const [salesIds, setSalesIds] = useState<number[]>([]);
+  const [salesTotals, setSalesTotals] = useState<Record<number, string>>({});
 
   useEffect(() => {
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((res) => res.json())
@@ -30,6 +31,7 @@ const SalesDetail: React.FC = () => {
         const sales = ledgers
           .filter((l: any) => String(l.group_id) === "-16")
           .map((l: any) => ({
+            id: l.id,
             name: l.name,
             opening_balance: l.opening_balance,
             balance_type: l.balance_type,
@@ -37,20 +39,48 @@ const SalesDetail: React.FC = () => {
           }));
 
         setSalesLedgers(sales);
+        setSalesIds(sales.map((s: any) => s.id));
       })
       .catch(() => setSalesLedgers([]));
   }, [companyId, ownerId, ownerType]);
 
+  useEffect(() => {
+    const fetchSalesData = async () => {
+      try {
+        if (salesIds.length === 0) return;
+
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/sales?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&ids=${salesIds.join(",")}`
+        );
+
+        const data = await res.json();
+
+        if (data.success) {
+          setSalesTotals(data.data);
+        }
+
+        console.log("Sales API Data:", data);
+
+      } catch (error) {
+        console.error("Sales API Error:", error);
+      }
+    };
+
+    fetchSalesData();
+  }, [companyId, ownerId, ownerType, salesIds]);
+
   /* ===================== ROW DATA ===================== */
   const getSalesAccountRows = () => {
     return salesLedgers.map((l: any) => {
-      const amount = Number(l.opening_balance || 0);
+      const apiAmount = salesTotals[l.id as number];
+      const amount = apiAmount ? Number(apiAmount) : 0;
 
       return {
         name: l.name,
         groupId: Number(l.group_id),
-        debit: l.balance_type === "debit" ? amount : "",
-        credit: l.balance_type === "credit" ? amount : "",
+        // Sales is Income, so it should be in Credit
+        debit: "",
+        credit: amount,
       };
     });
   };
@@ -71,9 +101,8 @@ const SalesDetail: React.FC = () => {
       <div className="flex items-center mb-6">
         <button
           onClick={() => navigate(-1)}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -126,8 +155,9 @@ const SalesDetail: React.FC = () => {
             </div>
 
             <div className="px-3 py-2 text-center font-mono">
-              {row.credit !== "" ? row.credit.toLocaleString() : ""}
+              {row.credit ? row.credit.toLocaleString() : ""}
             </div>
+
           </div>
         ))}
       </div>

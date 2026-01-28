@@ -5,7 +5,7 @@ const pool = require('../db'); // your MySQL pool connection
 //purchase
 router.get("/api/purchase", async (req, res) => {
   try {
-    console.log("hit hua");
+    // console.log("hit hua");
 
     const { ids, company_id, owner_id, owner_type } = req.query;
 
@@ -16,7 +16,7 @@ router.get("/api/purchase", async (req, res) => {
     // 1️⃣ Convert ids → array
     const idArray = ids.split(",").map(Number);
 
-    console.log("IDs:", idArray);
+    // console.log("IDs:", idArray);
 
     // 2️⃣ SQL Query with JOIN
     const [rows] = await pool.query(
@@ -47,7 +47,7 @@ router.get("/api/purchase", async (req, res) => {
     });
 
 
-    console.log(result);
+    // console.log(result);
 
     // 4️⃣ Send to frontend
     res.json({
@@ -58,6 +58,64 @@ router.get("/api/purchase", async (req, res) => {
   } catch (error) {
     console.log("Purchase API Error:", error);
     res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+
+//sales
+
+router.get("/api/sales", async (req, res) => {
+  try {
+
+    // console.log("Sales API hit ✅");
+
+    const { ids, company_id, owner_id, owner_type } = req.query;
+
+    if (!ids) {
+      return res.status(400).json({
+        success: false,
+        message: "IDs missing",
+      });
+    }
+
+    const idArray = ids.split(",").map(Number);
+
+    const [rows] = await pool.query(
+      `
+      SELECT 
+        svi.salesLedgerId,
+        SUM(sv.subtotal) AS totalSubtotal
+      FROM sales_voucher_items svi
+
+      JOIN sales_vouchers sv
+        ON svi.voucherId = sv.id
+
+      WHERE svi.salesLedgerId IN (?)
+        AND sv.company_id = ?
+        AND sv.owner_type = ?
+        AND sv.owner_id = ?
+
+      GROUP BY svi.salesLedgerId
+      `,
+      [idArray, company_id, owner_type, owner_id]
+    );
+
+    const result = {};
+
+    rows.forEach((row) => {
+      result[row.salesLedgerId] = row.totalSubtotal;
+    });
+
+    res.json({
+      success: true,
+      data: result,
+    });
+
+  } catch (error) {
+    console.log("Sales API Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server Error",
+    });
   }
 });
 
@@ -115,32 +173,31 @@ router.get("/api/purchase/:id", async (req, res) => {
   }
 });
 
-//sales
-
-router.get("/api/sales", async (req, res) => {
+//sales:id
+// sales:id (MONTH WISE)
+router.get("/api/sales/:id", async (req, res) => {
   try {
-    console.log("Sales API hit");
+    // console.log('hit hus saled :id')
 
-    const { ids, company_id, owner_id, owner_type } = req.query;
+    const { id } = req.params;
+    const { company_id, owner_id, owner_type } = req.query;
 
-    if (!ids) {
+    if (!id) {
       return res.status(400).json({
         success: false,
-        message: "IDs missing",
+        message: "ID missing",
       });
     }
 
-    // 1️⃣ ids → array
-    const idArray = ids.split(",").map(Number);
+    // ids → array
+    const idArray = id.split(",").map(Number);
 
-    console.log("Sales IDs:", idArray);
-
-    // 2️⃣ SQL with JOIN
     const [rows] = await pool.query(
       `
       SELECT 
-        svi.salesLedgerId,
-        SUM(sv.subtotal) AS totalSubtotal
+        MONTH(sv.date) AS monthNo,
+        SUM(sv.subtotal) AS total
+
       FROM sales_voucher_items svi
 
       JOIN sales_vouchers sv
@@ -151,32 +208,29 @@ router.get("/api/sales", async (req, res) => {
         AND sv.owner_type = ?
         AND sv.owner_id = ?
 
-      GROUP BY svi.salesLedgerId
+      GROUP BY MONTH(sv.date)
+
+      ORDER BY MONTH(sv.date)
       `,
       [idArray, company_id, owner_type, owner_id]
     );
 
-    // 3️⃣ Map bana do
-    const result = {};
-
-    rows.forEach((row) => {
-      result[row.salesLedgerId] = row.totalSubtotal;
-    });
-
-    // 4️⃣ Response
     res.json({
       success: true,
-      data: result,
+      data: rows,
     });
 
   } catch (error) {
-    console.log("Sales API Error:", error);
+    console.log("Sales Month API Error:", error);
+
     res.status(500).json({
       success: false,
       message: "Server Error",
     });
   }
 });
+
+
 
 // GET /api/profit-loss
 router.get('/api/profit-loss', async (req, res) => {
