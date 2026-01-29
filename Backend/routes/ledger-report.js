@@ -296,6 +296,9 @@ ORDER BY pv.date ASC
        7️⃣ BUILD TRANSACTIONS
     =============================== */
     let balance = Number(ledger.opening_balance || 0);
+    if (ledger.balance_type === "credit") {
+      balance = -balance;
+    }
     const transactions = [];
 
     // Normal vouchers
@@ -644,11 +647,17 @@ ORDER BY pv.date ASC
     let periodCredit = 0;
     const filteredTransactions = [];
 
+    const isDebitLedger = ledger.balance_type === "debit";
+
     transactions.forEach((t) => {
       const tDate = new Date(t.date).toISOString().split("T")[0];
 
       if (fromDate && tDate < fromDate) {
-        periodOpeningBalance += (t.debit - t.credit);
+        if (isDebitLedger) {
+          periodOpeningBalance += (t.debit - t.credit);
+        } else {
+          periodOpeningBalance += (t.credit - t.debit);
+        }
       } else if ((!fromDate || tDate >= fromDate) && (!toDate || tDate <= toDate)) {
         periodDebit += t.debit;
         periodCredit += t.credit;
@@ -656,7 +665,12 @@ ORDER BY pv.date ASC
       }
     });
 
-    const periodClosingBalance = periodOpeningBalance + periodDebit - periodCredit;
+    let periodClosingBalance = periodOpeningBalance;
+    if (isDebitLedger) {
+      periodClosingBalance += (periodDebit - periodCredit);
+    } else {
+      periodClosingBalance += (periodCredit - periodDebit);
+    }
 
     return res.json({
       success: true,

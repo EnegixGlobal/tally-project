@@ -19,6 +19,7 @@ interface LedgerTransaction {
   debit: number;
   credit: number;
   balance: number;
+  runningBalance?: number;
   narration?: string;
   reference?: string;
   isOpening?: boolean;
@@ -78,9 +79,16 @@ const LedgerReport: React.FC = () => {
   const [viewMode, setViewMode] = useState<"detailed" | "monthly">(
     "detailed"
   );
+  // Calculate Default Date (Current Month)
+  const now = new Date();
+  const year = now.getFullYear();
+  const month = now.getMonth();
+  const firstDayOfMonth = new Date(year, month, 1).toISOString().split("T")[0];
+  const lastDayOfMonth = new Date(year, month + 1, 0).toISOString().split("T")[0];
+
   const [selectedDateRange, setSelectedDateRange] = useState(searchParams.get("fromDate") ? "custom" : "current-year");
-  const [fromDate, setFromDate] = useState(searchParams.get("fromDate") || "2024-04-01");
-  const [toDate, setToDate] = useState(searchParams.get("toDate") || "2025-08-31");
+  const [fromDate, setFromDate] = useState(searchParams.get("fromDate") || firstDayOfMonth);
+  const [toDate, setToDate] = useState(searchParams.get("toDate") || lastDayOfMonth);
   const [showClosingBalances, setShowClosingBalances] = useState(true);
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherDetail | null>(
     null
@@ -244,8 +252,31 @@ const LedgerReport: React.FC = () => {
     ? ledgerGroups.find((g) => g.id === selectedLedgerData.groupId)
     : null;
 
+  const isDebitLedger = ledgerData?.ledger?.balance_type === "debit";
+
   // ledger transactions from API response remain the same
-  const ledgerTransactions = ledgerData ? ledgerData.transactions : [];
+  const ledgerTransactions = useMemo(() => {
+    if (!ledgerData) return [];
+
+    let balance = ledgerData.summary.openingBalance || 0;
+    const isDebitLedger = ledgerData.ledger?.balance_type === "debit";
+
+    return ledgerData.transactions.map((txn) => {
+      // Logic:
+      // If Debit Ledger: (Balance + Debit) - Credit
+      // If Credit Ledger: (Balance + Credit) - Debit
+      if (isDebitLedger) {
+        balance += (txn.debit - txn.credit);
+      } else {
+        balance += (txn.credit - txn.debit);
+      }
+
+      return {
+        ...txn,
+        runningBalance: balance,
+      };
+    });
+  }, [ledgerData]);
 
   // filtring and show only one time
   const groupedByVoucher = useMemo<LedgerTransaction[][]>(() => {
@@ -581,7 +612,11 @@ const LedgerReport: React.FC = () => {
                     }`}
                 >
                   {formatCurrency(Math.abs(summaryTotals.openingBalance))}
-                  {summaryTotals.openingBalance >= 0 ? " Dr" : " Cr"}
+                  {summaryTotals.openingBalance > 0
+                    ? isDebitLedger ? " Dr" : " Cr"
+                    : summaryTotals.openingBalance < 0
+                      ? isDebitLedger ? " Cr" : " Dr"
+                      : ""}
                 </div>
               </div>
             </div>
@@ -619,7 +654,11 @@ const LedgerReport: React.FC = () => {
                   }`}
               >
                 {formatCurrency(Math.abs(summaryTotals.closingBalance))}
-                {summaryTotals.closingBalance >= 0 ? " Dr" : " Cr"}
+                {summaryTotals.closingBalance > 0
+                  ? isDebitLedger ? " Dr" : " Cr"
+                  : summaryTotals.closingBalance < 0
+                    ? isDebitLedger ? " Cr" : " Dr"
+                    : ""}
               </div>
             </div>
             <div
@@ -695,6 +734,9 @@ const LedgerReport: React.FC = () => {
                       <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">
                         Credit
                       </th>
+                      <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">
+                        Closing Balance
+                      </th>
                     </tr>
                   </thead>
 
@@ -755,6 +797,16 @@ const LedgerReport: React.FC = () => {
                                   ? formatCurrency(txn.credit)
                                   : ""}
                               </td>
+
+                              {/* Closing Balance */}
+                              <td className="px-4 py-3 text-sm text-right font-mono font-medium">
+                                {formatCurrency(Math.abs(txn.runningBalance || 0))}
+                                {(txn.runningBalance || 0) > 0
+                                  ? isDebitLedger ? " Dr" : " Cr"
+                                  : (txn.runningBalance || 0) < 0
+                                    ? isDebitLedger ? " Cr" : " Dr"
+                                    : ""}
+                              </td>
                             </tr>
                           ))}
                         </React.Fragment>
@@ -778,6 +830,15 @@ const LedgerReport: React.FC = () => {
 
                       <td className="px-4 py-4 text-right font-mono">
                         {formatCurrency(summaryTotals.totalCredit)}
+                      </td>
+
+                      <td className="px-4 py-4 text-right font-mono">
+                        {formatCurrency(Math.abs(summaryTotals.closingBalance))}
+                        {summaryTotals.closingBalance > 0
+                          ? isDebitLedger ? " Dr" : " Cr"
+                          : summaryTotals.closingBalance < 0
+                            ? isDebitLedger ? " Cr" : " Dr"
+                            : ""}
                       </td>
                     </tr>
                   </tbody>
