@@ -818,6 +818,32 @@ const SalesVoucher: React.FC = () => {
         };
 
 
+        // ================= AUTO SALES LEDGER (DYNAMIC) =================
+
+        // Total GST calculate
+        let totalGst = 0;
+
+        if (statesMatch) {
+          totalGst = Number(extractedCgst || 0) + Number(extractedSgst || 0);
+        } else {
+          totalGst = Number(extractedIgst || 0);
+        }
+
+        // Round (2.5+2.5=5, 9+9=18 etc.)
+        totalGst = Math.round(totalGst);
+
+        // Find Sales Ledger
+        const salesLedger = getSalesLedgerByGst(totalGst);
+
+        if (salesLedger) {
+          updatedEntries[index].salesLedgerId = String(salesLedger.id);
+        } else if (totalGst > 0) {
+          Swal.fire({
+            icon: "warning",
+            title: "Sales Ledger Missing",
+            text: `Sales ${totalGst}% Ledger not found. Please create it first.`,
+          });
+        }
 
         updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
         setFormData((p) => ({ ...p, entries: updatedEntries }));
@@ -1483,6 +1509,21 @@ const SalesVoucher: React.FC = () => {
   } = calculateTotals();
 
 
+  // 🔥 Find Sales Ledger by GST %
+  const getSalesLedgerByGst = (gstPercent: any) => {
+    if (!gstPercent || gstPercent <= 0) return null;
+
+    const gstStr = String(Math.round(gstPercent));
+
+    return safeLedgers.find((l) => {
+      const name = (l.name || "").toLowerCase();
+
+      return (
+        name.includes("sales") &&
+        name.match(new RegExp(`\\b${gstStr}\\b`))
+      );
+    });
+  };
 
   // Helper functions for print layout
   const getItemDetails = (itemId: string) => {
@@ -1528,10 +1569,11 @@ const SalesVoucher: React.FC = () => {
       gstRate: Number(item.gstRate) || 0,
 
       // ✅ LEDGER IDS (ADD THIS)
-      gstLedgerId: item.gstLedgerId || "",
-      cgstLedgerId: item.cgstLedgerId || "",
-      sgstLedgerId: item.sgstLedgerId || "",
-      igstLedgerId: item.igstLedgerId || "",
+      gstLedgerId: (item as any).gstLedgerId || "",
+      cgstLedgerId: (item as any).cgstLedgerId || "",
+      sgstLedgerId: (item as any).sgstLedgerId || "",
+      igstLedgerId: (item as any).igstLedgerId || "",
+
 
       // ✅ Rate
       rate:
