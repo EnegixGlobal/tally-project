@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useMemo } from "react";
 import { useAppContext } from "../../context/AppContext";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams } from "react-router-dom";
 import {
   ArrowLeft,
   Printer,
@@ -56,6 +56,7 @@ const LedgerReport: React.FC = () => {
   const { theme, ledgerGroups } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams();
+  const [searchParams] = useSearchParams();
 
   // Financial Year Months (April → March)
   const financialMonths = [
@@ -77,9 +78,9 @@ const LedgerReport: React.FC = () => {
   const [viewMode, setViewMode] = useState<"detailed" | "monthly">(
     "detailed"
   );
-  const [selectedDateRange, setSelectedDateRange] = useState("current-year");
-  const [fromDate, setFromDate] = useState("2024-04-01");
-  const [toDate, setToDate] = useState("2025-08-31");
+  const [selectedDateRange, setSelectedDateRange] = useState(searchParams.get("fromDate") ? "custom" : "current-year");
+  const [fromDate, setFromDate] = useState(searchParams.get("fromDate") || "2024-04-01");
+  const [toDate, setToDate] = useState(searchParams.get("toDate") || "2025-08-31");
   const [showClosingBalances, setShowClosingBalances] = useState(true);
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherDetail | null>(
     null
@@ -180,6 +181,31 @@ const LedgerReport: React.FC = () => {
       default:
         break;
     }
+  };
+
+  const handleMonthClick = (monthKey: string) => {
+    // Determine the year based on the current fromDate
+    const currentFromDate = new Date(fromDate);
+    const startYear = currentFromDate.getFullYear();
+    const startMonth = currentFromDate.getMonth() + 1;
+
+    let year = startYear;
+    // If the selected month (e.g., Jan=1) is less than the start month (e.g., Apr=4),
+    // it belongs to the next calendar year in the financial period.
+    if (parseInt(monthKey) < startMonth) {
+      year++;
+    }
+
+    const firstDay = `${year}-${monthKey.padStart(2, "0")}-01`;
+    const lastDayDate = new Date(year, parseInt(monthKey), 0);
+    const lastDay = `${year}-${monthKey.padStart(2, "0")}-${String(
+      lastDayDate.getDate()
+    ).padStart(2, "0")}`;
+
+    setFromDate(firstDay);
+    setToDate(lastDay);
+    setViewMode("detailed");
+    setSelectedDateRange("custom");
   };
 
   useEffect(() => {
@@ -641,8 +667,8 @@ const LedgerReport: React.FC = () => {
                   {/* Header */}
                   <thead
                     className={`${theme === "dark"
-                        ? "bg-gray-700 text-gray-200"
-                        : "bg-gray-50 text-gray-700"
+                      ? "bg-gray-700 text-gray-200"
+                      : "bg-gray-50 text-gray-700"
                       }`}
                   >
                     <tr>
@@ -685,8 +711,8 @@ const LedgerReport: React.FC = () => {
                             <tr
                               key={txn.id}
                               className={`${theme === "dark"
-                                  ? "hover:bg-gray-700"
-                                  : "hover:bg-gray-50"
+                                ? "hover:bg-gray-700"
+                                : "hover:bg-gray-50"
                                 } transition`}
                             >
                               {/* Date */}
@@ -738,8 +764,8 @@ const LedgerReport: React.FC = () => {
                     {/* ================= Grand Total ================= */}
                     <tr
                       className={`border-t font-semibold ${theme === "dark"
-                          ? "bg-gray-700 text-white"
-                          : "bg-gray-100 text-gray-800"
+                        ? "bg-gray-700 text-white"
+                        : "bg-gray-100 text-gray-800"
                         }`}
                     >
                       <td className="px-4 py-4" colSpan={4}>
@@ -801,7 +827,8 @@ const LedgerReport: React.FC = () => {
                       return (
                         <tr
                           key={m.key}
-                          className={`${theme === "dark"
+                          onClick={() => handleMonthClick(m.key)}
+                          className={`cursor-pointer ${theme === "dark"
                             ? "hover:bg-gray-700"
                             : "hover:bg-gray-50"
                             } transition`}

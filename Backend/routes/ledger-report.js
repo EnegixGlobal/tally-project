@@ -632,29 +632,44 @@ ORDER BY pv.date ASC
     });
 
     /* ===============================
-       🔟 SORT BY DATE
+       🔟 SORT BY DATE & FILTER
     =============================== */
     transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    /* ===============================
-       1️⃣1️⃣ SUMMARY
-    =============================== */
-    const totalDebit = transactions.reduce((s, r) => s + r.debit, 0);
-    const totalCredit = transactions.reduce((s, r) => s + r.credit, 0);
+    const fromDate = req.query.fromDate;
+    const toDate = req.query.toDate;
 
+    let periodOpeningBalance = Number(ledger.opening_balance || 0);
+    let periodDebit = 0;
+    let periodCredit = 0;
+    const filteredTransactions = [];
+
+    transactions.forEach((t) => {
+      const tDate = new Date(t.date).toISOString().split("T")[0];
+
+      if (fromDate && tDate < fromDate) {
+        periodOpeningBalance += (t.debit - t.credit);
+      } else if ((!fromDate || tDate >= fromDate) && (!toDate || tDate <= toDate)) {
+        periodDebit += t.debit;
+        periodCredit += t.credit;
+        filteredTransactions.push(t);
+      }
+    });
+
+    const periodClosingBalance = periodOpeningBalance + periodDebit - periodCredit;
 
     return res.json({
       success: true,
       ledger,
-      transactions,
+      transactions: filteredTransactions,
       salesOrders,
       purchaseOrders,
       summary: {
-        openingBalance: Number(ledger.opening_balance || 0),
-        closingBalance: balance,
-        totalDebit,
-        totalCredit,
-        transactionCount: transactions.length,
+        openingBalance: periodOpeningBalance,
+        closingBalance: periodClosingBalance,
+        totalDebit: periodDebit,
+        totalCredit: periodCredit,
+        transactionCount: filteredTransactions.length,
       },
     });
   } catch (err) {

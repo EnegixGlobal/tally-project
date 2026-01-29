@@ -38,7 +38,6 @@ const PurchaseAddDetails: React.FC = () => {
   ];
 
   /* ===================== STATES ===================== */
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   /* ===================== MONTH WISE + RUNNING CLOSING ===================== */
   const [monthData, setMonthData] = useState<any[]>([]);
 
@@ -87,7 +86,7 @@ const PurchaseAddDetails: React.FC = () => {
     return MONTHS.map((monthName) => {
       const mysqlMonth = mysqlMonthMap[monthName];
       // Backend returns rows with monthNo (1-12)
-      const data = monthData.find((d) => d.monthNo === mysqlMonth);
+      const data = monthData.find((d: any) => d.monthNo === mysqlMonth);
       const debit = data ? Number(data.total) : 0;
       const credit = 0;
       runningTotal += debit - credit;
@@ -100,6 +99,39 @@ const PurchaseAddDetails: React.FC = () => {
       };
     });
   }, [monthData, MONTHS]);
+
+  const handleMonthClick = (monthName: string) => {
+    const mysqlMonthMap: Record<string, number> = {
+      April: 4,
+      May: 5,
+      June: 6,
+      July: 7,
+      August: 8,
+      September: 9,
+      October: 10,
+      November: 11,
+      December: 12,
+      January: 1,
+      February: 2,
+      March: 3,
+    };
+
+    const monthNo = mysqlMonthMap[monthName];
+    // Based on user data (Dec 2025, Jan 2026), current financial year starts in 2025
+    const startYear = 2025;
+    let year = startYear;
+    if (monthNo < 4) {
+      year++;
+    }
+
+    const firstDay = `${year}-${String(monthNo).padStart(2, "0")}-01`;
+    const lastDayDate = new Date(year, monthNo, 0);
+    const lastDay = `${year}-${String(monthNo).padStart(2, "0")}-${String(
+      lastDayDate.getDate()
+    ).padStart(2, "0")}`;
+
+    navigate(`/app/reports/ledger/${groupId}?fromDate=${firstDay}&toDate=${lastDay}`);
+  };
 
   /* ===================== UI ===================== */
   return (
@@ -132,17 +164,12 @@ const PurchaseAddDetails: React.FC = () => {
         </div>
       </div>
 
-      {/* ================= MONTH SUMMARY ================= */}
-      {monthSummary.map((row) => {
-        const hasData = row.debit > 0;
-
+      {monthSummary.map((row: any) => {
         return (
           <div
             key={row.month}
-            onClick={() => hasData && setSelectedMonth(row.month)}
-            className={`grid grid-cols-4 py-2 px-2 cursor-pointer
-        ${hasData ? "hover:bg-blue-50" : "opacity-50 cursor-default"}
-      `}
+            onClick={() => handleMonthClick(row.month)}
+            className="grid grid-cols-4 py-2 px-2 cursor-pointer hover:bg-blue-50 transition-colors border-b border-gray-100"
           >
             {/* Month */}
             <div className="text-lg font-medium">
@@ -151,17 +178,17 @@ const PurchaseAddDetails: React.FC = () => {
 
             {/* Debit */}
             <div className="text-center font-mono text-lg">
-              {hasData ? row.debit.toLocaleString() : ""}
+              {row.debit > 0 ? row.debit.toLocaleString() : ""}
             </div>
 
             {/* Credit */}
             <div className="text-center text-lg text-gray-400">
-              {hasData ? "0" : ""}
+              {row.debit > 0 ? "0" : ""}
             </div>
 
             {/* Closing */}
             <div className="text-center font-mono text-lg">
-              {hasData ? row.closing.toLocaleString() : ""}
+              {row.closing !== 0 ? row.closing.toLocaleString() : ""}
             </div>
           </div>
         );
@@ -172,7 +199,7 @@ const PurchaseAddDetails: React.FC = () => {
         <div className="px-2">Grand Total</div>
         <div className="text-center font-mono">
           {monthSummary
-            .reduce((sum, r) => sum + r.debit, 0)
+            .reduce((sum: number, r: any) => sum + r.debit, 0)
             .toLocaleString()}
         </div>
 
