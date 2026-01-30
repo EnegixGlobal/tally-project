@@ -164,12 +164,19 @@ const PurchaseAddDetails: React.FC = () => {
         </div>
       </div>
 
+      <div className="grid grid-cols-4 py-2 px-2 font-semibold text-gray-600 border-b bg-gray-100">
+        <div>Month</div>
+        <div className="text-center">Debit</div>
+        <div className="text-center">Credit</div>
+        <div className="text-center">Closing</div>
+      </div>
+
       {monthSummary.map((row: any) => {
         return (
           <div
             key={row.month}
             onClick={() => handleMonthClick(row.month)}
-            className="grid grid-cols-4 py-2 px-2 cursor-pointer hover:bg-blue-50 transition-colors border-b border-gray-100"
+            className="grid grid-cols-4 py-2 px-2 cursor-pointer hover:bg-blue-300 transition-colors border-b border-gray-100"
           >
             {/* Month */}
             <div className="text-lg font-medium">

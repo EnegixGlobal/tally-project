@@ -158,7 +158,7 @@ const SalesAddDetails: React.FC = () => {
             className="
                 grid grid-cols-4 py-2 border-b border-gray-100
                 cursor-pointer
-                hover:bg-blue-50
+                hover:bg-blue-300
                 transition-colors duration-150
               "
           >

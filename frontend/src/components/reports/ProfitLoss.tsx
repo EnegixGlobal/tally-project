@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useAppContext } from "../../context/AppContext";
-import { useNavigate,Link } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Printer, Download, Filter, Settings } from "lucide-react";
 
 const ProfitLoss: React.FC = () => {
@@ -10,6 +10,7 @@ const ProfitLoss: React.FC = () => {
   const [showFullData, setShowFullData] = useState(false);
   const [showInventoryBreakup, setShowInventoryBreakup] = useState(false);
   const [showDetailed, setShowDetailed] = useState(false);
+  const [ledgerBalances, setLedgerBalances] = useState<Record<number, { debit: number; credit: number }>>({});
 
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");
@@ -31,8 +32,7 @@ const ProfitLoss: React.FC = () => {
     const stockBatch = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -71,8 +71,7 @@ const ProfitLoss: React.FC = () => {
     const fetchPurchaseData = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/purchase-vouchers/purchase-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -94,8 +93,7 @@ const ProfitLoss: React.FC = () => {
     const fatchSalesData = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/sales-vouchers/sale-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const result = await res.json();
@@ -114,11 +112,11 @@ const ProfitLoss: React.FC = () => {
   const [purchaseLedgers, setPurchaseLedgers] = useState<SimpleLedger[]>([]);
   const [salesLedgers, setSalesLedgers] = useState<SimpleLedger[]>([]);
   const [directexpense, setDirectexpense] = useState<SimpleLedger[]>([]);
+  const [stockLedgers, setStockLedgers] = useState<any[]>([]);
 
   useEffect(() => {
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/group-summary?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((res) => res.json())
@@ -143,7 +141,7 @@ const ProfitLoss: React.FC = () => {
             opening_balance: l.opening_balance,
           }));
 
-        //direct-expense
+        // direct-expense
         const directExpense: SimpleLedger[] = ledgers
           .filter((l: any) => String(l.group_id) === "-7")
           .map((l: any) => ({
@@ -152,38 +150,68 @@ const ProfitLoss: React.FC = () => {
             opening_balance: l.opening_balance,
           }));
 
+        // Robust Stock-in-hand group identification
+        const normalizeStr = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, '');
+
+        const stockInHandGroup = (ledgerGroups || []).find(g => {
+          const name = normalizeStr(g.name || "");
+          const type = normalizeStr(g.type || "");
+          return name.includes("stock") || type.includes("stock");
+        });
+
+        const stockInHandGroupId = stockInHandGroup ? String(stockInHandGroup.id) : null;
+
+        const stockItems = ledgers.filter((l: any) => {
+          const gid = String(l.group_id || l.groupId || "");
+          const gname = normalizeStr(l.groupName || l.group_name || "");
+          const gtype = normalizeStr(l.groupType || l.group_type || l.type || "");
+
+          return (stockInHandGroupId && gid === stockInHandGroupId) ||
+            gname.includes("stock") ||
+            gtype.includes("stock");
+        });
+
         setPurchaseLedgers(purchases);
         setSalesLedgers(sales);
         setDirectexpense(directExpense);
+        setStockLedgers(stockItems);
+
+        // Fetch balances for all returned ledgers to show transactions
+        const ledgerIds = ledgers.map((l: any) => l.id).join(',');
+        if (ledgerIds) {
+          fetch(`${import.meta.env.VITE_API_URL}/api/group?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&ledgerIds=${ledgerIds}`)
+            .then((res) => res.json())
+            .then((balanceData) => {
+              if (balanceData.success) {
+                setLedgerBalances(balanceData.data);
+              }
+            })
+            .catch((err) => console.error("Failed to fetch ledger balances:", err));
+        }
       })
       .catch((err) => {
         console.error("Failed to fetch ledgers:", err);
         setPurchaseLedgers([]);
         setSalesLedgers([]);
+        setStockLedgers([]);
       });
-  }, [companyId, ownerId, ownerType]);
+  }, [companyId, ownerId, ownerType, ledgerGroups]);
 
-  //calcultate opening stock
+  console.log('stock', stockLedgers)
+  // Calculate opening stock from Stock-in-hand ledgers
   const getOpeningStock = () => {
-    return stockopening.reduce((sum, p: any) => {
-      const qty = Number(p.batchQuantity || 0);
-      const rate = Number(p.openingRate || 0);
-      return sum + qty * rate;
+    return stockLedgers.reduce((sum, l) => {
+      const balance = Number(l.opening_balance || 0);
+      return sum + balance;
     }, 0);
   };
 
-  //get closingStock data
-  // const getClosingStock = () => {
-  //   return 0;
-  // };
+  // Calculate closing stock from Stock-in-hand ledgers
   const getClosingStock = () => {
-    const openingValue = getOpeningStock();
-    const purchaseValue = getPurchaseTotal();
-    const salesValue = getSalesTotal();
-
-    const closing = openingValue + purchaseValue - salesValue;
-
-    return closing > 0 ? closing : 0;
+    return stockLedgers.reduce((sum, l) => {
+      const balance = Number(l.closing_balance || 0);
+      return sum + balance;
+    }, 0);
   };
 
   // Income calculations
@@ -194,6 +222,12 @@ const ProfitLoss: React.FC = () => {
       return sum + qty * rate;
     }, 0);
   };
+
+  // Sales + Closing Stock (Final Sales)
+  const getFinalSalesTotal = () => {
+    return getSalesTotal()
+  };
+
 
   const getIndirectIncomeTotal = () => {
     return ledgers
@@ -213,6 +247,9 @@ const ProfitLoss: React.FC = () => {
       return sum + qty * rate;
     }, 0);
   };
+
+
+
 
   const getDirectExpensesTotal = () => {
     return ledgers
@@ -239,9 +276,13 @@ const ProfitLoss: React.FC = () => {
     return getOpeningStock() + getPurchaseTotal() + getDirectExpensesTotal();
   };
 
+
+
+
   const getTradingCreditTotal = () => {
     return getSalesTotal() + getClosingStock();
   };
+
 
   const getGrossProfit = () => {
     return getTradingCreditTotal() - getTradingDebitTotal();
@@ -289,7 +330,7 @@ const ProfitLoss: React.FC = () => {
     });
 
     const itemMap = new Map<string, { id: string | number; name: string; qty: number; rate: number; value: number }>();
-    
+
     purchaseData.forEach((p: any) => {
       const itemName = p.itemName || "Unknown Item";
       const qty = Number(p.purchaseQuantity || 0);
@@ -302,12 +343,12 @@ const ProfitLoss: React.FC = () => {
         existing.value += value;
         existing.rate = existing.value / existing.qty || 0;
       } else {
-        itemMap.set(itemName, { 
+        itemMap.set(itemName, {
           id: itemIdMap.get(itemName) || itemName,
-          name: itemName, 
-          qty, 
-          rate, 
-          value 
+          name: itemName,
+          qty,
+          rate,
+          value
         });
       }
     });
@@ -323,7 +364,7 @@ const ProfitLoss: React.FC = () => {
     });
 
     const itemMap = new Map<string, { id: string | number; name: string; qty: number; rate: number; value: number }>();
-    
+
     salesData.forEach((s: any) => {
       const itemName = s.itemName || "Unknown Item";
       const qty = Math.abs(Number(s.qtyChange || 0));
@@ -336,12 +377,12 @@ const ProfitLoss: React.FC = () => {
         existing.value += value;
         existing.rate = existing.value / existing.qty || 0;
       } else {
-        itemMap.set(itemName, { 
+        itemMap.set(itemName, {
           id: itemIdMap.get(itemName) || itemName,
-          name: itemName, 
-          qty, 
-          rate, 
-          value 
+          name: itemName,
+          qty,
+          rate,
+          value
         });
       }
     });
@@ -496,9 +537,8 @@ const ProfitLoss: React.FC = () => {
           title="Back to Reports"
           type="button"
           onClick={() => navigate("/app/reports")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -512,9 +552,8 @@ const ProfitLoss: React.FC = () => {
               title="Settings"
               type="button"
               onClick={() => setShowFullData((prev) => !prev)}
-              className={`p-2 rounded-md ${
-                theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-              }`}
+              className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+                }`}
             >
               <Settings size={18} />
             </button>
@@ -561,9 +600,8 @@ const ProfitLoss: React.FC = () => {
             title="Toggle Filters"
             type="button"
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md  ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md  ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Filter size={18} />
           </button>
@@ -571,9 +609,8 @@ const ProfitLoss: React.FC = () => {
           {/* Print Button */}
           <button
             title="Print Report"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
@@ -582,9 +619,8 @@ const ProfitLoss: React.FC = () => {
           <button
             title="Download Report"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Download size={18} />
           </button>
@@ -593,9 +629,8 @@ const ProfitLoss: React.FC = () => {
 
       {showFilterPanel && (
         <div
-          className={`p-4 mb-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 mb-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h3 className="font-semibold mb-4">Filters</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -603,11 +638,10 @@ const ProfitLoss: React.FC = () => {
               <label className="block text-sm font-medium mb-1">Period</label>
               <select
                 title="Select Period"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               >
                 <option value="current-month">Current Month</option>
                 <option value="current-quarter">Current Quarter</option>
@@ -622,9 +656,8 @@ const ProfitLoss: React.FC = () => {
 
       {/* Trading Account Section */}
       <div
-        className={`mb-6 p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`mb-6 p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <h2 className="text-xl font-bold mb-4 text-center">Trading Account</h2>
         <p className="text-center text-sm opacity-75 mb-4">
@@ -640,9 +673,8 @@ const ProfitLoss: React.FC = () => {
             <div className="space-y-2">
               <div className="py-2 border-b border-gray-300 dark:border-gray-600">
                 <div
-                  className={`flex justify-between cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
+                  className={`flex justify-between cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                    }`}
                   onClick={handleStockClick}
                   title="Click to view Stock Summary"
                 >
@@ -661,9 +693,8 @@ const ProfitLoss: React.FC = () => {
                       <div
                         key={index}
                         onClick={() => handleOpeningStockItemClick(item.name, item.id)}
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
-                          theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                        }`}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                          }`}
                       >
                         <span className="text-blue-600 underline">
                           {item.name}
@@ -674,9 +705,8 @@ const ProfitLoss: React.FC = () => {
                       </div>
                     ))}
                     {getOpeningStockByItems().length === 0 && (
-                      <div className={`text-xs italic ${
-                        theme === "dark" ? "text-gray-500" : "text-gray-500"
-                      }`}>No opening stock items</div>
+                      <div className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-500"
+                        }`}>No opening stock items</div>
                     )}
                   </div>
                 )}
@@ -688,18 +718,9 @@ const ProfitLoss: React.FC = () => {
                   <div className="flex justify-between font-semibold">
                     <span>To Purchases</span>
                     <span className="font-mono">
-                      {(
-                        purchaseLedgers.reduce(
-                          (sum, item) =>
-                            sum + Number(item.opening_balance || 0),
-                          0
-                        ) +
-                        (showInventoryBreakup
-                          ? getPurchaseByItems().reduce(
-                              (sum, item) => sum + item.value,
-                              0
-                            )
-                          : 0)
+                      {purchaseLedgers.reduce(
+                        (sum, item) => sum + (ledgerBalances[item.id]?.debit || 0),
+                        0
                       ).toLocaleString()}
                     </span>
                   </div>
@@ -723,15 +744,14 @@ const ProfitLoss: React.FC = () => {
                         onClick={() =>
                           handlePurchaseLedgerClick(item.name, item.id)
                         }
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         <span className="text-blue-600 underline">
                           {item.name}
                         </span>
                         <span className="font-mono">
-                          {Number(item.opening_balance).toLocaleString()}
+                          {(ledgerBalances[item.id]?.debit || 0).toLocaleString()}
                         </span>
                       </div>
                     ))}
@@ -743,9 +763,8 @@ const ProfitLoss: React.FC = () => {
                           <div
                             key={`item-${index}`}
                             onClick={() => handlePurchaseItemClick(item.name, item.id)}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
-                              theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                            }`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                              }`}
                           >
                             <span className="text-blue-600 underline">
                               {item.name}
@@ -767,9 +786,8 @@ const ProfitLoss: React.FC = () => {
                       <div
                         key={index}
                         onClick={() => handlePurchaseItemClick(item.name, item.id)}
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
-                          theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                        }`}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                          }`}
                       >
                         <span className="text-blue-600 underline">
                           {item.name}
@@ -780,13 +798,29 @@ const ProfitLoss: React.FC = () => {
                       </div>
                     ))}
                     {getPurchaseByItems().length === 0 && (
-                      <div className={`text-xs italic ${
-                        theme === "dark" ? "text-gray-500" : "text-gray-500"
-                      }`}>No purchase items</div>
+                      <div className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-500"
+                        }`}>No purchase items</div>
                     )}
                   </div>
                 )}
               </div>
+
+              {/* Total Row */}
+              <div className="flex justify-between py-2 font-bold text-lg border-t-2 border-gray-400 dark:border-gray-500">
+                <span>Total</span>
+                <span className="font-mono">
+                   {getTradingDebitTotal().toLocaleString()}
+                </span>
+              </div>
+
+              {getGrossProfit() > 0 && (
+                <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 font-semibold text-green-600">
+                  <span>To Gross Profit c/o</span>
+                  <span className="font-mono">
+                    {getGrossProfit().toLocaleString()}
+                  </span>
+                </div>
+              )}
 
               <div className="py-2 border-b border-gray-300 dark:border-gray-600">
                 {/* Header – Always visible */}
@@ -804,15 +838,14 @@ const ProfitLoss: React.FC = () => {
                       <div
                         key={index}
                         onClick={() => handleDirectExpenseClick(item.name, item.id)}
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
-                          theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                        }`}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                          }`}
                       >
                         <span className="text-blue-600 underline">
                           {item.name}
                         </span>
                         <span className="font-mono">
-                          {Number(item.opening_balance).toLocaleString()}
+                          {(ledgerBalances[item.id]?.debit || 0).toLocaleString()}
                         </span>
                       </div>
                     ))}
@@ -821,9 +854,8 @@ const ProfitLoss: React.FC = () => {
                     <div className="border-t border-dashed border-gray-400 my-1" />
 
                     {/* TOTAL */}
-                    <div className={`flex justify-between font-semibold ${
-                      theme === "dark" ? "text-gray-200" : "text-gray-900"
-                    }`}>
+                    <div className={`flex justify-between font-semibold ${theme === "dark" ? "text-gray-200" : "text-gray-900"
+                      }`}>
                       <span>Total Direct Expenses</span>
                       <span className="font-mono">
                         {(
@@ -838,24 +870,6 @@ const ProfitLoss: React.FC = () => {
                     </div>
                   </div>
                 )}
-              </div>
-
-              {getGrossProfit() > 0 && (
-                <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 font-semibold text-green-600">
-                  <span>To Gross Profit c/o</span>
-                  <span className="font-mono">
-                    {getGrossProfit().toLocaleString()}
-                  </span>
-                </div>
-              )}
-              <div className="flex justify-between py-2 font-bold text-lg border-t-2 border-gray-400 dark:border-gray-500">
-                <span>Total</span>
-                <span className="font-mono">
-                  {Math.max(
-                    getTradingDebitTotal(),
-                    getTradingCreditTotal()
-                  ).toLocaleString()}
-                </span>
               </div>
             </div>
           </div>
@@ -872,18 +886,9 @@ const ProfitLoss: React.FC = () => {
                   <div className="flex justify-between font-semibold">
                     <span>By Sales</span>
                     <span className="font-mono">
-                      {(
-                        salesLedgers.reduce(
-                          (sum, item) =>
-                            sum + Number(item.opening_balance || 0),
-                          0
-                        ) +
-                        (showInventoryBreakup
-                          ? getSalesByItems().reduce(
-                              (sum, item) => sum + item.value,
-                              0
-                            )
-                          : 0)
+                      {salesLedgers.reduce(
+                        (sum, item) => sum + (ledgerBalances[item.id]?.credit || 0),
+                        0
                       ).toLocaleString()}
                     </span>
                   </div>
@@ -893,7 +898,7 @@ const ProfitLoss: React.FC = () => {
                       <span>By Sales</span>
                     </Link>
                     <span className="font-mono">
-                      {getSalesTotal().toLocaleString()}
+                      {getFinalSalesTotal().toLocaleString()}
                     </span>
                   </div>
                 )}
@@ -907,15 +912,14 @@ const ProfitLoss: React.FC = () => {
                         onClick={() =>
                           handleSalesLedgerClick(item.name, item.id)
                         }
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         <span className="text-blue-600 underline">
                           {item.name}
                         </span>
                         <span className="font-mono">
-                          {Number(item.opening_balance).toLocaleString()}
+                          {(ledgerBalances[item.id]?.credit || 0).toLocaleString()}
                         </span>
                       </div>
                     ))}
@@ -927,9 +931,8 @@ const ProfitLoss: React.FC = () => {
                           <div
                             key={`item-${index}`}
                             onClick={() => handleSalesItemClick(item.name, item.id)}
-                            className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
-                              theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                            }`}
+                            className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                              }`}
                           >
                             <span className="text-blue-600 underline">
                               {item.name}
@@ -951,9 +954,8 @@ const ProfitLoss: React.FC = () => {
                       <div
                         key={index}
                         onClick={() => handleSalesItemClick(item.name, item.id)}
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
-                          theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                        }`}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                          }`}
                       >
                         <span className="text-blue-600 underline">
                           {item.name}
@@ -964,9 +966,8 @@ const ProfitLoss: React.FC = () => {
                       </div>
                     ))}
                     {getSalesByItems().length === 0 && (
-                      <div className={`text-xs italic ${
-                        theme === "dark" ? "text-gray-500" : "text-gray-500"
-                      }`}>No sales items</div>
+                      <div className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-500"
+                        }`}>No sales items</div>
                     )}
                   </div>
                 )}
@@ -974,9 +975,8 @@ const ProfitLoss: React.FC = () => {
 
               <div className="py-2 border-b border-gray-300 dark:border-gray-600">
                 <div
-                  className={`flex justify-between cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
+                  className={`flex justify-between cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                    }`}
                   onClick={handleStockClick}
                   title="Click to view Stock Summary"
                 >
@@ -995,9 +995,8 @@ const ProfitLoss: React.FC = () => {
                       <div
                         key={index}
                         onClick={() => handleOpeningStockItemClick(item.name, item.id)}
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${
-                          theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                        }`}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                          }`}
                       >
                         <span className="text-blue-600 underline">
                           {item.name}
@@ -1008,9 +1007,8 @@ const ProfitLoss: React.FC = () => {
                       </div>
                     ))}
                     {getClosingStockByItems().length === 0 && (
-                      <div className={`text-xs italic ${
-                        theme === "dark" ? "text-gray-500" : "text-gray-500"
-                      }`}>No closing stock items</div>
+                      <div className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-500"
+                        }`}>No closing stock items</div>
                     )}
                   </div>
                 )}
@@ -1039,9 +1037,8 @@ const ProfitLoss: React.FC = () => {
 
       {/* Profit & Loss Account Section */}
       <div
-        className={`mb-6 p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`mb-6 p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <h2 className="text-xl font-bold mb-4 text-center">
           Profit & Loss Account
@@ -1079,20 +1076,18 @@ const ProfitLoss: React.FC = () => {
                     {getIndirectExpensesLedgers().map((ledger, index) => (
                       <div
                         key={index}
-                        className={`flex justify-between ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         <span>{ledger.name}</span>
                         <span className="font-mono">
-                          {ledger.openingBalance.toLocaleString()}
+                          {(ledgerBalances[Number(ledger.id)]?.debit || 0).toLocaleString()}
                         </span>
                       </div>
                     ))}
                     {getIndirectExpensesLedgers().length === 0 && (
-                      <div className={`text-xs italic ${
-                        theme === "dark" ? "text-gray-500" : "text-gray-500"
-                      }`}>No indirect expenses</div>
+                      <div className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-500"
+                        }`}>No indirect expenses</div>
                     )}
                   </div>
                 )}
@@ -1145,20 +1140,18 @@ const ProfitLoss: React.FC = () => {
                     {getIndirectIncomeLedgers().map((ledger, index) => (
                       <div
                         key={index}
-                        className={`flex justify-between ${
-                          theme === "dark" ? "text-gray-300" : "text-gray-700"
-                        }`}
+                        className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                          }`}
                       >
                         <span>{ledger.name}</span>
                         <span className="font-mono">
-                          {ledger.openingBalance.toLocaleString()}
+                          {(ledgerBalances[Number(ledger.id)]?.credit || 0).toLocaleString()}
                         </span>
                       </div>
                     ))}
                     {getIndirectIncomeLedgers().length === 0 && (
-                      <div className={`text-xs italic ${
-                        theme === "dark" ? "text-gray-500" : "text-gray-500"
-                      }`}>No indirect income</div>
+                      <div className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-500"
+                        }`}>No indirect income</div>
                     )}
                   </div>
                 )}
@@ -1187,9 +1180,8 @@ const ProfitLoss: React.FC = () => {
 
       {/* Summary Section */}
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <div className="text-center">
           <h2 className="text-2xl font-bold mb-4">Summary</h2>
@@ -1197,9 +1189,8 @@ const ProfitLoss: React.FC = () => {
             <div>
               <p className="text-sm opacity-75">Gross Profit/Loss</p>
               <p
-                className={`text-xl font-bold ${
-                  getGrossProfit() >= 0 ? "text-green-600" : "text-red-600"
-                }`}
+                className={`text-xl font-bold ${getGrossProfit() >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
               >
                 ₹ {Math.abs(getGrossProfit()).toLocaleString()}
                 <span className="text-sm ml-2">
@@ -1210,9 +1201,8 @@ const ProfitLoss: React.FC = () => {
             <div>
               <p className="text-sm opacity-75">Net Profit/Loss</p>
               <p
-                className={`text-xl font-bold ${
-                  getNetProfit() >= 0 ? "text-green-600" : "text-red-600"
-                }`}
+                className={`text-xl font-bold ${getNetProfit() >= 0 ? "text-green-600" : "text-red-600"
+                  }`}
               >
                 ₹ {Math.abs(getNetProfit()).toLocaleString()}
                 <span className="text-sm ml-2">
@@ -1234,9 +1224,8 @@ const ProfitLoss: React.FC = () => {
       </div>
 
       <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <p className="text-sm">
           <span className="font-semibold">Pro Tip:</span> Click on Opening Stock
