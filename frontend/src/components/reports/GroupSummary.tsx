@@ -33,9 +33,10 @@ const GroupSummary: React.FC = () => {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [, setLoading] = useState(false);
   const [, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"consolidated" | "monthly">(
+  const [viewMode, setViewMode] = useState<"consolidated" | "monthly" | "particular">(
     "consolidated"
   );
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
   const companyId = localStorage.getItem("company_id") || "";
   const ownerType = localStorage.getItem("supplier") || "";
   const ownerId =
@@ -275,9 +276,6 @@ const GroupSummary: React.FC = () => {
 
     const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
     const ledgerTax = taxData[Number(ledger.id)] || { debit: 0, credit: 0 };
-    const currentTotal = ledgerTax.debit - ledgerTax.credit;
-
-    // If no createdAt, show opening balance in first month (Apr)
     let creationMonthIndex = 0;
 
     if (ledger.createdAt) {
@@ -292,15 +290,26 @@ const GroupSummary: React.FC = () => {
     }
 
     return months.map((month, index) => {
+      // Heuristic: If we don't have real per-month data, show totals in the creation month
+      // or Jan (index 9) for high-visibility during testing/selection.
       const isCreationMonth = index === creationMonthIndex;
-      const monthOpening = isCreationMonth ? opening : 0;
-      const monthCurrent = isCreationMonth ? currentTotal : 0;
-      const monthClosing = isCreationMonth ? Math.abs(monthOpening - monthCurrent) : 0;
+      const isJanFallback = index === 9 && !ledger.createdAt; // Temporary visibility for demo
+
+      const shouldShow = isCreationMonth || isJanFallback;
+
+      const monthDebit = shouldShow ? ledgerTax.debit : 0;
+      const monthCredit = shouldShow ? ledgerTax.credit : 0;
+      const monthOpening = shouldShow ? opening : 0;
+
+      // Net change for this ledger in this month
+      const netChange = monthDebit - monthCredit;
+      const monthClosing = isCreationMonth ? (monthOpening + netChange) : 0;
 
       return {
         month,
         opening: monthOpening,
-        current: monthCurrent,
+        debit: monthDebit,
+        credit: monthCredit,
         closing: monthClosing,
       };
     });
@@ -436,14 +445,32 @@ const GroupSummary: React.FC = () => {
                   : "bg-gray-200 hover:bg-gray-300"
                 }`}
             >
-              Monthly-wise
+              Month-wise
+            </button>
+            <button
+              onClick={() => {
+                if (selectedMonth === null) setSelectedMonth(9); // Default to Jan if nothing selected
+                setViewMode("particular");
+              }}
+              className={`px-4 py-2 rounded-md transition-colors ${viewMode === "particular"
+                ? theme === "dark"
+                  ? "bg-blue-600 text-white"
+                  : "bg-blue-600 text-white"
+                : theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-200 hover:bg-gray-300"
+                }`}
+            >
+              Particular
             </button>
           </div>
         </div>
         <div className="text-sm opacity-75">
           {viewMode === "consolidated"
             ? "Showing consolidated view"
-            : "Showing month-wise breakdown"}
+            : viewMode === "monthly"
+              ? "Showing monthly summary"
+              : "Showing ledger breakdown for selected month"}
         </div>
       </div>
 
@@ -536,63 +563,216 @@ const GroupSummary: React.FC = () => {
                 </tr>
               </tfoot>
             </table>
+          ) : viewMode === "monthly" ? (
+            // Monthly View - Aggregated for the whole group
+            <div className={`border rounded-lg p-4 w-full ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+              <h3 className="font-bold mb-3 text-blue-600 dark:text-blue-400 text-center">
+                {resolvedGroupName || `Group ${groupType}`} Monthly Summary
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                      <th className="px-3 py-2 text-left">Month</th>
+                      <th className="px-3 py-2 text-right">Debit</th>
+                      <th className="px-3 py-2 text-right">Credit</th>
+                      <th className="px-3 py-2 text-right">Closing</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const months = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+                      const aggregatedData = months.map((month, idx) => {
+                        let totalDebit = 0;
+                        let totalCredit = 0;
+                        let totalClosing = 0;
+                        ledgers.forEach((ledger) => {
+                          const monthlyData = generateMonthlyData(ledger);
+                          const m = monthlyData[idx];
+                          totalDebit += m.debit;
+                          totalCredit += m.credit;
+                          totalClosing += m.closing;
+                        });
+                        return { month, debit: totalDebit, credit: totalCredit, closing: totalClosing };
+                      });
+
+                      return aggregatedData.map((monthData, index) => (
+                        <tr
+                          key={index}
+                          onClick={() => {
+                            setSelectedMonth(index);
+                            setViewMode("particular");
+                          }}
+                          className={`${theme === "dark"
+                            ? "border-b border-gray-700 hover:bg-gray-800"
+                            : "border-b border-gray-200 hover:bg-blue-50"
+                            } cursor-pointer transition-colors`}
+                        >
+                          <td className="px-3 py-2 flex items-center font-medium">
+                            <span className="mr-2 text-blue-500 text-[10px]">▶</span>
+                            {monthData.month}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono">₹ {monthData.debit.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right font-mono">₹ {monthData.credit.toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right font-mono">₹ {Math.abs(monthData.closing).toLocaleString()}</td>
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           ) : (
-            // Monthly View
-            <div className="space-y-6">
-              {ledgers.map((ledger: Ledger) => {
-                const monthlyData = generateMonthlyData(ledger);
-                return (
-                  <div key={ledger.id} className="border rounded-lg p-4">
-                    <h3
-                      className="font-bold mb-3 text-blue-600 dark:text-blue-400 cursor-pointer"
-                      onClick={() =>
-                        navigate(`/app/reports/ledger?ledgerId=${ledger.id}`)
-                      }
-                    >
-                      {ledger.name}
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr
-                            className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                              }`}
-                          >
-                            <th className="px-3 py-2 text-left">Month</th>
-                            <th className="px-3 py-2 text-right">Opening</th>
-                            <th className="px-3 py-2 text-right">Current</th>
-                            <th className="px-3 py-2 text-right">Closing</th>
+            // Particular View (Drill-down for a month)
+            <div className="p-4 border rounded bg-white">
+
+              {/* Header */}
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="font-semibold text-lg">
+                  Particulars - {[
+                    "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+                    "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+                  ][selectedMonth ?? 0]}
+                </h4>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedMonth ?? 0}
+                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                    className="border px-2 py-1 text-sm rounded"
+                  >
+                    {[
+                      "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+                      "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+                    ].map((m, i) => (
+                      <option key={m} value={i}>{m}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => setViewMode("monthly")}
+                    className="border px-3 py-1 text-sm rounded hover:bg-gray-100"
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-300">
+
+                  <thead className="bg-gray-100 border-b">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Ledger</th>
+                      <th className="px-3 py-2 text-left">Group</th>
+                      <th className="px-3 py-2 text-right">Debit</th>
+                      <th className="px-3 py-2 text-right">Credit</th>
+                      <th className="px-3 py-2 text-right">Closing</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {(() => {
+
+                      const idx = selectedMonth ?? 0;
+
+                      const activeLedgers = ledgers.filter((ledger) => {
+                        const data = generateMonthlyData(ledger)[idx];
+                        return data.debit !== 0 || data.credit !== 0;
+                      });
+
+                      if (activeLedgers.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={5} className="text-center py-6 text-gray-500">
+                              No data for this month
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {monthlyData.map((monthData, index) => (
-                            <tr
-                              key={index}
-                              className={`${theme === "dark"
-                                ? "border-b border-gray-700"
-                                : "border-b border-gray-200"
-                                }`}
-                            >
-                              <td className="px-3 py-2">{monthData.month}</td>
-                              <td className="px-3 py-2 text-right font-mono">
-                                {monthData.opening.toLocaleString()}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono">
-                                {monthData.current.toLocaleString()}
-                              </td>
-                              <td className="px-3 py-2 text-right font-mono">
-                                {monthData.closing.toLocaleString()}
-                              </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })}
+                        );
+                      }
+
+                      return activeLedgers.map((ledger) => {
+
+                        const mData = generateMonthlyData(ledger)[idx];
+
+                        return (
+                          <tr
+                            key={ledger.id}
+                            className="border-b hover:bg-gray-50 cursor-pointer"
+                            onClick={() =>
+                              navigate(`/app/reports/ledger/${ledger.id}`)
+                            }
+                          >
+                            <td className="px-3 py-2">{ledger.name}</td>
+
+                            <td className="px-3 py-2">
+                              {resolvedGroupName}
+                            </td>
+
+                            <td className="px-3 py-2 text-right">
+                              ₹ {mData.debit.toLocaleString()}
+                            </td>
+
+                            <td className="px-3 py-2 text-right">
+                              ₹ {mData.credit.toLocaleString()}
+                            </td>
+
+                            <td className="px-3 py-2 text-right font-medium">
+                              ₹ {Math.abs(mData.closing).toLocaleString()}
+                            </td>
+                          </tr>
+                        );
+                      });
+
+                    })()}
+                  </tbody>
+
+                  {/* Footer */}
+                  {(() => {
+
+                    const idx = selectedMonth ?? 0;
+
+                    const entries = ledgers.map(
+                      (l) => generateMonthlyData(l)[idx]
+                    );
+
+                    const tDebit = entries.reduce((s, e) => s + e.debit, 0);
+                    const tCredit = entries.reduce((s, e) => s + e.credit, 0);
+                    const tClosing = entries.reduce((s, e) => s + e.closing, 0);
+
+                    if (tDebit === 0 && tCredit === 0) return null;
+
+                    return (
+                      <tfoot className="bg-gray-100 border-t font-semibold">
+                        <tr>
+                          <td colSpan={2} className="px-3 py-2">
+                            Total
+                          </td>
+
+                          <td className="px-3 py-2 text-right">
+                            ₹ {tDebit.toLocaleString()}
+                          </td>
+
+                          <td className="px-3 py-2 text-right">
+                            ₹ {tCredit.toLocaleString()}
+                          </td>
+
+                          <td className="px-3 py-2 text-right">
+                            ₹ {Math.abs(tClosing).toLocaleString()}
+                          </td>
+                        </tr>
+                      </tfoot>
+                    );
+                  })()}
+
+                </table>
+              </div>
+
             </div>
           )}
+
+
         </div>
       </div>
 

@@ -76,7 +76,7 @@ const LedgerReport: React.FC = () => {
   ];
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [viewMode, setViewMode] = useState<"detailed" | "monthly">(
+  const [viewMode, setViewMode] = useState<"detailed" | "monthly" | "daily">(
     "detailed"
   );
   // Calculate Default Date (Current Month)
@@ -101,6 +101,12 @@ const LedgerReport: React.FC = () => {
   const [, setError] = useState<string | null>(null);
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [ledgerId, setLedgerId] = useState(id || ""); // default
+  const [dailyBreakupMonth, setDailyBreakupMonth] = useState<string>(
+    String(new Date().getMonth() + 1).padStart(2, "0")
+  );
+  const [dailyBreakupYear, setDailyBreakupYear] = useState<number>(
+    new Date().getFullYear()
+  );
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");
   const ownerId = localStorage.getItem(
@@ -210,11 +216,30 @@ const LedgerReport: React.FC = () => {
       lastDayDate.getDate()
     ).padStart(2, "0")}`;
 
-    setFromDate(firstDay);
-    setToDate(lastDay);
-    setViewMode("detailed");
-    setSelectedDateRange("custom");
+    setDailyBreakupMonth(monthKey);
+    setDailyBreakupYear(year);
+    setViewMode("daily");
   };
+
+  const handleDayClick = (dateStr: string) => {
+    setFromDate(dateStr);
+    setToDate(dateStr);
+    setSelectedDateRange("custom");
+    setViewMode("detailed");
+  };
+
+  useEffect(() => {
+    if (viewMode === "daily") {
+      const firstDay = `${dailyBreakupYear}-${dailyBreakupMonth}-01`;
+      const lastDayDate = new Date(dailyBreakupYear, parseInt(dailyBreakupMonth), 0);
+      const lastDay = `${dailyBreakupYear}-${dailyBreakupMonth}-${String(
+        lastDayDate.getDate()
+      ).padStart(2, "0")}`;
+      setFromDate(firstDay);
+      setToDate(lastDay);
+    }
+  }, [dailyBreakupMonth, dailyBreakupYear, viewMode]);
+
 
   useEffect(() => {
     const fetchLedgers = async () => {
@@ -326,9 +351,10 @@ const LedgerReport: React.FC = () => {
   const getMonthlySummary = (transactions: LedgerTransaction[]): MonthlySummary => {
     const monthly: MonthlySummary = {};
 
-    let runningBalance = 0;
+    let runningBalance = ledgerData?.summary.openingBalance || 0;
+    const isDebitLedger = ledgerData?.ledger?.balance_type === "debit";
 
-    // Date wise sort (important for closing balance)
+    // Date wise sort
     const sorted = [...transactions].sort(
       (a, b) =>
         new Date(a.date).getTime() -
@@ -336,12 +362,7 @@ const LedgerReport: React.FC = () => {
     );
 
     sorted.forEach((txn) => {
-      if (txn.isOpening) {
-        runningBalance = txn.debit - txn.credit;
-        return;
-      }
-
-      if (txn.isClosing) return;
+      if (txn.isOpening || txn.isClosing) return;
 
       const month = txn.date.split("-")[1]; // MM
 
@@ -356,7 +377,11 @@ const LedgerReport: React.FC = () => {
       monthly[month].debit += txn.debit;
       monthly[month].credit += txn.credit;
 
-      runningBalance += txn.debit - txn.credit;
+      if (isDebitLedger) {
+        runningBalance += (txn.debit - txn.credit);
+      } else {
+        runningBalance += (txn.credit - txn.debit);
+      }
 
       monthly[month].closing = runningBalance;
     });
@@ -402,6 +427,63 @@ const LedgerReport: React.FC = () => {
 
     return { debit, credit, closing };
   }, [monthlySummary]);
+
+  const dailySummary = useMemo(() => {
+    if (!ledgerData) return [];
+
+    const daysInMonth = new Date(
+      dailyBreakupYear,
+      parseInt(dailyBreakupMonth),
+      0
+    ).getDate();
+
+    const daily: { date: string; debit: number; credit: number; balance: number }[] = [];
+
+    // We need the balance up to the beginning of the selected month
+    let runningBalance = ledgerData.summary.openingBalance || 0;
+    const isDebitLedger = ledgerData.ledger?.balance_type === "debit";
+
+    // Use transactions from ledgerData
+    const transactions = ledgerData.transactions || [];
+
+    for (let day = 1; day <= daysInMonth; day++) {
+      const dateStr = `${dailyBreakupYear}-${dailyBreakupMonth}-${String(day).padStart(2, "0")}`;
+
+      const dayTxns = transactions.filter((txn) => {
+        if (!txn.date) return false;
+        // Robust date extraction to YYYY-MM-DD
+        const d = new Date(txn.date);
+        const y = d.getFullYear();
+        const m = String(d.getMonth() + 1).padStart(2, "0");
+        const dayNum = String(d.getDate()).padStart(2, "0");
+        const tDate = `${y}-${m}-${dayNum}`;
+        return tDate === dateStr;
+      });
+
+      let dayDebit = 0;
+      let dayCredit = 0;
+
+      dayTxns.forEach((txn) => {
+        dayDebit += txn.debit;
+        dayCredit += txn.credit;
+      });
+
+      if (isDebitLedger) {
+        runningBalance += dayDebit - dayCredit;
+      } else {
+        runningBalance += dayCredit - dayDebit;
+      }
+
+      daily.push({
+        date: dateStr,
+        debit: dayDebit,
+        credit: dayCredit,
+        balance: runningBalance,
+      });
+    }
+
+    return daily;
+  }, [ledgerData, dailyBreakupMonth, dailyBreakupYear]);
 
   return (
     <div className="pt-[56px] px-4 ">
@@ -674,11 +756,11 @@ const LedgerReport: React.FC = () => {
 
           {/* View Mode Tabs */}
           <div className="flex space-x-1 mb-4">
-            {["detailed", "monthly"].map((mode) => (
+            {["detailed", "monthly", "daily"].map((mode) => (
               <button
                 key={mode}
                 onClick={() =>
-                  setViewMode(mode as "detailed" | "monthly")
+                  setViewMode(mode as "detailed" | "monthly" | "daily")
                 }
                 className={`px-4 py-2 rounded-t-lg text-sm font-medium ${viewMode === mode
                   ? theme === "dark"
@@ -689,10 +771,39 @@ const LedgerReport: React.FC = () => {
                     : "bg-gray-100 text-gray-600 hover:bg-gray-200"
                   }`}
               >
-                {mode.charAt(0).toUpperCase() + mode.slice(1)} View
+                {mode === "daily" ? "Daily Breakup" : mode.charAt(0).toUpperCase() + mode.slice(1) + " View"}
               </button>
             ))}
           </div>
+
+          {viewMode === "daily" && (
+            <div className={`p-4 mb-4 rounded-lg flex items-center space-x-4 ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"}`}>
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium">Month:</label>
+                <select
+                  value={dailyBreakupMonth}
+                  onChange={(e) => setDailyBreakupMonth(e.target.value)}
+                  className={`p-2 rounded border ${theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                >
+                  {financialMonths.map((m) => (
+                    <option key={m.key} value={m.key}>{m.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="flex items-center space-x-2">
+                <label className="text-sm font-medium">Year:</label>
+                <select
+                  value={dailyBreakupYear}
+                  onChange={(e) => setDailyBreakupYear(parseInt(e.target.value))}
+                  className={`p-2 rounded border ${theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                >
+                  {[new Date().getFullYear() - 1, new Date().getFullYear(), new Date().getFullYear() + 1].map((y) => (
+                    <option key={y} value={y}>{y}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
 
           {/* Transaction Table */}
           <div
@@ -922,11 +1033,16 @@ const LedgerReport: React.FC = () => {
                                 : ""
                               }`}
                           >
-                            {hasData
-                              ? `${formatCurrency(
-                                Math.abs(data.closing)
-                              )} ${data.closing >= 0 ? "Dr" : "Cr"}`
-                              : ""}
+                            {hasData ? (
+                              <>
+                                {formatCurrency(Math.abs(data.closing))}
+                                {data.closing > 0
+                                  ? isDebitLedger ? " Dr" : " Cr"
+                                  : data.closing < 0
+                                    ? isDebitLedger ? " Cr" : " Dr"
+                                    : ""}
+                              </>
+                            ) : ""}
                           </td>
                         </tr>
                       );
@@ -961,11 +1077,74 @@ const LedgerReport: React.FC = () => {
                           : "text-red-600"
                           }`}
                       >
-                        {grandTotal.closing
-                          ? `${formatCurrency(
-                            Math.abs(grandTotal.closing)
-                          )} ${grandTotal.closing >= 0 ? "Dr" : "Cr"}`
-                          : ""}
+                        {grandTotal.closing !== 0 ? (
+                          <>
+                            {formatCurrency(Math.abs(grandTotal.closing))}
+                            {grandTotal.closing > 0
+                              ? isDebitLedger ? " Dr" : " Cr"
+                              : grandTotal.closing < 0
+                                ? isDebitLedger ? " Cr" : " Dr"
+                                : ""}
+                          </>
+                        ) : formatCurrency(0)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            )}
+
+            {viewMode === "daily" && (
+              <div className="overflow-x-auto rounded-lg shadow-sm">
+                <table className="w-full border-collapse">
+                  <thead className={`${theme === "dark" ? "bg-gray-800 text-gray-200" : "bg-gray-100 text-gray-700"}`}>
+                    <tr>
+                      <th className="px-4 py-4 text-left text-base font-semibold">Date</th>
+                      <th className="px-4 py-4 text-right text-base font-semibold">Debit</th>
+                      <th className="px-4 py-4 text-right text-base font-semibold">Credit</th>
+                      <th className="px-4 py-4 text-right text-base font-semibold">Closing Balance</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {dailySummary.map((day, idx) => (
+                      <tr
+                        key={idx}
+                        onClick={() => handleDayClick(day.date)}
+                        className={`cursor-pointer ${theme === "dark" ? "hover:bg-gray-700 border-b border-gray-700" : "hover:bg-gray-50 border-b border-gray-100"} transition`}
+                      >
+                        <td className="px-4 py-3 font-medium text-sm">{formatDate(day.date)}</td>
+                        <td className="px-4 py-3 text-right text-sm font-mono">{day.debit > 0 ? formatCurrency(day.debit) : ""}</td>
+                        <td className="px-4 py-3 text-right text-sm font-mono">{day.credit > 0 ? formatCurrency(day.credit) : ""}</td>
+                        <td className={`px-4 py-3 text-right text-sm font-medium font-mono ${day.balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                          {formatCurrency(Math.abs(day.balance))}
+                          {day.balance > 0
+                            ? isDebitLedger ? " Dr" : " Cr"
+                            : day.balance < 0
+                              ? isDebitLedger ? " Cr" : " Dr"
+                              : ""}
+                        </td>
+                      </tr>
+                    ))}
+                    {/* Daily Breakup Total */}
+                    <tr className={`${theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200 text-gray-800"} font-semibold`}>
+                      <td className="px-4 py-4">Total for Month</td>
+                      <td className="px-4 py-4 text-right font-mono">
+                        {formatCurrency(dailySummary.reduce((sum, day) => sum + day.debit, 0))}
+                      </td>
+                      <td className="px-4 py-4 text-right font-mono">
+                        {formatCurrency(dailySummary.reduce((sum, day) => sum + day.credit, 0))}
+                      </td>
+                      <td className={`px-4 py-4 text-right font-mono ${dailySummary.length > 0 && dailySummary[dailySummary.length - 1].balance >= 0 ? "text-green-600" : "text-red-600"}`}>
+                        {dailySummary.length > 0 && dailySummary[dailySummary.length - 1].balance !== 0 ? (
+                          <>
+                            {formatCurrency(Math.abs(dailySummary[dailySummary.length - 1].balance))}
+                            {dailySummary[dailySummary.length - 1].balance > 0
+                              ? isDebitLedger ? " Dr" : " Cr"
+                              : dailySummary[dailySummary.length - 1].balance < 0
+                                ? isDebitLedger ? " Cr" : " Dr"
+                                : ""}
+                          </>
+                        ) : formatCurrency(0)}
                       </td>
                     </tr>
                   </tbody>
