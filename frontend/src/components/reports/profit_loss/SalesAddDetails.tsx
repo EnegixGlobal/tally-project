@@ -1,10 +1,8 @@
 import React, { useEffect, useMemo, useState } from "react";
-import { useAppContext } from "../../../context/AppContext";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 
 const SalesAddDetails: React.FC = () => {
-  const { theme } = useAppContext();
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
 
@@ -34,7 +32,6 @@ const SalesAddDetails: React.FC = () => {
   ];
 
   /* ===================== STATES ===================== */
-  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
   const [monthData, setMonthData] = useState<any[]>([]);
 
   /* ================= FETCH MONTH DATA ================= */
@@ -79,7 +76,7 @@ const SalesAddDetails: React.FC = () => {
 
     return MONTHS.map((monthName) => {
       const mysqlMonth = mysqlMonthMap[monthName];
-      const data = monthData.find((d) => d.monthNo === mysqlMonth);
+      const data = monthData.find((d: any) => d.monthNo === mysqlMonth);
       const credit = data ? Number(data.total) : 0;
       const debit = 0;
       runningTotal += credit - debit;
@@ -92,6 +89,38 @@ const SalesAddDetails: React.FC = () => {
       };
     });
   }, [monthData]);
+
+  const handleMonthClick = (monthName: string) => {
+    const mysqlMonthMap: Record<string, number> = {
+      April: 4,
+      May: 5,
+      June: 6,
+      July: 7,
+      August: 8,
+      September: 9,
+      October: 10,
+      November: 11,
+      December: 12,
+      January: 1,
+      February: 2,
+      March: 3,
+    };
+
+    const monthNo = mysqlMonthMap[monthName];
+    const startYear = 2025;
+    let year = startYear;
+    if (monthNo < 4) {
+      year++;
+    }
+
+    const firstDay = `${year}-${String(monthNo).padStart(2, "0")}-01`;
+    const lastDayDate = new Date(year, monthNo, 0);
+    const lastDay = `${year}-${String(monthNo).padStart(2, "0")}-${String(
+      lastDayDate.getDate()
+    ).padStart(2, "0")}`;
+
+    navigate(`/app/reports/ledger/${groupId}?fromDate=${firstDay}&toDate=${lastDay}`);
+  };
 
   /* ===================== UI ===================== */
   return (
@@ -112,64 +141,63 @@ const SalesAddDetails: React.FC = () => {
       </div>
 
       {/* ================= MONTH SUMMARY ================= */}
-      {!selectedMonth && (
-        <div className="w-full mt-2">
-          {/* Table Head */}
-          <div className="grid grid-cols-4 font-semibold bg-gray-50 py-2 border-b">
-            <div className="px-3">Month</div>
-            <div className="px-3 text-center">Debit</div>
-            <div className="px-3 text-center">Credit</div>
-            <div className="px-3 text-center">Closing Balance</div>
-          </div>
+      <div className="w-full mt-2">
+        {/* Table Head */}
+        <div className="grid grid-cols-4 font-semibold bg-gray-50 py-2 border-b">
+          <div className="px-3">Month</div>
+          <div className="px-3 text-center">Debit</div>
+          <div className="px-3 text-center">Credit</div>
+          <div className="px-3 text-center">Closing Balance</div>
+        </div>
 
-          {/* Table Rows */}
-          {monthSummary.map((row) => (
-            <div
-              key={row.month}
-              className="
+        {/* Table Rows */}
+        {monthSummary.map((row: any) => (
+          <div
+            key={row.month}
+            onClick={() => handleMonthClick(row.month)}
+            className="
                 grid grid-cols-4 py-2 border-b border-gray-100
                 cursor-pointer
-                hover:bg-blue-50
+                hover:bg-blue-300
                 transition-colors duration-150
               "
-            >
-              <div className="px-3">{row.month}</div>
+          >
+            <div className="px-3">{row.month}</div>
 
-              <div className="px-3 text-center font-mono">
-                {row.debit !== 0 ? row.debit.toLocaleString() : ""}
-              </div>
-
-              <div className="px-3 text-center font-mono">
-                {row.credit !== 0 ? row.credit.toLocaleString() : ""}
-              </div>
-
-              <div className="px-3 text-center font-mono">
-                {row.closing !== 0 ? row.closing.toLocaleString() : ""}
-              </div>
-            </div>
-          ))}
-
-          {/* ================= GRAND TOTAL ================= */}
-          <div className="grid grid-cols-4 font-bold bg-gray-100 py-3 border-t">
-            <div className="px-3 text-lg">Grand Total</div>
             <div className="px-3 text-center font-mono">
-              {monthSummary.reduce((sum, r) => sum + r.debit, 0) || ""}
+              {row.debit !== 0 ? row.debit.toLocaleString() : ""}
             </div>
-            <div className="px-3 text-center font-mono text-lg">
-              {monthSummary
-                .reduce((sum, r) => sum + r.credit, 0)
-                .toLocaleString()}
+
+            <div className="px-3 text-center font-mono">
+              {row.credit !== 0 ? row.credit.toLocaleString() : ""}
             </div>
-            <div className="px-3 text-center font-mono text-lg">
-              {monthSummary.length
-                ? monthSummary[
-                    monthSummary.length - 1
-                  ].closing.toLocaleString()
-                : ""}
+
+            <div className="px-3 text-center font-mono">
+              {row.closing !== 0 ? row.closing.toLocaleString() : ""}
             </div>
           </div>
+        ))}
+
+        {/* ================= GRAND TOTAL ================= */}
+        <div className="grid grid-cols-4 font-bold bg-gray-100 py-3 border-t">
+          <div className="px-3 text-lg">Grand Total</div>
+          <div className="px-3 text-center font-mono">
+            {monthSummary.reduce((sum: number, r: any) => sum + r.debit, 0) || ""}
+          </div>
+          <div className="px-3 text-center font-mono text-lg">
+            {monthSummary
+              .reduce((sum: number, r: any) => sum + r.credit, 0)
+              .toLocaleString()}
+          </div>
+          <div className="px-3 text-center font-mono text-lg">
+            {monthSummary.length
+              ? monthSummary[
+                monthSummary.length - 1
+              ].closing.toLocaleString()
+              : ""}
+          </div>
         </div>
-      )}
+      </div>
     </div>
   );
 };

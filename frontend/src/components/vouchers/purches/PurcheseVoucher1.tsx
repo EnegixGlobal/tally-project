@@ -2423,8 +2423,8 @@ const PurchaseVoucher: React.FC = () => {
                               value={entry.purchaseLedgerId || ""}
                               onChange={(e) => handleEntryChange(index, e)}
                               className={`${TABLE_STYLES.select} min-w-[120px] text-xs ${errors[`entry${index}.purchaseLedgerId`]
-                                  ? "border-red-500"
-                                  : ""
+                                ? "border-red-500"
+                                : ""
                                 }`}
                             >
                               <option value="">Select Ledger</option>

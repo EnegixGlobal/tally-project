@@ -296,6 +296,9 @@ ORDER BY pv.date ASC
        7️⃣ BUILD TRANSACTIONS
     =============================== */
     let balance = Number(ledger.opening_balance || 0);
+    if (ledger.balance_type === "credit") {
+      balance = -balance;
+    }
     const transactions = [];
 
     // Normal vouchers
@@ -632,29 +635,56 @@ ORDER BY pv.date ASC
     });
 
     /* ===============================
-       🔟 SORT BY DATE
+       🔟 SORT BY DATE & FILTER
     =============================== */
     transactions.sort((a, b) => new Date(a.date) - new Date(b.date));
 
-    /* ===============================
-       1️⃣1️⃣ SUMMARY
-    =============================== */
-    const totalDebit = transactions.reduce((s, r) => s + r.debit, 0);
-    const totalCredit = transactions.reduce((s, r) => s + r.credit, 0);
+    const fromDate = req.query.fromDate;
+    const toDate = req.query.toDate;
 
+    let periodOpeningBalance = Number(ledger.opening_balance || 0);
+    let periodDebit = 0;
+    let periodCredit = 0;
+    const filteredTransactions = [];
+
+    const isDebitLedger = ledger.balance_type === "debit";
+
+    transactions.forEach((t) => {
+      const d = new Date(t.date);
+      const tDate = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+      if (fromDate && tDate < fromDate) {
+        if (isDebitLedger) {
+          periodOpeningBalance += (t.debit - t.credit);
+        } else {
+          periodOpeningBalance += (t.credit - t.debit);
+        }
+      } else if ((!fromDate || tDate >= fromDate) && (!toDate || tDate <= toDate)) {
+        periodDebit += t.debit;
+        periodCredit += t.credit;
+        filteredTransactions.push(t);
+      }
+    });
+
+    let periodClosingBalance = periodOpeningBalance;
+    if (isDebitLedger) {
+      periodClosingBalance += (periodDebit - periodCredit);
+    } else {
+      periodClosingBalance += (periodCredit - periodDebit);
+    }
 
     return res.json({
       success: true,
       ledger,
-      transactions,
+      transactions: filteredTransactions,
       salesOrders,
       purchaseOrders,
       summary: {
-        openingBalance: Number(ledger.opening_balance || 0),
-        closingBalance: balance,
-        totalDebit,
-        totalCredit,
-        transactionCount: transactions.length,
+        openingBalance: periodOpeningBalance,
+        closingBalance: periodClosingBalance,
+        totalDebit: periodDebit,
+        totalCredit: periodCredit,
+        transactionCount: filteredTransactions.length,
       },
     });
   } catch (err) {

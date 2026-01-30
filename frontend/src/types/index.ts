@@ -87,7 +87,7 @@ export type Ledger = {
   name: string;
   groupId: string;
   openingBalance: number;
-  balanceType: "debit" | "credit";
+  balance_type: "debit" | "credit";
   address?: string;
   email?: string;
   phone?: string;

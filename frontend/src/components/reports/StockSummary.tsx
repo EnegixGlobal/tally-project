@@ -201,6 +201,7 @@ const StockSummary: React.FC = () => {
           hsnCode: v.hsnCode,
           batchNumber: v.batchNumber,
           qty: v.purchaseQuantity,
+          rate: Number(v.rate || v.purchaseRate || 0),
           date: v.purchaseDate,
         }))
         : [];
@@ -237,10 +238,12 @@ const StockSummary: React.FC = () => {
 
       const formatted = Array.isArray(json.data)
         ? json.data.map((v: any) => ({
+          id: v.id,
           itemName: v.itemName,
           hsnCode: v.hsnCode,
           batchNumber: v.batchNumber,
           qty: Math.abs(v.qtyChange),
+          rate: Number(v.rate || 0),
           date: v.movementDate,
         }))
         : [];
@@ -609,18 +612,9 @@ const StockSummary: React.FC = () => {
         { header: "Item", accessor: "itemName", align: "center" as const },
         { header: "HSN", accessor: "hsnCode", align: "center" as const },
         { header: "Batch", accessor: "batchNumber", align: "center" as const },
-        {
-          header: "Qty ",
-          accessor: "qty",
-          align: "center" as const,
-          render: (r: any) => `${r.qty}`,
-        },
-        {
-          header: "Date",
-          accessor: "date",
-          align: "center" as const,
-          render: (r: any) => formatDate(r.date),
-        },
+        { header: "Qty ", accessor: "qty", align: "center" as const, render: (r: any) => `${r.qty}`, },
+        { header: "Rate", accessor: "rate", align: "center" as const, render: (r: any) => formatCurrency(Number(r.rate || 0)), },
+        { header: "Date", accessor: "date", align: "center" as const, render: (r: any) => formatDate(r.date), },
       ];
     }
 
@@ -630,18 +624,9 @@ const StockSummary: React.FC = () => {
         { header: "Item", accessor: "itemName", align: "center" as const },
         { header: "HSN", accessor: "hsnCode", align: "center" as const },
         { header: "Batch", accessor: "batchNumber", align: "center" as const },
-        {
-          header: "Sale Qty",
-          accessor: "qty",
-          align: "center" as const,
-          render: (r: any) => `${r.qty}`,
-        },
-        {
-          header: "Sale Date",
-          accessor: "date",
-          align: "center" as const,
-          render: (r: any) => formatDate(r.date),
-        },
+        { header: "Qty", accessor: "qty", align: "center" as const, render: (r: any) => `${r.qty}`, },
+        { header: "Rate", accessor: "rate", align: "center" as const, render: (r: any) => formatCurrency(Number(r.rate || 0)), },
+        { header: "Sale Date", accessor: "date", align: "center" as const, render: (r: any) => formatDate(r.date), },
       ];
     }
 
@@ -1560,6 +1545,25 @@ const StockSummary: React.FC = () => {
                               >
                                 {group.hsnCode || "-"}
                               </td>
+                              {/* Batch placeholder */}
+                              <td
+                                className={`p-2 border ${theme === "dark"
+                                  ? "border-gray-500"
+                                  : "border-gray-400"
+                                  } text-center`}
+                              >
+                                -
+                              </td>
+                              {/* Qty */}
+                              <td
+                                className={`p-2 border ${theme === "dark"
+                                  ? "border-gray-500"
+                                  : "border-gray-400"
+                                  } text-center font-semibold`}
+                              >
+                                {group.totalQty}
+                              </td>
+                              {/* Rate placeholder */}
                               {reportView !== "Closing" && (
                                 <td
                                   className={`p-2 border ${theme === "dark"
@@ -1570,7 +1574,8 @@ const StockSummary: React.FC = () => {
                                   -
                                 </td>
                               )}
-                              {reportView === "Closing" && (
+                              {/* Date placeholder */}
+                              {reportView !== "Closing" && (
                                 <td
                                   className={`p-2 border ${theme === "dark"
                                     ? "border-gray-500"
@@ -1580,14 +1585,6 @@ const StockSummary: React.FC = () => {
                                   -
                                 </td>
                               )}
-                              <td
-                                className={`p-2 border ${theme === "dark"
-                                  ? "border-gray-500"
-                                  : "border-gray-400"
-                                  } text-center font-semibold`}
-                              >
-                                {group.totalQty}
-                              </td>
                             </tr>
                             {/* Expanded Transaction Rows */}
                             {isExpanded &&
@@ -1599,15 +1596,6 @@ const StockSummary: React.FC = () => {
                                       ? "bg-gray-900 text-white"
                                       : "bg-white text-black"
                                       }`}
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      let itemId = transaction.id || "";
-                                      if (itemId) {
-                                        navigate(
-                                          `/app/reports/movement-analysis?itemId=${itemId}`
-                                        );
-                                      }
-                                    }}
                                   >
                                     {reportView === "Closing" ? (
                                       <>
@@ -1706,7 +1694,14 @@ const StockSummary: React.FC = () => {
                                             Number(transaction.qty) || 0
                                           )}
                                         </td>
-
+                                        <td
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-right font-mono`}
+                                        >
+                                          {formatCurrency(Number(transaction.rate || 0))}
+                                        </td>
                                         <td
                                           className={`p-2 border ${theme === "dark"
                                             ? "border-gray-500"

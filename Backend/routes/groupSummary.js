@@ -287,6 +287,7 @@ router.get("/api/group-summary", async (req, res) => {
         l.group_id,
         l.opening_balance,
         l.balance_type,
+        l.closing_balance,
 
         g.name     AS group_name,
         g.type     AS group_type,

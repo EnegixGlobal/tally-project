@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Printer, Download, Filter } from "lucide-react";
+import { ArrowLeft, Printer, Download, Filter, Settings } from "lucide-react";
 
 interface Ledger {
   id: number;
@@ -33,9 +33,17 @@ const GroupSummary: React.FC = () => {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [, setLoading] = useState(false);
   const [, setError] = useState<string | null>(null);
-  const [viewMode, setViewMode] = useState<"consolidated" | "monthly">(
+  const [viewMode, setViewMode] = useState<"consolidated" | "monthly" | "particular">(
     "consolidated"
   );
+  const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState({
+    opening: true,
+    debit: true,
+    credit: true,
+    closing: true
+  });
   const companyId = localStorage.getItem("company_id") || "";
   const ownerType = localStorage.getItem("supplier") || "";
   const ownerId =
@@ -198,14 +206,17 @@ const GroupSummary: React.FC = () => {
         const data = await res.json();
 
 
-        // ✅ Normalize keys (e.g., "113.00" -> 113)
+        // ✅ Normalize keys and ensure values are numbers
         const normalizedData: Record<number, { debit: number; credit: number }> = {};
         if (data.data) {
           Object.keys(data.data).forEach((key) => {
-            normalizedData[Number(key)] = data.data[key];
+            const entry = data.data[key];
+            normalizedData[Number(key)] = {
+              debit: Number(entry.debit) || 0,
+              credit: Number(entry.credit) || 0
+            };
           });
         }
-        // console.log('nor', normalizedData)
         setTaxData(normalizedData);
 
       } catch (err) {
@@ -274,10 +285,8 @@ const GroupSummary: React.FC = () => {
     ];
 
     const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
+    const balanceType = ledger.balanceType || "debit";
     const ledgerTax = taxData[Number(ledger.id)] || { debit: 0, credit: 0 };
-    const currentTotal = ledgerTax.debit - ledgerTax.credit;
-
-    // If no createdAt, show opening balance in first month (Apr)
     let creationMonthIndex = 0;
 
     if (ledger.createdAt) {
@@ -291,31 +300,69 @@ const GroupSummary: React.FC = () => {
       }
     }
 
+    let runningOpening = opening;
+
     return months.map((month, index) => {
       const isCreationMonth = index === creationMonthIndex;
-      const monthOpening = isCreationMonth ? opening : 0;
-      const monthCurrent = isCreationMonth ? currentTotal : 0;
-      const monthClosing = isCreationMonth ? Math.abs(monthOpening - monthCurrent) : 0;
+      const isJanFallback = index === 9 && !ledger.createdAt;
+      const shouldShow = isCreationMonth || isJanFallback;
+
+      const monthDebit = shouldShow ? ledgerTax.debit : 0;
+      const monthCredit = shouldShow ? ledgerTax.credit : 0;
+      const monthOpening = index === 0 ? opening : runningOpening;
+
+      // Calculate closing based on user formula
+      let monthClosing = 0;
+      if (balanceType === "debit") {
+        monthClosing = (monthOpening + monthDebit) - monthCredit;
+      } else {
+        monthClosing = (monthOpening + monthCredit) - monthDebit;
+      }
+
+      // For the next month, the current month's closing is the opening
+      // However, since we currently only have total data in one month (heuristic),
+      // we just update runningOpening for consistency in this mock-up logic.
+      runningOpening = monthClosing;
 
       return {
         month,
         opening: monthOpening,
-        current: monthCurrent,
+        debit: monthDebit,
+        credit: monthCredit,
         closing: monthClosing,
+        balanceType: balanceType
       };
     });
   };
 
-  const totalDebit = Object.values(taxData).reduce(
-    (sum: number, t: any) => sum + (t.debit || 0),
-    0
+  const totals = ledgers.reduce(
+    (acc, ledger) => {
+      const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
+      const tData = taxData[Number(ledger.id)] || { debit: 0, credit: 0 };
+      const debit = Number(tData.debit) || 0;
+      const credit = Number(tData.credit) || 0;
+      const type = (ledger.balanceType || "debit").toLowerCase();
+
+      let closing = 0;
+      if (type === "debit" || type === "dr") {
+        closing = (opening + debit) - credit;
+      } else {
+        closing = (opening + credit) - debit;
+      }
+
+      acc.opening += opening;
+      acc.debit += debit;
+      acc.credit += credit;
+      acc.closing += Math.abs(closing);
+      return acc;
+    },
+    { opening: 0, debit: 0, credit: 0, closing: 0 }
   );
 
-
-  const totalCredit = Object.values(taxData).reduce(
-    (sum: number, t: any) => sum + (t.credit || 0),
-    0
-  );
+  const totalOpening = totals.opening;
+  const totalDebit = totals.debit;
+  const totalCredit = totals.credit;
+  const totalClosing = totals.closing;
 
   // You can replace this with your actual theme logic or context
   const [theme] = useState<"light" | "dark">("light");
@@ -362,6 +409,58 @@ const GroupSummary: React.FC = () => {
           >
             <Download size={18} />
           </button>
+
+          <div className="relative">
+            <button
+              title="Column Settings"
+              type="button"
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+                } ${showSettings ? 'bg-blue-100 text-blue-600' : ''}`}
+            >
+              <Settings size={18} />
+            </button>
+
+            {showSettings && (
+              <div className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg z-50 ${theme === 'dark' ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
+                }`}>
+                <div className="p-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase opacity-50 mb-2">Show Columns</p>
+                  <label className="flex items-center space-x-2 cursor-pointer hover:opacity-80">
+                    <input
+                      type="checkbox"
+                      checked={columnVisibility.opening}
+                      onChange={() => setColumnVisibility(prev => ({ ...prev, opening: !prev.opening }))}
+                      className="rounded text-blue-600"
+                    />
+                    <span className="text-sm">Opening Balance</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer hover:opacity-80">
+                    <input
+                      type="checkbox"
+                      checked={columnVisibility.debit}
+                      onChange={() => setColumnVisibility(prev => ({ ...prev, debit: !prev.debit }))}
+                      className="rounded text-blue-600"
+                    />
+                    <span className="text-sm">Debit</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer hover:opacity-80">
+                    <input
+                      type="checkbox"
+                      checked={columnVisibility.credit}
+                      onChange={() => setColumnVisibility(prev => ({ ...prev, credit: !prev.credit }))}
+                      className="rounded text-blue-600"
+                    />
+                    <span className="text-sm">Credit</span>
+                  </label>
+                  <label className="flex items-center space-x-2 opacity-50">
+                    <input type="checkbox" checked disabled className="rounded" />
+                    <span className="text-sm">Closing Balance</span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -436,14 +535,32 @@ const GroupSummary: React.FC = () => {
                   : "bg-gray-200 hover:bg-gray-300"
                 }`}
             >
-              Monthly-wise
+              Month-wise
+            </button>
+            <button
+              onClick={() => {
+                if (selectedMonth === null) setSelectedMonth(9); // Default to Jan if nothing selected
+                setViewMode("particular");
+              }}
+              className={`px-4 py-2 rounded-md transition-colors ${viewMode === "particular"
+                ? theme === "dark"
+                  ? "bg-blue-600 text-white"
+                  : "bg-blue-600 text-white"
+                : theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-200 hover:bg-gray-300"
+                }`}
+            >
+              Particular
             </button>
           </div>
         </div>
         <div className="text-sm opacity-75">
           {viewMode === "consolidated"
             ? "Showing consolidated view"
-            : "Showing month-wise breakdown"}
+            : viewMode === "monthly"
+              ? "Showing monthly summary"
+              : "Showing ledger breakdown for selected month"}
         </div>
       </div>
 
@@ -475,9 +592,10 @@ const GroupSummary: React.FC = () => {
                 >
                   <th className="px-4 py-3 text-left">Ledger Name</th>
                   <th className="px-4 py-3 text-left">Group</th>
-                  <th className="px-4 py-3 text-right">Debit</th>
-                  <th className="px-4 py-3 text-right">Credit</th>
-                  <th className="px-4 py-3 text-right">Closing Balance</th>
+                  {columnVisibility.opening && <th className="px-4 py-3 text-right">Opening Balance</th>}
+                  {columnVisibility.debit && <th className="px-4 py-3 text-right">Debit</th>}
+                  {columnVisibility.credit && <th className="px-4 py-3 text-right">Credit</th>}
+                  {columnVisibility.closing && <th className="px-4 py-3 text-right">Closing Balance</th>}
                 </tr>
               </thead>
               <tbody>
@@ -497,21 +615,47 @@ const GroupSummary: React.FC = () => {
                       {resolvedGroupName || `Group ${groupType}`}
                     </td>
 
-                    <td className="px-4 py-3 text-right font-mono text-green-600">
-                      ₹ {(taxData[Number(ledger.id)]?.debit || 0).toLocaleString()}
-                    </td>
+                    {/* Opening */}
+                    {columnVisibility.opening && (
+                      <td className="px-4 py-3 text-right font-mono">
+                        ₹ {(Number(ledger.openingBalance || ledger.opening_balance) || 0).toLocaleString()} {ledger.balanceType === 'debit' ? 'Dr' : 'Cr'}
+                      </td>
+                    )}
 
-                    <td className="px-4 py-3 text-right font-mono text-red-600">
-                      ₹ {(taxData[Number(ledger.id)]?.credit || 0).toLocaleString()}
-                    </td>
+                    {columnVisibility.debit && (
+                      <td className="px-4 py-3 text-right font-mono text-green-600">
+                        ₹ {(taxData[Number(ledger.id)]?.debit || 0).toLocaleString()}
+                      </td>
+                    )}
+
+                    {columnVisibility.credit && (
+                      <td className="px-4 py-3 text-right font-mono text-red-600">
+                        ₹ {(taxData[Number(ledger.id)]?.credit || 0).toLocaleString()}
+                      </td>
+                    )}
 
                     {/* Closing */}
-                    <td className="px-4 py-3 text-right font-mono font-semibold">
-                      ₹ {Math.abs(
-                        (taxData[Number(ledger.id)]?.debit || 0) -
-                        (taxData[Number(ledger.id)]?.credit || 0)
-                      ).toLocaleString()}
-                    </td>
+                    {columnVisibility.closing && (
+                      <td className="px-4 py-3 text-right font-mono font-semibold">
+                        {(() => {
+                          const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
+                          const debit = taxData[Number(ledger.id)]?.debit || 0;
+                          const credit = taxData[Number(ledger.id)]?.credit || 0;
+                          const type = ledger.balanceType || 'debit';
+                          let closing = 0;
+                          if (type === 'debit') {
+                            closing = (opening + debit) - credit;
+                          } else {
+                            closing = (opening + credit) - debit;
+                          }
+                          return (
+                            <>
+                              ₹ {Math.abs(closing).toLocaleString()} {closing >= 0 ? (type === 'debit' ? 'Dr' : 'Cr') : (type === 'debit' ? 'Cr' : 'Dr')}
+                            </>
+                          );
+                        })()}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -524,75 +668,285 @@ const GroupSummary: React.FC = () => {
                     }`}
                 >
                   <td className="px-4 py-3" colSpan={2}>Total</td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    ₹ {totalDebit.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    ₹ {totalCredit.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold">
-                    ₹ {Math.abs(totalDebit - totalCredit).toLocaleString()}
-                  </td>
+                  {columnVisibility.opening && (
+                    <td className="px-4 py-3 text-right font-mono font-bold">
+                      ₹ {totalOpening.toLocaleString()}
+                    </td>
+                  )}
+                  {columnVisibility.debit && (
+                    <td className="px-4 py-3 text-right font-mono font-bold">
+                      ₹ {totalDebit.toLocaleString()}
+                    </td>
+                  )}
+                  {columnVisibility.credit && (
+                    <td className="px-4 py-3 text-right font-mono font-bold">
+                      ₹ {totalCredit.toLocaleString()}
+                    </td>
+                  )}
+                  {columnVisibility.closing && (
+                    <td className="px-4 py-3 text-right font-mono font-bold">
+                      ₹ {totalClosing.toLocaleString()}
+                    </td>
+                  )}
                 </tr>
               </tfoot>
             </table>
+          ) : viewMode === "monthly" ? (
+            // Monthly View - Aggregated for the whole group
+            <div className={`border rounded-lg p-4 w-full ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+              <h3 className="font-bold mb-3 text-blue-600 dark:text-blue-400 text-center">
+                {resolvedGroupName || `Group ${groupType}`} Monthly Summary
+              </h3>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                      <th className="px-3 py-2 text-left">Month</th>
+                      {columnVisibility.opening && <th className="px-3 py-2 text-right">Opening</th>}
+                      {columnVisibility.debit && <th className="px-3 py-2 text-right">Debit</th>}
+                      {columnVisibility.credit && <th className="px-3 py-2 text-right">Credit</th>}
+                      {columnVisibility.closing && <th className="px-3 py-2 text-right">Closing</th>}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {(() => {
+                      const months = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+                      const aggregatedData = months.map((month, idx) => {
+                        let totalMonthOpening = 0;
+                        let totalDebit = 0;
+                        let totalCredit = 0;
+                        let totalClosing = 0;
+
+                        ledgers.forEach((ledger) => {
+                          const monthlyData = generateMonthlyData(ledger);
+                          const m = monthlyData[idx];
+                          totalMonthOpening += Math.abs(m.opening);
+                          totalDebit += m.debit;
+                          totalCredit += m.credit;
+                          totalClosing += Math.abs(m.closing);
+                        });
+                        return {
+                          month,
+                          opening: totalMonthOpening,
+                          debit: totalDebit,
+                          credit: totalCredit,
+                          closing: totalClosing
+                        };
+                      });
+
+                      return aggregatedData.map((monthData, index) => (
+                        <tr
+                          key={index}
+                          onClick={() => {
+                            setSelectedMonth(index);
+                            setViewMode("particular");
+                          }}
+                          className={`${theme === "dark"
+                            ? "border-b border-gray-700 hover:bg-gray-800"
+                            : "border-b border-gray-200 hover:bg-blue-50"
+                            } cursor-pointer transition-colors`}
+                        >
+                          <td className="px-3 py-2 flex items-center font-medium">
+                            <span className="mr-2 text-blue-500 text-[10px]">▶</span>
+                            {monthData.month}
+                          </td>
+                          {columnVisibility.opening && <td className="px-3 py-2 text-right font-mono">₹ {monthData.opening.toLocaleString()}</td>}
+                          {columnVisibility.debit && <td className="px-3 py-2 text-right font-mono">₹ {monthData.debit.toLocaleString()}</td>}
+                          {columnVisibility.credit && <td className="px-3 py-2 text-right font-mono">₹ {monthData.credit.toLocaleString()}</td>}
+                          {columnVisibility.closing && <td className="px-3 py-2 text-right font-mono">₹ {monthData.closing.toLocaleString()}</td>}
+                        </tr>
+                      ));
+                    })()}
+                  </tbody>
+                  <tfoot className={`font-bold ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <tr className="border-t-2 border-gray-300">
+                      <td className="px-3 py-2">Total</td>
+                      {columnVisibility.opening && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalOpening.toLocaleString()}</td>}
+                      {columnVisibility.debit && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalDebit.toLocaleString()}</td>}
+                      {columnVisibility.credit && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalCredit.toLocaleString()}</td>}
+                      {columnVisibility.closing && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalClosing.toLocaleString()}</td>}
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
           ) : (
-            // Monthly View
-            <div className="space-y-6">
-              {ledgers.map((ledger: Ledger) => {
-                const monthlyData = generateMonthlyData(ledger);
-                return (
-                  <div key={ledger.id} className="border rounded-lg p-4">
-                    <h3
-                      className="font-bold mb-3 text-blue-600 dark:text-blue-400 cursor-pointer"
-                      onClick={() =>
-                        navigate(`/app/reports/ledger?ledgerId=${ledger.id}`)
-                      }
-                    >
-                      {ledger.name}
-                    </h3>
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm">
-                        <thead>
-                          <tr
-                            className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                              }`}
-                          >
-                            <th className="px-3 py-2 text-left">Month</th>
-                            <th className="px-3 py-2 text-right">Opening</th>
-                            <th className="px-3 py-2 text-right">Current</th>
-                            <th className="px-3 py-2 text-right">Closing</th>
+            // Particular View (Drill-down for a month)
+            <div className="p-4 border rounded bg-white">
+
+              {/* Header */}
+              <div className="flex justify-between items-center mb-4">
+                <h4 className="font-semibold text-lg">
+                  Particulars - {[
+                    "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+                    "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+                  ][selectedMonth ?? 0]}
+                </h4>
+
+                <div className="flex items-center gap-2">
+                  <select
+                    value={selectedMonth ?? 0}
+                    onChange={(e) => setSelectedMonth(Number(e.target.value))}
+                    className="border px-2 py-1 text-sm rounded"
+                  >
+                    {[
+                      "Apr", "May", "Jun", "Jul", "Aug", "Sep",
+                      "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"
+                    ].map((m, i) => (
+                      <option key={m} value={i}>{m}</option>
+                    ))}
+                  </select>
+
+                  <button
+                    onClick={() => setViewMode("monthly")}
+                    className="border px-3 py-1 text-sm rounded hover:bg-gray-100"
+                  >
+                    Back
+                  </button>
+                </div>
+              </div>
+
+              {/* Table */}
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm border border-gray-300">
+
+                  <thead className="bg-gray-100 border-b">
+                    <tr>
+                      <th className="px-3 py-2 text-left">Ledger</th>
+                      <th className="px-3 py-2 text-left">Group</th>
+                      {columnVisibility.opening && <th className="px-3 py-2 text-right">Opening</th>}
+                      {columnVisibility.debit && <th className="px-3 py-2 text-right">Debit</th>}
+                      {columnVisibility.credit && <th className="px-3 py-2 text-right">Credit</th>}
+                      {columnVisibility.closing && <th className="px-3 py-2 text-right">Closing</th>}
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {(() => {
+
+                      const idx = selectedMonth ?? 0;
+
+                      const activeLedgers = ledgers.filter((ledger) => {
+                        const data = generateMonthlyData(ledger)[idx];
+                        return data.opening !== 0 || data.debit !== 0 || data.credit !== 0;
+                      });
+
+                      if (activeLedgers.length === 0) {
+                        return (
+                          <tr>
+                            <td colSpan={5} className="text-center py-6 text-gray-500">
+                              No data for this month
+                            </td>
                           </tr>
-                        </thead>
-                        <tbody>
-                          {monthlyData.map((monthData, index) => (
-                            <tr
-                              key={index}
-                              className={`${theme === "dark"
-                                ? "border-b border-gray-700"
-                                : "border-b border-gray-200"
-                                }`}
-                            >
-                              <td className="px-3 py-2">{monthData.month}</td>
+                        );
+                      }
+
+                      return activeLedgers.map((ledger) => {
+
+                        const mData = generateMonthlyData(ledger)[idx];
+
+                        return (
+                          <tr
+                            key={ledger.id}
+                            className="border-b hover:bg-gray-50 cursor-pointer"
+                            onClick={() =>
+                              navigate(`/app/reports/ledger/${ledger.id}`)
+                            }
+                          >
+                            <td className="px-3 py-2">{ledger.name}</td>
+
+                            <td className="px-3 py-2">
+                              {resolvedGroupName}
+                            </td>
+
+                            {columnVisibility.opening && (
                               <td className="px-3 py-2 text-right font-mono">
-                                {monthData.opening.toLocaleString()}
+                                ₹ {mData.opening.toLocaleString()} {mData.balanceType === 'debit' ? 'Dr' : 'Cr'}
                               </td>
+                            )}
+
+                            {columnVisibility.debit && (
                               <td className="px-3 py-2 text-right font-mono">
-                                {monthData.current.toLocaleString()}
+                                ₹ {mData.debit.toLocaleString()}
                               </td>
+                            )}
+
+                            {columnVisibility.credit && (
                               <td className="px-3 py-2 text-right font-mono">
-                                {monthData.closing.toLocaleString()}
+                                ₹ {mData.credit.toLocaleString()}
                               </td>
-                            </tr>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })}
+                            )}
+
+                            {columnVisibility.closing && (
+                              <td className="px-3 py-2 text-right font-medium font-mono">
+                                ₹ {Math.abs(mData.closing).toLocaleString()} {mData.closing >= 0 ? (mData.balanceType === 'debit' ? 'Dr' : 'Cr') : (mData.balanceType === 'debit' ? 'Cr' : 'Dr')}
+                              </td>
+                            )}
+                          </tr>
+                        );
+                      });
+
+                    })()}
+                  </tbody>
+
+                  {/* Footer */}
+                  {(() => {
+
+                    const idx = selectedMonth ?? 0;
+
+                    const entries = ledgers.map(
+                      (l) => generateMonthlyData(l)[idx]
+                    );
+
+                    const tOpening = entries.reduce((s, e) => s + Math.abs(e.opening), 0);
+                    const tDebit = entries.reduce((s, e) => s + e.debit, 0);
+                    const tCredit = entries.reduce((s, e) => s + e.credit, 0);
+                    const tClosing = entries.reduce((s, e) => s + Math.abs(e.closing), 0);
+
+                    if (tOpening === 0 && tDebit === 0 && tCredit === 0) return null;
+
+                    return (
+                      <tfoot className="bg-gray-100 border-t font-semibold">
+                        <tr className="font-bold border-t-2 border-gray-300">
+                          <td colSpan={2} className="px-3 py-2">
+                            Total
+                          </td>
+
+                          {columnVisibility.opening && (
+                            <td className="px-3 py-2 text-right font-mono">
+                              ₹ {tOpening.toLocaleString()}
+                            </td>
+                          )}
+
+                          {columnVisibility.debit && (
+                            <td className="px-3 py-2 text-right font-mono">
+                              ₹ {tDebit.toLocaleString()}
+                            </td>
+                          )}
+
+                          {columnVisibility.credit && (
+                            <td className="px-3 py-2 text-right font-mono">
+                              ₹ {tCredit.toLocaleString()}
+                            </td>
+                          )}
+
+                          {columnVisibility.closing && (
+                            <td className="px-3 py-2 text-right font-mono font-bold">
+                              ₹ {tClosing.toLocaleString()}
+                            </td>
+                          )}
+                        </tr>
+                      </tfoot>
+                    );
+                  })()}
+
+                </table>
+              </div>
+
             </div>
           )}
+
+
         </div>
       </div>
 
@@ -603,6 +957,11 @@ const GroupSummary: React.FC = () => {
       >
         <div className="flex justify-between">
           <h2 className="text-xl font-bold mb-4">Group Summary</h2>
+          <div>
+            <p className="text-sm opacity-75">Opening Balance</p>
+            <p className="text-xl font-bold">₹ {totalOpening.toLocaleString()}</p>
+          </div>
+
           <div>
             <p className="text-sm opacity-75">Total Debit</p>
             <p className="text-xl font-bold">₹ {totalDebit.toLocaleString()}</p>
@@ -616,7 +975,7 @@ const GroupSummary: React.FC = () => {
           <div>
             <p className="text-sm opacity-75">Closing Balance</p>
             <p className="text-xl font-bold">
-              ₹ {Math.abs(totalDebit - totalCredit).toLocaleString()}
+              ₹ {totalClosing.toLocaleString()}
             </p>
           </div>
           <div className="mt-4">
