@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Printer, Download, Filter } from "lucide-react";
+import { ArrowLeft, Printer, Download, Filter, Settings } from "lucide-react";
 
 interface Ledger {
   id: number;
@@ -37,6 +37,13 @@ const GroupSummary: React.FC = () => {
     "consolidated"
   );
   const [selectedMonth, setSelectedMonth] = useState<number | null>(null);
+  const [showSettings, setShowSettings] = useState(false);
+  const [columnVisibility, setColumnVisibility] = useState({
+    opening: true,
+    debit: true,
+    credit: true,
+    closing: true
+  });
   const companyId = localStorage.getItem("company_id") || "";
   const ownerType = localStorage.getItem("supplier") || "";
   const ownerId =
@@ -402,6 +409,58 @@ const GroupSummary: React.FC = () => {
           >
             <Download size={18} />
           </button>
+
+          <div className="relative">
+            <button
+              title="Column Settings"
+              type="button"
+              onClick={() => setShowSettings(!showSettings)}
+              className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+                } ${showSettings ? 'bg-blue-100 text-blue-600' : ''}`}
+            >
+              <Settings size={18} />
+            </button>
+
+            {showSettings && (
+              <div className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg z-50 ${theme === 'dark' ? 'bg-gray-800 border border-gray-700' : 'bg-white border border-gray-200'
+                }`}>
+                <div className="p-3 space-y-2">
+                  <p className="text-xs font-semibold uppercase opacity-50 mb-2">Show Columns</p>
+                  <label className="flex items-center space-x-2 cursor-pointer hover:opacity-80">
+                    <input
+                      type="checkbox"
+                      checked={columnVisibility.opening}
+                      onChange={() => setColumnVisibility(prev => ({ ...prev, opening: !prev.opening }))}
+                      className="rounded text-blue-600"
+                    />
+                    <span className="text-sm">Opening Balance</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer hover:opacity-80">
+                    <input
+                      type="checkbox"
+                      checked={columnVisibility.debit}
+                      onChange={() => setColumnVisibility(prev => ({ ...prev, debit: !prev.debit }))}
+                      className="rounded text-blue-600"
+                    />
+                    <span className="text-sm">Debit</span>
+                  </label>
+                  <label className="flex items-center space-x-2 cursor-pointer hover:opacity-80">
+                    <input
+                      type="checkbox"
+                      checked={columnVisibility.credit}
+                      onChange={() => setColumnVisibility(prev => ({ ...prev, credit: !prev.credit }))}
+                      className="rounded text-blue-600"
+                    />
+                    <span className="text-sm">Credit</span>
+                  </label>
+                  <label className="flex items-center space-x-2 opacity-50">
+                    <input type="checkbox" checked disabled className="rounded" />
+                    <span className="text-sm">Closing Balance</span>
+                  </label>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -533,10 +592,10 @@ const GroupSummary: React.FC = () => {
                 >
                   <th className="px-4 py-3 text-left">Ledger Name</th>
                   <th className="px-4 py-3 text-left">Group</th>
-                  <th className="px-4 py-3 text-right">Opening Balance</th>
-                  <th className="px-4 py-3 text-right">Debit</th>
-                  <th className="px-4 py-3 text-right">Credit</th>
-                  <th className="px-4 py-3 text-right">Closing Balance</th>
+                  {columnVisibility.opening && <th className="px-4 py-3 text-right">Opening Balance</th>}
+                  {columnVisibility.debit && <th className="px-4 py-3 text-right">Debit</th>}
+                  {columnVisibility.credit && <th className="px-4 py-3 text-right">Credit</th>}
+                  {columnVisibility.closing && <th className="px-4 py-3 text-right">Closing Balance</th>}
                 </tr>
               </thead>
               <tbody>
@@ -557,38 +616,46 @@ const GroupSummary: React.FC = () => {
                     </td>
 
                     {/* Opening */}
-                    <td className="px-4 py-3 text-right font-mono">
-                      ₹ {(Number(ledger.openingBalance || ledger.opening_balance) || 0).toLocaleString()} {ledger.balanceType === 'debit' ? 'Dr' : 'Cr'}
-                    </td>
+                    {columnVisibility.opening && (
+                      <td className="px-4 py-3 text-right font-mono">
+                        ₹ {(Number(ledger.openingBalance || ledger.opening_balance) || 0).toLocaleString()} {ledger.balanceType === 'debit' ? 'Dr' : 'Cr'}
+                      </td>
+                    )}
 
-                    <td className="px-4 py-3 text-right font-mono text-green-600">
-                      ₹ {(taxData[Number(ledger.id)]?.debit || 0).toLocaleString()}
-                    </td>
+                    {columnVisibility.debit && (
+                      <td className="px-4 py-3 text-right font-mono text-green-600">
+                        ₹ {(taxData[Number(ledger.id)]?.debit || 0).toLocaleString()}
+                      </td>
+                    )}
 
-                    <td className="px-4 py-3 text-right font-mono text-red-600">
-                      ₹ {(taxData[Number(ledger.id)]?.credit || 0).toLocaleString()}
-                    </td>
+                    {columnVisibility.credit && (
+                      <td className="px-4 py-3 text-right font-mono text-red-600">
+                        ₹ {(taxData[Number(ledger.id)]?.credit || 0).toLocaleString()}
+                      </td>
+                    )}
 
                     {/* Closing */}
-                    <td className="px-4 py-3 text-right font-mono font-semibold">
-                      {(() => {
-                        const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
-                        const debit = taxData[Number(ledger.id)]?.debit || 0;
-                        const credit = taxData[Number(ledger.id)]?.credit || 0;
-                        const type = ledger.balanceType || 'debit';
-                        let closing = 0;
-                        if (type === 'debit') {
-                          closing = (opening + debit) - credit;
-                        } else {
-                          closing = (opening + credit) - debit;
-                        }
-                        return (
-                          <>
-                            ₹ {Math.abs(closing).toLocaleString()} {closing >= 0 ? (type === 'debit' ? 'Dr' : 'Cr') : (type === 'debit' ? 'Cr' : 'Dr')}
-                          </>
-                        );
-                      })()}
-                    </td>
+                    {columnVisibility.closing && (
+                      <td className="px-4 py-3 text-right font-mono font-semibold">
+                        {(() => {
+                          const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
+                          const debit = taxData[Number(ledger.id)]?.debit || 0;
+                          const credit = taxData[Number(ledger.id)]?.credit || 0;
+                          const type = ledger.balanceType || 'debit';
+                          let closing = 0;
+                          if (type === 'debit') {
+                            closing = (opening + debit) - credit;
+                          } else {
+                            closing = (opening + credit) - debit;
+                          }
+                          return (
+                            <>
+                              ₹ {Math.abs(closing).toLocaleString()} {closing >= 0 ? (type === 'debit' ? 'Dr' : 'Cr') : (type === 'debit' ? 'Cr' : 'Dr')}
+                            </>
+                          );
+                        })()}
+                      </td>
+                    )}
                   </tr>
                 ))}
               </tbody>
@@ -601,18 +668,26 @@ const GroupSummary: React.FC = () => {
                     }`}
                 >
                   <td className="px-4 py-3" colSpan={2}>Total</td>
-                  <td className="px-4 py-3 text-right font-mono font-bold">
-                    ₹ {totalOpening.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold">
-                    ₹ {totalDebit.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold">
-                    ₹ {totalCredit.toLocaleString()}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono font-bold">
-                    ₹ {totalClosing.toLocaleString()}
-                  </td>
+                  {columnVisibility.opening && (
+                    <td className="px-4 py-3 text-right font-mono font-bold">
+                      ₹ {totalOpening.toLocaleString()}
+                    </td>
+                  )}
+                  {columnVisibility.debit && (
+                    <td className="px-4 py-3 text-right font-mono font-bold">
+                      ₹ {totalDebit.toLocaleString()}
+                    </td>
+                  )}
+                  {columnVisibility.credit && (
+                    <td className="px-4 py-3 text-right font-mono font-bold">
+                      ₹ {totalCredit.toLocaleString()}
+                    </td>
+                  )}
+                  {columnVisibility.closing && (
+                    <td className="px-4 py-3 text-right font-mono font-bold">
+                      ₹ {totalClosing.toLocaleString()}
+                    </td>
+                  )}
                 </tr>
               </tfoot>
             </table>
@@ -627,10 +702,10 @@ const GroupSummary: React.FC = () => {
                   <thead>
                     <tr className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
                       <th className="px-3 py-2 text-left">Month</th>
-                      <th className="px-3 py-2 text-right">Opening</th>
-                      <th className="px-3 py-2 text-right">Debit</th>
-                      <th className="px-3 py-2 text-right">Credit</th>
-                      <th className="px-3 py-2 text-right">Closing</th>
+                      {columnVisibility.opening && <th className="px-3 py-2 text-right">Opening</th>}
+                      {columnVisibility.debit && <th className="px-3 py-2 text-right">Debit</th>}
+                      {columnVisibility.credit && <th className="px-3 py-2 text-right">Credit</th>}
+                      {columnVisibility.closing && <th className="px-3 py-2 text-right">Closing</th>}
                     </tr>
                   </thead>
                   <tbody>
@@ -675,10 +750,10 @@ const GroupSummary: React.FC = () => {
                             <span className="mr-2 text-blue-500 text-[10px]">▶</span>
                             {monthData.month}
                           </td>
-                          <td className="px-3 py-2 text-right font-mono">₹ {monthData.opening.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right font-mono">₹ {monthData.debit.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right font-mono">₹ {monthData.credit.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right font-mono">₹ {monthData.closing.toLocaleString()}</td>
+                          {columnVisibility.opening && <td className="px-3 py-2 text-right font-mono">₹ {monthData.opening.toLocaleString()}</td>}
+                          {columnVisibility.debit && <td className="px-3 py-2 text-right font-mono">₹ {monthData.debit.toLocaleString()}</td>}
+                          {columnVisibility.credit && <td className="px-3 py-2 text-right font-mono">₹ {monthData.credit.toLocaleString()}</td>}
+                          {columnVisibility.closing && <td className="px-3 py-2 text-right font-mono">₹ {monthData.closing.toLocaleString()}</td>}
                         </tr>
                       ));
                     })()}
@@ -686,10 +761,10 @@ const GroupSummary: React.FC = () => {
                   <tfoot className={`font-bold ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
                     <tr className="border-t-2 border-gray-300">
                       <td className="px-3 py-2">Total</td>
-                      <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalOpening.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalDebit.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalCredit.toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalClosing.toLocaleString()}</td>
+                      {columnVisibility.opening && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalOpening.toLocaleString()}</td>}
+                      {columnVisibility.debit && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalDebit.toLocaleString()}</td>}
+                      {columnVisibility.credit && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalCredit.toLocaleString()}</td>}
+                      {columnVisibility.closing && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalClosing.toLocaleString()}</td>}
                     </tr>
                   </tfoot>
                 </table>
@@ -739,10 +814,10 @@ const GroupSummary: React.FC = () => {
                     <tr>
                       <th className="px-3 py-2 text-left">Ledger</th>
                       <th className="px-3 py-2 text-left">Group</th>
-                      <th className="px-3 py-2 text-right">Opening</th>
-                      <th className="px-3 py-2 text-right">Debit</th>
-                      <th className="px-3 py-2 text-right">Credit</th>
-                      <th className="px-3 py-2 text-right">Closing</th>
+                      {columnVisibility.opening && <th className="px-3 py-2 text-right">Opening</th>}
+                      {columnVisibility.debit && <th className="px-3 py-2 text-right">Debit</th>}
+                      {columnVisibility.credit && <th className="px-3 py-2 text-right">Credit</th>}
+                      {columnVisibility.closing && <th className="px-3 py-2 text-right">Closing</th>}
                     </tr>
                   </thead>
 
@@ -784,21 +859,29 @@ const GroupSummary: React.FC = () => {
                               {resolvedGroupName}
                             </td>
 
-                            <td className="px-3 py-2 text-right">
-                              ₹ {mData.opening.toLocaleString()} {mData.balanceType === 'debit' ? 'Dr' : 'Cr'}
-                            </td>
+                            {columnVisibility.opening && (
+                              <td className="px-3 py-2 text-right font-mono">
+                                ₹ {mData.opening.toLocaleString()} {mData.balanceType === 'debit' ? 'Dr' : 'Cr'}
+                              </td>
+                            )}
 
-                            <td className="px-3 py-2 text-right">
-                              ₹ {mData.debit.toLocaleString()}
-                            </td>
+                            {columnVisibility.debit && (
+                              <td className="px-3 py-2 text-right font-mono">
+                                ₹ {mData.debit.toLocaleString()}
+                              </td>
+                            )}
 
-                            <td className="px-3 py-2 text-right">
-                              ₹ {mData.credit.toLocaleString()}
-                            </td>
+                            {columnVisibility.credit && (
+                              <td className="px-3 py-2 text-right font-mono">
+                                ₹ {mData.credit.toLocaleString()}
+                              </td>
+                            )}
 
-                            <td className="px-3 py-2 text-right font-medium">
-                              ₹ {Math.abs(mData.closing).toLocaleString()} {mData.closing >= 0 ? (mData.balanceType === 'debit' ? 'Dr' : 'Cr') : (mData.balanceType === 'debit' ? 'Cr' : 'Dr')}
-                            </td>
+                            {columnVisibility.closing && (
+                              <td className="px-3 py-2 text-right font-medium font-mono">
+                                ₹ {Math.abs(mData.closing).toLocaleString()} {mData.closing >= 0 ? (mData.balanceType === 'debit' ? 'Dr' : 'Cr') : (mData.balanceType === 'debit' ? 'Cr' : 'Dr')}
+                              </td>
+                            )}
                           </tr>
                         );
                       });
@@ -829,21 +912,29 @@ const GroupSummary: React.FC = () => {
                             Total
                           </td>
 
-                          <td className="px-3 py-2 text-right font-mono">
-                            ₹ {tOpening.toLocaleString()}
-                          </td>
+                          {columnVisibility.opening && (
+                            <td className="px-3 py-2 text-right font-mono">
+                              ₹ {tOpening.toLocaleString()}
+                            </td>
+                          )}
 
-                          <td className="px-3 py-2 text-right font-mono">
-                            ₹ {tDebit.toLocaleString()}
-                          </td>
+                          {columnVisibility.debit && (
+                            <td className="px-3 py-2 text-right font-mono">
+                              ₹ {tDebit.toLocaleString()}
+                            </td>
+                          )}
 
-                          <td className="px-3 py-2 text-right font-mono">
-                            ₹ {tCredit.toLocaleString()}
-                          </td>
+                          {columnVisibility.credit && (
+                            <td className="px-3 py-2 text-right font-mono">
+                              ₹ {tCredit.toLocaleString()}
+                            </td>
+                          )}
 
-                          <td className="px-3 py-2 text-right font-mono font-bold">
-                            ₹ {tClosing.toLocaleString()}
-                          </td>
+                          {columnVisibility.closing && (
+                            <td className="px-3 py-2 text-right font-mono font-bold">
+                              ₹ {tClosing.toLocaleString()}
+                            </td>
+                          )}
                         </tr>
                       </tfoot>
                     );
