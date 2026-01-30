@@ -199,14 +199,17 @@ const GroupSummary: React.FC = () => {
         const data = await res.json();
 
 
-        // ✅ Normalize keys (e.g., "113.00" -> 113)
+        // ✅ Normalize keys and ensure values are numbers
         const normalizedData: Record<number, { debit: number; credit: number }> = {};
         if (data.data) {
           Object.keys(data.data).forEach((key) => {
-            normalizedData[Number(key)] = data.data[key];
+            const entry = data.data[key];
+            normalizedData[Number(key)] = {
+              debit: Number(entry.debit) || 0,
+              credit: Number(entry.credit) || 0
+            };
           });
         }
-        // console.log('nor', normalizedData)
         setTaxData(normalizedData);
 
       } catch (err) {
@@ -275,6 +278,7 @@ const GroupSummary: React.FC = () => {
     ];
 
     const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
+    const balanceType = ledger.balanceType || "debit";
     const ledgerTax = taxData[Number(ledger.id)] || { debit: 0, credit: 0 };
     let creationMonthIndex = 0;
 
@@ -289,21 +293,29 @@ const GroupSummary: React.FC = () => {
       }
     }
 
-    return months.map((month, index) => {
-      // Heuristic: If we don't have real per-month data, show totals in the creation month
-      // or Jan (index 9) for high-visibility during testing/selection.
-      const isCreationMonth = index === creationMonthIndex;
-      const isJanFallback = index === 9 && !ledger.createdAt; // Temporary visibility for demo
+    let runningOpening = opening;
 
+    return months.map((month, index) => {
+      const isCreationMonth = index === creationMonthIndex;
+      const isJanFallback = index === 9 && !ledger.createdAt;
       const shouldShow = isCreationMonth || isJanFallback;
 
       const monthDebit = shouldShow ? ledgerTax.debit : 0;
       const monthCredit = shouldShow ? ledgerTax.credit : 0;
-      const monthOpening = shouldShow ? opening : 0;
+      const monthOpening = index === 0 ? opening : runningOpening;
 
-      // Net change for this ledger in this month
-      const netChange = monthDebit - monthCredit;
-      const monthClosing = isCreationMonth ? (monthOpening + netChange) : 0;
+      // Calculate closing based on user formula
+      let monthClosing = 0;
+      if (balanceType === "debit") {
+        monthClosing = (monthOpening + monthDebit) - monthCredit;
+      } else {
+        monthClosing = (monthOpening + monthCredit) - monthDebit;
+      }
+
+      // For the next month, the current month's closing is the opening
+      // However, since we currently only have total data in one month (heuristic),
+      // we just update runningOpening for consistency in this mock-up logic.
+      runningOpening = monthClosing;
 
       return {
         month,
@@ -311,20 +323,39 @@ const GroupSummary: React.FC = () => {
         debit: monthDebit,
         credit: monthCredit,
         closing: monthClosing,
+        balanceType: balanceType
       };
     });
   };
 
-  const totalDebit = Object.values(taxData).reduce(
-    (sum: number, t: any) => sum + (t.debit || 0),
-    0
+  const totals = ledgers.reduce(
+    (acc, ledger) => {
+      const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
+      const tData = taxData[Number(ledger.id)] || { debit: 0, credit: 0 };
+      const debit = Number(tData.debit) || 0;
+      const credit = Number(tData.credit) || 0;
+      const type = (ledger.balanceType || "debit").toLowerCase();
+
+      let closing = 0;
+      if (type === "debit" || type === "dr") {
+        closing = (opening + debit) - credit;
+      } else {
+        closing = (opening + credit) - debit;
+      }
+
+      acc.opening += opening;
+      acc.debit += debit;
+      acc.credit += credit;
+      acc.closing += Math.abs(closing);
+      return acc;
+    },
+    { opening: 0, debit: 0, credit: 0, closing: 0 }
   );
 
-
-  const totalCredit = Object.values(taxData).reduce(
-    (sum: number, t: any) => sum + (t.credit || 0),
-    0
-  );
+  const totalOpening = totals.opening;
+  const totalDebit = totals.debit;
+  const totalCredit = totals.credit;
+  const totalClosing = totals.closing;
 
   // You can replace this with your actual theme logic or context
   const [theme] = useState<"light" | "dark">("light");
@@ -502,6 +533,7 @@ const GroupSummary: React.FC = () => {
                 >
                   <th className="px-4 py-3 text-left">Ledger Name</th>
                   <th className="px-4 py-3 text-left">Group</th>
+                  <th className="px-4 py-3 text-right">Opening Balance</th>
                   <th className="px-4 py-3 text-right">Debit</th>
                   <th className="px-4 py-3 text-right">Credit</th>
                   <th className="px-4 py-3 text-right">Closing Balance</th>
@@ -524,6 +556,11 @@ const GroupSummary: React.FC = () => {
                       {resolvedGroupName || `Group ${groupType}`}
                     </td>
 
+                    {/* Opening */}
+                    <td className="px-4 py-3 text-right font-mono">
+                      ₹ {(Number(ledger.openingBalance || ledger.opening_balance) || 0).toLocaleString()} {ledger.balanceType === 'debit' ? 'Dr' : 'Cr'}
+                    </td>
+
                     <td className="px-4 py-3 text-right font-mono text-green-600">
                       ₹ {(taxData[Number(ledger.id)]?.debit || 0).toLocaleString()}
                     </td>
@@ -534,10 +571,23 @@ const GroupSummary: React.FC = () => {
 
                     {/* Closing */}
                     <td className="px-4 py-3 text-right font-mono font-semibold">
-                      ₹ {Math.abs(
-                        (taxData[Number(ledger.id)]?.debit || 0) -
-                        (taxData[Number(ledger.id)]?.credit || 0)
-                      ).toLocaleString()}
+                      {(() => {
+                        const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
+                        const debit = taxData[Number(ledger.id)]?.debit || 0;
+                        const credit = taxData[Number(ledger.id)]?.credit || 0;
+                        const type = ledger.balanceType || 'debit';
+                        let closing = 0;
+                        if (type === 'debit') {
+                          closing = (opening + debit) - credit;
+                        } else {
+                          closing = (opening + credit) - debit;
+                        }
+                        return (
+                          <>
+                            ₹ {Math.abs(closing).toLocaleString()} {closing >= 0 ? (type === 'debit' ? 'Dr' : 'Cr') : (type === 'debit' ? 'Cr' : 'Dr')}
+                          </>
+                        );
+                      })()}
                     </td>
                   </tr>
                 ))}
@@ -551,14 +601,17 @@ const GroupSummary: React.FC = () => {
                     }`}
                 >
                   <td className="px-4 py-3" colSpan={2}>Total</td>
-                  <td className="px-4 py-3 text-right font-mono">
+                  <td className="px-4 py-3 text-right font-mono font-bold">
+                    ₹ {totalOpening.toLocaleString()}
+                  </td>
+                  <td className="px-4 py-3 text-right font-mono font-bold">
                     ₹ {totalDebit.toLocaleString()}
                   </td>
-                  <td className="px-4 py-3 text-right font-mono">
+                  <td className="px-4 py-3 text-right font-mono font-bold">
                     ₹ {totalCredit.toLocaleString()}
                   </td>
                   <td className="px-4 py-3 text-right font-mono font-bold">
-                    ₹ {Math.abs(totalDebit - totalCredit).toLocaleString()}
+                    ₹ {totalClosing.toLocaleString()}
                   </td>
                 </tr>
               </tfoot>
@@ -574,6 +627,7 @@ const GroupSummary: React.FC = () => {
                   <thead>
                     <tr className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
                       <th className="px-3 py-2 text-left">Month</th>
+                      <th className="px-3 py-2 text-right">Opening</th>
                       <th className="px-3 py-2 text-right">Debit</th>
                       <th className="px-3 py-2 text-right">Credit</th>
                       <th className="px-3 py-2 text-right">Closing</th>
@@ -583,17 +637,26 @@ const GroupSummary: React.FC = () => {
                     {(() => {
                       const months = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
                       const aggregatedData = months.map((month, idx) => {
+                        let totalMonthOpening = 0;
                         let totalDebit = 0;
                         let totalCredit = 0;
                         let totalClosing = 0;
+
                         ledgers.forEach((ledger) => {
                           const monthlyData = generateMonthlyData(ledger);
                           const m = monthlyData[idx];
+                          totalMonthOpening += Math.abs(m.opening);
                           totalDebit += m.debit;
                           totalCredit += m.credit;
-                          totalClosing += m.closing;
+                          totalClosing += Math.abs(m.closing);
                         });
-                        return { month, debit: totalDebit, credit: totalCredit, closing: totalClosing };
+                        return {
+                          month,
+                          opening: totalMonthOpening,
+                          debit: totalDebit,
+                          credit: totalCredit,
+                          closing: totalClosing
+                        };
                       });
 
                       return aggregatedData.map((monthData, index) => (
@@ -612,13 +675,23 @@ const GroupSummary: React.FC = () => {
                             <span className="mr-2 text-blue-500 text-[10px]">▶</span>
                             {monthData.month}
                           </td>
+                          <td className="px-3 py-2 text-right font-mono">₹ {monthData.opening.toLocaleString()}</td>
                           <td className="px-3 py-2 text-right font-mono">₹ {monthData.debit.toLocaleString()}</td>
                           <td className="px-3 py-2 text-right font-mono">₹ {monthData.credit.toLocaleString()}</td>
-                          <td className="px-3 py-2 text-right font-mono">₹ {Math.abs(monthData.closing).toLocaleString()}</td>
+                          <td className="px-3 py-2 text-right font-mono">₹ {monthData.closing.toLocaleString()}</td>
                         </tr>
                       ));
                     })()}
                   </tbody>
+                  <tfoot className={`font-bold ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <tr className="border-t-2 border-gray-300">
+                      <td className="px-3 py-2">Total</td>
+                      <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalOpening.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalDebit.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalCredit.toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalClosing.toLocaleString()}</td>
+                    </tr>
+                  </tfoot>
                 </table>
               </div>
             </div>
@@ -666,6 +739,7 @@ const GroupSummary: React.FC = () => {
                     <tr>
                       <th className="px-3 py-2 text-left">Ledger</th>
                       <th className="px-3 py-2 text-left">Group</th>
+                      <th className="px-3 py-2 text-right">Opening</th>
                       <th className="px-3 py-2 text-right">Debit</th>
                       <th className="px-3 py-2 text-right">Credit</th>
                       <th className="px-3 py-2 text-right">Closing</th>
@@ -679,7 +753,7 @@ const GroupSummary: React.FC = () => {
 
                       const activeLedgers = ledgers.filter((ledger) => {
                         const data = generateMonthlyData(ledger)[idx];
-                        return data.debit !== 0 || data.credit !== 0;
+                        return data.opening !== 0 || data.debit !== 0 || data.credit !== 0;
                       });
 
                       if (activeLedgers.length === 0) {
@@ -711,6 +785,10 @@ const GroupSummary: React.FC = () => {
                             </td>
 
                             <td className="px-3 py-2 text-right">
+                              ₹ {mData.opening.toLocaleString()} {mData.balanceType === 'debit' ? 'Dr' : 'Cr'}
+                            </td>
+
+                            <td className="px-3 py-2 text-right">
                               ₹ {mData.debit.toLocaleString()}
                             </td>
 
@@ -719,7 +797,7 @@ const GroupSummary: React.FC = () => {
                             </td>
 
                             <td className="px-3 py-2 text-right font-medium">
-                              ₹ {Math.abs(mData.closing).toLocaleString()}
+                              ₹ {Math.abs(mData.closing).toLocaleString()} {mData.closing >= 0 ? (mData.balanceType === 'debit' ? 'Dr' : 'Cr') : (mData.balanceType === 'debit' ? 'Cr' : 'Dr')}
                             </td>
                           </tr>
                         );
@@ -737,29 +815,34 @@ const GroupSummary: React.FC = () => {
                       (l) => generateMonthlyData(l)[idx]
                     );
 
+                    const tOpening = entries.reduce((s, e) => s + Math.abs(e.opening), 0);
                     const tDebit = entries.reduce((s, e) => s + e.debit, 0);
                     const tCredit = entries.reduce((s, e) => s + e.credit, 0);
-                    const tClosing = entries.reduce((s, e) => s + e.closing, 0);
+                    const tClosing = entries.reduce((s, e) => s + Math.abs(e.closing), 0);
 
-                    if (tDebit === 0 && tCredit === 0) return null;
+                    if (tOpening === 0 && tDebit === 0 && tCredit === 0) return null;
 
                     return (
                       <tfoot className="bg-gray-100 border-t font-semibold">
-                        <tr>
+                        <tr className="font-bold border-t-2 border-gray-300">
                           <td colSpan={2} className="px-3 py-2">
                             Total
                           </td>
 
-                          <td className="px-3 py-2 text-right">
+                          <td className="px-3 py-2 text-right font-mono">
+                            ₹ {tOpening.toLocaleString()}
+                          </td>
+
+                          <td className="px-3 py-2 text-right font-mono">
                             ₹ {tDebit.toLocaleString()}
                           </td>
 
-                          <td className="px-3 py-2 text-right">
+                          <td className="px-3 py-2 text-right font-mono">
                             ₹ {tCredit.toLocaleString()}
                           </td>
 
-                          <td className="px-3 py-2 text-right">
-                            ₹ {Math.abs(tClosing).toLocaleString()}
+                          <td className="px-3 py-2 text-right font-mono font-bold">
+                            ₹ {tClosing.toLocaleString()}
                           </td>
                         </tr>
                       </tfoot>
@@ -784,6 +867,11 @@ const GroupSummary: React.FC = () => {
         <div className="flex justify-between">
           <h2 className="text-xl font-bold mb-4">Group Summary</h2>
           <div>
+            <p className="text-sm opacity-75">Opening Balance</p>
+            <p className="text-xl font-bold">₹ {totalOpening.toLocaleString()}</p>
+          </div>
+
+          <div>
             <p className="text-sm opacity-75">Total Debit</p>
             <p className="text-xl font-bold">₹ {totalDebit.toLocaleString()}</p>
           </div>
@@ -796,7 +884,7 @@ const GroupSummary: React.FC = () => {
           <div>
             <p className="text-sm opacity-75">Closing Balance</p>
             <p className="text-xl font-bold">
-              ₹ {Math.abs(totalDebit - totalCredit).toLocaleString()}
+              ₹ {totalClosing.toLocaleString()}
             </p>
           </div>
           <div className="mt-4">
