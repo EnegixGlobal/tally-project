@@ -574,6 +574,21 @@ const ProfitLoss: React.FC = () => {
     );
   };
 
+
+  // Save Net Profit for Balance Sheet
+  useEffect(() => {
+    const profit = getNetProfit();
+
+    if (companyId) {
+      localStorage.setItem(
+        `NET_PROFIT_${companyId}`,
+        profit.toString()
+      );
+    }
+
+  }, [getNetProfit, companyId]);
+
+
   return (
     <div className="pt-[56px] px-4 ">
       <div className="flex items-center mb-6 relative">
