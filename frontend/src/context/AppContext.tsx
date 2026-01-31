@@ -327,10 +327,11 @@
 
 
 
-import React, { createContext, useContext, useState } from 'react';
+import React, { createContext, useContext, useState, useEffect } from 'react';
 import type { ReactNode } from 'react';
 import type { CompanyInfo, Ledger, LedgerGroup, VoucherEntry, StockItem, UnitOfMeasurement, Godown, StockGroup, GstClassification, CapitalGain, TDSEntry } from '../types';
 import { defaultLedgerGroups, defaultLedgers } from '../data/defaultData';
+import { useCompany } from './CompanyContext';
 
 type ThemeMode = 'light' | 'dark';
 
@@ -369,9 +370,29 @@ interface AppContextProps {
 
 const AppContext = createContext<AppContextProps | undefined>(undefined);
 
-export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+// Internal component that uses CompanyContext
+// This must be rendered inside CompanyProvider
+const AppProviderInner: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<ThemeMode>('light');
-  const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const { companyInfo: contextCompanyInfo } = useCompany();
+  const [localCompanyInfo, setLocalCompanyInfo] = useState<CompanyInfo | null>(null);
+  
+  // Sync with CompanyContext - companyInfo from context takes precedence
+  useEffect(() => {
+    if (contextCompanyInfo) {
+      setLocalCompanyInfo(contextCompanyInfo);
+    } else {
+      setLocalCompanyInfo(null);
+    }
+  }, [contextCompanyInfo]);
+  
+  // Use context companyInfo if available, otherwise use local state
+  const companyInfo = contextCompanyInfo || localCompanyInfo;
+  
+  const setCompanyInfo = (info: CompanyInfo) => {
+    setLocalCompanyInfo(info);
+    // Note: For proper company switching, use useCompany().switchCompany()
+  };
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>(defaultLedgerGroups);
   const [ledgers, setLedgers] = useState<Ledger[]>(defaultLedgers);
   const [vouchers, setVouchers] = useState<VoucherEntry[]>([
@@ -729,6 +750,12 @@ export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => 
       {children}
     </AppContext.Provider>
   );
+};
+
+// Wrapper that ensures CompanyProvider is available
+// This must be used inside CompanyProvider (see App.tsx)
+export const AppProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  return <AppProviderInner>{children}</AppProviderInner>;
 };
 
 export const useAppContext = () => {

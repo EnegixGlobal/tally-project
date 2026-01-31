@@ -1,6 +1,7 @@
 import { useEffect } from "react";
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 import { AppProvider } from "./context/AppContext";
+import { CompanyProvider } from "./context/CompanyContext";
 import MainLayout from "./components/layout/MainLayout";
 import RequireCompany from "./components/layout/RequireCompany";
 import Dashboard from "./components/dashboard/Dashboard";
@@ -247,6 +248,7 @@ function App() {
 
   return (
     <AuthProvider>
+      <CompanyProvider>
       <AppProvider>
         <Router>
           <Routes>
@@ -1965,6 +1967,7 @@ function App() {
           </Routes>
         </Router>
       </AppProvider>
+      </CompanyProvider>
     </AuthProvider>
   );
 }

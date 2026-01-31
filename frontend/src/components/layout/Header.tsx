@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { useCompany } from '../../context/CompanyContext';
 import { Moon, Sun, Menu } from 'lucide-react';
 
 interface HeaderProps {
@@ -14,29 +15,29 @@ interface CompanyData {
 
 const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
   const { theme, toggleTheme } = useAppContext();
-  const storedCompanyId = localStorage.getItem("company_id");
+  const { activeCompanyId, companyInfo } = useCompany();
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
 
   useEffect(() => {
-    const storedCompanyId = localStorage.getItem("company_id");
+    // Use activeCompanyId from CompanyContext instead of directly reading localStorage
+    const companyId = activeCompanyId;
 
-    if (!storedCompanyId) return;
+    if (!companyId) return;
 
-    fetch(`${import.meta.env.VITE_API_URL}/api/header/${storedCompanyId}`)
-  .then(res => res.json())
-  .then((data) => {
-    if (data.error) {
-      setCompanyData(null);
-    } else {
-      setCompanyData(data);
-    }
-  })
-  .catch(err => {
-    setCompanyData(null);
-    console.error("Failed to fetch company info:", err);
-  });
-
-  }, [storedCompanyId]);
+    fetch(`${import.meta.env.VITE_API_URL}/api/header/${companyId}`)
+      .then(res => res.json())
+      .then((data) => {
+        if (data.error) {
+          setCompanyData(null);
+        } else {
+          setCompanyData(data);
+        }
+      })
+      .catch(err => {
+        setCompanyData(null);
+        console.error("Failed to fetch company info:", err);
+      });
+  }, [activeCompanyId]);
 
   return (
     <header
