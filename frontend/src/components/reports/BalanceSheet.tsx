@@ -29,6 +29,9 @@ const BalanceSheet: React.FC = () => {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [netProfit, setNetProfit] = useState<string | null>(null);
+
+
   const [debitCreditData, setDebitCreditData] = useState<Record<number, { debit: number; credit: number }>>({});
 
   const companyId = localStorage.getItem("company_id") || "";
@@ -68,6 +71,18 @@ const BalanceSheet: React.FC = () => {
     };
     fetchData();
   }, [companyId, ownerType, ownerId]);
+
+  // Load Net Profit from Profit & Loss page
+  useEffect(() => {
+    if (companyId) {
+      const profit = Number(
+        localStorage.getItem(`NET_PROFIT_${companyId}`) || 0
+      );
+
+      setNetProfit(profit);
+    }
+  }, [companyId]);
+
 
   // calculate total balance
   const [calculatedTotal, setCalculatedTotal] = useState({
@@ -230,8 +245,8 @@ const BalanceSheet: React.FC = () => {
                 type="date"
                 defaultValue={new Date().toISOString().split("T")[0]}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
                   }`}
                 disabled={loading}
               />
@@ -314,7 +329,7 @@ const BalanceSheet: React.FC = () => {
                   <span className="text-blue-600 dark:text-blue-400 underline">
                     Profit & Loss A/c
                   </span>
-                  <span className="text-right font-mono">0</span>
+                  <span className="text-right font-mono">{netProfit}</span>
                 </div>
 
                 {/* Total */}
