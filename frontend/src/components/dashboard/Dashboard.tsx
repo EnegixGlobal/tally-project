@@ -1,6 +1,7 @@
 import React, { useEffect, useState, type ReactNode } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
+import { useCompany } from "../../context/CompanyContext";
 import {
   Book,
   DollarSign,
@@ -13,7 +14,14 @@ import AssignCompaniesModal from "./AssignCompaniesModal"; // Adjust path accord
 import DashboardCaEmployee from "./DashboardCaEmployee";
 
 const Dashboard: React.FC = () => {
+
+  const isSameCompany = (a: any, b: any) => {
+    if (!a || !b) return false;
+    return String(a.id) === String(b.id);
+  };
+
   const { theme, setCompanyInfo } = useAppContext();
+  const { switchCompany, activeCompanyId, setCompanies: setContextCompanies } = useCompany();
   const navigate = useNavigate();
   const [companyInfo, setCompanyInfoState] = useState<any>(null);
   const [ledgers, setLedgers] = useState<any[]>([]);
@@ -60,7 +68,7 @@ const Dashboard: React.FC = () => {
     name: string;
   };
   const [companies, setCompanies] = useState<Company[]>([]);
-  
+
   // Initialize selectedCompany from localStorage first
   const [selectedCompany, setSelectedCompany] = useState(() => {
     const storedCompanyId = localStorage.getItem("company_id");
@@ -99,26 +107,28 @@ const Dashboard: React.FC = () => {
 
   const employeeId = localStorage.getItem("employee_id");
 
-  useEffect(() => {
-    // Only update if companyInfo exists and selectedCompany is empty or different
-    if (companyInfo?.id) {
-      const companyIdStr = companyInfo.id.toString();
-      const storedCompanyId = localStorage.getItem("company_id");
-      
-      // If localStorage has a company_id, use it; otherwise use companyInfo.id
-      if (storedCompanyId && storedCompanyId !== companyIdStr) {
-        // If stored company is different, update selectedCompany but don't change localStorage
-        setSelectedCompany(storedCompanyId);
-      } else if (!storedCompanyId) {
-        // If no stored company, use companyInfo.id and save it
-        setSelectedCompany(companyIdStr);
-        localStorage.setItem("company_id", companyIdStr);
-      } else {
-        // If they match, just ensure state is in sync
-        setSelectedCompany(companyIdStr);
-      }
-    }
-  }, [companyInfo]);
+  // Removed this useEffect - it was causing infinite loop
+  // CompanyContext now handles syncing automatically
+  // useEffect(() => {
+  //   // Only update if companyInfo exists and selectedCompany is empty or different
+  //   if (companyInfo?.id) {
+  //     const companyIdStr = companyInfo.id.toString();
+  //     const storedCompanyId = localStorage.getItem("company_id");
+  //     
+  //     // If localStorage has a company_id, use it; otherwise use companyInfo.id
+  //     if (storedCompanyId && storedCompanyId !== companyIdStr) {
+  //       // If stored company is different, update selectedCompany but don't change localStorage
+  //       setSelectedCompany(storedCompanyId);
+  //     } else if (!storedCompanyId) {
+  //       // If no stored company, use companyInfo.id and save it
+  //       setSelectedCompany(companyIdStr);
+  //       localStorage.setItem("company_id", companyIdStr);
+  //     } else {
+  //       // If they match, just ensure state is in sync
+  //       setSelectedCompany(companyIdStr);
+  //     }
+  //   }
+  // }, [companyInfo]);
 
 
   useEffect(() => {
@@ -126,8 +136,7 @@ const Dashboard: React.FC = () => {
       try {
         const token = localStorage.getItem("token");
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/dashboard-data?employee_id=${employeeId}`,
           {
             headers: {
@@ -138,10 +147,16 @@ const Dashboard: React.FC = () => {
         );
 
         const data = await res.json();
-        console.log("this is data", data.companyInfo);
+        // console.log("this is data", data.companyInfo);
         if (data.success) {
-          setCompanyInfoState(data.companyInfo);
-          setCompanyInfo(data.companyInfo);
+          setCompanyInfoState((prev: any) => {
+            if (isSameCompany(prev, data.companyInfo)) {
+              return prev; // same company hai → dobara set mat karo
+            }
+            return data.companyInfo;
+          });
+          // Don't call setCompanyInfo here - it causes infinite loop
+          // CompanyContext will sync automatically based on active_company_id
           setUserLimit(data.userLimit ?? 1);
           setCompanies(data.companies || []);
           setLedgers(data.ledgers || []);
@@ -161,7 +176,8 @@ const Dashboard: React.FC = () => {
     } else {
       setLoading(false);
     }
-  }, [employeeId, setCompanyInfo]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [employeeId]); // Removed setCompanyInfo from dependencies to prevent infinite loop
 
   useEffect(() => {
     const employeeId = localStorage.getItem("employee_id");
@@ -169,8 +185,7 @@ const Dashboard: React.FC = () => {
     if (!employeeId) return;
 
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/companies-by-employee?employee_id=${employeeId}`
     )
       .then((res) => res.json())
@@ -196,8 +211,7 @@ const Dashboard: React.FC = () => {
   useEffect(() => {
     if (!caId) return;
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/ca-employees-with-companies?ca_id=${caId}`
     )
       .then((res) => res.json())
@@ -216,11 +230,27 @@ const Dashboard: React.FC = () => {
     setShowAssignModal(false);
   };
 
+  useEffect(() => {
+    if (!companyInfo) return;
+
+    const stored = localStorage.getItem("companyInfo");
+
+    if (stored) {
+      const parsed = JSON.parse(stored);
+
+      if (parsed?.id === companyInfo.id) return;
+    }
+
+    localStorage.setItem("companyInfo", JSON.stringify(companyInfo));
+    setCompanyInfo(companyInfo);
+
+  }, [companyInfo]);
+
+
   // Fetch function to reload employees after assignment
   const fetchEmployees = () => {
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/ca-employees-with-companies?ca_id=${caId}`
     )
       .then((res) => res.json())
@@ -312,21 +342,34 @@ const Dashboard: React.FC = () => {
               )}
 
               {allCompanies.length > 0 && (
-                <div className="pt-[56px] px-4 mb-6">
+                <div className="mb-6">
                   <label className="block mb-2 font-medium text-gray-700 text-sm">
                     Switch Company
                   </label>
                   <select
-                    value={selectedCompany}
-                    onChange={(e) => {
+                    value={activeCompanyId || selectedCompany}
+                    onChange={async (e) => {
                       const companyId = e.target.value;
                       if (companyId) {
-                        // ✅ Save to localStorage
-                        localStorage.setItem("company_id", companyId);
-                        // ✅ Update state
-                        setSelectedCompany(companyId);
-                        // ✅ Reload the page to refresh data
-                        window.location.reload();
+                        try {
+                          // Use CompanyContext to switch company
+                          // This automatically updates active_company_id and companyInfo
+                          await switchCompany(companyId);
+                          setSelectedCompany(companyId);
+
+                          // Update companies list in context
+                          if (allCompanies.length > 0) {
+                            const formattedCompanies = allCompanies.map((c: any) => ({
+                              id: c.id,
+                              name: c.name,
+                              ...c,
+                            }));
+                            setContextCompanies(formattedCompanies);
+                          }
+                        } catch (error) {
+                          console.error("Failed to switch company:", error);
+                          alert("Failed to switch company. Please try again.");
+                        }
                       }
                     }}
                     className="border rounded px-3 py-2 w-full max-w-xs bg-white"
@@ -360,16 +403,14 @@ const Dashboard: React.FC = () => {
                 return (
                   <div
                     key={c.id}
-                    className={`rounded-2xl p-6 hover:shadow-xl transition-all border-2 ${
-                      isSelected
+                    className={`rounded-2xl p-6 hover:shadow-xl transition-all border-2 ${isSelected
                         ? "bg-gradient-to-b from-indigo-100 to-purple-100 shadow-lg border-indigo-500 ring-2 ring-indigo-300 ring-offset-2"
                         : "bg-gradient-to-b from-purple-50 to-blue-50 shadow-md border-indigo-100"
-                    }`}
+                      }`}
                   >
                     <div className="flex items-center justify-between mb-1">
-                      <h3 className={`text-lg font-bold ${
-                        isSelected ? "text-indigo-800" : "text-gray-800"
-                      }`}>
+                      <h3 className={`text-lg font-bold ${isSelected ? "text-indigo-800" : "text-gray-800"
+                        }`}>
                         {c.name}
                       </h3>
                       {isSelected && (
@@ -379,9 +420,8 @@ const Dashboard: React.FC = () => {
                       )}
                     </div>
 
-                    <div className={`text-sm mb-3 ${
-                      isSelected ? "text-gray-600" : "text-gray-500"
-                    }`}>
+                    <div className={`text-sm mb-3 ${isSelected ? "text-gray-600" : "text-gray-500"
+                      }`}>
                       {c.address || "—"}
                     </div>
 
@@ -403,9 +443,8 @@ const Dashboard: React.FC = () => {
           {/* ✅ If no company, show welcome */}
           {!companyInfo ? (
             <div
-              className={`p-1 rounded-lg mb-6 ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
+              className={`p-1 rounded-lg mb-6 ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+                }`}
             >
               {/* <h2 className="text-xl font-semibold mb-4">
                 Welcome to Tally Prime
@@ -429,9 +468,8 @@ const Dashboard: React.FC = () => {
             <>
               {/* Company Info */}
               <div
-                className={`p-6 rounded-lg mb-6 ${
-                  theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-                }`}
+                className={`p-6 rounded-lg mb-6 ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+                  }`}
               >
                 <h2 className="text-xl font-semibold mb-2">
                   {companyInfo.name}
@@ -472,9 +510,8 @@ const Dashboard: React.FC = () => {
                 {stats.map((stat, index) => (
                   <div
                     key={index}
-                    className={`p-6 rounded-lg ${stat.color} ${
-                      theme === "dark" ? "" : "shadow"
-                    }`}
+                    className={`p-6 rounded-lg ${stat.color} ${theme === "dark" ? "" : "shadow"
+                      }`}
                   >
                     <div className="flex justify-between items-start">
                       <div>
@@ -482,9 +519,8 @@ const Dashboard: React.FC = () => {
                         <p className="text-2xl font-semibold">{stat.value}</p>
                       </div>
                       <div
-                        className={`p-2 rounded-full ${
-                          theme === "dark" ? "bg-gray-700" : "bg-white"
-                        }`}
+                        className={`p-2 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-white"
+                          }`}
                       >
                         {stat.icon}
                       </div>

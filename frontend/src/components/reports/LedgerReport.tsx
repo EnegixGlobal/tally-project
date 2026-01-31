@@ -79,16 +79,23 @@ const LedgerReport: React.FC = () => {
   const [viewMode, setViewMode] = useState<"detailed" | "monthly" | "daily">(
     "detailed"
   );
-  // Calculate Default Date (Current Month)
+  // Calculate Default Date
   const now = new Date();
-  const year = now.getFullYear();
-  const month = now.getMonth();
-  const firstDayOfMonth = new Date(year, month, 1).toISOString().split("T")[0];
-  const lastDayOfMonth = new Date(year, month + 1, 0).toISOString().split("T")[0];
+  const currentYear = now.getFullYear();
+  const currentMonth = now.getMonth();
+
+  // Current Month range
+  const firstDayOfMonth = new Date(currentYear, currentMonth, 1).toISOString().split("T")[0];
+  const lastDayOfMonth = new Date(currentYear, currentMonth + 1, 0).toISOString().split("T")[0];
+
+  // Financial Year range (April - March)
+  const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+  const fyStartDate = `${fyStartYear}-04-01`;
+  const fyEndDate = `${fyStartYear + 1}-03-31`;
 
   const [selectedDateRange, setSelectedDateRange] = useState(searchParams.get("fromDate") ? "custom" : "current-year");
-  const [fromDate, setFromDate] = useState(searchParams.get("fromDate") || firstDayOfMonth);
-  const [toDate, setToDate] = useState(searchParams.get("toDate") || lastDayOfMonth);
+  const [fromDate, setFromDate] = useState(searchParams.get("fromDate") || fyStartDate);
+  const [toDate, setToDate] = useState(searchParams.get("toDate") || fyEndDate);
   const [showClosingBalances, setShowClosingBalances] = useState(true);
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherDetail | null>(
     null
@@ -188,8 +195,9 @@ const LedgerReport: React.FC = () => {
         break;
       }
       case "current-year": {
-        setFromDate(`${currentYear}-04-01`);
-        setToDate(`${currentYear + 1}-03-31`);
+        const startYear = today.getMonth() >= 3 ? currentYear : currentYear - 1;
+        setFromDate(`${startYear}-04-01`);
+        setToDate(`${startYear + 1}-03-31`);
         break;
       }
       default:

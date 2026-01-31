@@ -10,6 +10,7 @@ router.get("/api/group", async (req, res) => {
 
     const { company_id, owner_type, owner_id, ledgerIds } = req.query;
 
+
     if (!company_id || !owner_type || !owner_id || !ledgerIds) {
       return res.status(400).json({
         success: false,
@@ -22,29 +23,29 @@ router.get("/api/group", async (req, res) => {
       .map(id => Number(id))
       .filter(id => !isNaN(id));
 
-    /*
-      LOGIC:
-      Purchase  → Debit
-      Sales     → Credit
-    */
+    if (!idArray.length) {
+      return res.json({
+        success: true,
+        data: {},
+      });
+    }
 
     const [rows] = await pool.query(
+
       `
       SELECT
-        CAST(ledgerId AS UNSIGNED) AS ledgerId,
-
+        ledgerId,
         SUM(debit)  AS debit,
         SUM(credit) AS credit
 
       FROM (
 
-        /* ================= PURCHASE (DEBIT) ================= */
+        /* ================= PURCHASE ================= */
 
-        -- Purchase CGST
         SELECT
           CAST(pvi.cgstRate AS UNSIGNED) AS ledgerId,
           pv.cgstTotal AS debit,
-          0            AS credit
+          0 AS credit
         FROM purchase_voucher_items pvi
         JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
         WHERE pvi.cgstRate IN (?)
@@ -54,9 +55,8 @@ router.get("/api/group", async (req, res) => {
 
         UNION ALL
 
-        -- Purchase SGST
         SELECT
-          CAST(pvi.sgstRate AS UNSIGNED),
+          CAST(pvi.sgstRate AS UNSIGNED) AS ledgerId,
           pv.sgstTotal,
           0
         FROM purchase_voucher_items pvi
@@ -68,9 +68,8 @@ router.get("/api/group", async (req, res) => {
 
         UNION ALL
 
-        -- Purchase IGST
         SELECT
-          CAST(pvi.igstRate AS UNSIGNED),
+          CAST(pvi.igstRate AS UNSIGNED) AS ledgerId,
           pv.igstTotal,
           0
         FROM purchase_voucher_items pvi
@@ -82,9 +81,8 @@ router.get("/api/group", async (req, res) => {
 
         UNION ALL
 
-        -- Purchase Subtotal (Purchase Ledger)
         SELECT
-          CAST(pvi.purchaseLedgerId AS UNSIGNED),
+          CAST(pvi.purchaseLedgerId AS UNSIGNED) AS ledgerId,
           pvi.amount,
           0
         FROM purchase_voucher_items pvi
@@ -95,13 +93,12 @@ router.get("/api/group", async (req, res) => {
           AND pv.owner_id = ?
 
 
-        /* ================= SALES (CREDIT) ================= */
+        /* ================= SALES ================= */
 
         UNION ALL
 
-        -- Sales CGST
         SELECT
-          CAST(svi.cgstRate AS UNSIGNED),
+          CAST(svi.cgstRate AS UNSIGNED) AS ledgerId,
           0,
           sv.cgstTotal
         FROM sales_voucher_items svi
@@ -113,9 +110,8 @@ router.get("/api/group", async (req, res) => {
 
         UNION ALL
 
-        -- Sales SGST
         SELECT
-          CAST(svi.sgstRate AS UNSIGNED),
+          CAST(svi.sgstRate AS UNSIGNED) AS ledgerId,
           0,
           sv.sgstTotal
         FROM sales_voucher_items svi
@@ -127,9 +123,8 @@ router.get("/api/group", async (req, res) => {
 
         UNION ALL
 
-        -- Sales IGST
         SELECT
-          CAST(svi.igstRate AS UNSIGNED),
+          CAST(svi.igstRate AS UNSIGNED) AS ledgerId,
           0,
           sv.igstTotal
         FROM sales_voucher_items svi
@@ -141,9 +136,8 @@ router.get("/api/group", async (req, res) => {
 
         UNION ALL
 
-        -- Sales Subtotal (Sales Ledger)
         SELECT
-          CAST(svi.salesLedgerId AS UNSIGNED),
+          CAST(svi.salesLedgerId AS UNSIGNED) AS ledgerId,
           0,
           svi.amount
         FROM sales_voucher_items svi
@@ -153,13 +147,13 @@ router.get("/api/group", async (req, res) => {
           AND sv.owner_type = ?
           AND sv.owner_id = ?
 
+
+        /* ================= PARTY ================= */
+
         UNION ALL
 
-        /* ================= PARTY DATA (AR/AP) ================= */
-
-        -- Purchase Party (Credit - Accounts Payable)
         SELECT
-          CAST(pv.partyId AS UNSIGNED),
+          CAST(pv.partyId AS UNSIGNED) AS ledgerId,
           0,
           pv.total
         FROM purchase_vouchers pv
@@ -170,9 +164,8 @@ router.get("/api/group", async (req, res) => {
 
         UNION ALL
 
-        -- Sales Party (Debit - Accounts Receivable)
         SELECT
-          CAST(sv.partyId AS UNSIGNED),
+          CAST(sv.partyId AS UNSIGNED) AS ledgerId,
           sv.total,
           0
         FROM sales_vouchers sv
@@ -181,41 +174,75 @@ router.get("/api/group", async (req, res) => {
           AND sv.owner_type = ?
           AND sv.owner_id = ?
 
-      ) AS tax_data
+
+        /* ================= JOURNAL / CONTRA / PAYMENT ================= */
+
+        UNION ALL
+
+        SELECT
+          CAST(ve.ledger_id AS UNSIGNED) AS ledgerId,
+
+          CASE
+            WHEN ve.entry_type = 'debit' THEN ve.amount
+            ELSE 0
+          END AS debit,
+
+          CASE
+            WHEN ve.entry_type = 'credit' THEN ve.amount
+            ELSE 0
+          END AS credit
+
+        FROM voucher_entries ve
+        JOIN voucher_main vm ON vm.id = ve.voucher_id
+
+        WHERE ve.ledger_id IN (?)
+          AND vm.voucher_type IN ('journal','contra','payment','receipt')
+          AND vm.company_id = ?
+          AND vm.owner_type = ?
+          AND vm.owner_id = ?
+
+      ) AS final_data
 
       GROUP BY ledgerId
       `,
+
       [
-        // Purchase (4 branches)
+
+        // Purchase
         idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
 
-        // Sales (4 branches)
+        // Sales
         idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
 
-        // Parties (2 branches)
+        // Party
         idArray, company_id, owner_type, owner_id,
+        idArray, company_id, owner_type, owner_id,
+
+        // Journal
         idArray, company_id, owner_type, owner_id,
       ]
     );
 
-    // Format response
+
     const result = {};
 
     rows.forEach(row => {
-      // Ensure key is a clean integer
-      const cleanId = Math.floor(Number(row.ledgerId));
-      if (!isNaN(cleanId)) {
-        result[cleanId] = {
+
+      const id = Number(row.ledgerId);
+
+      if (!isNaN(id)) {
+        result[id] = {
           debit: Number(row.debit || 0),
           credit: Number(row.credit || 0),
         };
       }
+
     });
 
     res.json({
@@ -225,7 +252,7 @@ router.get("/api/group", async (req, res) => {
 
   } catch (err) {
 
-    console.log(err);
+    console.error("Group API Error:", err);
 
     res.status(500).json({
       success: false,
@@ -233,6 +260,7 @@ router.get("/api/group", async (req, res) => {
     });
   }
 });
+
 
 // GET /api/group-summary
 router.get("/api/group-summary", async (req, res) => {

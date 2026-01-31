@@ -29,6 +29,7 @@ const BalanceSheet: React.FC = () => {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [debitCreditData, setDebitCreditData] = useState<Record<number, { debit: number; credit: number }>>({});
 
   const companyId = localStorage.getItem("company_id") || "";
   const ownerType = localStorage.getItem("supplier") || "";
@@ -42,9 +43,8 @@ const BalanceSheet: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const url = `${
-          import.meta.env.VITE_API_URL
-        }/api/balance-sheet?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        const url = `${import.meta.env.VITE_API_URL
+          }/api/balance-sheet?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load balance sheet data");
         const data = await res.json();
@@ -81,28 +81,14 @@ const BalanceSheet: React.FC = () => {
   });
 
   useEffect(() => {
-    let capitalTotal = 0;
-    let loanLability = 0;
-    let currentLiability = 0;
-    let fixedAssets = 0;
-    let CurrentAssets = 0;
+    // Calculate totals using closing balances
+    const capitalTotal = calculateGroupTotal(-4);
+    const loanLability = calculateGroupTotal(-13);
+    const currentLiability = calculateGroupTotal(-6);
+    const fixedAssets = calculateGroupTotal(-9);
+    const CurrentAssets = calculateGroupTotal(-5);
 
-    ledgers.forEach((ledger) => {
-      if (Number(ledger.groupId) === -4) {
-        capitalTotal += Number(ledger.openingBalance || 0);
-      } else if (Number(ledger.groupId) === -13) {
-        loanLability += Number(ledger.openingBalance);
-      } else if (Number(ledger.groupId) === -6) {
-        currentLiability += Number(ledger.openingBalance);
-      } else if (Number(ledger.groupId) === -9) {
-        fixedAssets += Number(ledger.openingBalance);
-      } else if (Number(ledger.groupId) === -5) {
-        CurrentAssets += Number(ledger.openingBalance);
-      }
-    });
-
-    setCalculatedTotal((prev) => ({
-      ...prev,
+    setCalculatedTotal({
       CapitalAccount: capitalTotal,
       Loans: loanLability,
       CurrentLiabilities: currentLiability,
@@ -110,11 +96,63 @@ const BalanceSheet: React.FC = () => {
       CurrentAssets: CurrentAssets,
       LaiblityTotal: capitalTotal + loanLability + currentLiability,
       AssetTotal: fixedAssets + CurrentAssets,
-    }));
-  }, [ledgers]);
+    });
+  }, [ledgers, debitCreditData]);
+
+  // Fetch debit/credit data for all ledgers to calculate closing balances
+  useEffect(() => {
+    const fetchDebitCreditData = async () => {
+      if (!companyId || !ownerType || !ownerId || ledgers.length === 0) {
+        return;
+      }
+
+      try {
+        const ledgerIds = ledgers.map((l) => l.id).join(",");
+        const url = `${import.meta.env.VITE_API_URL}/api/group` +
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}` +
+          `&ledgerIds=${ledgerIds}`;
+
+        const res = await fetch(url);
+        if (!res.ok) throw new Error("Failed to load debit/credit data");
+        const data = await res.json();
+
+        if (data.success && data.data) {
+          setDebitCreditData(data.data);
+        }
+      } catch (err) {
+        console.error("Error fetching debit/credit data:", err);
+      }
+    };
+
+    fetchDebitCreditData();
+  }, [ledgers, companyId, ownerType, ownerId]);
+
+  // Calculate closing balance for a ledger
+  const calculateClosingBalance = (ledger: Ledger): number => {
+    const opening = Number(ledger.openingBalance) || 0;
+    const debit = debitCreditData[ledger.id]?.debit || 0;
+    const credit = debitCreditData[ledger.id]?.credit || 0;
+
+    if (ledger.balanceType === "debit") {
+      return opening + debit - credit;
+    } else {
+      return opening + credit - debit;
+    }
+  };
+
+  // Calculate group total with closing balances
+  const calculateGroupTotal = (groupId: number): number => {
+    const groupLedgers = ledgers.filter((l) => Number(l.groupId) === groupId);
+    return groupLedgers.reduce((sum, ledger) => {
+      const closing = calculateClosingBalance(ledger);
+      return sum + Math.abs(closing);
+    }, 0);
+  };
 
   // Navigation handlers
-  const handleGroupClick = (groupType: any) => {
+  const handleGroupClick = (groupType: number) => {
     navigate(`/app/reports/group-summary/${groupType}`);
   };
 
@@ -126,7 +164,7 @@ const BalanceSheet: React.FC = () => {
   //   navigate('/app/reports/stock-summary');
   // };
 
- 
+
 
   return (
     <div className="pt-[56px] px-4">
@@ -135,9 +173,8 @@ const BalanceSheet: React.FC = () => {
           title="Back to Reports"
           type="button"
           onClick={() => navigate("/app/reports")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
           disabled={loading}
         >
           <ArrowLeft size={20} />
@@ -148,9 +185,8 @@ const BalanceSheet: React.FC = () => {
             title="Toggle Filters"
             type="button"
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
             disabled={loading}
           >
             <Filter size={18} />
@@ -158,18 +194,16 @@ const BalanceSheet: React.FC = () => {
           <button
             title="Print Report"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
           <button
             title="Download Report"
             type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Download size={18} />
           </button>
@@ -178,9 +212,8 @@ const BalanceSheet: React.FC = () => {
 
       {showFilterPanel && (
         <div
-          className={`p-4 mb-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 mb-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h3 className="font-semibold mb-4">Filters</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -196,11 +229,10 @@ const BalanceSheet: React.FC = () => {
                 title="Select Date"
                 type="date"
                 defaultValue={new Date().toISOString().split("T")[0]}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600"
                     : "bg-white border-gray-300"
-                }`}
+                  }`}
                 disabled={loading}
               />
             </div>
@@ -216,9 +248,8 @@ const BalanceSheet: React.FC = () => {
           <div className=" flex gap-5">
             {/* Liabilities Section */}
             <div
-              className={`p-6 rounded-lg w-1/2 ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
+              className={`p-6 rounded-lg w-1/2 ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+                }`}
             >
               <h2 className="mb-4 text-xl font-bold text-center">
                 Liabilities
@@ -234,15 +265,13 @@ const BalanceSheet: React.FC = () => {
               <div className="space-y-1 mt-2">
                 {/* Capital Account */}
                 <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
+                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                    }`}
                   onClick={() => handleGroupClick(-4)}
                 >
                   <span className="text-blue-600 dark:text-blue-400 underline">
                     Capital Account
                   </span>
-
                   <span className="text-right font-mono">
                     {calculatedTotal.CapitalAccount.toLocaleString()}
                   </span>
@@ -250,39 +279,36 @@ const BalanceSheet: React.FC = () => {
 
                 {/* Loans */}
                 <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
+                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                    }`}
                   onClick={() => handleGroupClick(-13)}
                 >
                   <span className="text-blue-600 dark:text-blue-400 underline">
                     Loans (Liability)
                   </span>
                   <span className="text-right font-mono">
-                    {calculatedTotal.Loans}
+                    {calculatedTotal.Loans.toLocaleString()}
                   </span>
                 </div>
 
                 {/* Current Liabilities */}
                 <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
+                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                    }`}
                   onClick={() => handleGroupClick(-6)}
                 >
                   <span className="text-blue-600 dark:text-blue-400 underline">
                     Current Liabilities
                   </span>
                   <span className="text-right font-mono">
-                    {calculatedTotal.CurrentLiabilities}
+                    {calculatedTotal.CurrentLiabilities.toLocaleString()}
                   </span>
                 </div>
 
                 {/* Profit & Loss */}
                 <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
+                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                    }`}
                   onClick={handleProfitLossClick}
                 >
                   <span className="text-blue-600 dark:text-blue-400 underline">
@@ -303,9 +329,8 @@ const BalanceSheet: React.FC = () => {
 
             {/* Assets Section */}
             <div
-              className={`p-6 rounded-lg w-1/2 ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
+              className={`p-6 rounded-lg w-1/2 ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+                }`}
             >
               <h2 className="mb-4 text-xl font-bold text-center">Assets</h2>
 
@@ -318,9 +343,8 @@ const BalanceSheet: React.FC = () => {
               <div className="space-y-1 mt-2">
                 {/* Fixed Assets */}
                 <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
+                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                    }`}
                   onClick={() => handleGroupClick(-9)}
                   title="Click to view Fixed Assets details"
                 >
@@ -328,15 +352,14 @@ const BalanceSheet: React.FC = () => {
                     Fixed Assets
                   </span>
                   <span className="text-right font-mono">
-                    {calculatedTotal.FixedAssets}
+                    {calculatedTotal.FixedAssets.toLocaleString()}
                   </span>
                 </div>
 
                 {/* Current Assets */}
                 <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
+                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                    }`}
                   onClick={() => handleGroupClick(-5)}
                   title="Click to view Current Assets details"
                 >
@@ -344,7 +367,7 @@ const BalanceSheet: React.FC = () => {
                     Current Assets
                   </span>
                   <span className="text-right font-mono">
-                    {calculatedTotal.CurrentAssets}
+                    {calculatedTotal.CurrentAssets.toLocaleString()}
                   </span>
                 </div>
 
@@ -361,9 +384,8 @@ const BalanceSheet: React.FC = () => {
 
           {/* Balance Verification Section */}
           <div
-            className={`mt-6 p-6 rounded-lg ${
-              theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-            }`}
+            className={`mt-6 p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+              }`}
           >
             <div className="text-center">
               <h2 className="mb-4 text-xl font-bold">Balance Verification</h2>
@@ -399,15 +421,14 @@ const BalanceSheet: React.FC = () => {
                   </p>
                 </div>
               </div>
-              
+
             </div>
           </div>
 
           {/* Footer / Pro Tips */}
           <div
-            className={`mt-6 p-4 rounded ${
-              theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-            }`}
+            className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+              }`}
           >
             <p className="text-sm">
               <span className="font-semibold">Navigation:</span> Click on Loans,
