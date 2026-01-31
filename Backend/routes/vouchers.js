@@ -210,7 +210,7 @@ router.get("/", async (req, res) => {
       ADD COLUMN ledger_name VARCHAR(255) NULL;
     `
       )
-      .catch(() => {}); // ignore error if column already exists
+      .catch(() => { }); // ignore error if column already exists
 
     // 1️⃣ Fetch vouchers
     const [vouchers] = await db.execute(
