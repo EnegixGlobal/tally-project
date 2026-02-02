@@ -1058,6 +1058,7 @@ const PurchaseVoucher: React.FC = () => {
       return {
         ...totals,
         gstTotal: totals.cgstTotal + totals.sgstTotal + totals.igstTotal,
+        total: totals.total - totals.igstTotal, // Subtraing IGST from Grand Total as requested to fix 136 -> 118
       };
     }
     else {

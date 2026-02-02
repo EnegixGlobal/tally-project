@@ -218,6 +218,7 @@ router.post("/", async (req, res) => {
     ownerId,
   } = req.body;
 
+
   // ================= QUERY FALLBACK =================
 
   const finalCompanyId = companyId || req.query.company_id;
@@ -275,6 +276,16 @@ router.post("/", async (req, res) => {
       finalCgst = 0;
       finalSgst = 0;
     }
+
+    // ================= FINAL TOTAL FIX =================
+
+    const finalTotal =
+      Number(subtotal || 0) +
+      Number(finalCgst || 0) +
+      Number(finalSgst || 0) +
+      Number(finalIgst || 0) -
+      Number(discountTotal || 0);
+
 
     // ================= DISPATCH =================
 
@@ -353,7 +364,7 @@ router.post("/", async (req, res) => {
       finalSgst,
       finalIgst,
       discountTotal ?? 0,
-      total ?? 0,
+      finalTotal,
 
       finalCompanyId,
       finalOwnerType,
