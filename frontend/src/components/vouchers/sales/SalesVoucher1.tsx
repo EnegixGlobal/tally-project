@@ -115,6 +115,74 @@ const SalesVoucher: React.FC = () => {
 
   const partyLedgers = ledgers;
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [unitss, setUnits] = useState<any[]>([]);
+
+  // 🔹 Fetch units from backend
+  useEffect(() => {
+    const fetchUnits = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const data = await res.json();
+        setUnits(data);
+      } catch (error) {
+        console.error("Failed to fetch units:", error);
+      }
+    };
+    if (companyId) fetchUnits();
+  }, [companyId, ownerType, ownerId]);
+
+  // Unified Item Details Helper
+  const getItemDetails = (itemId: string) => {
+    const item = (stockItems || []).find((i) => String(i.id) === String(itemId));
+    if (!item)
+      return {
+        name: "-",
+        hsnCode: "",
+        unit: "-",
+        unitId: "",
+        unitLabel: "",
+        gstRate: 0,
+        rate: 0,
+        batches: [],
+      };
+
+    const rawUnit = item.unitId ?? item.unit_id ?? item.unit ?? item.unitName ?? null;
+
+    // Look in context units OR local unitss
+    const allUnits = [...(units || []), ...(unitss || [])];
+    const matchedUnit = allUnits.find((u) => String(u.id) === String(rawUnit)) ||
+      allUnits.find((u) => u.name?.toLowerCase() === String(rawUnit).toLowerCase() || u.symbol?.toLowerCase() === String(rawUnit).toLowerCase());
+
+    const unitIdResult = matchedUnit?.id ?? rawUnit ?? "";
+    const unitLabelResult = matchedUnit?.symbol || matchedUnit?.name || String(rawUnit || "");
+
+    return {
+      name: item.name,
+      hsnCode: item.hsnCode || "",
+      unit: unitLabelResult,
+      unitId: unitIdResult,
+      unitLabel: unitLabelResult,
+      gstRate: Number(item.gstRate) || 0,
+      gstLedgerId: (item as any).gstLedgerId || "",
+      cgstLedgerId: (item as any).cgstLedgerId || "",
+      sgstLedgerId: (item as any).sgstLedgerId || "",
+      igstLedgerId: (item as any).igstLedgerId || "",
+      rate: Number(item.standardSaleRate || item.sellingRate || item.sellingPrice || item.saleRate || item.rate || item.mrp || 0),
+      mrp: Number(item.mrp || item.MRP || item.sellingPrice || 0),
+      batches: (() => {
+        if (!item.batches) return [];
+        try { return typeof item.batches === "string" ? JSON.parse(item.batches) : item.batches; } catch { return []; }
+      })(),
+    };
+  };
+
+  const getUnitName = (unitId: any) => {
+    if (!unitId) return "-";
+    const unit = unitss.find((u: any) => String(u.id) === String(unitId));
+    return unit?.name || unit?.symbol || "-";
+  };
 
   // Check if quotation mode is requested via URL
 
@@ -387,6 +455,8 @@ const SalesVoucher: React.FC = () => {
   }, [isQuotation, isEditMode]);
 
   // Load voucher in edit mode
+  // ================= EDIT MODE LOAD (BACKEND DRIVEN) =================
+
   useEffect(() => {
     if (!isEditMode || !id) return;
 
@@ -395,6 +465,7 @@ const SalesVoucher: React.FC = () => {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/sales-vouchers/${id}`
         );
+
         const data = await res.json();
 
         if (!data.success) {
@@ -402,56 +473,73 @@ const SalesVoucher: React.FC = () => {
           return;
         }
 
-        const v = data.voucher;
-
-        // Prepare entries for frontend
-        const itemEntries = data.items.map((item: any) => ({
-          id: "e" + Math.random().toString(36).substr(2, 9),
-          itemId: item.itemId,
-          quantity: item.quantity,
-          rate: item.rate,
-          amount: item.amount,
-          cgstRate: item.cgstRate,
-          sgstRate: item.sgstRate,
-          igstRate: item.igstRate,
-          discount: item.discount,
-          hsnCode: item.hsnCode,
-          batchNumber: item.batchNumber,
-          godownId: item.godownId,
-          salesLedgerId: item.salesLedgerId?.toString() || v.salesLedgerId?.toString() || "",
-          type: "debit",
-        }));
-
-        const ledgerEntries = data.ledgerEntries.map((l: any) => ({
-          id: "e" + Math.random().toString(36).substr(2, 9),
-          ledgerId: l.ledger_id,
-          amount: l.amount,
-          type: l.entry_type,
-        }));
-
-        const mergedEntries =
-          itemEntries.length > 0 ? itemEntries : ledgerEntries;
-
+        // 🔥 DIRECT FROM BACKEND
         setFormData({
-          date: v.date.split("T")[0],
-          number: v.number,
-          referenceNo: v.referenceNo,
-          partyId: v.partyId?.toString(),
+          date: data.date?.split("T")[0] || "",
+
+          number: data.number || "",
+
+          referenceNo: data.referenceNo || "",
+
+          partyId: data.partyId?.toString() || "",
+
           mode: "item-invoice",
-          isQuotation: v.isQuotation === 1,
-          salesLedgerId: v.salesLedgerId?.toString(),
+
+          isQuotation: data.isQuotation === 1,
+
+          salesLedgerId: data.salesLedgerId?.toString() || "",
+
           dispatchDetails: {
-            docNo: v.dispatchDocNo,
-            through: v.dispatchThrough,
-            destination: v.destination,
-            approxDistance: v.approxDistance || "",
+            docNo: data.dispatchDocNo || "",
+            through: data.dispatchThrough || "",
+            destination: data.destination || "",
+            approxDistance: data.approxDistance || "",
           },
-          narration: v.narration,
-          entries: mergedEntries,
+
+          narration: data.narration || "",
+
+          // ⭐ MAIN FIX: Map IDs correctly (Backend stores IDs in Rate columns)
+          entries: data.entries.map((e, i) => ({
+            id: "e" + i + Date.now(),
+
+            itemId: e.itemId,
+
+            quantity: Number(e.quantity || 0),
+
+            rate: Number(e.rate || 0),
+
+            discount: Number(e.discount || 0),
+
+            amount: Number(e.amount || 0),
+
+            // Map Backend IDs to LedgerId fields (Convert float string "115.00" to int 115)
+            cgstLedgerId: e.cgstRate ? String(Math.round(Number(e.cgstRate))) : "",
+            sgstLedgerId: e.sgstRate ? String(Math.round(Number(e.sgstRate))) : "",
+            igstLedgerId: e.igstRate ? String(Math.round(Number(e.igstRate))) : "",
+
+            // Initialise Rates to 0 (will be hydrated by useEffect)
+            cgstRate: 0,
+            sgstRate: 0,
+            igstRate: 0,
+
+            godownId: e.godownId || "",
+
+            salesLedgerId: e.salesLedgerId?.toString() || "",
+
+            // 🔥 AUTO FROM HISTORY
+            hsnCode: e.hsnCode || "",
+
+            batchNumber: e.batchNumber || "",
+
+            type: "debit",
+          })),
+
           type: "sales",
         });
 
-        setIsQuotation(v.isQuotation === 1);
+        setIsQuotation(data.isQuotation === 1);
+        setSelectedSalesTypeId(data.sales_type_id?.toString() || "");
+
       } catch (err) {
         console.error("Single voucher load error:", err);
       }
@@ -460,9 +548,90 @@ const SalesVoucher: React.FC = () => {
     loadSingleVoucher();
   }, [isEditMode, id]);
 
+  // 🔥 HYDRATE GST RATES FROM LEDGER IDs (Fix for Edit Mode)
+  useEffect(() => {
+    // Wait until dependencies are loaded
+    const ledgersLoaded = ledgers.length > 0;
+    const itemsLoaded = stockItems.length > 0;
+
+    if (formData.entries.length === 0) return;
+
+    setFormData((prev) => {
+      let hasChanges = false;
+
+      const newEntries = prev.entries.map((entry) => {
+        let updatedEntry = { ...entry };
+        let entryChanged = false;
+
+        // --- 1. Hydrate Item Details (Batches, Unit, HSN) ---
+        if (itemsLoaded && entry.itemId) {
+          const details = getItemDetails(entry.itemId);
+          if (details.name !== "-") {
+            // Batches (only if missing)
+            if ((!updatedEntry.batches || updatedEntry.batches.length === 0) && details.batches && details.batches.length > 0) {
+              updatedEntry.batches = details.batches;
+              entryChanged = true;
+            }
+
+            // HSN (if missing)
+            if (!updatedEntry.hsnCode && details.hsnCode) {
+              updatedEntry.hsnCode = details.hsnCode;
+              entryChanged = true;
+            }
+
+            // Unit (if missing)
+            if (!updatedEntry.unitId && details.unitId) {
+              updatedEntry.unitId = details.unitId;
+              updatedEntry.unitLabel = details.unitLabel;
+              entryChanged = true;
+            }
+          }
+        }
+
+        // --- 2. Hydrate GST Rates from Ledger IDs ---
+        if (ledgersLoaded) {
+          const extract = (ledgerId: any) => {
+            if (!ledgerId) return 0;
+            const l = ledgers.find((x) => String(x.id) === String(ledgerId));
+            if (l && l.name) {
+              const m = l.name.match(/(\d+(\.\d+)?)/);
+              return m ? Number(m[1]) : 0;
+            }
+            return 0;
+          };
+
+          if (entry.cgstLedgerId) {
+            const r = extract(entry.cgstLedgerId);
+            if (r !== updatedEntry.cgstRate) { updatedEntry.cgstRate = r; entryChanged = true; }
+          }
+          if (entry.sgstLedgerId) {
+            const r = extract(entry.sgstLedgerId);
+            if (r !== updatedEntry.sgstRate) { updatedEntry.sgstRate = r; entryChanged = true; }
+          }
+          if (entry.igstLedgerId) {
+            const r = extract(entry.igstLedgerId);
+            if (r !== updatedEntry.igstRate) { updatedEntry.igstRate = r; entryChanged = true; }
+          }
+        }
+
+        if (entryChanged) {
+          hasChanges = true;
+          return updatedEntry;
+        }
+        return entry;
+      });
+
+      if (hasChanges) {
+        return { ...prev, entries: newEntries };
+      }
+      return prev;
+    });
+  }, [ledgers, stockItems, units, unitss, formData.entries]);
+
+
   // voucher no logic
   useEffect(() => {
-    if (!selectedSalesType) return;
+    if (!selectedSalesType || isEditMode) return;
 
     const prefix = (selectedSalesType.prefix || "").trim();
     const suffix = (selectedSalesType.suffix || "").trim();
@@ -1525,85 +1694,6 @@ const SalesVoucher: React.FC = () => {
     });
   };
 
-  // Helper functions for print layout
-  const getItemDetails = (itemId: string) => {
-    const item = safeStockItems.find((i) => String(i.id) === String(itemId));
-    if (!item)
-      return {
-        name: "-",
-        hsnCode: "",
-        unit: "-",
-        unitId: "",
-        unitLabel: "",
-        gstRate: 0,
-        rate: 0,
-        batches: [],
-      };
-
-    // 👇 yahan se unit ka id aur label dono nikal rahe hain
-    const rawUnit =
-      item.unitId ?? item.unit_id ?? item.unit ?? item.unitName ?? null;
-
-    // try to map rawUnit to units list
-    const matchedUnit =
-      units.find((u) => String(u.id) === String(rawUnit)) ||
-      units.find(
-        (u) =>
-          u.name?.toLowerCase() === String(rawUnit).toLowerCase() ||
-          u.symbol?.toLowerCase() === String(rawUnit).toLowerCase()
-      );
-
-    const unitId = matchedUnit?.id ?? rawUnit ?? "";
-    const unitLabel =
-      matchedUnit?.symbol || matchedUnit?.name || String(rawUnit || "");
-
-    return {
-      name: item.name,
-      hsnCode: item.hsnCode || "",
-
-      unit: unitLabel,
-      unitId,
-      unitLabel,
-
-      // ✅ GST %
-      gstRate: Number(item.gstRate) || 0,
-
-      // ✅ LEDGER IDS (ADD THIS)
-      gstLedgerId: (item as any).gstLedgerId || "",
-      cgstLedgerId: (item as any).cgstLedgerId || "",
-      sgstLedgerId: (item as any).sgstLedgerId || "",
-      igstLedgerId: (item as any).igstLedgerId || "",
-
-
-      // ✅ Rate
-      rate:
-        Number(item.standardSaleRate) ||
-        Number(item.sellingRate) ||
-        Number(item.sellingPrice) ||
-        Number(item.saleRate) ||
-        Number(item.rate) ||
-        Number(item.mrp) ||
-        0,
-
-      mrp:
-        Number(item.mrp) ||
-        Number(item.MRP) ||
-        Number(item.sellingPrice) ||
-        0,
-
-      batches: (() => {
-        if (!item.batches) return [];
-        try {
-          return typeof item.batches === "string"
-            ? JSON.parse(item.batches)
-            : item.batches;
-        } catch {
-          return [];
-        }
-      })(),
-    };
-
-  };
 
   // ✅ Get Ledger Name by ID and extract GST %
   const getLedgerNameById = (ledgerId: any) => {
@@ -1681,33 +1771,6 @@ const SalesVoucher: React.FC = () => {
     entry?.batches?.some((b) => b?.batchName)
   );
 
-  // 🔹 Fetch units from backend
-  const [unitss, setUnits] = useState<any[]>([]);
-  useEffect(() => {
-    const fetchUnits = async () => {
-      try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL
-          }/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-        );
-        const data = await res.json();
-        setUnits(data);
-      } catch (error) {
-        console.error("Failed to fetch units:", error);
-      }
-    };
-
-    fetchUnits();
-  }, []);
-
-  //get Unit Name
-  const getUnitName = (unitId: any) => {
-    if (!unitId) return "-";
-
-    const unit = unitss.find((u: any) => String(u.id) === String(unitId));
-
-    return unit?.name || "-";
-  };
 
   // 🔹 Resolve Party & Sales Ledger for Invoice Print
   const partyLedger = safeLedgers.find(
@@ -2335,7 +2398,7 @@ const SalesVoucher: React.FC = () => {
 
                             {/* UNIT */}
                             <td className="px-1 py-2 min-w-[45px] text-center text-xs">
-                              {getUnitName(entry.unitId)}
+                              {itemDetails.unit || getUnitName(entry.unitId)}
                             </td>
 
                             {/* RATE */}

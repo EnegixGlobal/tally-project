@@ -57,7 +57,7 @@ async function ensureDispatchColumns() {
     { name: "dispatchDocNo", type: "VARCHAR(100)" },
     { name: "dispatchThrough", type: "VARCHAR(100)" },
     { name: "destination", type: "VARCHAR(255)" },
-    { name: "approxDistance", type: "VARCHAR(50)" }, 
+    { name: "approxDistance", type: "VARCHAR(50)" },
   ];
 
   for (const col of columns) {
@@ -518,52 +518,153 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-//single get
-router.get("/:id", async (req, res) => {
-  const voucherId = req.params.id;
+// ===============================
+// GET SINGLE SALES VOUCHER (EDIT MODE WITH HISTORY)
+// ===============================
 
+// ===============================
+// GET SINGLE SALES VOUCHER (EDIT MODE - LIKE PURCHASE)
+// ===============================
+
+router.get("/:id", async (req, res) => {
   try {
-    // ---- 1) Main Voucher ----
+    const voucherId = req.params.id;
+
+    /* ======================
+       1️⃣ GET VOUCHER
+    ====================== */
     const [voucherRows] = await db.execute(
       `SELECT * FROM sales_vouchers WHERE id = ?`,
       [voucherId]
     );
 
-    if (voucherRows.length === 0) {
-      return res.status(404).json({ message: "Voucher not found" });
+    if (!voucherRows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Voucher not found",
+      });
     }
 
     const voucher = voucherRows[0];
 
-    // ---- 2) Items ----
-    const [itemRows] = await db.execute(
-      `SELECT *
-       FROM sales_voucher_items
-       WHERE voucherId = ?`,
+    /* ======================
+       2️⃣ GET ITEMS
+    ====================== */
+    const [items] = await db.execute(
+      `
+      SELECT *
+      FROM sales_voucher_items
+      WHERE voucherId = ?
+      `,
       [voucherId]
     );
 
-    // ---- 3) Ledger Entries ----
-    const [ledgerRows] = await db.execute(
-      `SELECT *
-       FROM voucher_entries
-       WHERE voucher_id = ?`,
-      [voucherId]
+    /* ======================
+       3️⃣ GET SALE HISTORY (BY VOUCHER NUMBER)
+    ====================== */
+    const [history] = await db.execute(
+      `
+      SELECT *
+      FROM sale_history
+      WHERE voucherNumber = ?
+      `,
+      [voucher.number]
     );
+
+    /* ======================
+       4️⃣ MERGE ITEMS + HISTORY
+       (MATCH BY GODOWN)
+    ====================== */
+
+    const entries = items.map((item) => {
+
+      // 🔥 Same logic as purchase
+      const historyRow = history.find(
+        (h) =>
+          String(h.godownId) === String(item.godownId)
+      );
+
+      return {
+        id: item.id,
+
+        itemId: item.itemId,
+
+        quantity: item.quantity,
+        rate: item.rate,
+        discount: item.discount,
+        amount: item.amount,
+
+        cgstRate: item.cgstRate,
+        sgstRate: item.sgstRate,
+        igstRate: item.igstRate,
+
+        godownId: item.godownId,
+        salesLedgerId: item.salesLedgerId,
+
+        // 🔥 FROM HISTORY
+        batchNumber: historyRow?.batchNumber || "",
+        hsnCode: historyRow?.hsnCode || "",
+        movementDate: historyRow?.movementDate || voucher.date,
+      };
+    });
+
+
+
+    /* ======================
+       5️⃣ SEND RESPONSE
+    ====================== */
 
     return res.json({
       success: true,
-      voucher,
-      items: itemRows,
-      ledgerEntries: ledgerRows,
+
+      id: voucher.id,
+
+      number: voucher.number,
+      date: voucher.date,
+
+      narration: voucher.narration,
+      partyId: voucher.partyId,
+      referenceNo: voucher.referenceNo,
+
+      dispatchDocNo: voucher.dispatchDocNo,
+      dispatchThrough: voucher.dispatchThrough,
+      destination: voucher.destination,
+
+      salesLedgerId: voucher.salesLedgerId,
+
+      subtotal: voucher.subtotal,
+      cgstTotal: voucher.cgstTotal,
+      sgstTotal: voucher.sgstTotal,
+      igstTotal: voucher.igstTotal,
+
+      discountTotal: voucher.discountTotal,
+      total: voucher.total,
+
+      profit: voucher.profit,
+
+      billNo: voucher.bill_no,
+      approxDistance: voucher.approxDistance,
+
+      isQuotation: voucher.isQuotation,
+
+      supplierInvoiceDate: voucher.supplierInvoiceDate,
+      sales_type_id: voucher.sales_type_id,
+
+      // ⭐ MAIN DATA
+      entries,
     });
+
   } catch (err) {
-    console.error("GET sales voucher failed:", err);
-    return res
-      .status(500)
-      .json({ message: err.message || "Something went wrong" });
+    console.error("🔥 Fetch sales edit voucher error:", err);
+
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
+
+
 
 //single put
 router.put("/:id", async (req, res) => {
