@@ -32,6 +32,9 @@ const BalanceSheet: React.FC = () => {
   const [netProfit, setNetProfit] = useState<string | null>(null);
 
 
+
+
+
   const [debitCreditData, setDebitCreditData] = useState<Record<number, { debit: number; credit: number }>>({});
 
   const companyId = localStorage.getItem("company_id") || "";
@@ -166,14 +169,20 @@ const BalanceSheet: React.FC = () => {
     }, 0);
   };
 
-  // Navigation handlers
-  const handleGroupClick = (groupType: number) => {
-    navigate(`/app/reports/group-summary/${groupType}`);
+
+  const handleGroupClick = (groupId: number) => {
+    navigate(`/app/reports/sub-group-summary/${groupId}`);
   };
+
+
 
   const handleProfitLossClick = () => {
     navigate("/app/reports/profit-loss");
   };
+
+
+
+
 
   // const handleStockClick = () => {
   //   navigate('/app/reports/stock-summary');
@@ -283,6 +292,7 @@ const BalanceSheet: React.FC = () => {
                   className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
                     }`}
                   onClick={() => handleGroupClick(-4)}
+
                 >
                   <span className="text-blue-600 dark:text-blue-400 underline">
                     Capital Account
@@ -297,6 +307,7 @@ const BalanceSheet: React.FC = () => {
                   className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
                     }`}
                   onClick={() => handleGroupClick(-13)}
+
                 >
                   <span className="text-blue-600 dark:text-blue-400 underline">
                     Loans (Liability)
@@ -375,7 +386,7 @@ const BalanceSheet: React.FC = () => {
                 <div
                   className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
                     }`}
-                  onClick={() => handleGroupClick(-5)}
+                  onClick={() => handleGroupClick(-5, "Current Assets")}
                   title="Click to view Current Assets details"
                 >
                   <span className="text-blue-600 dark:text-blue-400 underline">
