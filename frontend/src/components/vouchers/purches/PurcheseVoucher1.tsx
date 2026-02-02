@@ -262,6 +262,9 @@ const PurchaseVoucher: React.FC = () => {
                 (item) => String(item.id) === String(e.itemId)
               );
 
+              // Calculate total saved GST rate to populate the dropdown/display if needed
+              const savedGstRate = (Number(e.cgstRate) || 0) + (Number(e.sgstRate) || 0) + (Number(e.igstRate) || 0);
+
               return {
                 id: "e" + (idx + 1),
 
@@ -270,19 +273,26 @@ const PurchaseVoucher: React.FC = () => {
                 rate: e.rate || 0,
                 amount: e.amount || 0,
 
-                // AUTO FILL FROM ITEM MASTER
-                hsnCode: stockItem?.hsnCode || "",
+                // AUTO FILL: Prioritize saved data, fallback to Item Master if missing
+                hsnCode: e.hsnCode || stockItem?.hsnCode || "",
                 unitName: stockItem?.unit || "",
-                gstRate: stockItem?.gstRate || 0,
-                cgstRate: stockItem?.gstRate ? stockItem.gstRate / 2 : 0,
-                sgstRate: stockItem?.gstRate ? stockItem.gstRate / 2 : 0,
-                igstRate: 0,
 
-                // BATCH Auto Fill
+                // Use saved GST Rate logic
+                gstRate: savedGstRate || stockItem?.gstRate || 0,
+                cgstRate: e.cgstRate || 0,
+                sgstRate: e.sgstRate || 0,
+                igstRate: e.igstRate || 0,
+
+                // BATCH Auto Fill from Saved Data
                 batches: stockItem?.batches || [],
                 batchNumber: e.batchNumber || "",
                 batchExpiryDate: e.batchExpiryDate || "",
                 batchManufacturingDate: e.batchManufacturingDate || "",
+
+                // TAX LEDGERS (Critical for Totals Calculation)
+                gstLedgerId: e.gstLedgerId || stockItem?.gstLedgerId || "",
+                sgstLedgerId: e.sgstLedgerId || stockItem?.sgstLedgerId || "",
+                cgstLedgerId: e.cgstLedgerId || stockItem?.cgstLedgerId || "",
 
                 // Godown
                 godownId: e.godownId || "",

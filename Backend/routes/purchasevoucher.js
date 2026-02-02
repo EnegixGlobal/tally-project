@@ -655,39 +655,153 @@ router.delete("/:id", async (req, res) => {
 });
 
 //single GET
+// ===============================
+// GET PURCHASE VOUCHER WITH ITEMS + HISTORY
+// ===============================
+
 router.get("/:id", async (req, res) => {
   try {
     const voucherId = req.params.id;
 
+    /* ======================
+       1️⃣ GET VOUCHER
+    ====================== */
+
     const [voucherRows] = await db.execute(
-      "SELECT * FROM purchase_vouchers WHERE id = ?",
+      `SELECT * FROM purchase_vouchers WHERE id = ?`,
       [voucherId]
     );
 
-    if (voucherRows.length === 0) {
-      return res.status(404).json({ message: "Voucher not found" });
+    if (!voucherRows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Voucher not found",
+      });
     }
 
     const voucher = voucherRows[0];
 
-    const [itemRows] = await db.execute(
-      "SELECT * FROM purchase_voucher_items WHERE voucherId = ?",
+    /* ======================
+       2️⃣ GET ITEMS
+    ====================== */
+
+    const [items] = await db.execute(
+      `
+      SELECT *
+      FROM purchase_voucher_items
+      WHERE voucherId = ?
+      `,
       [voucherId]
     );
 
-    const [ledgerRows] = await db.execute(
-      "SELECT * FROM voucher_entries WHERE voucher_id = ?",
-      [voucherId]
+    /* ======================
+       3️⃣ GET HISTORY (BY VOUCHER NUMBER)
+    ====================== */
+
+    const [history] = await db.execute(
+      `
+      SELECT *
+      FROM purchase_history
+      WHERE voucherNumber = ?
+      `,
+      [voucher.number]
     );
+
+    /* ======================
+       4️⃣ MAP HISTORY BY ITEM NAME
+    ====================== */
+
+    const historyMap = {};
+
+    history.forEach((h) => {
+      if (h.itemName) {
+        historyMap[h.itemName.trim().toLowerCase()] = h;
+      }
+    });
+
+    /* ======================
+       5️⃣ MERGE ITEMS + HISTORY
+    ====================== */
+
+    const entries = items.map((item) => {
+
+      // ⚠️ match via itemName (only way in current DB)
+      const historyRow = history.find(
+        (h) =>
+          String(h.godownId) === String(item.godownId)
+      );
+
+      return {
+        id: item.id,
+
+        itemId: item.itemId,
+
+        quantity: item.quantity,
+        rate: item.rate,
+        discount: item.discount,
+        amount: item.amount,
+
+        cgstRate: item.cgstRate,
+        sgstRate: item.sgstRate,
+        igstRate: item.igstRate,
+
+        godownId: item.godownId,
+        purchaseLedgerId: item.purchaseLedgerId,
+
+        // 🔥 FROM HISTORY
+        batchNumber: historyRow?.batchNumber || "",
+        hsnCode: historyRow?.hsnCode || "",
+        purchaseDate: historyRow?.purchaseDate || voucher.date,
+      };
+    });
+
+    console.log('subtotal: voucher.subtotal', voucher.subtotal,
+      voucher.cgstTotal,
+      voucher.sgstTotal,
+      voucher.igstTotal)
+
+    /* ======================
+       6️⃣ SEND RESPONSE
+    ====================== */
 
     return res.json({
-      ...voucher,
-      entries: [...itemRows, ...ledgerRows],
+      id: voucher.id,
+
+      number: voucher.number,
+      date: voucher.date,
+      supplierInvoiceDate: voucher.supplierInvoiceDate,
+
+      narration: voucher.narration,
+      partyId: voucher.partyId,
+      referenceNo: voucher.referenceNo,
+
+      dispatchDocNo: voucher.dispatchDocNo,
+      dispatchThrough: voucher.dispatchThrough,
+      destination: voucher.destination,
+
+      purchaseLedgerId: voucher.purchaseLedgerId,
+
+      subtotal: voucher.subtotal,
+      cgstTotal: voucher.cgstTotal,
+      sgstTotal: voucher.sgstTotal,
+      igstTotal: voucher.igstTotal,
+      discountTotal: voucher.discountTotal,
+      total: voucher.total,
+
+      // ⭐ MAIN
+      entries,
     });
+
   } catch (err) {
-    return res.status(500).json({ error: err.message });
+    console.error("🔥 Fetch edit voucher error:", err);
+
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
+
 
 //put code
 // UPDATE PURCHASE VOUCHER
@@ -709,6 +823,8 @@ router.put("/:id", async (req, res) => {
     igstTotal,
     discountTotal,
     total,
+    entries = [], // ✅ Get entries
+    mode,
     purchaseLedgerId,
     companyId,
     ownerType,
@@ -727,12 +843,6 @@ router.put("/:id", async (req, res) => {
       message: "Unauthorized: Missing company or owner info",
     });
   }
-
-  // console.log("🔐 Update Auth →", {
-  //   companyId: finalCompanyId,
-  //   ownerType: finalOwnerType,
-  //   ownerId: finalOwnerId,
-  // });
 
   try {
     // 🔍 Fetch voucher first
@@ -753,10 +863,6 @@ router.put("/:id", async (req, res) => {
         "UPDATE purchase_vouchers SET company_id = ?, owner_type = ?, owner_id = ? WHERE id = ?",
         [finalCompanyId, finalOwnerType, finalOwnerId, voucherId]
       );
-      // console.log(
-      //   "⚡ Auto fixed missing company fields for voucher:",
-      //   voucherId
-      // );
     } else {
       // 🚫 Block other company's update attempt
       if (
@@ -770,6 +876,37 @@ router.put("/:id", async (req, res) => {
         });
       }
     }
+
+    // ================= STATES & GST LOGIC (COPIED FROM POST) =================
+    await ensurePurchaseLedgerColumn();
+
+    let companyState = "";
+    let partyState = "";
+
+    const [companyRows] = await db.execute(
+      "SELECT state FROM tbcompanies WHERE id=?",
+      [finalCompanyId]
+    );
+
+    if (companyRows.length) {
+      companyState = companyRows[0].state || "";
+    }
+
+    const [partyRows] = await db.execute(
+      "SELECT state FROM ledgers WHERE id=?",
+      [partyId]
+    );
+
+    if (partyRows.length) {
+      partyState = partyRows[0].state || "";
+    }
+
+    const isIntra =
+      cleanState(companyState) &&
+      cleanState(partyState) &&
+      cleanState(companyState) === cleanState(partyState);
+
+    // =====================================================================
 
     const dispatchDocNo = dispatchDetails?.docNo || null;
     const dispatchThrough = dispatchDetails?.through || null;
@@ -793,9 +930,9 @@ router.put("/:id", async (req, res) => {
         igstTotal = ?,
         discountTotal = ?,
         total = ?,
-        company_id = ?,     -- ⭐ Updated
-        owner_type = ?,     -- ⭐ Updated
-        owner_id = ?        -- ⭐ Updated
+        company_id = ?,
+        owner_type = ?,
+        owner_id = ?
       WHERE id = ?
     `;
 
@@ -821,6 +958,71 @@ router.put("/:id", async (req, res) => {
       finalOwnerId,
       voucherId,
     ]);
+
+    // ================= UPDATE ITEMS (DELETE OLD + INSERT NEW) =================
+
+    // 1️⃣ Delete old items
+    await db.execute("DELETE FROM purchase_voucher_items WHERE voucherId = ?", [
+      voucherId,
+    ]);
+
+    // 2️⃣ Insert new items (if any)
+    const validItems = entries.filter((e) => e.itemId);
+
+    if (validItems.length > 0) {
+      const insertItemSql = `
+        INSERT INTO purchase_voucher_items (
+          voucherId,
+          itemId,
+          quantity,
+          rate,
+          discount,
+          cgstRate,
+          sgstRate,
+          igstRate,
+          amount,
+          godownId,
+          purchaseLedgerId
+        ) VALUES ?
+      `;
+
+      const itemValues = validItems.map((e) => {
+        if (isIntra) {
+          return [
+            voucherId,
+            e.itemId,
+            Number(e.quantity || 0),
+            Number(e.rate || 0),
+            Number(e.discount || 0),
+            // ✅ LEDGER ID (Saved in rate columns as per POST logic)
+            Number(e.cgstLedgerId || 0),
+            Number(e.sgstLedgerId || 0),
+            0,
+            Number(e.amount || 0),
+            e.godownId || null,
+            e.purchaseLedgerId || purchaseLedgerId || null,
+          ];
+        }
+
+        // INTER
+        return [
+          voucherId,
+          e.itemId,
+          Number(e.quantity || 0),
+          Number(e.rate || 0),
+          Number(e.discount || 0),
+          0,
+          0,
+          // ✅ LEDGER ID
+          Number(e.gstLedgerId || 0),
+          Number(e.amount || 0),
+          e.godownId || null,
+          e.purchaseLedgerId || purchaseLedgerId || null,
+        ];
+      });
+
+      await db.query(insertItemSql, [itemValues]);
+    }
 
     return res.json({
       success: true,

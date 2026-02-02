@@ -66,9 +66,9 @@ export type LedgerGroup = {
   nettBalancesForReporting?: boolean;
   usedForCalculation?: boolean;
   allocationMethod?:
-    | "Appropriate by Qty"
-    | "Appropriate by Value"
-    | "No Appropriation";
+  | "Appropriate by Qty"
+  | "Appropriate by Value"
+  | "No Appropriation";
   gstDetails?: {
     setAlterHSNSAC?: boolean;
     hsnSacClassificationId?: string;
@@ -153,14 +153,14 @@ export type VoucherEntry = {
   narration?: string;
   entries: VoucherEntryLine[];
   mode?:
-    | "item-invoice"
-    | "accounting-invoice"
-    | "as-voucher"
-    | "transfer"
-    | "adjustment"
-    | "double-entry"
-    | "single-entry"
-    | "sales-order";
+  | "item-invoice"
+  | "accounting-invoice"
+  | "as-voucher"
+  | "transfer"
+  | "adjustment"
+  | "double-entry"
+  | "single-entry"
+  | "sales-order";
   referenceNo?: string;
   partyId?: string;
   salesLedgerId?: string;
@@ -205,6 +205,10 @@ export type StockItem = {
   gstRate?: number | string; // <-- added string support
   hsnCode?: string;
   taxType?: "Taxable" | "Exempt" | "Nil-rated";
+
+  gstLedgerId?: string;
+  sgstLedgerId?: string;
+  cgstLedgerId?: string;
 
   standardPurchaseRate?: number | string;
   standardSaleRate?: number | string;
