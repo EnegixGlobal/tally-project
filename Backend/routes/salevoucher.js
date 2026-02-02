@@ -670,7 +670,6 @@ router.get("/:id", async (req, res) => {
 router.put("/:id", async (req, res) => {
   const voucherId = req.params.id;
 
-  // frontend se ye sab aa raha hoga:
   const {
     date,
     number,
@@ -692,43 +691,10 @@ router.put("/:id", async (req, res) => {
   } = req.body;
 
   try {
-
+    await ensureSalesLedgerColumn();
     await ensureDispatchColumns();
-    // ================= CHECK & ADD COLUMNS IF MISSING (for UPDATE route too) =================
-    try {
-      const [salesTypeIdCheck] = await db.execute(
-        `SELECT COLUMN_NAME
-         FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = 'sales_vouchers'
-           AND COLUMN_NAME = 'sales_type_id'`
-      );
-
-      if (salesTypeIdCheck.length === 0) {
-        await db.execute(
-          `ALTER TABLE sales_vouchers ADD COLUMN sales_type_id INT NULL`
-        );
-      }
-
-      const [billNoCheck] = await db.execute(
-        `SELECT COLUMN_NAME
-         FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = 'sales_vouchers'
-           AND COLUMN_NAME = 'bill_no'`
-      );
-
-      if (billNoCheck.length === 0) {
-        await db.execute(
-          `ALTER TABLE sales_vouchers ADD COLUMN bill_no VARCHAR(100) NULL`
-        );
-      }
-    } catch (colErr) {
-      console.error("Column check/add error (non-fatal):", colErr);
-    }
 
     // ---- 1) UPDATE MAIN TABLE ----
-    // Always include sales_type_id and bill_no (columns will be added if missing)
     await db.execute(
       `UPDATE sales_vouchers
        SET 
@@ -786,21 +752,22 @@ router.put("/:id", async (req, res) => {
       const itemValues = itemEntries.map((e) => [
         voucherId,
         e.itemId,
-        e.quantity,
-        e.rate,
-        e.amount,
-        e.cgstRate,
-        e.sgstRate,
-        e.igstRate,
-        e.discount,
-        e.hsnCode,
-        e.batchNumber,
-        e.godownId,
+        Number(e.quantity || 0),
+        Number(e.rate || 0),
+        Number(e.amount || 0),
+        Number(e.cgstLedgerId || e.cgstRate || 0),
+        Number(e.sgstLedgerId || e.sgstRate || 0),
+        Number(e.igstLedgerId || e.igstRate || e.gstLedgerId || 0),
+        Number(e.discount || 0),
+        e.hsnCode || "",
+        e.batchNumber || "",
+        e.godownId || null,
+        Number(e.salesLedgerId || 0),
       ]);
 
       await db.query(
         `INSERT INTO sales_voucher_items 
-        (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId)
+        (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId, salesLedgerId)
         VALUES ?`,
         [itemValues]
       );
@@ -818,8 +785,8 @@ router.put("/:id", async (req, res) => {
       const ledgerValues = ledgerEntries.map((e) => [
         voucherId,
         e.ledgerId,
-        e.amount,
-        e.type,
+        Number(e.amount || 0),
+        e.type || "debit",
       ]);
 
       await db.query(
@@ -829,10 +796,13 @@ router.put("/:id", async (req, res) => {
       );
     }
 
+    // ---- 6) CLEAR OLD HISTORY (The frontend will POST new history) ----
+    await db.execute(`DELETE FROM sale_history WHERE voucherNumber = ?`, [number]);
+
     return res.json({ success: true, message: "Voucher updated successfully" });
   } catch (err) {
-    console.error("Update failed:", err);
-    return res.status(500).json({ message: err.message || "Update failed" });
+    console.error("❌ Update failed:", err);
+    return res.status(500).json({ success: false, message: err.message || "Update failed" });
   }
 });
 
