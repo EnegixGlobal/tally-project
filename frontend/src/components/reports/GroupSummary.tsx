@@ -70,6 +70,7 @@ const GroupSummary: React.FC = () => {
     { id: -15, name: "Purchase Accounts", nature: "Expenses" },
     { id: -16, name: "Sales Accounts", nature: "Income" },
     { id: -17, name: "Suspense A/C", nature: "Assets" },
+    { id: -18, name: "Profit/Loss", nature: "Liabilities" },
   ];
 
   // Fetch ledger groups and ledgers filtered by groupType (optional)

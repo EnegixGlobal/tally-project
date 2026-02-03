@@ -58,6 +58,7 @@ const LedgerForm: React.FC = () => {
   { id: -15, name: "Purchase Accounts", nature: "Expenses" },
   { id: -16, name: "Sales Accounts", nature: "Income" },
   { id: -17, name: "Suspense A/C", nature: "Assets" },
+  { id: -18, name: "Profit/Loss", nature: "Liabilities" },
 ];
 
   // Indian States list with codes

@@ -22,7 +22,12 @@ const GroupList: React.FC = () => {
     { id: -3, name: "Branch/Division", nature: "Assets", isSystem: true },
     { id: -4, name: "Capital Account", nature: "Liabilities", isSystem: true },
     { id: -5, name: "Current Assets", nature: "Assets", isSystem: true },
-    { id: -6, name: "Current Liabilities", nature: "Liabilities", isSystem: true, },
+    {
+      id: -6,
+      name: "Current Liabilities",
+      nature: "Liabilities",
+      isSystem: true,
+    },
     { id: -7, name: "Direct Expenses", nature: "Expenses", isSystem: true },
     { id: -8, name: "Direct Income", nature: "Income", isSystem: true },
     { id: -9, name: "Fixed Assets", nature: "Assets", isSystem: true },
@@ -30,10 +35,16 @@ const GroupList: React.FC = () => {
     { id: -11, name: "Indirect Income", nature: "Income", isSystem: true },
     { id: -12, name: "Investments", nature: "Assets", isSystem: true },
     { id: -13, name: "Loan(Liability)", nature: "Liabilities", isSystem: true },
-    { id: -14, name: "Misc expenses (Assets)", nature: "Assets", isSystem: true, },
+    {
+      id: -14,
+      name: "Misc expenses (Assets)",
+      nature: "Assets",
+      isSystem: true,
+    },
     { id: -15, name: "Purchase Accounts", nature: "Expenses", isSystem: true },
     { id: -16, name: "Sales Accounts", nature: "Income", isSystem: true },
     { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },
+    { id: -18, name: "Profit/Loss", nature: "Liabilities", isSystem: true },
   ];
 
   // prefer AuthContext values, fall back to localStorage
@@ -58,7 +69,8 @@ const GroupList: React.FC = () => {
 
       try {
         const data = await apiFetch(
-          `${import.meta.env.VITE_API_URL
+          `${
+            import.meta.env.VITE_API_URL
           }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -173,15 +185,17 @@ const GroupList: React.FC = () => {
           <button
             title="Back to Group List"
             onClick={() => navigate("/app/masters")}
-            className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-              }`}
+            className={`mr-4 p-2 rounded-full ${
+              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
           >
             <ArrowLeft size={20} />
           </button>
 
           <h1
-            className={`text-2xl font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"
-              }`}
+            className={`text-2xl font-bold ${
+              theme === "dark" ? "text-gray-100" : "text-gray-900"
+            }`}
           >
             Group List
           </h1>
@@ -194,10 +208,11 @@ const GroupList: React.FC = () => {
             type="button"
             title="Create Group"
             onClick={() => navigate("/app/masters/group/create")}
-            className={`flex items-center px-4 py-2 rounded text-sm font-medium ${theme === "dark"
-              ? "bg-blue-600 hover:bg-blue-700 text-white"
-              : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
+            className={`flex items-center px-4 py-2 rounded text-sm font-medium ${
+              theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+            }`}
           >
             <Plus size={18} className="mr-1" />
             Create Group
@@ -208,8 +223,9 @@ const GroupList: React.FC = () => {
             type="button"
             title="Group Settings"
             onClick={() => setDel(!del)}
-            className={`p-2 rounded ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-              }`}
+            className={`p-2 rounded ${
+              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
           >
             <Settings size={20} />
           </button>
@@ -217,28 +233,32 @@ const GroupList: React.FC = () => {
       </div>
 
       <div
-        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+        className={`p-6 rounded-lg ${
+          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+        }`}
       >
         <div className="flex items-center mb-4">
           <div
-            className={`flex items-center w-full max-w-md px-3 py-2 rounded-md ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-              }`}
+            className={`flex items-center w-full max-w-md px-3 py-2 rounded-md ${
+              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+            }`}
           >
             <Search
               size={18}
-              className={`mr-2 opacity-70 ${theme === "dark" ? "text-gray-400" : "text-gray-500"
-                }`}
+              className={`mr-2 opacity-70 ${
+                theme === "dark" ? "text-gray-400" : "text-gray-500"
+              }`}
             />
             <input
               type="text"
               placeholder="Search groups..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full bg-transparent border-none outline-none ${theme === "dark"
-                ? "text-gray-100 placeholder-gray-500"
-                : "text-gray-900 placeholder-gray-400"
-                }`}
+              className={`w-full bg-transparent border-none outline-none ${
+                theme === "dark"
+                  ? "text-gray-100 placeholder-gray-500"
+                  : "text-gray-900 placeholder-gray-400"
+              }`}
             />
           </div>
         </div>
@@ -247,25 +267,29 @@ const GroupList: React.FC = () => {
           <table className="w-full">
             <thead>
               <tr
-                className={`border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"
-                  }`}
+                className={`border-b ${
+                  theme === "dark" ? "border-gray-700" : "border-gray-200"
+                }`}
               >
                 <th
-                  className={`px-4 py-3 text-left ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-                    }`}
+                  className={`px-4 py-3 text-left ${
+                    theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
                 >
                   Name
                 </th>
 
                 <th
-                  className={`px-4 py-3 text-left ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-                    }`}
+                  className={`px-4 py-3 text-left ${
+                    theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
                 >
                   Parent Group
                 </th>
                 <th
-                  className={`px-4 py-3 text-left ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-                    }`}
+                  className={`px-4 py-3 text-left ${
+                    theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
                 >
                   Alias
                 </th>
@@ -275,27 +299,31 @@ const GroupList: React.FC = () => {
               {filteredGroups.map((group: LedgerGroup) => (
                 <tr
                   key={group.id}
-                  className={`border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"
-                    } hover:bg-opacity-10 hover:bg-blue-500`}
+                  className={`border-b ${
+                    theme === "dark" ? "border-gray-700" : "border-gray-200"
+                  } hover:bg-opacity-10 hover:bg-blue-500`}
                 >
                   <td
-                    className={`px-4 py-3 ${theme === "dark" ? "text-gray-100" : "text-gray-900"
-                      }`}
+                    className={`px-4 py-3 ${
+                      theme === "dark" ? "text-gray-100" : "text-gray-900"
+                    }`}
                   >
                     {group.name}
                   </td>
 
                   <td
-                    className={`px-4 py-3 ${theme === "dark" ? "text-gray-100" : "text-gray-900"
-                      }`}
+                    className={`px-4 py-3 ${
+                      theme === "dark" ? "text-gray-100" : "text-gray-900"
+                    }`}
                   >
                     {group.parent
                       ? groups.find((g) => g.id === group.parent)?.name || "-"
-                      : "-"}
+                      : "Primary"}
                   </td>
                   <td
-                    className={`px-4 py-3 ${theme === "dark" ? "text-gray-100" : "text-gray-900"
-                      }`}
+                    className={`px-4 py-3 ${
+                      theme === "dark" ? "text-gray-100" : "text-gray-900"
+                    }`}
                   >
                     {group.alias}
                   </td>
@@ -315,12 +343,13 @@ const GroupList: React.FC = () => {
                               !group.isSystem &&
                               navigate(`/app/masters/group/edit/${group.id}`)
                             }
-                            className={`p-1 rounded ${group.isSystem
-                              ? "opacity-40 cursor-not-allowed"
-                              : theme === "dark"
+                            className={`p-1 rounded ${
+                              group.isSystem
+                                ? "opacity-40 cursor-not-allowed"
+                                : theme === "dark"
                                 ? "hover:bg-gray-700"
                                 : "hover:bg-gray-100"
-                              }`}
+                            }`}
                           >
                             <Edit size={16} />
                           </button>
@@ -335,12 +364,13 @@ const GroupList: React.FC = () => {
                             onClick={() =>
                               !group.isSystem && handleDelete(group.id)
                             }
-                            className={`p-1 rounded transition-all ${group.isSystem
-                              ? "opacity-40 cursor-not-allowed"
-                              : theme === "dark"
+                            className={`p-1 rounded transition-all ${
+                              group.isSystem
+                                ? "opacity-40 cursor-not-allowed"
+                                : theme === "dark"
                                 ? "hover:bg-gray-700"
                                 : "hover:bg-gray-100"
-                              }`}
+                            }`}
                           >
                             {del && <Trash2 size={16} />}
                           </button>
@@ -357,8 +387,9 @@ const GroupList: React.FC = () => {
         {filteredGroups.length === 0 && (
           <div className="text-center py-8">
             <p
-              className={`opacity-70 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+              className={`opacity-70 ${
+                theme === "dark" ? "text-gray-300" : "text-gray-700"
+              }`}
             >
               No groups found matching your search.
             </p>
@@ -367,12 +398,14 @@ const GroupList: React.FC = () => {
       </div>
 
       <div
-        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-          }`}
+        className={`mt-6 p-4 rounded ${
+          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+        }`}
       >
         <p
-          className={`text-sm ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-            }`}
+          className={`text-sm ${
+            theme === "dark" ? "text-gray-300" : "text-gray-700"
+          }`}
         >
           <span className="font-semibold">Keyboard Shortcuts:</span> Ctrl+C to
           create a new group, Ctrl+A to edit first group, Ctrl+D to delete first

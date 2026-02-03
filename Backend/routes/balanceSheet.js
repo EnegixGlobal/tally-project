@@ -67,8 +67,27 @@ router.get("/api/balance-sheet/group", async (req, res) => {
       [id, company_id, owner_type, owner_id]
     );
 
-    // 2️⃣ Un groups ke ledgers nikalo
-    let ledgers = [];
+    // 2️⃣ Direct ledgers under parent group
+    const [directLedgers] = await pool.query(
+      `
+      SELECT 
+        l.id,
+        l.name,
+        l.group_id,
+        l.opening_balance,
+        l.balance_type
+      FROM ledgers l
+      WHERE 
+        l.group_id = ?
+        AND l.company_id = ?
+        AND l.owner_type = ?
+        AND l.owner_id = ?
+      `,
+      [id, company_id, owner_type, owner_id]
+    );
+
+    // 3️⃣ Ledgers under child groups
+    let ledgers = [...directLedgers];
 
     if (groups.length > 0) {
       const groupIds = groups.map(g => g.id);
@@ -93,7 +112,7 @@ router.get("/api/balance-sheet/group", async (req, res) => {
         [...groupIds, company_id, owner_type, owner_id]
       );
 
-      ledgers = rows;
+      ledgers = [...ledgers, ...rows];
     }
 
     return res.json({
