@@ -17,8 +17,8 @@ const GroupList: React.FC = () => {
   const [del, setDel] = useState(false);
 
   const baseGroups = [
-    { id: -1, name: "Branch Accounts", nature: "Assets", isSystem: true },
-    { id: -2, name: "Branch OD A/c", nature: "Assets", isSystem: true },
+    { id: -1, name: "Bank Accounts", nature: "Assets", isSystem: true },
+    { id: -2, name: "Bank OD A/c", nature: "Assets", isSystem: true },
     { id: -3, name: "Branch/Division", nature: "Assets", isSystem: true },
     { id: -4, name: "Capital Account", nature: "Liabilities", isSystem: true },
     { id: -5, name: "Current Assets", nature: "Assets", isSystem: true },

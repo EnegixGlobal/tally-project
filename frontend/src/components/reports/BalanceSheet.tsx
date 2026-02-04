@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
-import { ArrowLeft, Printer, Download, Filter } from "lucide-react";
+import { ArrowLeft, Printer, Download, Settings } from "lucide-react";
 
 // Interfaces copied from your structure
 interface Ledger {
@@ -18,6 +18,7 @@ interface LedgerGroup {
   id: number;
   name: string;
   type: string | null;
+  parent: number | null;
 }
 
 const BalanceSheet: React.FC = () => {
@@ -26,10 +27,11 @@ const BalanceSheet: React.FC = () => {
 
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [isDetailedView, setIsDetailedView] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [netProfit, setNetProfit] = useState<string | null>(null);
+  const [netProfit, setNetProfit] = useState<number>(0);
+  const [netLoss, setNetLoss] = useState<number>(0);
 
   const [debitCreditData, setDebitCreditData] = useState<
     Record<number, { debit: number; credit: number }>
@@ -44,16 +46,15 @@ const BalanceSheet: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
+      if (!companyId) return;
       setLoading(true);
       setError(null);
       try {
-        const url = `${
-          import.meta.env.VITE_API_URL
-        }/api/balance-sheet?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        const url = `${import.meta.env.VITE_API_URL}/api/balance-sheet?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load balance sheet data");
         const data = await res.json();
-        // ... rest remains unchanged
+
         const normalizedLedgers = data.ledgers.map((l: any) => ({
           id: l.id,
           name: l.name,
@@ -64,7 +65,12 @@ const BalanceSheet: React.FC = () => {
           groupType: l.group_type,
         }));
         setLedgers(normalizedLedgers);
-        setLedgerGroups(data.ledgerGroups);
+
+        const normalizedGroups = data.ledgerGroups.map((g: any) => ({
+          ...g,
+          parent: g.parent ? Number(g.parent) : null
+        }));
+        setLedgerGroups(normalizedGroups);
       } catch (err: any) {
         setError(err.message || "Unknown error occurred");
       } finally {
@@ -74,18 +80,19 @@ const BalanceSheet: React.FC = () => {
     fetchData();
   }, [companyId, ownerType, ownerId]);
 
-  // Load Net Profit from Profit & Loss page
   useEffect(() => {
     if (companyId) {
       const profit = Number(
         localStorage.getItem(`NET_PROFIT_${companyId}`) || 0
       );
-
+      const loss = Number(
+        localStorage.getItem(`NET_LOSS_${companyId}`) || 0
+      );
       setNetProfit(profit);
+      setNetLoss(loss);
     }
   }, [companyId]);
 
-  // calculate total balance
   const [calculatedTotal, setCalculatedTotal] = useState({
     CapitalAccount: 0,
     Loans: 0,
@@ -97,7 +104,6 @@ const BalanceSheet: React.FC = () => {
   });
 
   useEffect(() => {
-    // Calculate totals using closing balances
     const capitalTotal = calculateGroupTotal(-4);
     const loanLability = calculateGroupTotal(-13);
     const currentLiability = calculateGroupTotal(-6);
@@ -110,80 +116,94 @@ const BalanceSheet: React.FC = () => {
       CurrentLiabilities: currentLiability,
       FixedAssets: fixedAssets,
       CurrentAssets: CurrentAssets,
-      LaiblityTotal: capitalTotal + loanLability + currentLiability,
+      LaiblityTotal: capitalTotal + loanLability + currentLiability + (netProfit - netLoss),
       AssetTotal: fixedAssets + CurrentAssets,
     });
-  }, [ledgers, debitCreditData]);
+  }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss]);
 
-  // Fetch debit/credit data for all ledgers to calculate closing balances
   useEffect(() => {
     const fetchDebitCreditData = async () => {
-      if (!companyId || !ownerType || !ownerId || ledgers.length === 0) {
-        return;
-      }
+      if (!companyId || !ownerType || !ownerId || ledgers.length === 0) return;
 
       try {
         const ledgerIds = ledgers.map((l) => l.id).join(",");
-        const url =
-          `${import.meta.env.VITE_API_URL}/api/group` +
-          `?company_id=${companyId}` +
-          `&owner_type=${ownerType}` +
-          `&owner_id=${ownerId}` +
-          `&ledgerIds=${ledgerIds}`;
-
+        const url = `${import.meta.env.VITE_API_URL}/api/group?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&ledgerIds=${ledgerIds}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load debit/credit data");
         const data = await res.json();
-
-        if (data.success && data.data) {
-          setDebitCreditData(data.data);
-        }
+        if (data.success && data.data) setDebitCreditData(data.data);
       } catch (err) {
         console.error("Error fetching debit/credit data:", err);
       }
     };
-
     fetchDebitCreditData();
   }, [ledgers, companyId, ownerType, ownerId]);
 
-  // Calculate closing balance for a ledger
   const calculateClosingBalance = (ledger: Ledger): number => {
     const opening = Number(ledger.openingBalance) || 0;
     const debit = debitCreditData[ledger.id]?.debit || 0;
     const credit = debitCreditData[ledger.id]?.credit || 0;
-
-    if (ledger.balanceType === "debit") {
-      return opening + debit - credit;
-    } else {
-      return opening + credit - debit;
-    }
+    return ledger.balanceType === "debit" ? (opening + debit - credit) : (opening + credit - debit);
   };
 
-  // Calculate group total with closing balances
   const calculateGroupTotal = (groupId: number): number => {
-    const groupLedgers = ledgers.filter((l) => Number(l.groupId) === groupId);
-    return groupLedgers.reduce((sum, ledger) => {
-      const closing = calculateClosingBalance(ledger);
-      return sum + Math.abs(closing);
-    }, 0);
+    const findSubGroups = (id: number): number[] => {
+      let results = [id];
+      ledgerGroups.filter(g => g.parent === id).forEach(c => {
+        results = [...results, ...findSubGroups(c.id)];
+      });
+      return results;
+    };
+    const allGroupIds = findSubGroups(groupId);
+    const recursiveLedgers = ledgers.filter(l => allGroupIds.includes(Number(l.groupId)));
+    return recursiveLedgers.reduce((sum, ledger) => sum + Math.abs(calculateClosingBalance(ledger)), 0);
   };
 
   const handleGroupClick = (groupId: number, additionalGroupId?: number) => {
-    const groupIds = additionalGroupId
-      ? [groupId, additionalGroupId]
-      : [groupId];
-    navigate(`/app/reports/sub-group-summary/${groupId}`, {
-      state: { groupIds },
-    });
+    const groupIds = additionalGroupId ? [groupId, additionalGroupId] : [groupId];
+    navigate(`/app/reports/sub-group-summary/${groupId}`, { state: { groupIds } });
   };
 
-  const handleProfitLossClick = () => {
-    navigate("/app/reports/profit-loss");
-  };
+  const renderDetailedGroupItems = (parentGroupId: number, level: number = 1) => {
+    const subGroups = ledgerGroups.filter(g => g.parent === parentGroupId);
+    const directLedgers = ledgers.filter(l => Number(l.groupId) === parentGroupId);
 
-  // const handleStockClick = () => {
-  //   navigate('/app/reports/stock-summary');
-  // };
+    return (
+      <div className="mt-1 space-y-1">
+        {subGroups.map(group => {
+          const total = calculateGroupTotal(group.id);
+          return (
+            <div key={group.id}>
+              <div
+                className={`grid grid-cols-2 gap-2 py-1 text-sm cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-200 rounded px-2  `}
+                style={{ paddingLeft: `${level * 1.5}rem` }}
+                onClick={() => navigate(`/app/reports/sub-group-summary/${group.id}`)}
+              >
+                <span className="italic font-semibold text-blue-500">{group.name}</span>
+                <span className="text-right font-mono text-xs">{total.toLocaleString()}</span>
+              </div>
+              {renderDetailedGroupItems(group.id, level + 1)}
+            </div>
+          );
+        })}
+
+        {directLedgers.map(ledger => {
+          const closing = calculateClosingBalance(ledger);
+          return (
+            <div
+              key={ledger.id}
+              className="grid grid-cols-2 gap-2 py-1 text-xs text-gray-500 font-semibold dark:text-gray-600 cursor-pointer hover:text-blue-600 px-2"
+              style={{ paddingLeft: `${level * 1.5}rem` }}
+              onClick={() => navigate(`/app/reports/ledger/${ledger.id}`)}
+            >
+              <span>{ledger.name}</span>
+              <span className="text-right font-mono">{closing.toLocaleString()}</span>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
 
   return (
     <div className="pt-[56px] px-4">
@@ -192,9 +212,7 @@ const BalanceSheet: React.FC = () => {
           title="Back to Reports"
           type="button"
           onClick={() => navigate("/app/reports")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
           disabled={loading}
         >
           <ArrowLeft size={20} />
@@ -202,297 +220,125 @@ const BalanceSheet: React.FC = () => {
         <h1 className="text-2xl font-bold">Balance Sheet</h1>
         <div className="ml-auto flex space-x-2">
           <button
-            title="Toggle Filters"
+            title="Toggle Detailed Mode"
             type="button"
-            onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
-            disabled={loading}
+            onClick={() => setIsDetailedView(!isDetailedView)}
+            className={`p-2 rounded-md transition-all ${isDetailedView ? "bg-indigo-600 text-white shadow-lg" : theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
           >
-            <Filter size={18} />
+            <Settings size={18} className={isDetailedView ? "animate-spin-slow text-white" : ""} />
           </button>
-          <button
-            title="Print Report"
-            type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
-          >
-            <Printer size={18} />
-          </button>
-          <button
-            title="Download Report"
-            type="button"
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
-          >
-            <Download size={18} />
-          </button>
+          <button title="Print" className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}><Printer size={18} /></button>
+          <button title="Download" className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}><Download size={18} /></button>
         </div>
       </div>
-
-      {showFilterPanel && (
-        <div
-          className={`p-4 mb-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
-        >
-          <h3 className="font-semibold mb-4">Filters</h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="filter-date"
-              >
-                As on Date
-              </label>
-              <input
-                id="filter-date"
-                title="Select Date"
-                type="date"
-                defaultValue={new Date().toISOString().split("T")[0]}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
-                disabled={loading}
-              />
-            </div>
-          </div>
-        </div>
-      )}
 
       {loading && <p>Loading...</p>}
       {error && <p className="text-red-600">{error}</p>}
 
       {!loading && !error && (
-        <>
-          <div className=" flex gap-5">
-            {/* Liabilities Section */}
-            <div
-              className={`p-6 rounded-lg w-1/2 ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
-            >
-              <h2 className="mb-4 text-xl font-bold text-center">
-                Liabilities
-              </h2>
-
-              {/* Header */}
-              <div className="grid grid-cols-3 gap-2 pb-2 border-b-2 border-gray-400 dark:border-gray-500 font-semibold text-sm">
+        <div className="flex flex-col gap-6">
+          <div className="flex gap-5">
+            {/* Liabilities */}
+            <div className={`p-6 rounded-lg w-1/2 ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"}`}>
+              <h2 className="mb-4 text-xl font-bold text-center border-b pb-2">Liabilities</h2>
+              <div className="grid grid-cols-2 gap-2 pb-2 border-b-2 border-gray-400 font-semibold text-sm">
                 <div>Particulars</div>
-
-                <div className="text-right">Closing</div>
+                <div className="text-right">Amount</div>
               </div>
 
-              <div className="space-y-1 mt-2">
+              <div className="space-y-2 mt-3">
                 {/* Capital Account */}
-                <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
-                  onClick={() => handleGroupClick(-4, -18)}
-                >
-                  <span className="text-blue-600 dark:text-blue-400 underline">
-                    Capital Account
-                  </span>
-                  <span></span>
-                  <span className="text-right font-mono">
-                    {calculatedTotal.CapitalAccount.toLocaleString()}
-                  </span>
+                <div>
+                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-4, -18)}>
+                    <span className="text-blue-600 font-semibold underline">Capital Account</span>
+                    <span className="text-right font-mono font-bold">{calculatedTotal.CapitalAccount.toLocaleString()}</span>
+                  </div>
+                  {isDetailedView && renderDetailedGroupItems(-4)}
                 </div>
 
                 {/* Loans */}
-                <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
-                  onClick={() => handleGroupClick(-13)}
-                >
-                  <span className="text-blue-600 dark:text-blue-400 underline">
-                    Loans (Liability)
-                  </span>
-                  <span></span>
-                  <span className="text-right font-mono">
-                    {calculatedTotal.Loans.toLocaleString()}
-                  </span>
+                <div>
+                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-13)}>
+                    <span className="text-blue-600 font-semibold underline">Loans (Liability)</span>
+                    <span className="text-right font-mono font-bold">{calculatedTotal.Loans.toLocaleString()}</span>
+                  </div>
+                  {isDetailedView && renderDetailedGroupItems(-13)}
                 </div>
 
                 {/* Current Liabilities */}
-                <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
-                  onClick={() => handleGroupClick(-6)}
-                >
-                  <span className="text-blue-600 dark:text-blue-400 underline">
-                    Current Liabilities
+                <div>
+                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-6)}>
+                    <span className="text-blue-600 font-semibold underline">Current Liabilities</span>
+                    <span className="text-right font-mono font-bold">{calculatedTotal.CurrentLiabilities.toLocaleString()}</span>
+                  </div>
+                  {isDetailedView && renderDetailedGroupItems(-6)}
+                </div>
+
+                {/* Profit & Loss A/c (Restored to standalone row) */}
+                <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={() => navigate("/app/reports/profit-loss")}>
+                  <span className="text-blue-600 font-semibold underline">Profit & Loss A/c</span>
+                  <span className="text-right font-mono font-bold">
+                    {netProfit > 0 ? netProfit.toLocaleString() : netLoss > 0 ? `-${netLoss.toLocaleString()}` : "0"}
                   </span>
-                  <span></span>
-                  <span className="text-right font-mono">
-                    {calculatedTotal.CurrentLiabilities.toLocaleString()}
-                  </span>
                 </div>
 
-                {/* Profit & Loss */}
-                <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
-                  onClick={handleProfitLossClick}
-                >
-                  <span className="text-blue-600 dark:text-blue-400 underline">
-                    Profit & Loss A/c
-                  </span>
-                  <span></span>
-                  <span className="text-right font-mono">{netProfit}</span>
-                </div>
-
-                {/* P&L Breakup */}
-                <div className="grid grid-cols-3 gap-2 py-1 text-sm pl-4">
-                  <span>Current Period</span>
-                  <span></span>
-                  <span className="text-right font-mono">{netProfit}</span>
-                </div>
-
-                <div className="grid grid-cols-3 gap-2 py-1 text-sm pl-4">
-                  <span>Less: Transferred</span>
-                  <span></span>
-                  <span className="text-right font-mono">{netProfit}</span>
-                </div>
-
-                {/* Total */}
-                <div className="grid grid-cols-3 gap-2 py-2 font-bold text-lg border-t-2 border-gray-400 dark:border-gray-500 mt-2">
+                <div className="flex justify-between font-bold text-lg border-t-2 border-gray-400 mt-4 pt-2">
                   <span>Total Liabilities</span>
-                  <span></span>
-                  <span className="text-right font-mono">
-                    {calculatedTotal.LaiblityTotal}
-                  </span>
+                  <span className="text-indigo-600">{calculatedTotal.LaiblityTotal.toLocaleString()}</span>
                 </div>
               </div>
             </div>
 
-            {/* Assets Section */}
-            <div
-              className={`p-6 rounded-lg w-1/2 ${
-                theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-              }`}
-            >
-              <h2 className="mb-4 text-xl font-bold text-center">Assets</h2>
-
-              {/* Header */}
-              <div className="grid grid-cols-3 gap-2 pb-2 border-b-2 border-gray-400 dark:border-gray-500 font-semibold text-sm">
+            {/* Assets */}
+            <div className={`p-6 rounded-lg w-1/2 ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"}`}>
+              <h2 className="mb-4 text-xl font-bold text-center border-b pb-2">Assets</h2>
+              <div className="grid grid-cols-2 gap-2 pb-2 border-b-2 border-gray-400 font-semibold text-sm">
                 <div>Particulars</div>
-                <div className="text-right">Closing</div>
+                <div className="text-right">Amount</div>
               </div>
 
-              <div className="space-y-1 mt-2">
+              <div className="space-y-2 mt-3">
                 {/* Fixed Assets */}
-                <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
-                  onClick={() => handleGroupClick(-9)}
-                  title="Click to view Fixed Assets details"
-                >
-                  <span className="text-blue-600 dark:text-blue-400 underline">
-                    Fixed Assets
-                  </span>
-                  <span className="text-right font-mono">
-                    {calculatedTotal.FixedAssets.toLocaleString()}
-                  </span>
+                <div>
+                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-9)}>
+                    <span className="text-blue-600 font-semibold underline">Fixed Assets</span>
+                    <span className="text-right font-mono font-bold">{calculatedTotal.FixedAssets.toLocaleString()}</span>
+                  </div>
+                  {isDetailedView && renderDetailedGroupItems(-9)}
                 </div>
 
                 {/* Current Assets */}
-                <div
-                  className={`grid grid-cols-3 gap-2 py-2 border-b border-gray-300 dark:border-gray-600 cursor-pointer transition-colors ${
-                    theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
-                  }`}
-                  onClick={() => handleGroupClick(-5, "Current Assets")}
-                  title="Click to view Current Assets details"
-                >
-                  <span className="text-blue-600 dark:text-blue-400 underline">
-                    Current Assets
-                  </span>
-                  <span className="text-right font-mono">
-                    {calculatedTotal.CurrentAssets.toLocaleString()}
-                  </span>
+                <div>
+                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-5)}>
+                    <span className="text-blue-600 font-semibold underline">Current Assets</span>
+                    <span className="text-right font-mono font-bold">{calculatedTotal.CurrentAssets.toLocaleString()}</span>
+                  </div>
+                  {isDetailedView && renderDetailedGroupItems(-5)}
                 </div>
 
-                {/* Total Assets */}
-                <div className="grid grid-cols-3 gap-2 py-2 font-bold text-lg border-t-2 border-gray-400 dark:border-gray-500 mt-2">
+                <div className="flex justify-between font-bold text-lg border-t-2 border-gray-400 mt-4 pt-2">
                   <span>Total Assets</span>
-                  <span className="text-right font-mono">
-                    {calculatedTotal.AssetTotal}
-                  </span>
+                  <span className="text-indigo-600">{calculatedTotal.AssetTotal.toLocaleString()}</span>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Balance Verification Section */}
-          <div
-            className={`mt-6 p-6 rounded-lg ${
-              theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-            }`}
-          >
-            <div className="text-center">
-              <h2 className="mb-4 text-xl font-bold">Balance Verification</h2>
-              <div className="grid grid-cols-2 md:grid-cols-6 gap-4">
-                <div className="col-span-2">
-                  <p className="text-sm opacity-75">Total Assets (Opening)</p>
-                  <p className="text-xl font-bold">
-                    {calculatedTotal.AssetTotal}
-                  </p>
-                </div>
-
-                <div className="col-span-2">
-                  <p className="text-sm opacity-75">Total Assets (Closing)</p>
-                  <p className="text-xl font-bold">
-                    ₹ {calculatedTotal.AssetTotal}
-                  </p>
-                </div>
-                <div className="col-span-2">
-                  <p className="text-sm opacity-75">
-                    Total Liabilities (Opening)
-                  </p>
-                  <p className="text-xl font-bold">
-                    ₹ {calculatedTotal.LaiblityTotal}
-                  </p>
-                </div>
-
-                <div className="col-span-2">
-                  <p className="text-sm opacity-75">
-                    Total Liabilities (Closing)
-                  </p>
-                  <p className="text-xl font-bold">
-                    ₹ {calculatedTotal.LaiblityTotal}
-                  </p>
-                </div>
+          {/* Verification */}
+          <div className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"}`}>
+            <h2 className="mb-4 text-xl font-bold text-center">Verification</h2>
+            <div className="grid grid-cols-3 text-center gap-4">
+              <div><p className="opacity-75">Assets</p><p className="text-xl font-bold">₹{calculatedTotal.AssetTotal.toLocaleString()}</p></div>
+              <div><p className="opacity-75">Liabilities</p><p className="text-xl font-bold">₹{calculatedTotal.LaiblityTotal.toLocaleString()}</p></div>
+              <div>
+                <p className="opacity-75">Difference</p>
+                <p className={`text-xl font-bold ${Math.abs(calculatedTotal.AssetTotal - calculatedTotal.LaiblityTotal) > 1 ? 'text-red-500' : 'text-green-500'}`}>
+                  ₹{(calculatedTotal.AssetTotal - calculatedTotal.LaiblityTotal).toLocaleString()}
+                </p>
               </div>
             </div>
           </div>
-
-          {/* Footer / Pro Tips */}
-          <div
-            className={`mt-6 p-4 rounded ${
-              theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-            }`}
-          >
-            <p className="text-sm">
-              <span className="font-semibold">Navigation:</span> Click on Loans,
-              Current Liabilities, or Current Assets to view group details.
-              Click on Profit & Loss A/c to view P&L statement.
-            </p>
-            <p className="text-sm mt-1">
-              <span className="font-semibold">Pro Tip:</span> Press F5 to
-              refresh, F12 to configure display options.
-            </p>
-          </div>
-        </>
+        </div>
       )}
     </div>
   );
