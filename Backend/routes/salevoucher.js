@@ -57,7 +57,7 @@ async function ensureDispatchColumns() {
     { name: "dispatchDocNo", type: "VARCHAR(100)" },
     { name: "dispatchThrough", type: "VARCHAR(100)" },
     { name: "destination", type: "VARCHAR(255)" },
-    { name: "approxDistance", type: "VARCHAR(50)" }, 
+    { name: "approxDistance", type: "VARCHAR(50)" },
   ];
 
   for (const col of columns) {
@@ -518,58 +518,158 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
-//single get
-router.get("/:id", async (req, res) => {
-  const voucherId = req.params.id;
+// ===============================
+// GET SINGLE SALES VOUCHER (EDIT MODE WITH HISTORY)
+// ===============================
 
+// ===============================
+// GET SINGLE SALES VOUCHER (EDIT MODE - LIKE PURCHASE)
+// ===============================
+
+router.get("/:id", async (req, res) => {
   try {
-    // ---- 1) Main Voucher ----
+    const voucherId = req.params.id;
+
+    /* ======================
+       1️⃣ GET VOUCHER
+    ====================== */
     const [voucherRows] = await db.execute(
       `SELECT * FROM sales_vouchers WHERE id = ?`,
       [voucherId]
     );
 
-    if (voucherRows.length === 0) {
-      return res.status(404).json({ message: "Voucher not found" });
+    if (!voucherRows.length) {
+      return res.status(404).json({
+        success: false,
+        message: "Voucher not found",
+      });
     }
 
     const voucher = voucherRows[0];
 
-    // ---- 2) Items ----
-    const [itemRows] = await db.execute(
-      `SELECT *
-       FROM sales_voucher_items
-       WHERE voucherId = ?`,
+    /* ======================
+       2️⃣ GET ITEMS
+    ====================== */
+    const [items] = await db.execute(
+      `
+      SELECT *
+      FROM sales_voucher_items
+      WHERE voucherId = ?
+      `,
       [voucherId]
     );
 
-    // ---- 3) Ledger Entries ----
-    const [ledgerRows] = await db.execute(
-      `SELECT *
-       FROM voucher_entries
-       WHERE voucher_id = ?`,
-      [voucherId]
+    /* ======================
+       3️⃣ GET SALE HISTORY (BY VOUCHER NUMBER)
+    ====================== */
+    const [history] = await db.execute(
+      `
+      SELECT *
+      FROM sale_history
+      WHERE voucherNumber = ?
+      `,
+      [voucher.number]
     );
+
+    /* ======================
+       4️⃣ MERGE ITEMS + HISTORY
+       (MATCH BY GODOWN)
+    ====================== */
+
+    const entries = items.map((item) => {
+
+      // 🔥 Same logic as purchase
+      const historyRow = history.find(
+        (h) =>
+          String(h.godownId) === String(item.godownId)
+      );
+
+      return {
+        id: item.id,
+
+        itemId: item.itemId,
+
+        quantity: item.quantity,
+        rate: item.rate,
+        discount: item.discount,
+        amount: item.amount,
+
+        cgstRate: item.cgstRate,
+        sgstRate: item.sgstRate,
+        igstRate: item.igstRate,
+
+        godownId: item.godownId,
+        salesLedgerId: item.salesLedgerId,
+
+        // 🔥 FROM HISTORY
+        batchNumber: historyRow?.batchNumber || "",
+        hsnCode: historyRow?.hsnCode || "",
+        movementDate: historyRow?.movementDate || voucher.date,
+      };
+    });
+
+
+
+    /* ======================
+       5️⃣ SEND RESPONSE
+    ====================== */
 
     return res.json({
       success: true,
-      voucher,
-      items: itemRows,
-      ledgerEntries: ledgerRows,
+
+      id: voucher.id,
+
+      number: voucher.number,
+      date: voucher.date,
+
+      narration: voucher.narration,
+      partyId: voucher.partyId,
+      referenceNo: voucher.referenceNo,
+
+      dispatchDocNo: voucher.dispatchDocNo,
+      dispatchThrough: voucher.dispatchThrough,
+      destination: voucher.destination,
+
+      salesLedgerId: voucher.salesLedgerId,
+
+      subtotal: voucher.subtotal,
+      cgstTotal: voucher.cgstTotal,
+      sgstTotal: voucher.sgstTotal,
+      igstTotal: voucher.igstTotal,
+
+      discountTotal: voucher.discountTotal,
+      total: voucher.total,
+
+      profit: voucher.profit,
+
+      billNo: voucher.bill_no,
+      approxDistance: voucher.approxDistance,
+
+      isQuotation: voucher.isQuotation,
+
+      supplierInvoiceDate: voucher.supplierInvoiceDate,
+      sales_type_id: voucher.sales_type_id,
+
+      // ⭐ MAIN DATA
+      entries,
     });
+
   } catch (err) {
-    console.error("GET sales voucher failed:", err);
-    return res
-      .status(500)
-      .json({ message: err.message || "Something went wrong" });
+    console.error("🔥 Fetch sales edit voucher error:", err);
+
+    return res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
+
+
 
 //single put
 router.put("/:id", async (req, res) => {
   const voucherId = req.params.id;
 
-  // frontend se ye sab aa raha hoga:
   const {
     date,
     number,
@@ -591,43 +691,10 @@ router.put("/:id", async (req, res) => {
   } = req.body;
 
   try {
-
+    await ensureSalesLedgerColumn();
     await ensureDispatchColumns();
-    // ================= CHECK & ADD COLUMNS IF MISSING (for UPDATE route too) =================
-    try {
-      const [salesTypeIdCheck] = await db.execute(
-        `SELECT COLUMN_NAME
-         FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = 'sales_vouchers'
-           AND COLUMN_NAME = 'sales_type_id'`
-      );
-
-      if (salesTypeIdCheck.length === 0) {
-        await db.execute(
-          `ALTER TABLE sales_vouchers ADD COLUMN sales_type_id INT NULL`
-        );
-      }
-
-      const [billNoCheck] = await db.execute(
-        `SELECT COLUMN_NAME
-         FROM INFORMATION_SCHEMA.COLUMNS
-         WHERE TABLE_SCHEMA = DATABASE()
-           AND TABLE_NAME = 'sales_vouchers'
-           AND COLUMN_NAME = 'bill_no'`
-      );
-
-      if (billNoCheck.length === 0) {
-        await db.execute(
-          `ALTER TABLE sales_vouchers ADD COLUMN bill_no VARCHAR(100) NULL`
-        );
-      }
-    } catch (colErr) {
-      console.error("Column check/add error (non-fatal):", colErr);
-    }
 
     // ---- 1) UPDATE MAIN TABLE ----
-    // Always include sales_type_id and bill_no (columns will be added if missing)
     await db.execute(
       `UPDATE sales_vouchers
        SET 
@@ -685,21 +752,22 @@ router.put("/:id", async (req, res) => {
       const itemValues = itemEntries.map((e) => [
         voucherId,
         e.itemId,
-        e.quantity,
-        e.rate,
-        e.amount,
-        e.cgstRate,
-        e.sgstRate,
-        e.igstRate,
-        e.discount,
-        e.hsnCode,
-        e.batchNumber,
-        e.godownId,
+        Number(e.quantity || 0),
+        Number(e.rate || 0),
+        Number(e.amount || 0),
+        Number(e.cgstLedgerId || e.cgstRate || 0),
+        Number(e.sgstLedgerId || e.sgstRate || 0),
+        Number(e.igstLedgerId || e.igstRate || e.gstLedgerId || 0),
+        Number(e.discount || 0),
+        e.hsnCode || "",
+        e.batchNumber || "",
+        e.godownId || null,
+        Number(e.salesLedgerId || 0),
       ]);
 
       await db.query(
         `INSERT INTO sales_voucher_items 
-        (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId)
+        (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId, salesLedgerId)
         VALUES ?`,
         [itemValues]
       );
@@ -717,8 +785,8 @@ router.put("/:id", async (req, res) => {
       const ledgerValues = ledgerEntries.map((e) => [
         voucherId,
         e.ledgerId,
-        e.amount,
-        e.type,
+        Number(e.amount || 0),
+        e.type || "debit",
       ]);
 
       await db.query(
@@ -728,10 +796,13 @@ router.put("/:id", async (req, res) => {
       );
     }
 
+    // ---- 6) CLEAR OLD HISTORY (The frontend will POST new history) ----
+    await db.execute(`DELETE FROM sale_history WHERE voucherNumber = ?`, [number]);
+
     return res.json({ success: true, message: "Voucher updated successfully" });
   } catch (err) {
-    console.error("Update failed:", err);
-    return res.status(500).json({ message: err.message || "Update failed" });
+    console.error("❌ Update failed:", err);
+    return res.status(500).json({ success: false, message: err.message || "Update failed" });
   }
 });
 

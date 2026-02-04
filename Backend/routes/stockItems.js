@@ -1,6 +1,10 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
+const upload = require(".././middlewares/upload");
+const cloudinary = require(".././utils/cloudnary");
+const streamifier = require("streamifier");
+
 
 // GET all stock items (scoped)
 router.get("/", async (req, res) => {
@@ -8,6 +12,22 @@ router.get("/", async (req, res) => {
 
   const connection = await db.getConnection();
   try {
+    const ensureColumn = async (table, column, definition) => {
+      const [rows] = await connection.execute(
+        `
+        SELECT COUNT(*) AS count
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
+        `,
+        [table, column]
+      );
+      if (rows[0].count === 0) {
+        await connection.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      }
+    };
+    await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
     let query = `
       SELECT 
         s.id,
@@ -28,6 +48,7 @@ router.get("/", async (req, res) => {
         s.barcode,
         s.batches,
         s.type,
+        s.image,
         s.company_id,
         s.owner_type,
         s.owner_id
@@ -321,7 +342,7 @@ router.get("/", async (req, res) => {
 //   }
 // });
 
-router.post("/", async (req, res) => {
+router.post("/", upload.single("image"), async (req, res) => {
   const connection = await db.getConnection();
 
   try {
@@ -367,6 +388,7 @@ router.post("/", async (req, res) => {
     await ensureColumn("stock_items", "gstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
 
 
     /* ===============================
@@ -382,11 +404,9 @@ router.post("/", async (req, res) => {
       hsnCode,
       gstRate,
       taxType,
-
       gstLedgerId,
       cgstLedgerId,
       sgstLedgerId,
-
       standardPurchaseRate,
       standardSaleRate,
       enableBatchTracking,
@@ -401,7 +421,16 @@ router.post("/", async (req, res) => {
       owner_id,
     } = req.body;
 
-    console.log('gst', gstLedgerId, cgstLedgerId, sgstLedgerId)
+    let parsedBatches = Array.isArray(batches) ? batches : [];
+    if (typeof batches === "string") {
+      try { parsedBatches = JSON.parse(batches); } catch (e) { parsedBatches = []; }
+    }
+
+    let parsedGodownAllocations = Array.isArray(godownAllocations) ? godownAllocations : [];
+    if (typeof godownAllocations === "string") {
+      try { parsedGodownAllocations = JSON.parse(godownAllocations); } catch (e) { parsedGodownAllocations = []; }
+    }
+
 
     if (!name || !unit || !taxType) {
       return res.status(400).json({
@@ -410,7 +439,7 @@ router.post("/", async (req, res) => {
       });
     }
 
-    const batchNames = batches
+    const batchNames = parsedBatches
       .map((b) => (b.batchName || "").trim().toUpperCase())
       .filter(Boolean);
 
@@ -479,7 +508,7 @@ router.post("/", async (req, res) => {
 
     let totalOpeningValue = 0;
 
-    const batchData = batches.map((b) => {
+    const batchData = parsedBatches.map((b) => {
       const qty = Number(b.batchQuantity) || 0;
       const rate = Number(b.batchRate) || 0;
       const openingValue = qty * rate;
@@ -496,6 +525,28 @@ router.post("/", async (req, res) => {
         mode: "opening",
       };
     });
+
+    /* ===============================
+       🖼️ IMAGE UPLOAD (CLOUDINARY)
+       =============================== */
+    let imageUrl = null;
+    if (req.file) {
+      try {
+        const result = await new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            { folder: "stock_items" },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+        });
+        imageUrl = result.secure_url;
+      } catch (uploadError) {
+        console.error("❌ Cloudinary Upload Error:", uploadError);
+      }
+    }
 
     /* ===============================
        🧠 SAFE DYNAMIC INSERT
@@ -529,8 +580,9 @@ router.post("/", async (req, res) => {
     company_id,
     owner_type,
     owner_id,
-    type
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    type,
+    image
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
     const values = [
@@ -558,14 +610,11 @@ router.post("/", async (req, res) => {
       sanitize(company_id),
       sanitize(owner_type),
       sanitize(owner_id),
-      "opening"
+      "opening",
+      imageUrl
     ];
 
-    console.log("SAVING LEDGERS =>", {
-      gstLedgerId,
-      cgstLedgerId,
-      sgstLedgerId,
-    });
+
 
     const [result] = await connection.execute(insertQuery, values);
 
@@ -573,10 +622,10 @@ router.post("/", async (req, res) => {
     const stockItemId = result.insertId;
 
     /* ===============================
-       🏬 GODOWN ALLOCATIONS
+        🏬 GODOWN ALLOCATIONS
        =============================== */
 
-    for (const alloc of godownAllocations) {
+    for (const alloc of parsedGodownAllocations) {
       await connection.execute(
         `
         INSERT INTO godown_allocations
@@ -612,6 +661,16 @@ router.post("/", async (req, res) => {
     connection.release();
   }
 });
+
+// Helper for parsing batches and godownAllocations in PUT
+const parseFormDataArrays = (req) => {
+  if (typeof req.body.batches === "string") {
+    try { req.body.batches = JSON.parse(req.body.batches); } catch (e) { req.body.batches = []; }
+  }
+  if (typeof req.body.godownAllocations === "string") {
+    try { req.body.godownAllocations = JSON.parse(req.body.godownAllocations); } catch (e) { req.body.godownAllocations = []; }
+  }
+};
 
 // stock purchase item
 
@@ -911,7 +970,6 @@ router.get("/ledger", async (req, res) => {
       }
     });
 
-    console.log('data', result)
     res.json({
       success: true,
       data: result,
@@ -1049,7 +1107,7 @@ router.delete("/:id", async (req, res) => {
     // 🔹 1. Get stock item (name check)
     const [items] = await connection.execute(
       `
-      SELECT id, name 
+      SELECT id, name, image 
       FROM stock_items
       WHERE id = ? AND company_id = ? AND owner_type = ? AND owner_id = ?
       `,
@@ -1065,6 +1123,7 @@ router.delete("/:id", async (req, res) => {
     }
 
     const itemName = items[0].name;
+    const itemImage = items[0].image;
 
     // 🔹 2. Check sales_history & purchase_history usage
     const [[usage]] = await connection.execute(
@@ -1108,6 +1167,17 @@ router.delete("/:id", async (req, res) => {
 
     // 🔹 4. Delete stock item
     await connection.execute("DELETE FROM stock_items WHERE id = ?", [id]);
+
+    // 🔹 5. Delete image from Cloudinary if exists
+    if (itemImage && itemImage.includes("res.cloudinary.com")) {
+      try {
+        const parts = itemImage.split("/");
+        const publicId = `stock_item/${parts.pop().split(".")[0]}`;
+        await cloudinary.uploader.destroy(publicId);
+      } catch (err) {
+        console.error("❌ Cloudinary Delete Error (Item Deletion):", err);
+      }
+    }
 
     await connection.commit();
 
@@ -1174,13 +1244,21 @@ router.delete("/:itemId/delete-by-hsn", async (req, res) => {
 });
 
 //put item
-router.put("/:id", async (req, res) => {
+router.put("/:id", upload.single("image"), async (req, res) => {
+  parseFormDataArrays(req);
   const connection = await db.getConnection();
 
   try {
     await connection.beginTransaction();
 
     const { id } = req.params;
+
+    // 🔍 FETCH OLD IMAGE FOR DELETION
+    const [existing] = await connection.execute(
+      "SELECT image FROM stock_items WHERE id = ?",
+      [id]
+    );
+    const oldImageUrl = existing[0]?.image;
 
     /* ===============================
        🔥 RUNTIME COLUMN CHECK & ADD
@@ -1216,6 +1294,7 @@ router.put("/:id", async (req, res) => {
     await ensureColumn("stock_items", "gstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
 
 
     /* ===============================
@@ -1282,6 +1361,39 @@ router.put("/:id", async (req, res) => {
     });
 
     /* ===============================
+       🖼️ IMAGE UPLOAD (CLOUDINARY)
+       =============================== */
+    let imageUrl = req.body.image || null; // fallback to existing image if no new one
+    if (req.file) {
+      // 🗑️ DELETE OLD IMAGE FROM CLOUDINARY
+      if (oldImageUrl && oldImageUrl.includes("res.cloudinary.com")) {
+        try {
+          const parts = oldImageUrl.split("/");
+          const publicId = `stock_item/${parts.pop().split(".")[0]}`;
+          await cloudinary.uploader.destroy(publicId);
+        } catch (delError) {
+          console.error("❌ Cloudinary Delete Error:", delError);
+        }
+      }
+
+      try {
+        const result = await new Promise((resolve, reject) => {
+          const uploadStream = cloudinary.uploader.upload_stream(
+            { folder: "stock_item" },
+            (error, result) => {
+              if (error) reject(error);
+              else resolve(result);
+            }
+          );
+          streamifier.createReadStream(req.file.buffer).pipe(uploadStream);
+        });
+        imageUrl = result.secure_url;
+      } catch (uploadError) {
+        console.error("❌ Cloudinary Upload Error:", uploadError);
+      }
+    }
+
+    /* ===============================
        🧠 UPDATE QUERY
        =============================== */
 
@@ -1309,7 +1421,8 @@ router.put("/:id", async (req, res) => {
         barcode = ?,
         company_id = ?,
         owner_type = ?,
-        owner_id = ?
+        owner_id = ?,
+        image = ?
       WHERE id = ?
     `;
 
@@ -1337,6 +1450,7 @@ router.put("/:id", async (req, res) => {
       sanitize(company_id),
       sanitize(owner_type),
       sanitize(owner_id),
+      imageUrl,
       id,
     ];
 
@@ -1389,6 +1503,7 @@ router.get("/:id", async (req, res) => {
         s.taxType,
         s.barcode,
         s.batches,
+        s.image,
         s.company_id,
         s.owner_type,
         s.owner_id

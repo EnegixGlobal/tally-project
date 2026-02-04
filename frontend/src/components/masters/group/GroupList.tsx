@@ -17,8 +17,8 @@ const GroupList: React.FC = () => {
   const [del, setDel] = useState(false);
 
   const baseGroups = [
-    { id: -1, name: "Branch Accounts", nature: "Assets", isSystem: true },
-    { id: -2, name: "Branch OD A/c", nature: "Assets", isSystem: true },
+    { id: -1, name: "Bank Accounts", nature: "Assets", isSystem: true },
+    { id: -2, name: "Bank OD A/c", nature: "Assets", isSystem: true },
     { id: -3, name: "Branch/Division", nature: "Assets", isSystem: true },
     { id: -4, name: "Capital Account", nature: "Liabilities", isSystem: true },
     { id: -5, name: "Current Assets", nature: "Assets", isSystem: true },
@@ -44,6 +44,7 @@ const GroupList: React.FC = () => {
     { id: -15, name: "Purchase Accounts", nature: "Expenses", isSystem: true },
     { id: -16, name: "Sales Accounts", nature: "Income", isSystem: true },
     { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },
+    { id: -18, name: "Profit/Loss", nature: "Liabilities", isSystem: true },
   ];
 
   // prefer AuthContext values, fall back to localStorage
@@ -317,7 +318,7 @@ const GroupList: React.FC = () => {
                   >
                     {group.parent
                       ? groups.find((g) => g.id === group.parent)?.name || "-"
-                      : "-"}
+                      : "Primary"}
                   </td>
                   <td
                     className={`px-4 py-3 ${

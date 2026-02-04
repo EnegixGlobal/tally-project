@@ -238,29 +238,42 @@ ORDER BY pv.date ASC
     );
 
     /* ===============================
-       6️⃣ NORMAL LEDGER ENTRIES
-    =============================== */
+      6️⃣ NORMAL LEDGER ENTRIES (WITH OPPOSITE LEDGER)
+   =============================== */
     const [txns] = await connection.execute(
       `
-  SELECT
-    vm.id AS voucher_id,
-    vm.voucher_type,
-    vm.voucher_number,
-    vm.date,
+SELECT
+  vm.id AS voucher_id,
+  vm.voucher_type,
+  vm.voucher_number,
+  vm.date,
 
-    ve.entry_type,
-    ve.amount,
-    ve.narration AS entry_narration,
+  ve.entry_type,
+  ve.amount,
 
-    ve.ledger_id,
-    l.name AS ledger_name
+  ve.ledger_id AS current_ledger,
 
-  FROM voucher_entries ve
-  JOIN voucher_main vm ON vm.id = ve.voucher_id
-  LEFT JOIN ledgers l ON l.id = ve.ledger_id
-  WHERE ve.ledger_id = ?
-  ORDER BY vm.date ASC
-  `,
+  other.ledger_id AS opposite_ledger,
+  l2.name AS opposite_ledger_name
+
+FROM voucher_entries ve
+
+JOIN voucher_main vm
+  ON vm.id = ve.voucher_id
+
+JOIN voucher_entries other
+  ON other.voucher_id = ve.voucher_id
+ AND other.ledger_id != ve.ledger_id
+
+LEFT JOIN ledgers l2
+  ON l2.id = other.ledger_id
+
+WHERE ve.ledger_id = ?
+
+  AND vm.voucher_type IN ('journal','contra','receipt','payment')
+
+ORDER BY vm.date ASC
+`,
       [ledgerId]
     );
 
@@ -302,25 +315,42 @@ ORDER BY pv.date ASC
     const transactions = [];
 
     // Normal vouchers
+    // Normal vouchers (Journal / Contra / Receipt / Payment)
     txns.forEach((row) => {
-      const debit = row.entry_type === "debit" ? Number(row.amount) : 0;
-      const credit = row.entry_type === "credit" ? Number(row.amount) : 0;
+
+      const debit =
+        row.entry_type === "debit"
+          ? Number(row.amount)
+          : 0;
+
+      const credit =
+        row.entry_type === "credit"
+          ? Number(row.amount)
+          : 0;
 
       balance += debit - credit;
 
       transactions.push({
-        id: String(row.voucher_id || `voucher_${row.voucher_number}`),
+
+        id: String(row.voucher_id),
+
         date: row.date,
+
         voucherType: row.voucher_type,
+
         voucherNo: row.voucher_number,
 
-        particulars: row.ledger_name || String(row.ledger_id),
+     
+        particulars:
+          row.opposite_ledger_name ||
+          String(row.opposite_ledger),
 
         debit,
         credit,
         balance,
       });
     });
+
 
     // Debit  Notes
     dcNotes.forEach((note) => {

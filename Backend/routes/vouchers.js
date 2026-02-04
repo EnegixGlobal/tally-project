@@ -175,10 +175,10 @@ router.get("/next-number", async (req, res) => {
       nextNo = Number(rows[0].voucher_number.split("/").pop()) + 1;
     }
 
-    console.log(
-      "Next Voucher Number:",
-      `${prefix}/${fy}/${month}/${String(nextNo).padStart(6, "0")}`
-    );
+    // console.log(
+    //   "Next Voucher Number:",
+    //   `${prefix}/${fy}/${month}/${String(nextNo).padStart(6, "0")}`
+    // );
     return res.json({
       success: true,
       voucherNumber: `${prefix}/${fy}/${month}/${String(nextNo).padStart(

@@ -138,8 +138,8 @@ const SalesRepostDetails = () => {
 
   // group name
   const baseGroups = [
-    { id: -1, name: "Branch Accounts", nature: "Assets" },
-    { id: -2, name: "Branch OD A/c", nature: "Assets" },
+    { id: -1, name: "Bank Accounts", nature: "Assets" },
+    { id: -2, name: "Bank OD A/c", nature: "Assets" },
     { id: -3, name: "Branch/Division", nature: "Assets" },
     { id: -4, name: "Capital Account", nature: "Liabilities" },
     { id: -5, name: "Current Assets", nature: "Assets" },
@@ -155,6 +155,7 @@ const SalesRepostDetails = () => {
     { id: -15, name: "Purchase Accounts", nature: "Expenses" },
     { id: -16, name: "Sales Accounts", nature: "Income" },
     { id: -17, name: "Suspense A/C", nature: "Assets" },
+    { id: -18, name: "Profit/Loss", nature: "Liabilities" },
   ];
 
   useEffect(() => {

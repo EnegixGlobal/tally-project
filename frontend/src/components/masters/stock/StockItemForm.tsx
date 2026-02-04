@@ -313,7 +313,12 @@ const StockItemForm = () => {
             allowNegativeStock: !!item.allowNegativeStock,
             maintainInPieces: !!item.maintainInPieces,
             secondaryUnit: item.secondaryUnit || "",
+            image: item.image || "",
           });
+
+          if (item.image) {
+            setPreview(item.image);
+          }
 
           // --- Set godown allocations ---
           setGodownAllocations(item.godownAllocations || []);
@@ -390,6 +395,7 @@ const StockItemForm = () => {
     allowNegativeStock: boolean;
     maintainInPieces: boolean;
     secondaryUnit: string;
+    image: string;
   }
 
   interface Errors {
@@ -421,7 +427,23 @@ const StockItemForm = () => {
     allowNegativeStock: true,
     maintainInPieces: false,
     secondaryUnit: "",
+    image: "",
   });
+
+  const [imageFile, setImageFile] = useState<File | null>(null);
+  const [preview, setPreview] = useState<string>("");
+
+  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setImageFile(file);
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
 
 
   const [godownAllocations, setGodownAllocations] = useState<
@@ -463,6 +485,7 @@ const StockItemForm = () => {
         batchManufacturingDate: "",
         batchQuantity: "",
         batchRate: "",
+        openingRate: 0,
       },
     ]);
   };
@@ -581,11 +604,13 @@ const StockItemForm = () => {
     }
 
     // Construct stockItem object
-    const stockItem = {
+    const stockItem: any = {
       name: formData.name,
       stockGroupId: formData.stockGroupId,
       categoryId: formData.categoryId,
       unit: formData.unit,
+      openingBalance: formData.openingBalance,
+      openingValue: formData.openingValue,
 
       hsnCode: formData.hsnCode,
       gstRate: Number(formData.gstRate),
@@ -594,6 +619,11 @@ const StockItemForm = () => {
       gstLedgerId: formData.gstLedgerId,
       cgstLedgerId: formData.cgstLedgerId,
       sgstLedgerId: formData.sgstLedgerId,
+
+      enableBatchTracking: formData.enableBatchTracking,
+      allowNegativeStock: formData.allowNegativeStock,
+      maintainInPieces: formData.maintainInPieces,
+      secondaryUnit: formData.secondaryUnit,
 
       batches: batchRows.map((b) => ({
         ...b,
@@ -609,6 +639,22 @@ const StockItemForm = () => {
       owner_id: ownerId,
     };
 
+    // Use FormData for file upload
+    const submitData = new FormData();
+    Object.entries(stockItem).forEach(([key, value]) => {
+      if (key === "batches" || key === "godownAllocations") {
+        submitData.append(key, JSON.stringify(value));
+      } else {
+        submitData.append(key, value as string);
+      }
+    });
+
+    if (imageFile) {
+      submitData.append("image", imageFile);
+    } else if (formData.image) {
+      submitData.append("image", formData.image);
+    }
+
     // Determine if we're updating or creating a new record
     const method = id ? "PUT" : "POST"; // Use PUT for update, POST for new
     const url = id
@@ -618,8 +664,7 @@ const StockItemForm = () => {
     try {
       const res = await fetch(url, {
         method: method,
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(stockItem),
+        body: submitData, // Send FormData instead of JSON
       });
 
       // Check if response status is ok (2xx status codes)
@@ -793,6 +838,53 @@ const StockItemForm = () => {
               options={sgstOptions}
             />
 
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium mb-1">Product Image</label>
+              <div className="flex items-center space-x-4">
+                <div
+                  className={`relative w-32 h-32 rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden ${theme === "dark" ? "border-gray-600 bg-gray-700" : "border-gray-300 bg-gray-50"
+                    }`}
+                >
+                  {preview ? (
+                    <>
+                      <img src={preview} alt="Preview" className="w-full h-full object-cover" />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPreview("");
+                          setImageFile(null);
+                          setFormData(prev => ({ ...prev, image: "" }));
+                        }}
+                        className="absolute top-1 right-1 p-1 bg-red-500 text-white rounded-full hover:bg-red-600 transition-colors"
+                      >
+                        <X size={14} />
+                      </button>
+                    </>
+                  ) : (
+                    <Plus className="text-gray-400" size={32} />
+                  )}
+                </div>
+                <div>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    onChange={handleImageChange}
+                    className="hidden"
+                    id="product-image-upload"
+                  />
+                  <label
+                    htmlFor="product-image-upload"
+                    className="cursor-pointer px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors inline-block text-sm font-medium"
+                  >
+                    {preview ? "Change Image" : "Upload Image"}
+                  </label>
+                  <p className="text-xs text-gray-500 mt-2">Max size: 5MB (PNG, JPG, JPEG)</p>
+                </div>
+              </div>
+            </div>
+
+
+
 
             {/* ----------------- Batch Tracking Dynamic Rows ----------------- */}
             <div className="flex justify-between items-center mt-4">
@@ -807,6 +899,9 @@ const StockItemForm = () => {
                 />
                 Enable Batch Tracking
               </label>
+
+             
+
 
               {/* Right: Add Batch Button */}
 

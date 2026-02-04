@@ -92,6 +92,7 @@ import SalesAddDetails from "./components/reports/profit_loss/SalesAddDetails";
 import BalanceSheet from "./components/reports/BalanceSheet";
 import GroupSummary from "./components/reports/GroupSummary";
 import GroupSummaryIndex from "./components/reports/GroupSummaryIndex";
+import SubGroupSummary from "./components/reports/SubGroupSummary";
 import CashFlow from "./components/reports/CashFlow";
 import CashFlowSummary from "./components/reports/CashFlowSummary";
 import GroupCashFlow from "./components/reports/GroupCashFlow";
@@ -1140,6 +1141,14 @@ function App() {
                   element={
                     <RequireCompany>
                       <BalanceSheet />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="reports/sub-group-summary/:groupId"
+                  element={
+                    <RequireCompany>
+                      <SubGroupSummary />
                     </RequireCompany>
                   }
                 />

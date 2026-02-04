@@ -228,7 +228,7 @@ const ContraVoucher: React.FC = () => {
 
   const handleSubmit = useCallback(
     async (e: React.FormEvent) => {
-      e.preventDefault();
+      if (e && e.preventDefault) e.preventDefault();
 
       // if (!validateForm()) {
       //   Swal.fire('Validation Error', 'Please fix the errors before submitting.', 'warning');
@@ -242,16 +242,20 @@ const ContraVoucher: React.FC = () => {
           owner_type: ownerType,
           owner_id: ownerId,
         };
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/vouchers`,
-          {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload), // your state
-          }
-        );
+
+        const url = isEditMode && id
+          ? `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`
+          : `${import.meta.env.VITE_API_URL}/api/vouchers`;
+
+        const method = isEditMode && id ? "PUT" : "POST";
+
+        const response = await fetch(url, {
+          method,
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        });
 
         const data = await response.json();
 
@@ -259,9 +263,9 @@ const ContraVoucher: React.FC = () => {
           Swal.fire({
             icon: "success",
             title: "Success",
-            text: data.message,
+            text: data.message || (isEditMode ? "Voucher updated successfully" : "Voucher saved successfully"),
           }).then(() => {
-            navigate("/app/vouchers"); // or your route to go back
+            navigate("/app/vouchers");
           });
         } else {
           Swal.fire("Error", data.message || "Something went wrong", "error");
@@ -271,7 +275,7 @@ const ContraVoucher: React.FC = () => {
         Swal.fire("Network Error", "Failed to connect to the server.", "error");
       }
     },
-    [formData, navigate]
+    [formData, navigate, isEditMode, id, companyId, ownerType, ownerId]
   );
 
   const handlePrint = useCallback(() => {
@@ -436,8 +440,8 @@ const ContraVoucher: React.FC = () => {
             title="Save Voucher"
             onClick={handleSubmit}
             className={`p-2 rounded-md ${theme === "dark"
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-blue-500 hover:bg-blue-600"
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-blue-500 hover:bg-blue-600"
               } text-white flex items-center`}
             disabled={!isBalanced}
           >
@@ -483,8 +487,8 @@ const ContraVoucher: React.FC = () => {
                 required
                 title="Select voucher date"
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500`}
               />
               {errors.date && (
@@ -507,8 +511,8 @@ const ContraVoucher: React.FC = () => {
                 required
                 title="Voucher number"
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500 ${config.autoNumbering ? "opacity-50" : ""
                   }`}
                 placeholder={
@@ -559,8 +563,8 @@ const ContraVoucher: React.FC = () => {
                   }));
                 }}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500`}
               >
                 <option value="double-entry">Double Entry</option>
@@ -583,8 +587,8 @@ const ContraVoucher: React.FC = () => {
                     onChange={handleChange}
                     title="Reference number"
                     className={`w-full p-2 rounded border ${theme === "dark"
-                        ? "bg-gray-700 border-gray-600 text-gray-100"
-                        : "bg-white border-gray-300 text-gray-900"
+                      ? "bg-gray-700 border-gray-600 text-gray-100"
+                      : "bg-white border-gray-300 text-gray-900"
                       } focus:border-blue-500 focus:ring-blue-500`}
                     placeholder="Enter reference number"
                   />
@@ -603,8 +607,8 @@ const ContraVoucher: React.FC = () => {
                     onChange={handleChange}
                     title="Reference date"
                     className={`w-full p-2 rounded border ${theme === "dark"
-                        ? "bg-gray-700 border-gray-600 text-gray-100"
-                        : "bg-white border-gray-300 text-gray-900"
+                      ? "bg-gray-700 border-gray-600 text-gray-100"
+                      : "bg-white border-gray-300 text-gray-900"
                       } focus:border-blue-500 focus:ring-blue-500`}
                   />
                 </div>
@@ -628,21 +632,21 @@ const ContraVoucher: React.FC = () => {
                   required
                   title="Select account ledger (Cash/Bank)"
                   className={`w-full p-2 rounded border ${theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
+                    ? "bg-gray-700 border-gray-600 text-gray-100"
+                    : "bg-white border-gray-300 text-gray-900"
                     } focus:border-blue-500 focus:ring-blue-500`}
                 >
                   <option value="">Select Cash/Bank Ledger</option>
                   {cashBankLedgers.map((ledger) => (
                     <option key={ledger.id} value={ledger.id}>
-                      {ledger.name} ({ledger.groupName})
+                      {ledger.name}
                     </option>
                   ))}
                   <option
                     value="add-new"
                     className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                        ? "bg-blue-600 hover:bg-green-700"
-                        : "bg-green-600 hover:bg-green-700 text-white"
+                      ? "bg-blue-600 hover:bg-green-700"
+                      : "bg-green-600 hover:bg-green-700 text-white"
                       }`}
                   >
                     + Add New Ledger
@@ -669,21 +673,21 @@ const ContraVoucher: React.FC = () => {
                   required
                   title="Select  ledger (Cash/Bank)"
                   className={`w-full p-2 rounded border ${theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
+                    ? "bg-gray-700 border-gray-600 text-gray-100"
+                    : "bg-white border-gray-300 text-gray-900"
                     } focus:border-blue-500 focus:ring-blue-500`}
                 >
                   <option value="">Select Cash/Bank Ledger</option>
                   {cashBankLedgers.map((ledger) => (
                     <option key={ledger.id} value={ledger.id}>
-                      {ledger.name} ({ledger.groupName})
+                      {ledger.name}
                     </option>
                   ))}
                   <option
                     value="add-new"
                     className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                        ? "bg-blue-600 hover:bg-green-700"
-                        : "bg-green-600 hover:bg-green-700 text-white"
+                      ? "bg-blue-600 hover:bg-green-700"
+                      : "bg-green-600 hover:bg-green-700 text-white"
                       }`}
                   >
                     + Add New Ledger
@@ -728,8 +732,8 @@ const ContraVoucher: React.FC = () => {
                   title="Enter amount"
                   placeholder="0.00"
                   className={`w-full p-2 rounded border ${theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
+                    ? "bg-gray-700 border-gray-600 text-gray-100"
+                    : "bg-white border-gray-300 text-gray-900"
                     } focus:border-blue-500 focus:ring-blue-500`}
                 />
                 {errors.amount0 && (
@@ -754,8 +758,8 @@ const ContraVoucher: React.FC = () => {
                         value={formData.entries[0].bankName || ""}
                         onChange={(e) => handleEntryChange(0, e)}
                         className={`w-full p-2 rounded border ${theme === "dark"
-                            ? "bg-gray-700 border-gray-600 text-gray-100"
-                            : "bg-white border-gray-300 text-gray-900"
+                          ? "bg-gray-700 border-gray-600 text-gray-100"
+                          : "bg-white border-gray-300 text-gray-900"
                           } focus:border-blue-500 focus:ring-blue-500`}
                         placeholder="Enter bank name"
                       />
@@ -773,8 +777,8 @@ const ContraVoucher: React.FC = () => {
                         value={formData.entries[0].chequeNumber || ""}
                         onChange={(e) => handleEntryChange(0, e)}
                         className={`w-full p-2 rounded border ${theme === "dark"
-                            ? "bg-gray-700 border-gray-600 text-gray-100"
-                            : "bg-white border-gray-300 text-gray-900"
+                          ? "bg-gray-700 border-gray-600 text-gray-100"
+                          : "bg-white border-gray-300 text-gray-900"
                           } focus:border-blue-500 focus:ring-blue-500`}
                         placeholder="Enter cheque number or transaction ID"
                       />
@@ -799,8 +803,8 @@ const ContraVoucher: React.FC = () => {
                         value={formData.entries[1].bankName || ""}
                         onChange={(e) => handleEntryChange(1, e)}
                         className={`w-full p-2 rounded border ${theme === "dark"
-                            ? "bg-gray-700 border-gray-600 text-gray-100"
-                            : "bg-white border-gray-300 text-gray-900"
+                          ? "bg-gray-700 border-gray-600 text-gray-100"
+                          : "bg-white border-gray-300 text-gray-900"
                           } focus:border-blue-500 focus:ring-blue-500`}
                         placeholder="Enter bank name"
                       />
@@ -818,8 +822,8 @@ const ContraVoucher: React.FC = () => {
                         value={formData.entries[1].chequeNumber || ""}
                         onChange={(e) => handleEntryChange(1, e)}
                         className={`w-full p-2 rounded border ${theme === "dark"
-                            ? "bg-gray-700 border-gray-600 text-gray-100"
-                            : "bg-white border-gray-300 text-gray-900"
+                          ? "bg-gray-700 border-gray-600 text-gray-100"
+                          : "bg-white border-gray-300 text-gray-900"
                           } focus:border-blue-500 focus:ring-blue-500`}
                         placeholder="Enter cheque number or transaction ID"
                       />
@@ -840,8 +844,8 @@ const ContraVoucher: React.FC = () => {
                   type="button"
                   onClick={addEntry}
                   className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
-                      ? "bg-blue-600 hover:bg-blue-700"
-                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
                     }`}
                 >
                   <Plus size={16} className="mr-1" /> Add Line
@@ -852,8 +856,8 @@ const ContraVoucher: React.FC = () => {
                   <thead>
                     <tr
                       className={`${theme === "dark"
-                          ? "border-b border-gray-600"
-                          : "border-b border-gray-300"
+                        ? "border-b border-gray-600"
+                        : "border-b border-gray-300"
                         }`}
                     >
                       <th className="px-4 py-2 text-left">Ledger Account</th>
@@ -873,8 +877,8 @@ const ContraVoucher: React.FC = () => {
                       <tr
                         key={index}
                         className={`${theme === "dark"
-                            ? "border-b border-gray-600"
-                            : "border-b border-gray-300"
+                          ? "border-b border-gray-600"
+                          : "border-b border-gray-300"
                           }`}
                       >
                         <td className="px-4 py-2">
@@ -885,15 +889,15 @@ const ContraVoucher: React.FC = () => {
                             required
                             title="Select ledger account (Cash/Bank)"
                             className={`w-full p-2 rounded border ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
                               } focus:border-blue-500 focus:ring-blue-500`}
                           >
                             <option value="">Select Cash/Bank Ledger</option>
                             {cashBankLedgers && cashBankLedgers.length > 0 ? (
                               cashBankLedgers.map((ledger) => (
                                 <option key={ledger.id} value={ledger.id}>
-                                  {ledger.name} ({ledger.groupName})
+                                  {ledger.name}
                                 </option>
                               ))
                             ) : (
@@ -904,8 +908,8 @@ const ContraVoucher: React.FC = () => {
                             <option
                               value="add-new"
                               className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                                  ? "bg-blue-600 hover:bg-green-700"
-                                  : "bg-green-600 hover:bg-green-700 text-white"
+                                ? "bg-blue-600 hover:bg-green-700"
+                                : "bg-green-600 hover:bg-green-700 text-white"
                                 }`}
                             >
                               + Add New Ledger
@@ -925,8 +929,8 @@ const ContraVoucher: React.FC = () => {
                             onChange={(e) => handleEntryChange(index, e)}
                             title="Select debit or credit"
                             className={`w-full p-2 rounded border ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
                               } focus:border-blue-500 focus:ring-blue-500`}
                           >
                             <option value="debit">Dr</option>
@@ -945,8 +949,8 @@ const ContraVoucher: React.FC = () => {
                             title="Enter amount"
                             placeholder="0.00"
                             className={`w-full p-2 rounded border text-right ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
                               } focus:border-blue-500 focus:ring-blue-500`}
                           />
                           {errors[`amount${index}`] && (
@@ -963,8 +967,8 @@ const ContraVoucher: React.FC = () => {
                               onChange={(e) => handleEntryChange(index, e)}
                               title="Select cost centre"
                               className={`w-full p-2 rounded border ${theme === "dark"
-                                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                                  : "bg-white border-gray-300 text-gray-900"
+                                ? "bg-gray-700 border-gray-600 text-gray-100"
+                                : "bg-white border-gray-300 text-gray-900"
                                 } focus:border-blue-500 focus:ring-blue-500`}
                             >
                               <option value="">None</option>
@@ -984,8 +988,8 @@ const ContraVoucher: React.FC = () => {
                               value={entry.narration || ""}
                               onChange={(e) => handleEntryChange(index, e)}
                               className={`w-full p-2 rounded border ${theme === "dark"
-                                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                                  : "bg-white border-gray-300 text-gray-900"
+                                ? "bg-gray-700 border-gray-600 text-gray-100"
+                                : "bg-white border-gray-300 text-gray-900"
                                 } focus:border-blue-500 focus:ring-blue-500`}
                               placeholder="Entry narration"
                             />
@@ -1002,10 +1006,10 @@ const ContraVoucher: React.FC = () => {
                                 : "Remove entry"
                             }
                             className={`p-1 rounded ${formData.entries.length <= 2
-                                ? "opacity-50 cursor-not-allowed"
-                                : theme === "dark"
-                                  ? "hover:bg-gray-600"
-                                  : "hover:bg-gray-300"
+                              ? "opacity-50 cursor-not-allowed"
+                              : theme === "dark"
+                                ? "hover:bg-gray-600"
+                                : "hover:bg-gray-300"
                               }`}
                           >
                             <Trash2 size={16} />
@@ -1017,8 +1021,8 @@ const ContraVoucher: React.FC = () => {
                   <tfoot>
                     <tr
                       className={`font-semibold ${theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
+                        ? "border-t border-gray-600"
+                        : "border-t border-gray-300"
                         }`}
                     >
                       <td className="px-4 py-2 text-right" colSpan={2}>
@@ -1043,8 +1047,8 @@ const ContraVoucher: React.FC = () => {
                         {isBalanced ? (
                           <span
                             className={`px-2 py-1 rounded text-xs ${theme === "dark"
-                                ? "bg-green-900 text-green-200"
-                                : "bg-green-100 text-green-800"
+                              ? "bg-green-900 text-green-200"
+                              : "bg-green-100 text-green-800"
                               }`}
                           >
                             Balanced
@@ -1052,8 +1056,8 @@ const ContraVoucher: React.FC = () => {
                         ) : (
                           <span
                             className={`px-2 py-1 rounded text-xs ${theme === "dark"
-                                ? "bg-red-900 text-red-200"
-                                : "bg-red-100 text-red-800"
+                              ? "bg-red-900 text-red-200"
+                              : "bg-red-100 text-red-800"
                               }`}
                           >
                             Unbalanced
@@ -1100,8 +1104,8 @@ const ContraVoucher: React.FC = () => {
               title="Enter narration"
               placeholder="Enter voucher narration"
               className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                  : "bg-white border-gray-300 text-gray-900"
+                ? "bg-gray-700 border-gray-600 text-gray-100"
+                : "bg-white border-gray-300 text-gray-900"
                 } focus:border-blue-500 focus:ring-blue-500`}
             />
           </div>

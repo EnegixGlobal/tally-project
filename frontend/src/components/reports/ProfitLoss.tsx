@@ -575,15 +575,24 @@ const ProfitLoss: React.FC = () => {
   };
 
 
-  // Save Net Profit for Balance Sheet
+  // Save Net Profit/Loss for Balance Sheet
   useEffect(() => {
-    const profit = getNetProfit();
+    const netAmount = getNetProfit();
 
     if (companyId) {
-      localStorage.setItem(
-        `NET_PROFIT_${companyId}`,
-        profit.toString()
-      );
+      if (netAmount > 0) {
+        // It's a profit
+        localStorage.setItem(`NET_PROFIT_${companyId}`, netAmount.toString());
+        localStorage.setItem(`NET_LOSS_${companyId}`, "0");
+      } else if (netAmount < 0) {
+        // It's a loss
+        localStorage.setItem(`NET_PROFIT_${companyId}`, "0");
+        localStorage.setItem(`NET_LOSS_${companyId}`, Math.abs(netAmount).toString());
+      } else {
+        // Zero
+        localStorage.setItem(`NET_PROFIT_${companyId}`, "0");
+        localStorage.setItem(`NET_LOSS_${companyId}`, "0");
+      }
     }
 
   }, [getNetProfit, companyId]);

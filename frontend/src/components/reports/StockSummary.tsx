@@ -815,7 +815,7 @@ const StockSummary: React.FC = () => {
                       setShowSettings(false);
                     }}
                   />
-                  Create new
+                  Only Account
                 </label>
               </div>
             </div>
