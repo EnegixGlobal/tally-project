@@ -429,7 +429,7 @@ const SubGroupSummary: React.FC = () => {
                                   : "border-gray-200 hover:bg-gray-50"
                                   }`}
                               >
-                                <td className="py-3 px-4 text-blue-600 font-medium underline">
+                                <td className="py-3 px-4 text-blue-600 font-medium ">
                                   {ledger.name}
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono text-sm">
@@ -532,7 +532,7 @@ const SubGroupSummary: React.FC = () => {
                             : "border-gray-200 hover:bg-gray-50"
                             }`}
                         >
-                          <td className="py-3 px-4 text-blue-600 font-medium underline">
+                          <td className="py-3 px-4 text-blue-600 font-medium ">
                             {group.name}
                             {groupLedgers.length === 0 && (
                               <span className="text-gray-500 text-xs ml-2">

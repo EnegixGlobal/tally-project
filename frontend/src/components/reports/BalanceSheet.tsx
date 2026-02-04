@@ -254,7 +254,7 @@ const BalanceSheet: React.FC = () => {
                 {/* Capital Account */}
                 <div>
                   <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-4, -18)}>
-                    <span className="text-blue-600 font-semibold underline">Capital Account</span>
+                    <span className="text-blue-600 font-semibold ">Capital Account</span>
                     <span className="text-right font-mono font-bold">{calculatedTotal.CapitalAccount.toLocaleString()}</span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-4)}
@@ -263,7 +263,7 @@ const BalanceSheet: React.FC = () => {
                 {/* Loans */}
                 <div>
                   <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-13)}>
-                    <span className="text-blue-600 font-semibold underline">Loans (Liability)</span>
+                    <span className="text-blue-600 font-semibold ">Loans (Liability)</span>
                     <span className="text-right font-mono font-bold">{calculatedTotal.Loans.toLocaleString()}</span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-13)}
@@ -272,7 +272,7 @@ const BalanceSheet: React.FC = () => {
                 {/* Current Liabilities */}
                 <div>
                   <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-6)}>
-                    <span className="text-blue-600 font-semibold underline">Current Liabilities</span>
+                    <span className="text-blue-600 font-semibold ">Current Liabilities</span>
                     <span className="text-right font-mono font-bold">{calculatedTotal.CurrentLiabilities.toLocaleString()}</span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-6)}
@@ -285,7 +285,7 @@ const BalanceSheet: React.FC = () => {
                     className="grid grid-cols-2 gap-2 py-2 cursor-pointer"
                     onClick={() => navigate("/app/reports/profit-loss")}
                   >
-                    <span className="text-blue-600 font-semibold underline">
+                    <span className="text-blue-600 font-semibold ">
                       Profit & Loss A/c
                     </span>
                     <span className="text-right font-mono font-bold">
@@ -331,7 +331,7 @@ const BalanceSheet: React.FC = () => {
                 {/* Fixed Assets */}
                 <div>
                   <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-9)}>
-                    <span className="text-blue-600 font-semibold underline">Fixed Assets</span>
+                    <span className="text-blue-600 font-semibold ">Fixed Assets</span>
                     <span className="text-right font-mono font-bold">{calculatedTotal.FixedAssets.toLocaleString()}</span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-9)}
@@ -340,7 +340,7 @@ const BalanceSheet: React.FC = () => {
                 {/* Current Assets */}
                 <div>
                   <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-5)}>
-                    <span className="text-blue-600 font-semibold underline">Current Assets</span>
+                    <span className="text-blue-600 font-semibold ">Current Assets</span>
                     <span className="text-right font-mono font-bold">{calculatedTotal.CurrentAssets.toLocaleString()}</span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-5)}
