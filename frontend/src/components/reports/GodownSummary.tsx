@@ -52,8 +52,7 @@ const GodownMovementRegister: React.FC = () => {
 
   useEffect(() => {
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((res) => res.json())
@@ -71,8 +70,7 @@ const GodownMovementRegister: React.FC = () => {
     if (!companyId || !ownerType || !ownerId) return;
 
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/purchase-vouchers/purchase-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((r) => r.json())
@@ -87,8 +85,7 @@ const GodownMovementRegister: React.FC = () => {
     if (!companyId || !ownerType || !ownerId) return;
 
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/sales-vouchers/sale-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
     )
       .then((r) => r.json())
@@ -259,21 +256,19 @@ const GodownMovementRegister: React.FC = () => {
           <div className="flex items-center gap-2 border border-gray-300 rounded-lg p-1 bg-gray-50">
             <button
               onClick={() => setViewMode("summary")}
-              className={`px-4 py-2 rounded font-medium transition-all ${
-                viewMode === "summary"
+              className={`px-4 py-2 rounded font-medium transition-all ${viewMode === "summary"
                   ? "bg-blue-500 text-white"
                   : "bg-transparent text-gray-700 hover:bg-gray-200"
-              }`}
+                }`}
             >
               Summary View
             </button>
             <button
               onClick={() => setViewMode("detail")}
-              className={`px-4 py-2 rounded font-medium transition-all ${
-                viewMode === "detail"
+              className={`px-4 py-2 rounded font-medium transition-all ${viewMode === "detail"
                   ? "bg-blue-500 text-white"
                   : "bg-transparent text-gray-700 hover:bg-gray-200"
-              }`}
+                }`}
             >
               Detail View
             </button>
@@ -423,6 +418,15 @@ const GodownMovementRegister: React.FC = () => {
 
             {Object.entries(filteredGodownTransactions).map(([godownId, transactions]) => {
               const godownNameValue = godownName(godownId);
+
+              // Group transactions by item and batch for calculation
+              const groupedTransactions: Record<string, Transaction[]> = {};
+              transactions.forEach(t => {
+                const key = `${t.itemName}|${t.batch}`;
+                if (!groupedTransactions[key]) groupedTransactions[key] = [];
+                groupedTransactions[key].push(t);
+              });
+
               return (
                 <div key={godownId} className="border rounded-md p-6 bg-white shadow-md">
                   {/* GODOWN NAME */}
@@ -444,54 +448,58 @@ const GodownMovementRegister: React.FC = () => {
                           <th className="border px-4 py-3 text-center font-semibold text-gray-700">
                             Date
                           </th>
-                          <th className="border px-4 py-3 text-center font-semibold text-gray-700">
-                            Type
+                          <th className="border px-4 py-3 text-center font-semibold text-green-700">
+                            Inward
                           </th>
-                          <th className="border px-4 py-3 text-center font-semibold text-gray-700">
-                            Quantity
+                          <th className="border px-4 py-3 text-center font-semibold text-red-700">
+                            Outward
                           </th>
-                          <th className="border px-4 py-3 text-center font-semibold text-gray-700">
-                            Rate
-                          </th>
-                          <th className="border px-4 py-3 text-center font-semibold text-gray-700">
-                            Amount
+                          <th className="border px-4 py-3 text-center font-semibold text-blue-700">
+                            Closing
                           </th>
                         </tr>
                       </thead>
 
                       <tbody>
-                        {transactions.map((transaction, index) => (
-                          <tr
-                            key={index}
-                            className="hover:bg-gray-50 border-b"
-                          >
-                            <td className="border px-4 py-3 font-medium text-gray-800">
-                              {transaction.itemName}
-                            </td>
-                            <td className="border px-4 py-3 text-center text-gray-600">
-                              {transaction.batch}
-                            </td>
-                            <td className="border px-4 py-3 text-center text-gray-600">
-                              {formatDate(transaction.date)}
-                            </td>
-                            <td className={`border px-4 py-3 text-center font-semibold ${
-                              transaction.type === "Inward"
-                                ? "text-green-700 bg-green-50"
-                                : "text-red-700 bg-red-50"
-                            }`}>
-                              {transaction.type}
-                            </td>
-                            <td className="border px-4 py-3 text-center font-semibold">
-                              {transaction.qty}
-                            </td>
-                            <td className="border px-4 py-3 text-center font-mono">
-                              {transaction.rate.toFixed(2)}
-                            </td>
-                            <td className="border px-4 py-3 text-center font-bold text-blue-700 bg-blue-50">
-                              {transaction.amount.toFixed(2)}
-                            </td>
-                          </tr>
-                        ))}
+                        {Object.entries(groupedTransactions).map(([key, itemTransactions]) => {
+                          const [itemName, batch] = key.split('|');
+                          let currentClosing = 0;
+
+                          return itemTransactions.map((transaction, idx) => {
+                            if (transaction.type === "Inward") {
+                              currentClosing += transaction.qty;
+                            } else {
+                              currentClosing -= transaction.qty;
+                            }
+
+                            return (
+                              <tr key={`${key}-${idx}`} className="hover:bg-gray-50 border-b">
+                                {idx === 0 ? (
+                                  <>
+                                    <td className="border px-4 py-3 font-semibold text-gray-800 bg-gray-50" rowSpan={itemTransactions.length}>
+                                      {itemName}
+                                    </td>
+                                    <td className="border px-4 py-3 text-center bg-gray-50" rowSpan={itemTransactions.length}>
+                                      {batch}
+                                    </td>
+                                  </>
+                                ) : null}
+                                <td className="border px-4 py-3 text-center text-gray-600">
+                                  {formatDate(transaction.date)}
+                                </td>
+                                <td className="border px-4 py-3 text-center font-semibold text-green-700">
+                                  {transaction.type === "Inward" ? transaction.qty : "-"}
+                                </td>
+                                <td className="border px-4 py-3 text-center font-semibold text-red-700">
+                                  {transaction.type === "Outward" ? transaction.qty : "-"}
+                                </td>
+                                <td className="border px-4 py-3 text-center font-bold text-blue-700 bg-blue-50">
+                                  {currentClosing}
+                                </td>
+                              </tr>
+                            );
+                          });
+                        })}
                       </tbody>
                     </table>
                   </div>
