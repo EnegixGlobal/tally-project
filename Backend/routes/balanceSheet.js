@@ -39,7 +39,25 @@ router.get("/api/balance-sheet", async (req, res) => {
       [company_id, owner_type, owner_id]
     );
 
-    res.json({ ledgerGroups, ledgers });
+    // Fetch transferred Profit/Loss from voucher_entries narration
+    const [transferredEntries] = await pool.query(
+      `SELECT narration FROM voucher_entries 
+       WHERE (narration LIKE 'PROFIT_TR:%' OR narration LIKE 'LOSS_TR:%')
+       AND voucher_id IN (SELECT id FROM voucher_main WHERE company_id = ? AND owner_type = ? AND owner_id = ?)`,
+      [company_id, owner_type, owner_id]
+    );
+
+    let transferredProfit = 0;
+    let transferredLoss = 0;
+    transferredEntries.forEach(entry => {
+      if (entry.narration.startsWith('PROFIT_TR:')) {
+        transferredProfit = Math.max(transferredProfit, parseFloat(entry.narration.split(':')[1]) || 0);
+      } else if (entry.narration.startsWith('LOSS_TR:')) {
+        transferredLoss = Math.max(transferredLoss, parseFloat(entry.narration.split(':')[1]) || 0);
+      }
+    });
+
+    res.json({ ledgerGroups, ledgers, transferredProfit, transferredLoss });
   } catch (err) {
     console.error("Error fetching balance sheet data", err);
     res.status(500).json({ error: "Internal Server Error" });
@@ -145,9 +163,6 @@ router.patch("/api/profit", async (req, res) => {
       capitalAccountId,
       profitId
     } = req.body;
-
-
-
 
     /* -------------------------------
        1. Validation
@@ -329,9 +344,5 @@ router.patch("/api/profit", async (req, res) => {
     return res.status(500).json({ success: false, error: err.message });
   }
 });
-
-
-
-
 
 module.exports = router;

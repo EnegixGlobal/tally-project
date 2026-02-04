@@ -32,6 +32,8 @@ const BalanceSheet: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [netProfit, setNetProfit] = useState<number>(0);
   const [netLoss, setNetLoss] = useState<number>(0);
+  const [transferredProfit, setTransferredProfit] = useState<number>(0);
+  const [transferredLoss, setTransferredLoss] = useState<number>(0);
 
   const [debitCreditData, setDebitCreditData] = useState<
     Record<number, { debit: number; credit: number }>
@@ -71,6 +73,8 @@ const BalanceSheet: React.FC = () => {
           parent: g.parent ? Number(g.parent) : null
         }));
         setLedgerGroups(normalizedGroups);
+        setTransferredProfit(data.transferredProfit || 0);
+        setTransferredLoss(data.transferredLoss || 0);
       } catch (err: any) {
         setError(err.message || "Unknown error occurred");
       } finally {
@@ -116,10 +120,10 @@ const BalanceSheet: React.FC = () => {
       CurrentLiabilities: currentLiability,
       FixedAssets: fixedAssets,
       CurrentAssets: CurrentAssets,
-      LaiblityTotal: capitalTotal + loanLability + currentLiability + (netProfit - netLoss),
+      LaiblityTotal: capitalTotal + loanLability + currentLiability + (netProfit - netLoss - transferredProfit + transferredLoss),
       AssetTotal: fixedAssets + CurrentAssets,
     });
-  }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss]);
+  }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss, transferredProfit, transferredLoss]);
 
   useEffect(() => {
     const fetchDebitCreditData = async () => {
@@ -275,12 +279,38 @@ const BalanceSheet: React.FC = () => {
                 </div>
 
                 {/* Profit & Loss A/c (Restored to standalone row) */}
-                <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors" onClick={() => navigate("/app/reports/profit-loss")}>
-                  <span className="text-blue-600 font-semibold underline">Profit & Loss A/c</span>
-                  <span className="text-right font-mono font-bold">
-                    {netProfit > 0 ? netProfit.toLocaleString() : netLoss > 0 ? `-${netLoss.toLocaleString()}` : "0"}
-                  </span>
+                <div className="border-b border-gray-300 pb-2">
+                  {/* Header */}
+                  <div
+                    className="grid grid-cols-2 gap-2 py-2 cursor-pointer"
+                    onClick={() => navigate("/app/reports/profit-loss")}
+                  >
+                    <span className="text-blue-600 font-semibold underline">
+                      Profit & Loss A/c
+                    </span>
+                    <span className="text-right font-mono font-bold">
+                      {(netProfit - netLoss - transferredProfit + transferredLoss).toLocaleString()}
+                    </span>
+                  </div>
+
+                  {/* Breakdown */}
+                  <div className="ml-4 text-sm space-y-1 mt-1">
+                    <div className="grid grid-cols-2">
+                      <span className="opacity-75">Current Period</span>
+                      <span className="text-right font-mono">
+                        {(netProfit - netLoss).toLocaleString()}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2">
+                      <span className="opacity-75">Less Transferred</span>
+                      <span className="text-right font-mono">
+                        {(transferredProfit > 0 || transferredLoss > 0) ? 0 : (netProfit - netLoss).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
                 </div>
+
 
                 <div className="flex justify-between font-bold text-lg border-t-2 border-gray-400 mt-4 pt-2">
                   <span>Total Liabilities</span>
