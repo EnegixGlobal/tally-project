@@ -1,16 +1,19 @@
 // db.js
-const mysql = require('mysql2/promise');
+const mysql = require("mysql2/promise");
+require("dotenv").config(); // 👈 VERY IMPORTANT
 
 const db = mysql.createPool({
-  host: 'localhost',
-  user: 'root',
-  password: '',
-  database: 'dbenegix'
-
-  
+  host: process.env.DB_HOST,
+  user: process.env.DB_USER,
+  password: process.env.DB_PASSWORD, // 👈 from .env
+  database: process.env.DB_NAME,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0
 });
 
 module.exports = db;
+
 
 
 // db.js
