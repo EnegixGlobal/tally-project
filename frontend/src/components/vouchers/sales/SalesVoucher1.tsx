@@ -1142,7 +1142,7 @@ const SalesVoucher: React.FC = () => {
                   body: JSON.stringify({
                     batchName: candidateBatch.batchName ?? "",
                     quantity: adjustedStockDiff,
-                    mode: "add", 
+                    mode: "add",
                   }),
                 }
               )
@@ -1359,7 +1359,31 @@ const SalesVoucher: React.FC = () => {
           }
 
           const totalGst = statesMatch ? (extractedCgst + extractedSgst) : extractedIgst;
-          const salesLedger = getSalesLedgerByGst(Math.round(totalGst));
+          const gstToMatch = Math.round(totalGst);
+
+          // Find matching Sales Ledger with robust logic
+          const salesLedgers = ledgers.filter(l => String(l.name).toLowerCase().includes("sales"));
+
+          const matchingSalesLedger = salesLedgers.find((l) => {
+            const name = String(l.name).toLowerCase();
+            return (
+              name.includes(`${gstToMatch}%`) ||
+              name.includes(`${gstToMatch} %`) ||
+              name.includes(`sales ${gstToMatch}`) ||
+              name.includes(`@${gstToMatch}%`) ||
+              name.includes(`@ ${gstToMatch}%`)
+            );
+          });
+
+          // ⚠️ Warning if not found
+          if (!matchingSalesLedger && gstToMatch > 0) {
+            Swal.fire({
+              title: "Sales Ledger Missing",
+              text: `Sales ${gstToMatch}% Ledger not found. Please create it first.`,
+              icon: "warning",
+              confirmButtonColor: "#3085d6",
+            });
+          }
 
           const newEntry = {
             id: `e${Date.now()}`,
@@ -1380,7 +1404,7 @@ const SalesVoucher: React.FC = () => {
             cgstLedgerId: details.cgstLedgerId || "",
             sgstLedgerId: details.sgstLedgerId || "",
             igstLedgerId: details.igstLedgerId || "",
-            salesLedgerId: salesLedger ? String(salesLedger.id) : "",
+            salesLedgerId: matchingSalesLedger ? String(matchingSalesLedger.id) : "",
             godownId: "",
             discount: 0,
           };

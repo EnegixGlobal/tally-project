@@ -219,7 +219,7 @@ const PurchaseVoucher: React.FC = () => {
   const [supplierState, setSupplierState] = useState("");
 
 
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
+  const [visibleColumns, setVisibleColumns] = useState(
     {
       hsn: true,
       gst: true,
@@ -228,6 +228,180 @@ const PurchaseVoucher: React.FC = () => {
       showReceiptDetails: true,
     }
   );
+
+  // Barcode State
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [isBarcodeError, setIsBarcodeError] = useState(false);
+
+  // Helper to find stock item details
+  const resolveStockItemDetails = (itemId: string) => {
+    const item = stockItems.find((i) => String(i.id) === String(itemId));
+    if (!item) return {};
+
+    return {
+      name: item.name,
+      hsnCode: item.hsnCode,
+      unit: item.unit,
+      gstRate: Number(item.gstRate || 0),
+      // For Purchase, we usually use standardPurchaseRate, but fallback to rate/mrp if needed
+      standardPurchaseRate: Number(item.standardPurchaseRate || item.purchaseRate || item.rate || 0),
+      batches: item.batches,
+      gstLedgerId: item.gstLedgerId,
+      sgstLedgerId: item.sgstLedgerId,
+      cgstLedgerId: item.cgstLedgerId,
+      igstLedgerId: item.igstLedgerId,
+    };
+  };
+
+  const performBarcodeLookup = async (code: string) => {
+    if (!code.trim()) return;
+
+    try {
+      // Using sales-vouchers endpoint as requested by user ("ke jaisa") which implies same logic
+      // Assuming backend endpoint is generic enough or we use the sales one for item lookup
+      const url = `${import.meta.env.VITE_API_URL}/api/sales-vouchers/item-by-barcode?barcode=${code}&company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (json.success && json.data) {
+        setIsBarcodeError(false);
+        const item = json.data;
+        const details = resolveStockItemDetails(item.id);
+
+        setFormData((prev) => {
+          const updatedEntries = [...prev.entries];
+
+          const gst = Number(details.gstRate || 0);
+
+          // Calculate amounts using existing helper
+          const calculated = calculateEntryValues(
+            1, // quantity 1 by default
+            Number(details.standardPurchaseRate || 0),
+            0, // discount
+            gst,
+            companyState,
+            supplierState
+          );
+
+          // Get normalized tax ledgers/rates
+          const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(
+            gst,
+            companyState,
+            supplierState
+          );
+
+          // 🔍 Find Purchase Ledger
+          let gstToMatch = gst;
+          // If GST is 0, try to deduce from GST ledger name (similar to manual entry logic)
+          if (gstToMatch === 0 && details.gstLedgerId) {
+            const ledger = ledgers.find((l) => String(l.id) === String(details.gstLedgerId));
+            if (ledger) {
+              const match = ledger.name.match(/(\d+(\.\d+)?)/);
+              gstToMatch = match ? Number(match[1]) : 0;
+            }
+          }
+
+          const matchingPurchaseLedger = purchaseLedgers.find((l) => {
+            const name = String(l.name).toLowerCase();
+            return (
+              name.includes(`${gstToMatch}%`) ||
+              name.includes(`${gstToMatch} %`) ||
+              name.includes(`purchase ${gstToMatch}`) ||
+              name.includes(`@${gstToMatch}%`) ||
+              name.includes(`@ ${gstToMatch}%`)
+            );
+          });
+
+          // ⚠️ Warning if not found
+          if (!matchingPurchaseLedger && gstToMatch > 0) {
+            Swal.fire({
+              title: "Purchase Ledger Missing",
+              text: `Purchase ${gstToMatch}% Ledger not found. Please create it first.`,
+              icon: "warning",
+              confirmButtonColor: "#3085d6",
+            });
+          }
+
+          const newEntry = {
+            id: `e${Date.now()}`,
+            itemId: String(item.id),
+            hsnCode: details.hsnCode || "",
+            unitName: details.unit || "",
+
+            quantity: 1,
+            rate: calculated.rate,
+            amount: calculated.amount,
+
+            gstRate: gst,
+            cgstRate: cgstRate,
+            sgstRate: sgstRate,
+            igstRate: igstRate,
+
+            // Prioritize item master tax ledgers
+            gstLedgerId: details.gstLedgerId || "",
+            sgstLedgerId: details.sgstLedgerId || "",
+            cgstLedgerId: details.cgstLedgerId || "",
+            igstLedgerId: details.igstLedgerId || "",
+
+            batches: details.batches || [],
+            batchNumber: "",
+            godownId: "",
+            discount: 0,
+            purchaseLedgerId: matchingPurchaseLedger?.id || prev.purchaseLedgerId || "",
+
+            // Fill other required fields based on Type
+            type: "debit",
+          };
+
+          const lastIndex = updatedEntries.length - 1;
+          // If last row is empty (no item selected), replace it; otherwise add new
+          if (lastIndex >= 0 && !updatedEntries[lastIndex].itemId) {
+            updatedEntries[lastIndex] = newEntry as any;
+          } else {
+            updatedEntries.push(newEntry as any);
+          }
+
+          return { ...prev, entries: updatedEntries };
+        });
+
+        const Toast = Swal.mixin({
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 1500,
+          timerProgressBar: true,
+        });
+        Toast.fire({
+          icon: 'success',
+          title: `Item added: ${item.name}`
+        });
+      } else {
+        if (code) {
+          setIsBarcodeError(true);
+        }
+      }
+    } catch (err) {
+      console.error("Barcode Fetch Error:", err);
+      setIsBarcodeError(true);
+    }
+  };
+
+  // Debounced Barcode Lookup
+  useEffect(() => {
+    if (!barcodeInput || barcodeInput.length < 3) return;
+
+    const timer = setTimeout(() => {
+      performBarcodeLookup(barcodeInput);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [barcodeInput]);
+
+  const handleBarcodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!barcodeInput.trim()) return;
+    performBarcodeLookup(barcodeInput);
+  };
 
   useEffect(() => {
     if (!isEditMode || !id) return;
@@ -1970,6 +2144,33 @@ const PurchaseVoucher: React.FC = () => {
                 Add {formData.mode === "item-invoice" ? "Item" : "Ledger"}
               </button>
             </div>
+
+            {/* Barcode Input Section */}
+            {formData.mode === "item-invoice" && (
+              <div className="mb-4">
+                <form onSubmit={handleBarcodeSubmit} className="relative group max-w-md">
+                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2z"></path><path d="M7 7h1v10H7z"></path><path d="M10 7h2v10h-2z"></path><path d="M15 7h1v10h-1z"></path><path d="M18 7h1v10h-1z"></path></svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Scan Barcode or Type & Press Enter..."
+                    value={barcodeInput}
+                    onChange={(e) => {
+                      setBarcodeInput(e.target.value);
+                      setIsBarcodeError(false);
+                    }}
+                    className={`w-full pl-10 pr-4 py-2 rounded-lg border-2 transition-all outline-none ${isBarcodeError
+                      ? "border-red-500 bg-red-50"
+                      : theme === "dark"
+                        ? "bg-gray-800 border-gray-700 focus:border-blue-500 text-white"
+                        : "bg-white border-gray-200 focus:border-blue-500"
+                      }`}
+                  />
+                </form>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               {" "}
               {formData.mode === "item-invoice" ? (
