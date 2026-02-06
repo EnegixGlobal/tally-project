@@ -665,7 +665,7 @@ const PurchaseVoucher: React.FC = () => {
           Number(selected?.standardPurchaseRate ?? selected?.rate ?? 0),
           0, // discount
           gst,
-          safeCompanyInfo.state || "",
+          companyState || "",
           supplierState
         );
 
@@ -778,7 +778,7 @@ const PurchaseVoucher: React.FC = () => {
           newRate,
           newDisc,
           gst,
-          safeCompanyInfo.state || "",
+          companyState || "",
           supplierState
         );
 
@@ -881,7 +881,7 @@ const PurchaseVoucher: React.FC = () => {
               Number(e.rate || 0),
               Number(e.discount || 0),
               gst,
-              safeCompanyInfo.state || "",
+              companyState || "",
               supplierState
             );
             return calculated.amount;
@@ -889,7 +889,7 @@ const PurchaseVoucher: React.FC = () => {
         };
       }),
     }));
-  }, [supplierState, safeStockItems, safeCompanyInfo.state]);
+  }, [supplierState, safeStockItems, companyState]);
 
 
   const addEntry = () => {
@@ -904,7 +904,7 @@ const PurchaseVoucher: React.FC = () => {
           quantity: 0,
           rate: 0,
           amount: 0,
-          type: formData.mode === "item-invoice" ? "debit" : "debit",
+          type: "debit",
           cgstRate: 0,
           sgstRate: 0,
           igstRate: 0,
@@ -1097,7 +1097,7 @@ const PurchaseVoucher: React.FC = () => {
       return {
         ...totals,
         gstTotal: totals.cgstTotal + totals.sgstTotal + totals.igstTotal,
-        total: totals.total - totals.igstTotal, // Subtraing IGST from Grand Total as requested to fix 136 -> 118
+        total: totals.total,
       };
     }
     else {
@@ -1306,17 +1306,17 @@ const PurchaseVoucher: React.FC = () => {
 
   // Helper functions for print layout
   const getItemDetails = (itemId: string) => {
-    const item = safeStockItems.find((item) => item.id === itemId);
+    const item = safeStockItems.find((item) => String(item.id) === String(itemId));
     return item || { name: "-", hsnCode: "-", unit: "-", gstRate: 0, rate: 0 };
   };
 
   const getPartyName = (partyId: string) => {
-    const party = safeLedgers.find((l) => l.id === partyId);
+    const party = safeLedgers.find((l) => String(l.id) === String(partyId));
     return party?.name || "Unknown Party";
   };
 
   const getPurchaseLedgerName = (purchaseLedgerId: string) => {
-    const ledger = safeLedgers.find((l) => l.id === purchaseLedgerId);
+    const ledger = safeLedgers.find((l) => String(l.id) === String(purchaseLedgerId));
     return ledger?.name || "Unknown Purchase Ledger";
   };
 
@@ -1989,14 +1989,10 @@ const PurchaseVoucher: React.FC = () => {
                         <th className={TABLE_STYLES.header}>Batch</th>
                       )}
 
-                      {!addBatchModal.visible && (
-                        <th className={TABLE_STYLES.headerRight}>Quantity</th>
-                      )}
+                      <th className={TABLE_STYLES.headerRight}>Quantity</th>
 
                       <th className={TABLE_STYLES.header}>Unit</th>
-                      {!addBatchModal.visible && (
-                        <th className={TABLE_STYLES.headerRight}>Rate</th>
-                      )}
+                      <th className={TABLE_STYLES.headerRight}>Rate</th>
 
                       {/* GST Header */}
                       {visibleColumns.gst && isIntraState && (

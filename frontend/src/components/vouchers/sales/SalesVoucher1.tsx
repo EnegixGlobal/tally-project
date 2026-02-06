@@ -1142,6 +1142,7 @@ const SalesVoucher: React.FC = () => {
                   body: JSON.stringify({
                     batchName: candidateBatch.batchName ?? "",
                     quantity: adjustedStockDiff,
+                    mode: "add", 
                   }),
                 }
               )
@@ -1162,6 +1163,7 @@ const SalesVoucher: React.FC = () => {
                 body: JSON.stringify({
                   batchName: candidateBatch.batchName ?? "",
                   quantity: stockDiff,
+                  mode: "add", // ✅ Incremental update
                 }),
               }
             )
@@ -1707,6 +1709,7 @@ const SalesVoucher: React.FC = () => {
               body: JSON.stringify({
                 batchName: entry.batchNumber,
                 quantity: -Number(entry.quantity || 0), // 🔴 subtract stock
+                mode: "add", // ✅ Incremental update
               }),
             }
           );
