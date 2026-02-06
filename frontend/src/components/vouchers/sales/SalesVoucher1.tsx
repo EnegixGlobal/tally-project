@@ -384,6 +384,8 @@ const SalesVoucher: React.FC = () => {
   // Add these states at top of your component:
   const [statusMsg, setStatusMsg] = useState("");
   const [statusColor, setStatusColor] = useState("");
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [isBarcodeError, setIsBarcodeError] = useState(false);
 
   // timers for debouncing rate input per entry
   const rateDebounceTimers = useRef<{ [entryId: string]: number | null }>({});
@@ -1310,6 +1312,126 @@ const SalesVoucher: React.FC = () => {
     updatedEntries.splice(index, 1);
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
   };
+
+  const performBarcodeLookup = async (code: string) => {
+    if (!code.trim()) return;
+
+    try {
+      const url = `${import.meta.env.VITE_API_URL}/api/sales-vouchers/item-by-barcode?barcode=${code}&company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (json.success && json.data) {
+        setIsBarcodeError(false); // Reset error state on success
+        const item = json.data;
+        const details = getItemDetails(item.id);
+
+        setFormData((prev) => {
+          const updatedEntries = [...prev.entries];
+
+          const extractGstPercent = (ledgerId: any) => {
+            if (!ledgerId) return 0;
+            const ledger = safeLedgers.find((l) => String(l.id) === String(ledgerId));
+            if (!ledger?.name) return 0;
+            const match = ledger.name.match(/(\d+(\.\d+)?)/);
+            return match ? Number(match[1]) : 0;
+          };
+
+          const companyState = safeCompanyInfo?.state || "";
+          const partyState = selectedPartyState || "";
+          const statesMatch =
+            companyState &&
+            partyState &&
+            companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+
+          const extractedCgst = extractGstPercent(details.cgstLedgerId);
+          const extractedSgst = extractGstPercent(details.sgstLedgerId);
+          const extractedIgst = extractGstPercent(details.gstLedgerId || details.igstLedgerId);
+
+          let cgstRate = 0, sgstRate = 0, igstRate = 0;
+          if (statesMatch) {
+            cgstRate = extractedCgst;
+            sgstRate = extractedSgst;
+          } else {
+            igstRate = extractedIgst;
+          }
+
+          const totalGst = statesMatch ? (extractedCgst + extractedSgst) : extractedIgst;
+          const salesLedger = getSalesLedgerByGst(Math.round(totalGst));
+
+          const newEntry = {
+            id: `e${Date.now()}`,
+            itemId: String(item.id),
+            hsnCode: details.hsnCode || "",
+            unitId: details.unitId || "",
+            unitLabel: details.unitLabel || "",
+            batches: details.batches || [],
+            batchNumber: "",
+            quantity: 1,
+            rate: details.rate || 0,
+            amount: details.rate || 0,
+            type: "debit",
+            cgstRate: cgstRate,
+            sgstRate: sgstRate,
+            igstRate: igstRate,
+            gstLedgerId: details.gstLedgerId || "",
+            cgstLedgerId: details.cgstLedgerId || "",
+            sgstLedgerId: details.sgstLedgerId || "",
+            igstLedgerId: details.igstLedgerId || "",
+            salesLedgerId: salesLedger ? String(salesLedger.id) : "",
+            godownId: "",
+            discount: 0,
+          };
+
+          const lastIndex = updatedEntries.length - 1;
+          if (lastIndex >= 0 && !updatedEntries[lastIndex].itemId) {
+            updatedEntries[lastIndex] = newEntry as any;
+          } else {
+            updatedEntries.push(newEntry as any);
+          }
+
+          return { ...prev, entries: updatedEntries };
+        });
+
+        // NOT clearing the input anymore as requested: "barcode number wahi rahe hate nii"
+        const Toast = Swal.mixin({
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 1500,
+          timerProgressBar: true,
+        });
+        Toast.fire({
+          icon: 'success',
+          title: `Item added: ${item.name}`
+        });
+      } else {
+        if (code) {
+          setIsBarcodeError(true); // Set error state to true for visual feedback
+        }
+      }
+    } catch (err) {
+      console.error("Barcode Fetch Error:", err);
+      setIsBarcodeError(true);
+    }
+  };
+
+  // 🔹 AUTOMATIC BARCODE LOOKUP ON TYPING (Debounced)
+  useEffect(() => {
+    if (!barcodeInput || barcodeInput.length < 3) return;
+
+    const timer = setTimeout(() => {
+      performBarcodeLookup(barcodeInput);
+    }, 600); // Wait for 600ms of inactivity before calling API
+
+    return () => clearTimeout(timer);
+  }, [barcodeInput]);
+
+  const handleBarcodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!barcodeInput.trim()) return;
+    performBarcodeLookup(barcodeInput);
+  };
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
     const messages: string[] = [];
@@ -2090,23 +2212,50 @@ const SalesVoucher: React.FC = () => {
               className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
                 }`}
             >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold">
+              <div className="flex flex-col md:flex-row gap-4 items-center mb-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <span className="w-1.5 h-6 bg-blue-600 rounded-full"></span>
                   {formData.mode === "item-invoice"
-                    ? "Items"
+                    ? "Items & Particulars"
                     : "Ledger Entries"}
                 </h3>
+
+                {formData.mode === "item-invoice" && (
+                  <div className="flex-1 max-w-md w-full ml-auto">
+                    <form onSubmit={handleBarcodeSubmit} className="relative group">
+                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2z"></path><path d="M7 7h1v10H7z"></path><path d="M10 7h2v10h-2z"></path><path d="M15 7h1v10h-1z"></path><path d="M18 7h1v10h-1z"></path></svg>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Scan Barcode or Type & Press Enter..."
+                        value={barcodeInput}
+                        onChange={(e) => {
+                          setBarcodeInput(e.target.value);
+                          setIsBarcodeError(false); // Reset error when typing
+                        }}
+                        className={`w-full pl-10 pr-4 py-2 rounded-lg border-2 transition-all outline-none ${isBarcodeError
+                          ? "border-red-500 bg-red-50"
+                          : theme === "dark"
+                            ? "bg-gray-800 border-gray-700 focus:border-blue-500 text-white"
+                            : "bg-white border-gray-200 focus:border-blue-500"
+                          }`}
+                      />
+                    </form>
+                  </div>
+                )}
+
                 <button
                   title="Add Entry"
                   type="button"
                   onClick={addEntry}
-                  className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700"
+                  className={`flex items-center text-sm font-medium px-4 py-2 rounded-lg transition-all shadow-sm ${theme === "dark"
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
                     }`}
                 >
-                  <Plus size={16} className="mr-1" />
-                  Add {formData.mode === "item-invoice" ? "Item" : "Ledger"}
+                  <Plus size={18} className="mr-2" />
+                  Add {formData.mode === "item-invoice" ? "Item Row" : "Ledger Row"}
                 </button>
               </div>
               <div className="overflow-x-auto">

@@ -22,6 +22,54 @@ router.get("/items", async (req, res) => {
   }
 });
 
+// GET Item by Barcode
+router.get("/item-by-barcode", async (req, res) => {
+  const { barcode, company_id, owner_type, owner_id } = req.query;
+
+  if (!barcode) {
+    return res.status(400).json({ success: false, message: "Barcode is required" });
+  }
+
+  try {
+    const query = `
+      SELECT s.*, sg.name as stockGroupName, u.name as unitName
+      FROM stock_items s
+      LEFT JOIN stock_groups sg ON s.stockGroupId = sg.id
+      LEFT JOIN stock_units u ON s.unit = u.id
+      WHERE s.barcode = ? AND s.company_id = ? AND s.owner_type = ? AND s.owner_id = ?
+    `;
+    const [rows] = await db.execute(query, [
+      barcode,
+      company_id,
+      owner_type,
+      owner_id,
+    ]);
+
+    if (rows.length === 0) {
+      return res.status(404).json({
+        success: false,
+        message: "Item not found for this barcode",
+      });
+    }
+
+    const item = rows[0];
+
+    // Parse batches if they are stored as string
+    if (item.batches && typeof item.batches === "string") {
+      try {
+        item.batches = JSON.parse(item.batches);
+      } catch (e) {
+        item.batches = [];
+      }
+    }
+
+    res.json({ success: true, data: item });
+  } catch (err) {
+    console.error("Barcode lookup error:", err);
+    res.status(500).json({ success: false, error: err.message });
+  }
+});
+
 // POST Sales Voucher
 // 🔹 Helper: Clean State Name
 const cleanState = (state = "") =>
@@ -520,10 +568,6 @@ router.delete("/:id", async (req, res) => {
 
 // ===============================
 // GET SINGLE SALES VOUCHER (EDIT MODE WITH HISTORY)
-// ===============================
-
-// ===============================
-// GET SINGLE SALES VOUCHER (EDIT MODE - LIKE PURCHASE)
 // ===============================
 
 router.get("/:id", async (req, res) => {
