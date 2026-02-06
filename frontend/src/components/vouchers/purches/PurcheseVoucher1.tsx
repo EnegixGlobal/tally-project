@@ -207,7 +207,8 @@ const PurchaseVoucher: React.FC = () => {
   const partyLedgers = ledgers;
 
   const purchaseLedgers = ledgers.filter((l) =>
-    String(l.name).toLowerCase().includes("purchase")
+    String(l.name).toLowerCase().includes("purchase") ||
+    String(l.groupName).toLowerCase().includes("purchase accounts")
   );
 
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
@@ -224,9 +225,7 @@ const PurchaseVoucher: React.FC = () => {
       gst: true,
       batch: true,
       godown: true,
-      receiptDocNo: true,
-      receiptThrough: true,
-      origin: true,
+      showReceiptDetails: true,
     }
   );
 
@@ -486,7 +485,7 @@ const PurchaseVoucher: React.FC = () => {
     purchaseLedgerId: "", // New field for purchase ledger
     partyId: "",
     mode: "item-invoice",
-    dispatchDetails: { docNo: "", through: "", destination: "" },
+    dispatchDetails: { docNo: "", through: "", destination: "", approxDistance: "" },
     entries: [
       {
         id: "e1",
@@ -666,9 +665,37 @@ const PurchaseVoucher: React.FC = () => {
           Number(selected?.standardPurchaseRate ?? selected?.rate ?? 0),
           0, // discount
           gst,
-          safeCompanyInfo.state,
+          safeCompanyInfo.state || "",
           supplierState
         );
+
+        // Auto selection of Purchase Ledger based on GST rate
+        // Improved matching: Case-insensitive, handles various formats like "18%", "18 %", "@18%"
+        let gstToMatch = gst;
+        if (gstToMatch === 0 && selected?.gstLedgerId) {
+          const taxLedgerName = getLedgerNameById(selected.gstLedgerId);
+          gstToMatch = extractGstPercent(taxLedgerName);
+        }
+
+        const matchingPurchaseLedger = purchaseLedgers.find((l) => {
+          const name = String(l.name).toLowerCase();
+          return (
+            name.includes(`${gstToMatch}%`) ||
+            name.includes(`${gstToMatch} %`) ||
+            name.includes(`purchase ${gstToMatch}`) ||
+            name.includes(`@${gstToMatch}%`) ||
+            name.includes(`@ ${gstToMatch}%`)
+          );
+        });
+
+        if (!matchingPurchaseLedger && gstToMatch > 0) {
+          Swal.fire({
+            title: "Purchase Ledger Missing",
+            text: `Purchase ${gstToMatch}% Ledger not found. Please create it first.`,
+            icon: "warning",
+            confirmButtonColor: "#3085d6",
+          });
+        }
 
         updatedEntries[index] = {
           ...entry,
@@ -682,6 +709,8 @@ const PurchaseVoucher: React.FC = () => {
           cgstRate: calculated.cgstRate,
           sgstRate: calculated.sgstRate,
           igstRate: calculated.igstRate,
+
+          purchaseLedgerId: matchingPurchaseLedger?.id || entry.purchaseLedgerId || "",
 
           // ✅ GST LEDGER IDS
           gstLedgerId: selected?.gstLedgerId || "",
@@ -749,7 +778,7 @@ const PurchaseVoucher: React.FC = () => {
           newRate,
           newDisc,
           gst,
-          safeCompanyInfo.state,
+          safeCompanyInfo.state || "",
           supplierState
         );
 
@@ -843,7 +872,7 @@ const PurchaseVoucher: React.FC = () => {
           ...e,
           ...resolvePurchaseGst(
             gst,
-            safeCompanyInfo.state,
+            safeCompanyInfo.state || "",
             supplierState
           ),
           amount: (() => {
@@ -852,7 +881,7 @@ const PurchaseVoucher: React.FC = () => {
               Number(e.rate || 0),
               Number(e.discount || 0),
               gst,
-              safeCompanyInfo.state,
+              safeCompanyInfo.state || "",
               supplierState
             );
             return calculated.amount;
@@ -1680,17 +1709,15 @@ const PurchaseVoucher: React.FC = () => {
               { key: "batch", label: "Show Batch Column" },
               { key: "gst", label: "Show GST Column" },
               { key: "godown", label: "Show Godown Column" },
-              { key: "receiptDocNo", label: "Show Receipt Doc No." },
-              { key: "receiptThrough", label: "Show Receipt Through" },
-              { key: "origin", label: "Show Origin" },
             ].map(({ key, label }) => (
               <label
                 key={key}
-                className="flex justify-between items-center mb-3"
+                className="flex justify-between items-center mb-3 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors"
               >
-                {label}
+                <span className="text-sm font-medium">{label}</span>
                 <input
                   type="checkbox"
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                   checked={visibleColumns[key]}
                   onChange={() =>
                     setVisibleColumns((prev) => ({
@@ -1701,6 +1728,21 @@ const PurchaseVoucher: React.FC = () => {
                 />
               </label>
             ))}
+
+            <label className="flex justify-between items-center mb-3 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors border-t border-gray-200 dark:border-gray-600 mt-2 pt-4">
+              <span className="text-sm font-semibold">Enable Receipt & Shipping Details</span>
+              <input
+                type="checkbox"
+                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+                checked={visibleColumns.showReceiptDetails}
+                onChange={() =>
+                  setVisibleColumns((prev) => ({
+                    ...prev,
+                    showReceiptDetails: !prev.showReceiptDetails,
+                  }))
+                }
+              />
+            </label>
 
             <div className="flex justify-end mt-5">
               <button
@@ -1718,248 +1760,191 @@ const PurchaseVoucher: React.FC = () => {
           }`}
       >
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium mb-1" htmlFor="date">
-                Date
-              </label>
-              <input
-                type="date"
-                id="date"
-                name="date"
-                value={formData.date}
-                onChange={handleChange}
-                required
-                className={getInputClasses(theme, !!errors.date)}
-              />
-              {errors.date && (
-                <p className="text-red-500 text-xs mt-1">{errors.date}</p>
-              )}
-            </div>
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="number"
-              >
-                Voucher No.
-              </label>{" "}
-              <input
-                type="text"
-                id="number"
-                name="number"
-                value={formData.number}
-                readOnly
-                className={`${getInputClasses(
-                  theme,
-                  !!errors.number
-                )} bg-opacity-60 cursor-not-allowed`}
-              />
-              {errors.number && (
-                <p className="text-red-500 text-xs mt-1">{errors.number}</p>
-              )}
-            </div>
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="referenceNo"
-              >
-                Supplier Invoice
-              </label>
-              <input
-                type="text"
-                id="referenceNo"
-                name="referenceNo"
-                value={formData.referenceNo}
-                onChange={handleChange}
-                required
-                placeholder="Enter supplier invoice number"
-                className={getInputClasses(theme, !!errors.referenceNo)}
-              />
-              {errors.referenceNo && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.referenceNo}
-                </p>
-              )}
-            </div>
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="supplierInvoiceDate"
-              >
-                Supplier Invoice Date
-              </label>
-              <input
-                type="date"
-                id="supplierInvoiceDate"
-                name="supplierInvoiceDate"
-                value={formData.supplierInvoiceDate}
-                onChange={handleChange}
-                required
-                className={getInputClasses(theme, !!errors.supplierInvoiceDate)}
-              />
-              {errors.supplierInvoiceDate && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.supplierInvoiceDate}
-                </p>
-              )}
-            </div>
-
-            {formData.mode !== "accounting-invoice" &&
-              formData.mode !== "as-voucher" && (
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    htmlFor="partyId"
-                  >
-                    Party Name
-                  </label>
-
-                  <select
-                    id="partyId"
-                    name="partyId"
-                    value={formData.partyId}
-                    onChange={handlePartyChange}
-                    className={getSelectClasses(theme, !!errors.partyId)}
-                  >
-                    <option value="">-- Select Party --</option>
-
-                    {partyLedgers.map((ledger) => (
-                      <option key={ledger.id} value={ledger.id}>
-                        {ledger.name}
-                      </option>
-                    ))}
-
-                    <option
-                      value="add-new"
-                      className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                        ? "bg-blue-600 hover:bg-green-700"
-                        : "bg-green-600 hover:bg-green-700 text-white"
-                        }`}
-                    >
-                      + Add New Ledger
-                    </option>
-                  </select>
-
-                  {selectedPartyLedger && (() => {
-                    const partyState =
-                      selectedPartyLedger.state ||
-                      selectedPartyLedger.state_name ||
-                      selectedPartyLedger.State ||
-                      "N/A";
-
-                    return (
-                      <div
-                        className={`mt-1 text-xs font-medium ${isRegularCharge ? "text-green-600" : "text-orange-600"
-                          }`}
-                      >
-                        {isRegularCharge ? (
-                          <>
-                            Regular
-                            <span className="ml-2 text-gray-600">
-                              (GSTIN: {selectedPartyLedger.gstNumber || "N/A"}, State: {partyState})
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            Inward supplies liable to reverse charge
-                            <span className="ml-2 text-gray-600">
-                              (State: {partyState})
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-
-                  {errors.partyId && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors.partyId}
-                    </p>
-                  )}
-                </div>
-              )}
-          </div>
-
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            {/* Godown Enable/Disable dropdown */}
-            {visibleColumns.godown && (
+          {/* Header Form Fields - Properly Organized in 4-Column Grid */}
+          <div className={`p-5 mb-8 rounded-xl border ${theme === "dark" ? "bg-gray-800/50 border-gray-700" : "bg-gray-50/50 border-gray-200"} space-y-6 shadow-sm`}>
+            {/* Row 1: Primary Details */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="godownEnabled"
-                >
-                  Enable Godown Selection
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="date">
+                  Voucher Date
+                </label>
+                <input
+                  type="date"
+                  id="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleChange}
+                  required
+                  className={getInputClasses(theme, !!errors.date)}
+                />
+                {errors.date && (
+                  <p className="text-red-500 text-xs mt-1">{errors.date}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="number">
+                  Voucher No.
+                </label>
+                <input
+                  type="text"
+                  id="number"
+                  name="number"
+                  value={formData.number}
+                  readOnly
+                  className={`${getInputClasses(theme, !!errors.number)} bg-opacity-60 cursor-not-allowed font-mono`}
+                />
+                {errors.number && (
+                  <p className="text-red-500 text-xs mt-1">{errors.number}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="referenceNo">
+                  Supplier Invoice #
+                </label>
+                <input
+                  type="text"
+                  id="referenceNo"
+                  name="referenceNo"
+                  value={formData.referenceNo}
+                  onChange={handleChange}
+                  required
+                  placeholder="Invoice Number"
+                  className={getInputClasses(theme, !!errors.referenceNo)}
+                />
+                {errors.referenceNo && (
+                  <p className="text-red-500 text-xs mt-1">{errors.referenceNo}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="supplierInvoiceDate">
+                  Invoice Date
+                </label>
+                <input
+                  type="date"
+                  id="supplierInvoiceDate"
+                  name="supplierInvoiceDate"
+                  value={formData.supplierInvoiceDate}
+                  onChange={handleChange}
+                  required
+                  className={getInputClasses(theme, !!errors.supplierInvoiceDate)}
+                />
+                {errors.supplierInvoiceDate && (
+                  <p className="text-red-500 text-xs mt-1">{errors.supplierInvoiceDate}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Row 2: Party & Selection */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div className="md:col-span-2">
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="partyId">
+                  Party / Supplier Name
                 </label>
                 <select
-                  id="godownEnabled"
-                  value={godownEnabled}
-                  onChange={(e) =>
-                    setGodownEnabled(e.target.value as "yes" | "no")
-                  }
+                  id="partyId"
+                  name="partyId"
+                  value={formData.partyId}
+                  onChange={handlePartyChange}
+                  className={`${getSelectClasses(theme, !!errors.partyId)} font-semibold`}
+                >
+                  <option value="">-- Select Party --</option>
+                  {partyLedgers.map((ledger) => (
+                    <option key={ledger.id} value={ledger.id}>{ledger.name}</option>
+                  ))}
+                  <option value="add-new" className="text-blue-600 font-bold">+ Create New Ledger</option>
+                </select>
+                {selectedPartyLedger && (() => {
+                  const partyState = selectedPartyLedger.state || selectedPartyLedger.state_name || selectedPartyLedger.State || "N/A";
+                  return (
+                    <div className={`mt-1.5 text-[10px] font-bold flex items-center gap-1.5 px-2 py-0.5 rounded-full w-fit ${isRegularCharge ? "bg-green-100 text-green-700 dark:bg-green-900/30" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isRegularCharge ? "bg-green-600" : "bg-orange-600 animate-pulse"}`}></span>
+                      {isRegularCharge ? `REGULAR | GSTIN: ${selectedPartyLedger.gstNumber || "N/A"} | ${partyState}` : `REVERSE CHARGE | ${partyState}`}
+                    </div>
+                  );
+                })()}
+                {errors.partyId && <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
+                  Transaction Mode
+                </label>
+                <select
+                  name="mode"
+                  value={formData.mode}
+                  onChange={handleChange}
                   className={getSelectClasses(theme)}
                 >
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
+                  <option value="item-invoice">Item Invoice</option>
+                  <option value="accounting-invoice">Accounting Invoice</option>
+                  <option value="as-voucher">As Voucher</option>
                 </select>
               </div>
-            )}
 
-            {visibleColumns.receiptDocNo && (
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="dispatchDetails.docNo"
-                >
-                  Receipt Doc No.
-                </label>
-                <input
-                  type="text"
-                  id="dispatchDetails.docNo"
-                  name="dispatchDetails.docNo"
-                  value={formData.dispatchDetails?.docNo ?? ""}
-                  onChange={handleChange}
-                  className={getInputClasses(theme)}
-                />
-              </div>
-            )}
+              {formData.mode === "item-invoice" && visibleColumns.godown && (
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
+                    Godown Tracking
+                  </label>
+                  <select
+                    value={godownEnabled}
+                    onChange={(e) => setGodownEnabled(e.target.value as "yes" | "no")}
+                    className={getSelectClasses(theme)}
+                  >
+                    <option value="yes">Enabled (Yes)</option>
+                    <option value="no">Disabled (No)</option>
+                  </select>
+                </div>
+              )}
+            </div>
 
-            {visibleColumns.receiptThrough && (
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="dispatchDetails.through"
-                >
-                  Receipt Through
-                </label>
-                <input
-                  type="text"
-                  id="dispatchDetails.through"
-                  name="dispatchDetails.through"
-                  value={formData.dispatchDetails?.through ?? ""}
-                  onChange={handleChange}
-                  className={getInputClasses(theme)}
-                />
-              </div>
-            )}
+            {/* Row 3: Receipt Details (Conditional with animation) */}
+            {visibleColumns.showReceiptDetails && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-dashed border-gray-300 dark:border-gray-700 animate-in fade-in slide-in-from-top-1">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
+                    Receipt Doc No.
+                  </label>
+                  <input
+                    type="text"
+                    name="dispatchDetails.docNo"
+                    value={formData.dispatchDetails?.docNo ?? ""}
+                    onChange={handleChange}
+                    placeholder="Doc Reference"
+                    className={getInputClasses(theme)}
+                  />
+                </div>
 
-            {visibleColumns.origin && (
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="dispatchDetails.destination"
-                >
-                  Origin
-                </label>
-                <input
-                  type="text"
-                  id="dispatchDetails.destination"
-                  name="dispatchDetails.destination"
-                  value={formData.dispatchDetails?.destination ?? ""}
-                  onChange={handleChange}
-                  className={getInputClasses(theme)}
-                />
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
+                    Receipt Through
+                  </label>
+                  <input
+                    type="text"
+                    name="dispatchDetails.through"
+                    value={formData.dispatchDetails?.through ?? ""}
+                    onChange={handleChange}
+                    placeholder="E.g. Transport Name"
+                    className={getInputClasses(theme)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
+                    Origin / Source
+                  </label>
+                  <input
+                    type="text"
+                    name="dispatchDetails.destination"
+                    value={formData.dispatchDetails?.destination ?? ""}
+                    onChange={handleChange}
+                    placeholder="Place of Origin"
+                    className={getInputClasses(theme)}
+                  />
+                </div>
               </div>
             )}
           </div>
