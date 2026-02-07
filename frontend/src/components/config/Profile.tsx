@@ -101,11 +101,10 @@ const InputField: React.FC<InputFieldProps> = ({
       required={required}
       placeholder={placeholder}
       title={title}
-      className={`w-full p-2 rounded border ${
-        theme === "dark"
-          ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
-          : "bg-white border-gray-300 focus:border-blue-500"
-      } outline-none transition-colors`}
+      className={`w-full p-2 rounded border ${theme === "dark"
+        ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
+        : "bg-white border-gray-300 focus:border-blue-500"
+        } outline-none transition-colors`}
     />
   </div>
 );
@@ -148,11 +147,10 @@ const SelectField: React.FC<SelectFieldProps> = ({
       value={value}
       onChange={onChange}
       required={required}
-      className={`w-full p-2 rounded border ${
-        theme === "dark"
-          ? "bg-gray-700 border-gray-600 text-white"
-          : "bg-white border-gray-300 text-black"
-      } outline-none transition-colors`}
+      className={`w-full p-2 rounded border ${theme === "dark"
+        ? "bg-gray-700 border-gray-600 text-white"
+        : "bg-white border-gray-300 text-black"
+        } outline-none transition-colors`}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>
@@ -176,6 +174,7 @@ const Profile: React.FC = () => {
     phoneNumber: "",
     email: "",
     panNumber: "",
+    tanNumber: "",
     gstNumber: "",
     vatNumber: "",
     cinNumber: "",
@@ -227,6 +226,7 @@ const Profile: React.FC = () => {
           phoneNumber: data.phoneNumber || "",
           email: data.email || "",
           panNumber: data.panNumber || "",
+          tanNumber: data.tanNumber || "",
           gstNumber: data.gstNumber || "",
           vatNumber: data.vatNumber || "",
           cinNumber: "", // frontend-only
@@ -330,6 +330,9 @@ const Profile: React.FC = () => {
     if (!company.state) newErrors.state = "State is required";
     if (!company.panNumber.trim())
       newErrors.panNumber = "PAN number is required";
+    if (!company.tanNumber.trim()) {
+      newErrors.tanNumber = "TAN number is required";
+    }
     if (!company.email) newErrors.email = "Email is required";
 
     // Format validations
@@ -477,94 +480,92 @@ const Profile: React.FC = () => {
     return !!formValues;
   };
 
- const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  if (!validateForm()) {
-    Swal.fire({
-      title: "Validation Error",
-      text: "Please fix the errors before submitting",
-      icon: "error",
-      confirmButtonColor: "#d33",
-    });
-    return;
-  }
-
-  try {
-    // 1️⃣ Vault password confirmation
-    const vaultConfirmed = await handleVaultConfirmation();
-    if (!vaultConfirmed) return;
-
-    // 2️⃣ Access control login
-    const accessConfirmed = await handleAccessControlLogin();
-    if (!accessConfirmed) return;
-
-    // 3️⃣ Prepare payload
-    const payload = {
-      ...company,
-      cinNumber: undefined, // frontend only
-      vaultEnabled,
-      vaultPassword: vaultEnabled ? vaultPassword : null,
-      accessControlEnabled,
-      username: accessControlEnabled ? username : null,
-      password: accessControlEnabled ? password : null,
-      employeeId: localStorage.getItem("employee_id"),
-    };
-
-    // 4️⃣ PUT API call (UPDATE)
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/company/company/${companyId}`,
-      {
-        method: "PUT",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(payload),
-      }
-    );
-
-    const data = await res.json();
-
-    if (!res.ok) {
-      throw new Error(data.message || "Failed to update company");
+    if (!validateForm()) {
+      Swal.fire({
+        title: "Validation Error",
+        text: "Please fix the errors before submitting",
+        icon: "error",
+        confirmButtonColor: "#d33",
+      });
+      return;
     }
 
-    // ✅ 5️⃣ SUCCESS MESSAGE (NO REDIRECT)
-    await Swal.fire({
-      title: "✅ Company Updated",
-      text: "Company information updated successfully",
-      icon: "success",
-      timer: 1500,
-      showConfirmButton: false,
-    });
+    try {
+      // 1️⃣ Vault password confirmation
+      const vaultConfirmed = await handleVaultConfirmation();
+      if (!vaultConfirmed) return;
+
+      // 2️⃣ Access control login
+      const accessConfirmed = await handleAccessControlLogin();
+      if (!accessConfirmed) return;
+
+      // 3️⃣ Prepare payload
+      const payload = {
+        ...company,
+        cinNumber: undefined, // frontend only
+        vaultEnabled,
+        vaultPassword: vaultEnabled ? vaultPassword : null,
+        accessControlEnabled,
+        username: accessControlEnabled ? username : null,
+        password: accessControlEnabled ? password : null,
+        employeeId: localStorage.getItem("employee_id"),
+      };
+
+      // 4️⃣ PUT API call (UPDATE)
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/company/company/${companyId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!res.ok) {
+        throw new Error(data.message || "Failed to update company");
+      }
+
+      // ✅ 5️⃣ SUCCESS MESSAGE (NO REDIRECT)
+      await Swal.fire({
+        title: "✅ Company Updated",
+        text: "Company information updated successfully",
+        icon: "success",
+        timer: 1500,
+        showConfirmButton: false,
+      });
 
 
 
-    setCompanyInfo(company);
+      setCompanyInfo(company);
 
-  } catch (err) {
-    console.error("Submit error:", err);
-    Swal.fire({
-      title: "Network Error!",
-      text: "Could not update company. Please try again.",
-      icon: "error",
-      confirmButtonColor: "#d33",
-    });
-  }
-};
+    } catch (err) {
+      console.error("Submit error:", err);
+      Swal.fire({
+        title: "Network Error!",
+        text: "Could not update company. Please try again.",
+        icon: "error",
+        confirmButtonColor: "#d33",
+      });
+    }
+  };
 
 
   return (
     <div className="pt-[56px] px-4">
       <div
-        className={`max-w-4xl mx-auto p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow-md"
-        }`}
+        className={`max-w-4xl mx-auto p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow-md"
+          }`}
       >
         <h2
-          className={`text-2xl font-bold mb-6 ${
-            theme === "dark" ? "text-white" : "text-gray-900"
-          }`}
+          className={`text-2xl font-bold mb-6 ${theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
         >
           Edit Company
         </h2>
@@ -572,14 +573,12 @@ const Profile: React.FC = () => {
         <form onSubmit={handleSubmit}>
           {/* Basic Company Information */}
           <div
-            className={`p-4 rounded-lg mb-6 ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-            }`}
+            className={`p-4 rounded-lg mb-6 ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+              }`}
           >
             <h3
-              className={`text-lg font-semibold mb-4 ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}
+              className={`text-lg font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
             >
               <Building size={20} className="inline mr-2" />
               Basic Information
@@ -738,22 +737,42 @@ const Profile: React.FC = () => {
                 )}
               </div>
 
-              <div>
-                <InputField
-                  id="panNumber"
-                  name="panNumber"
-                  label="PAN Number *"
-                  value={company.panNumber}
-                  onChange={handleChange}
-                  icon={<CreditCard size={16} />}
-                  theme={theme}
-                  placeholder="e.g., ABCDE1234F"
-                />
-                {errors.panNumber && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {errors.panNumber}
-                  </p>
-                )}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <InputField
+                    id="panNumber"
+                    name="panNumber"
+                    label="PAN Number *"
+                    value={company.panNumber}
+                    onChange={handleChange}
+                    icon={<CreditCard size={16} />}
+                    theme={theme}
+                    placeholder="e.g., ABCDE1234F"
+                  />
+                  {errors.panNumber && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.panNumber}
+                    </p>
+                  )}
+                </div>
+
+                <div>
+                  <InputField
+                    id="tanNumber"
+                    name="tanNumber"
+                    label="TAN Number *"
+                    value={company.tanNumber}
+                    onChange={handleChange}
+                    icon={<CreditCard size={16} />}
+                    theme={theme}
+                    placeholder="e.g., ABCD12345E"
+                  />
+                  {errors.tanNumber && (
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.tanNumber}
+                    </p>
+                  )}
+                </div>
               </div>
 
               <div>
@@ -789,21 +808,20 @@ const Profile: React.FC = () => {
                   onChange={handleChange}
                   placeholder={`Enter ${company.taxType} number`}
                   title={`Enter the ${company.taxType} Number`}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                      : "bg-white border-gray-300 text-black focus:border-blue-500"
-                  } outline-none transition-colors`}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                    : "bg-white border-gray-300 text-black focus:border-blue-500"
+                    } outline-none transition-colors`}
                 />
 
                 {((company.taxType === "GST" && errors.gstNumber) ||
                   (company.taxType === "VAT" && errors.vatNumber)) && (
-                  <p className="text-red-500 text-sm mt-1">
-                    {company.taxType === "GST"
-                      ? errors.gstNumber
-                      : errors.vatNumber}
-                  </p>
-                )}
+                    <p className="text-red-500 text-sm mt-1">
+                      {company.taxType === "GST"
+                        ? errors.gstNumber
+                        : errors.vatNumber}
+                    </p>
+                  )}
               </div>
 
               <div>
@@ -855,11 +873,10 @@ const Profile: React.FC = () => {
                     name="accountantName"
                     value={company.accountantName || ""}
                     onChange={handleChange}
-                    className={`w-full p-2 rounded border ${
-                      theme === "dark"
-                        ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                        : "bg-white border-gray-300 text-black focus:border-blue-500"
-                    } outline-none transition-colors`}
+                    className={`w-full p-2 rounded border ${theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                      : "bg-white border-gray-300 text-black focus:border-blue-500"
+                      } outline-none transition-colors`}
                   >
                     <option value="">-- Select Accountant --</option>
                     {accountantsList.map((acc) => (
@@ -879,14 +896,12 @@ const Profile: React.FC = () => {
           </div>
           {/* Tally Vault Security */}
           <div
-            className={`p-4 rounded-lg mb-6 ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-            }`}
+            className={`p-4 rounded-lg mb-6 ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+              }`}
           >
             <h3
-              className={`text-lg font-semibold mb-4 ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}
+              className={`text-lg font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
             >
               <Lock size={20} className="inline mr-2" />
               Tally Vault Security (Optional)
@@ -901,11 +916,10 @@ const Profile: React.FC = () => {
                   title="Enable or disable Tally Vault password protection"
                   value={vaultEnabled ? "yes" : "no"}
                   onChange={(e) => setVaultEnabled(e.target.value === "yes")}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-white"
-                      : "bg-white border-gray-300 text-black"
-                  } outline-none transition-colors`}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white"
+                    : "bg-white border-gray-300 text-black"
+                    } outline-none transition-colors`}
                 >
                   <option value="no">No</option>
                   <option value="yes">Yes</option>
@@ -915,9 +929,8 @@ const Profile: React.FC = () => {
               {vaultEnabled && (
                 <>
                   <div
-                    className={`p-3 rounded border-l-4 border-orange-500 ${
-                      theme === "dark" ? "bg-orange-900/20" : "bg-orange-50"
-                    }`}
+                    className={`p-3 rounded border-l-4 border-orange-500 ${theme === "dark" ? "bg-orange-900/20" : "bg-orange-50"
+                      }`}
                   >
                     <div className="flex items-start">
                       <AlertTriangle
@@ -943,11 +956,10 @@ const Profile: React.FC = () => {
                         value={vaultPassword}
                         onChange={(e) => setVaultPassword(e.target.value)}
                         placeholder="Enter vault password (min 6 characters)"
-                        className={`w-full p-2 pr-10 rounded border ${
-                          theme === "dark"
-                            ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                            : "bg-white border-gray-300 text-black focus:border-blue-500"
-                        } outline-none transition-colors`}
+                        className={`w-full p-2 pr-10 rounded border ${theme === "dark"
+                          ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                          : "bg-white border-gray-300 text-black focus:border-blue-500"
+                          } outline-none transition-colors`}
                       />
                       <button
                         type="button"
@@ -974,14 +986,12 @@ const Profile: React.FC = () => {
 
           {/* Access Control */}
           <div
-            className={`p-4 rounded-lg mb-6 ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-            }`}
+            className={`p-4 rounded-lg mb-6 ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+              }`}
           >
             <h3
-              className={`text-lg font-semibold mb-4 ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}
+              className={`text-lg font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
             >
               <Shield size={20} className="inline mr-2" />
               Access Control (Optional)
@@ -998,11 +1008,10 @@ const Profile: React.FC = () => {
                   onChange={(e) =>
                     setAccessControlEnabled(e.target.value === "yes")
                   }
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-white"
-                      : "bg-white border-gray-300 text-black"
-                  } outline-none transition-colors`}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white"
+                    : "bg-white border-gray-300 text-black"
+                    } outline-none transition-colors`}
                 >
                   <option value="no">No</option>
                   <option value="yes">Yes</option>
@@ -1021,11 +1030,10 @@ const Profile: React.FC = () => {
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="Enter username"
-                      className={`w-full p-2 rounded border ${
-                        theme === "dark"
-                          ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                          : "bg-white border-gray-300 text-black focus:border-blue-500"
-                      } outline-none transition-colors`}
+                      className={`w-full p-2 rounded border ${theme === "dark"
+                        ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                        : "bg-white border-gray-300 text-black focus:border-blue-500"
+                        } outline-none transition-colors`}
                     />
                     {errors.username && (
                       <p className="text-red-500 text-sm mt-1">
@@ -1045,11 +1053,10 @@ const Profile: React.FC = () => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Enter password (min 8 characters)"
-                        className={`w-full p-2 pr-10 rounded border ${
-                          theme === "dark"
-                            ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                            : "bg-white border-gray-300 text-black focus:border-blue-500"
-                        } outline-none transition-colors`}
+                        className={`w-full p-2 pr-10 rounded border ${theme === "dark"
+                          ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                          : "bg-white border-gray-300 text-black focus:border-blue-500"
+                          } outline-none transition-colors`}
                       />
                       <button
                         type="button"
@@ -1081,11 +1088,10 @@ const Profile: React.FC = () => {
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="Confirm your password"
-                        className={`w-full p-2 pr-10 rounded border ${
-                          theme === "dark"
-                            ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                            : "bg-white border-gray-300 text-black focus:border-blue-500"
-                        } outline-none transition-colors`}
+                        className={`w-full p-2 pr-10 rounded border ${theme === "dark"
+                          ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                          : "bg-white border-gray-300 text-black focus:border-blue-500"
+                          } outline-none transition-colors`}
                       />
                       <button
                         type="button"
@@ -1114,31 +1120,27 @@ const Profile: React.FC = () => {
 
           {/* Admin Information */}
           <div
-            className={`p-4 rounded-lg mb-6 ${
-              theme === "dark" ? "bg-blue-900/20" : "bg-blue-50"
-            }`}
+            className={`p-4 rounded-lg mb-6 ${theme === "dark" ? "bg-blue-900/20" : "bg-blue-50"
+              }`}
           >
             <h3
-              className={`text-lg font-semibold mb-2 ${
-                theme === "dark" ? "text-blue-200" : "text-blue-900"
-              }`}
+              className={`text-lg font-semibold mb-2 ${theme === "dark" ? "text-blue-200" : "text-blue-900"
+                }`}
             >
               <User size={20} className="inline mr-2" />
               Admin Rights
             </h3>
             <p
-              className={`text-sm ${
-                theme === "dark" ? "text-blue-300" : "text-blue-800"
-              }`}
+              className={`text-sm ${theme === "dark" ? "text-blue-300" : "text-blue-800"
+                }`}
             >
               You will be automatically set as the{" "}
               <strong>Administrator</strong> of this company with full access
               to:
             </p>
             <ul
-              className={`mt-2 text-sm space-y-1 ${
-                theme === "dark" ? "text-blue-300" : "text-blue-800"
-              }`}
+              className={`mt-2 text-sm space-y-1 ${theme === "dark" ? "text-blue-300" : "text-blue-800"
+                }`}
             >
               <li>• Lock/Unlock company access</li>
               <li>• Grant or revoke user permissions</li>
@@ -1151,22 +1153,20 @@ const Profile: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate("/app")}
-              className={`flex items-center gap-2 px-6 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-gray-200 hover:bg-gray-300"
-              } transition-colors`}
+              className={`flex items-center gap-2 px-6 py-2 rounded ${theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600"
+                : "bg-gray-200 hover:bg-gray-300"
+                } transition-colors`}
             >
               <X size={16} />
               Cancel
             </button>
             <button
               type="submit"
-              className={`flex items-center gap-2 px-6 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              } transition-colors`}
+              className={`flex items-center gap-2 px-6 py-2 rounded ${theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+                } transition-colors`}
             >
               <Save size={16} />
               Update Company

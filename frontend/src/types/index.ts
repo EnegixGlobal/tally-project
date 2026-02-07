@@ -10,6 +10,7 @@ export type CompanyInfo = {
   phoneNumber: string;
   email: string;
   panNumber: string;
+  tanNumber: string;
   gstNumber: string;
   vatNumber: string;
   cinNumber: string;
