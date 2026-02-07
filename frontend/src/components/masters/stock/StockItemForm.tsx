@@ -12,6 +12,22 @@ import Barcode from "react-barcode";
 import { nanoid } from "nanoid";
 import { useParams } from "react-router-dom";
 
+const generateEAN13 = () => {
+  let code = "890"; // India prefix
+  for (let i = 0; i < 9; i++) {
+    code += Math.floor(Math.random() * 10).toString();
+  }
+
+  // Calculate checksum for EAN-13
+  let sum = 0;
+  for (let i = 0; i < 12; i++) {
+    sum += parseInt(code[i]) * (i % 2 === 0 ? 1 : 3);
+  }
+  const checksum = (10 - (sum % 10)) % 10;
+  return code + checksum;
+};
+
+
 // Interface for InputField props
 interface InputFieldProps {
   id: string;
@@ -364,10 +380,12 @@ const StockItemForm = () => {
     fetchStockItem();
   }, [id, companyId, ownerType, ownerId]);
 
-  // Generate barcode on first load or on form reset
+  // Generate barcode on first load if not editing
   useEffect(() => {
-    setBarcode(nanoid(12));
-  }, []);
+    if (!id) {
+      setBarcode(generateEAN13());
+    }
+  }, [id]);
 
   interface FormData {
     name: string;
@@ -839,6 +857,7 @@ const StockItemForm = () => {
             />
 
             <div className="md:col-span-2">
+
               <label className="block text-sm font-medium mb-1">Product Image</label>
               <div className="flex items-center space-x-4">
                 <div
@@ -900,7 +919,7 @@ const StockItemForm = () => {
                 Enable Batch Tracking
               </label>
 
-             
+
 
 
               {/* Right: Add Batch Button */}
@@ -1046,6 +1065,7 @@ const StockItemForm = () => {
                 <Barcode value={barcode} width={1} height={40} fontSize={16} />
               </div>
             )}
+
           </div>
 
           <div className="mt-6 flex justify-end gap-3">

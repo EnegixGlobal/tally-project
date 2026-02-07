@@ -141,6 +141,9 @@ router.get("/next-number", async (req, res) => {
 
     console.log("voucherNumber:", voucherNumber);
 
+    // ✅ Create TDS columns if they don't exist
+    await ensureTDSColumns();
+
     return res.json({
       success: true,
       voucherNumber
@@ -192,6 +195,36 @@ ADD COLUMN purchaseLedgerId INT NULL
   isPurchaseLedgerChecked = true;
 };
 
+// ✅ AUTO CREATE TDS COLUMNS
+let isTDSChecked = false;
+const ensureTDSColumns = async () => {
+  if (isTDSChecked) return;
+
+  // 1️⃣ purchase_voucher_items -> tdsRate
+  const [itemRows] = await db.execute(`
+    SHOW COLUMNS FROM purchase_voucher_items LIKE 'tdsRate'
+  `);
+  if (itemRows.length === 0) {
+    await db.execute(`
+      ALTER TABLE purchase_voucher_items ADD COLUMN tdsRate DECIMAL(10,2) DEFAULT 0
+    `);
+    console.log("✅ tdsRate column created in purchase_voucher_items");
+  }
+
+  // 2️⃣ purchase_vouchers -> tdsTotal
+  const [voucherRows] = await db.execute(`
+    SHOW COLUMNS FROM purchase_vouchers LIKE 'tdsTotal'
+  `);
+  if (voucherRows.length === 0) {
+    await db.execute(`
+      ALTER TABLE purchase_vouchers ADD COLUMN tdsTotal DECIMAL(10,2) DEFAULT 0
+    `);
+    console.log("✅ tdsTotal column created in purchase_vouchers");
+  }
+
+  isTDSChecked = true;
+};
+
 
 
 // ================= ROUTE =================
@@ -209,6 +242,7 @@ router.post("/", async (req, res) => {
     sgstTotal,
     igstTotal,
     discountTotal,
+    tdsTotal,
     total,
     entries = [],
     mode,
@@ -237,6 +271,7 @@ router.post("/", async (req, res) => {
   try {
     // ================= FETCH STATES =================
     await ensurePurchaseLedgerColumn();
+    await ensureTDSColumns();
 
     let companyState = "";
     let partyState = "";
@@ -283,8 +318,8 @@ router.post("/", async (req, res) => {
       Number(subtotal || 0) +
       Number(finalCgst || 0) +
       Number(finalSgst || 0) +
-      Number(finalIgst || 0) -
-      Number(discountTotal || 0);
+      Number(discountTotal || 0) +
+      Number(tdsTotal || 0);
 
 
     // ================= DISPATCH =================
@@ -338,11 +373,12 @@ router.post("/", async (req, res) => {
         sgstTotal,
         igstTotal,
         discountTotal,
+        tdsTotal,
         total,
         company_id,
         owner_type,
         owner_id
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `;
 
     const insertVoucherValues = [
@@ -364,6 +400,7 @@ router.post("/", async (req, res) => {
       finalSgst,
       finalIgst,
       discountTotal ?? 0,
+      tdsTotal ?? 0,
       finalTotal,
 
       finalCompanyId,
@@ -400,6 +437,7 @@ router.post("/", async (req, res) => {
         sgstRate,
         igstRate,
         amount,
+        tdsRate,
         godownId,
         purchaseLedgerId
       ) VALUES ?
@@ -425,6 +463,7 @@ router.post("/", async (req, res) => {
           0,
 
           Number(e.amount || 0),
+          Number(e.tdsRate || 0),
           e.godownId || null,
 
           e.purchaseLedgerId || purchaseLedgerId || null,
@@ -447,6 +486,7 @@ router.post("/", async (req, res) => {
         Number(e.gstLedgerId || 0),
 
         Number(e.amount || 0),
+        Number(e.tdsRate || 0),
         e.godownId || null,
 
         e.purchaseLedgerId || purchaseLedgerId || null,
@@ -747,6 +787,7 @@ router.get("/:id", async (req, res) => {
 
         godownId: item.godownId,
         purchaseLedgerId: item.purchaseLedgerId,
+        tdsRate: item.tdsRate, // ✅ Added
 
         // 🔥 FROM HISTORY
         batchNumber: historyRow?.batchNumber || "",
@@ -786,6 +827,7 @@ router.get("/:id", async (req, res) => {
       sgstTotal: voucher.sgstTotal,
       igstTotal: voucher.igstTotal,
       discountTotal: voucher.discountTotal,
+      tdsTotal: voucher.tdsTotal, // ✅ Added
       total: voucher.total,
 
       // ⭐ MAIN
@@ -822,8 +864,9 @@ router.put("/:id", async (req, res) => {
     sgstTotal,
     igstTotal,
     discountTotal,
+    tdsTotal,
     total,
-    entries = [], // ✅ Get entries
+    entries = [],
     mode,
     purchaseLedgerId,
     companyId,
@@ -879,6 +922,7 @@ router.put("/:id", async (req, res) => {
 
     // ================= STATES & GST LOGIC (COPIED FROM POST) =================
     await ensurePurchaseLedgerColumn();
+    await ensureTDSColumns();
 
     let companyState = "";
     let partyState = "";
@@ -906,6 +950,26 @@ router.put("/:id", async (req, res) => {
       cleanState(partyState) &&
       cleanState(companyState) === cleanState(partyState);
 
+    // ================= GST TOTAL FIX =================
+    let finalCgst = Number(cgstTotal || 0);
+    let finalSgst = Number(sgstTotal || 0);
+    let finalIgst = Number(igstTotal || 0);
+
+    if (isIntra) {
+      finalIgst = 0;
+    } else {
+      finalCgst = 0;
+      finalSgst = 0;
+    }
+
+    // ================= FINAL TOTAL FIX =================
+    const finalTotal =
+      Number(subtotal || 0) +
+      Number(finalCgst || 0) +
+      Number(finalSgst || 0) +
+      Number(discountTotal || 0) +
+      Number(tdsTotal || 0);
+
     // =====================================================================
 
     const dispatchDocNo = dispatchDetails?.docNo || null;
@@ -929,6 +993,7 @@ router.put("/:id", async (req, res) => {
         sgstTotal = ?,
         igstTotal = ?,
         discountTotal = ?,
+        tdsTotal = ?,
         total = ?,
         company_id = ?,
         owner_type = ?,
@@ -948,11 +1013,12 @@ router.put("/:id", async (req, res) => {
       destination ?? null,
       purchaseLedgerId ?? null,
       subtotal ?? 0,
-      cgstTotal ?? 0,
-      sgstTotal ?? 0,
-      igstTotal ?? 0,
+      finalCgst,
+      finalSgst,
+      finalIgst,
       discountTotal ?? 0,
-      total ?? 0,
+      tdsTotal ?? 0,
+      finalTotal,
       finalCompanyId,
       finalOwnerType,
       finalOwnerId,
@@ -981,6 +1047,7 @@ router.put("/:id", async (req, res) => {
           sgstRate,
           igstRate,
           amount,
+          tdsRate,
           godownId,
           purchaseLedgerId
         ) VALUES ?
@@ -999,6 +1066,7 @@ router.put("/:id", async (req, res) => {
             Number(e.sgstLedgerId || 0),
             0,
             Number(e.amount || 0),
+            Number(e.tdsRate || 0),
             e.godownId || null,
             e.purchaseLedgerId || purchaseLedgerId || null,
           ];
@@ -1016,6 +1084,7 @@ router.put("/:id", async (req, res) => {
           // ✅ LEDGER ID
           Number(e.gstLedgerId || 0),
           Number(e.amount || 0),
+          Number(e.tdsRate || 0),
           e.godownId || null,
           e.purchaseLedgerId || purchaseLedgerId || null,
         ];

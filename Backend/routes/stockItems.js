@@ -1574,7 +1574,7 @@ router.get("/:id", async (req, res) => {
 router.patch("/:id/batches", async (req, res) => {
   const { id } = req.params;
   const { company_id, owner_type, owner_id } = req.query;
-  const { batchName, quantity, rate } = req.body;
+  const { batchName, quantity, rate, mode } = req.body;
 
   if (quantity === undefined) {
     return res.status(400).json({
@@ -1586,8 +1586,8 @@ router.patch("/:id/batches", async (req, res) => {
   const connection = await db.getConnection();
   try {
     const [rows] = await connection.execute(
-      `SELECT batches FROM stock_items
-       WHERE id=? AND company_id=? AND owner_type=? AND owner_id=?`,
+      `SELECT batches, allowNegativeStock FROM stock_items
+         WHERE id=? AND company_id=? AND owner_type=? AND owner_id=?`,
       [id, company_id, owner_type, owner_id]
     );
 
@@ -1598,7 +1598,8 @@ router.patch("/:id/batches", async (req, res) => {
       });
     }
 
-    let batches = JSON.parse(rows[0].batches || "[]");
+    const item = rows[0];
+    let batches = JSON.parse(item.batches || "[]");
 
     const index = batches.findIndex(
       (b) => String(b.batchName ?? "") === String(batchName ?? "")
@@ -1612,15 +1613,31 @@ router.patch("/:id/batches", async (req, res) => {
     }
 
     // =========================
-    // ✅ PURE REPLACE LOGIC
+    // ✅ LOGIC: ADD or REPLACE
     // =========================
-    const newQty = Number(quantity);
+    let newQty = 0;
+
+    if (mode === "add") {
+      // Incremental update (add/subtract)
+      newQty = Number(batches[index].batchQuantity || 0) + Number(quantity);
+    } else {
+      // Default: Replace (absolute set)
+      newQty = Number(quantity);
+    }
 
     if (newQty < 0) {
-      return res.status(400).json({
-        success: false,
-        message: "Quantity cannot be negative",
-      });
+      // Optional: Check allowNegativeStock if needed, 
+      // currently standardizing on preventing negative unless explicitly allowed? 
+      // But for now, let's just Block negative unless item allows it (if we had the flag).
+      // The query above fetches allowNegativeStock, let's use it.
+      const allowNegative = item.allowNegativeStock === 1;
+
+      if (!allowNegative) {
+        return res.status(400).json({
+          success: false,
+          message: `Stock cannot be negative (Current: ${batches[index].batchQuantity}, Requested Change: ${quantity})`,
+        });
+      }
     }
 
     batches[index].batchQuantity = newQty;

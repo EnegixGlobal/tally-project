@@ -2,10 +2,10 @@ import React, { useState, useMemo, useRef, useEffect, type Key, type ReactNode }
 import { useAppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { 
-  ArrowLeft, 
-  Download, 
-  Filter, 
+import {
+  ArrowLeft,
+  Download,
+  Filter,
   Eye,
   User,
   ShoppingBag,
@@ -72,6 +72,13 @@ const B2C: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // For display (similar to B2CHsn)
+  const [saleData, setSaleData] = useState<any[]>([]);
+  const [partyIds, setPartyIds] = useState<number[]>([]);
+  const [ledger, setLedger] = useState<any[]>([]);
+  const [matchedSales, setMatchedSales] = useState<any[]>([]);
+  const [salesHistory, setSalesHistory] = useState<any[]>([]);
+
   // Get auth parameters from localStorage
   // Try multiple keys as different parts of the app may use different keys
   const company_id = localStorage.getItem('company_id') || '';
@@ -98,13 +105,13 @@ const B2C: React.FC = () => {
       setLoading(false);
       return;
     }
-    
+
     if (!owner_type) {
       setError('User type is missing. Please log in again.');
       setLoading(false);
       return;
     }
-    
+
     if (!owner_id) {
       setError('Owner ID is missing. Please log in again.');
       setLoading(false);
@@ -131,7 +138,7 @@ const B2C: React.FC = () => {
         setLoading(false);
       });
   }, [company_id, owner_type, owner_id]);
-  
+
   useEffect(() => {
     if (!company_id || !owner_type || !owner_id) {
       setLoading(false);
@@ -140,7 +147,7 @@ const B2C: React.FC = () => {
 
     setLoading(true);
     setError(null);
-    
+
     // Fetch B2C orders (sales without GST numbers)
     // Backend filters: WHERE (l.gst_number IS NULL OR l.gst_number = '')
     axios
@@ -155,35 +162,35 @@ const B2C: React.FC = () => {
       })
       .then(res => {
         console.log('B2C Orders API Response:', res.data);
-        
+
         // Backend returns item-level rows, need to group by order
         const rawData = res.data as any[];
-        
+
         if (!Array.isArray(rawData)) {
           console.error('Expected array but got:', typeof rawData);
           setOrders([]);
           setLoading(false);
           return;
         }
-        
+
         if (rawData.length === 0) {
           console.log('No B2C orders found for the selected date range');
           setOrders([]);
           setLoading(false);
           return;
         }
-        
+
         // Group items by orderId to create order objects with items arrays
         const orderMap = new Map<number, Order>();
-        
+
         rawData.forEach((row: any) => {
           const orderId = row.orderId;
-          
+
           if (!orderId) {
             console.warn('Row missing orderId:', row);
             return;
           }
-          
+
           if (!orderMap.has(orderId)) {
             // Create new order object
             orderMap.set(orderId, {
@@ -206,7 +213,7 @@ const B2C: React.FC = () => {
               gstNumber: row.gstNumber || null, // Should be null/empty for B2C
             });
           }
-          
+
           // Add item to order
           const order = orderMap.get(orderId)!;
           if (row.itemId && row.itemName) {
@@ -224,14 +231,14 @@ const B2C: React.FC = () => {
             });
           }
         });
-        
+
         // Convert map to array - Backend already filters by GST number
         // Only filter out if GST number exists and is not empty (safety check)
         const ordersArray = Array.from(orderMap.values()).filter(order => {
           // Keep orders that have no GST number or empty GST number
           return !order.gstNumber || String(order.gstNumber).trim() === '';
         });
-        
+
         console.log(`Processed ${ordersArray.length} B2C orders from ${rawData.length} item rows`);
         setOrders(ordersArray);
         setLoading(false);
@@ -244,6 +251,130 @@ const B2C: React.FC = () => {
       });
   }, [company_id, owner_type, owner_id, filters.fromDate, filters.toDate]);
 
+  // 🔹 Fetch sales vouchers for B2C (similar to B2CHsn)
+  useEffect(() => {
+    if (!company_id || !owner_type || !owner_id) return;
+
+    const loadSalesVouchers = async () => {
+      try {
+        const url = `${import.meta.env.VITE_API_URL
+          }/api/sales-vouchers?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`;
+
+        const res = await fetch(url);
+        const json = await res.json();
+
+        const vouchers = json?.data || json || [];
+
+        const allPartyIds = vouchers
+          .map((v: any) => v.partyId)
+          .filter((id: any) => id !== null && id !== undefined);
+
+        setSaleData(vouchers);
+        setPartyIds(allPartyIds);
+      } catch (err) {
+        console.error("Failed to fetch sales vouchers:", err);
+        setSaleData([]);
+        setPartyIds([]);
+      }
+    };
+
+    loadSalesVouchers();
+  }, [company_id, owner_type, owner_id]);
+
+  // 🔹 Fetch ledger data
+  useEffect(() => {
+    const fetchLedger = async () => {
+      try {
+        const ledgerRes = await fetch(
+          `${import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+        );
+        const ledgerData = await ledgerRes.json();
+        setLedger(ledgerData || []);
+      } catch (err) {
+        console.error("Ledger fetch failed:", err);
+        setLedger([]);
+      }
+    };
+
+    if (company_id && owner_type && owner_id) {
+      fetchLedger();
+    }
+  }, [company_id, owner_type, owner_id]);
+
+  // 🔹 Match B2C sales (ledgers WITHOUT GST numbers)
+  useEffect(() => {
+    if (!partyIds.length || !ledger.length || !saleData.length) return;
+
+    // Filter ledgers to only those WITHOUT GST numbers (B2C)
+    const filteredLedgers = ledger.filter((l: any) => {
+      return (
+        partyIds.includes(l.id) &&
+        (!l.gstNumber || String(l.gstNumber).trim() === "")
+      );
+    });
+
+    // Get matched ledger ids
+    const matchedLedgerIdSet = new Set(filteredLedgers.map((l: any) => l.id));
+
+    // Filter sales to only those with matched ledgers (B2C)
+    const filteredSales = saleData.filter((s: any) =>
+      matchedLedgerIdSet.has(s.partyId)
+    );
+
+    console.log("B2C filteredSales", filteredSales);
+    setMatchedSales(filteredSales);
+  }, [partyIds, ledger, saleData]);
+
+  // 🔹 Ledger quick lookup (id → ledger)
+  const ledgerMap = useMemo(() => {
+    const map = new Map<number, any>();
+    ledger.forEach((l: any) => {
+      map.set(l.id, l);
+    });
+    return map;
+  }, [ledger]);
+
+  // 🔹 Fetch sales history for HSN codes (for QTY and Rate)
+  useEffect(() => {
+    const fetchSalesHistory = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL
+          }/api/sales-vouchers/sale-history?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+        );
+        const resJson = await res.json();
+        const rows = Array.isArray(resJson?.data)
+          ? resJson.data
+          : Array.isArray(resJson)
+            ? resJson
+            : [];
+
+        setSalesHistory(rows);
+      } catch (err) {
+        console.error("Sales history fetch failed", err);
+        setSalesHistory([]);
+      }
+    };
+
+    if (company_id && owner_type && owner_id) {
+      fetchSalesHistory();
+    }
+  }, [company_id, owner_type, owner_id]);
+
+  const salesHistoryMap = useMemo(() => {
+    return new Map(salesHistory.map((h: any) => [h.voucherNumber, h]));
+  }, [salesHistory]);
+
+  const getQtyByVoucher = (voucherNo: string) => {
+    const qty = salesHistoryMap.get(voucherNo)?.qtyChange;
+    return qty ? Math.abs(qty) : "";
+  };
+
+  const getRateByVoucher = (voucherNo: string) => {
+    return salesHistoryMap.get(voucherNo)?.rate || "";
+  };
+
   const filteredTransactions = useMemo(() => {
     if (!orders || orders.length === 0) {
       return [];
@@ -253,42 +384,42 @@ const B2C: React.FC = () => {
       // Safety filter: Ensure no GST numbers (backend already filters, but double-check)
       const noGstNumber = !transaction.gstNumber || String(transaction.gstNumber).trim() === '';
       if (!noGstNumber) return false;
-      
+
       // Date filter - data is already filtered by API, but verify for safety
       const transactionDate = new Date(transaction.orderDate);
       const fromDate = new Date(filters.fromDate);
       fromDate.setHours(0, 0, 0, 0);
       const toDate = new Date(filters.toDate);
       toDate.setHours(23, 59, 59, 999);
-      
+
       const dateInRange = transactionDate >= fromDate && transactionDate <= toDate;
       if (!dateInRange) return false;
-      
+
       // Customer name filter (case-insensitive search)
-      const customerMatch = !filters.customerFilter || 
+      const customerMatch = !filters.customerFilter ||
         transaction.customerName?.toLowerCase().includes(filters.customerFilter.toLowerCase().trim());
       if (!customerMatch) return false;
-      
+
       // Payment method filter
-      const paymentMatch = !filters.paymentMethod || 
+      const paymentMatch = !filters.paymentMethod ||
         transaction.paymentMethod?.toLowerCase() === filters.paymentMethod.toLowerCase();
       if (!paymentMatch) return false;
-      
+
       // Order status filter (note: orderStatus is hardcoded as 'delivered' in current implementation)
-      const statusMatch = !filters.orderStatus || 
+      const statusMatch = !filters.orderStatus ||
         transaction.orderStatus?.toLowerCase() === filters.orderStatus.toLowerCase();
       if (!statusMatch) return false;
-      
+
       // Source filter (note: source is hardcoded as '' in current implementation)
-      const sourceMatch = !filters.source || 
+      const sourceMatch = !filters.source ||
         transaction.source?.toLowerCase() === filters.source.toLowerCase();
       if (!sourceMatch) return false;
-      
+
       // Amount range filter
       const amountMatch = (!filters.amountRangeMin || transaction.netAmount >= Number(filters.amountRangeMin)) &&
         (!filters.amountRangeMax || transaction.netAmount <= Number(filters.amountRangeMax));
       if (!amountMatch) return false;
-      
+
       return true;
     });
   }, [orders, filters]);
@@ -300,9 +431,9 @@ const B2C: React.FC = () => {
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     const totalCustomers = customers.length;
     const activeCustomers = customers.filter(c => c.status === 'active').length;
-    const customerLifetimeValue = totalCustomers > 0 ? 
+    const customerLifetimeValue = totalCustomers > 0 ?
       customers.reduce((sum, c) => sum + c.totalSpent, 0) / totalCustomers : 0;
-    
+
     const orderStatusCounts = {
       placed: filteredTransactions.filter(t => t.orderStatus === 'placed').length,
       confirmed: filteredTransactions.filter(t => t.orderStatus === 'confirmed').length,
@@ -469,11 +600,10 @@ const B2C: React.FC = () => {
           <button
             onClick={() => navigate('/app/reports')}
             title="Back to Reports"
-            className={`p-2 rounded-lg mr-3 ${
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white' 
-                : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-            }`}
+            className={`p-2 rounded-lg mr-3 ${theme === 'dark'
+              ? 'bg-gray-700 hover:bg-gray-600 text-white'
+              : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+              }`}
           >
             <ArrowLeft size={20} />
           </button>
@@ -484,7 +614,7 @@ const B2C: React.FC = () => {
             </h1>
             <p className="text-sm text-gray-600 mt-1">Business-to-Consumer sales and customer management</p>
             <p className="text-xs text-purple-600 mt-1">
-              📊 <strong>Showing sales transactions from customers WITHOUT GST numbers</strong> | 
+              📊 <strong>Showing sales transactions from customers WITHOUT GST numbers</strong> |
               <span className="ml-2">B2B transactions (with GST numbers) are shown in the B2B module</span>
             </p>
           </div>
@@ -493,20 +623,18 @@ const B2C: React.FC = () => {
           <button
             onClick={() => setShowFilterPanel(!showFilterPanel)}
             title="Toggle Filters"
-            className={`p-2 rounded-lg ${
-              showFilterPanel
-                ? (theme === 'dark' ? 'bg-purple-600' : 'bg-purple-500 text-white')
-                : (theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200')
-            }`}
+            className={`p-2 rounded-lg ${showFilterPanel
+              ? (theme === 'dark' ? 'bg-purple-600' : 'bg-purple-500 text-white')
+              : (theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200')
+              }`}
           >
             <Filter size={16} />
           </button>
           <button
             onClick={handleExport}
             title="Export to Excel"
-            className={`p-2 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
-            }`}
+            className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
+              }`}
           >
             <Download size={16} />
           </button>
@@ -515,9 +643,8 @@ const B2C: React.FC = () => {
 
       {/* Error Message */}
       {error && (
-        <div className={`mb-4 p-4 rounded-lg ${
-          theme === 'dark' ? 'bg-red-900 text-red-100' : 'bg-red-50 text-red-800'
-        }`}>
+        <div className={`mb-4 p-4 rounded-lg ${theme === 'dark' ? 'bg-red-900 text-red-100' : 'bg-red-50 text-red-800'
+          }`}>
           <p className="font-semibold">Error:</p>
           <p className="text-sm">{error}</p>
         </div>
@@ -525,9 +652,8 @@ const B2C: React.FC = () => {
 
       {/* Loading Message */}
       {loading && (
-        <div className={`mb-4 p-4 rounded-lg text-center ${
-          theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
-        }`}>
+        <div className={`mb-4 p-4 rounded-lg text-center ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+          }`}>
           <p>Loading B2C orders...</p>
         </div>
       )}
@@ -544,18 +670,16 @@ const B2C: React.FC = () => {
 
       {/* Filter Panel */}
       {showFilterPanel && (
-        <div className={`p-4 rounded-lg mb-6 ${
-          theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
-        }`}>
+        <div className={`p-4 rounded-lg mb-6 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+          }`}>
           <div className="flex items-center justify-between mb-4">
             <h3 className="text-lg font-semibold">Filters</h3>
             <button
               onClick={handleClearFilters}
-              className={`px-3 py-1 text-sm rounded ${
-                theme === 'dark' 
-                  ? 'bg-gray-700 hover:bg-gray-600 text-white' 
-                  : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
-              }`}
+              className={`px-3 py-1 text-sm rounded ${theme === 'dark'
+                ? 'bg-gray-700 hover:bg-gray-600 text-white'
+                : 'bg-gray-200 hover:bg-gray-300 text-gray-700'
+                }`}
             >
               Clear All
             </button>
@@ -567,11 +691,10 @@ const B2C: React.FC = () => {
                 value={filters.dateRange}
                 onChange={(e) => handleDateRangeChange(e.target.value)}
                 title="Select date range"
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                  ? 'bg-gray-700 border-gray-600 text-white'
+                  : 'bg-white border-gray-300 text-black'
+                  } outline-none`}
               >
                 <option value="today">Today</option>
                 <option value="this-week">This Week</option>
@@ -590,11 +713,10 @@ const B2C: React.FC = () => {
                     type="date"
                     value={filters.fromDate}
                     onChange={(e) => handleFilterChange('fromDate', e.target.value)}
-                    className={`w-full p-2 rounded border ${
-                      theme === 'dark' 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-black'
-                    } outline-none`}
+                    className={`w-full p-2 rounded border ${theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600 text-white'
+                      : 'bg-white border-gray-300 text-black'
+                      } outline-none`}
                   />
                 </div>
                 <div>
@@ -603,11 +725,10 @@ const B2C: React.FC = () => {
                     type="date"
                     value={filters.toDate}
                     onChange={(e) => handleFilterChange('toDate', e.target.value)}
-                    className={`w-full p-2 rounded border ${
-                      theme === 'dark' 
-                        ? 'bg-gray-700 border-gray-600 text-white' 
-                        : 'bg-white border-gray-300 text-black'
-                    } outline-none`}
+                    className={`w-full p-2 rounded border ${theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600 text-white'
+                      : 'bg-white border-gray-300 text-black'
+                      } outline-none`}
                   />
                 </div>
               </>
@@ -620,11 +741,10 @@ const B2C: React.FC = () => {
                 placeholder="Search customer..."
                 value={filters.customerFilter}
                 onChange={(e) => handleFilterChange('customerFilter', e.target.value)}
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                  ? 'bg-gray-700 border-gray-600 text-white'
+                  : 'bg-white border-gray-300 text-black'
+                  } outline-none`}
               />
             </div>
 
@@ -634,11 +754,10 @@ const B2C: React.FC = () => {
                 value={filters.paymentMethod}
                 onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
                 title="Select payment method"
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                  ? 'bg-gray-700 border-gray-600 text-white'
+                  : 'bg-white border-gray-300 text-black'
+                  } outline-none`}
               >
                 <option value="">All Methods</option>
                 <option value="card">Card</option>
@@ -656,11 +775,10 @@ const B2C: React.FC = () => {
                 value={filters.orderStatus}
                 onChange={(e) => handleFilterChange('orderStatus', e.target.value)}
                 title="Select order status"
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                  ? 'bg-gray-700 border-gray-600 text-white'
+                  : 'bg-white border-gray-300 text-black'
+                  } outline-none`}
               >
                 <option value="">All Status</option>
                 <option value="placed">Placed</option>
@@ -679,11 +797,10 @@ const B2C: React.FC = () => {
                 value={filters.source}
                 onChange={(e) => handleFilterChange('source', e.target.value)}
                 title="Select source"
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                  ? 'bg-gray-700 border-gray-600 text-white'
+                  : 'bg-white border-gray-300 text-black'
+                  } outline-none`}
               >
                 <option value="">All Sources</option>
                 <option value="website">Website</option>
@@ -703,11 +820,10 @@ const B2C: React.FC = () => {
                 onChange={(e) => handleFilterChange('amountRangeMin', e.target.value)}
                 min="0"
                 step="0.01"
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                  ? 'bg-gray-700 border-gray-600 text-white'
+                  : 'bg-white border-gray-300 text-black'
+                  } outline-none`}
               />
             </div>
 
@@ -720,11 +836,10 @@ const B2C: React.FC = () => {
                 onChange={(e) => handleFilterChange('amountRangeMax', e.target.value)}
                 min="0"
                 step="0.01"
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
-                    : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                  ? 'bg-gray-700 border-gray-600 text-white'
+                  : 'bg-white border-gray-300 text-black'
+                  } outline-none`}
               />
             </div>
           </div>
@@ -740,9 +855,8 @@ const B2C: React.FC = () => {
           <div className="space-y-6">
             {/* Summary Cards */}
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div className={`p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
+              <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+                }`}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm opacity-75">Total Orders</p>
@@ -752,9 +866,8 @@ const B2C: React.FC = () => {
                 </div>
               </div>
 
-              <div className={`p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
+              <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+                }`}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm opacity-75">Revenue</p>
@@ -764,9 +877,8 @@ const B2C: React.FC = () => {
                 </div>
               </div>
 
-              <div className={`p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
+              <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+                }`}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm opacity-75">Avg Order Value</p>
@@ -776,9 +888,8 @@ const B2C: React.FC = () => {
                 </div>
               </div>
 
-              <div className={`p-4 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
+              <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+                }`}>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-sm opacity-75">Active Customers</p>
@@ -790,49 +901,77 @@ const B2C: React.FC = () => {
             </div>
 
             {/* Recent Orders */}
-            <div className={`p-6 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
+            <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+              }`}>
               <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className={`${
-                    theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                  }`}>
+                  <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
+                    }`}>
                     <tr>
-                      <th className="text-left p-3">Order</th>
                       <th className="text-left p-3">Customer</th>
+                      <th className="text-left p-3">Voucher No</th>
+                      <th className="text-left p-3">QTY</th>
+                      <th className="text-left p-3">Rate</th>
                       <th className="text-left p-3">Amount</th>
-                      <th className="text-left p-3">Status</th>
+                      <th className="text-left p-3">Tax Value</th>
+                      <th className="text-left p-3">IGST</th>
+                      <th className="text-left p-3">CGST</th>
+                      <th className="text-left p-3">SGST</th>
+                      <th className="text-left p-3">Total Amount</th>
                       <th className="text-left p-3">Date</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredTransactions.slice(0, 5).map((transaction, index) => (
-                      <tr key={transaction.id || transaction.orderId || `order-${index}`} className={`border-b ${
-                        theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-                      }`}>
-                        <td className="p-3">
-                          <div>
-                            <div className="font-medium">{transaction.orderNumber}</div>
-                            <div className="text-sm opacity-75">{transaction.items.length} items</div>
-                          </div>
-                        </td>
-                        <td className="p-3">
-                          <div>
-                            <div className="font-medium">{transaction.customerName}</div>
-                            <div className="text-sm opacity-75">{transaction.source}</div>
-                          </div>
-                        </td>
-                        <td className="p-3 font-medium">{formatCurrency(transaction.netAmount)}</td>
-                        <td className="p-3">
-                          <span className={`px-2 py-1 rounded-full text-xs ${getStatusColor(transaction.orderStatus)}`}>
-                            {transaction.orderStatus || 'N/A'}
-                          </span>
-                        </td>
-                        <td className="p-3">{new Date(transaction.orderDate).toLocaleDateString()}</td>
-                      </tr>
-                    ))}
+                    {matchedSales.slice(0, 5).map((sale, index) => {
+                      const partyLedger = ledgerMap.get(sale.partyId);
+
+                      return (
+                        <tr key={sale.id || index} className={`border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+                          }`}>
+                          {/* Customer */}
+                          <td className="p-3">
+                            <div className="font-medium">{partyLedger?.name || "Unknown Party"}</div>
+                          </td>
+
+                          {/* Voucher No */}
+                          <td className="p-3 font-mono">{sale.number}</td>
+
+                          {/* QTY */}
+                          <td className="p-3">{getQtyByVoucher(sale.number)}</td>
+
+                          {/* Rate */}
+                          <td className="p-3">{getRateByVoucher(sale.number)}</td>
+
+                          {/* Amount (Taxable) */}
+                          <td className="p-3">₹{Number(sale.subtotal || 0).toFixed(2)}</td>
+
+                          {/* Tax Value */}
+                          <td className="p-3">
+                            ₹{(
+                              Number(sale.igstTotal || 0) +
+                              Number(sale.cgstTotal || 0) +
+                              Number(sale.sgstTotal || 0)
+                            ).toFixed(2)}
+                          </td>
+
+                          {/* IGST */}
+                          <td className="p-3">{sale.igstTotal || 0}%</td>
+
+                          {/* CGST */}
+                          <td className="p-3">{sale.cgstTotal || 0}%</td>
+
+                          {/* SGST */}
+                          <td className="p-3">{sale.sgstTotal || 0}%</td>
+
+                          {/* Total Amount */}
+                          <td className="p-3 font-semibold">₹{Number(sale.total || 0).toFixed(2)}</td>
+
+                          {/* Date */}
+                          <td className="p-3">{new Date(sale.date).toLocaleDateString('en-IN')}</td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
@@ -872,11 +1011,10 @@ const B2C: React.FC = () => {
       </div>
 
       {/* Pro Tip */}
-      <div className={`mt-6 p-4 rounded-lg ${
-        theme === 'dark' ? 'bg-gray-800' : 'bg-purple-50'
-      }`}>
+      <div className={`mt-6 p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-purple-50'
+        }`}>
         <p className="text-sm">
-          <span className="font-semibold">Pro Tip:</span> Use the B2C module to track customer behavior, 
+          <span className="font-semibold">Pro Tip:</span> Use the B2C module to track customer behavior,
           analyze purchase patterns, and create targeted marketing campaigns. Leverage loyalty programs to increase retention.
         </p>
       </div>

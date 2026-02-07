@@ -207,7 +207,12 @@ const PurchaseVoucher: React.FC = () => {
   const partyLedgers = ledgers;
 
   const purchaseLedgers = ledgers.filter((l) =>
-    String(l.name).toLowerCase().includes("purchase")
+    String(l.name).toLowerCase().includes("purchase") ||
+    String(l.groupName).toLowerCase().includes("purchase accounts")
+  );
+
+  const tdsLedgers = ledgers.filter((l) =>
+    String(l.name).toUpperCase().includes("TDS")
   );
 
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
@@ -218,17 +223,190 @@ const PurchaseVoucher: React.FC = () => {
   const [supplierState, setSupplierState] = useState("");
 
 
-  const [visibleColumns, setVisibleColumns] = useState<Record<string, boolean>>(
+  const [visibleColumns, setVisibleColumns] = useState(
     {
       hsn: true,
       gst: true,
       batch: true,
       godown: true,
-      receiptDocNo: true,
-      receiptThrough: true,
-      origin: true,
+      showReceiptDetails: true,
+      tds: true,
     }
   );
+
+  // Barcode State
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [isBarcodeError, setIsBarcodeError] = useState(false);
+
+  // Helper to find stock item details
+  const resolveStockItemDetails = (itemId: string) => {
+    const item = stockItems.find((i) => String(i.id) === String(itemId));
+    if (!item) return {};
+
+    return {
+      name: item.name,
+      hsnCode: item.hsnCode,
+      unit: item.unit,
+      gstRate: Number(item.gstRate || 0),
+      // For Purchase, we usually use standardPurchaseRate, but fallback to rate/mrp if needed
+      standardPurchaseRate: Number(item.standardPurchaseRate || item.purchaseRate || item.rate || 0),
+      batches: item.batches,
+      gstLedgerId: item.gstLedgerId,
+      sgstLedgerId: item.sgstLedgerId,
+      cgstLedgerId: item.cgstLedgerId,
+      igstLedgerId: item.igstLedgerId,
+    };
+  };
+
+  const performBarcodeLookup = async (code: string) => {
+    if (!code.trim()) return;
+
+    try {
+      // Using sales-vouchers endpoint as requested by user ("ke jaisa") which implies same logic
+      // Assuming backend endpoint is generic enough or we use the sales one for item lookup
+      const url = `${import.meta.env.VITE_API_URL}/api/sales-vouchers/item-by-barcode?barcode=${code}&company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (json.success && json.data) {
+        setIsBarcodeError(false);
+        const item = json.data;
+        const details = resolveStockItemDetails(item.id);
+
+        setFormData((prev) => {
+          const updatedEntries = [...prev.entries];
+
+          const gst = Number(details.gstRate || 0);
+
+          // Calculate amounts using existing helper
+          const calculated = calculateEntryValues(
+            1, // quantity 1 by default
+            Number(details.standardPurchaseRate || 0),
+            0, // discount
+            gst,
+            companyState,
+            supplierState
+          );
+
+          // Get normalized tax ledgers/rates
+          const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(
+            gst,
+            companyState,
+            supplierState
+          );
+
+          // 🔍 Find Purchase Ledger
+          let gstToMatch = gst;
+          // If GST is 0, try to deduce from GST ledger name (similar to manual entry logic)
+          if (gstToMatch === 0 && details.gstLedgerId) {
+            const ledger = ledgers.find((l) => String(l.id) === String(details.gstLedgerId));
+            if (ledger) {
+              const match = ledger.name.match(/(\d+(\.\d+)?)/);
+              gstToMatch = match ? Number(match[1]) : 0;
+            }
+          }
+
+          const matchingPurchaseLedger = purchaseLedgers.find((l) => {
+            const name = String(l.name).toLowerCase();
+            return (
+              name.includes(`${gstToMatch}%`) ||
+              name.includes(`${gstToMatch} %`) ||
+              name.includes(`purchase ${gstToMatch}`) ||
+              name.includes(`@${gstToMatch}%`) ||
+              name.includes(`@ ${gstToMatch}%`)
+            );
+          });
+
+          // ⚠️ Warning if not found
+          if (!matchingPurchaseLedger && gstToMatch > 0) {
+            Swal.fire({
+              title: "Purchase Ledger Missing",
+              text: `Purchase ${gstToMatch}% Ledger not found. Please create it first.`,
+              icon: "warning",
+              confirmButtonColor: "#3085d6",
+            });
+          }
+
+          const newEntry = {
+            id: `e${Date.now()}`,
+            itemId: String(item.id),
+            hsnCode: details.hsnCode || "",
+            unitName: details.unit || "",
+
+            quantity: 1,
+            rate: calculated.rate,
+            amount: calculated.amount,
+
+            gstRate: gst,
+            cgstRate: cgstRate,
+            sgstRate: sgstRate,
+            igstRate: igstRate,
+
+            // Prioritize item master tax ledgers
+            gstLedgerId: details.gstLedgerId || "",
+            sgstLedgerId: details.sgstLedgerId || "",
+            cgstLedgerId: details.cgstLedgerId || "",
+            igstLedgerId: details.igstLedgerId || "",
+
+            batches: details.batches || [],
+            batchNumber: "",
+            godownId: "",
+            discount: 0,
+            purchaseLedgerId: matchingPurchaseLedger?.id || prev.purchaseLedgerId || "",
+
+            // Fill other required fields based on Type
+            type: "debit",
+          };
+
+          const lastIndex = updatedEntries.length - 1;
+          // If last row is empty (no item selected), replace it; otherwise add new
+          if (lastIndex >= 0 && !updatedEntries[lastIndex].itemId) {
+            updatedEntries[lastIndex] = newEntry as any;
+          } else {
+            updatedEntries.push(newEntry as any);
+          }
+
+          return { ...prev, entries: updatedEntries };
+        });
+
+        const Toast = Swal.mixin({
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 1500,
+          timerProgressBar: true,
+        });
+        Toast.fire({
+          icon: 'success',
+          title: `Item added: ${item.name}`
+        });
+      } else {
+        if (code) {
+          setIsBarcodeError(true);
+        }
+      }
+    } catch (err) {
+      console.error("Barcode Fetch Error:", err);
+      setIsBarcodeError(true);
+    }
+  };
+
+  // Debounced Barcode Lookup
+  useEffect(() => {
+    if (!barcodeInput || barcodeInput.length < 3) return;
+
+    const timer = setTimeout(() => {
+      performBarcodeLookup(barcodeInput);
+    }, 600);
+
+    return () => clearTimeout(timer);
+  }, [barcodeInput]);
+
+  const handleBarcodeSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!barcodeInput.trim()) return;
+    performBarcodeLookup(barcodeInput);
+  };
 
   useEffect(() => {
     if (!isEditMode || !id) return;
@@ -247,6 +425,8 @@ const PurchaseVoucher: React.FC = () => {
           referenceNo: data.referenceNo || "",
           partyId: data.partyId || "",
           purchaseLedgerId: data.purchaseLedgerId || "",
+          tdsLedgerId: data.tdsLedgerId || "",
+          tdsAmount: data.tdsAmount || 0,
           narration: data.narration || "",
           number: data.number || prev.number,
 
@@ -254,6 +434,7 @@ const PurchaseVoucher: React.FC = () => {
             docNo: data.dispatchDocNo || "",
             through: data.dispatchThrough || "",
             destination: data.destination || "",
+            approxDistance: data.approxDistance || "",
           },
 
           entries:
@@ -486,7 +667,10 @@ const PurchaseVoucher: React.FC = () => {
     purchaseLedgerId: "", // New field for purchase ledger
     partyId: "",
     mode: "item-invoice",
-    dispatchDetails: { docNo: "", through: "", destination: "" },
+    tdsLedgerId: "",
+    tdsRate: 0,
+    tdsAmount: 0,
+    dispatchDetails: { docNo: "", through: "", destination: "", approxDistance: "" },
     entries: [
       {
         id: "e1",
@@ -666,9 +850,37 @@ const PurchaseVoucher: React.FC = () => {
           Number(selected?.standardPurchaseRate ?? selected?.rate ?? 0),
           0, // discount
           gst,
-          safeCompanyInfo.state,
+          companyState || "",
           supplierState
         );
+
+        // Auto selection of Purchase Ledger based on GST rate
+        // Improved matching: Case-insensitive, handles various formats like "18%", "18 %", "@18%"
+        let gstToMatch = gst;
+        if (gstToMatch === 0 && selected?.gstLedgerId) {
+          const taxLedgerName = getLedgerNameById(selected.gstLedgerId);
+          gstToMatch = extractGstPercent(taxLedgerName);
+        }
+
+        const matchingPurchaseLedger = purchaseLedgers.find((l) => {
+          const name = String(l.name).toLowerCase();
+          return (
+            name.includes(`${gstToMatch}%`) ||
+            name.includes(`${gstToMatch} %`) ||
+            name.includes(`purchase ${gstToMatch}`) ||
+            name.includes(`@${gstToMatch}%`) ||
+            name.includes(`@ ${gstToMatch}%`)
+          );
+        });
+
+        if (!matchingPurchaseLedger && gstToMatch > 0) {
+          Swal.fire({
+            title: "Purchase Ledger Missing",
+            text: `Purchase ${gstToMatch}% Ledger not found. Please create it first.`,
+            icon: "warning",
+            confirmButtonColor: "#3085d6",
+          });
+        }
 
         updatedEntries[index] = {
           ...entry,
@@ -682,6 +894,8 @@ const PurchaseVoucher: React.FC = () => {
           cgstRate: calculated.cgstRate,
           sgstRate: calculated.sgstRate,
           igstRate: calculated.igstRate,
+
+          purchaseLedgerId: matchingPurchaseLedger?.id || entry.purchaseLedgerId || "",
 
           // ✅ GST LEDGER IDS
           gstLedgerId: selected?.gstLedgerId || "",
@@ -749,7 +963,7 @@ const PurchaseVoucher: React.FC = () => {
           newRate,
           newDisc,
           gst,
-          safeCompanyInfo.state,
+          companyState || "",
           supplierState
         );
 
@@ -843,7 +1057,7 @@ const PurchaseVoucher: React.FC = () => {
           ...e,
           ...resolvePurchaseGst(
             gst,
-            safeCompanyInfo.state,
+            safeCompanyInfo.state || "",
             supplierState
           ),
           amount: (() => {
@@ -852,7 +1066,7 @@ const PurchaseVoucher: React.FC = () => {
               Number(e.rate || 0),
               Number(e.discount || 0),
               gst,
-              safeCompanyInfo.state,
+              companyState || "",
               supplierState
             );
             return calculated.amount;
@@ -860,7 +1074,7 @@ const PurchaseVoucher: React.FC = () => {
         };
       }),
     }));
-  }, [supplierState, safeStockItems, safeCompanyInfo.state]);
+  }, [supplierState, safeStockItems, companyState]);
 
 
   const addEntry = () => {
@@ -875,7 +1089,7 @@ const PurchaseVoucher: React.FC = () => {
           quantity: 0,
           rate: 0,
           amount: 0,
-          type: formData.mode === "item-invoice" ? "debit" : "debit",
+          type: "debit",
           cgstRate: 0,
           sgstRate: 0,
           igstRate: 0,
@@ -1009,7 +1223,11 @@ const PurchaseVoucher: React.FC = () => {
     return match ? Number(match[1]) : 0;
   };
 
-
+  // 🔹 Intra / Inter State Check
+  const isIntraState =
+    cleanState(companyState) &&
+    cleanState(supplierState) && // Changed from partyState to supplierState
+    cleanState(companyState) === cleanState(supplierState); // Changed from partyState to supplierState
 
   const calculateTotals = () => {
     if (formData.mode === "item-invoice") {
@@ -1032,26 +1250,21 @@ const PurchaseVoucher: React.FC = () => {
             getLedgerNameById(entry.gstLedgerId)
           );
 
-          // ✅ Total GST Rate
-          const totalGstRate = sgst + cgst + igst;
+          // ✅ Total GST Rate (respecting Intra/Inter state)
+          const totalGstRate = isIntraState ? (sgst + cgst) : igst;
 
           const baseAmount = qty * rate;
-
           const gstAmount = (baseAmount * totalGstRate) / 100;
-
           const totalAmount = baseAmount + gstAmount - discount;
 
           return {
             subtotal: acc.subtotal + baseAmount,
 
-            cgstTotal: acc.cgstTotal + (baseAmount * cgst) / 100,
-
-            sgstTotal: acc.sgstTotal + (baseAmount * sgst) / 100,
-
-            igstTotal: acc.igstTotal + (baseAmount * igst) / 100,
+            cgstTotal: acc.cgstTotal + (isIntraState ? (baseAmount * cgst) / 100 : 0),
+            sgstTotal: acc.sgstTotal + (isIntraState ? (baseAmount * sgst) / 100 : 0),
+            igstTotal: acc.igstTotal + (!isIntraState ? (baseAmount * igst) / 100 : 0),
 
             discountTotal: acc.discountTotal + discount,
-
             total: acc.total + totalAmount,
           };
         },
@@ -1065,10 +1278,19 @@ const PurchaseVoucher: React.FC = () => {
         }
       );
 
+      const tdsRatePercent = extractGstPercent(
+        getLedgerNameById(formData.tdsLedgerId)
+      );
+
+      const tdsAmount = (totals.subtotal * tdsRatePercent) / 100;
+
       return {
         ...totals,
         gstTotal: totals.cgstTotal + totals.sgstTotal + totals.igstTotal,
-        total: totals.total - totals.igstTotal, // Subtraing IGST from Grand Total as requested to fix 136 -> 118
+        tdsAmount,
+        tdsTotal: tdsAmount, // ✅ Added for backend
+        tdsRate: tdsRatePercent, // Keep percentage for UI if needed
+        total: totals.total + tdsAmount, // ✅ Added to total as per user requirement (118 + 1 = 119)
       };
     }
     else {
@@ -1084,18 +1306,11 @@ const PurchaseVoucher: React.FC = () => {
     }
   };
 
-  // ✅ Fix GST before saving (Intra / Inter State Logic)
-
-  const isIntra =
-    cleanState(companyState) &&
-    cleanState(supplierState) &&
-    cleanState(companyState) === cleanState(supplierState);
-
   // Update entries GST based on state
   const fixedEntries = formData.entries.map((entry) => {
     if (!entry.itemId) return entry;
 
-    if (isIntra) {
+    if (isIntraState) {
       // Same State → SGST + CGST only
       return {
         ...entry,
@@ -1152,11 +1367,16 @@ const PurchaseVoucher: React.FC = () => {
           firstDebitEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
       }
 
-      // 🔥 1. Voucher payload (batchMeta INCLUDED but no API yet)
+      // 🔥 1. Voucher payload
       const payload = {
         ...formData,
-        partyId: finalPartyId, // Use extracted partyId
+        partyId: finalPartyId,
         ...totals,
+        // ✅ Map entries to include TDS Ledger ID as tdsRate (as requested by user)
+        entries: formData.entries.map(e => ({
+          ...e,
+          tdsRate: formData.tdsLedgerId || 0
+        })),
         companyId,
         ownerType,
         ownerId,
@@ -1270,6 +1490,8 @@ const PurchaseVoucher: React.FC = () => {
     igstTotal = 0,
     gstTotal = 0,
     discountTotal = 0,
+    tdsAmount = 0,
+    tdsRate = 0,
     total = 0,
     debitTotal = 0,
     creditTotal = 0,
@@ -1277,17 +1499,17 @@ const PurchaseVoucher: React.FC = () => {
 
   // Helper functions for print layout
   const getItemDetails = (itemId: string) => {
-    const item = safeStockItems.find((item) => item.id === itemId);
+    const item = safeStockItems.find((item) => String(item.id) === String(itemId));
     return item || { name: "-", hsnCode: "-", unit: "-", gstRate: 0, rate: 0 };
   };
 
   const getPartyName = (partyId: string) => {
-    const party = safeLedgers.find((l) => l.id === partyId);
+    const party = safeLedgers.find((l) => String(l.id) === String(partyId));
     return party?.name || "Unknown Party";
   };
 
   const getPurchaseLedgerName = (purchaseLedgerId: string) => {
-    const ledger = safeLedgers.find((l) => l.id === purchaseLedgerId);
+    const ledger = safeLedgers.find((l) => String(l.id) === String(purchaseLedgerId));
     return ledger?.name || "Unknown Purchase Ledger";
   };
 
@@ -1634,12 +1856,7 @@ const PurchaseVoucher: React.FC = () => {
 
 
   // 🔹 Intra / Inter State Check
-  const isIntraState =
-    cleanState(companyState) &&
-    cleanState(partyState) &&
-    cleanState(companyState) === cleanState(partyState);
-
-
+  // Note: isIntraState is now defined above calculateTotals to avoid ReferenceError
 
   return (
     <div className="pt-[56px] px-4">
@@ -1680,17 +1897,16 @@ const PurchaseVoucher: React.FC = () => {
               { key: "batch", label: "Show Batch Column" },
               { key: "gst", label: "Show GST Column" },
               { key: "godown", label: "Show Godown Column" },
-              { key: "receiptDocNo", label: "Show Receipt Doc No." },
-              { key: "receiptThrough", label: "Show Receipt Through" },
-              { key: "origin", label: "Show Origin" },
+              { key: "tds", label: "Show TDS Row" },
             ].map(({ key, label }) => (
               <label
                 key={key}
-                className="flex justify-between items-center mb-3"
+                className="flex justify-between items-center mb-3 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors"
               >
-                {label}
+                <span className="text-sm font-medium">{label}</span>
                 <input
                   type="checkbox"
+                  className="w-4 h-4 rounded text-blue-600 focus:ring-blue-500"
                   checked={visibleColumns[key]}
                   onChange={() =>
                     setVisibleColumns((prev) => ({
@@ -1701,6 +1917,21 @@ const PurchaseVoucher: React.FC = () => {
                 />
               </label>
             ))}
+
+            <label className="flex justify-between items-center mb-3 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors border-t border-gray-200 dark:border-gray-600 mt-2 pt-4">
+              <span className="text-sm font-semibold">Enable Receipt & Shipping Details</span>
+              <input
+                type="checkbox"
+                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+                checked={visibleColumns.showReceiptDetails}
+                onChange={() =>
+                  setVisibleColumns((prev) => ({
+                    ...prev,
+                    showReceiptDetails: !prev.showReceiptDetails,
+                  }))
+                }
+              />
+            </label>
 
             <div className="flex justify-end mt-5">
               <button
@@ -1718,248 +1949,191 @@ const PurchaseVoucher: React.FC = () => {
           }`}
       >
         <form onSubmit={handleSubmit}>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            <div>
-              <label className="block text-sm font-medium mb-1" htmlFor="date">
-                Date
-              </label>
-              <input
-                type="date"
-                id="date"
-                name="date"
-                value={formData.date}
-                onChange={handleChange}
-                required
-                className={getInputClasses(theme, !!errors.date)}
-              />
-              {errors.date && (
-                <p className="text-red-500 text-xs mt-1">{errors.date}</p>
-              )}
-            </div>
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="number"
-              >
-                Voucher No.
-              </label>{" "}
-              <input
-                type="text"
-                id="number"
-                name="number"
-                value={formData.number}
-                readOnly
-                className={`${getInputClasses(
-                  theme,
-                  !!errors.number
-                )} bg-opacity-60 cursor-not-allowed`}
-              />
-              {errors.number && (
-                <p className="text-red-500 text-xs mt-1">{errors.number}</p>
-              )}
-            </div>
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="referenceNo"
-              >
-                Supplier Invoice
-              </label>
-              <input
-                type="text"
-                id="referenceNo"
-                name="referenceNo"
-                value={formData.referenceNo}
-                onChange={handleChange}
-                required
-                placeholder="Enter supplier invoice number"
-                className={getInputClasses(theme, !!errors.referenceNo)}
-              />
-              {errors.referenceNo && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.referenceNo}
-                </p>
-              )}
-            </div>
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="supplierInvoiceDate"
-              >
-                Supplier Invoice Date
-              </label>
-              <input
-                type="date"
-                id="supplierInvoiceDate"
-                name="supplierInvoiceDate"
-                value={formData.supplierInvoiceDate}
-                onChange={handleChange}
-                required
-                className={getInputClasses(theme, !!errors.supplierInvoiceDate)}
-              />
-              {errors.supplierInvoiceDate && (
-                <p className="text-red-500 text-xs mt-1">
-                  {errors.supplierInvoiceDate}
-                </p>
-              )}
-            </div>
-
-            {formData.mode !== "accounting-invoice" &&
-              formData.mode !== "as-voucher" && (
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    htmlFor="partyId"
-                  >
-                    Party Name
-                  </label>
-
-                  <select
-                    id="partyId"
-                    name="partyId"
-                    value={formData.partyId}
-                    onChange={handlePartyChange}
-                    className={getSelectClasses(theme, !!errors.partyId)}
-                  >
-                    <option value="">-- Select Party --</option>
-
-                    {partyLedgers.map((ledger) => (
-                      <option key={ledger.id} value={ledger.id}>
-                        {ledger.name}
-                      </option>
-                    ))}
-
-                    <option
-                      value="add-new"
-                      className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                        ? "bg-blue-600 hover:bg-green-700"
-                        : "bg-green-600 hover:bg-green-700 text-white"
-                        }`}
-                    >
-                      + Add New Ledger
-                    </option>
-                  </select>
-
-                  {selectedPartyLedger && (() => {
-                    const partyState =
-                      selectedPartyLedger.state ||
-                      selectedPartyLedger.state_name ||
-                      selectedPartyLedger.State ||
-                      "N/A";
-
-                    return (
-                      <div
-                        className={`mt-1 text-xs font-medium ${isRegularCharge ? "text-green-600" : "text-orange-600"
-                          }`}
-                      >
-                        {isRegularCharge ? (
-                          <>
-                            Regular
-                            <span className="ml-2 text-gray-600">
-                              (GSTIN: {selectedPartyLedger.gstNumber || "N/A"}, State: {partyState})
-                            </span>
-                          </>
-                        ) : (
-                          <>
-                            Inward supplies liable to reverse charge
-                            <span className="ml-2 text-gray-600">
-                              (State: {partyState})
-                            </span>
-                          </>
-                        )}
-                      </div>
-                    );
-                  })()}
-
-
-                  {errors.partyId && (
-                    <p className="text-red-500 text-xs mt-1">
-                      {errors.partyId}
-                    </p>
-                  )}
-                </div>
-              )}
-          </div>
-
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-            {/* Godown Enable/Disable dropdown */}
-            {visibleColumns.godown && (
+          {/* Header Form Fields - Properly Organized in 4-Column Grid */}
+          <div className={`p-5 mb-8 rounded-xl border ${theme === "dark" ? "bg-gray-800/50 border-gray-700" : "bg-gray-50/50 border-gray-200"} space-y-6 shadow-sm`}>
+            {/* Row 1: Primary Details */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="godownEnabled"
-                >
-                  Enable Godown Selection
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="date">
+                  Voucher Date
+                </label>
+                <input
+                  type="date"
+                  id="date"
+                  name="date"
+                  value={formData.date}
+                  onChange={handleChange}
+                  required
+                  className={getInputClasses(theme, !!errors.date)}
+                />
+                {errors.date && (
+                  <p className="text-red-500 text-xs mt-1">{errors.date}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="number">
+                  Voucher No.
+                </label>
+                <input
+                  type="text"
+                  id="number"
+                  name="number"
+                  value={formData.number}
+                  readOnly
+                  className={`${getInputClasses(theme, !!errors.number)} bg-opacity-60 cursor-not-allowed font-mono`}
+                />
+                {errors.number && (
+                  <p className="text-red-500 text-xs mt-1">{errors.number}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="referenceNo">
+                  Supplier Invoice #
+                </label>
+                <input
+                  type="text"
+                  id="referenceNo"
+                  name="referenceNo"
+                  value={formData.referenceNo}
+                  onChange={handleChange}
+                  required
+                  placeholder="Invoice Number"
+                  className={getInputClasses(theme, !!errors.referenceNo)}
+                />
+                {errors.referenceNo && (
+                  <p className="text-red-500 text-xs mt-1">{errors.referenceNo}</p>
+                )}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="supplierInvoiceDate">
+                  Invoice Date
+                </label>
+                <input
+                  type="date"
+                  id="supplierInvoiceDate"
+                  name="supplierInvoiceDate"
+                  value={formData.supplierInvoiceDate}
+                  onChange={handleChange}
+                  required
+                  className={getInputClasses(theme, !!errors.supplierInvoiceDate)}
+                />
+                {errors.supplierInvoiceDate && (
+                  <p className="text-red-500 text-xs mt-1">{errors.supplierInvoiceDate}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Row 2: Party & Selection */}
+            <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+              <div className="md:col-span-2">
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="partyId">
+                  Party / Supplier Name
                 </label>
                 <select
-                  id="godownEnabled"
-                  value={godownEnabled}
-                  onChange={(e) =>
-                    setGodownEnabled(e.target.value as "yes" | "no")
-                  }
+                  id="partyId"
+                  name="partyId"
+                  value={formData.partyId}
+                  onChange={handlePartyChange}
+                  className={`${getSelectClasses(theme, !!errors.partyId)} font-semibold`}
+                >
+                  <option value="">-- Select Party --</option>
+                  {partyLedgers.map((ledger) => (
+                    <option key={ledger.id} value={ledger.id}>{ledger.name}</option>
+                  ))}
+                  <option value="add-new" className="text-blue-600 font-bold">+ Create New Ledger</option>
+                </select>
+                {selectedPartyLedger && (() => {
+                  const partyState = selectedPartyLedger.state || selectedPartyLedger.state_name || selectedPartyLedger.State || "N/A";
+                  return (
+                    <div className={`mt-1.5 text-[10px] font-bold flex items-center gap-1.5 px-2 py-0.5 rounded-full w-fit ${isRegularCharge ? "bg-green-100 text-green-700 dark:bg-green-900/30" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30"}`}>
+                      <span className={`w-1.5 h-1.5 rounded-full ${isRegularCharge ? "bg-green-600" : "bg-orange-600 animate-pulse"}`}></span>
+                      {isRegularCharge ? `REGULAR | GSTIN: ${selectedPartyLedger.gstNumber || "N/A"} | ${partyState}` : `REVERSE CHARGE | ${partyState}`}
+                    </div>
+                  );
+                })()}
+                {errors.partyId && <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>}
+              </div>
+
+              <div>
+                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
+                  Transaction Mode
+                </label>
+                <select
+                  name="mode"
+                  value={formData.mode}
+                  onChange={handleChange}
                   className={getSelectClasses(theme)}
                 >
-                  <option value="yes">Yes</option>
-                  <option value="no">No</option>
+                  <option value="item-invoice">Item Invoice</option>
+                  <option value="accounting-invoice">Accounting Invoice</option>
+                  <option value="as-voucher">As Voucher</option>
                 </select>
               </div>
-            )}
 
-            {visibleColumns.receiptDocNo && (
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="dispatchDetails.docNo"
-                >
-                  Receipt Doc No.
-                </label>
-                <input
-                  type="text"
-                  id="dispatchDetails.docNo"
-                  name="dispatchDetails.docNo"
-                  value={formData.dispatchDetails?.docNo ?? ""}
-                  onChange={handleChange}
-                  className={getInputClasses(theme)}
-                />
-              </div>
-            )}
+              {formData.mode === "item-invoice" && visibleColumns.godown && (
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
+                    Godown Tracking
+                  </label>
+                  <select
+                    value={godownEnabled}
+                    onChange={(e) => setGodownEnabled(e.target.value as "yes" | "no")}
+                    className={getSelectClasses(theme)}
+                  >
+                    <option value="yes">Enabled (Yes)</option>
+                    <option value="no">Disabled (No)</option>
+                  </select>
+                </div>
+              )}
+            </div>
 
-            {visibleColumns.receiptThrough && (
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="dispatchDetails.through"
-                >
-                  Receipt Through
-                </label>
-                <input
-                  type="text"
-                  id="dispatchDetails.through"
-                  name="dispatchDetails.through"
-                  value={formData.dispatchDetails?.through ?? ""}
-                  onChange={handleChange}
-                  className={getInputClasses(theme)}
-                />
-              </div>
-            )}
+            {/* Row 3: Receipt Details (Conditional with animation) */}
+            {visibleColumns.showReceiptDetails && (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-4 border-t border-dashed border-gray-300 dark:border-gray-700 animate-in fade-in slide-in-from-top-1">
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
+                    Receipt Doc No.
+                  </label>
+                  <input
+                    type="text"
+                    name="dispatchDetails.docNo"
+                    value={formData.dispatchDetails?.docNo ?? ""}
+                    onChange={handleChange}
+                    placeholder="Doc Reference"
+                    className={getInputClasses(theme)}
+                  />
+                </div>
 
-            {visibleColumns.origin && (
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="dispatchDetails.destination"
-                >
-                  Origin
-                </label>
-                <input
-                  type="text"
-                  id="dispatchDetails.destination"
-                  name="dispatchDetails.destination"
-                  value={formData.dispatchDetails?.destination ?? ""}
-                  onChange={handleChange}
-                  className={getInputClasses(theme)}
-                />
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
+                    Receipt Through
+                  </label>
+                  <input
+                    type="text"
+                    name="dispatchDetails.through"
+                    value={formData.dispatchDetails?.through ?? ""}
+                    onChange={handleChange}
+                    placeholder="E.g. Transport Name"
+                    className={getInputClasses(theme)}
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
+                    Origin / Source
+                  </label>
+                  <input
+                    type="text"
+                    name="dispatchDetails.destination"
+                    value={formData.dispatchDetails?.destination ?? ""}
+                    onChange={handleChange}
+                    placeholder="Place of Origin"
+                    className={getInputClasses(theme)}
+                  />
+                </div>
               </div>
             )}
           </div>
@@ -1985,6 +2159,33 @@ const PurchaseVoucher: React.FC = () => {
                 Add {formData.mode === "item-invoice" ? "Item" : "Ledger"}
               </button>
             </div>
+
+            {/* Barcode Input Section */}
+            {formData.mode === "item-invoice" && (
+              <div className="mb-4">
+                <form onSubmit={handleBarcodeSubmit} className="relative group max-w-md">
+                  <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                    <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2z"></path><path d="M7 7h1v10H7z"></path><path d="M10 7h2v10h-2z"></path><path d="M15 7h1v10h-1z"></path><path d="M18 7h1v10h-1z"></path></svg>
+                  </div>
+                  <input
+                    type="text"
+                    placeholder="Scan Barcode or Type & Press Enter..."
+                    value={barcodeInput}
+                    onChange={(e) => {
+                      setBarcodeInput(e.target.value);
+                      setIsBarcodeError(false);
+                    }}
+                    className={`w-full pl-10 pr-4 py-2 rounded-lg border-2 transition-all outline-none ${isBarcodeError
+                      ? "border-red-500 bg-red-50"
+                      : theme === "dark"
+                        ? "bg-gray-800 border-gray-700 focus:border-blue-500 text-white"
+                        : "bg-white border-gray-200 focus:border-blue-500"
+                      }`}
+                  />
+                </form>
+              </div>
+            )}
+
             <div className="overflow-x-auto">
               {" "}
               {formData.mode === "item-invoice" ? (
@@ -2004,14 +2205,10 @@ const PurchaseVoucher: React.FC = () => {
                         <th className={TABLE_STYLES.header}>Batch</th>
                       )}
 
-                      {!addBatchModal.visible && (
-                        <th className={TABLE_STYLES.headerRight}>Quantity</th>
-                      )}
+                      <th className={TABLE_STYLES.headerRight}>Quantity</th>
 
                       <th className={TABLE_STYLES.header}>Unit</th>
-                      {!addBatchModal.visible && (
-                        <th className={TABLE_STYLES.headerRight}>Rate</th>
-                      )}
+                      <th className={TABLE_STYLES.headerRight}>Rate</th>
 
                       {/* GST Header */}
                       {visibleColumns.gst && isIntraState && (
@@ -2471,32 +2668,84 @@ const PurchaseVoucher: React.FC = () => {
                     {/* Calculate dynamic colspan based on visible columns */}
                     {(() => {
                       const colSpanBeforeAmount =
-                        4 + // Sr(1) + Item(1) + Unit(1) + Discount(1)
+                        6 + // Sr(1) + Item(1) + Qty(1) + Unit(1) + Rate(1) + Discount(1)
                         (visibleColumns.hsn ? 1 : 0) +
                         (visibleColumns.batch ? 1 : 0) +
-                        (!addBatchModal.visible ? 2 : 0) + // Qty(1) + Rate(1)
-                        (visibleColumns.gst ? (isIntraState ? 2 : 1) : 0) +
-                        ((godownEnabled === "yes" && visibleColumns.godown) ? 1 : 0) +
-                        1; // Purchase Ledger
+                        (visibleColumns.gst ? (isIntraState ? 2 : 1) : 0);
+
+                      const colSpanAfterAmount =
+                        2 + // Purchase Ledger(1) + Action(1)
+                        ((godownEnabled === "yes" && visibleColumns.godown) ? 1 : 0);
 
                       return (
                         <>
+                          {/* Subtotal */}
                           <tr
                             className={`font-semibold ${theme === "dark"
                               ? "border-t border-gray-600"
                               : "border-t border-gray-300"
                               }`}
                           >
-                            <td
-                              className="px-4 py-2 text-right"
-                              colSpan={colSpanBeforeAmount}
-                            >
+                            <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                               Subtotal:
                             </td>
+
                             <td className="px-4 py-2 text-right">
                               {subtotal.toLocaleString()}
                             </td>
+
+                            <td colSpan={colSpanAfterAmount}></td>
                           </tr>
+
+                          {/* TDS (FIXED WIDTH) */}
+                          {/* TDS Row */}
+                          {visibleColumns.tds && (
+                            <tr
+                              className={`font-semibold ${theme === "dark"
+                                ? "border-t border-gray-600"
+                                : "border-t border-gray-300"
+                                }`}
+                            >
+                              {/* Label + Dropdown */}
+                              <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
+                                <div className="flex items-center justify-end gap-3 pr-6">
+
+                                  <span className="whitespace-nowrap">
+                                    TDS:
+                                  </span>
+
+                                  <select
+                                    name="tdsLedgerId"
+                                    value={formData.tdsLedgerId}
+                                    onChange={handleChange}
+                                    className={`${TABLE_STYLES.select} !w-32 text-[11px] h-8 inline-block`}
+                                  >
+                                    <option value="">Select TDS</option>
+
+                                    {tdsLedgers.map((l) => (
+                                      <option key={l.id} value={l.id}>
+                                        {l.name}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                </div>
+                              </td>
+
+                              {/* Amount */}
+                              <td className="px-4 py-2 text-right font-bold">
+                                {tdsAmount.toLocaleString()}
+                              </td>
+
+                              {/* Empty Space */}
+                              <td colSpan={colSpanAfterAmount} className="px-4 py-2">
+                                &nbsp;
+                              </td>
+                            </tr>
+                          )}
+
+
+                          {/* IGST / SGST */}
                           {isIntraState ? (
                             <>
                               <tr
@@ -2505,35 +2754,32 @@ const PurchaseVoucher: React.FC = () => {
                                   : "border-t border-gray-300"
                                   }`}
                               >
-                                <td
-                                  className="px-4 py-2 text-right"
-                                  colSpan={colSpanBeforeAmount}
-                                >
+                                <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                                   SGST Total:
                                 </td>
+
                                 <td className="px-4 py-2 text-right">
                                   {sgstTotal.toLocaleString()}
                                 </td>
-                                <td className="px-4 py-2"></td>
-                                <td className="px-4 py-2"></td>
+
+                                <td colSpan={colSpanAfterAmount}></td>
                               </tr>
+
                               <tr
                                 className={`font-semibold ${theme === "dark"
                                   ? "border-t border-gray-600"
                                   : "border-t border-gray-300"
                                   }`}
                               >
-                                <td
-                                  className="px-4 py-2 text-right"
-                                  colSpan={colSpanBeforeAmount}
-                                >
+                                <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                                   CGST Total:
                                 </td>
+
                                 <td className="px-4 py-2 text-right">
                                   {cgstTotal.toLocaleString()}
                                 </td>
-                                <td className="px-4 py-2"></td>
-                                <td className="px-4 py-2"></td>
+
+                                <td colSpan={colSpanAfterAmount}></td>
                               </tr>
                             </>
                           ) : (
@@ -2543,57 +2789,56 @@ const PurchaseVoucher: React.FC = () => {
                                 : "border-t border-gray-300"
                                 }`}
                             >
-                              <td
-                                className="px-4 py-2 text-right"
-                                colSpan={colSpanBeforeAmount}
-                              >
+                              <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                                 IGST Total:
                               </td>
+
                               <td className="px-4 py-2 text-right">
                                 {igstTotal.toLocaleString()}
                               </td>
 
-                              <td className="px-4 py-2"></td>
-                              <td className="px-4 py-2"></td>
+                              <td colSpan={colSpanAfterAmount}></td>
                             </tr>
                           )}
+
+                          {/* Discount */}
                           <tr
                             className={`font-semibold ${theme === "dark"
                               ? "border-t border-gray-600"
                               : "border-t border-gray-300"
                               }`}
                           >
-                            <td
-                              className="px-4 py-2 text-right"
-                              colSpan={colSpanBeforeAmount}
-                            >
+                            <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                               Discount Total:
                             </td>
+
                             <td className="px-4 py-2 text-right">
                               {discountTotal.toLocaleString()}
                             </td>
-                            <td className="px-4 py-2"></td>
-                            <td className="px-4 py-2"></td>
+
+                            <td colSpan={colSpanAfterAmount}></td>
                           </tr>
+
+                          {/* Grand Total */}
                           <tr
-                            className={`font-semibold ${theme === "dark"
-                              ? "border-t border-gray-600"
-                              : "border-t border-gray-300"
+                            className={`font-semibold text-lg ${theme === "dark"
+                              ? "bg-gray-700/50 border-t-2 border-blue-500"
+                              : "bg-blue-50 border-t-2 border-blue-600 text-blue-900"
                               }`}
                           >
-                            <td
-                              className="px-4 py-2 text-right"
-                              colSpan={colSpanBeforeAmount}
-                            >
+                            <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                               Grand Total:
                             </td>
-                            <td className="px-4 py-2 text-right">
+
+                            <td className="px-4 py-2 text-right font-bold text-green-600">
                               {total.toLocaleString()}
                             </td>
-                            <td className="px-4 py-2"></td>
-                            <td className="px-4 py-2"></td>
+
+                            <td colSpan={colSpanAfterAmount}></td>
                           </tr>
                         </>
+
+
                       );
                     })()}
                   </tfoot>

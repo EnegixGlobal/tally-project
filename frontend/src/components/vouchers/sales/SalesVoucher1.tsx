@@ -70,6 +70,7 @@ const SalesVoucher: React.FC = () => {
 
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
   const [selectedPartyState, setSelectedPartyState] = useState<string>(""); // Store selected party's state
+  const [selectedPartyGst, setSelectedPartyGst] = useState<string>(""); // Store selected party's GST number
   const [salesTypes, setSalesTypes] = useState<SalesType[]>([]);
   const [selectedSalesTypeId, setSelectedSalesTypeId] = useState<string>("");
 
@@ -366,10 +367,11 @@ const SalesVoucher: React.FC = () => {
     showDiscount: true,
     showGST: true,
 
-    // 🔥 NEW HEADER FIELD CONTROLS
+    // NEW HEADER FIELD CONTROLS
     showDestination: true,
     showDispatchThrough: true,
     showDispatchDocNo: true,
+    showDispatchDetails: true,
   });
 
   //wholsell or retailer
@@ -382,6 +384,8 @@ const SalesVoucher: React.FC = () => {
   // Add these states at top of your component:
   const [statusMsg, setStatusMsg] = useState("");
   const [statusColor, setStatusColor] = useState("");
+  const [barcodeInput, setBarcodeInput] = useState("");
+  const [isBarcodeError, setIsBarcodeError] = useState(false);
 
   // timers for debouncing rate input per entry
   const rateDebounceTimers = useRef<{ [entryId: string]: number | null }>({});
@@ -499,7 +503,7 @@ const SalesVoucher: React.FC = () => {
           narration: data.narration || "",
 
           // ⭐ MAIN FIX: Map IDs correctly (Backend stores IDs in Rate columns)
-          entries: data.entries.map((e, i) => ({
+          entries: data.entries.map((e: any, i: any) => ({
             id: "e" + i + Date.now(),
 
             itemId: e.itemId,
@@ -664,6 +668,10 @@ const SalesVoucher: React.FC = () => {
         partyAny?.state || partyAny?.state_name || partyAny?.State || "";
       setSelectedPartyState(partyState);
 
+      const partyGst =
+        partyAny?.gstNumber || partyAny?.gst_number || partyAny?.gstin || "";
+      setSelectedPartyGst(partyGst);
+
       // Debug logging for state matching
       const companyState = safeCompanyInfo?.state || "";
       const statesMatch =
@@ -672,6 +680,7 @@ const SalesVoucher: React.FC = () => {
         companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
     } else {
       setSelectedPartyState("");
+      setSelectedPartyGst("");
     }
   }, [formData.partyId, ledgers, safeCompanyInfo?.state]);
 
@@ -766,6 +775,13 @@ const SalesVoucher: React.FC = () => {
           selectedAny?.State ||
           "";
         setSelectedPartyState(partyState);
+
+        const partyGst =
+          selectedAny?.gstNumber ||
+          selectedAny?.gst_number ||
+          selectedAny?.gstin ||
+          "";
+        setSelectedPartyGst(partyGst);
 
         // Update GST rates for all existing entries when party changes
         if (formData.mode === "item-invoice") {
@@ -1126,6 +1142,7 @@ const SalesVoucher: React.FC = () => {
                   body: JSON.stringify({
                     batchName: candidateBatch.batchName ?? "",
                     quantity: adjustedStockDiff,
+                    mode: "add",
                   }),
                 }
               )
@@ -1146,6 +1163,7 @@ const SalesVoucher: React.FC = () => {
                 body: JSON.stringify({
                   batchName: candidateBatch.batchName ?? "",
                   quantity: stockDiff,
+                  mode: "add", // ✅ Incremental update
                 }),
               }
             )
@@ -1295,6 +1313,150 @@ const SalesVoucher: React.FC = () => {
     const updatedEntries = [...formData.entries];
     updatedEntries.splice(index, 1);
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+  };
+
+  const performBarcodeLookup = async (code: string) => {
+    if (!code.trim()) return;
+
+    try {
+      const url = `${import.meta.env.VITE_API_URL}/api/sales-vouchers/item-by-barcode?barcode=${code}&company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+      const res = await fetch(url);
+      const json = await res.json();
+
+      if (json.success && json.data) {
+        setIsBarcodeError(false); // Reset error state on success
+        const item = json.data;
+        const details = getItemDetails(item.id);
+
+        setFormData((prev) => {
+          const updatedEntries = [...prev.entries];
+
+          const extractGstPercent = (ledgerId: any) => {
+            if (!ledgerId) return 0;
+            const ledger = safeLedgers.find((l) => String(l.id) === String(ledgerId));
+            if (!ledger?.name) return 0;
+            const match = ledger.name.match(/(\d+(\.\d+)?)/);
+            return match ? Number(match[1]) : 0;
+          };
+
+          const companyState = safeCompanyInfo?.state || "";
+          const partyState = selectedPartyState || "";
+          const statesMatch =
+            companyState &&
+            partyState &&
+            companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+
+          const extractedCgst = extractGstPercent(details.cgstLedgerId);
+          const extractedSgst = extractGstPercent(details.sgstLedgerId);
+          const extractedIgst = extractGstPercent(details.gstLedgerId || details.igstLedgerId);
+
+          let cgstRate = 0, sgstRate = 0, igstRate = 0;
+          if (statesMatch) {
+            cgstRate = extractedCgst;
+            sgstRate = extractedSgst;
+          } else {
+            igstRate = extractedIgst;
+          }
+
+          const totalGst = statesMatch ? (extractedCgst + extractedSgst) : extractedIgst;
+          const gstToMatch = Math.round(totalGst);
+
+          // Find matching Sales Ledger with robust logic
+          const salesLedgers = ledgers.filter(l => String(l.name).toLowerCase().includes("sales"));
+
+          const matchingSalesLedger = salesLedgers.find((l) => {
+            const name = String(l.name).toLowerCase();
+            return (
+              name.includes(`${gstToMatch}%`) ||
+              name.includes(`${gstToMatch} %`) ||
+              name.includes(`sales ${gstToMatch}`) ||
+              name.includes(`@${gstToMatch}%`) ||
+              name.includes(`@ ${gstToMatch}%`)
+            );
+          });
+
+          // ⚠️ Warning if not found
+          if (!matchingSalesLedger && gstToMatch > 0) {
+            Swal.fire({
+              title: "Sales Ledger Missing",
+              text: `Sales ${gstToMatch}% Ledger not found. Please create it first.`,
+              icon: "warning",
+              confirmButtonColor: "#3085d6",
+            });
+          }
+
+          const newEntry = {
+            id: `e${Date.now()}`,
+            itemId: String(item.id),
+            hsnCode: details.hsnCode || "",
+            unitId: details.unitId || "",
+            unitLabel: details.unitLabel || "",
+            batches: details.batches || [],
+            batchNumber: "",
+            quantity: 1,
+            rate: details.rate || 0,
+            amount: details.rate || 0,
+            type: "debit",
+            cgstRate: cgstRate,
+            sgstRate: sgstRate,
+            igstRate: igstRate,
+            gstLedgerId: details.gstLedgerId || "",
+            cgstLedgerId: details.cgstLedgerId || "",
+            sgstLedgerId: details.sgstLedgerId || "",
+            igstLedgerId: details.igstLedgerId || "",
+            salesLedgerId: matchingSalesLedger ? String(matchingSalesLedger.id) : "",
+            godownId: "",
+            discount: 0,
+          };
+
+          const lastIndex = updatedEntries.length - 1;
+          if (lastIndex >= 0 && !updatedEntries[lastIndex].itemId) {
+            updatedEntries[lastIndex] = newEntry as any;
+          } else {
+            updatedEntries.push(newEntry as any);
+          }
+
+          return { ...prev, entries: updatedEntries };
+        });
+
+        // NOT clearing the input anymore as requested: "barcode number wahi rahe hate nii"
+        const Toast = Swal.mixin({
+          toast: true,
+          position: 'top-end',
+          showConfirmButton: false,
+          timer: 1500,
+          timerProgressBar: true,
+        });
+        Toast.fire({
+          icon: 'success',
+          title: `Item added: ${item.name}`
+        });
+      } else {
+        if (code) {
+          setIsBarcodeError(true); // Set error state to true for visual feedback
+        }
+      }
+    } catch (err) {
+      console.error("Barcode Fetch Error:", err);
+      setIsBarcodeError(true);
+    }
+  };
+
+  // 🔹 AUTOMATIC BARCODE LOOKUP ON TYPING (Debounced)
+  useEffect(() => {
+    if (!barcodeInput || barcodeInput.length < 3) return;
+
+    const timer = setTimeout(() => {
+      performBarcodeLookup(barcodeInput);
+    }, 600); // Wait for 600ms of inactivity before calling API
+
+    return () => clearTimeout(timer);
+  }, [barcodeInput]);
+
+  const handleBarcodeSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!barcodeInput.trim()) return;
+    performBarcodeLookup(barcodeInput);
   };
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -1571,6 +1733,7 @@ const SalesVoucher: React.FC = () => {
               body: JSON.stringify({
                 batchName: entry.batchNumber,
                 quantity: -Number(entry.quantity || 0), // 🔴 subtract stock
+                mode: "add", // ✅ Incremental update
               }),
             }
           );
@@ -1839,378 +2002,287 @@ const SalesVoucher: React.FC = () => {
             }`}
         >
           <form onSubmit={handleSubmit}>
-            <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="date"
-                >
-                  Date
-                </label>
-                <input
-                  type="date"
-                  id="date"
-                  name="date"
-                  value={formData.date}
-                  onChange={handleChange}
-                  required
-                  title="Sale Date"
-                  className={FORM_STYLES.input(theme, !!errors.date)}
-                />
-                {errors.date && (
-                  <p className="text-red-500 text-xs mt-1">{errors.date}</p>
-                )}
-              </div>
-
-              {/* Bill No. (Preview from Sales Type) */}
-
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="number"
-                >
-                  Voucher No.
-                </label>
-                <input
-                  type="text"
-                  id="number"
-                  name="number"
-                  value={formData.number}
-                  readOnly
-                  title="Voucher Number"
-                  className={`${FORM_STYLES.input(theme, !!errors.number)} ${theme === "dark" ? "bg-gray-700" : "bg-gray-200"
-                    }`}
-                />
-                {errors.number && (
-                  <p className="text-red-500 text-xs mt-1">{errors.number}</p>
-                )}
-              </div>
-              {formData.mode !== "accounting-invoice" &&
-                formData.mode !== "as-voucher" && (
-                  <div>
-                    <label
-                      className="block text-sm font-medium mb-1"
-                      htmlFor="partyId"
-                    >
-                      Party Name
-                    </label>
-                    <select
-                      name="partyId"
-                      value={formData.partyId}
-                      onChange={handleChange}
-                      required
-                      className={`min-h-10 text-14 ${FORM_STYLES.select(
-                        theme,
-                        !!errors.partyId
-                      )}`}
-                    >
-                      <option value="" disabled>
-                        -- Select Party --
-                      </option>
-                      {partyLedgers.map((ledger) => (
-                        <option key={ledger.id} value={ledger.id}>
-                          {ledger.name}
-                        </option>
-                      ))}
-                      <option
-                        value="add-new"
-                        className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                          ? "bg-blue-600 hover:bg-green-700"
-                          : "bg-green-600 hover:bg-green-700 text-white"
-                          }`}
-                      >
-                        + Add New Ledger
-                      </option>
-                    </select>
-
-                    {selectedPartyState && (
-                      <p className="mt-1 text-xs text-green-600 font-medium">
-                        State: {selectedPartyState}
-                      </p>
-                    )}
-                    {errors.partyId && (
-                      <p className="text-red-500 text-xs mt-1">
-                        {errors.partyId}
-                      </p>
-                    )}
-
-                  </div>
-                )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="referenceNo"
-                >
-                  Reference No.
-                </label>
-                <input
-                  type="text"
-                  id="referenceNo"
-                  name="referenceNo"
-                  value={formData.referenceNo}
-                  onChange={handleChange}
-                  title="Reference Number"
-                  placeholder="Enter reference number"
-                  className={FORM_STYLES.input(theme)}
-                />
-              </div>
-              {columnSettings.showDispatchDocNo && (
+            {/* Header Form Fields - Properly Organized in 4-Column Grid */}
+            <div className={`p-5 mb-8 rounded-xl border ${theme === "dark" ? "bg-gray-800/50 border-gray-700" : "bg-gray-50/50 border-gray-200"} space-y-6 shadow-sm`}>
+              {/* Row 1: Primary Details */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Dispatch Doc No.
+                  <label className="block text-sm font-semibold mb-1.5 opacity-80" htmlFor="date">
+                    Date
+                  </label>
+                  <input
+                    type="date"
+                    id="date"
+                    name="date"
+                    value={formData.date}
+                    onChange={handleChange}
+                    required
+                    className={FORM_STYLES.input(theme, !!errors.date)}
+                  />
+                  {errors.date && <p className="text-red-500 text-xs mt-1">{errors.date}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5 opacity-80" htmlFor="number">
+                    Voucher No.
                   </label>
                   <input
                     type="text"
-                    name="dispatchDetails.docNo"
-                    value={formData.dispatchDetails?.docNo ?? ""}
-                    onChange={handleChange}
-                    className={FORM_STYLES.input(theme)}
+                    id="number"
+                    name="number"
+                    value={formData.number}
+                    readOnly
+                    className={`${FORM_STYLES.input(theme, !!errors.number)} ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-100"}`}
                   />
+                  {errors.number && <p className="text-red-500 text-xs mt-1">{errors.number}</p>}
                 </div>
-              )}
 
-              {columnSettings.showDispatchThrough && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Dispatch Through
+                <div className="md:col-span-1">
+                  <label className="block text-sm font-semibold mb-1.5 opacity-80" htmlFor="partyId">
+                    Party Name
                   </label>
-                  <input
-                    type="text"
-                    name="dispatchDetails.through"
-                    value={formData.dispatchDetails?.through ?? ""}
-                    onChange={handleChange}
-                    className={FORM_STYLES.input(theme)}
-                  />
-                </div>
-              )}
-            </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-              {columnSettings.showDestination && (
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Destination
-                  </label>
-                  <input
-                    type="text"
-                    name="dispatchDetails.destination"
-                    value={formData.dispatchDetails?.destination ?? ""}
-                    onChange={handleChange}
-                    className={FORM_STYLES.input(theme)}
-                  />
-                </div>
-
-              )}
-
-
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Approximate Distance (KM)
-                </label>
-                <input
-                  type="text"
-                  name="dispatchDetails.approxDistance"
-                  value={formData.dispatchDetails?.approxDistance ?? ""}
-                  onChange={handleChange}
-                  placeholder="e.g. 120"
-                  className={FORM_STYLES.input(theme)}
-                />
-              </div>
-
-              <div>
-                <label
-                  className="block text-sm font-medium mb-1"
-                  htmlFor="mode"
-                >
-                  Voucher Mode
-                </label>
-                <select
-                  id="mode"
-                  name="mode"
-                  value={formData.mode}
-                  onChange={handleChange}
-                  title="Voucher Mode"
-                  className={FORM_STYLES.select(theme)}
-                >
-                  <option value="item-invoice">Item Invoice</option>
-                  <option value="accounting-invoice">Accounting Invoice</option>
-                  <option value="as-voucher">As Voucher</option>
-                </select>
-              </div>
-            </div>
-            {/* Quotation Mode Checkbox - Similar to Tally Prime */}
-            {isQuotationMode && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div className="flex items-center space-x-2">
-                  <span className="text-sm font-medium">📋 Quotation Mode</span>
-                  <span className="text-xs text-gray-500">
-                    (This will be treated as a quotation)
-                  </span>
-                </div>
-              </div>
-            )}
-
-            {/* Sales Ledger selection for item-invoice mode removed from here */}
-            {/* Godown Enable/Disable toggle */}
-            {formData.mode === "item-invoice" && columnSettings.showGodown && (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    htmlFor="godownEnabled"
-                  >
-                    Enable Godown Selection
-                  </label>
-
                   <select
-                    id="godownEnabled"
-                    value={godownEnabled}
-                    onChange={(e) =>
-                      setGodownEnabled(e.target.value as "yes" | "no")
-                    }
+                    name="partyId"
+                    value={formData.partyId}
+                    onChange={handleChange}
+                    required
+                    className={`${FORM_STYLES.select(theme, !!errors.partyId)} font-medium`}
+                  >
+                    <option value="" disabled>-- Select Party --</option>
+                    {partyLedgers.map((ledger) => (
+                      <option key={ledger.id} value={ledger.id}>{ledger.name}</option>
+                    ))}
+                    <option value="add-new" className="text-blue-600 font-bold">+ Add New Ledger</option>
+                  </select>
+                  {selectedPartyState && (
+                    <p className="mt-1 text-[10px] uppercase tracking-wider text-blue-600 font-bold flex items-center gap-1">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                      State: {selectedPartyState}  | Gst: {selectedPartyGst || "N/A"}
+                    </p>
+                  )}
+                  {errors.partyId && <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>}
+                </div>
+
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5 opacity-80" htmlFor="referenceNo">
+                    Reference No.
+                  </label>
+                  <input
+                    type="text"
+                    id="referenceNo"
+                    name="referenceNo"
+                    value={formData.referenceNo}
+                    onChange={handleChange}
+                    placeholder="Enter ref #"
+                    className={FORM_STYLES.input(theme)}
+                  />
+                </div>
+              </div>
+
+              {/* Row 2: Dispatch Details */}
+              {columnSettings.showDispatchDetails && (
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-6 animate-in fade-in slide-in-from-top-2 duration-300">
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5 opacity-80">
+                      Dispatch Doc No.
+                    </label>
+                    <input
+                      type="text"
+                      name="dispatchDetails.docNo"
+                      value={formData.dispatchDetails?.docNo ?? ""}
+                      onChange={handleChange}
+                      placeholder="Doc Number"
+                      className={FORM_STYLES.input(theme)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5 opacity-80">
+                      Dispatch Through
+                    </label>
+                    <input
+                      type="text"
+                      name="dispatchDetails.through"
+                      value={formData.dispatchDetails?.through ?? ""}
+                      onChange={handleChange}
+                      placeholder="Carrier Name"
+                      className={FORM_STYLES.input(theme)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5 opacity-80">
+                      Destination
+                    </label>
+                    <input
+                      type="text"
+                      name="dispatchDetails.destination"
+                      value={formData.dispatchDetails?.destination ?? ""}
+                      onChange={handleChange}
+                      placeholder="Delivery Place"
+                      className={FORM_STYLES.input(theme)}
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-semibold mb-1.5 opacity-80">
+                      Distance (KM)
+                    </label>
+                    <input
+                      type="text"
+                      name="dispatchDetails.approxDistance"
+                      value={formData.dispatchDetails?.approxDistance ?? ""}
+                      onChange={handleChange}
+                      placeholder="e.g. 120"
+                      className={FORM_STYLES.input(theme)}
+                    />
+                  </div>
+                </div>
+              )}
+
+              {/* Row 3: Configuration & Mode */}
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-6 items-end">
+                <div>
+                  <label className="block text-sm font-semibold mb-1.5 opacity-80" htmlFor="mode">
+                    Voucher Mode
+                  </label>
+                  <select
+                    id="mode"
+                    name="mode"
+                    value={formData.mode}
+                    onChange={handleChange}
                     className={FORM_STYLES.select(theme)}
                   >
-                    <option value="yes">Yes</option>
-                    <option value="no">No</option>
+                    <option value="item-invoice">Item Invoice</option>
+                    <option value="accounting-invoice">Accounting Invoice</option>
+                    <option value="as-voucher">As Voucher</option>
                   </select>
                 </div>
-              </div>
-            )}
-            {/* ///whollsell or retailer */}
-            {formData.mode !== "accounting-invoice" &&
-              formData.mode !== "as-voucher" && (
-                <div>
-                  <div className="flex gap-6 mb-3">
-                    {/* Wholesale */}
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="customerType"
-                        value="wholesale"
-                        checked={profitConfig.customerType === "wholesale"}
-                        onChange={(e) =>
-                          setProfitConfig({
-                            customerType: e.target.value,
-                            method: "",
-                            value: "",
-                          })
-                        }
-                        className="h-4 w-4"
-                      />
-                      <span className="font-medium">Wholesale</span>
-                    </label>
 
-                    {/* Retailer */}
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
-                        type="radio"
-                        name="customerType"
-                        value="retailer"
-                        checked={profitConfig.customerType === "retailer"}
-                        onChange={(e) =>
-                          setProfitConfig({
-                            customerType: e.target.value,
-                            method: "",
-                            value: "",
-                          })
-                        }
-                        className="h-4 w-4"
-                      />
-                      <span className="font-medium">Retailer</span>
-                    </label>
+
+
+                {(formData.mode !== "accounting-invoice" && formData.mode !== "as-voucher") && (
+                  <div className="md:col-span-2">
+                    <label className="block text-sm font-semibold mb-2 opacity-80">Pricing Rule / Customer Type</label>
+                    <div className="flex items-center gap-6 p-2 rounded-lg border border-dashed border-gray-400/50">
+                      <div className="flex gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                          <input
+                            type="radio"
+                            name="customerType"
+                            value="wholesale"
+                            checked={profitConfig.customerType === "wholesale"}
+                            onChange={(e) => setProfitConfig({ customerType: e.target.value, method: "", value: "" })}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm font-medium group-hover:text-blue-500 transition-colors">Wholesale</span>
+                        </label>
+
+                        <label className="flex items-center gap-2 cursor-pointer group">
+                          <input
+                            type="radio"
+                            name="customerType"
+                            value="retailer"
+                            checked={profitConfig.customerType === "retailer"}
+                            onChange={(e) => setProfitConfig({ customerType: e.target.value, method: "", value: "" })}
+                            className="h-4 w-4 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-sm font-medium group-hover:text-blue-500 transition-colors">Retailer</span>
+                        </label>
+                      </div>
+
+                      {/* Pricing Strategy Selector */}
+                      {(profitConfig.customerType === "wholesale" || profitConfig.customerType === "retailer") && (
+                        <div className="flex items-center gap-3 pl-4 border-l border-gray-300 dark:border-gray-600">
+                          <label className="flex items-center gap-1.5 cursor-pointer">
+                            <input
+                              type="radio"
+                              name="pricingMethod"
+                              value="profit_percentage"
+                              checked={profitConfig.method === "profit_percentage"}
+                              onChange={(e) => setProfitConfig({ ...profitConfig, method: e.target.value })}
+                              className="h-3 w-3"
+                            />
+                            <span className="text-xs">Profit %</span>
+                          </label>
+
+                          {profitConfig.customerType === "retailer" && (
+                            <label className="flex items-center gap-1.5 cursor-pointer">
+                              <input
+                                type="radio"
+                                name="pricingMethod"
+                                value="on_mrp"
+                                checked={profitConfig.method === "on_mrp"}
+                                onChange={(e) => setProfitConfig({ ...profitConfig, method: e.target.value, value: "0" })}
+                                className="h-3 w-3"
+                              />
+                              <span className="text-xs">On MRP</span>
+                            </label>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Status Msg */}
+                      {statusMsg && (
+                        <div className={`text-[10px] px-2 py-0.5 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-white"} shadow-sm ml-auto animate-pulse`}>
+                          <span className={statusColor}>{statusMsg}</span>
+                        </div>
+                      )}
+                    </div>
                   </div>
+                )}
+              </div>
+            </div>
 
-                  {/* Wholesale Inner Options */}
-                  {profitConfig.customerType === "wholesale" && (
-                    <div className="ml-6 space-y-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="wholesaleMethod"
-                          value="profit_percentage"
-                          checked={profitConfig.method === "profit_percentage"}
-                          onChange={(e) =>
-                            setProfitConfig({
-                              ...profitConfig,
-                              method: e.target.value,
-                            })
-                          }
-                          className="h-4 w-4"
-                        />
-                        <span>Profit Percentage %</span>
-                      </label>
-                    </div>
-                  )}
-
-                  {/* Retailer Inner Options */}
-                  {profitConfig.customerType === "retailer" && (
-                    <div className="ml-6 space-y-2">
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="retailerMethod"
-                          value="profit_percentage"
-                          checked={profitConfig.method === "profit_percentage"}
-                          onChange={(e) =>
-                            setProfitConfig({
-                              ...profitConfig,
-                              method: e.target.value,
-                            })
-                          }
-                          className="h-4 w-4"
-                        />
-                        <span>Profit Percentage %</span>
-                      </label>
-
-                      <label className="flex items-center gap-2 cursor-pointer">
-                        <input
-                          type="radio"
-                          name="retailerMethod"
-                          value="on_mrp"
-                          checked={profitConfig.method === "on_mrp"}
-                          onChange={(e) =>
-                            setProfitConfig({
-                              ...profitConfig,
-                              method: e.target.value,
-                              value: "0", // Auto-set value when On MRP
-                            })
-                          }
-                          className="h-4 w-4"
-                        />
-                        <span>On MRP</span>
-                      </label>
-                    </div>
-                  )}
-
-                  {/* Status Display */}
-                  {statusMsg && (
-                    <p className={`mt-2 text-sm ${statusColor}`}>{statusMsg}</p>
-                  )}
-                </div>
-              )}
 
             <div
               className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
                 }`}
             >
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-semibold">
+              <div className="flex flex-col md:flex-row gap-4 items-center mb-4">
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  <span className="w-1.5 h-6 bg-blue-600 rounded-full"></span>
                   {formData.mode === "item-invoice"
-                    ? "Items"
+                    ? "Items & Particulars"
                     : "Ledger Entries"}
                 </h3>
+
+                {formData.mode === "item-invoice" && (
+                  <div className="flex-1 max-w-md w-full ml-auto">
+                    <form onSubmit={handleBarcodeSubmit} className="relative group">
+                      <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2z"></path><path d="M7 7h1v10H7z"></path><path d="M10 7h2v10h-2z"></path><path d="M15 7h1v10h-1z"></path><path d="M18 7h1v10h-1z"></path></svg>
+                      </div>
+                      <input
+                        type="text"
+                        placeholder="Scan Barcode or Type & Press Enter..."
+                        value={barcodeInput}
+                        onChange={(e) => {
+                          setBarcodeInput(e.target.value);
+                          setIsBarcodeError(false); // Reset error when typing
+                        }}
+                        className={`w-full pl-10 pr-4 py-2 rounded-lg border-2 transition-all outline-none ${isBarcodeError
+                          ? "border-red-500 bg-red-50"
+                          : theme === "dark"
+                            ? "bg-gray-800 border-gray-700 focus:border-blue-500 text-white"
+                            : "bg-white border-gray-200 focus:border-blue-500"
+                          }`}
+                      />
+                    </form>
+                  </div>
+                )}
+
                 <button
                   title="Add Entry"
                   type="button"
                   onClick={addEntry}
-                  className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700"
+                  className={`flex items-center text-sm font-medium px-4 py-2 rounded-lg transition-all shadow-sm ${theme === "dark"
+                    ? "bg-blue-600 hover:bg-blue-700 text-white"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
                     }`}
                 >
-                  <Plus size={16} className="mr-1" />
-                  Add {formData.mode === "item-invoice" ? "Item" : "Ledger"}
+                  <Plus size={18} className="mr-2" />
+                  Add {formData.mode === "item-invoice" ? "Item Row" : "Ledger Row"}
                 </button>
               </div>
               <div className="overflow-x-auto">
@@ -2963,20 +3035,6 @@ const SalesVoucher: React.FC = () => {
 
               <div className="space-y-4">
                 <label className="flex justify-between items-center">
-                  <span>Enable Godown Selection</span>
-                  <input
-                    type="checkbox"
-                    checked={columnSettings.showGodown}
-                    onChange={(e) =>
-                      setColumnSettings((prev) => ({
-                        ...prev,
-                        showGodown: e.target.checked,
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="flex justify-between items-center">
                   <span>Enable Batch Column</span>
                   <input
                     type="checkbox"
@@ -3018,43 +3076,18 @@ const SalesVoucher: React.FC = () => {
                   />
                 </label>
 
-                {/* Dispatch-related header controls */}
-                <label className="flex justify-between items-center">
-                  <span>Show Dispatch Doc No.</span>
+                <label className="flex justify-between items-center p-2 rounded hover:bg-gray-100 transition-colors cursor-pointer">
+                  <span className="font-medium">Enable Dispatch & Shipping Details</span>
                   <input
                     type="checkbox"
-                    checked={columnSettings.showDispatchDocNo}
+                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    checked={columnSettings.showDispatchDetails}
                     onChange={(e) =>
                       setColumnSettings((prev) => ({
                         ...prev,
+                        showDispatchDetails: e.target.checked,
                         showDispatchDocNo: e.target.checked,
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="flex justify-between items-center">
-                  <span>Show Dispatch Through</span>
-                  <input
-                    type="checkbox"
-                    checked={columnSettings.showDispatchThrough}
-                    onChange={(e) =>
-                      setColumnSettings((prev) => ({
-                        ...prev,
                         showDispatchThrough: e.target.checked,
-                      }))
-                    }
-                  />
-                </label>
-
-                <label className="flex justify-between items-center">
-                  <span>Show Destination</span>
-                  <input
-                    type="checkbox"
-                    checked={columnSettings.showDestination}
-                    onChange={(e) =>
-                      setColumnSettings((prev) => ({
-                        ...prev,
                         showDestination: e.target.checked,
                       }))
                     }

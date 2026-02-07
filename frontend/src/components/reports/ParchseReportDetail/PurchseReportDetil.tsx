@@ -120,6 +120,7 @@ const PurchseReportDetil = () => {
     { id: -16, name: "Sales Accounts", nature: "Income" },
     { id: -17, name: "Suspense A/C", nature: "Assets" },
     { id: -18, name: "Profit/Loss", nature: "Liabilities" },
+    { id: -19, name: "TDS Payables", nature: "Liabilities" },
   ];
 
   useEffect(() => {

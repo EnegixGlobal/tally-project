@@ -164,12 +164,22 @@ const TrialBalance: React.FC = () => {
     { id: -13, name: "Loans (Liability)" },
     { id: -6, name: "Current Liabilities" },
     { id: -5, name: "Current Assets" },
+    { id: -9, name: "Fixed Assets" },
     { id: -16, name: "Sales Accounts" },
     { id: -15, name: "Purchase Accounts" },
     { id: -11, name: "Indirect Income" },
     { id: -10, name: "Indirect Expenses" },
     { id: -18, name: "Profit & Loss A/c" },
+    { id: -1, name: "Bank Accounts" },
+    { id: -2, name: "Bank OD A/c" },
+    { id: -3, name: "Branch/Division" },
+    { id: -7, name: "Direct Expenses" },
+    { id: -8, name: "Direct Income" },
+    { id: -12, name: "Investments" },
+    { id: -14, name: "Misc expenses (Assets)" },
+    { id: -17, name: "Suspense A/C" },
   ];
+
 
   const renderGroupRows = (groupId: number, level: number = 0) => {
     const subGroups = ledgerGroups.filter(g => g.parent === groupId);

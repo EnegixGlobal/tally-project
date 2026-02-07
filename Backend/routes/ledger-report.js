@@ -79,12 +79,14 @@ SELECT
   pv.cgstTotal,
   pv.sgstTotal,
   pv.igstTotal,
+  pv.tdsTotal,
   pv.total,
 
   pvi.purchaseLedgerId,
   pvi.cgstRate,
   pvi.sgstRate,
   pvi.igstRate,
+  pvi.tdsRate,
 
   l_party.name    AS partyName,
   l_purchase.name AS purchaseLedgerName
@@ -106,10 +108,11 @@ WHERE
   OR pvi.cgstRate = ?
   OR pvi.sgstRate = ?
   OR pvi.igstRate = ?
+  OR pvi.tdsRate = ?
 
 ORDER BY pv.date ASC
 `,
-      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
+      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
     );
 
     /* ===============================
@@ -340,7 +343,7 @@ ORDER BY vm.date ASC
 
         voucherNo: row.voucher_number,
 
-     
+
         particulars:
           row.opposite_ledger_name ||
           String(row.opposite_ledger),
@@ -459,12 +462,22 @@ ORDER BY vm.date ASC
         particulars = pv.partyName;
       }
 
+      /* ========= TDS ========= */
+      else if (currentLedger === Number(pv.tdsRate)) {
+        debit = Number(pv.tdsTotal || 0);
+        particulars = pv.partyName;
+      }
+
       if (debit === 0 && credit === 0) return;
 
-      // Balance sirf party + purchase pe
+      // Balance updates for relevant ledgers
       if (
         currentLedger === Number(pv.partyId) ||
-        currentLedger === Number(pv.purchaseLedgerId)
+        currentLedger === Number(pv.purchaseLedgerId) ||
+        currentLedger === Number(pv.cgstRate) ||
+        currentLedger === Number(pv.sgstRate) ||
+        currentLedger === Number(pv.igstRate) ||
+        currentLedger === Number(pv.tdsRate)
       ) {
         balance += debit - credit;
       }

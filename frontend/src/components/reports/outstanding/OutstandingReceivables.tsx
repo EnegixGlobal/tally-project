@@ -43,8 +43,7 @@ const OutstandingReceivables: React.FC = () => {
 
       try {
         const response = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -115,9 +114,8 @@ const OutstandingReceivables: React.FC = () => {
         if (selectedGroup) params.append("customerGroup", selectedGroup);
         if (selectedRisk) params.append("riskCategory", selectedRisk);
 
-        const url = `${
-          import.meta.env.VITE_API_URL
-        }/api/outstanding-receivables?${params.toString()}`;
+        const url = `${import.meta.env.VITE_API_URL
+          }/api/outstanding-receivables?${params.toString()}`;
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -125,7 +123,7 @@ const OutstandingReceivables: React.FC = () => {
           throw new Error(errorText || `Error: ${response.status}`);
         }
 
-        const data: CustomerOutstanding[] = await response.json();
+        const data: LedgerOutstanding[] = await response.json();
 
         setCustomersData(data);
       } catch (e: any) {
@@ -164,50 +162,57 @@ const OutstandingReceivables: React.FC = () => {
   const calculateTotals = (ledger: LedgerOutstanding) => {
     const vouchers = Array.isArray(ledger.vouchers) ? ledger.vouchers : [];
 
-    const purchaseTotal = vouchers.reduce((sum, v) => sum + Number(v.total), 0);
+    const totalVoucherAmount = vouchers.reduce((sum, v) => sum + Number(v.total), 0);
 
-    const outstanding =
-      ledger.balance_type === "debit"
-        ? Number(ledger.opening_balance) - purchaseTotal
-        : purchaseTotal - Number(ledger.opening_balance);
+    // For Sundry Debtors (Receivables):
+    // Normally Debit Balance.
+    // Sales increase the balance (Debit).
 
-    return { purchaseTotal, outstanding };
+    // Assuming 'vouchers' here only contains the "sales" (debit) side or outstanding bills.
+    // If the API only returns outstanding bills, then:
+    // Closing Balance = Opening Balance + Total New Outstanding
+
+    let closingBalance = 0;
+    if (ledger.balance_type === "debit") {
+      closingBalance = Number(ledger.opening_balance) + totalVoucherAmount;
+    } else {
+      // If credit balance (e.g. advance), and we add debits (sales)
+      closingBalance = Number(ledger.opening_balance) - totalVoucherAmount;
+    }
+
+    return { closingBalance };
   };
 
   return (
     <div className="space-y-6">
-            {/* Header */}     
+      {/* Header */}
       <div
-        className={`rounded-xl border p-6 ${
-          theme === "dark"
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        }`}
+        className={`rounded-xl border p-6 ${theme === "dark"
+          ? "bg-gray-800 border-gray-700"
+          : "bg-white border-gray-200"
+          }`}
       >
-               
+
         <div className="flex items-center justify-between mb-6">
-                   
+
           <div>
-                       
+
             <h2
-              className={`text-2xl font-bold ${
-                theme === "dark" ? "text-white" : "text-gray-900"
-              }`}
+              className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"
+                }`}
             >
-                            Receivables Outstanding            
+              Receivables Outstanding
             </h2>
-                       
+
             <p
-              className={`mt-1 ${
-                theme === "dark" ? "text-gray-400" : "text-gray-500"
-              }`}
+              className={`mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"
+                }`}
             >
-              Party-wise outstanding receivables summary - Tally Style          
-               
+              Party-wise outstanding receivables summary - Tally Style
+
             </p>
-                     
+
           </div>
-                           
         </div>
         {loading && (
           <div className="mt-4 p-3 text-center text-sm text-gray-500">
@@ -219,60 +224,56 @@ const OutstandingReceivables: React.FC = () => {
             {error}
           </div>
         )}{" "}
-                   
+
       </div>
-            {/* Filters */}     
+      {/* Filters */}
       <div
-        className={`rounded-xl border p-6 ${
-          theme === "dark"
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        }`}
-      >
-               
-        <h3
-          className={`text-lg font-semibold mb-4 ${
-            theme === "dark" ? "text-white" : "text-gray-900"
+        className={`rounded-xl border p-6 ${theme === "dark"
+          ? "bg-gray-800 border-gray-700"
+          : "bg-white border-gray-200"
           }`}
+      >
+
+        <h3
+          className={`text-lg font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"
+            }`}
         >
-                    Filters & Search        
+          Filters & Search
         </h3>
-                       
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-                   
+
           <div className="relative">
-                       
+
             <Search
-              className={`absolute left-3 top-2.5 w-4 h-4 ${
-                theme === "dark" ? "text-gray-400" : "text-gray-500"
-              }`}
+              className={`absolute left-3 top-2.5 w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"
+                }`}
             />
-                       
+
             <input
               type="text"
               placeholder="Search customers, GSTIN..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full ${
-                theme === "dark"
-                  ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400"
-                  : "border-gray-300 bg-white text-gray-900 placeholder-gray-500"
-              }`}
+              className={`pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full ${theme === "dark"
+                ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400"
+                : "border-gray-300 bg-white text-gray-900 placeholder-gray-500"
+                }`}
             />
-                     
+
           </div>
-                             
+
           <select
             value={selectedGroup}
             onChange={(e) => setSelectedGroup(e.target.value)}
             aria-label="Filter by customer group"
-            className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-              theme === "dark"
-                ? "border-gray-600 bg-gray-700 text-white"
-                : "border-gray-300 bg-white text-gray-900"
-            }`}
+            disabled={groups.length === 1} // Lock if only one group
+            className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${theme === "dark"
+              ? "border-gray-600 bg-gray-700 text-white"
+              : "border-gray-300 bg-white text-gray-900"
+              }`}
           >
-            <option value="">All Groups</option>
+            {/* Removed "All Groups" option */}
 
             {groups.map((group) => (
               <option key={group.id} value={group.id}>
@@ -280,54 +281,42 @@ const OutstandingReceivables: React.FC = () => {
               </option>
             ))}
           </select>
-                                             
+
         </div>
-           
+
       </div>
-            {/* Customer-wise Data Table */}     
+      {/* Customer-wise Data Table */}
       <div
-        className={`rounded-xl border ${
-          theme === "dark"
-            ? "bg-gray-800 border-gray-700"
-            : "bg-white border-gray-200"
-        }`}
-      >
-               
-        <div
-          className={`px-6 py-4 border-b ${
-            theme === "dark" ? "border-gray-700" : "border-gray-200"
+        className={`rounded-xl border ${theme === "dark"
+          ? "bg-gray-800 border-gray-700"
+          : "bg-white border-gray-200"
           }`}
-        >
-                   
-          <h3
-            className={`text-lg font-semibold ${
-              theme === "dark" ? "text-white" : "text-gray-900"
+      >
+
+        <div
+          className={`px-6 py-4 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"
             }`}
+        >
+
+          <h3
+            className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
           >
-                        Customer-wise Outstanding Details          
+            Customer-wise Outstanding Details
           </h3>
-                 
+
         </div>
-               
+
         <div className="overflow-x-auto rounded-xl border dark:border-gray-700 border-gray-200">
-          <table className="min-w-[1200px] w-full border-collapse">
+          <table className="min-w-[800px] w-full border-collapse">
             {/* ================= THEAD ================= */}
             <thead className={theme === "dark" ? "bg-gray-800" : "bg-gray-100"}>
               <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-[26%]">
+                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-[70%]">
                   Customer
                 </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider w-[18%]">
-                  Outstanding
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-[22%]">
-                  Ageing
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-[18%]">
-                  Credit
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider w-[16%]">
-                  Actions
+                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider w-[30%]">
+                  Closing Balance
                 </th>
               </tr>
             </thead>
@@ -341,84 +330,43 @@ const OutstandingReceivables: React.FC = () => {
               }
             >
               {filteredData.map((ledger) => {
-                const { purchaseTotal, outstanding } = calculateTotals(ledger);
+                const { closingBalance } = calculateTotals(ledger);
 
                 return (
-                  <React.Fragment key={ledger.ledger_id}>
-                    {/* ================= MAIN ROW ================= */}
-                    <tr
-                      className={
-                        theme === "dark"
-                          ? "hover:bg-gray-800"
-                          : "hover:bg-gray-50"
-                      }
-                    >
-                      {/* LEDGER */}
-                      <td className="px-4 py-4 align-top">
-                        <div className="font-medium text-sm">
-                          {ledger.ledger_name}
-                        </div>
-                        <div className="text-xs text-gray-500">
-                          {ledger.ledger_group_name}
-                        </div>
-                      </td>
+                  <tr
+                    key={ledger.ledger_id}
+                    className={`cursor-pointer ${theme === "dark"
+                      ? "hover:bg-gray-800"
+                      : "hover:bg-gray-50"
+                      }`}
+                    onClick={() =>
+                      navigate(
+                        `/app/reports/ledger/${ledger.ledger_id}`
+                      )
+                    }
+                  >
+                    {/* CUSTOMER NAME */}
+                    <td className="px-4 py-4 align-top">
+                      <div className="font-medium text-sm text-blue-600 dark:text-blue-400 hover:underline">
+                        {ledger.ledger_name}
+                      </div>
+                    </td>
 
-                      {/* OUTSTANDING */}
-                      <td className="px-4 py-4 text-right">
-                        <div className="font-semibold">
-                          {formatCurrency(outstanding)}
-                        </div>
-                      </td>
-
-                      {/* AGEING */}
-                      <td className="px-4 py-4 text-sm text-gray-400">
-                        Ageing not available
-                      </td>
-
-                      {/* CREDIT / OPENING */}
-                      <td className="px-4 py-4 text-xs text-gray-500">
-                        <div>
-                          Opening:{" "}
-                          {formatCurrency(Number(ledger.opening_balance))}
-                        </div>
-                        <div>Type: {ledger.balance_type}</div>
-                      </td>
-
-                      {/* ACTIONS */}
-                      <td className="px-4 py-4 text-center">
-                        <div className="flex items-center">
-                          <button
-                            onClick={() =>
-                              navigate(
-                                `/app/reports/outstanding/payables?ledgerId=${
-                                  ledger.ledger_id
-                                }&ledgerName=${encodeURIComponent(
-                                  ledger.ledger_name
-                                )}`
-                              )
-                            }
-                            className="p-2 rounded hover:bg-gray-200 dark:hover:bg-gray-700"
-                          >
-                            <Eye className="w-4 h-4" />
-                          </button>
-
-                          {/* {expandedLedgerId === ledger.ledger_id && (
-                            <span className="ml-2 text-xs text-blue-600 font-medium">
-                              Expanded: {ledger.ledger_id}
-                            </span>
-                          )} */}
-                        </div>
-                      </td>
-                    </tr>
-                  </React.Fragment>
+                    {/* CLOSING BALANCE */}
+                    <td className="px-4 py-4 text-right">
+                      <div className="font-semibold">
+                        {formatCurrency(closingBalance)}
+                      </div>
+                    </td>
+                  </tr>
                 );
               })}
             </tbody>
           </table>
         </div>
-             
+
       </div>
-         
+
     </div>
   );
 };

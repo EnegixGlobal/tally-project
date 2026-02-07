@@ -35,6 +35,8 @@ const baseGroups = [
   { id: -15, name: "Purchase Accounts", nature: "Expenses" },
   { id: -16, name: "Sales Accounts", nature: "Income" },
   { id: -17, name: "Suspense A/C", nature: "Assets" },
+  { id: -18, name: "Profit/Loss", nature: "Liabilities" },
+  { id: -19, name: "TDS Payables", nature: "Liabilities" },
 ];
 
 const GroupForm: React.FC = () => {
@@ -82,8 +84,7 @@ const GroupForm: React.FC = () => {
 
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -108,8 +109,7 @@ const GroupForm: React.FC = () => {
       const fetchGroup = async () => {
         try {
           const res = await fetch(
-            `${
-              import.meta.env.VITE_API_URL
+            `${import.meta.env.VITE_API_URL
             }/api/ledger-groups/${id}?ownerType=${ownerType}&ownerId=${ownerId}`
           );
           const data = await res.json();
@@ -286,33 +286,29 @@ const GroupForm: React.FC = () => {
         <button
           title="Back to Group List"
           onClick={() => navigate("/app/masters/group")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
         <h1
-          className={`text-2xl font-bold ${
-            theme === "dark" ? "text-gray-100" : "text-gray-900"
-          }`}
+          className={`text-2xl font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"
+            }`}
         >
           {isEditMode ? "Edit" : "Create"} Group
         </h1>
       </div>
 
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
                 htmlFor="name"
               >
                 Group Name *
@@ -324,13 +320,12 @@ const GroupForm: React.FC = () => {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                className={`w-full p-2 rounded border ${
-                  errors.name
-                    ? "border-red-500"
-                    : theme === "dark"
+                className={`w-full p-2 rounded border ${errors.name
+                  ? "border-red-500"
+                  : theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
                     : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
-                } outline-none transition-colors`}
+                  } outline-none transition-colors`}
               />
               {errors.name && (
                 <p className="text-red-500 text-xs mt-1">{errors.name}</p>
@@ -339,9 +334,8 @@ const GroupForm: React.FC = () => {
 
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
                 htmlFor="alias"
               >
                 Alias
@@ -352,19 +346,17 @@ const GroupForm: React.FC = () => {
                 name="alias"
                 value={formData.alias}
                 onChange={handleChange}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
-                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
-                } outline-none transition-colors`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                  : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                  } outline-none transition-colors`}
               />
             </div>
 
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
                 htmlFor="under"
               >
                 Under *
@@ -402,9 +394,8 @@ const GroupForm: React.FC = () => {
             {/* 🔹 Nature of Group field always visible */}
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
                 htmlFor="nature"
               >
                 Nature of Group *
@@ -417,15 +408,13 @@ const GroupForm: React.FC = () => {
                 onChange={handleChange}
                 required
                 disabled={!!formData.under}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
-                    : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
-                } ${
-                  formData.under && Number(formData.under) < 0
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
+                  : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
+                  } ${formData.under && Number(formData.under) < 0
                     ? "cursor-not-allowed text-gray-400"
                     : ""
-                }`}
+                  }`}
               >
                 <option value="">Select Nature</option>
                 <option value="Assets">Assets</option>
@@ -442,9 +431,8 @@ const GroupForm: React.FC = () => {
             {isPurchaseRelated && (
               <div>
                 <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                   htmlFor="allocationMethod"
                 >
                   Method to Allocate when Used in Purchase Ledger
@@ -454,13 +442,12 @@ const GroupForm: React.FC = () => {
                   name="allocationMethod"
                   value={formData.allocationMethod}
                   onChange={handleChange}
-                  className={`w-full p-2 rounded border ${
-                    errors.under
-                      ? "border-red-500"
-                      : theme === "dark"
+                  className={`w-full p-2 rounded border ${errors.under
+                    ? "border-red-500"
+                    : theme === "dark"
                       ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-gray-100"
                       : "bg-white border-gray-300 focus:border-blue-500 text-gray-900"
-                  } outline-none transition-colors`}
+                    } outline-none transition-colors`}
                 >
                   {allocationOptions.map((option) => (
                     <option key={option.value} value={option.value}>
@@ -477,22 +464,20 @@ const GroupForm: React.FC = () => {
               title="Cancel Group Creation"
               type="button"
               onClick={() => navigate("/app/masters/group")}
-              className={`px-4 py-2 rounded text-sm font-medium ${
-                theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600 text-gray-100"
-                  : "bg-gray-200 hover:bg-gray-300 text-gray-700"
-              }`}
+              className={`px-4 py-2 rounded text-sm font-medium ${theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-100"
+                : "bg-gray-200 hover:bg-gray-300 text-gray-700"
+                }`}
             >
               Cancel
             </button>
             <button
               title="Save Group"
               type="submit"
-              className={`flex items-center px-4 py-2 rounded text-sm font-medium ${
-                theme === "dark"
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
+              className={`flex items-center px-4 py-2 rounded text-sm font-medium ${theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
             >
               <Save size={18} className="mr-1" />
               {isEditMode ? "Update" : "Save"}
@@ -502,9 +487,8 @@ const GroupForm: React.FC = () => {
       </div>
 
       <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <p className="text-sm text-gray-700 dark:text-gray-300">
           <span className="font-semibold">Keyboard Shortcuts:</span> Ctrl+A to

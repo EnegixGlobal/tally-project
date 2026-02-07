@@ -231,4 +231,175 @@ router.get('/employee-financial-report-consolidated', async (req, res) => {
   }
 });
 
+// GET /api/consolidated-balance-sheet - For consolidated balance sheet view (all employee's companies)
+router.get('/consolidated-balance-sheet', async (req, res) => {
+  const employee_id = req.query.employee_id;
+  if (!employee_id) return res.status(400).json({ message: "Missing employee_id" });
+
+  const connection = await db.getConnection();
+  try {
+    // Get all companies assigned to this employee
+    const [companies] = await connection.query(
+      `SELECT id, name FROM tbcompanies WHERE employee_id = ?`,
+      [employee_id]
+    );
+
+    if (companies.length === 0) {
+      connection.release();
+      return res.json({ companies: [], ledgers: [], ledgerGroups: [], debitCreditData: {}, profitLossData: {} });
+    }
+
+    const companyIds = companies.map(c => c.id);
+    const placeholders = companyIds.map(() => '?').join(',');
+
+    // Fetch all ledger groups for all companies
+    const [ledgerGroups] = await connection.query(
+      `SELECT id, name, type, parent, company_id 
+       FROM ledger_groups 
+       WHERE company_id IN (${placeholders})`,
+      companyIds
+    );
+
+    // Fetch all ledgers for all companies with company name
+    const [ledgers] = await connection.query(
+      `SELECT 
+        l.id, 
+        l.name, 
+        l.group_id AS groupId,
+        CAST(l.opening_balance AS DECIMAL(15,2)) AS openingBalance,
+        l.balance_type AS balanceType,
+        g.name AS groupName,
+        g.type AS groupType,
+        l.company_id AS companyId,
+        c.name AS companyName
+       FROM ledgers l
+       LEFT JOIN ledger_groups g ON l.group_id = g.id
+       LEFT JOIN tbcompanies c ON l.company_id = c.id
+       WHERE l.company_id IN (${placeholders})
+       ORDER BY l.company_id, g.type, g.name, l.name`,
+      companyIds
+    );
+
+    // Fetch debit/credit data for all ledgers across all companies
+    const ledgerIds = ledgers.map(l => l.id);
+    let debitCreditData = {};
+
+    if (ledgerIds.length > 0) {
+      const ledgerPlaceholders = ledgerIds.map(() => '?').join(',');
+      const [dcRows] = await connection.query(
+        `SELECT 
+          ledger_id,
+          SUM(CASE WHEN entry_type = 'debit' THEN amount ELSE 0 END) AS debit,
+          SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE 0 END) AS credit
+         FROM voucher_entries
+         WHERE ledger_id IN (${ledgerPlaceholders})
+         GROUP BY ledger_id`,
+        ledgerIds
+      );
+
+      // Map debitCreditData with companyId_ledgerId as key
+      dcRows.forEach(row => {
+        const ledger = ledgers.find(l => l.id === row.ledger_id);
+        if (ledger) {
+          const key = `${ledger.companyId}_${row.ledger_id}`;
+          debitCreditData[key] = {
+            debit: Number(row.debit) || 0,
+            credit: Number(row.credit) || 0
+          };
+        }
+      });
+    }
+
+    // Fetch P&L data for each company
+    const profitLossData = {};
+    for (const company of companies) {
+      // Get net profit/loss from localStorage values (stored in voucher_entries narration)
+      const [transferredEntries] = await connection.query(
+        `SELECT narration FROM voucher_entries 
+         WHERE (narration LIKE 'PROFIT_TR:%' OR narration LIKE 'LOSS_TR:%')
+         AND voucher_id IN (SELECT id FROM voucher_main WHERE company_id = ?)`,
+        [company.id]
+      );
+
+      let transferredProfit = 0;
+      let transferredLoss = 0;
+      transferredEntries.forEach(entry => {
+        if (entry.narration.startsWith('PROFIT_TR:')) {
+          transferredProfit = Math.max(transferredProfit, parseFloat(entry.narration.split(':')[1]) || 0);
+        } else if (entry.narration.startsWith('LOSS_TR:')) {
+          transferredLoss = Math.max(transferredLoss, parseFloat(entry.narration.split(':')[1]) || 0);
+        }
+      });
+
+      // Calculate net profit/loss from sales and purchases
+      const [[salesResult]] = await connection.query(
+        `SELECT COALESCE(SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
+        [company.id]
+      );
+      const [[purchasesResult]] = await connection.query(
+        `SELECT COALESCE(SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
+        [company.id]
+      );
+
+      // Get expenses from indirect expenses group
+      const [[expensesResult]] = await connection.query(
+        `SELECT COALESCE(SUM(ve.amount), 0) AS total
+         FROM voucher_entries ve
+         JOIN ledgers l ON ve.ledger_id = l.id
+         JOIN ledger_groups g ON l.group_id = g.id
+         WHERE l.company_id = ? 
+         AND (g.id = -11 OR g.parent = -11 OR g.name LIKE '%Indirect Expenses%')
+         AND ve.entry_type = 'debit'`,
+        [company.id]
+      );
+
+      const sales = Number(salesResult?.total) || 0;
+      const purchases = Number(purchasesResult?.total) || 0;
+      const expenses = Number(expensesResult?.total) || 0;
+      const grossProfit = sales - purchases;
+      const netPL = grossProfit - expenses;
+
+      profitLossData[company.id] = {
+        netProfit: netPL > 0 ? netPL : 0,
+        netLoss: netPL < 0 ? Math.abs(netPL) : 0,
+        transferredProfit,
+        transferredLoss
+      };
+    }
+
+    // Fetch Sales and Purchase data for each company
+    const salesData = {};
+    const purchaseData = {};
+    for (const company of companies) {
+      const [[salesResult]] = await connection.query(
+        `SELECT COALESCE(SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
+        [company.id]
+      );
+      const [[purchasesResult]] = await connection.query(
+        `SELECT COALESCE(SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
+        [company.id]
+      );
+      salesData[company.id] = Number(salesResult?.total) || 0;
+      purchaseData[company.id] = Number(purchasesResult?.total) || 0;
+    }
+
+    connection.release();
+
+    res.json({
+      companies,
+      ledgers,
+      ledgerGroups,
+      debitCreditData,
+      profitLossData,
+      salesData,
+      purchaseData
+    });
+
+  } catch (err) {
+    connection.release();
+    console.error("Consolidated Balance Sheet Error:", err);
+    res.status(500).json({ message: err.message });
+  }
+});
+
 module.exports = router;

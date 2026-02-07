@@ -1243,14 +1243,14 @@ const StockSummary: React.FC = () => {
 
                         const totals = batches.reduce(
                           (acc: any, b: any) => {
-                            acc.openingQty += b.opening.qty;
-                            acc.openingValue += b.opening.value;
-                            acc.inwardQty += b.inward.qty;
-                            acc.inwardValue += b.inward.value;
-                            acc.outwardQty += b.outward.qty;
-                            acc.outwardValue += b.outward.value;
-                            acc.closingQty += b.closing.qty;
-                            acc.closingValue += b.closing.value;
+                            acc.openingQty += b.opening?.qty || 0;
+                            acc.openingValue += b.opening?.value || 0;
+                            acc.inwardQty += b.inward?.qty || 0;
+                            acc.inwardValue += b.inward?.value || 0;
+                            acc.outwardQty += b.outward?.qty || 0;
+                            acc.outwardValue += b.outward?.value || 0;
+                            acc.closingQty += b.closing?.qty || 0;
+                            acc.closingValue += b.closing?.value || 0;
                             return acc;
                           },
                           {
@@ -1426,34 +1426,82 @@ const StockSummary: React.FC = () => {
                               ? item.batches
                               : [];
                             batches.forEach((b: any) => {
-                              acc.opening += b.opening.value;
-                              acc.inward += b.inward.value;
-                              acc.outward += b.outward.value;
-                              acc.closing += b.closing.value;
+                              acc.openingQty += b.opening?.qty || 0;
+                              acc.openingValue += b.opening?.value || 0;
+
+                              acc.inwardQty += b.inward?.qty || 0;
+                              acc.inwardValue += b.inward?.value || 0;
+
+                              acc.outwardQty += b.outward?.qty || 0;
+                              acc.outwardValue += b.outward?.value || 0;
+
+                              acc.closingQty += b.closing?.qty || 0;
+                              acc.closingValue += b.closing?.value || 0;
                             });
                             return acc;
                           },
-                          { opening: 0, inward: 0, outward: 0, closing: 0 }
+                          {
+                            openingQty: 0,
+                            openingValue: 0,
+                            inwardQty: 0,
+                            inwardValue: 0,
+                            outwardQty: 0,
+                            outwardValue: 0,
+                            closingQty: 0,
+                            closingValue: 0,
+                          }
                         );
+
+                        // Calculate average rates
+                        const safeRate = (val: number, qty: number) =>
+                          qty !== 0 ? val / qty : 0;
 
                         return (
                           <tr className="font-bold bg-gray-200">
                             <td className="border p-2">Grand Total</td>
-                            <td colSpan={2}></td>
+
+                            {/* Opening */}
                             <td className="border p-2 text-right align-middle">
-                              {formatCurrency(grand.opening)}
+                              {grand.openingQty || ""}
                             </td>
-                            <td colSpan={2}></td>
                             <td className="border p-2 text-right align-middle">
-                              {formatCurrency(grand.inward)}
+                              {/* Rate */}
                             </td>
-                            <td colSpan={2}></td>
                             <td className="border p-2 text-right align-middle">
-                              {formatCurrency(grand.outward)}
+                              {formatCurrency(grand.openingValue)}
                             </td>
-                            <td colSpan={2}></td>
+
+                            {/* Inward */}
                             <td className="border p-2 text-right align-middle">
-                              {formatCurrency(grand.closing)}
+                              {grand.inwardQty || ""}
+                            </td>
+                            <td className="border p-2 text-right align-middle">
+                              {/* Rate */}
+                            </td>
+                            <td className="border p-2 text-right align-middle">
+                              {formatCurrency(grand.inwardValue)}
+                            </td>
+
+                            {/* Outward */}
+                            <td className="border p-2 text-right align-middle">
+                              {grand.outwardQty || ""}
+                            </td>
+                            <td className="border p-2 text-right align-middle">
+                              {/* Rate */}
+                            </td>
+                            <td className="border p-2 text-right align-middle">
+                              {formatCurrency(grand.outwardValue)}
+                            </td>
+
+                            {/* Closing */}
+                            <td className="border p-2 text-right align-middle">
+                              {grand.closingQty || ""}
+                            </td>
+                            <td className="border p-2 text-right align-middle">
+                              {/* Rate */}
+                            </td>
+                            <td className="border p-2 text-right align-middle">
+                              {formatCurrency(grand.closingValue)}
                             </td>
                           </tr>
                         );
