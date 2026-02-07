@@ -45,6 +45,7 @@ const GroupList: React.FC = () => {
     { id: -16, name: "Sales Accounts", nature: "Income", isSystem: true },
     { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },
     { id: -18, name: "Profit/Loss", nature: "Liabilities", isSystem: true },
+    { id: -19, name: "TDS Payables", nature: "Liabilities", isSystem: true },
   ];
 
   // prefer AuthContext values, fall back to localStorage
