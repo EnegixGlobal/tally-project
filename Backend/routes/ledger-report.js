@@ -88,8 +88,8 @@ SELECT
   MAX(pvi.igstRate)        AS igstRate,
   MAX(pvi.tdsRate)         AS tdsRate,
 
-  l_party.name    AS partyName,
-  l_purchase.name AS purchaseLedgerName
+  MAX(l_party.name)    AS partyName,
+  MAX(l_purchase.name) AS purchaseLedgerName
 
 FROM purchase_vouchers pv
 
@@ -116,6 +116,7 @@ ORDER BY pv.date ASC
 `,
       [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
     );
+
 
     /* ===============================
        3️⃣ SALES VOUCHERS → CREDIT/DEBIT
