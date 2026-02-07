@@ -1278,18 +1278,19 @@ const PurchaseVoucher: React.FC = () => {
         }
       );
 
-      const tdsRate = extractGstPercent(
+      const tdsRatePercent = extractGstPercent(
         getLedgerNameById(formData.tdsLedgerId)
       );
 
-      const tdsAmount = (totals.subtotal * tdsRate) / 100;
+      const tdsAmount = (totals.subtotal * tdsRatePercent) / 100;
 
       return {
         ...totals,
         gstTotal: totals.cgstTotal + totals.sgstTotal + totals.igstTotal,
         tdsAmount,
-        tdsRate,
-        total: totals.total + tdsAmount,
+        tdsTotal: tdsAmount, // ✅ Added for backend
+        tdsRate: tdsRatePercent, // Keep percentage for UI if needed
+        total: totals.total + tdsAmount, // ✅ Added to total as per user requirement (118 + 1 = 119)
       };
     }
     else {
@@ -1366,11 +1367,16 @@ const PurchaseVoucher: React.FC = () => {
           firstDebitEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
       }
 
-      // 🔥 1. Voucher payload (batchMeta INCLUDED but no API yet)
+      // 🔥 1. Voucher payload
       const payload = {
         ...formData,
-        partyId: finalPartyId, // Use extracted partyId
+        partyId: finalPartyId,
         ...totals,
+        // ✅ Map entries to include TDS Ledger ID as tdsRate (as requested by user)
+        entries: formData.entries.map(e => ({
+          ...e,
+          tdsRate: formData.tdsLedgerId || 0
+        })),
         companyId,
         ownerType,
         ownerId,
