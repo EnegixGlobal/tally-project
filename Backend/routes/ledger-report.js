@@ -82,11 +82,11 @@ SELECT
   pv.tdsTotal,
   pv.total,
 
-  pvi.purchaseLedgerId,
-  pvi.cgstRate,
-  pvi.sgstRate,
-  pvi.igstRate,
-  pvi.tdsRate,
+  MAX(pvi.purchaseLedgerId) AS purchaseLedgerId,
+  MAX(pvi.cgstRate)        AS cgstRate,
+  MAX(pvi.sgstRate)        AS sgstRate,
+  MAX(pvi.igstRate)        AS igstRate,
+  MAX(pvi.tdsRate)         AS tdsRate,
 
   l_party.name    AS partyName,
   l_purchase.name AS purchaseLedgerName
@@ -109,6 +109,8 @@ WHERE
   OR pvi.sgstRate = ?
   OR pvi.igstRate = ?
   OR pvi.tdsRate = ?
+
+GROUP BY pv.id
 
 ORDER BY pv.date ASC
 `,
