@@ -181,6 +181,9 @@ export type VoucherEntry = {
   cgstTotal?: number;
   sgstTotal?: number;
   igstTotal?: number;
+  tdsLedgerId?: string;
+  tdsRate?: number;
+  tdsAmount?: number;
   total?: number;
 
   safeDate?: Date | null;
@@ -234,13 +237,6 @@ export type StockItem = {
   }[];
 
   // API or future mapping may use this (KEEP)
-  batches?: {
-    batchName: string;
-    expiryDate?: string;
-    manufacturingDate?: string;
-  }[];
-
-  // Backend may send a `batches` field (stringified JSON or array)
   batches?: any;
 };
 

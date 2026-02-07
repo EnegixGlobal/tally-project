@@ -211,6 +211,10 @@ const PurchaseVoucher: React.FC = () => {
     String(l.groupName).toLowerCase().includes("purchase accounts")
   );
 
+  const tdsLedgers = ledgers.filter((l) =>
+    String(l.name).toUpperCase().includes("TDS")
+  );
+
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const { id } = useParams();
   const isEditMode = Boolean(id);
@@ -226,6 +230,7 @@ const PurchaseVoucher: React.FC = () => {
       batch: true,
       godown: true,
       showReceiptDetails: true,
+      tds: true,
     }
   );
 
@@ -420,6 +425,8 @@ const PurchaseVoucher: React.FC = () => {
           referenceNo: data.referenceNo || "",
           partyId: data.partyId || "",
           purchaseLedgerId: data.purchaseLedgerId || "",
+          tdsLedgerId: data.tdsLedgerId || "",
+          tdsAmount: data.tdsAmount || 0,
           narration: data.narration || "",
           number: data.number || prev.number,
 
@@ -427,6 +434,7 @@ const PurchaseVoucher: React.FC = () => {
             docNo: data.dispatchDocNo || "",
             through: data.dispatchThrough || "",
             destination: data.destination || "",
+            approxDistance: data.approxDistance || "",
           },
 
           entries:
@@ -659,6 +667,9 @@ const PurchaseVoucher: React.FC = () => {
     purchaseLedgerId: "", // New field for purchase ledger
     partyId: "",
     mode: "item-invoice",
+    tdsLedgerId: "",
+    tdsRate: 0,
+    tdsAmount: 0,
     dispatchDetails: { docNo: "", through: "", destination: "", approxDistance: "" },
     entries: [
       {
@@ -1212,7 +1223,11 @@ const PurchaseVoucher: React.FC = () => {
     return match ? Number(match[1]) : 0;
   };
 
-
+  // 🔹 Intra / Inter State Check
+  const isIntraState =
+    cleanState(companyState) &&
+    cleanState(supplierState) && // Changed from partyState to supplierState
+    cleanState(companyState) === cleanState(supplierState); // Changed from partyState to supplierState
 
   const calculateTotals = () => {
     if (formData.mode === "item-invoice") {
@@ -1235,26 +1250,21 @@ const PurchaseVoucher: React.FC = () => {
             getLedgerNameById(entry.gstLedgerId)
           );
 
-          // ✅ Total GST Rate
-          const totalGstRate = sgst + cgst + igst;
+          // ✅ Total GST Rate (respecting Intra/Inter state)
+          const totalGstRate = isIntraState ? (sgst + cgst) : igst;
 
           const baseAmount = qty * rate;
-
           const gstAmount = (baseAmount * totalGstRate) / 100;
-
           const totalAmount = baseAmount + gstAmount - discount;
 
           return {
             subtotal: acc.subtotal + baseAmount,
 
-            cgstTotal: acc.cgstTotal + (baseAmount * cgst) / 100,
-
-            sgstTotal: acc.sgstTotal + (baseAmount * sgst) / 100,
-
-            igstTotal: acc.igstTotal + (baseAmount * igst) / 100,
+            cgstTotal: acc.cgstTotal + (isIntraState ? (baseAmount * cgst) / 100 : 0),
+            sgstTotal: acc.sgstTotal + (isIntraState ? (baseAmount * sgst) / 100 : 0),
+            igstTotal: acc.igstTotal + (!isIntraState ? (baseAmount * igst) / 100 : 0),
 
             discountTotal: acc.discountTotal + discount,
-
             total: acc.total + totalAmount,
           };
         },
@@ -1268,10 +1278,18 @@ const PurchaseVoucher: React.FC = () => {
         }
       );
 
+      const tdsRate = extractGstPercent(
+        getLedgerNameById(formData.tdsLedgerId)
+      );
+
+      const tdsAmount = (totals.subtotal * tdsRate) / 100;
+
       return {
         ...totals,
         gstTotal: totals.cgstTotal + totals.sgstTotal + totals.igstTotal,
-        total: totals.total,
+        tdsAmount,
+        tdsRate,
+        total: totals.total + tdsAmount,
       };
     }
     else {
@@ -1287,18 +1305,11 @@ const PurchaseVoucher: React.FC = () => {
     }
   };
 
-  // ✅ Fix GST before saving (Intra / Inter State Logic)
-
-  const isIntra =
-    cleanState(companyState) &&
-    cleanState(supplierState) &&
-    cleanState(companyState) === cleanState(supplierState);
-
   // Update entries GST based on state
   const fixedEntries = formData.entries.map((entry) => {
     if (!entry.itemId) return entry;
 
-    if (isIntra) {
+    if (isIntraState) {
       // Same State → SGST + CGST only
       return {
         ...entry,
@@ -1473,6 +1484,8 @@ const PurchaseVoucher: React.FC = () => {
     igstTotal = 0,
     gstTotal = 0,
     discountTotal = 0,
+    tdsAmount = 0,
+    tdsRate = 0,
     total = 0,
     debitTotal = 0,
     creditTotal = 0,
@@ -1837,12 +1850,7 @@ const PurchaseVoucher: React.FC = () => {
 
 
   // 🔹 Intra / Inter State Check
-  const isIntraState =
-    cleanState(companyState) &&
-    cleanState(partyState) &&
-    cleanState(companyState) === cleanState(partyState);
-
-
+  // Note: isIntraState is now defined above calculateTotals to avoid ReferenceError
 
   return (
     <div className="pt-[56px] px-4">
@@ -1883,6 +1891,7 @@ const PurchaseVoucher: React.FC = () => {
               { key: "batch", label: "Show Batch Column" },
               { key: "gst", label: "Show GST Column" },
               { key: "godown", label: "Show Godown Column" },
+              { key: "tds", label: "Show TDS Row" },
             ].map(({ key, label }) => (
               <label
                 key={key}
@@ -2653,32 +2662,84 @@ const PurchaseVoucher: React.FC = () => {
                     {/* Calculate dynamic colspan based on visible columns */}
                     {(() => {
                       const colSpanBeforeAmount =
-                        4 + // Sr(1) + Item(1) + Unit(1) + Discount(1)
+                        6 + // Sr(1) + Item(1) + Qty(1) + Unit(1) + Rate(1) + Discount(1)
                         (visibleColumns.hsn ? 1 : 0) +
                         (visibleColumns.batch ? 1 : 0) +
-                        (!addBatchModal.visible ? 2 : 0) + // Qty(1) + Rate(1)
-                        (visibleColumns.gst ? (isIntraState ? 2 : 1) : 0) +
-                        ((godownEnabled === "yes" && visibleColumns.godown) ? 1 : 0) +
-                        1; // Purchase Ledger
+                        (visibleColumns.gst ? (isIntraState ? 2 : 1) : 0);
+
+                      const colSpanAfterAmount =
+                        2 + // Purchase Ledger(1) + Action(1)
+                        ((godownEnabled === "yes" && visibleColumns.godown) ? 1 : 0);
 
                       return (
                         <>
+                          {/* Subtotal */}
                           <tr
                             className={`font-semibold ${theme === "dark"
                               ? "border-t border-gray-600"
                               : "border-t border-gray-300"
                               }`}
                           >
-                            <td
-                              className="px-4 py-2 text-right"
-                              colSpan={colSpanBeforeAmount}
-                            >
+                            <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                               Subtotal:
                             </td>
+
                             <td className="px-4 py-2 text-right">
                               {subtotal.toLocaleString()}
                             </td>
+
+                            <td colSpan={colSpanAfterAmount}></td>
                           </tr>
+
+                          {/* TDS (FIXED WIDTH) */}
+                          {/* TDS Row */}
+                          {visibleColumns.tds && (
+                            <tr
+                              className={`font-semibold ${theme === "dark"
+                                ? "border-t border-gray-600"
+                                : "border-t border-gray-300"
+                                }`}
+                            >
+                              {/* Label + Dropdown */}
+                              <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
+                                <div className="flex items-center justify-end gap-3 pr-6">
+
+                                  <span className="whitespace-nowrap">
+                                    TDS:
+                                  </span>
+
+                                  <select
+                                    name="tdsLedgerId"
+                                    value={formData.tdsLedgerId}
+                                    onChange={handleChange}
+                                    className={`${TABLE_STYLES.select} !w-32 text-[11px] h-8 inline-block`}
+                                  >
+                                    <option value="">Select TDS</option>
+
+                                    {tdsLedgers.map((l) => (
+                                      <option key={l.id} value={l.id}>
+                                        {l.name}
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                </div>
+                              </td>
+
+                              {/* Amount */}
+                              <td className="px-4 py-2 text-right font-bold">
+                                {tdsAmount.toLocaleString()}
+                              </td>
+
+                              {/* Empty Space */}
+                              <td colSpan={colSpanAfterAmount} className="px-4 py-2">
+                                &nbsp;
+                              </td>
+                            </tr>
+                          )}
+
+
+                          {/* IGST / SGST */}
                           {isIntraState ? (
                             <>
                               <tr
@@ -2687,35 +2748,32 @@ const PurchaseVoucher: React.FC = () => {
                                   : "border-t border-gray-300"
                                   }`}
                               >
-                                <td
-                                  className="px-4 py-2 text-right"
-                                  colSpan={colSpanBeforeAmount}
-                                >
+                                <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                                   SGST Total:
                                 </td>
+
                                 <td className="px-4 py-2 text-right">
                                   {sgstTotal.toLocaleString()}
                                 </td>
-                                <td className="px-4 py-2"></td>
-                                <td className="px-4 py-2"></td>
+
+                                <td colSpan={colSpanAfterAmount}></td>
                               </tr>
+
                               <tr
                                 className={`font-semibold ${theme === "dark"
                                   ? "border-t border-gray-600"
                                   : "border-t border-gray-300"
                                   }`}
                               >
-                                <td
-                                  className="px-4 py-2 text-right"
-                                  colSpan={colSpanBeforeAmount}
-                                >
+                                <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                                   CGST Total:
                                 </td>
+
                                 <td className="px-4 py-2 text-right">
                                   {cgstTotal.toLocaleString()}
                                 </td>
-                                <td className="px-4 py-2"></td>
-                                <td className="px-4 py-2"></td>
+
+                                <td colSpan={colSpanAfterAmount}></td>
                               </tr>
                             </>
                           ) : (
@@ -2725,57 +2783,56 @@ const PurchaseVoucher: React.FC = () => {
                                 : "border-t border-gray-300"
                                 }`}
                             >
-                              <td
-                                className="px-4 py-2 text-right"
-                                colSpan={colSpanBeforeAmount}
-                              >
+                              <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                                 IGST Total:
                               </td>
+
                               <td className="px-4 py-2 text-right">
                                 {igstTotal.toLocaleString()}
                               </td>
 
-                              <td className="px-4 py-2"></td>
-                              <td className="px-4 py-2"></td>
+                              <td colSpan={colSpanAfterAmount}></td>
                             </tr>
                           )}
+
+                          {/* Discount */}
                           <tr
                             className={`font-semibold ${theme === "dark"
                               ? "border-t border-gray-600"
                               : "border-t border-gray-300"
                               }`}
                           >
-                            <td
-                              className="px-4 py-2 text-right"
-                              colSpan={colSpanBeforeAmount}
-                            >
+                            <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                               Discount Total:
                             </td>
+
                             <td className="px-4 py-2 text-right">
                               {discountTotal.toLocaleString()}
                             </td>
-                            <td className="px-4 py-2"></td>
-                            <td className="px-4 py-2"></td>
+
+                            <td colSpan={colSpanAfterAmount}></td>
                           </tr>
+
+                          {/* Grand Total */}
                           <tr
-                            className={`font-semibold ${theme === "dark"
-                              ? "border-t border-gray-600"
-                              : "border-t border-gray-300"
+                            className={`font-semibold text-lg ${theme === "dark"
+                              ? "bg-gray-700/50 border-t-2 border-blue-500"
+                              : "bg-blue-50 border-t-2 border-blue-600 text-blue-900"
                               }`}
                           >
-                            <td
-                              className="px-4 py-2 text-right"
-                              colSpan={colSpanBeforeAmount}
-                            >
+                            <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
                               Grand Total:
                             </td>
-                            <td className="px-4 py-2 text-right">
+
+                            <td className="px-4 py-2 text-right font-bold text-green-600">
                               {total.toLocaleString()}
                             </td>
-                            <td className="px-4 py-2"></td>
-                            <td className="px-4 py-2"></td>
+
+                            <td colSpan={colSpanAfterAmount}></td>
                           </tr>
                         </>
+
+
                       );
                     })()}
                   </tfoot>
