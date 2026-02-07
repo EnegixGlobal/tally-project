@@ -1216,22 +1216,22 @@ function App() {
                     </RequireCompany>
                   }
                 />
-                <Route
+                {/* <Route
                   path="reports/outstanding/receivables"
                   element={
                     <RequireCompany>
                       <ReceivablesDetails />
                     </RequireCompany>
                   }
-                />
-                <Route
+                /> */}
+                {/* <Route
                   path="reports/outstanding/payables"
                   element={
                     <RequireCompany>
                       <Payablesdetails />
                     </RequireCompany>
                   }
-                />
+                /> */}
                 <Route
                   path="reports/stock-summary"
                   element={

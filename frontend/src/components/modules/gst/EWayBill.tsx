@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { jsPDF } from "jspdf";
-import { ArrowLeft, X } from "lucide-react";
+import { ArrowLeft, X, Settings } from "lucide-react";
 
 
 // state list
@@ -80,6 +80,9 @@ const EWayBill: React.FC = () => {
   const [selectedSale, setSelectedSale] = useState<any>(null);
   const [showEWayForm, setShowEWayForm] = useState(false);
   const [generateEWay, setGenerateEWay] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
+  const [combineView, setCombineView] = useState(false);
+
 
 
   const [supplier, setSupplier] = useState({
@@ -151,9 +154,9 @@ const EWayBill: React.FC = () => {
     isService: "",
     hsn: "",
     unit: "",
-    unitPrice: 0,   
+    unitPrice: 0,
     gst: "",
-    qty: 0,        
+    qty: 0,
   });
 
 
@@ -416,13 +419,14 @@ const EWayBill: React.FC = () => {
     (row: any) => Number(row.total) <= 50000
   );
 
+  const combinedData = [...eWayEligible, ...nonEWay];
 
 
 
 
   return (
     <div className="pt-[56px] px-4">
-      <div className="flex items-center justify-between mb-6">
+      <div className="flex items-center justify-between mb-6 relative">
         <div className="flex items-center">
           <button
             onClick={() => navigate("/app/gst")}
@@ -434,17 +438,48 @@ const EWayBill: React.FC = () => {
           </button>
           <h1 className="text-2xl font-bold">E-Way Bill Management</h1>
         </div>
+        {/* Settings Icon */}
+        <div className="relative">
+          <button
+            onClick={() => setShowSettings(!showSettings)}
+            className="p-2 rounded-full hover:bg-gray-200"
+          >
+            <Settings size={20} />
+          </button>
+
+          {showSettings && (
+            <div className="absolute right-0 mt-2 w-56 bg-white border rounded-md shadow-lg p-4 z-50">
+              <label className="flex items-center gap-2 text-sm cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={combineView}
+                  onChange={(e) => setCombineView(e.target.checked)}
+                  className="h-4 w-4"
+                />
+                Mandatory E-Invoice View
+              </label>
+
+              <p className="text-xs text-gray-500 mt-1">
+                Show all invoices together
+              </p>
+            </div>
+          )}
+        </div>
+
       </div>
 
-      {/* // sales data show */}
+
 
       {/* Sales Voucher List amount >50000 */}
-      <div className="bg-white mt-6 rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          E-Way Bill Eligible Sales (Amount &gt; ₹50,000)
-        </h2>
 
-        {eWayEligible.length > 0 ? (
+
+      {/* Combined View */}
+      {combineView ? (
+        <div className="bg-white mt-6 rounded-lg shadow-sm border p-6">
+          <h2 className="text-lg font-semibold mb-4">
+            All Sales (E-Invoice Mode)
+          </h2>
+
           <div className="overflow-x-auto">
             <table className="min-w-full border border-gray-200 text-sm">
               <thead className="bg-gray-100">
@@ -456,19 +491,14 @@ const EWayBill: React.FC = () => {
                   <th className="px-3 py-2 border text-right">CGST</th>
                   <th className="px-3 py-2 border text-right">SGST</th>
                   <th className="px-3 py-2 border text-right">IGST</th>
-                  <th className="px-3 py-2 border text-right font-semibold">
-                    Total
-                  </th>
+                  <th className="px-3 py-2 border text-right font-semibold">Total</th>
                   <th className="px-3 py-2 border text-center">Action</th>
                 </tr>
               </thead>
 
               <tbody>
-                {eWayEligible.map((row: any) => (
-                  <tr
-                    key={row.id}
-                    className="hover:bg-blue-50 transition"
-                  >
+                {combinedData.map((row: any) => (
+                  <tr key={row.id} className="hover:bg-gray-50 transition">
                     <td className="px-3 py-2 border">
                       {formatDate(row.date)}
                     </td>
@@ -476,8 +506,6 @@ const EWayBill: React.FC = () => {
                     <td className="px-3 py-2 border font-medium">
                       {row.number}
                     </td>
-
-
 
                     <td className="px-3 py-2 border">
                       {row.partyName || row.partyId}
@@ -506,92 +534,12 @@ const EWayBill: React.FC = () => {
                     <td className="px-3 py-2 border text-center">
                       <button
                         onClick={() => handleGenerateEWay(row)}
-                        className="px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
+                        className={`px-3 py-1 rounded text-white text-xs ${Number(row.total) > 50000
+                            ? "bg-blue-600 hover:bg-blue-700"
+                            : "bg-green-600 hover:bg-green-700"
+                          }`}
                       >
-                        Generate E-Way
-                      </button>
-
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        ) : (
-          <div className="text-center text-gray-500 text-sm py-6">
-            No sales vouchers eligible for E-Way Bill
-          </div>
-        )}
-      </div>
-
-
-
-      {/* Sales Voucher List amount <= 50000 */}
-      <div className="bg-white mt-6 rounded-lg shadow-sm border border-gray-200 p-6">
-        <h2 className="text-lg font-semibold text-gray-800 mb-4">
-          Sales (Amount ≤ ₹50,000) – E-Invoice Only
-        </h2>
-
-        {nonEWay.length > 0 ? (
-          <div className="overflow-x-auto">
-            <table className="min-w-full border border-gray-200 text-sm">
-              <thead className="bg-gray-100">
-                <tr>
-                  <th className="px-3 py-2 border">Date</th>
-                  <th className="px-3 py-2 border">Invoice No</th>
-                  <th className="px-3 py-2 border">Party</th>
-                  <th className="px-3 py-2 border text-right">Subtotal</th>
-                  <th className="px-3 py-2 border text-right">CGST</th>
-                  <th className="px-3 py-2 border text-right">SGST</th>
-                  <th className="px-3 py-2 border text-right">IGST</th>
-                  <th className="px-3 py-2 border text-right font-semibold">
-                    Total
-                  </th>
-                  <th className="px-3 py-2 border text-center">Action</th>
-                </tr>
-              </thead>
-
-              <tbody>
-                {nonEWay.map((row: any) => (
-                  <tr key={row.id} className="hover:bg-gray-50 transition">
-                    <td className="px-3 py-2 border">
-                      {formatDate(row.date)}
-                    </td>
-
-                    <td className="px-3 py-2 border font-medium">
-                      {row.number}
-                    </td>
-
-                    <td className="px-3 py-2 border">
-                      {row.partyName || row.partyId}
-                    </td>
-
-                    <td className="px-3 py-2 border text-right">
-                      ₹{formatAmount(row.subtotal)}
-                    </td>
-
-                    <td className="px-3 py-2 border text-right">
-                      ₹{formatAmount(row.cgstTotal)}
-                    </td>
-
-                    <td className="px-3 py-2 border text-right">
-                      ₹{formatAmount(row.sgstTotal)}
-                    </td>
-
-                    <td className="px-3 py-2 border text-right text-orange-600">
-                      ₹{formatAmount(row.igstTotal)}
-                    </td>
-
-                    <td className="px-3 py-2 border text-right text-green-600 font-bold">
-                      ₹{formatAmount(row.total)}
-                    </td>
-
-                    <td className="px-3 py-2 border text-center">
-                      <button
-                        onClick={() => handleGenerateEWay(row)}
-                        className="px-3 py-1 rounded bg-green-600 text-white text-xs hover:bg-green-700"
-                      >
-                        Generate E-Invoice
+                        {Number(row.total) > 50000 ? "Generate E-Way" : "Generate E-Invoice"}
                       </button>
                     </td>
                   </tr>
@@ -599,12 +547,183 @@ const EWayBill: React.FC = () => {
               </tbody>
             </table>
           </div>
-        ) : (
-          <div className="text-center text-gray-500 text-sm py-4">
-            No sales found below ₹50,000
+        </div>
+      ) : (
+        <>
+          {/* Yahan tumhara purana >50000 table */}
+          <div className="bg-white mt-6 rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">
+              E-Way Bill Eligible Sales (Amount &gt; ₹50,000)
+            </h2>
+
+            {eWayEligible.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 border">Date</th>
+                      <th className="px-3 py-2 border">Invoice No</th>
+                      <th className="px-3 py-2 border">Party ID</th>
+                      <th className="px-3 py-2 border text-right">Subtotal</th>
+                      <th className="px-3 py-2 border text-right">CGST</th>
+                      <th className="px-3 py-2 border text-right">SGST</th>
+                      <th className="px-3 py-2 border text-right">IGST</th>
+                      <th className="px-3 py-2 border text-right font-semibold">
+                        Total
+                      </th>
+                      <th className="px-3 py-2 border text-center">Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {eWayEligible.map((row: any) => (
+                      <tr
+                        key={row.id}
+                        className="hover:bg-blue-50 transition"
+                      >
+                        <td className="px-3 py-2 border">
+                          {formatDate(row.date)}
+                        </td>
+
+                        <td className="px-3 py-2 border font-medium">
+                          {row.number}
+                        </td>
+
+
+
+                        <td className="px-3 py-2 border">
+                          {row.partyName || row.partyId}
+                        </td>
+
+                        <td className="px-3 py-2 border text-right">
+                          ₹{formatAmount(row.subtotal)}
+                        </td>
+
+                        <td className="px-3 py-2 border text-right">
+                          ₹{formatAmount(row.cgstTotal)}
+                        </td>
+
+                        <td className="px-3 py-2 border text-right">
+                          ₹{formatAmount(row.sgstTotal)}
+                        </td>
+
+                        <td className="px-3 py-2 border text-right text-orange-600 font-semibold">
+                          ₹{formatAmount(row.igstTotal)}
+                        </td>
+
+                        <td className="px-3 py-2 border text-right text-green-600 font-bold">
+                          ₹{formatAmount(row.total)}
+                        </td>
+
+                        <td className="px-3 py-2 border text-center">
+                          <button
+                            onClick={() => handleGenerateEWay(row)}
+                            className="px-3 py-1 rounded bg-blue-600 text-white text-xs hover:bg-blue-700"
+                          >
+                            Generate E-Way
+                          </button>
+
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 text-sm py-6">
+                No sales vouchers eligible for E-Way Bill
+              </div>
+            )}
           </div>
-        )}
-      </div>
+
+
+
+          {/* Sales Voucher List amount <= 50000 */}
+          <div className="bg-white mt-6 rounded-lg shadow-sm border border-gray-200 p-6">
+            <h2 className="text-lg font-semibold text-gray-800 mb-4">
+              Sales (Amount ≤ ₹50,000) – E-Invoice Only
+            </h2>
+
+            {nonEWay.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-200 text-sm">
+                  <thead className="bg-gray-100">
+                    <tr>
+                      <th className="px-3 py-2 border">Date</th>
+                      <th className="px-3 py-2 border">Invoice No</th>
+                      <th className="px-3 py-2 border">Party</th>
+                      <th className="px-3 py-2 border text-right">Subtotal</th>
+                      <th className="px-3 py-2 border text-right">CGST</th>
+                      <th className="px-3 py-2 border text-right">SGST</th>
+                      <th className="px-3 py-2 border text-right">IGST</th>
+                      <th className="px-3 py-2 border text-right font-semibold">
+                        Total
+                      </th>
+                      <th className="px-3 py-2 border text-center">Action</th>
+                    </tr>
+                  </thead>
+
+                  <tbody>
+                    {nonEWay.map((row: any) => (
+                      <tr key={row.id} className="hover:bg-gray-50 transition">
+                        <td className="px-3 py-2 border">
+                          {formatDate(row.date)}
+                        </td>
+
+                        <td className="px-3 py-2 border font-medium">
+                          {row.number}
+                        </td>
+
+                        <td className="px-3 py-2 border">
+                          {row.partyName || row.partyId}
+                        </td>
+
+                        <td className="px-3 py-2 border text-right">
+                          ₹{formatAmount(row.subtotal)}
+                        </td>
+
+                        <td className="px-3 py-2 border text-right">
+                          ₹{formatAmount(row.cgstTotal)}
+                        </td>
+
+                        <td className="px-3 py-2 border text-right">
+                          ₹{formatAmount(row.sgstTotal)}
+                        </td>
+
+                        <td className="px-3 py-2 border text-right text-orange-600">
+                          ₹{formatAmount(row.igstTotal)}
+                        </td>
+
+                        <td className="px-3 py-2 border text-right text-green-600 font-bold">
+                          ₹{formatAmount(row.total)}
+                        </td>
+
+                        <td className="px-3 py-2 border text-center">
+                          <button
+                            onClick={() => handleGenerateEWay(row)}
+                            className="px-3 py-1 rounded bg-green-600 text-white text-xs hover:bg-green-700"
+                          >
+                            Generate E-Invoice
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="text-center text-gray-500 text-sm py-4">
+                No sales found below ₹50,000
+              </div>
+            )}
+          </div>
+
+        </>
+      )}
+
+
+
+
 
 
 
