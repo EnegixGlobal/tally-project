@@ -226,7 +226,12 @@ const DayBook: React.FC = () => {
         /* ==========================
          🔹 GROUPED STATE
       ========================== */
-        const groupedArray = Object.values(grouped);
+        const groupedArray = Object.values(grouped).sort((a, b) => {
+          const dateA = new Date(a.date).getTime();
+          const dateB = new Date(b.date).getTime();
+          if (dateB !== dateA) return dateB - dateA;
+          return b.voucherNo.localeCompare(a.voucherNo);
+        });
         setGroupedVouchers(groupedArray);
         setAllGroupedVouchers(groupedArray);
 
@@ -235,6 +240,14 @@ const DayBook: React.FC = () => {
       ========================== */
         const entryGroups: DayBookEntry[][] = [];
         const groupMap = new Map<string, number>();
+
+        // Sort RAW entries by date descending before grouping
+        allDetailedEntriesRaw.sort((a, b) => {
+          const dateA = new Date(a.date).getTime();
+          const dateB = new Date(b.date).getTime();
+          if (dateB !== dateA) return dateB - dateA;
+          return b.voucherNo.localeCompare(a.voucherNo);
+        });
 
         allDetailedEntriesRaw.forEach((entry) => {
           const key = `${entry.date}|${entry.voucherType}|${entry.voucherNo}|${entry.particulars}`;
