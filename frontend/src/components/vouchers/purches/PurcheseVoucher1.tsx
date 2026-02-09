@@ -1290,7 +1290,7 @@ const PurchaseVoucher: React.FC = () => {
         tdsAmount,
         tdsTotal: tdsAmount, // ✅ Added for backend
         tdsRate: tdsRatePercent, // Keep percentage for UI if needed
-        total: totals.total + tdsAmount, // ✅ Added to total as per user requirement (118 + 1 = 119)
+        total: totals.total + tdsAmount, // ✅ Added to total (118 + 8 = 126)
       };
     }
     else {

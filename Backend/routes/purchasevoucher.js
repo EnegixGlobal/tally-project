@@ -318,6 +318,7 @@ router.post("/", async (req, res) => {
       Number(subtotal || 0) +
       Number(finalCgst || 0) +
       Number(finalSgst || 0) +
+      Number(finalIgst || 0) -
       Number(discountTotal || 0) +
       Number(tdsTotal || 0);
 
@@ -967,6 +968,7 @@ router.put("/:id", async (req, res) => {
       Number(subtotal || 0) +
       Number(finalCgst || 0) +
       Number(finalSgst || 0) +
+      Number(finalIgst || 0) -
       Number(discountTotal || 0) +
       Number(tdsTotal || 0);
 
