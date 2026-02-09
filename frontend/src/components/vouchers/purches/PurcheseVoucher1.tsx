@@ -234,6 +234,8 @@ const PurchaseVoucher: React.FC = () => {
     }
   );
 
+  const [isReadyToSave, setIsReadyToSave] = useState(false);
+
   // Barcode State
   const [barcodeInput, setBarcodeInput] = useState("");
   const [isBarcodeError, setIsBarcodeError] = useState(false);
@@ -740,6 +742,71 @@ const PurchaseVoucher: React.FC = () => {
       },
     ],
   });
+
+  // Draft Persistence Logic
+  const DRAFT_KEY = "PURCHASE_VOUCHER_CREATE_DRAFT";
+
+  // 1. RESTORE DRAFT ON MOUNT (First Priority)
+  useEffect(() => {
+    if (isEditMode) {
+      setIsReadyToSave(true);
+      return;
+    }
+
+    const savedDraft = localStorage.getItem(DRAFT_KEY);
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        // Only restore if the draft has some data
+        if (parsed.partyId || (parsed.entries && parsed.entries.some((e: any) => e.itemId))) {
+          setFormData(parsed);
+
+          const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000,
+            timerProgressBar: true,
+          });
+          Toast.fire({
+            icon: 'info',
+            title: 'Draft restored'
+          });
+        }
+      } catch (e) {
+        console.error("Failed to restore purchase voucher draft:", e);
+      }
+    }
+    // Delay setting ready to true to allow setFormData to settle
+    setIsReadyToSave(true);
+  }, [isEditMode]);
+
+  // 2. SAVE DRAFT (Only after restore attempt)
+  useEffect(() => {
+    if (!isEditMode && isReadyToSave && formData) {
+      // Check if there's actual data to save to avoid saving empty defaults
+      const hasData = formData.partyId || formData.entries.some(e => e.itemId || e.quantity > 0);
+      if (hasData) {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+      }
+    }
+  }, [formData, isEditMode, isReadyToSave]);
+
+  // 3. SYNC SUPPLIER STATE (For restored drafts or party changes)
+  useEffect(() => {
+    if (formData.partyId && safeLedgers.length > 0) {
+      const selected = safeLedgers.find(l => String(l.id) === String(formData.partyId));
+      if (selected) {
+        const pState = selected.state || selected.state_name || selected.State || "";
+        setSupplierState(pState);
+      }
+    }
+  }, [formData.partyId, safeLedgers]);
+
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    window.location.reload(); // Quickest way to reset everything to defaults
+  };
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showConfig, setShowConfig] = useState(false);
@@ -1383,6 +1450,7 @@ const PurchaseVoucher: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsReadyToSave(false); // Stop draft saving immediately when starting submission
 
     if (!validateForm()) {
       Swal.fire({
@@ -1453,6 +1521,11 @@ const PurchaseVoucher: React.FC = () => {
         return;
       }
 
+      // ✅ CLEAR DRAFT ON SUCCESS
+      if (!isEditMode) {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+
       // 🔥 3. NOW save ONLY NEW batches
       for (const entry of formData.entries) {
         if (!entry.batchMeta?.isNew) continue;
@@ -1510,6 +1583,10 @@ const PurchaseVoucher: React.FC = () => {
             body: JSON.stringify(historyData),
           }
         );
+      }
+
+      if (!isEditMode) {
+        localStorage.removeItem(DRAFT_KEY);
       }
 
       await Swal.fire(
@@ -1980,9 +2057,9 @@ const PurchaseVoucher: React.FC = () => {
             <div className="flex justify-end mt-5">
               <button
                 onClick={() => setShowTableConfig(false)}
-                className="px-4 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700"
+                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-lg transition-all"
               >
-                Apply & Close
+                Close Settings
               </button>
             </div>
           </div>
@@ -3084,29 +3161,6 @@ const PurchaseVoucher: React.FC = () => {
           </div>
 
           <div className="flex justify-end space-x-4">
-            <button
-              title="Cancel (Esc)"
-              type="button"
-              onClick={() => navigate("/app/vouchers")}
-              className={`px-4 py-2 rounded ${theme === "dark"
-                ? "bg-gray-700 hover:bg-gray-600"
-                : "bg-gray-200 hover:bg-gray-300"
-                }`}
-            >
-              Cancel
-            </button>
-            <button
-              title="Print"
-              type="button"
-              onClick={handlePrint}
-              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                ? "bg-green-600 hover:bg-green-700"
-                : "bg-green-600 hover:bg-green-700 text-white"
-                }`}
-            >
-              <Printer size={18} className="mr-1" />
-              Print
-            </button>
             <button
               title="Save Voucher (F9)"
               type="submit"

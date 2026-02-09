@@ -73,6 +73,8 @@ const SalesVoucher: React.FC = () => {
   const [selectedPartyGst, setSelectedPartyGst] = useState<string>(""); // Store selected party's GST number
   const [salesTypes, setSalesTypes] = useState<SalesType[]>([]);
   const [selectedSalesTypeId, setSelectedSalesTypeId] = useState<string>("");
+  const [isReadyToSave, setIsReadyToSave] = useState(false);
+  const DRAFT_KEY = "SALES_VOUCHER_CREATE_DRAFT";
 
   // Robust detection for party ledgers — backend may return different field names
 
@@ -354,6 +356,65 @@ const SalesVoucher: React.FC = () => {
   const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>(() =>
     getInitialFormData()
   );
+
+  // --- DRAFT PERSISTENCE (RESTORE) ---
+  useEffect(() => {
+    if (isEditMode) {
+      setIsReadyToSave(true);
+      return;
+    }
+
+    const savedDraft = localStorage.getItem(DRAFT_KEY);
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed && (parsed.partyId || (parsed.entries && parsed.entries.some((e: any) => e.itemId)))) {
+          setFormData(parsed);
+
+          if (parsed.sales_type_id) {
+            setSelectedSalesTypeId(parsed.sales_type_id);
+          }
+
+          if (parsed.profitConfig) {
+            setProfitConfig(parsed.profitConfig);
+          }
+
+          Swal.fire({
+            toast: true,
+            position: "top-end",
+            icon: "info",
+            title: "Draft restored",
+            showConfirmButton: false,
+            timer: 2000,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to restore Sales Voucher draft", e);
+      }
+    }
+    setIsReadyToSave(true);
+  }, [isEditMode]);
+
+  // --- DRAFT PERSISTENCE (SAVE) ---
+  useEffect(() => {
+    if (!isEditMode && isReadyToSave && formData) {
+      const hasData = formData.partyId || formData.entries.some(e => e.itemId || e.quantity > 0);
+      if (hasData) {
+        // Include additional states in the draft
+        const draftData = {
+          ...formData,
+          sales_type_id: selectedSalesTypeId,
+          profitConfig: profitConfig
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+      }
+    }
+  }, [formData, isEditMode, isReadyToSave, selectedSalesTypeId]);
+
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+    window.location.reload();
+  };
 
   const [godownEnabled, setGodownEnabled] = useState<"yes" | "no">("yes"); // Add state for godown selection visibility
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -1642,6 +1703,7 @@ const SalesVoucher: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsReadyToSave(false); // Stop draft saving immediately when starting submission
 
     const { isValid, messages } = validateForm();
 
@@ -1814,6 +1876,9 @@ const SalesVoucher: React.FC = () => {
         }
       );
 
+      if (!isEditMode) {
+        localStorage.removeItem(DRAFT_KEY);
+      }
       Swal.fire("Success", "Voucher saved successfully!", "success");
       navigate("/app/vouchers");
     } catch (err) {
@@ -3032,29 +3097,6 @@ const SalesVoucher: React.FC = () => {
             </div>
             <div className="flex justify-end space-x-4">
               <button
-                title="Cancel (Esc)"
-                type="button"
-                onClick={() => navigate("/app/vouchers")}
-                className={`px-4 py-2 rounded ${theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-gray-200 hover:bg-gray-300"
-                  }`}
-              >
-                Cancel
-              </button>
-              <button
-                title="Print"
-                type="button"
-                onClick={handlePrintClick}
-                className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "bg-green-600 hover:bg-green-700 text-white"
-                  }`}
-              >
-                <Printer size={18} className="mr-1" />
-                Print
-              </button>
-              <button
                 title="Save Voucher (F9)"
                 type="submit"
                 className={`flex items-center px-4 py-2 rounded ${theme === "dark"
@@ -3139,9 +3181,9 @@ const SalesVoucher: React.FC = () => {
                 </label>
               </div>
 
-              <div className="flex justify-end mt-6">
+              <div className="flex flex-col gap-3 mt-6">
                 <button
-                  className="px-4 py-2 bg-gray-200  rounded"
+                  className="w-full py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded font-semibold transition-all"
                   onClick={() => setShowConfig(false)}
                 >
                   Close
