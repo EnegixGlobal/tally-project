@@ -3097,6 +3097,29 @@ const SalesVoucher: React.FC = () => {
             </div>
             <div className="flex justify-end space-x-4">
               <button
+                title="Cancel (Esc)"
+                type="button"
+                onClick={() => navigate("/app/vouchers")}
+                className={`px-4 py-2 rounded ${theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-200 hover:bg-gray-300"
+                  }`}
+              >
+                Cancel
+              </button>
+              <button
+                title="Print"
+                type="button"
+                onClick={handlePrintClick}
+                className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                  ? "bg-green-600 hover:bg-green-700"
+                  : "bg-green-600 hover:bg-green-700 text-white"
+                  }`}
+              >
+                <Printer size={18} className="mr-1" />
+                Print
+              </button>
+              <button
                 title="Save Voucher (F9)"
                 type="submit"
                 className={`flex items-center px-4 py-2 rounded ${theme === "dark"
