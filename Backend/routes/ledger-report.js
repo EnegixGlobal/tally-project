@@ -139,8 +139,8 @@ ORDER BY pv.date ASC
     MAX(svi.sgstRate) AS sgstRate,
     MAX(svi.igstRate) AS igstRate,
 
-    l_party.name  AS partyName,
-    l_sales.name  AS salesLedgerName
+    MAX(l_party.name) AS partyName,
+    MAX(l_sales.name) AS salesLedgerName
 
   FROM sales_vouchers sv
 
