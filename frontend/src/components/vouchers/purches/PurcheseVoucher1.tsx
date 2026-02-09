@@ -391,7 +391,51 @@ const PurchaseVoucher: React.FC = () => {
     }
   };
 
-  // Debounced Barcode Lookup
+  // POS Barcode Scanner Logic (Global Listener)
+  const barcodeBuffer = useRef("");
+  const lastKeyTime = useRef(0);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ignore if source is common inputs (unless it's barcode specific)
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        // If it's the barcode input itself, let the default handle it or we still buffer? 
+        // Most scanners "type" into the focused field.
+        // We only want to "auto-detect" if NOT in a critical field or specially handled.
+      }
+
+      const currentTime = Date.now();
+      const diff = currentTime - lastKeyTime.current;
+      lastKeyTime.current = currentTime;
+
+      // Professional scanners usually type very fast (< 50ms per char)
+      if (diff < 50) {
+        if (e.key === "Enter") {
+          if (barcodeBuffer.current.length >= 3) {
+            const code = barcodeBuffer.current;
+            setBarcodeInput(code);
+            performBarcodeLookup(code);
+            barcodeBuffer.current = "";
+          }
+        } else if (e.key.length === 1) {
+          barcodeBuffer.current += e.key;
+        }
+      } else {
+        // Reset buffer if delay is too long
+        if (e.key.length === 1) {
+          barcodeBuffer.current = e.key;
+        } else {
+          barcodeBuffer.current = "";
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [barcodeInput]); // Dependency on barcodeInput to stay updated or performBarcodeLookup
+
+  // Debounced Barcode Lookup (for manual typing)
   useEffect(() => {
     if (!barcodeInput || barcodeInput.length < 3) return;
 

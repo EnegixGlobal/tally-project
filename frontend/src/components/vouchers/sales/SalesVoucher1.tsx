@@ -388,6 +388,9 @@ const SalesVoucher: React.FC = () => {
   const [isBarcodeError, setIsBarcodeError] = useState(false);
 
   // timers for debouncing rate input per entry
+  // POS Barcode Scanner Logic (Global Listener)
+  const barcodeBuffer = useRef("");
+  const lastKeyTime = useRef(0);
   const rateDebounceTimers = useRef<{ [entryId: string]: number | null }>({});
 
   // Add this useEffect() in component (below states)
@@ -1441,6 +1444,47 @@ const SalesVoucher: React.FC = () => {
       setIsBarcodeError(true);
     }
   };
+
+  // POS Barcode Scanner Logic (Global Listener)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ignore if source is common inputs (unless it's barcode specific)
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        // Option: allow barcode scanning even if inside an input, 
+        // but typically we let the standard field typing happen.
+        // For auto POS we buffer everything.
+      }
+
+      const currentTime = Date.now();
+      const diff = currentTime - lastKeyTime.current;
+      lastKeyTime.current = currentTime;
+
+      // Professional scanners usually type very fast (< 50ms per char)
+      if (diff < 50) {
+        if (e.key === "Enter") {
+          if (barcodeBuffer.current.length >= 3) {
+            const code = barcodeBuffer.current;
+            setBarcodeInput(code);
+            performBarcodeLookup(code);
+            barcodeBuffer.current = "";
+          }
+        } else if (e.key.length === 1) {
+          barcodeBuffer.current += e.key;
+        }
+      } else {
+        // Reset buffer if delay is too long (human typing)
+        if (e.key.length === 1) {
+          barcodeBuffer.current = e.key;
+        } else {
+          barcodeBuffer.current = "";
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []); // Run once on mount
 
   // 🔹 AUTOMATIC BARCODE LOOKUP ON TYPING (Debounced)
   useEffect(() => {
