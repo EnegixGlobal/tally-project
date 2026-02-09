@@ -288,20 +288,45 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
       const ledgerPlaceholders = ledgerIds.map(() => '?').join(',');
       const [dcRows] = await connection.query(
         `SELECT 
-          ledger_id,
-          SUM(CASE WHEN entry_type = 'debit' THEN amount ELSE 0 END) AS debit,
-          SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE 0 END) AS credit
-         FROM voucher_entries
-         WHERE ledger_id IN (${ledgerPlaceholders})
-         GROUP BY ledger_id`,
-        ledgerIds
+          ledgerId, 
+          SUM(debit) AS debit, 
+          SUM(credit) AS credit
+        FROM (
+          SELECT 
+            ledger_id AS ledgerId,
+            SUM(CASE WHEN entry_type = 'debit' THEN amount ELSE 0 END) AS debit,
+            SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE 0 END) AS credit
+          FROM voucher_entries
+          WHERE ledger_id IN (${ledgerPlaceholders})
+          GROUP BY ledger_id
+
+          UNION ALL
+
+          SELECT
+            pvi.tdsLedgerId AS ledgerId,
+            SUM(pv.tdsTotal) AS debit,
+            0 AS credit
+          FROM (
+             SELECT voucherId, MAX(tdsRate) AS tdsLedgerId 
+             FROM purchase_voucher_items 
+             WHERE tdsRate > 0 
+             GROUP BY voucherId
+          ) pvi
+          JOIN purchase_vouchers pv ON pv.id = pvi.voucherId
+          WHERE pvi.tdsLedgerId IN (${ledgerPlaceholders})
+            AND pv.company_id IN (${placeholders})
+          GROUP BY pvi.tdsLedgerId
+        ) AS combined_data
+        GROUP BY ledgerId`,
+        [...ledgerIds, ...ledgerIds, ...companyIds]
       );
 
       // Map debitCreditData with companyId_ledgerId as key
       dcRows.forEach(row => {
-        const ledger = ledgers.find(l => l.id === row.ledger_id);
+        const rowLedgerId = Number(row.ledgerId);
+        const ledger = ledgers.find(l => Number(l.id) === rowLedgerId);
         if (ledger) {
-          const key = `${ledger.companyId}_${row.ledger_id}`;
+          const key = `${ledger.companyId}_${rowLedgerId}`;
           debitCreditData[key] = {
             debit: Number(row.debit) || 0,
             credit: Number(row.credit) || 0

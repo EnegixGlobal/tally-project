@@ -147,6 +147,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
     { id: -4, name: "Capital Account" },
     { id: -13, name: "Loans (Liability)" },
     { id: -6, name: "Current Liabilities" },
+    { id: -19, name: "TDS Payable" },
   ];
 
   const assetGroups = [
@@ -212,6 +213,9 @@ const ConsolidatedFinancialReport: React.FC = () => {
             {expandedSections.trading ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             Trading Account
           </h2>
+          <span className="text-sm font-bold text-indigo-600">
+            {formatINR(getTotalSales() - getTotalPurchase())}
+          </span>
         </div>
 
         {expandedSections.trading && (
@@ -264,6 +268,9 @@ const ConsolidatedFinancialReport: React.FC = () => {
             {expandedSections.profitLoss ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
             Profit & Loss
           </h2>
+          <span className="text-sm font-bold text-indigo-600">
+            {formatINR(getTotalPL())}
+          </span>
         </div>
 
         {expandedSections.profitLoss && (
