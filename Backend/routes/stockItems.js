@@ -344,6 +344,10 @@ router.get("/", async (req, res) => {
 
 router.post("/", upload.single("image"), async (req, res) => {
   const connection = await db.getConnection();
+  const safeNumber = (v, def = 0) => {
+    const n = Number(v);
+    return isNaN(n) ? def : n;
+  };
 
   try {
     await connection.beginTransaction();
@@ -593,7 +597,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       openingBalance ?? 0,
       totalOpeningValue ?? 0,
       sanitize(hsnCode),
-      gstRate ?? 0,
+      safeNumber(gstRate, 0),
       taxType,
 
       // 🔥 LEDGER IDS — AB 100% SAVE HONGE
