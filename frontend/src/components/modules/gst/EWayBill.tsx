@@ -535,8 +535,8 @@ const EWayBill: React.FC = () => {
                       <button
                         onClick={() => handleGenerateEWay(row)}
                         className={`px-3 py-1 rounded text-white text-xs ${Number(row.total) > 50000
-                            ? "bg-blue-600 hover:bg-blue-700"
-                            : "bg-green-600 hover:bg-green-700"
+                          ? "bg-blue-600 hover:bg-blue-700"
+                          : "bg-green-600 hover:bg-green-700"
                           }`}
                       >
                         {Number(row.total) > 50000 ? "Generate E-Way" : "Generate E-Invoice"}
@@ -639,84 +639,59 @@ const EWayBill: React.FC = () => {
 
 
           {/* Sales Voucher List amount <= 50000 */}
-          <div className="bg-white mt-6 rounded-lg shadow-sm border border-gray-200 p-6">
-            <h2 className="text-lg font-semibold text-gray-800 mb-4">
-              Sales (Amount ≤ ₹50,000) – E-Invoice Only
-            </h2>
+          {combineView && (
+            <div className="bg-white mt-6 rounded-lg shadow-sm border border-gray-200 p-6">
+              <h2 className="text-lg font-semibold text-gray-800 mb-4">
+                Sales (Amount ≤ ₹50,000) – E-Invoice Only
+              </h2>
 
-            {nonEWay.length > 0 ? (
-              <div className="overflow-x-auto">
-                <table className="min-w-full border border-gray-200 text-sm">
-                  <thead className="bg-gray-100">
-                    <tr>
-                      <th className="px-3 py-2 border">Date</th>
-                      <th className="px-3 py-2 border">Invoice No</th>
-                      <th className="px-3 py-2 border">Party</th>
-                      <th className="px-3 py-2 border text-right">Subtotal</th>
-                      <th className="px-3 py-2 border text-right">CGST</th>
-                      <th className="px-3 py-2 border text-right">SGST</th>
-                      <th className="px-3 py-2 border text-right">IGST</th>
-                      <th className="px-3 py-2 border text-right font-semibold">
-                        Total
-                      </th>
-                      <th className="px-3 py-2 border text-center">Action</th>
-                    </tr>
-                  </thead>
-
-                  <tbody>
-                    {nonEWay.map((row: any) => (
-                      <tr key={row.id} className="hover:bg-gray-50 transition">
-                        <td className="px-3 py-2 border">
-                          {formatDate(row.date)}
-                        </td>
-
-                        <td className="px-3 py-2 border font-medium">
-                          {row.number}
-                        </td>
-
-                        <td className="px-3 py-2 border">
-                          {row.partyName || row.partyId}
-                        </td>
-
-                        <td className="px-3 py-2 border text-right">
-                          ₹{formatAmount(row.subtotal)}
-                        </td>
-
-                        <td className="px-3 py-2 border text-right">
-                          ₹{formatAmount(row.cgstTotal)}
-                        </td>
-
-                        <td className="px-3 py-2 border text-right">
-                          ₹{formatAmount(row.sgstTotal)}
-                        </td>
-
-                        <td className="px-3 py-2 border text-right text-orange-600">
-                          ₹{formatAmount(row.igstTotal)}
-                        </td>
-
-                        <td className="px-3 py-2 border text-right text-green-600 font-bold">
-                          ₹{formatAmount(row.total)}
-                        </td>
-
-                        <td className="px-3 py-2 border text-center">
-                          <button
-                            onClick={() => handleGenerateEWay(row)}
-                            className="px-3 py-1 rounded bg-green-600 text-white text-xs hover:bg-green-700"
-                          >
-                            Generate E-Invoice
-                          </button>
-                        </td>
+              {nonEWay.length > 0 ? (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full border border-gray-200 text-sm">
+                    <thead className="bg-gray-100">
+                      <tr>
+                        <th className="px-3 py-2 border">Date</th>
+                        <th className="px-3 py-2 border">Invoice No</th>
+                        <th className="px-3 py-2 border">Party</th>
+                        <th className="px-3 py-2 border text-right">Subtotal</th>
+                        <th className="px-3 py-2 border text-right">CGST</th>
+                        <th className="px-3 py-2 border text-right">SGST</th>
+                        <th className="px-3 py-2 border text-right">IGST</th>
+                        <th className="px-3 py-2 border text-right font-semibold">
+                          Total
+                        </th>
+                        <th className="px-3 py-2 border text-center">Action</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-            ) : (
-              <div className="text-center text-gray-500 text-sm py-4">
-                No sales found below ₹50,000
-              </div>
-            )}
-          </div>
+                    </thead>
+
+                    <tbody>
+                      {nonEWay.map((row: any) => (
+                        <tr key={row.id}>
+                          <td className="px-3 py-2 border">{formatDate(row.date)}</td>
+                          <td className="px-3 py-2 border">{row.number}</td>
+                          <td className="px-3 py-2 border">{row.partyName}</td>
+                          <td className="px-3 py-2 border text-right">₹{formatAmount(row.subtotal)}</td>
+                          <td className="px-3 py-2 border text-right">₹{formatAmount(row.cgstTotal)}</td>
+                          <td className="px-3 py-2 border text-right">₹{formatAmount(row.sgstTotal)}</td>
+                          <td className="px-3 py-2 border text-right">₹{formatAmount(row.igstTotal)}</td>
+                          <td className="px-3 py-2 border text-right font-bold">₹{formatAmount(row.total)}</td>
+                          <td className="px-3 py-2 border text-center">
+                            <button className="px-3 py-1 bg-green-600 text-white rounded text-xs">
+                              Generate E-Invoice
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="text-center text-gray-500 text-sm py-4">
+                  No sales found below ₹50,000
+                </div>
+              )}
+            </div>
+          )}
 
         </>
       )}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useReactToPrint } from "react-to-print";
 
 import { useAppContext } from "../../../context/AppContext";
@@ -211,9 +211,16 @@ const PurchaseVoucher: React.FC = () => {
     String(l.groupName).toLowerCase().includes("purchase accounts")
   );
 
-  const tdsLedgers = ledgers.filter((l) =>
+  const tdsLedgers = useMemo(() => ledgers.filter((l) =>
     String(l.name).toUpperCase().includes("TDS")
-  );
+  ), [ledgers]);
+
+  // Auto-select TDS Ledger if only one exists
+  useEffect(() => {
+    if (tdsLedgers.length === 1 && !formData.tdsLedgerId) {
+      setFormData((prev) => ({ ...prev, tdsLedgerId: String(tdsLedgers[0].id) }));
+    }
+  }, [tdsLedgers]);
 
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const { id } = useParams();
@@ -233,6 +240,8 @@ const PurchaseVoucher: React.FC = () => {
       tds: true,
     }
   );
+
+  const [isReadyToSave, setIsReadyToSave] = useState(false);
 
   // Barcode State
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -288,8 +297,7 @@ const PurchaseVoucher: React.FC = () => {
             supplierState
           );
 
-          // Get normalized tax ledgers/rates
-          const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(
+          const { cgstRate, sgstRate, igstRate, isIntra } = resolvePurchaseGst(
             gst,
             companyState,
             supplierState
@@ -308,13 +316,20 @@ const PurchaseVoucher: React.FC = () => {
 
           const matchingPurchaseLedger = purchaseLedgers.find((l) => {
             const name = String(l.name).toLowerCase();
-            return (
+            const gstMatch =
               name.includes(`${gstToMatch}%`) ||
               name.includes(`${gstToMatch} %`) ||
               name.includes(`purchase ${gstToMatch}`) ||
               name.includes(`@${gstToMatch}%`) ||
-              name.includes(`@ ${gstToMatch}%`)
-            );
+              name.includes(`@ ${gstToMatch}%`);
+
+            if (!gstMatch) return false;
+
+            if (isIntra) {
+              return name.includes("intra");
+            } else {
+              return name.includes("inter");
+            }
           });
 
           // ⚠️ Warning if not found
@@ -391,7 +406,51 @@ const PurchaseVoucher: React.FC = () => {
     }
   };
 
-  // Debounced Barcode Lookup
+  // POS Barcode Scanner Logic (Global Listener)
+  const barcodeBuffer = useRef("");
+  const lastKeyTime = useRef(0);
+
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ignore if source is common inputs (unless it's barcode specific)
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        // If it's the barcode input itself, let the default handle it or we still buffer? 
+        // Most scanners "type" into the focused field.
+        // We only want to "auto-detect" if NOT in a critical field or specially handled.
+      }
+
+      const currentTime = Date.now();
+      const diff = currentTime - lastKeyTime.current;
+      lastKeyTime.current = currentTime;
+
+      // Professional scanners usually type very fast (< 50ms per char)
+      if (diff < 50) {
+        if (e.key === "Enter") {
+          if (barcodeBuffer.current.length >= 3) {
+            const code = barcodeBuffer.current;
+            setBarcodeInput(code);
+            performBarcodeLookup(code);
+            barcodeBuffer.current = "";
+          }
+        } else if (e.key.length === 1) {
+          barcodeBuffer.current += e.key;
+        }
+      } else {
+        // Reset buffer if delay is too long
+        if (e.key.length === 1) {
+          barcodeBuffer.current = e.key;
+        } else {
+          barcodeBuffer.current = "";
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, [barcodeInput]); // Dependency on barcodeInput to stay updated or performBarcodeLookup
+
+  // Debounced Barcode Lookup (for manual typing)
   useEffect(() => {
     if (!barcodeInput || barcodeInput.length < 3) return;
 
@@ -697,6 +756,128 @@ const PurchaseVoucher: React.FC = () => {
     ],
   });
 
+  // Draft Persistence Logic
+  const DRAFT_KEY = "PURCHASE_VOUCHER_CREATE_DRAFT";
+
+  // 1. RESTORE DRAFT ON MOUNT (First Priority)
+  useEffect(() => {
+    if (isEditMode) {
+      setIsReadyToSave(true);
+      return;
+    }
+
+    const savedDraft = localStorage.getItem(DRAFT_KEY);
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        // Only restore if the draft has some data
+        if (parsed.partyId || (parsed.entries && parsed.entries.some((e: any) => e.itemId))) {
+          setFormData(parsed);
+
+          const Toast = Swal.mixin({
+            toast: true,
+            position: 'top-end',
+            showConfirmButton: false,
+            timer: 2000,
+            timerProgressBar: true,
+          });
+          Toast.fire({
+            icon: 'info',
+            title: 'Draft restored'
+          });
+        }
+      } catch (e) {
+        console.error("Failed to restore purchase voucher draft:", e);
+      }
+    }
+    // Delay setting ready to true to allow setFormData to settle
+    setIsReadyToSave(true);
+  }, [isEditMode]);
+
+  // 2. SAVE DRAFT (Only after restore attempt)
+  useEffect(() => {
+    if (!isEditMode && isReadyToSave && formData) {
+      // Check if there's actual data to save to avoid saving empty defaults
+      const hasData = formData.partyId || formData.entries.some(e => e.itemId || e.quantity > 0);
+      if (hasData) {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(formData));
+      }
+    }
+  }, [formData, isEditMode, isReadyToSave]);
+
+  // 3. SYNC SUPPLIER STATE (For restored drafts or party changes)
+  useEffect(() => {
+    if (formData.partyId && safeLedgers.length > 0) {
+      const selected = safeLedgers.find(l => String(l.id) === String(formData.partyId));
+      if (selected) {
+        const pState = selected.state || selected.state_name || selected.State || "";
+        setSupplierState(pState);
+      }
+    }
+  }, [formData.partyId, safeLedgers]);
+
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+
+    setFormData({
+      date: new Date().toISOString().split("T")[0],
+      type: "purchase",
+      number: formData.number, // Preserve the number
+      narration: "",
+      referenceNo: "",
+      supplierInvoiceDate: new Date().toISOString().split("T")[0],
+      purchaseLedgerId: "",
+      partyId: "",
+      mode: "item-invoice",
+      tdsLedgerId: "",
+      tdsRate: 0,
+      tdsAmount: 0,
+      dispatchDetails: { docNo: "", through: "", destination: "", approxDistance: "" },
+      entries: [
+        {
+          id: "e1",
+          itemId: "",
+          quantity: 0,
+          rate: 0,
+          amount: 0,
+          type: "debit",
+          cgstRate: 0,
+          sgstRate: 0,
+          igstRate: 0,
+          gstLedgerId: "",
+          sgstLedgerId: "",
+          cgstLedgerId: "",
+
+          godownId: "",
+          discount: 0,
+          batchNumber: "",
+          batchExpiryDate: "",
+          batchManufacturingDate: "",
+          batches: [],
+          purchaseLedgerId: "",
+          entryDate: undefined, // ensure no stale data
+          ledgerId: "",
+        },
+      ],
+    });
+
+    setSupplierState("");
+    setIsReadyToSave(true);
+    setShowTableConfig(false);
+
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true,
+    });
+    Toast.fire({
+      icon: 'success',
+      title: 'Draft Cleared'
+    });
+  };
+
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showConfig, setShowConfig] = useState(false);
   const [godownEnabled, setGodownEnabled] = useState<"yes" | "no">("yes");
@@ -862,15 +1043,27 @@ const PurchaseVoucher: React.FC = () => {
           gstToMatch = extractGstPercent(taxLedgerName);
         }
 
+        const isIntra =
+          cleanState(companyState) &&
+          cleanState(supplierState) &&
+          cleanState(companyState) === cleanState(supplierState);
+
         const matchingPurchaseLedger = purchaseLedgers.find((l) => {
           const name = String(l.name).toLowerCase();
-          return (
+          const gstMatch =
             name.includes(`${gstToMatch}%`) ||
             name.includes(`${gstToMatch} %`) ||
             name.includes(`purchase ${gstToMatch}`) ||
             name.includes(`@${gstToMatch}%`) ||
-            name.includes(`@ ${gstToMatch}%`)
-          );
+            name.includes(`@ ${gstToMatch}%`);
+
+          if (!gstMatch) return false;
+
+          if (isIntra) {
+            return name.includes("intra");
+          } else {
+            return name.includes("inter");
+          }
         });
 
         if (!matchingPurchaseLedger && gstToMatch > 0) {
@@ -1339,6 +1532,7 @@ const PurchaseVoucher: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsReadyToSave(false); // Stop draft saving immediately when starting submission
 
     if (!validateForm()) {
       Swal.fire({
@@ -1409,6 +1603,11 @@ const PurchaseVoucher: React.FC = () => {
         return;
       }
 
+      // ✅ CLEAR DRAFT ON SUCCESS
+      if (!isEditMode) {
+        localStorage.removeItem(DRAFT_KEY);
+      }
+
       // 🔥 3. NOW save ONLY NEW batches
       for (const entry of formData.entries) {
         if (!entry.batchMeta?.isNew) continue;
@@ -1466,6 +1665,10 @@ const PurchaseVoucher: React.FC = () => {
             body: JSON.stringify(historyData),
           }
         );
+      }
+
+      if (!isEditMode) {
+        localStorage.removeItem(DRAFT_KEY);
       }
 
       await Swal.fire(
@@ -1933,12 +2136,25 @@ const PurchaseVoucher: React.FC = () => {
               />
             </label>
 
+            {localStorage.getItem(DRAFT_KEY) && (
+              <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2">
+                <button
+                  type="button"
+                  onClick={clearDraft}
+                  className="w-full flex items-center justify-between p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                >
+                  <span className="text-sm font-semibold">Clear Saved Draft</span>
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            )}
+
             <div className="flex justify-end mt-5">
               <button
                 onClick={() => setShowTableConfig(false)}
-                className="px-4 py-1.5 rounded bg-blue-600 text-white hover:bg-blue-700"
+                className="w-full py-3 px-4 bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-bold shadow-lg transition-all"
               >
-                Apply & Close
+                Close Settings
               </button>
             </div>
           </div>

@@ -3,11 +3,10 @@ const router = express.Router();
 const db = require("../db");
 
 
-
 router.get("/purchase", async (req, res) => {
   try {
+
     const { company_id, owner_type, owner_id } = req.query;
-    console.log("purchase route hit");
 
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
@@ -16,81 +15,261 @@ router.get("/purchase", async (req, res) => {
       });
     }
 
-    // 🔹 COMPANY STATE
-    const [companyRows] = await db.query(
-      `SELECT state FROM tbcompanies WHERE id = ?`,
-      [company_id]
-    );
-
-    const companyStateRaw = companyRows[0]?.state || "";
-    const companyStateCode = companyStateRaw.match(/\((\d+)\)/)?.[1];
-
-    // 🔹 PURCHASE DATA
-    const [rows] = await db.query(
+    // ================================
+    // FETCH ALL RELATED LEDGERS
+    // ================================
+    const [rows] = await db.execute(
       `
-      SELECT
-        LOWER(l.name) AS ledgerName,
-        MONTH(pv.date) AS month,
-        SUM(pv.total) AS total,
-        sl.state AS supplierState
-      FROM purchase_vouchers pv
-
-      -- GST PURCHASE LEDGER
-      JOIN ledgers l ON l.id = pv.purchaseLedgerId  
-
-      -- SUPPLIER LEDGER
-      JOIN ledgers sl ON sl.id = pv.partyId
-
-      WHERE pv.company_id = ?
-        AND pv.owner_type = ?
-        AND pv.owner_id = ?
-        AND LOWER(l.name) IN (
-          '0% gst purchase',
-          '3% gst purchase',
-          '5% gst purchase',
-          '12% gst purchase',
-          '18% gst purchase',
-          '28% gst purchase'
+      SELECT id, name
+      FROM ledgers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND (owner_id = ? OR owner_id = 0)
+        AND (
+          LOWER(name) LIKE '%purchase%'
+          OR LOWER(name) LIKE '%igst%'
+          OR LOWER(name) LIKE '%cgst%'
+          OR LOWER(name) LIKE '%sgst%'
+          OR LOWER(name) LIKE '%intra%'
+          OR LOWER(name) LIKE '%inter%'
         )
-      GROUP BY l.name, MONTH(pv.date), sl.state
+      ORDER BY name
       `,
       [company_id, owner_type, owner_id]
     );
 
-    // 🔹 INTRA / INTER DECISION (🔥 SAME AS SALES)
-    const finalData = rows.map(r => {
-      const supplierStateCode =
-        r.supplierState?.match(/\((\d+)\)/)?.[1];
+    // ================================
+    // GROUP LEDGERS
+    // ================================
+    const ledgers = {
+      intraPurchase: [],
+      interPurchase: [],
+      igst: [],
+      cgst: [],
+      sgst: []
+    };
 
-      return {
-        ledgerName: r.ledgerName,
-        month: r.month,
-        total: r.total,
-        supplyType:
-          supplierStateCode === companyStateCode ? "INTRA" : "INTER",
-      };
+
+    rows.forEach((row) => {
+
+      const name = row.name.toLowerCase();
+
+      // Intra Purchase
+      if (name.includes("purchase") && name.includes("intra")) {
+        ledgers.intraPurchase.push(row);
+      }
+
+      // Inter Purchase
+      else if (name.includes("purchase") && name.includes("inter")) {
+        ledgers.interPurchase.push(row);
+      }
+
+      // Taxes
+      else if (name.includes("igst")) {
+        ledgers.igst.push(row);
+      }
+
+      else if (name.includes("cgst")) {
+        ledgers.cgst.push(row);
+      }
+
+      else if (name.includes("sgst")) {
+        ledgers.sgst.push(row);
+      }
+
     });
 
-    res.json({
+    // ================================
+    // FETCH TRANSACTIONS
+    // ================================
+    const [transactions] = await db.execute(`
+      SELECT
+        MONTH(v.date) as monthVal,
+        i.purchaseLedgerId,
+        i.amount,
+        i.cgstRate,
+        i.sgstRate,
+        i.igstRate
+      FROM purchase_vouchers v
+      JOIN purchase_voucher_items i ON v.id = i.voucherId
+      WHERE v.company_id = ? 
+        AND v.owner_type = ? 
+        AND v.owner_id = ?
+    `, [company_id, owner_type, owner_id]);
+
+    // ================================
+    // MONTH CONFIG
+    // ================================
+    const monthNames = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+
+    const monthlyData = {};
+
+    // ================================
+    // LEDGER MAP
+    // ================================
+    const ledgerMap = new Map();
+    rows.forEach(r => ledgerMap.set(r.id, r));
+
+    // ================================
+    // RATE EXTRACTOR
+    // ================================
+    const getRateFromLedger = (ledgerId) => {
+
+      const ledger = ledgerMap.get(ledgerId);
+
+      if (!ledger) return 0;
+
+      // 18% , 2.5% , 28.00%
+      const match = ledger.name.match(/(\d+(\.\d+)?)/);
+
+      return match ? parseFloat(match[0]) : 0;
+    };
+
+    // ================================
+    // PROCESS TRANSACTIONS
+    // ================================
+    transactions.forEach(t => {
+
+      const mName = monthNames[t.monthVal - 1];
+
+      if (!monthlyData[mName]) {
+        monthlyData[mName] = {
+          intraPurchase: {},
+          interPurchase: {},
+          cgst: {},
+          sgst: {},
+          igst: {},
+
+          totalIntraPurchase: 0,
+          totalInterPurchase: 0,
+
+          totalCGST: 0,
+          totalSGST: 0,
+          totalIGST: 0
+        };
+      }
+
+      const amount = Number(t.amount || 0);
+
+      const purchaseLedgerId = t.purchaseLedgerId;
+
+      const cgstLedgerId = Math.round(Number(t.cgstRate || 0));
+      const sgstLedgerId = Math.round(Number(t.sgstRate || 0));
+      const igstLedgerId = Math.round(Number(t.igstRate || 0));
+
+      const purchaseLedger = ledgerMap.get(purchaseLedgerId);
+
+      const purchaseName = purchaseLedger?.name?.toLowerCase() || "";
+
+      // ================================
+      // PURCHASE TYPE
+      // ================================
+
+      // INTRA
+      if (purchaseName.includes("intra")) {
+
+        monthlyData[mName].intraPurchase[purchaseLedgerId] =
+          (monthlyData[mName].intraPurchase[purchaseLedgerId] || 0) + amount;
+
+        monthlyData[mName].totalIntraPurchase += amount;
+      }
+
+      // INTER
+      else if (purchaseName.includes("inter")) {
+
+        monthlyData[mName].interPurchase[purchaseLedgerId] =
+          (monthlyData[mName].interPurchase[purchaseLedgerId] || 0) + amount;
+
+        monthlyData[mName].totalInterPurchase += amount;
+      }
+
+      // ================================
+      // TAX CALCULATION
+      // ================================
+
+      // CGST
+      if (cgstLedgerId > 0) {
+
+        const rate = getRateFromLedger(cgstLedgerId);
+
+        const tax = amount * (rate / 100);
+
+        if (ledgerMap.has(cgstLedgerId)) {
+
+          monthlyData[mName].cgst[cgstLedgerId] =
+            (monthlyData[mName].cgst[cgstLedgerId] || 0) + tax;
+
+          monthlyData[mName].totalCGST += tax;
+        }
+      }
+
+      // SGST
+      if (sgstLedgerId > 0) {
+
+        const rate = getRateFromLedger(sgstLedgerId);
+
+        const tax = amount * (rate / 100);
+
+        if (ledgerMap.has(sgstLedgerId)) {
+
+          monthlyData[mName].sgst[sgstLedgerId] =
+            (monthlyData[mName].sgst[cgstLedgerId] || 0) + tax;
+
+          monthlyData[mName].totalSGST += tax;
+        }
+      }
+
+      // IGST
+      if (igstLedgerId > 0) {
+
+        const rate = getRateFromLedger(igstLedgerId);
+
+        const tax = amount * (rate / 100);
+
+        if (ledgerMap.has(igstLedgerId)) {
+
+          monthlyData[mName].igst[igstLedgerId] =
+            (monthlyData[mName].igst[igstLedgerId] || 0) + tax;
+
+          monthlyData[mName].totalIGST += tax;
+        }
+      }
+
+    });
+
+
+    // ================================
+    // RESPONSE
+    // ================================
+    return res.json({
       success: true,
-      data: finalData,
+      data: {
+        ledgers,
+        monthlyData
+      }
     });
 
   } catch (error) {
-    console.error("GST purchase error:", error);
+
+    console.error("Purchase GST Error:", error);
+
     res.status(500).json({
       success: false,
-      message: "Database error",
+      message: "Server Error"
     });
   }
 });
+
 
 
 
 router.get("/sales", async (req, res) => {
   try {
+
     const { company_id, owner_type, owner_id } = req.query;
-    console.log("sales route hit");
 
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
@@ -99,325 +278,253 @@ router.get("/sales", async (req, res) => {
       });
     }
 
-    /*
-      LOGIC:
-      - voucherId → sales_vouchers.id
-      - tax decision ONLY from sales_voucher_items
-      - IGST → igstRate
-      - CGST+SGST → cgstRate + sgstRate
-    */
-
-    const [rows] = await db.query(`
-      SELECT
-        LOWER(gl.name) AS ledgerName,
-        MONTH(sv.date) AS month,
-
-        -- decide taxable amount
-        SUM(
-          CASE
-            WHEN svi.igstRate > 0 THEN sv.igstTotal
-            WHEN (svi.cgstRate + svi.sgstRate) > 0
-              THEN (sv.cgstTotal + sv.sgstTotal)
-            ELSE 0
-          END
-        ) AS taxAmount,
-
-        -- identify tax type
-        MAX(
-          CASE
-            WHEN svi.igstRate > 0 THEN 'IGST'
-            ELSE 'GST'
-          END
-        ) AS taxType,
-
-        -- extract effective GST rate
-        MAX(
-          CASE
-            WHEN svi.igstRate > 0 THEN svi.igstRate
-            ELSE (svi.cgstRate + svi.sgstRate)
-          END
-        ) AS gstRate
-
-      FROM sales_vouchers sv
-
-      -- SALES GST LEDGER
-      JOIN ledgers gl ON gl.id = sv.salesLedgerId
-
-      -- SALES ITEMS (TAX SOURCE)
-      JOIN sales_voucher_items svi
-        ON svi.voucherId = sv.id
-
-      WHERE sv.company_id = ?
-        AND sv.owner_type = ?
-        AND sv.owner_id = ?
-        AND sv.type = 'sales'
-        AND LOWER(gl.name) IN (
-          '0% gst sales',
-          '3% gst sales',
-          '5% gst sales',
-          '12% gst sales',
-          '18% gst sales',
-          '28% gst sales'
+    // ================================
+    // FETCH ALL RELATED LEDGERS
+    // ================================
+    const [rows] = await db.execute(
+      `
+      SELECT id, name
+      FROM ledgers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND (owner_id = ? OR owner_id = 0)
+        AND (
+          LOWER(name) LIKE '%sales%'
+          OR LOWER(name) LIKE '%igst%'
+          OR LOWER(name) LIKE '%cgst%'
+          OR LOWER(name) LIKE '%sgst%'
+          OR LOWER(name) LIKE '%intra%'
+          OR LOWER(name) LIKE '%inter%'
         )
+      ORDER BY name
+      `,
+      [company_id, owner_type, owner_id]
+    );
 
-      GROUP BY
-        gl.name,
-        MONTH(sv.date)
+    // ================================
+    // GROUP LEDGERS
+    // ================================
+    const ledgers = {
+      intraSales: [],
+      interSales: [],
+      igst: [],
+      cgst: [],
+      sgst: []
+    };
+
+    rows.forEach((row) => {
+
+      const name = row.name.toLowerCase();
+
+      // Intra Sales
+      if (name.includes("sales") && name.includes("intra")) {
+        ledgers.intraSales.push(row);
+      }
+
+      // Inter Sales
+      else if (name.includes("sales") && name.includes("inter")) {
+        ledgers.interSales.push(row);
+      }
+
+      // Taxes
+      else if (name.includes("igst")) {
+        ledgers.igst.push(row);
+      }
+
+      else if (name.includes("cgst")) {
+        ledgers.cgst.push(row);
+      }
+
+      else if (name.includes("sgst")) {
+        ledgers.sgst.push(row);
+      }
+
+    });
+
+    // ================================
+    // FETCH TRANSACTIONS
+    // ================================
+    const [transactions] = await db.execute(`
+      SELECT
+        MONTH(v.date) as monthVal,
+        i.salesLedgerId,
+        i.amount,
+        i.cgstRate,
+        i.sgstRate,
+        i.igstRate
+      FROM sales_vouchers v
+      JOIN sales_voucher_items i ON v.id = i.voucherId
+      WHERE v.company_id = ? 
+        AND v.owner_type = ? 
+        AND v.owner_id = ?
     `, [company_id, owner_type, owner_id]);
 
-    /*
-      FINAL NORMALIZED OUTPUT
-      - 12% IGST → "12% igst sales"
-      - 6+6 GST → "12% gst sales"
-    */
+    // ================================
+    // MONTH CONFIG
+    // ================================
+    const monthNames = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
 
-    const finalData = rows.map(r => {
-      const rate = Number(r.gstRate || 0);
+    const monthlyData = {};
 
-      return {
-        ledgerName:
-          r.taxType === "IGST"
-            ? `${rate}% igst sales`
-            : `${rate}% gst sales`,
-        month: r.month,
-        total: Number(r.taxAmount || 0),
-      };
-    });
+    // ================================
+    // LEDGER MAP
+    // ================================
+    const ledgerMap = new Map();
+    rows.forEach(r => ledgerMap.set(r.id, r));
 
-    res.json({
-      success: true,
-      data: finalData,
-    });
+    // ================================
+    // RATE EXTRACTOR
+    // ================================
+    const getRateFromLedger = (ledgerId) => {
 
-  } catch (error) {
-    console.error("GST sales error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Database error",
-    });
-  }
-});
+      const ledger = ledgerMap.get(ledgerId);
 
+      if (!ledger) return 0;
 
+      // 18% , 2.5% , 28%
+      const match = ledger.name.match(/(\d+(\.\d+)?)/);
 
+      return match ? parseFloat(match[0]) : 0;
+    };
 
+    // ================================
+    // PROCESS TRANSACTIONS
+    // ================================
+    transactions.forEach(t => {
 
-router.get("/debit-notes", async (req, res) => {
-  try {
-    const { company_id, owner_type, owner_id } = req.query;
-    console.log("debit notes route hit");
+      const mName = monthNames[t.monthVal - 1];
 
-    const GST_RATES = ["0%", "3%", "5%", "12%", "18%", "28%"];
+      if (!monthlyData[mName]) {
+        monthlyData[mName] = {
 
+          intraSales: {},
+          interSales: {},
 
-    if (!company_id || !owner_type || !owner_id) {
-      return res.status(400).json({
-        success: false,
-        message: "company_id, owner_type and owner_id are required",
-      });
-    }
+          cgst: {},
+          sgst: {},
+          igst: {},
 
-    /* 🔹 COMPANY STATE */
-    const [companyRows] = await db.query(
-      `SELECT state FROM tbcompanies WHERE id = ?`,
-      [company_id]
-    );
+          totalIntraSales: 0,
+          totalInterSales: 0,
 
-    const companyStateCode =
-      companyRows[0]?.state?.match(/\((\d+)\)/)?.[1] || "";
-
-    /* 🔹 FETCH ALL LEDGERS (for GST % detection) */
-    const [ledgerRows] = await db.query(`
-      SELECT id, LOWER(name) AS name
-      FROM ledgers
-    `);
-
-    const ledgerMap = {};
-    ledgerRows.forEach(l => {
-      ledgerMap[l.id] = l.name;
-    });
-
-    /* 🔹 DEBIT NOTES */
-    const [rows] = await db.query(
-      `
-      SELECT
-        MONTH(dnv.date) AS month,
-        dnv.narration,
-        sl.state AS partyState
-      FROM debit_note_vouchers dnv
-      LEFT JOIN ledgers sl ON sl.id = dnv.party_id
-      WHERE dnv.company_id = ?
-        AND dnv.owner_type = ?
-        AND dnv.owner_id = ?
-      `,
-      [company_id, owner_type, owner_id]
-    );
-
-    const result = [];
-
-    for (const r of rows) {
-      let narration;
-      try {
-        narration = JSON.parse(r.narration || "{}");
-      } catch {
-        continue;
+          totalCGST: 0,
+          totalSGST: 0,
+          totalIGST: 0
+        };
       }
 
-      const entries = narration.accountingEntries || [];
+      const amount = Number(t.amount || 0);
 
-      for (const e of entries) {
-        if (e.type !== "debit") continue;
+      const salesLedgerId = t.salesLedgerId;
 
-        const ledgerName = ledgerMap[e.ledgerId] || "";
+      const cgstLedgerId = Math.round(Number(t.cgstRate || 0));
+      const sgstLedgerId = Math.round(Number(t.sgstRate || 0));
+      const igstLedgerId = Math.round(Number(t.igstRate || 0));
 
-        const gstRate = GST_RATES.find(rate =>
-          ledgerName.includes(rate)
-        );
+      const salesLedger = ledgerMap.get(salesLedgerId);
 
-        if (!gstRate) continue;
+      const salesName = salesLedger?.name?.toLowerCase() || "";
 
-        const partyStateCode =
-          r.partyState?.match(/\((\d+)\)/)?.[1] || "";
+      // ================================
+      // SALES TYPE
+      // ================================
 
-        result.push({
-          ledgerName: `${gstRate} debit notes`,
-          month: r.month,
-          total: Number(e.amount || 0),
-          supplyType:
-            partyStateCode === companyStateCode ? "INTRA" : "INTER",
-        });
-      }
-    }
+      // INTRA
+      if (salesName.includes("intra")) {
 
-    res.json({
-      success: true,
-      data: result,
-    });
+        monthlyData[mName].intraSales[salesLedgerId] =
+          (monthlyData[mName].intraSales[salesLedgerId] || 0) + amount;
 
-  } catch (error) {
-    console.error("Debit note GST error:", error);
-    res.status(500).json({
-      success: false,
-      message: "Database error",
-    });
-  }
-});
-
-
-
-router.get("/credit-notes", async (req, res) => {
-  try {
-    const { company_id, owner_type, owner_id } = req.query;
-    console.log("credit notes route hit");
-
-    const GST_RATES = ["0%", "3%", "5%", "12%", "18%", "28%"];
-
-    if (!company_id || !owner_type || !owner_id) {
-      return res.status(400).json({
-        success: false,
-        message: "company_id, owner_type and owner_id are required",
-      });
-    }
-
-    /* 🔹 COMPANY STATE */
-    const [companyRows] = await db.query(
-      `SELECT state FROM tbcompanies WHERE id = ?`,
-      [company_id]
-    );
-
-    const companyStateCode =
-      companyRows[0]?.state?.match(/\((\d+)\)/)?.[1] || "";
-
-    /* 🔹 LEDGERS */
-    const [ledgerRows] = await db.query(`
-      SELECT id, LOWER(name) AS name
-      FROM ledgers
-    `);
-
-    const ledgerMap = {};
-    ledgerRows.forEach(l => {
-      ledgerMap[l.id] = l.name;
-    });
-
-    /* 🔹 CREDIT NOTES (correct table) */
-    const [rows] = await db.query(
-      `
-      SELECT
-        MONTH(cnv.date) AS month,
-        cnv.narration,
-        sl.state AS partyState
-      FROM credit_vouchers cnv
-      LEFT JOIN ledgers sl ON sl.id = cnv.partyId
-      WHERE cnv.company_id = ?
-        AND cnv.owner_type = ?
-        AND cnv.owner_id = ?
-      `,
-      [company_id, owner_type, owner_id]
-    );
-
-    const result = [];
-
-    for (const r of rows) {
-      let narration;
-      try {
-        narration = JSON.parse(r.narration || "{}");
-      } catch {
-        continue;
+        monthlyData[mName].totalIntraSales += amount;
       }
 
-      const entries = narration.accountingEntries || [];
+      // INTER
+      else if (salesName.includes("inter")) {
 
-      for (const e of entries) {
-        // ✅ GST LEDGER IS ALWAYS DEBIT
-        if (e.type !== "debit") continue;
+        monthlyData[mName].interSales[salesLedgerId] =
+          (monthlyData[mName].interSales[salesLedgerId] || 0) + amount;
 
-        const ledgerName = ledgerMap[e.ledgerId] || "";
+        monthlyData[mName].totalInterSales += amount;
+      }
 
-        const gstRate = GST_RATES.find(rate =>
-          ledgerName.includes(rate)
-        );
+      // ================================
+      // TAX CALCULATION
+      // ================================
 
-        if (!gstRate) continue;
+      // CGST
+      if (cgstLedgerId > 0) {
 
-        const partyStateCode =
-          r.partyState?.match(/\((\d+)\)/)?.[1] || "";
+        const rate = getRateFromLedger(cgstLedgerId);
 
-        let supplyType = "UNKNOWN";
-        if (partyStateCode && companyStateCode) {
-          supplyType =
-            partyStateCode === companyStateCode ? "INTRA" : "INTER";
+        const tax = amount * (rate / 100);
+
+        if (ledgerMap.has(cgstLedgerId)) {
+
+          monthlyData[mName].cgst[cgstLedgerId] =
+            (monthlyData[mName].cgst[cgstLedgerId] || 0) + tax;
+
+          monthlyData[mName].totalCGST += tax;
         }
-
-        result.push({
-          ledgerName: `${gstRate} credit notes`,
-          month: r.month,
-          total: Number(e.amount || 0),
-          supplyType,
-        });
       }
-    }
 
-    res.json({
+      // SGST
+      if (sgstLedgerId > 0) {
+
+        const rate = getRateFromLedger(sgstLedgerId);
+
+        const tax = amount * (rate / 100);
+
+        if (ledgerMap.has(sgstLedgerId)) {
+
+          monthlyData[mName].sgst[sgstLedgerId] =
+            (monthlyData[mName].sgst[sgstLedgerId] || 0) + tax;
+
+          monthlyData[mName].totalSGST += tax;
+        }
+      }
+
+      // IGST
+      if (igstLedgerId > 0) {
+
+        const rate = getRateFromLedger(igstLedgerId);
+
+        const tax = amount * (rate / 100);
+
+        if (ledgerMap.has(igstLedgerId)) {
+
+          monthlyData[mName].igst[igstLedgerId] =
+            (monthlyData[mName].igst[igstLedgerId] || 0) + tax;
+
+          monthlyData[mName].totalIGST += tax;
+        }
+      }
+
+    });
+
+    // ================================
+    // RESPONSE
+    // ================================
+    return res.json({
       success: true,
-      data: result,
+      data: {
+        ledgers,
+        monthlyData
+      }
     });
 
   } catch (error) {
-    console.error("Credit note GST error:", error);
+
+    console.error("Sales GST Error:", error);
+
     res.status(500).json({
       success: false,
-      message: "Database error",
+      message: "Server Error"
     });
   }
 });
-
-
-
-
-
-
-
-
 
 
 

@@ -101,6 +101,7 @@ router.get("/", async (req, res) => {
     pv.cgstTotal,
     pv.sgstTotal,
     pv.igstTotal,
+    pv.tdsTotal,
     pv.total,
 
     pi.purchaseLedgerId,
@@ -129,11 +130,10 @@ router.get("/", async (req, res) => {
     );
 
     purchaseRows.forEach((row) => {
-
       const key = `PUR-${row.voucher_id}`;
 
       /* ================================
-         CREATE VOUCHER
+         1. CREATE VOUCHER (If Not Exists)
       ================================= */
       if (!vouchers[key]) {
         vouchers[key] = {
@@ -141,134 +141,116 @@ router.get("/", async (req, res) => {
           voucher_type: "purchase",
           voucher_number: row.voucher_number,
           date: row.voucher_date,
-
           subtotal: row.subtotal,
           cgstTotal: row.cgstTotal,
           sgstTotal: row.sgstTotal,
           igstTotal: row.igstTotal,
+          tdsTotal: row.tdsTotal,
           total: row.total,
-
           partyId: row.partyId,
           partyName: row.party_name,
-
           entries: [],
         };
 
-        /* 🔴 PARTY → CREDIT */
+        /* 🔴 PARTY -> CREDIT */
         vouchers[key].entries.push({
           id: `PUR-P-${row.voucher_id}`,
-
           ledger_id: row.partyId,
           ledger_name: row.party_name,
-
           amount: Number(row.total),
-
           entry_type: "credit",
-
           narration: "Purchase Party",
-
           isParty: true,
         });
       }
 
       /* ================================
-         PURCHASE LEDGER → DEBIT (REAL LEDGER)
+         2. PURCHASE LEDGER -> DEBIT (REAL LEDGER)
       ================================= */
       if (row.purchaseLedgerId) {
         vouchers[key].entries.push({
-          id: `PUR-L-${row.voucher_id}-${row.purchaseLedgerId}`,
-
+          id: `PUR-L-${row.voucher_id}-${row.purchaseLedgerId}-${vouchers[key].entries.length}`,
           ledger_id: row.purchaseLedgerId,
-
-          // ✅ REAL LEDGER NAME (18% Purchase etc.)
           ledger_name: row.purchase_ledger_name,
-
-          // ✅ ITEM AMOUNT (not full subtotal)
           amount: Number(row.item_amount),
-
           entry_type: "debit",
-
           narration: row.purchase_ledger_name,
-
           isParty: false,
-
           isChild: true,
         });
       }
+    });
 
-      /* ================================
-         GST BREAKUP
-      ================================= */
+    /* =====================================================
+       2.1 PURCHASE VOUCHER TAXES & TDS (AFTER ITEMS)
+    ===================================================== */
+    Object.values(vouchers).forEach((v) => {
+      if (v.id.startsWith("PUR-")) {
+        const subtotal = Number(v.subtotal || 0);
+        const vid = v.id.split("-")[1];
 
-      // IGST
-      if (Number(row.igstTotal) > 0) {
-        const igstRate = ((row.igstTotal / row.subtotal) * 100).toFixed(2);
+        if (subtotal > 0) {
+          // IGST
+          if (Number(v.igstTotal) > 0) {
+            const igstRate = ((v.igstTotal / subtotal) * 100).toFixed(2);
+            v.entries.push({
+              id: `PUR-IGST-${vid}`,
+              ledger_id: null,
+              ledger_name: `IGST @ ${igstRate}%`,
+              amount: Number(v.igstTotal),
+              entry_type: "debit",
+              narration: "IGST",
+              isParty: false,
+              isChild: true,
+            });
+          }
 
-        vouchers[key].entries.push({
-          id: `PUR-IGST-${row.voucher_id}`,
+          // CGST
+          if (Number(v.cgstTotal) > 0) {
+            const cgstRate = ((v.cgstTotal / subtotal) * 100).toFixed(2);
+            v.entries.push({
+              id: `PUR-CGST-${vid}`,
+              ledger_id: null,
+              ledger_name: `CGST @ ${cgstRate}%`,
+              amount: Number(v.cgstTotal),
+              entry_type: "debit",
+              narration: "CGST",
+              isParty: false,
+              isChild: true,
+            });
+          }
 
-          ledger_id: null,
+          // SGST
+          if (Number(v.sgstTotal) > 0) {
+            const sgstRate = ((v.sgstTotal / subtotal) * 100).toFixed(2);
+            v.entries.push({
+              id: `PUR-SGST-${vid}`,
+              ledger_id: null,
+              ledger_name: `SGST @ ${sgstRate}%`,
+              amount: Number(v.sgstTotal),
+              entry_type: "debit",
+              narration: "SGST",
+              isParty: false,
+              isChild: true,
+            });
+          }
 
-          ledger_name: `IGST @ ${igstRate}%`,
-
-          amount: Number(row.igstTotal),
-
-          entry_type: "debit",
-
-          narration: "IGST",
-
-          isParty: false,
-
-          isChild: true,
-        });
+          // TDS (LAST)
+          if (Number(v.tdsTotal) > 0) {
+            const tdsRate = ((v.tdsTotal / subtotal) * 100).toFixed(2);
+            v.entries.push({
+              id: `PUR-TDS-${vid}`,
+              ledger_id: null,
+              ledger_name: `TDS @ ${tdsRate}%`,
+              amount: Number(v.tdsTotal),
+              entry_type: "debit",
+              narration: "TDS",
+              isParty: false,
+              isChild: true,
+            });
+          }
+        }
       }
-
-      // CGST
-      if (Number(row.cgstTotal) > 0) {
-        const cgstRate = ((row.cgstTotal / row.subtotal) * 100).toFixed(2);
-
-        vouchers[key].entries.push({
-          id: `PUR-CGST-${row.voucher_id}`,
-
-          ledger_id: null,
-
-          ledger_name: `CGST @ ${cgstRate}%`,
-
-          amount: Number(row.cgstTotal),
-
-          entry_type: "debit",
-
-          narration: "CGST",
-
-          isParty: false,
-
-          isChild: true,
-        });
-      }
-
-      // SGST
-      if (Number(row.sgstTotal) > 0) {
-        const sgstRate = ((row.sgstTotal / row.subtotal) * 100).toFixed(2);
-
-        vouchers[key].entries.push({
-          id: `PUR-SGST-${row.voucher_id}`,
-
-          ledger_id: null,
-
-          ledger_name: `SGST @ ${sgstRate}%`,
-
-          amount: Number(row.sgstTotal),
-
-          entry_type: "debit",
-
-          narration: "SGST",
-
-          isParty: false,
-
-          isChild: true,
-        });
-      }
-
     });
 
     /* =====================================================
@@ -321,11 +303,10 @@ router.get("/", async (req, res) => {
     );
 
     salesRows.forEach((row) => {
-
       const key = `SAL-${row.voucher_id}`;
 
       /* ================================
-         CREATE VOUCHER
+         1. CREATE VOUCHER
       ================================= */
       if (!vouchers[key]) {
         vouchers[key] = {
@@ -333,134 +314,100 @@ router.get("/", async (req, res) => {
           voucher_type: "sales",
           voucher_number: row.voucher_number,
           date: row.voucher_date,
-
           subtotal: row.subtotal,
           cgstTotal: row.cgstTotal,
           sgstTotal: row.sgstTotal,
           igstTotal: row.igstTotal,
           total: row.total,
-
           partyId: row.partyId,
           partyName: row.party_name,
-
           entries: [],
         };
 
         /* 🔴 PARTY → DEBIT */
         vouchers[key].entries.push({
           id: `SAL-P-${row.voucher_id}`,
-
           ledger_id: row.partyId,
           ledger_name: row.party_name,
-
           amount: Number(row.total),
-
           entry_type: "debit",
-
           narration: "Sales Party",
-
           isParty: true,
         });
       }
 
       /* ================================
-         SALES LEDGER → CREDIT (REAL LEDGER)
+         2. SALES LEDGER → CREDIT (REAL LEDGER)
       ================================= */
       if (row.salesLedgerId) {
         vouchers[key].entries.push({
-          id: `SAL-L-${row.voucher_id}-${row.salesLedgerId}`,
-
+          id: `SAL-L-${row.voucher_id}-${row.salesLedgerId}-${vouchers[key].entries.length}`,
           ledger_id: row.salesLedgerId,
-
-          // ✅ REAL LEDGER NAME
           ledger_name: row.sales_ledger_name,
-
-          // ✅ ITEM AMOUNT
           amount: Number(row.item_amount),
-
           entry_type: "credit",
-
           narration: row.sales_ledger_name,
-
           isParty: false,
-
           isChild: true,
         });
       }
+    });
 
-      /* ================================
-         GST BREAKUP
-      ================================= */
+    /* =====================================================
+       3.1 SALES TAXES (AFTER ITEMS)
+    ===================================================== */
+    Object.values(vouchers).forEach((v) => {
+      if (v.id.startsWith("SAL-")) {
+        const subtotal = Number(v.subtotal || 0);
+        const vid = v.id.split("-")[1];
 
-      // IGST
-      if (Number(row.igstTotal) > 0) {
-        const igstRate = ((row.igstTotal / row.subtotal) * 100).toFixed(2);
+        if (subtotal > 0) {
+          // IGST
+          if (Number(v.igstTotal) > 0) {
+            const igstRate = ((v.igstTotal / subtotal) * 100).toFixed(2);
+            v.entries.push({
+              id: `SAL-IGST-${vid}`,
+              ledger_id: null,
+              ledger_name: `IGST @ ${igstRate}%`,
+              amount: Number(v.igstTotal),
+              entry_type: "credit",
+              narration: "IGST",
+              isParty: false,
+              isChild: true,
+            });
+          }
 
-        vouchers[key].entries.push({
-          id: `SAL-IGST-${row.voucher_id}`,
+          // CGST
+          if (Number(v.cgstTotal) > 0) {
+            const cgstRate = ((v.cgstTotal / subtotal) * 100).toFixed(2);
+            v.entries.push({
+              id: `SAL-CGST-${vid}`,
+              ledger_id: null,
+              ledger_name: `CGST @ ${cgstRate}%`,
+              amount: Number(v.cgstTotal),
+              entry_type: "credit",
+              narration: "CGST",
+              isParty: false,
+              isChild: true,
+            });
+          }
 
-          ledger_id: null,
-
-          ledger_name: `IGST @ ${igstRate}%`,
-
-          amount: Number(row.igstTotal),
-
-          entry_type: "credit",
-
-          narration: "IGST",
-
-          isParty: false,
-
-          isChild: true,
-        });
+          // SGST
+          if (Number(v.sgstTotal) > 0) {
+            const sgstRate = ((v.sgstTotal / subtotal) * 100).toFixed(2);
+            v.entries.push({
+              id: `SAL-SGST-${vid}`,
+              ledger_id: null,
+              ledger_name: `SGST @ ${sgstRate}%`,
+              amount: Number(v.sgstTotal),
+              entry_type: "credit",
+              narration: "SGST",
+              isParty: false,
+              isChild: true,
+            });
+          }
+        }
       }
-
-      // CGST
-      if (Number(row.cgstTotal) > 0) {
-        const cgstRate = ((row.cgstTotal / row.subtotal) * 100).toFixed(2);
-
-        vouchers[key].entries.push({
-          id: `SAL-CGST-${row.voucher_id}`,
-
-          ledger_id: null,
-
-          ledger_name: `CGST @ ${cgstRate}%`,
-
-          amount: Number(row.cgstTotal),
-
-          entry_type: "credit",
-
-          narration: "CGST",
-
-          isParty: false,
-
-          isChild: true,
-        });
-      }
-
-      // SGST
-      if (Number(row.sgstTotal) > 0) {
-        const sgstRate = ((row.sgstTotal / row.subtotal) * 100).toFixed(2);
-
-        vouchers[key].entries.push({
-          id: `SAL-SGST-${row.voucher_id}`,
-
-          ledger_id: null,
-
-          ledger_name: `SGST @ ${sgstRate}%`,
-
-          amount: Number(row.sgstTotal),
-
-          entry_type: "credit",
-
-          narration: "SGST",
-
-          isParty: false,
-
-          isChild: true,
-        });
-      }
-
     });
 
     /* =====================================================

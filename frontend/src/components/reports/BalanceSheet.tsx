@@ -103,6 +103,7 @@ const BalanceSheet: React.FC = () => {
     CurrentLiabilities: 0,
     FixedAssets: 0,
     CurrentAssets: 0,
+    TDSPayable: 0,
     LaiblityTotal: 0,
     AssetTotal: 0,
   });
@@ -113,6 +114,7 @@ const BalanceSheet: React.FC = () => {
     const currentLiability = calculateGroupTotal(-6);
     const fixedAssets = calculateGroupTotal(-9);
     const CurrentAssets = calculateGroupTotal(-5);
+    const tdsPayable = calculateGroupTotal(-19);
 
     setCalculatedTotal({
       CapitalAccount: capitalTotal,
@@ -120,8 +122,9 @@ const BalanceSheet: React.FC = () => {
       CurrentLiabilities: currentLiability,
       FixedAssets: fixedAssets,
       CurrentAssets: CurrentAssets,
+      TDSPayable: tdsPayable,
       LaiblityTotal: capitalTotal + loanLability + currentLiability + (netProfit - netLoss - transferredProfit + transferredLoss),
-      AssetTotal: fixedAssets + CurrentAssets,
+      AssetTotal: fixedAssets + CurrentAssets + tdsPayable,
     });
   }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss, transferredProfit, transferredLoss]);
 
@@ -335,6 +338,15 @@ const BalanceSheet: React.FC = () => {
                     <span className="text-right font-mono font-bold">{calculatedTotal.FixedAssets.toLocaleString()}</span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-9)}
+                </div>
+
+                {/* TDS Payable */}
+                <div>
+                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-19)}>
+                    <span className="text-blue-600 font-semibold ">TDS Payable</span>
+                    <span className="text-right font-mono font-bold">{calculatedTotal.TDSPayable.toLocaleString()}</span>
+                  </div>
+                  {isDetailedView && renderDetailedGroupItems(-19)}
                 </div>
 
                 {/* Current Assets */}

@@ -165,6 +165,7 @@ const TrialBalance: React.FC = () => {
     { id: -6, name: "Current Liabilities" },
     { id: -5, name: "Current Assets" },
     { id: -9, name: "Fixed Assets" },
+    { id: -19, name: "TDS Payable" },
     { id: -16, name: "Sales Accounts" },
     { id: -15, name: "Purchase Accounts" },
     { id: -11, name: "Indirect Income" },

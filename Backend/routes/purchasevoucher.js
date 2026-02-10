@@ -735,6 +735,13 @@ router.get("/:id", async (req, res) => {
       [voucherId]
     );
 
+    // 🔍 Fallback: If tdsLedgerId is missing in main row, try to get it from first item
+    // ⚠️ tdsRate column might be DECIMAL(10,2), so we must parse it to INT to match matches frontend ID
+    let fallbackTdsId = items.find(i => Number(i.tdsRate) > 0)?.tdsRate;
+    if (fallbackTdsId) fallbackTdsId = Math.round(Number(fallbackTdsId));
+
+    const tdsLedgerId = voucher.tdsLedgerId || fallbackTdsId || null;
+
     /* ======================
        3️⃣ GET HISTORY (BY VOUCHER NUMBER)
     ====================== */
@@ -829,6 +836,7 @@ router.get("/:id", async (req, res) => {
       igstTotal: voucher.igstTotal,
       discountTotal: voucher.discountTotal,
       tdsTotal: voucher.tdsTotal, // ✅ Added
+      tdsLedgerId: tdsLedgerId, // ✅ Use the calculated variable with fallback
       total: voucher.total,
 
       // ⭐ MAIN

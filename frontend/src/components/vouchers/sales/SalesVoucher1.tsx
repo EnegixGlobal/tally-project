@@ -73,6 +73,8 @@ const SalesVoucher: React.FC = () => {
   const [selectedPartyGst, setSelectedPartyGst] = useState<string>(""); // Store selected party's GST number
   const [salesTypes, setSalesTypes] = useState<SalesType[]>([]);
   const [selectedSalesTypeId, setSelectedSalesTypeId] = useState<string>("");
+  const [isReadyToSave, setIsReadyToSave] = useState(false);
+  const DRAFT_KEY = "SALES_VOUCHER_CREATE_DRAFT";
 
   // Robust detection for party ledgers — backend may return different field names
 
@@ -355,6 +357,111 @@ const SalesVoucher: React.FC = () => {
     getInitialFormData()
   );
 
+  // --- DRAFT PERSISTENCE (RESTORE) ---
+  useEffect(() => {
+    if (isEditMode) {
+      setIsReadyToSave(true);
+      return;
+    }
+
+    const savedDraft = localStorage.getItem(DRAFT_KEY);
+    if (savedDraft) {
+      try {
+        const parsed = JSON.parse(savedDraft);
+        if (parsed && (parsed.partyId || (parsed.entries && parsed.entries.some((e: any) => e.itemId)))) {
+          setFormData(parsed);
+
+          if (parsed.sales_type_id) {
+            setSelectedSalesTypeId(parsed.sales_type_id);
+          }
+
+          if (parsed.profitConfig) {
+            setProfitConfig(parsed.profitConfig);
+          }
+
+          Swal.fire({
+            toast: true,
+            position: "top-end",
+            icon: "info",
+            title: "Draft restored",
+            showConfirmButton: false,
+            timer: 2000,
+          });
+        }
+      } catch (e) {
+        console.error("Failed to restore Sales Voucher draft", e);
+      }
+    }
+    setIsReadyToSave(true);
+  }, [isEditMode]);
+
+  // --- DRAFT PERSISTENCE (SAVE) ---
+  useEffect(() => {
+    if (!isEditMode && isReadyToSave && formData) {
+      const hasData = formData.partyId || formData.entries.some(e => e.itemId || e.quantity > 0);
+      if (hasData) {
+        // Include additional states in the draft
+        const draftData = {
+          ...formData,
+          sales_type_id: selectedSalesTypeId,
+          profitConfig: profitConfig
+        };
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
+      }
+    }
+  }, [formData, isEditMode, isReadyToSave, selectedSalesTypeId]);
+
+  const clearDraft = () => {
+    localStorage.removeItem(DRAFT_KEY);
+
+    setFormData({
+      date: new Date().toISOString().split("T")[0],
+      type: isQuotationMode ? "quotation" : "sales",
+      number: formData.number, // Keep the number
+      narration: "",
+      referenceNo: "",
+      partyId: "",
+      mode: "item-invoice",
+      dispatchDetails: { docNo: "", through: "", destination: "", approxDistance: "", },
+      salesLedgerId: "",
+      entries: [
+        {
+          id: "e1",
+          itemId: "",
+          quantity: 0,
+          rate: 0,
+          amount: 0,
+          type: "debit",
+          cgstRate: 0,
+          sgstRate: 0,
+          igstRate: 0,
+          godownId: "",
+          salesLedgerId: "",
+          discount: 0,
+          hsnCode: "",
+        },
+      ],
+    });
+
+    setSelectedPartyState("");
+    setSelectedPartyGst("");
+    setProfitConfig({ customerType: "", method: "", value: "" });
+    setIsReadyToSave(true);
+    setShowConfig(false);
+
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true,
+    });
+    Toast.fire({
+      icon: 'success',
+      title: 'Draft Cleared'
+    });
+  };
+
   const [godownEnabled, setGodownEnabled] = useState<"yes" | "no">("yes"); // Add state for godown selection visibility
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showPrintOptions, setShowPrintOptions] = useState(false); // Print options popup state
@@ -388,6 +495,9 @@ const SalesVoucher: React.FC = () => {
   const [isBarcodeError, setIsBarcodeError] = useState(false);
 
   // timers for debouncing rate input per entry
+  // POS Barcode Scanner Logic (Global Listener)
+  const barcodeBuffer = useRef("");
+  const lastKeyTime = useRef(0);
   const rateDebounceTimers = useRef<{ [entryId: string]: number | null }>({});
 
   // Add this useEffect() in component (below states)
@@ -788,10 +898,10 @@ const SalesVoucher: React.FC = () => {
           setFormData((prev) => {
             const companyState = safeCompanyInfo?.state || "";
             const statesMatch =
-              companyState &&
+              Boolean(companyState &&
               partyState &&
               companyState.toLowerCase().trim() ===
-              partyState.toLowerCase().trim();
+              partyState.toLowerCase().trim());
 
             // ✅ Extract GST % from ledger names
             const extractGstPercent = (ledgerId: any) => {
@@ -947,9 +1057,9 @@ const SalesVoucher: React.FC = () => {
         const companyState = safeCompanyInfo?.state || "";
         const partyState = selectedPartyState || "";
         const statesMatch =
-          companyState &&
-          partyState &&
-          companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+          Boolean(companyState &&
+            partyState &&
+            companyState.toLowerCase().trim() === partyState.toLowerCase().trim());
 
         // ✅ Extract GST % from ledger names (do this once)
         const extractGstPercent = (ledgerId: any) => {
@@ -1018,7 +1128,7 @@ const SalesVoucher: React.FC = () => {
         totalGst = Math.round(totalGst);
 
         // Find Sales Ledger
-        const salesLedger = getSalesLedgerByGst(totalGst);
+        const salesLedger = getSalesLedgerByGst(totalGst, statesMatch); // Pass statesMatch (isIntra)
 
         if (salesLedger) {
           updatedEntries[index].salesLedgerId = String(salesLedger.id);
@@ -1026,7 +1136,7 @@ const SalesVoucher: React.FC = () => {
           Swal.fire({
             icon: "warning",
             title: "Sales Ledger Missing",
-            text: `Sales ${totalGst}% Ledger not found. Please create it first.`,
+            text: `Sales ${totalGst}% ${statesMatch ? 'Intra' : 'Inter'} Ledger not found. Please create it first.`,
           });
         }
 
@@ -1342,9 +1452,9 @@ const SalesVoucher: React.FC = () => {
           const companyState = safeCompanyInfo?.state || "";
           const partyState = selectedPartyState || "";
           const statesMatch =
-            companyState &&
-            partyState &&
-            companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+            Boolean(companyState &&
+              partyState &&
+              companyState.toLowerCase().trim() === partyState.toLowerCase().trim());
 
           const extractedCgst = extractGstPercent(details.cgstLedgerId);
           const extractedSgst = extractGstPercent(details.sgstLedgerId);
@@ -1366,6 +1476,14 @@ const SalesVoucher: React.FC = () => {
 
           const matchingSalesLedger = salesLedgers.find((l) => {
             const name = String(l.name).toLowerCase();
+
+            // Check for Inter/Intra
+            if (statesMatch) {
+              if (!name.includes("intra")) return false;
+            } else {
+              if (!name.includes("inter")) return false;
+            }
+
             return (
               name.includes(`${gstToMatch}%`) ||
               name.includes(`${gstToMatch} %`) ||
@@ -1441,6 +1559,47 @@ const SalesVoucher: React.FC = () => {
       setIsBarcodeError(true);
     }
   };
+
+  // POS Barcode Scanner Logic (Global Listener)
+  useEffect(() => {
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      // Ignore if source is common inputs (unless it's barcode specific)
+      const target = e.target as HTMLElement;
+      if (target.tagName === "INPUT" || target.tagName === "TEXTAREA" || target.isContentEditable) {
+        // Option: allow barcode scanning even if inside an input, 
+        // but typically we let the standard field typing happen.
+        // For auto POS we buffer everything.
+      }
+
+      const currentTime = Date.now();
+      const diff = currentTime - lastKeyTime.current;
+      lastKeyTime.current = currentTime;
+
+      // Professional scanners usually type very fast (< 50ms per char)
+      if (diff < 50) {
+        if (e.key === "Enter") {
+          if (barcodeBuffer.current.length >= 3) {
+            const code = barcodeBuffer.current;
+            setBarcodeInput(code);
+            performBarcodeLookup(code);
+            barcodeBuffer.current = "";
+          }
+        } else if (e.key.length === 1) {
+          barcodeBuffer.current += e.key;
+        }
+      } else {
+        // Reset buffer if delay is too long (human typing)
+        if (e.key.length === 1) {
+          barcodeBuffer.current = e.key;
+        } else {
+          barcodeBuffer.current = "";
+        }
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []); // Run once on mount
 
   // 🔹 AUTOMATIC BARCODE LOOKUP ON TYPING (Debounced)
   useEffect(() => {
@@ -1598,6 +1757,7 @@ const SalesVoucher: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsReadyToSave(false); // Stop draft saving immediately when starting submission
 
     const { isValid, messages } = validateForm();
 
@@ -1770,6 +1930,9 @@ const SalesVoucher: React.FC = () => {
         }
       );
 
+      if (!isEditMode) {
+        localStorage.removeItem(DRAFT_KEY);
+      }
       Swal.fire("Success", "Voucher saved successfully!", "success");
       navigate("/app/vouchers");
     } catch (err) {
@@ -1841,17 +2004,29 @@ const SalesVoucher: React.FC = () => {
   } = calculateTotals();
 
 
-  // 🔥 Find Sales Ledger by GST %
-  const getSalesLedgerByGst = (gstPercent: any) => {
+  // 🔥 Find Sales Ledger by GST % and Inter/Intra
+  const getSalesLedgerByGst = (gstPercent: any, isIntra: boolean = false) => {
     if (!gstPercent || gstPercent <= 0) return null;
 
     const gstStr = String(Math.round(gstPercent));
 
     return safeLedgers.find((l) => {
       const name = (l.name || "").toLowerCase();
+      if (!name.includes("sales")) return false;
 
+      // Check for Inter/Intra
+      if (isIntra) {
+        if (!name.includes("intra")) return false;
+      } else {
+        if (!name.includes("inter")) return false;
+      }
+
+      // Check for rate (e.g. "18%", "18 %", "@18%")
       return (
-        name.includes("sales") &&
+        name.includes(`${gstStr}%`) ||
+        name.includes(`${gstStr} %`) ||
+        name.includes(`sales ${gstStr}`) ||
+        name.includes(`@${gstStr}%`) ||
         name.match(new RegExp(`\\b${gstStr}\\b`))
       );
     });
@@ -3093,11 +3268,24 @@ const SalesVoucher: React.FC = () => {
                     }
                   />
                 </label>
+
+                {localStorage.getItem(DRAFT_KEY) && (
+                  <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={clearDraft}
+                      className="w-full flex items-center justify-between p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                    >
+                      <span className="font-semibold text-sm">Clear Saved Draft</span>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
 
-              <div className="flex justify-end mt-6">
+              <div className="flex flex-col gap-3 mt-6">
                 <button
-                  className="px-4 py-2 bg-gray-200  rounded"
+                  className="w-full py-2 bg-gray-200 hover:bg-gray-300 text-gray-800 rounded font-semibold transition-all"
                   onClick={() => setShowConfig(false)}
                 >
                   Close
