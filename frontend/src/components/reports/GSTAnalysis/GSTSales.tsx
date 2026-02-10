@@ -1,10 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
-
 const GSTSales: React.FC = () => {
-
-    const navigate = useNavigate();
 
     const company_id = localStorage.getItem("company_id");
     const owner_type = localStorage.getItem("supplier");
@@ -17,7 +12,8 @@ const GSTSales: React.FC = () => {
     ];
 
     // Sales Ledgers
-    const [salesLedgers, setSalesLedgers] = useState<any[]>([]);
+    const [intraSalesLedgers, setIntraSalesLedgers] = useState<any[]>([]);
+    const [interSalesLedgers, setInterSalesLedgers] = useState<any[]>([]);
     const [igstLedgers, setIgstLedgers] = useState<any[]>([]);
     const [cgstLedgers, setCgstLedgers] = useState<any[]>([]);
     const [sgstLedgers, setSgstLedgers] = useState<any[]>([]);
@@ -41,7 +37,8 @@ const GSTSales: React.FC = () => {
                 const data = await res.json();
 
                 if (data.success) {
-                    setSalesLedgers(data.data.ledgers.sales || []);
+                    setIntraSalesLedgers(data.data.ledgers.intraSales || []);
+                    setInterSalesLedgers(data.data.ledgers.interSales || []);
                     setIgstLedgers(data.data.ledgers.igst || []);
                     setCgstLedgers(data.data.ledgers.cgst || []);
                     setSgstLedgers(data.data.ledgers.sgst || []);
@@ -58,534 +55,583 @@ const GSTSales: React.FC = () => {
     }, [company_id, owner_type, owner_id]);
     return (
         <>
-            <div className="pt-[56px] px-4 bg-gray-50 min-h-screen">
-                {/* Header */}
-                <div className="flex items-center mb-6">
 
-                    <button
-                        onClick={() => navigate(-1)}
-                        className="mr-4 p-2 rounded-full hover:bg-gray-200"
-                    >
-                        <ArrowLeft size={20} />
-                    </button>
-                    <h1 className="flex-1 text-center text-2xl font-bold text-gray-800">
-                        GST Sales Analysis
-                    </h1>
-                </div>
-                <hr className="border-gray-300 mb-6" />
-                {/* ================= Sales Table ================= */}
+            {/* ================= Sales Table ================= */}
 
-                <div className="mt-6 overflow-x-auto shadow-lg rounded-lg bg-white">
-
-                    <h2 className="text-xl font-semibold p-4 text-center bg-gray-50 border-b">
-                        Sales Summary
-                    </h2>
-
-                    <table className="w-full border-collapse text-center text-sm">
-
-                        {/* ================= HEADER ================= */}
-
-                        <thead className="bg-gray-800 text-white">
-
-                            {/* Row 1 */}
-                            <tr>
-
-                                {/* Month */}
-                                <th
-                                    rowSpan={2}
-                                    className="border border-gray-600 px-3 py-2"
-                                >
-                                    Month
-                                </th>
-
-
-                                {/* Sales Group */}
-                                <th
-                                    colSpan={salesLedgers.length || 1}
-                                    className="border border-gray-600 px-3 py-2"
-                                >
-                                    Sales
-                                </th>
-
-
-                                {/* Total Sales */}
-                                <th
-                                    rowSpan={2}
-                                    className="border border-gray-600 px-3 py-2"
-                                >
-                                    Total
-                                </th>
+            <div className="mt-6 overflow-x-auto shadow-lg rounded-lg bg-white">
 
 
 
+                <table className="w-full border-collapse text-center text-sm">
 
-                            </tr>
+                    {/* ================= HEADER ================= */}
 
+                    <thead className="bg-gray-800 text-white">
 
-                            {/* Row 2 */}
-                            <tr>
+                        {/* Row 1 */}
+                        <tr>
 
-                                {/* Sales Ledgers */}
-                                {salesLedgers.length > 0 ? (
-                                    salesLedgers.map((ledger) => (
-                                        <th
-                                            key={ledger.id}
-                                            className="border border-gray-600 px-3 py-2 whitespace-nowrap"
-                                        >
-                                            {ledger.name}
-                                        </th>
-                                    ))
-                                ) : (
-                                    <th className="border border-gray-600 px-3 py-2">-</th>
-                                )}
+                            {/* Month */}
+                            <th
+                                rowSpan={2}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                Month
+                            </th>
 
 
+                            {/* Intra State Sales Group */}
+                            <th
+                                colSpan={intraSalesLedgers.length || 1}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                Sales (Intra State)
+                            </th>
 
-                            </tr>
-                        </thead>
-                        {/* ================= BODY ================= */}
+                            {/* Inter State Sales Group */}
+                            <th
+                                colSpan={interSalesLedgers.length || 1}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                Sales (Inter State)
+                            </th>
 
-                        <tbody>
 
-                            {months.map((month) => {
-                                const mData = monthlyData[month] || {};
-                                const sData = mData.sales || {};
+                            {/* Total Sales */}
+                            <th
+                                rowSpan={2}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                Total
+                            </th>
 
-                                return (
-                                    <tr key={month} className="odd:bg-white even:bg-gray-50 hover:bg-gray-200 transition-colors">
+                        </tr>
 
-                                        {/* Month */}
-                                        <td className="border border-gray-300 px-3 py-2 font-medium">
-                                            {month}
+
+                        {/* Row 2 */}
+                        <tr>
+
+                            {/* Intra Sales Ledgers */}
+                            {intraSalesLedgers.length > 0 ? (
+                                intraSalesLedgers.map((ledger) => (
+                                    <th
+                                        key={ledger.id}
+                                        className="border border-gray-600 px-3 py-2 whitespace-nowrap"
+                                    >
+                                        {ledger.name}
+                                    </th>
+                                ))
+                            ) : (
+                                <th className="border border-gray-600 px-3 py-2">-</th>
+                            )}
+
+                            {/* Inter Sales Ledgers */}
+                            {interSalesLedgers.length > 0 ? (
+                                interSalesLedgers.map((ledger) => (
+                                    <th
+                                        key={ledger.id}
+                                        className="border border-gray-600 px-3 py-2 whitespace-nowrap"
+                                    >
+                                        {ledger.name}
+                                    </th>
+                                ))
+                            ) : (
+                                <th className="border border-gray-600 px-3 py-2">-</th>
+                            )}
+
+                        </tr>
+                    </thead>
+                    {/* ================= BODY ================= */}
+
+                    <tbody>
+
+                        {months.map((month) => {
+                            const mData = monthlyData[month] || {};
+                            const intraData = mData.intraSales || {};
+                            const interData = mData.interSales || {};
+
+                            return (
+                                <tr key={month} className="odd:bg-white even:bg-gray-50 hover:bg-gray-200 transition-colors">
+
+                                    {/* Month */}
+                                    <td className="border border-gray-300 px-3 py-2 font-medium">
+                                        {month}
+                                    </td>
+
+
+                                    {/* Intra Sales Columns */}
+                                    {intraSalesLedgers.length > 0 ? (
+                                        intraSalesLedgers.map((ledger) => {
+                                            const val = intraData[ledger.id] ? Number(intraData[ledger.id]) : 0;
+                                            return (
+                                                <td
+                                                    key={ledger.id}
+                                                    className="border border-gray-300 px-3 py-2"
+                                                >
+                                                    {val ? val.toFixed(2) : ""}
+                                                </td>
+                                            )
+                                        })
+                                    ) : (
+                                        <td className="border border-gray-300 px-3 py-2">-</td>
+                                    )}
+
+                                    {/* Inter Sales Columns */}
+                                    {interSalesLedgers.length > 0 ? (
+                                        interSalesLedgers.map((ledger) => {
+                                            const val = interData[ledger.id] ? Number(interData[ledger.id]) : 0;
+                                            return (
+                                                <td
+                                                    key={ledger.id}
+                                                    className="border border-gray-300 px-3 py-2"
+                                                >
+                                                    {val ? val.toFixed(2) : ""}
+                                                </td>
+                                            )
+                                        })
+                                    ) : (
+                                        <td className="border border-gray-300 px-3 py-2">-</td>
+                                    )}
+
+
+                                    {/* Total Sales (Intra + Inter) */}
+                                    <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
+                                        {(() => {
+                                            const total = (Number(mData.totalIntraSales) || 0) + (Number(mData.totalInterSales) || 0);
+                                            return total ? total.toFixed(2) : "";
+                                        })()}
+                                    </td>
+
+                                </tr>
+                            );
+                        })}
+
+                    </tbody>
+
+                    {/* ================= FOOTER ================= */}
+                    <tfoot className="bg-gray-800 text-white font-bold">
+                        <tr>
+                            <td className="border border-gray-600 px-3 py-2">Grand Total</td>
+
+                            {/* Intra Sales Vertical Totals */}
+                            {intraSalesLedgers.length > 0 ? (
+                                intraSalesLedgers.map((ledger) => {
+                                    const total = months.reduce((acc, month) => {
+                                        const val = monthlyData[month]?.intraSales?.[ledger.id] || 0;
+                                        return acc + Number(val);
+                                    }, 0);
+                                    return (
+                                        <td key={ledger.id} className="border border-gray-600 px-3 py-2">
+                                            {total ? total.toFixed(2) : ""}
                                         </td>
+                                    );
+                                })
+                            ) : (
+                                <td className="border border-gray-600 px-3 py-2">-</td>
+                            )}
 
-
-                                        {/* Sales Columns */}
-                                        {salesLedgers.length > 0 ? (
-                                            salesLedgers.map((ledger) => {
-                                                const val = sData[ledger.id] ? Number(sData[ledger.id]) : 0;
-                                                return (
-                                                    <td
-                                                        key={ledger.id}
-                                                        className="border border-gray-300 px-3 py-2"
-                                                    >
-                                                        {val ? val.toFixed(2) : ""}
-                                                    </td>
-                                                )
-                                            })
-                                        ) : (
-                                            <td className="border border-gray-300 px-3 py-2">-</td>
-                                        )}
-
-
-                                        {/* Total Sales */}
-                                        <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
-                                            {mData.totalSales ? Number(mData.totalSales).toFixed(2) : ""}
+                            {/* Inter Sales Vertical Totals */}
+                            {interSalesLedgers.length > 0 ? (
+                                interSalesLedgers.map((ledger) => {
+                                    const total = months.reduce((acc, month) => {
+                                        const val = monthlyData[month]?.interSales?.[ledger.id] || 0;
+                                        return acc + Number(val);
+                                    }, 0);
+                                    return (
+                                        <td key={ledger.id} className="border border-gray-600 px-3 py-2">
+                                            {total ? total.toFixed(2) : ""}
                                         </td>
+                                    );
+                                })
+                            ) : (
+                                <td className="border border-gray-600 px-3 py-2">-</td>
+                            )}
+
+                            {/* Total Sales Grand Total */}
+                            <td className="border border-gray-600 px-3 py-2">
+                                {(() => {
+                                    const total = months.reduce((acc, month) => {
+                                        const mData = monthlyData[month] || {};
+                                        const monthTotal = (Number(mData.totalIntraSales) || 0) + (Number(mData.totalInterSales) || 0);
+                                        return acc + monthTotal;
+                                    }, 0);
+                                    return total ? total.toFixed(2) : "";
+                                })()}
+                            </td>
+
+                        </tr>
+                    </tfoot>
+
+
+                </table>
+            </div>
 
 
 
 
-                                    </tr>
-                                );
-                            })}
+            {/* ================= Sales Tax Detail ================= */}
 
-                        </tbody>
+            <div className="mt-10 mb-10 overflow-x-auto shadow-lg rounded-lg bg-white">
 
-                        {/* ================= FOOTER ================= */}
-                        <tfoot className="bg-gray-800 text-white font-bold">
-                            <tr>
-                                <td className="border border-gray-600 px-3 py-2">Grand Total</td>
+                <h2 className="text-xl font-semibold p-4 text-center bg-gray-50 border-b">
+                    Sales Tax Detail
+                </h2>
 
-                                {/* Sales Vertical Totals */}
-                                {salesLedgers.length > 0 ? (
-                                    salesLedgers.map((ledger) => {
-                                        const total = months.reduce((acc, month) => {
-                                            const val = monthlyData[month]?.sales?.[ledger.id] || 0;
-                                            return acc + Number(val);
-                                        }, 0);
-                                        return (
-                                            <td key={ledger.id} className="border border-gray-600 px-3 py-2">
-                                                {total ? total.toFixed(2) : ""}
-                                            </td>
-                                        );
-                                    })
-                                ) : (
-                                    <td className="border border-gray-600 px-3 py-2">-</td>
-                                )}
+                <table className="w-full border-collapse text-center text-sm">
 
-                                {/* Total Sales Grand Total */}
-                                <td className="border border-gray-600 px-3 py-2">
-                                    {months.reduce((acc, month) => acc + (monthlyData[month]?.totalSales || 0), 0).toFixed(2)}
-                                </td>
+                    {/* ================= HEADER ================= */}
+
+                    <thead className="bg-gray-800 text-white">
+
+                        {/* Row 1 */}
+                        <tr>
+
+                            {/* Month */}
+                            <th
+                                rowSpan={2}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                Month
+                            </th>
 
 
-
-                            </tr>
-                        </tfoot>
-
-
-                    </table>
-                </div>
-
-
+                            {/* CGST Group */}
+                            <th
+                                colSpan={cgstLedgers.length + 1 || 1}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                CGST
+                            </th>
 
 
-                {/* ================= Sales Tax Detail ================= */}
+                            {/* SGST Group */}
+                            <th
+                                colSpan={sgstLedgers.length + 1 || 1}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                SGST
+                            </th>
 
-                <div className="mt-10 mb-10 overflow-x-auto shadow-lg rounded-lg bg-white">
-
-                    <h2 className="text-xl font-semibold p-4 text-center bg-gray-50 border-b">
-                        Sales Tax Detail
-                    </h2>
-
-                    <table className="w-full border-collapse text-center text-sm">
-
-                        {/* ================= HEADER ================= */}
-
-                        <thead className="bg-gray-800 text-white">
-
-                            {/* Row 1 */}
-                            <tr>
-
-                                {/* Month */}
-                                <th
-                                    rowSpan={2}
-                                    className="border border-gray-600 px-3 py-2"
-                                >
-                                    Month
-                                </th>
+                        </tr>
 
 
-                                {/* CGST Group */}
-                                <th
-                                    colSpan={cgstLedgers.length + 1 || 1}
-                                    className="border border-gray-600 px-3 py-2"
-                                >
-                                    CGST
-                                </th>
+                        {/* Row 2 */}
+                        <tr>
+
+                            {/* CGST Ledgers */}
+                            {cgstLedgers.length > 0 ? (
+                                cgstLedgers.map((ledger) => (
+                                    <th
+                                        key={ledger.id}
+                                        className="border border-gray-600 px-3 py-2 whitespace-nowrap"
+                                    >
+                                        {ledger.name}
+                                    </th>
+                                ))
+                            ) : (
+                                <th className="border border-gray-600 px-3 py-2">-</th>
+                            )}
 
 
-                                {/* SGST Group */}
-                                <th
-                                    colSpan={sgstLedgers.length + 1 || 1}
-                                    className="border border-gray-600 px-3 py-2"
-                                >
-                                    SGST
-                                </th>
-
-                            </tr>
+                            {/* CGST Total */}
+                            <th className="border border-gray-600 px-3 py-2 font-semibold">
+                                Total
+                            </th>
 
 
-                            {/* Row 2 */}
-                            <tr>
-
-                                {/* CGST Ledgers */}
-                                {cgstLedgers.length > 0 ? (
-                                    cgstLedgers.map((ledger) => (
-                                        <th
-                                            key={ledger.id}
-                                            className="border border-gray-600 px-3 py-2 whitespace-nowrap"
-                                        >
-                                            {ledger.name}
-                                        </th>
-                                    ))
-                                ) : (
-                                    <th className="border border-gray-600 px-3 py-2">-</th>
-                                )}
+                            {/* SGST Ledgers */}
+                            {sgstLedgers.length > 0 ? (
+                                sgstLedgers.map((ledger) => (
+                                    <th
+                                        key={ledger.id}
+                                        className="border border-gray-600 px-3 py-2 whitespace-nowrap"
+                                    >
+                                        {ledger.name}
+                                    </th>
+                                ))
+                            ) : (
+                                <th className="border border-gray-600 px-3 py-2">-</th>
+                            )}
 
 
-                                {/* CGST Total */}
-                                <th className="border border-gray-600 px-3 py-2 font-semibold">
-                                    Total
-                                </th>
+                            {/* SGST Total */}
+                            <th className="border border-gray-600 px-3 py-2 font-semibold">
+                                Total
+                            </th>
+
+                        </tr>
+
+                    </thead>
 
 
-                                {/* SGST Ledgers */}
-                                {sgstLedgers.length > 0 ? (
-                                    sgstLedgers.map((ledger) => (
-                                        <th
-                                            key={ledger.id}
-                                            className="border border-gray-600 px-3 py-2 whitespace-nowrap"
-                                        >
-                                            {ledger.name}
-                                        </th>
-                                    ))
-                                ) : (
-                                    <th className="border border-gray-600 px-3 py-2">-</th>
-                                )}
+                    {/* ================= BODY ================= */}
 
+                    <tbody>
 
-                                {/* SGST Total */}
-                                <th className="border border-gray-600 px-3 py-2 font-semibold">
-                                    Total
-                                </th>
+                        {months.map((month) => {
+                            const mData = monthlyData[month] || {};
+                            const cData = mData.cgst || {};
+                            const sData = mData.sgst || {};
+                            return (
+                                <tr key={month} className="odd:bg-white even:bg-gray-50 hover:bg-gray-200 transition-colors">
 
-                            </tr>
+                                    {/* Month */}
+                                    <td className="border border-gray-300 px-3 py-2 font-medium">
+                                        {month}
+                                    </td>
+                                    {/* CGST Columns */}
+                                    {cgstLedgers.length > 0 ? (
+                                        cgstLedgers.map((ledger) => {
+                                            const val = cData[ledger.id] ? Number(cData[ledger.id]) : 0;
+                                            return (
+                                                <td
+                                                    key={ledger.id}
+                                                    className="border border-gray-300 px-3 py-2"
+                                                >
+                                                    {val ? val.toFixed(2) : ""}
+                                                </td>
+                                            )
+                                        })
+                                    ) : (
+                                        <td className="border border-gray-300 px-3 py-2">-</td>
+                                    )}
+                                    {/* CGST Total */}
+                                    <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
+                                        {mData.totalCGST ? Number(mData.totalCGST).toFixed(2) : ""}
+                                    </td>
+                                    {/* SGST Columns */}
+                                    {sgstLedgers.length > 0 ? (
+                                        sgstLedgers.map((ledger) => {
+                                            const val = sData[ledger.id] ? Number(sData[ledger.id]) : 0;
+                                            return (
+                                                <td
+                                                    key={ledger.id}
+                                                    className="border border-gray-300 px-3 py-2"
+                                                >
+                                                    {val ? val.toFixed(2) : ""}
+                                                </td>
+                                            )
+                                        })
+                                    ) : (
+                                        <td className="border border-gray-300 px-3 py-2">-</td>
+                                    )}
+                                    {/* SGST Total */}
+                                    <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
+                                        {mData.totalSGST ? Number(mData.totalSGST).toFixed(2) : ""}
+                                    </td>
+                                </tr>
+                            )
+                        })}
+                    </tbody>
 
-                        </thead>
+                    {/* ================= FOOTER ================= */}
+                    <tfoot className="bg-gray-800 text-white font-bold">
+                        <tr>
+                            <td className="border border-gray-600 px-3 py-2">Grand Total</td>
 
-
-                        {/* ================= BODY ================= */}
-
-                        <tbody>
-
-                            {months.map((month) => {
-                                const mData = monthlyData[month] || {};
-                                const cData = mData.cgst || {};
-                                const sData = mData.sgst || {};
-                                return (
-                                    <tr key={month} className="odd:bg-white even:bg-gray-50 hover:bg-gray-200 transition-colors">
-
-                                        {/* Month */}
-                                        <td className="border border-gray-300 px-3 py-2 font-medium">
-                                            {month}
+                            {/* CGST Vertical Totals */}
+                            {cgstLedgers.length > 0 ? (
+                                cgstLedgers.map((ledger) => {
+                                    const total = months.reduce((acc, month) => {
+                                        const val = monthlyData[month]?.cgst?.[ledger.id] || 0;
+                                        return acc + Number(val);
+                                    }, 0);
+                                    return (
+                                        <td key={ledger.id} className="border border-gray-600 px-3 py-2">
+                                            {total ? total.toFixed(2) : ""}
                                         </td>
-                                        {/* CGST Columns */}
-                                        {cgstLedgers.length > 0 ? (
-                                            cgstLedgers.map((ledger) => {
-                                                const val = cData[ledger.id] ? Number(cData[ledger.id]) : 0;
-                                                return (
-                                                    <td
-                                                        key={ledger.id}
-                                                        className="border border-gray-300 px-3 py-2"
-                                                    >
-                                                        {val ? val.toFixed(2) : ""}
-                                                    </td>
-                                                )
-                                            })
-                                        ) : (
-                                            <td className="border border-gray-300 px-3 py-2">-</td>
-                                        )}
-                                        {/* CGST Total */}
-                                        <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
-                                            {mData.totalCGST ? Number(mData.totalCGST).toFixed(2) : ""}
+                                    );
+                                })
+                            ) : (
+                                <td className="border border-gray-600 px-3 py-2">-</td>
+                            )}
+
+                            {/* Total CGST Grand Total */}
+                            <td className="border border-gray-600 px-3 py-2">
+                                {(() => {
+                                    const total = months.reduce((acc, month) => acc + (monthlyData[month]?.totalCGST || 0), 0);
+                                    return total ? total.toFixed(2) : "";
+                                })()}
+                            </td>
+
+
+                            {/* SGST Vertical Totals */}
+                            {sgstLedgers.length > 0 ? (
+                                sgstLedgers.map((ledger) => {
+                                    const total = months.reduce((acc, month) => {
+                                        const val = monthlyData[month]?.sgst?.[ledger.id] || 0;
+                                        return acc + Number(val);
+                                    }, 0);
+                                    return (
+                                        <td key={ledger.id} className="border border-gray-600 px-3 py-2">
+                                            {total ? total.toFixed(2) : ""}
                                         </td>
-                                        {/* SGST Columns */}
-                                        {sgstLedgers.length > 0 ? (
-                                            sgstLedgers.map((ledger) => {
-                                                const val = sData[ledger.id] ? Number(sData[ledger.id]) : 0;
-                                                return (
-                                                    <td
-                                                        key={ledger.id}
-                                                        className="border border-gray-300 px-3 py-2"
-                                                    >
-                                                        {val ? val.toFixed(2) : ""}
-                                                    </td>
-                                                )
-                                            })
-                                        ) : (
-                                            <td className="border border-gray-300 px-3 py-2">-</td>
-                                        )}
-                                        {/* SGST Total */}
-                                        <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
-                                            {mData.totalSGST ? Number(mData.totalSGST).toFixed(2) : ""}
+                                    );
+                                })
+                            ) : (
+                                <td className="border border-gray-600 px-3 py-2">-</td>
+                            )}
+
+                            {/* Total SGST Grand Total */}
+                            <td className="border border-gray-600 px-3 py-2">
+                                {(() => {
+                                    const total = months.reduce((acc, month) => acc + (monthlyData[month]?.totalSGST || 0), 0);
+                                    return total ? total.toFixed(2) : "";
+                                })()}
+                            </td>
+
+                        </tr>
+                    </tfoot>
+
+                </table>
+
+            </div>
+
+            {/* ================= IGST Detail ================= */}
+
+            <div className="mt-10 mb-10 overflow-x-auto shadow-lg rounded-lg bg-white">
+
+                <h2 className="text-xl font-semibold p-4 text-center bg-gray-50 border-b">
+                    IGST Detail
+                </h2>
+
+                <table className="w-full border-collapse text-center text-sm">
+
+                    {/* ================= HEADER ================= */}
+
+                    <thead className="bg-gray-800 text-white">
+
+                        {/* Row 1 */}
+                        <tr>
+
+                            {/* Month */}
+                            <th
+                                rowSpan={2}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                Month
+                            </th>
+
+
+                            {/* IGST Group */}
+                            <th
+                                colSpan={igstLedgers.length || 1}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                IGST
+                            </th>
+
+
+                            {/* Total IGST */}
+                            <th
+                                rowSpan={2}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                Total
+                            </th>
+
+                        </tr>
+
+
+                        {/* Row 2 */}
+                        <tr>
+
+                            {/* IGST Ledgers */}
+                            {igstLedgers.length > 0 ? (
+                                igstLedgers.map((ledger) => (
+                                    <th
+                                        key={ledger.id}
+                                        className="border border-gray-600 px-3 py-2 whitespace-nowrap"
+                                    >
+                                        {ledger.name}
+                                    </th>
+                                ))
+                            ) : (
+                                <th className="border border-gray-600 px-3 py-2">-</th>
+                            )}
+
+                        </tr>
+                    </thead>
+                    {/* ================= BODY ================= */}
+
+                    <tbody>
+
+                        {months.map((month) => {
+                            const mData = monthlyData[month] || {};
+                            const iData = mData.igst || {};
+
+                            return (
+                                <tr key={month} className="odd:bg-white even:bg-gray-50 hover:bg-gray-200 transition-colors">
+
+                                    {/* Month */}
+                                    <td className="border border-gray-300 px-3 py-2 font-medium">
+                                        {month}
+                                    </td>
+
+
+                                    {/* IGST Columns */}
+                                    {igstLedgers.length > 0 ? (
+                                        igstLedgers.map((ledger) => {
+                                            const val = iData[ledger.id] ? Number(iData[ledger.id]) : 0;
+                                            return (
+                                                <td
+                                                    key={ledger.id}
+                                                    className="border border-gray-300 px-3 py-2"
+                                                >
+                                                    {val ? val.toFixed(2) : ""}
+                                                </td>
+                                            )
+                                        })
+                                    ) : (
+                                        <td className="border border-gray-300 px-3 py-2">-</td>
+                                    )}
+
+
+                                    {/* Total IGST */}
+                                    <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
+                                        {mData.totalIGST ? Number(mData.totalIGST).toFixed(2) : ""}
+                                    </td>
+
+                                </tr>
+                            );
+                        })}
+
+                    </tbody>
+
+                    {/* ================= FOOTER ================= */}
+                    <tfoot className="bg-gray-800 text-white font-bold">
+                        <tr>
+                            <td className="border border-gray-600 px-3 py-2">Grand Total</td>
+
+                            {/* IGST Vertical Totals */}
+                            {igstLedgers.length > 0 ? (
+                                igstLedgers.map((ledger) => {
+                                    const total = months.reduce((acc, month) => {
+                                        const val = monthlyData[month]?.igst?.[ledger.id] || 0;
+                                        return acc + Number(val);
+                                    }, 0);
+                                    return (
+                                        <td key={ledger.id} className="border border-gray-600 px-3 py-2">
+                                            {total ? total.toFixed(2) : ""}
                                         </td>
-                                    </tr>
-                                )
-                            })}
-                        </tbody>
+                                    );
+                                })
+                            ) : (
+                                <td className="border border-gray-600 px-3 py-2">-</td>
+                            )}
 
-                        {/* ================= FOOTER ================= */}
-                        <tfoot className="bg-gray-800 text-white font-bold">
-                            <tr>
-                                <td className="border border-gray-600 px-3 py-2">Grand Total</td>
+                            {/* Total IGST Grand Total */}
+                            <td className="border border-gray-600 px-3 py-2">
+                                {(() => {
+                                    const total = months.reduce((acc, month) => acc + (monthlyData[month]?.totalIGST || 0), 0);
+                                    return total ? total.toFixed(2) : "";
+                                })()}
+                            </td>
 
-                                {/* CGST Vertical Totals */}
-                                {cgstLedgers.length > 0 ? (
-                                    cgstLedgers.map((ledger) => {
-                                        const total = months.reduce((acc, month) => {
-                                            const val = monthlyData[month]?.cgst?.[ledger.id] || 0;
-                                            return acc + Number(val);
-                                        }, 0);
-                                        return (
-                                            <td key={ledger.id} className="border border-gray-600 px-3 py-2">
-                                                {total ? total.toFixed(2) : ""}
-                                            </td>
-                                        );
-                                    })
-                                ) : (
-                                    <td className="border border-gray-600 px-3 py-2">-</td>
-                                )}
+                        </tr>
+                    </tfoot>
 
-                                {/* Total CGST Grand Total */}
-                                <td className="border border-gray-600 px-3 py-2">
-                                    {months.reduce((acc, month) => acc + (monthlyData[month]?.totalCGST || 0), 0).toFixed(2)}
-                                </td>
-
-
-                                {/* SGST Vertical Totals */}
-                                {sgstLedgers.length > 0 ? (
-                                    sgstLedgers.map((ledger) => {
-                                        const total = months.reduce((acc, month) => {
-                                            const val = monthlyData[month]?.sgst?.[ledger.id] || 0;
-                                            return acc + Number(val);
-                                        }, 0);
-                                        return (
-                                            <td key={ledger.id} className="border border-gray-600 px-3 py-2">
-                                                {total ? total.toFixed(2) : ""}
-                                            </td>
-                                        );
-                                    })
-                                ) : (
-                                    <td className="border border-gray-600 px-3 py-2">-</td>
-                                )}
-
-                                {/* Total SGST Grand Total */}
-                                <td className="border border-gray-600 px-3 py-2">
-                                    {months.reduce((acc, month) => acc + (monthlyData[month]?.totalSGST || 0), 0).toFixed(2)}
-                                </td>
-
-                            </tr>
-                        </tfoot>
-
-                    </table>
-
-                </div>
-
-                {/* ================= IGST Detail ================= */}
-
-                <div className="mt-10 mb-10 overflow-x-auto shadow-lg rounded-lg bg-white">
-
-                    <h2 className="text-xl font-semibold p-4 text-center bg-gray-50 border-b">
-                        IGST Detail
-                    </h2>
-
-                    <table className="w-full border-collapse text-center text-sm">
-
-                        {/* ================= HEADER ================= */}
-
-                        <thead className="bg-gray-800 text-white">
-
-                            {/* Row 1 */}
-                            <tr>
-
-                                {/* Month */}
-                                <th
-                                    rowSpan={2}
-                                    className="border border-gray-600 px-3 py-2"
-                                >
-                                    Month
-                                </th>
-
-
-                                {/* IGST Group */}
-                                <th
-                                    colSpan={igstLedgers.length || 1}
-                                    className="border border-gray-600 px-3 py-2"
-                                >
-                                    IGST
-                                </th>
-
-
-                                {/* Total IGST */}
-                                <th
-                                    rowSpan={2}
-                                    className="border border-gray-600 px-3 py-2"
-                                >
-                                    Total
-                                </th>
-
-                            </tr>
-
-
-                            {/* Row 2 */}
-                            <tr>
-
-                                {/* IGST Ledgers */}
-                                {igstLedgers.length > 0 ? (
-                                    igstLedgers.map((ledger) => (
-                                        <th
-                                            key={ledger.id}
-                                            className="border border-gray-600 px-3 py-2 whitespace-nowrap"
-                                        >
-                                            {ledger.name}
-                                        </th>
-                                    ))
-                                ) : (
-                                    <th className="border border-gray-600 px-3 py-2">-</th>
-                                )}
-
-                            </tr>
-                        </thead>
-                        {/* ================= BODY ================= */}
-
-                        <tbody>
-
-                            {months.map((month) => {
-                                const mData = monthlyData[month] || {};
-                                const iData = mData.igst || {};
-
-                                return (
-                                    <tr key={month} className="odd:bg-white even:bg-gray-50 hover:bg-gray-200 transition-colors">
-
-                                        {/* Month */}
-                                        <td className="border border-gray-300 px-3 py-2 font-medium">
-                                            {month}
-                                        </td>
-
-
-                                        {/* IGST Columns */}
-                                        {igstLedgers.length > 0 ? (
-                                            igstLedgers.map((ledger) => {
-                                                const val = iData[ledger.id] ? Number(iData[ledger.id]) : 0;
-                                                return (
-                                                    <td
-                                                        key={ledger.id}
-                                                        className="border border-gray-300 px-3 py-2"
-                                                    >
-                                                        {val ? val.toFixed(2) : ""}
-                                                    </td>
-                                                )
-                                            })
-                                        ) : (
-                                            <td className="border border-gray-300 px-3 py-2">-</td>
-                                        )}
-
-
-                                        {/* Total IGST */}
-                                        <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
-                                            {mData.totalIGST ? Number(mData.totalIGST).toFixed(2) : ""}
-                                        </td>
-
-                                    </tr>
-                                );
-                            })}
-
-                        </tbody>
-
-                        {/* ================= FOOTER ================= */}
-                        <tfoot className="bg-gray-800 text-white font-bold">
-                            <tr>
-                                <td className="border border-gray-600 px-3 py-2">Grand Total</td>
-
-                                {/* IGST Vertical Totals */}
-                                {igstLedgers.length > 0 ? (
-                                    igstLedgers.map((ledger) => {
-                                        const total = months.reduce((acc, month) => {
-                                            const val = monthlyData[month]?.igst?.[ledger.id] || 0;
-                                            return acc + Number(val);
-                                        }, 0);
-                                        return (
-                                            <td key={ledger.id} className="border border-gray-600 px-3 py-2">
-                                                {total ? total.toFixed(2) : ""}
-                                            </td>
-                                        );
-                                    })
-                                ) : (
-                                    <td className="border border-gray-600 px-3 py-2">-</td>
-                                )}
-
-                                {/* Total IGST Grand Total */}
-                                <td className="border border-gray-600 px-3 py-2">
-                                    {months.reduce((acc, month) => acc + (monthlyData[month]?.totalIGST || 0), 0).toFixed(2)}
-                                </td>
-
-                            </tr>
-                        </tfoot>
-
-                    </table>
-                </div>
+                </table>
             </div>
         </>
     );

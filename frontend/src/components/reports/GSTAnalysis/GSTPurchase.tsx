@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft } from "lucide-react";
+
 
 const GSTPurchase: React.FC = () => {
 
@@ -17,7 +17,8 @@ const GSTPurchase: React.FC = () => {
   ];
 
   // Purchase Ledgers
-  const [purchaseLedgers, setPurchaseLedgers] = useState<any[]>([]);
+  const [intraPurchaseLedgers, setIntraPurchaseLedgers] = useState<any[]>([]);
+  const [interPurchaseLedgers, setInterPurchaseLedgers] = useState<any[]>([]);
   const [igstLedgers, setIgstLedgers] = useState<any[]>([]);
   const [cgstLedgers, setCgstLedgers] = useState<any[]>([]);
   const [sgstLedgers, setSgstLedgers] = useState<any[]>([]);
@@ -41,7 +42,8 @@ const GSTPurchase: React.FC = () => {
         const data = await res.json();
 
         if (data.success) {
-          setPurchaseLedgers(data.data.ledgers.purchase || []);
+          setIntraPurchaseLedgers(data.data.ledgers.intraPurchase || []);
+          setInterPurchaseLedgers(data.data.ledgers.interPurchase || []);
           setIgstLedgers(data.data.ledgers.igst || []);
           setCgstLedgers(data.data.ledgers.cgst || []);
           setSgstLedgers(data.data.ledgers.sgst || []);
@@ -58,29 +60,11 @@ const GSTPurchase: React.FC = () => {
   }, [company_id, owner_type, owner_id]);
   return (
     <>
-      <div className="pt-[56px] px-4 bg-gray-50 min-h-screen">
-        {/* Header */}
-        <div className="flex items-center mb-6">
-
-          <button
-            onClick={() => navigate(-1)}
-            className="mr-4 p-2 rounded-full hover:bg-gray-200"
-          >
-            <ArrowLeft size={20} />
-          </button>
-          <h1 className="flex-1 text-center text-2xl font-bold text-gray-800">
-            GST Purchase Analysis
-          </h1>
-        </div>
-        <hr className="border-gray-300 mb-6" />
+   
 
         {/* ================= Purchase Table ================= */}
 
         <div className="mt-6 overflow-x-auto shadow-lg rounded-lg bg-white">
-
-          <h2 className="text-xl font-semibold p-4 text-center bg-gray-50 border-b">
-            Purchase Summary
-          </h2>
 
           <table className="w-full border-collapse text-center text-sm">
 
@@ -100,12 +84,20 @@ const GSTPurchase: React.FC = () => {
                 </th>
 
 
-                {/* Purchase Group */}
+                {/* Intra State Purchase Group */}
                 <th
-                  colSpan={purchaseLedgers.length || 1}
+                  colSpan={intraPurchaseLedgers.length || 1}
                   className="border border-gray-600 px-3 py-2"
                 >
-                  Purchase
+                  Purchase (Intra State)
+                </th>
+
+                {/* Inter State Purchase Group */}
+                <th
+                  colSpan={interPurchaseLedgers.length || 1}
+                  className="border border-gray-600 px-3 py-2"
+                >
+                  Purchase (Inter State)
                 </th>
 
 
@@ -117,18 +109,15 @@ const GSTPurchase: React.FC = () => {
                   Total
                 </th>
 
-
-
-
               </tr>
 
 
               {/* Row 2 */}
               <tr>
 
-                {/* Purchase Ledgers */}
-                {purchaseLedgers.length > 0 ? (
-                  purchaseLedgers.map((ledger) => (
+                {/* Intra Purchase Ledgers */}
+                {intraPurchaseLedgers.length > 0 ? (
+                  intraPurchaseLedgers.map((ledger) => (
                     <th
                       key={ledger.id}
                       className="border border-gray-600 px-3 py-2 whitespace-nowrap"
@@ -140,7 +129,19 @@ const GSTPurchase: React.FC = () => {
                   <th className="border border-gray-600 px-3 py-2">-</th>
                 )}
 
-
+                {/* Inter Purchase Ledgers */}
+                {interPurchaseLedgers.length > 0 ? (
+                  interPurchaseLedgers.map((ledger) => (
+                    <th
+                      key={ledger.id}
+                      className="border border-gray-600 px-3 py-2 whitespace-nowrap"
+                    >
+                      {ledger.name}
+                    </th>
+                  ))
+                ) : (
+                  <th className="border border-gray-600 px-3 py-2">-</th>
+                )}
 
               </tr>
             </thead>
@@ -150,8 +151,8 @@ const GSTPurchase: React.FC = () => {
 
               {months.map((month) => {
                 const mData = monthlyData[month] || {};
-                const pData = mData.purchase || {};
-                const iData = mData.igst || {};
+                const intraData = mData.intraPurchase || {};
+                const interData = mData.interPurchase || {};
 
                 return (
                   <tr key={month} className="odd:bg-white even:bg-gray-50 hover:bg-gray-200 transition-colors">
@@ -162,10 +163,27 @@ const GSTPurchase: React.FC = () => {
                     </td>
 
 
-                    {/* Purchase Columns */}
-                    {purchaseLedgers.length > 0 ? (
-                      purchaseLedgers.map((ledger) => {
-                        const val = pData[ledger.id] ? Number(pData[ledger.id]) : 0;
+                    {/* Intra Purchase Columns */}
+                    {intraPurchaseLedgers.length > 0 ? (
+                      intraPurchaseLedgers.map((ledger) => {
+                        const val = intraData[ledger.id] ? Number(intraData[ledger.id]) : 0;
+                        return (
+                          <td
+                            key={ledger.id}
+                            className="border border-gray-300 px-3 py-2"
+                          >
+                            {val ? val.toFixed(2) : ""}
+                          </td>
+                        )
+                      })
+                    ) : (
+                      <td className="border border-gray-300 px-3 py-2">-</td>
+                    )}
+
+                    {/* Inter Purchase Columns */}
+                    {interPurchaseLedgers.length > 0 ? (
+                      interPurchaseLedgers.map((ledger) => {
+                        const val = interData[ledger.id] ? Number(interData[ledger.id]) : 0;
                         return (
                           <td
                             key={ledger.id}
@@ -180,13 +198,13 @@ const GSTPurchase: React.FC = () => {
                     )}
 
 
-                    {/* Total Purchase */}
+                    {/* Total Purchase (Intra + Inter) */}
                     <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
-                      {mData.totalPurchase ? Number(mData.totalPurchase).toFixed(2) : ""}
+                      {(() => {
+                        const total = (Number(mData.totalIntraPurchase) || 0) + (Number(mData.totalInterPurchase) || 0);
+                        return total ? total.toFixed(2) : "";
+                      })()}
                     </td>
-
-
-
 
                   </tr>
                 );
@@ -199,11 +217,28 @@ const GSTPurchase: React.FC = () => {
               <tr>
                 <td className="border border-gray-600 px-3 py-2">Grand Total</td>
 
-                {/* Purchase Vertical Totals */}
-                {purchaseLedgers.length > 0 ? (
-                  purchaseLedgers.map((ledger) => {
+                {/* Intra Purchase Vertical Totals */}
+                {intraPurchaseLedgers.length > 0 ? (
+                  intraPurchaseLedgers.map((ledger) => {
                     const total = months.reduce((acc, month) => {
-                      const val = monthlyData[month]?.purchase?.[ledger.id] || 0;
+                      const val = monthlyData[month]?.intraPurchase?.[ledger.id] || 0;
+                      return acc + Number(val);
+                    }, 0);
+                    return (
+                      <td key={ledger.id} className="border border-gray-600 px-3 py-2">
+                        {total ? total.toFixed(2) : ""}
+                      </td>
+                    );
+                  })
+                ) : (
+                  <td className="border border-gray-600 px-3 py-2">-</td>
+                )}
+
+                {/* Inter Purchase Vertical Totals */}
+                {interPurchaseLedgers.length > 0 ? (
+                  interPurchaseLedgers.map((ledger) => {
+                    const total = months.reduce((acc, month) => {
+                      const val = monthlyData[month]?.interPurchase?.[ledger.id] || 0;
                       return acc + Number(val);
                     }, 0);
                     return (
@@ -218,10 +253,15 @@ const GSTPurchase: React.FC = () => {
 
                 {/* Total Purchase Grand Total */}
                 <td className="border border-gray-600 px-3 py-2">
-                  {months.reduce((acc, month) => acc + (monthlyData[month]?.totalPurchase || 0), 0).toFixed(2)}
+                  {(() => {
+                    const total = months.reduce((acc, month) => {
+                      const mData = monthlyData[month] || {};
+                      const monthTotal = (Number(mData.totalIntraPurchase) || 0) + (Number(mData.totalInterPurchase) || 0);
+                      return acc + monthTotal;
+                    }, 0);
+                    return total ? total.toFixed(2) : "";
+                  })()}
                 </td>
-
-
 
               </tr>
             </tfoot>
@@ -418,7 +458,10 @@ const GSTPurchase: React.FC = () => {
 
                 {/* Total CGST Grand Total */}
                 <td className="border border-gray-600 px-3 py-2">
-                  {months.reduce((acc, month) => acc + (monthlyData[month]?.totalCGST || 0), 0).toFixed(2)}
+                  {(() => {
+                    const total = months.reduce((acc, month) => acc + (monthlyData[month]?.totalCGST || 0), 0);
+                    return total ? total.toFixed(2) : "";
+                  })()}
                 </td>
 
 
@@ -441,7 +484,10 @@ const GSTPurchase: React.FC = () => {
 
                 {/* Total SGST Grand Total */}
                 <td className="border border-gray-600 px-3 py-2">
-                  {months.reduce((acc, month) => acc + (monthlyData[month]?.totalSGST || 0), 0).toFixed(2)}
+                  {(() => {
+                    const total = months.reduce((acc, month) => acc + (monthlyData[month]?.totalSGST || 0), 0);
+                    return total ? total.toFixed(2) : "";
+                  })()}
                 </td>
 
 
@@ -588,7 +634,10 @@ const GSTPurchase: React.FC = () => {
 
                 {/* Total IGST Grand Total */}
                 <td className="border border-gray-600 px-3 py-2">
-                  {months.reduce((acc, month) => acc + (monthlyData[month]?.totalIGST || 0), 0).toFixed(2)}
+                  {(() => {
+                    const total = months.reduce((acc, month) => acc + (monthlyData[month]?.totalIGST || 0), 0);
+                    return total ? total.toFixed(2) : "";
+                  })()}
                 </td>
 
               </tr>
@@ -596,7 +645,7 @@ const GSTPurchase: React.FC = () => {
 
           </table>
         </div>
-      </div>
+      
 
     </>
   );
