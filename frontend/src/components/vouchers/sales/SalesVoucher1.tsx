@@ -413,7 +413,53 @@ const SalesVoucher: React.FC = () => {
 
   const clearDraft = () => {
     localStorage.removeItem(DRAFT_KEY);
-    window.location.reload();
+
+    setFormData({
+      date: new Date().toISOString().split("T")[0],
+      type: isQuotationMode ? "quotation" : "sales",
+      number: formData.number, // Keep the number
+      narration: "",
+      referenceNo: "",
+      partyId: "",
+      mode: "item-invoice",
+      dispatchDetails: { docNo: "", through: "", destination: "", approxDistance: "", },
+      salesLedgerId: "",
+      entries: [
+        {
+          id: "e1",
+          itemId: "",
+          quantity: 0,
+          rate: 0,
+          amount: 0,
+          type: "debit",
+          cgstRate: 0,
+          sgstRate: 0,
+          igstRate: 0,
+          godownId: "",
+          salesLedgerId: "",
+          discount: 0,
+          hsnCode: "",
+        },
+      ],
+    });
+
+    setSelectedPartyState("");
+    setSelectedPartyGst("");
+    setProfitConfig({ customerType: "", method: "", value: "" });
+    setIsReadyToSave(true);
+    setShowConfig(false);
+
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true,
+    });
+    Toast.fire({
+      icon: 'success',
+      title: 'Draft Cleared'
+    });
   };
 
   const [godownEnabled, setGodownEnabled] = useState<"yes" | "no">("yes"); // Add state for godown selection visibility
@@ -852,10 +898,10 @@ const SalesVoucher: React.FC = () => {
           setFormData((prev) => {
             const companyState = safeCompanyInfo?.state || "";
             const statesMatch =
-              companyState &&
+              Boolean(companyState &&
               partyState &&
               companyState.toLowerCase().trim() ===
-              partyState.toLowerCase().trim();
+              partyState.toLowerCase().trim());
 
             // ✅ Extract GST % from ledger names
             const extractGstPercent = (ledgerId: any) => {
@@ -1011,9 +1057,9 @@ const SalesVoucher: React.FC = () => {
         const companyState = safeCompanyInfo?.state || "";
         const partyState = selectedPartyState || "";
         const statesMatch =
-          companyState &&
-          partyState &&
-          companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+          Boolean(companyState &&
+            partyState &&
+            companyState.toLowerCase().trim() === partyState.toLowerCase().trim());
 
         // ✅ Extract GST % from ledger names (do this once)
         const extractGstPercent = (ledgerId: any) => {
@@ -1082,7 +1128,7 @@ const SalesVoucher: React.FC = () => {
         totalGst = Math.round(totalGst);
 
         // Find Sales Ledger
-        const salesLedger = getSalesLedgerByGst(totalGst);
+        const salesLedger = getSalesLedgerByGst(totalGst, statesMatch); // Pass statesMatch (isIntra)
 
         if (salesLedger) {
           updatedEntries[index].salesLedgerId = String(salesLedger.id);
@@ -1090,7 +1136,7 @@ const SalesVoucher: React.FC = () => {
           Swal.fire({
             icon: "warning",
             title: "Sales Ledger Missing",
-            text: `Sales ${totalGst}% Ledger not found. Please create it first.`,
+            text: `Sales ${totalGst}% ${statesMatch ? 'Intra' : 'Inter'} Ledger not found. Please create it first.`,
           });
         }
 
@@ -1406,9 +1452,9 @@ const SalesVoucher: React.FC = () => {
           const companyState = safeCompanyInfo?.state || "";
           const partyState = selectedPartyState || "";
           const statesMatch =
-            companyState &&
-            partyState &&
-            companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
+            Boolean(companyState &&
+              partyState &&
+              companyState.toLowerCase().trim() === partyState.toLowerCase().trim());
 
           const extractedCgst = extractGstPercent(details.cgstLedgerId);
           const extractedSgst = extractGstPercent(details.sgstLedgerId);
@@ -1430,6 +1476,14 @@ const SalesVoucher: React.FC = () => {
 
           const matchingSalesLedger = salesLedgers.find((l) => {
             const name = String(l.name).toLowerCase();
+
+            // Check for Inter/Intra
+            if (statesMatch) {
+              if (!name.includes("intra")) return false;
+            } else {
+              if (!name.includes("inter")) return false;
+            }
+
             return (
               name.includes(`${gstToMatch}%`) ||
               name.includes(`${gstToMatch} %`) ||
@@ -1950,17 +2004,29 @@ const SalesVoucher: React.FC = () => {
   } = calculateTotals();
 
 
-  // 🔥 Find Sales Ledger by GST %
-  const getSalesLedgerByGst = (gstPercent: any) => {
+  // 🔥 Find Sales Ledger by GST % and Inter/Intra
+  const getSalesLedgerByGst = (gstPercent: any, isIntra: boolean = false) => {
     if (!gstPercent || gstPercent <= 0) return null;
 
     const gstStr = String(Math.round(gstPercent));
 
     return safeLedgers.find((l) => {
       const name = (l.name || "").toLowerCase();
+      if (!name.includes("sales")) return false;
 
+      // Check for Inter/Intra
+      if (isIntra) {
+        if (!name.includes("intra")) return false;
+      } else {
+        if (!name.includes("inter")) return false;
+      }
+
+      // Check for rate (e.g. "18%", "18 %", "@18%")
       return (
-        name.includes("sales") &&
+        name.includes(`${gstStr}%`) ||
+        name.includes(`${gstStr} %`) ||
+        name.includes(`sales ${gstStr}`) ||
+        name.includes(`@${gstStr}%`) ||
         name.match(new RegExp(`\\b${gstStr}\\b`))
       );
     });
@@ -3202,6 +3268,19 @@ const SalesVoucher: React.FC = () => {
                     }
                   />
                 </label>
+
+                {localStorage.getItem(DRAFT_KEY) && (
+                  <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2">
+                    <button
+                      type="button"
+                      onClick={clearDraft}
+                      className="w-full flex items-center justify-between p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                    >
+                      <span className="font-semibold text-sm">Clear Saved Draft</span>
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+                )}
               </div>
 
               <div className="flex flex-col gap-3 mt-6">

@@ -290,8 +290,7 @@ const PurchaseVoucher: React.FC = () => {
             supplierState
           );
 
-          // Get normalized tax ledgers/rates
-          const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(
+          const { cgstRate, sgstRate, igstRate, isIntra } = resolvePurchaseGst(
             gst,
             companyState,
             supplierState
@@ -310,13 +309,20 @@ const PurchaseVoucher: React.FC = () => {
 
           const matchingPurchaseLedger = purchaseLedgers.find((l) => {
             const name = String(l.name).toLowerCase();
-            return (
+            const gstMatch =
               name.includes(`${gstToMatch}%`) ||
               name.includes(`${gstToMatch} %`) ||
               name.includes(`purchase ${gstToMatch}`) ||
               name.includes(`@${gstToMatch}%`) ||
-              name.includes(`@ ${gstToMatch}%`)
-            );
+              name.includes(`@ ${gstToMatch}%`);
+
+            if (!gstMatch) return false;
+
+            if (isIntra) {
+              return name.includes("intra");
+            } else {
+              return name.includes("inter");
+            }
           });
 
           // ⚠️ Warning if not found
@@ -805,7 +811,64 @@ const PurchaseVoucher: React.FC = () => {
 
   const clearDraft = () => {
     localStorage.removeItem(DRAFT_KEY);
-    window.location.reload(); // Quickest way to reset everything to defaults
+
+    setFormData({
+      date: new Date().toISOString().split("T")[0],
+      type: "purchase",
+      number: formData.number, // Preserve the number
+      narration: "",
+      referenceNo: "",
+      supplierInvoiceDate: new Date().toISOString().split("T")[0],
+      purchaseLedgerId: "",
+      partyId: "",
+      mode: "item-invoice",
+      tdsLedgerId: "",
+      tdsRate: 0,
+      tdsAmount: 0,
+      dispatchDetails: { docNo: "", through: "", destination: "", approxDistance: "" },
+      entries: [
+        {
+          id: "e1",
+          itemId: "",
+          quantity: 0,
+          rate: 0,
+          amount: 0,
+          type: "debit",
+          cgstRate: 0,
+          sgstRate: 0,
+          igstRate: 0,
+          gstLedgerId: "",
+          sgstLedgerId: "",
+          cgstLedgerId: "",
+
+          godownId: "",
+          discount: 0,
+          batchNumber: "",
+          batchExpiryDate: "",
+          batchManufacturingDate: "",
+          batches: [],
+          purchaseLedgerId: "",
+          entryDate: undefined, // ensure no stale data
+          ledgerId: "",
+        },
+      ],
+    });
+
+    setSupplierState("");
+    setIsReadyToSave(true);
+    setShowTableConfig(false);
+
+    const Toast = Swal.mixin({
+      toast: true,
+      position: 'top-end',
+      showConfirmButton: false,
+      timer: 2000,
+      timerProgressBar: true,
+    });
+    Toast.fire({
+      icon: 'success',
+      title: 'Draft Cleared'
+    });
   };
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
@@ -973,15 +1036,27 @@ const PurchaseVoucher: React.FC = () => {
           gstToMatch = extractGstPercent(taxLedgerName);
         }
 
+        const isIntra =
+          cleanState(companyState) &&
+          cleanState(supplierState) &&
+          cleanState(companyState) === cleanState(supplierState);
+
         const matchingPurchaseLedger = purchaseLedgers.find((l) => {
           const name = String(l.name).toLowerCase();
-          return (
+          const gstMatch =
             name.includes(`${gstToMatch}%`) ||
             name.includes(`${gstToMatch} %`) ||
             name.includes(`purchase ${gstToMatch}`) ||
             name.includes(`@${gstToMatch}%`) ||
-            name.includes(`@ ${gstToMatch}%`)
-          );
+            name.includes(`@ ${gstToMatch}%`);
+
+          if (!gstMatch) return false;
+
+          if (isIntra) {
+            return name.includes("intra");
+          } else {
+            return name.includes("inter");
+          }
         });
 
         if (!matchingPurchaseLedger && gstToMatch > 0) {
@@ -2053,6 +2128,19 @@ const PurchaseVoucher: React.FC = () => {
                 }
               />
             </label>
+
+            {localStorage.getItem(DRAFT_KEY) && (
+              <div className="border-t border-gray-200 dark:border-gray-600 mt-2 pt-2">
+                <button
+                  type="button"
+                  onClick={clearDraft}
+                  className="w-full flex items-center justify-between p-2 text-red-600 hover:bg-red-50 dark:hover:bg-red-900/20 rounded transition-colors"
+                >
+                  <span className="text-sm font-semibold">Clear Saved Draft</span>
+                  <Trash2 size={16} />
+                </button>
+              </div>
+            )}
 
             <div className="flex justify-end mt-5">
               <button
