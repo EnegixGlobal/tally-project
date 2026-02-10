@@ -35,7 +35,7 @@ const GSTAnalysis: React.FC = () => {
       <section className="mb-16">
 
         <h2 className="text-xl font-semibold text-gray-700 mb-4 text-center">
-          📘 Purchase Analysis
+          Purchase Analysis
         </h2>
 
         <div className="bg-white rounded-xl shadow">
@@ -48,7 +48,7 @@ const GSTAnalysis: React.FC = () => {
       <section className="mb-10">
 
         <h2 className="text-xl font-semibold text-gray-700 mb-4 text-center">
-          📕 Sales Analysis
+          Sales Analysis
         </h2>
 
         <div className="bg-white rounded-xl shadow">

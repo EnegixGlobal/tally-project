@@ -1,4 +1,6 @@
 import React, { useState, useEffect } from "react";
+import { Printer } from "lucide-react";
+
 const GSTSales: React.FC = () => {
 
     const company_id = localStorage.getItem("company_id");
@@ -56,6 +58,15 @@ const GSTSales: React.FC = () => {
     return (
         <>
 
+            <div className="flex justify-end mb-4 print:hidden">
+                <button
+                    onClick={() => window.print()}
+                    className="flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded hover:bg-gray-700 transition"
+                >
+                    <Printer size={18} />
+                </button>
+            </div>
+
             {/* ================= Sales Table ================= */}
 
             <div className="mt-6 overflow-x-auto shadow-lg rounded-lg bg-white">
@@ -82,7 +93,7 @@ const GSTSales: React.FC = () => {
 
                             {/* Intra State Sales Group */}
                             <th
-                                colSpan={intraSalesLedgers.length || 1}
+                                colSpan={(intraSalesLedgers.length || 1) + 1}
                                 className="border border-gray-600 px-3 py-2"
                             >
                                 Sales (Intra State)
@@ -90,19 +101,10 @@ const GSTSales: React.FC = () => {
 
                             {/* Inter State Sales Group */}
                             <th
-                                colSpan={interSalesLedgers.length || 1}
+                                colSpan={(interSalesLedgers.length || 1) + 1}
                                 className="border border-gray-600 px-3 py-2"
                             >
                                 Sales (Inter State)
-                            </th>
-
-
-                            {/* Total Sales */}
-                            <th
-                                rowSpan={2}
-                                className="border border-gray-600 px-3 py-2"
-                            >
-                                Total
                             </th>
 
                         </tr>
@@ -124,6 +126,10 @@ const GSTSales: React.FC = () => {
                             ) : (
                                 <th className="border border-gray-600 px-3 py-2">-</th>
                             )}
+                            {/* Intra Sales Total */}
+                            <th className="border border-gray-600 px-3 py-2 font-semibold">
+                                Total
+                            </th>
 
                             {/* Inter Sales Ledgers */}
                             {interSalesLedgers.length > 0 ? (
@@ -138,6 +144,10 @@ const GSTSales: React.FC = () => {
                             ) : (
                                 <th className="border border-gray-600 px-3 py-2">-</th>
                             )}
+                            {/* Inter Sales Total */}
+                            <th className="border border-gray-600 px-3 py-2 font-semibold">
+                                Total
+                            </th>
 
                         </tr>
                     </thead>
@@ -175,6 +185,10 @@ const GSTSales: React.FC = () => {
                                     ) : (
                                         <td className="border border-gray-300 px-3 py-2">-</td>
                                     )}
+                                    {/* Intra Sales Total */}
+                                    <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
+                                        {mData.totalIntraSales ? Number(mData.totalIntraSales).toFixed(2) : ""}
+                                    </td>
 
                                     {/* Inter Sales Columns */}
                                     {interSalesLedgers.length > 0 ? (
@@ -192,14 +206,9 @@ const GSTSales: React.FC = () => {
                                     ) : (
                                         <td className="border border-gray-300 px-3 py-2">-</td>
                                     )}
-
-
-                                    {/* Total Sales (Intra + Inter) */}
+                                    {/* Inter Sales Total */}
                                     <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
-                                        {(() => {
-                                            const total = (Number(mData.totalIntraSales) || 0) + (Number(mData.totalInterSales) || 0);
-                                            return total ? total.toFixed(2) : "";
-                                        })()}
+                                        {mData.totalInterSales ? Number(mData.totalInterSales).toFixed(2) : ""}
                                     </td>
 
                                 </tr>
@@ -229,6 +238,13 @@ const GSTSales: React.FC = () => {
                             ) : (
                                 <td className="border border-gray-600 px-3 py-2">-</td>
                             )}
+                            {/* Grand Total Intra */}
+                            <td className="border border-gray-600 px-3 py-2">
+                                {(() => {
+                                    const total = months.reduce((acc, month) => acc + (Number(monthlyData[month]?.totalIntraSales) || 0), 0);
+                                    return total ? total.toFixed(2) : "";
+                                })()}
+                            </td>
 
                             {/* Inter Sales Vertical Totals */}
                             {interSalesLedgers.length > 0 ? (
@@ -246,15 +262,10 @@ const GSTSales: React.FC = () => {
                             ) : (
                                 <td className="border border-gray-600 px-3 py-2">-</td>
                             )}
-
-                            {/* Total Sales Grand Total */}
+                            {/* Grand Total Inter */}
                             <td className="border border-gray-600 px-3 py-2">
                                 {(() => {
-                                    const total = months.reduce((acc, month) => {
-                                        const mData = monthlyData[month] || {};
-                                        const monthTotal = (Number(mData.totalIntraSales) || 0) + (Number(mData.totalInterSales) || 0);
-                                        return acc + monthTotal;
-                                    }, 0);
+                                    const total = months.reduce((acc, month) => acc + (Number(monthlyData[month]?.totalInterSales) || 0), 0);
                                     return total ? total.toFixed(2) : "";
                                 })()}
                             </td>
@@ -527,7 +538,15 @@ const GSTSales: React.FC = () => {
                                 rowSpan={2}
                                 className="border border-gray-600 px-3 py-2"
                             >
-                                Total
+                                Total (IGST)
+                            </th>
+
+                            {/* Tax Summary Group */}
+                            <th
+                                colSpan={4}
+                                className="border border-gray-600 px-3 py-2"
+                            >
+                                Total (cgst,sgst,igst) 
                             </th>
 
                         </tr>
@@ -549,6 +568,12 @@ const GSTSales: React.FC = () => {
                             ) : (
                                 <th className="border border-gray-600 px-3 py-2">-</th>
                             )}
+
+                            {/* Tax Summary Headers */}
+                            <th className="border border-gray-600 px-3 py-2">CGST</th>
+                            <th className="border border-gray-600 px-3 py-2">SGST</th>
+                            <th className="border border-gray-600 px-3 py-2">IGST</th>
+                            <th className="border border-gray-600 px-3 py-2">Total</th>
 
                         </tr>
                     </thead>
@@ -592,6 +617,23 @@ const GSTSales: React.FC = () => {
                                         {mData.totalIGST ? Number(mData.totalIGST).toFixed(2) : ""}
                                     </td>
 
+                                    {/* Tax Summary Columns */}
+                                    <td className="border border-gray-300 px-3 py-2">
+                                        {mData.totalCGST ? Number(mData.totalCGST).toFixed(2) : ""}
+                                    </td>
+                                    <td className="border border-gray-300 px-3 py-2">
+                                        {mData.totalSGST ? Number(mData.totalSGST).toFixed(2) : ""}
+                                    </td>
+                                    <td className="border border-gray-300 px-3 py-2">
+                                        {mData.totalIGST ? Number(mData.totalIGST).toFixed(2) : ""}
+                                    </td>
+                                    <td className="border border-gray-300 px-3 py-2 font-bold bg-gray-100">
+                                        {(() => {
+                                            const total = (Number(mData.totalCGST) || 0) + (Number(mData.totalSGST) || 0) + (Number(mData.totalIGST) || 0);
+                                            return total ? total.toFixed(2) : "";
+                                        })()}
+                                    </td>
+
                                 </tr>
                             );
                         })}
@@ -624,6 +666,40 @@ const GSTSales: React.FC = () => {
                             <td className="border border-gray-600 px-3 py-2">
                                 {(() => {
                                     const total = months.reduce((acc, month) => acc + (monthlyData[month]?.totalIGST || 0), 0);
+                                    return total ? total.toFixed(2) : "";
+                                })()}
+                            </td>
+
+                            {/* Tax Summary Vertical Totals */}
+                            {/* CGST */}
+                            <td className="border border-gray-600 px-3 py-2">
+                                {(() => {
+                                    const total = months.reduce((acc, month) => acc + (Number(monthlyData[month]?.totalCGST) || 0), 0);
+                                    return total ? total.toFixed(2) : "";
+                                })()}
+                            </td>
+                            {/* SGST */}
+                            <td className="border border-gray-600 px-3 py-2">
+                                {(() => {
+                                    const total = months.reduce((acc, month) => acc + (Number(monthlyData[month]?.totalSGST) || 0), 0);
+                                    return total ? total.toFixed(2) : "";
+                                })()}
+                            </td>
+                            {/* IGST */}
+                            <td className="border border-gray-600 px-3 py-2">
+                                {(() => {
+                                    const total = months.reduce((acc, month) => acc + (Number(monthlyData[month]?.totalIGST) || 0), 0);
+                                    return total ? total.toFixed(2) : "";
+                                })()}
+                            </td>
+                            {/* Grand Tax Total */}
+                            <td className="border border-gray-600 px-3 py-2 text-yellow-500">
+                                {(() => {
+                                    const total = months.reduce((acc, month) => {
+                                        const mData = monthlyData[month] || {};
+                                        const rowTotal = (Number(mData.totalCGST) || 0) + (Number(mData.totalSGST) || 0) + (Number(mData.totalIGST) || 0);
+                                        return acc + rowTotal;
+                                    }, 0);
                                     return total ? total.toFixed(2) : "";
                                 })()}
                             </td>
