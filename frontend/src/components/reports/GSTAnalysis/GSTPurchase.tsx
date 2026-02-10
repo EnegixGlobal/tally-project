@@ -118,13 +118,7 @@ const GSTPurchase: React.FC = () => {
                 </th>
 
 
-                {/* IGST Group */}
-                <th
-                  colSpan={(igstLedgers.length || 1) + 1}
-                  className="border border-gray-600 px-3 py-2"
-                >
-                  IGST
-                </th>
+
 
               </tr>
 
@@ -147,24 +141,7 @@ const GSTPurchase: React.FC = () => {
                 )}
 
 
-                {/* IGST Ledgers */}
-                {igstLedgers.length > 0 ? (
-                  igstLedgers.map((ledger) => (
-                    <th
-                      key={ledger.id}
-                      className="border border-gray-600 px-3 py-2 whitespace-nowrap"
-                    >
-                      {ledger.name}
-                    </th>
-                  ))
-                ) : (
-                  <th className="border border-gray-600 px-3 py-2">-</th>
-                )}
 
-                {/* Total IGST */}
-                <th className="border border-gray-600 px-3 py-2 font-semibold">
-                  Total IGST
-                </th>
               </tr>
             </thead>
             {/* ================= BODY ================= */}
@@ -209,28 +186,7 @@ const GSTPurchase: React.FC = () => {
                     </td>
 
 
-                    {/* IGST Columns */}
-                    {igstLedgers.length > 0 ? (
-                      igstLedgers.map((ledger) => {
-                        const val = iData[ledger.id] ? Number(iData[ledger.id]) : 0;
-                        return (
-                          <td
-                            key={ledger.id}
-                            className="border border-gray-300 px-3 py-2"
-                          >
-                            {val ? val.toFixed(2) : ""}
-                          </td>
-                        )
-                      })
-                    ) : (
-                      <td className="border border-gray-300 px-3 py-2">-</td>
-                    )}
 
-
-                    {/* Total IGST */}
-                    <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
-                      {mData.totalIGST ? Number(mData.totalIGST).toFixed(2) : ""}
-                    </td>
 
                   </tr>
                 );
@@ -265,27 +221,7 @@ const GSTPurchase: React.FC = () => {
                   {months.reduce((acc, month) => acc + (monthlyData[month]?.totalPurchase || 0), 0).toFixed(2)}
                 </td>
 
-                {/* IGST Vertical Totals */}
-                {igstLedgers.length > 0 ? (
-                  igstLedgers.map((ledger) => {
-                    const total = months.reduce((acc, month) => {
-                      const val = monthlyData[month]?.igst?.[ledger.id] || 0;
-                      return acc + Number(val);
-                    }, 0);
-                    return (
-                      <td key={ledger.id} className="border border-gray-600 px-3 py-2">
-                        {total ? total.toFixed(2) : ""}
-                      </td>
-                    );
-                  })
-                ) : (
-                  <td className="border border-gray-600 px-3 py-2">-</td>
-                )}
 
-                {/* Total IGST Grand Total */}
-                <td className="border border-gray-600 px-3 py-2">
-                  {months.reduce((acc, month) => acc + (monthlyData[month]?.totalIGST || 0), 0).toFixed(2)}
-                </td>
 
               </tr>
             </tfoot>
@@ -340,6 +276,8 @@ const GSTPurchase: React.FC = () => {
                   SGST
                 </th>
 
+
+
               </tr>
 
 
@@ -386,6 +324,8 @@ const GSTPurchase: React.FC = () => {
                 <th className="border border-gray-600 px-3 py-2 font-semibold">
                   Total
                 </th>
+
+
 
               </tr>
 
@@ -447,6 +387,8 @@ const GSTPurchase: React.FC = () => {
                     <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
                       {mData.totalSGST ? Number(mData.totalSGST).toFixed(2) : ""}
                     </td>
+
+
                   </tr>
                 )
               })}
@@ -502,11 +444,157 @@ const GSTPurchase: React.FC = () => {
                   {months.reduce((acc, month) => acc + (monthlyData[month]?.totalSGST || 0), 0).toFixed(2)}
                 </td>
 
+
+
               </tr>
             </tfoot>
 
           </table>
 
+        </div>
+
+        {/* ================= IGST Detail ================= */}
+
+        <div className="mt-10 mb-10 overflow-x-auto shadow-lg rounded-lg bg-white">
+
+          <h2 className="text-xl font-semibold p-4 text-center bg-gray-50 border-b">
+            IGST Detail
+          </h2>
+
+          <table className="w-full border-collapse text-center text-sm">
+
+            {/* ================= HEADER ================= */}
+
+            <thead className="bg-gray-800 text-white">
+
+              {/* Row 1 */}
+              <tr>
+
+                {/* Month */}
+                <th
+                  rowSpan={2}
+                  className="border border-gray-600 px-3 py-2"
+                >
+                  Month
+                </th>
+
+
+                {/* IGST Group */}
+                <th
+                  colSpan={igstLedgers.length || 1}
+                  className="border border-gray-600 px-3 py-2"
+                >
+                  IGST
+                </th>
+
+
+                {/* Total IGST */}
+                <th
+                  rowSpan={2}
+                  className="border border-gray-600 px-3 py-2"
+                >
+                  Total
+                </th>
+
+              </tr>
+
+
+              {/* Row 2 */}
+              <tr>
+
+                {/* IGST Ledgers */}
+                {igstLedgers.length > 0 ? (
+                  igstLedgers.map((ledger) => (
+                    <th
+                      key={ledger.id}
+                      className="border border-gray-600 px-3 py-2 whitespace-nowrap"
+                    >
+                      {ledger.name}
+                    </th>
+                  ))
+                ) : (
+                  <th className="border border-gray-600 px-3 py-2">-</th>
+                )}
+
+              </tr>
+            </thead>
+            {/* ================= BODY ================= */}
+
+            <tbody>
+
+              {months.map((month) => {
+                const mData = monthlyData[month] || {};
+                const iData = mData.igst || {};
+
+                return (
+                  <tr key={month} className="odd:bg-white even:bg-gray-50 hover:bg-gray-200 transition-colors">
+
+                    {/* Month */}
+                    <td className="border border-gray-300 px-3 py-2 font-medium">
+                      {month}
+                    </td>
+
+
+                    {/* IGST Columns */}
+                    {igstLedgers.length > 0 ? (
+                      igstLedgers.map((ledger) => {
+                        const val = iData[ledger.id] ? Number(iData[ledger.id]) : 0;
+                        return (
+                          <td
+                            key={ledger.id}
+                            className="border border-gray-300 px-3 py-2"
+                          >
+                            {val ? val.toFixed(2) : ""}
+                          </td>
+                        )
+                      })
+                    ) : (
+                      <td className="border border-gray-300 px-3 py-2">-</td>
+                    )}
+
+
+                    {/* Total IGST */}
+                    <td className="border border-gray-300 px-3 py-2 font-semibold bg-gray-100">
+                      {mData.totalIGST ? Number(mData.totalIGST).toFixed(2) : ""}
+                    </td>
+
+                  </tr>
+                );
+              })}
+
+            </tbody>
+
+            {/* ================= FOOTER ================= */}
+            <tfoot className="bg-gray-800 text-white font-bold">
+              <tr>
+                <td className="border border-gray-600 px-3 py-2">Grand Total</td>
+
+                {/* IGST Vertical Totals */}
+                {igstLedgers.length > 0 ? (
+                  igstLedgers.map((ledger) => {
+                    const total = months.reduce((acc, month) => {
+                      const val = monthlyData[month]?.igst?.[ledger.id] || 0;
+                      return acc + Number(val);
+                    }, 0);
+                    return (
+                      <td key={ledger.id} className="border border-gray-600 px-3 py-2">
+                        {total ? total.toFixed(2) : ""}
+                      </td>
+                    );
+                  })
+                ) : (
+                  <td className="border border-gray-600 px-3 py-2">-</td>
+                )}
+
+                {/* Total IGST Grand Total */}
+                <td className="border border-gray-600 px-3 py-2">
+                  {months.reduce((acc, month) => acc + (monthlyData[month]?.totalIGST || 0), 0).toFixed(2)}
+                </td>
+
+              </tr>
+            </tfoot>
+
+          </table>
         </div>
       </div>
 
