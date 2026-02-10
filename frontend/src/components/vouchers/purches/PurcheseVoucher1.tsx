@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useCallback } from "react";
+import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useReactToPrint } from "react-to-print";
 
 import { useAppContext } from "../../../context/AppContext";
@@ -211,9 +211,16 @@ const PurchaseVoucher: React.FC = () => {
     String(l.groupName).toLowerCase().includes("purchase accounts")
   );
 
-  const tdsLedgers = ledgers.filter((l) =>
+  const tdsLedgers = useMemo(() => ledgers.filter((l) =>
     String(l.name).toUpperCase().includes("TDS")
-  );
+  ), [ledgers]);
+
+  // Auto-select TDS Ledger if only one exists
+  useEffect(() => {
+    if (tdsLedgers.length === 1 && !formData.tdsLedgerId) {
+      setFormData((prev) => ({ ...prev, tdsLedgerId: String(tdsLedgers[0].id) }));
+    }
+  }, [tdsLedgers]);
 
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const { id } = useParams();
