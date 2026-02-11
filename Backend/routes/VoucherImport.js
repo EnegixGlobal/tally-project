@@ -680,4 +680,446 @@ router.post("/sales_import", async (req, res) => {
         });
     }
 });
+
+// =========================================
+// PAYMENT EXCEL IMPORT
+// =========================================
+
+router.post("/payment_import", async (req, res) => {
+
+    try {
+        const { rows, companyId, ownerType, ownerId } = req.body;
+
+        console.log("Rows:", rows?.length);
+
+        // ================= VALIDATION =================
+
+        if (!rows || !rows.length) {
+            return res.status(400).json({
+                success: false,
+                message: "No data received",
+            });
+        }
+
+        if (!companyId || !ownerType || !ownerId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized",
+            });
+        }
+
+        // ================= LOAD LEDGERS =================
+
+        const [ledgers] = await db.execute(
+            "SELECT id, name FROM ledgers WHERE company_id=?",
+            [companyId]
+        );
+
+        const ledgerMap = {};
+
+        ledgers.forEach((l) => {
+            ledgerMap[l.name.toLowerCase().trim()] = l.id;
+        });
+
+        const errors = [];
+        const saved = [];
+
+        // ================= PROCESS ROWS =================
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+
+            const date = row.Date;
+
+            const referenceNo =
+                row["Reference No"] || row["Voucher No"] || null;
+
+            const paidToName = row["Paid To"]
+                ? String(row["Paid To"]).toLowerCase().trim()
+                : "";
+
+            const modeName = row["Payment Mode"]
+                ? String(row["Payment Mode"]).toLowerCase().trim()
+                : "";
+
+            const amount = Number(row.Amount || 0);
+
+            const chequeNo = row["Cheque Number"] || null;
+            const bankName = row["Bank Name"] || null;
+
+            // ================= BASIC VALIDATION =================
+
+            if (!date || !paidToName || !modeName || !amount) {
+                errors.push(
+                    `Row ${i + 2}: Date, Paid To, Payment Mode, Amount are required`
+                );
+                continue;
+            }
+
+            // ================= LEDGER MATCH =================
+
+            const debitLedgerId = ledgerMap[paidToName];
+            const creditLedgerId = ledgerMap[modeName];
+
+            if (!debitLedgerId) {
+                errors.push(
+                    `Row ${i + 2}: Paid To ledger not found (${row["Paid To"]})`
+                );
+                continue;
+            }
+
+            if (!creditLedgerId) {
+                errors.push(
+                    `Row ${i + 2}: Payment Mode ledger not found (${row["Payment Mode"]})`
+                );
+                continue;
+            }
+
+            // ================= GENERATE VOUCHER =================
+
+            const voucherNumber = await generateVoucherNumber({
+                companyId,
+                ownerType,
+                ownerId,
+                voucherType: "payment",
+                date,
+            });
+
+            // ================= INSERT MAIN =================
+
+            const [mainResult] = await db.execute(
+                `
+        INSERT INTO voucher_main
+        (
+          voucher_type,
+          voucher_number,
+          date,
+          narration,
+          reference_no,
+          supplier_invoice_date,
+          owner_type,
+          owner_id,
+          company_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+                [
+                    "payment",
+                    voucherNumber,
+                    date,
+
+                    null, // ❌ No narration
+
+                    referenceNo,
+
+                    date, // ✅ SAME DATE → supplier_invoice_date
+
+                    ownerType,
+                    ownerId,
+                    companyId,
+                ]
+            );
+
+            const voucherId = mainResult.insertId;
+
+            // ================= INSERT ENTRIES =================
+            // Payment = Debit Party + Credit Cash/Bank
+
+            const entryValues = [
+                // -------- Debit (Party) --------
+                [
+                    voucherId,
+                    debitLedgerId,
+                    row["Paid To"],
+
+                    amount,
+                    "debit",
+
+                    null, // narration
+
+                    null,
+                    null,
+                    null,
+                ],
+
+                // -------- Credit (Cash/Bank) --------
+                [
+                    voucherId,
+                    creditLedgerId,
+                    row["Payment Mode"],
+
+                    amount,
+                    "credit",
+
+                    null, // narration
+
+                    bankName,
+                    chequeNo,
+                    null,
+                ],
+            ];
+
+            await db.query(
+                `
+        INSERT INTO voucher_entries
+        (
+          voucher_id,
+          ledger_id,
+          ledger_name,
+          amount,
+          entry_type,
+          narration,
+          bank_name,
+          cheque_number,
+          cost_centre_id
+        )
+        VALUES ?
+        `,
+                [entryValues]
+            );
+
+            saved.push(voucherNumber);
+        }
+
+        // ================= RESPONSE =================
+
+        return res.json({
+            success: errors.length === 0,
+            imported: saved.length,
+            vouchers: saved,
+            errors,
+        });
+    } catch (error) {
+        console.error("❌ Payment Import Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Import failed",
+            error: error.message,
+        });
+    }
+});
+
+
+// =========================================
+// RECEIPT EXCEL IMPORT
+// =========================================
+
+
+router.post("/receipt_import", async (req, res) => {
+
+
+    try {
+        const { rows, companyId, ownerType, ownerId } = req.body;
+
+        console.log("Rows:", rows?.length);
+
+        // ================= VALIDATION =================
+
+        if (!rows || !rows.length) {
+            return res.status(400).json({
+                success: false,
+                message: "No data received",
+            });
+        }
+
+        if (!companyId || !ownerType || !ownerId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized",
+            });
+        }
+
+        // ================= LOAD LEDGERS =================
+
+        const [ledgers] = await db.execute(
+            "SELECT id, name FROM ledgers WHERE company_id=?",
+            [companyId]
+        );
+
+        const ledgerMap = {};
+
+        ledgers.forEach((l) => {
+            ledgerMap[l.name.toLowerCase().trim()] = l.id;
+        });
+
+        const errors = [];
+        const saved = [];
+
+        // ================= PROCESS ROWS =================
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+
+            const date = row.Date;
+
+            const referenceNo =
+                row["Reference No"] || row["Voucher No"] || null;
+
+            const partyName = row["Paid To"]
+                ? String(row["Paid To"]).toLowerCase().trim()
+                : "";
+
+            const modeName = row["Payment Mode"]
+                ? String(row["Payment Mode"]).toLowerCase().trim()
+                : "";
+
+            const amount = Number(row.Amount || 0);
+
+            // ================= BASIC VALIDATION =================
+
+            if (!date || !partyName || !modeName || !amount) {
+                errors.push(
+                    `Row ${i + 2}: Date, Paid To, Payment Mode, Amount are required`
+                );
+                continue;
+            }
+
+            // ================= LEDGER MATCH =================
+
+            // Receipt: Credit = Party | Debit = Cash/Bank
+
+            const creditLedgerId = ledgerMap[partyName];
+            const debitLedgerId = ledgerMap[modeName];
+
+            if (!creditLedgerId) {
+                errors.push(
+                    `Row ${i + 2}: Party ledger not found (${row["Paid To"]})`
+                );
+                continue;
+            }
+
+            if (!debitLedgerId) {
+                errors.push(
+                    `Row ${i + 2}: Payment Mode ledger not found (${row["Payment Mode"]})`
+                );
+                continue;
+            }
+
+            // ================= GENERATE VOUCHER =================
+
+            const voucherNumber = await generateVoucherNumber({
+                companyId,
+                ownerType,
+                ownerId,
+                voucherType: "receipt",
+                date,
+            });
+
+            // ================= INSERT MAIN =================
+
+            const [mainResult] = await db.execute(
+                `
+        INSERT INTO voucher_main
+        (
+          voucher_type,
+          voucher_number,
+          date,
+          narration,
+          reference_no,
+          supplier_invoice_date,
+          owner_type,
+          owner_id,
+          company_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+        `,
+                [
+                    "receipt",
+                    voucherNumber,
+                    date,
+
+                    null, // ❌ No narration
+
+                    referenceNo,
+
+                    date, // ✅ Same date → supplier_invoice_date
+
+                    ownerType,
+                    ownerId,
+                    companyId,
+                ]
+            );
+
+            const voucherId = mainResult.insertId;
+
+            // ================= INSERT ENTRIES =================
+            // Receipt = Credit Party + Debit Cash/Bank
+
+            const entryValues = [
+                // -------- Credit (Party) --------
+                [
+                    voucherId,
+                    creditLedgerId,
+                    row["Paid To"],
+
+                    amount,
+                    "credit",
+
+                    null, // narration
+
+                    null,
+                    null,
+                    null,
+                ],
+
+                // -------- Debit (Cash/Bank) --------
+                [
+                    voucherId,
+                    debitLedgerId,
+                    row["Payment Mode"],
+
+                    amount,
+                    "debit",
+
+                    null, // narration
+
+                    null,
+                    null,
+                    null,
+                ],
+            ];
+
+            await db.query(
+                `
+        INSERT INTO voucher_entries
+        (
+          voucher_id,
+          ledger_id,
+          ledger_name,
+          amount,
+          entry_type,
+          narration,
+          bank_name,
+          cheque_number,
+          cost_centre_id
+        )
+        VALUES ?
+        `,
+                [entryValues]
+            );
+
+            saved.push(voucherNumber);
+        }
+
+        // ================= RESPONSE =================
+
+        return res.json({
+            success: errors.length === 0,
+            imported: saved.length,
+            vouchers: saved,
+            errors,
+        });
+    } catch (error) {
+        console.error("❌ Receipt Import Error:", error);
+
+        return res.status(500).json({
+            success: false,
+            message: "Import failed",
+            error: error.message,
+        });
+    }
+});
+
+
 module.exports = router;

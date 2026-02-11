@@ -166,48 +166,58 @@ const VoucherImport: React.FC = () => {
     },
 
     {
-      name: "Payment Voucher Template",
+      name: "Payment Voucher (No Narration)",
       type: "payment",
-      description: "Import payment vouchers",
+
+      description:
+        "Import payment vouchers exactly like manual form (without narration)",
+
       fields: [
         "Date",
-        "Voucher No",
+        "Mode",
+        "Reference No",
         "Paid To",
-        "Amount",
         "Payment Mode",
-        "Narration",
+        "Amount",
+
       ],
+
       sampleData: [
         {
-          Date: "15/01/2024",
-          "Voucher No": "PAY001",
+          Date: "2024-01-15",
+          Mode: "single-entry",
+          "Reference No": "REF001",
           "Paid To": "Office Rent",
+          "Payment Mode": "HDFC Bank",
           Amount: 25000,
-          "Payment Mode": "Cash",
-          Narration: "Monthly office rent payment",
         },
       ],
-    },
+    }
+
+    ,
+
+
     {
       name: "Receipt Voucher Template",
       type: "receipt",
       description: "Import receipt vouchers",
-      fields: [
+       fields: [
         "Date",
-        "Voucher No",
-        "Received From",
+        "Mode",
+        "Reference No",
+        "Paid To",
+        "Payment Mode",
         "Amount",
-        "Receipt Mode",
-        "Narration",
+
       ],
-      sampleData: [
+     sampleData: [
         {
-          Date: "15/01/2024",
-          "Voucher No": "REC001",
-          "Received From": "Customer Payment",
-          Amount: 50000,
-          "Receipt Mode": "Bank",
-          Narration: "Payment received from customer",
+          Date: "2024-01-15",
+          Mode: "single-entry",
+          "Reference No": "REF001",
+          "Paid To": "Office Rent",
+          "Payment Mode": "HDFC Bank",
+          Amount: 25000,
         },
       ],
     },
@@ -339,10 +349,25 @@ const VoucherImport: React.FC = () => {
 
       console.log("📤 Sending Import Data:", payload);
 
-      const endpoint =
-        selectedTemplate === "sales"
-          ? `${import.meta.env.VITE_API_URL}/api/sales_import`
-          : `${import.meta.env.VITE_API_URL}/api/purchase_import`;
+      let endpoint = "";
+      switch (selectedTemplate) {
+        case "sales":
+          endpoint = `${import.meta.env.VITE_API_URL}/api/sales_import`;
+          break;
+        case "purchase":
+          endpoint = `${import.meta.env.VITE_API_URL}/api/purchase_import`;
+          break;
+        case "payment":
+          endpoint = `${import.meta.env.VITE_API_URL}/api/payment_import`;
+          break;
+        case "receipt":
+          endpoint = `${import.meta.env.VITE_API_URL}/api/receipt_import`;
+          break;
+        default:
+          alert("Invalid template selected");
+          setIsProcessing(false);
+          return;
+      }
 
       const res = await fetch(endpoint, {
         method: "POST",
