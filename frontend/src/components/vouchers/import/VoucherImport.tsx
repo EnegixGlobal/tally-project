@@ -65,62 +65,106 @@ const VoucherImport: React.FC = () => {
       description: "Import sales invoices with item details",
       fields: [
         "Date",
-        "Voucher No",
         "Party Name",
+        "Reference No",
         "Item Name",
+        "Batch No",
+        "Quantity",
         "Quantity",
         "Rate",
         "Amount",
         "HSN Code",
-        "GST Rate",
-        "Narration",
+
+        // GST (Fill Either One)
+        "CGST Rate",
+        "SGST Rate",
+        "IGST Rate",
+
+        // Ledger Mapping
+        "Sales Ledger",
+        "CGST Ledger",
+        "SGST Ledger",
+        "IGST Ledger",
       ],
       sampleData: [
         {
           Date: "15/01/2024",
-          "Voucher No": "SAL001",
           "Party Name": "ABC Electronics",
+          "Reference No": "REF001",
           "Item Name": "Laptop HP",
           Quantity: 2,
           Rate: 45000,
           Amount: 90000,
           "HSN Code": "8471",
-          "GST Rate": 18,
-          Narration: "Sales to ABC Electronics",
+          "CGST Rate": 9,
+          "SGST Rate": 9,
+          "IGST Rate": 0,
+          "Sales Ledger": "Sales @ 18%",
+          "CGST Ledger": "CGST 9%",
+          "SGST Ledger": "SGST 9%",
+          "IGST Ledger": "",
+          "Batch No": "BATCH-001",
         },
       ],
     },
     {
       name: "Purchase Voucher Template",
       type: "purchase",
-      description: "Import purchase invoices with supplier details",
+      description: "Import purchase invoices with auto voucher & GST handling",
+
       fields: [
         "Date",
-        "Voucher No",
+
         "Supplier Name",
+        "Reference No", // Added Reference No
+
         "Item Name",
+        "Batch No",
+        "Quantity",
         "Quantity",
         "Rate",
         "Amount",
         "HSN Code",
-        "GST Rate",
-        "Narration",
+
+        // GST (Fill Either One)
+        "CGST Rate",
+        "SGST Rate",
+        "IGST Rate",
+
+        // Ledger Mapping
+        "Purchase Ledger",
+        "CGST Ledger",
+        "SGST Ledger",
+        "IGST Ledger",
       ],
+
       sampleData: [
         {
-          Date: "15/01/2024",
-          "Voucher No": "PUR001",
-          "Supplier Name": "Tech Suppliers Ltd",
+          Date: "2024-01-15",
+
+          "Supplier Name": "Mohan Kumar",
+
           "Item Name": "Mobile Phone",
           Quantity: 5,
           Rate: 25000,
           Amount: 125000,
           "HSN Code": "8517",
-          "GST Rate": 18,
-          Narration: "Purchase from Tech Suppliers",
+
+          "CGST Rate": 9,
+          "SGST Rate": 9,
+          "IGST Rate": 0,
+
+          "Purchase Ledger": "18% inter Purchase",
+          "CGST Ledger": "CGST 9%",
+          "SGST Ledger": "SGST 9%",
+          "IGST Ledger": "",
+
+          "Reference No": "REF123",
+          "Batch No": "BATCH-002",
         },
       ],
     },
+
     {
       name: "Payment Voucher Template",
       type: "payment",
@@ -167,7 +211,7 @@ const VoucherImport: React.FC = () => {
         },
       ],
     },
-    
+
   ];
 
   const handleDrag = (e: React.DragEvent) => {
@@ -208,88 +252,40 @@ const VoucherImport: React.FC = () => {
     processFile(file);
   };
 
-const processFile = async (file: File) => {
-  setIsProcessing(true);
+  const processFile = async (file: File) => {
+    setIsProcessing(true);
 
-  console.log("📌 Selected Voucher Type :", selectedTemplate);
+    try {
+      const data = await file.arrayBuffer();
+      const workbook = XLSX.read(data);
+      const sheetName = workbook.SheetNames[0];
+      const worksheet = workbook.Sheets[sheetName];
 
-  try {
-    const data = await file.arrayBuffer();
-    const workbook = XLSX.read(data);
-    const sheetName = workbook.SheetNames[0];
-    const worksheet = workbook.Sheets[sheetName];
-    const jsonData = XLSX.utils.sheet_to_json(worksheet, { defval: "" });
+      // 👇 RAW Excel JSON
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, {
+        defval: "",
+      });
 
-    console.log("📌 Uploaded Excel Data:", jsonData);
+      console.log("📌 Raw Excel Data:", jsonData);
 
-    const processedVouchers: ImportedVoucher[] = (
-      jsonData as Record<string, unknown>[]
-    ).map((row: Record<string, unknown>, index: number) => {
-      try {
-        const getString = (key: string): string => String(row[key] || "");
-        const getNumber = (key: string): number =>
-          typeof row[key] === "number"
-            ? (row[key] as number)
-            : parseFloat(String(row[key] || 0)) || 0;
+      // 🔹 Process Data (Format Dates)
+      const formattedData = (jsonData as any[]).map((row) => ({
+        ...row,
+        Date: formatDate(row["Date"]), // ✅ Fix Date Format here
+      }));
 
-        return {
-          id: `import_${index + 1}`,
-          date: formatDate(row["Date"] || row["date"]),
-          voucherType: selectedTemplate, // 👈 Dropdown wale type se set
-          voucherNumber:
-            getString("Voucher No") ||
-            getString("voucher_no") ||
-            `AUTO${index + 1}`,
-          partyName:
-            getString("Party Name") ||
-            getString("Supplier Name") ||
-            getString("Paid To") ||
-            getString("Received From") ||
-            "Unknown",
-          amount: getNumber("Amount") || getNumber("amount"),
-          narration: getString("Narration") || "",
+      console.log("📌 Processed Excel Data:", formattedData);
 
-          items:
-            selectedTemplate === "sales" ||
-            selectedTemplate === "purchase"
-              ? [
-                  {
-                    itemName: getString("Item Name"),
-                    quantity: getNumber("Quantity"),
-                    rate: getNumber("Rate"),
-                    amount: getNumber("Amount"),
-                    hsnCode: getString("HSN Code"),
-                    gstRate: getNumber("GST Rate"),
-                  },
-                ]
-              : undefined,
+      setImportedVouchers(formattedData);
+      setActiveTab("preview");
+    } catch (err) {
+      console.error("File Read Error:", err);
+      alert("Invalid Excel file!");
+    } finally {
+      setIsProcessing(false);
+    }
+  };
 
-          status: "pending",
-        };
-      } catch (err) {
-        console.error("❌ Row Parse Failed", err);
-        return {
-          id: `import_${index + 1}`,
-          date: "",
-          voucherType: selectedTemplate,
-          voucherNumber: `ERROR${index + 1}`,
-          partyName: "Error",
-          amount: 0,
-          narration: "",
-          status: "error",
-        };
-      }
-    });
-
-    setImportedVouchers(processedVouchers);
-    setActiveTab("preview");
-  } catch (err) {
-    console.error("❌ File Processing Failed:", err);
-    alert("Invalid Excel Format!");
-  } finally {
-    setIsProcessing(false);
-  }
-};
 
 
 
@@ -323,102 +319,58 @@ const processFile = async (file: File) => {
   };
 
 
-const saveImportedVouchers = async () => {
-  setIsProcessing(true);
+  const saveImportedVouchers = async () => {
+    setIsProcessing(true);
 
-  try {
-    const validVouchers = importedVouchers.filter(v => v.status !== "error");
+    try {
+      const companyId = localStorage.getItem("company_id") || "";
+      const ownerType = localStorage.getItem("supplier") || "";
+      const ownerId =
+        localStorage.getItem(
+          ownerType === "employee" ? "employee_id" : "user_id"
+        ) || "";
 
-    const userType = localStorage.getItem("supplier") || "employee";
-    const userId = Number(localStorage.getItem("user_id")) || 1;
-    const companyId = Number(localStorage.getItem("company_id")) || 1;
-
-    for (const voucher of validVouchers) {
-      console.log("▶ Saving Voucher:", voucher);
-
-      let apiUrl = "";
-      const payload: any = {
-        number: voucher.voucherNumber,
-        date: voucher.date,
-        narration: voucher.narration,
-        subtotal: voucher.amount,
-        total: voucher.amount,
-        type: voucher.voucherType,
-
-        // 🔹 Auto Assign user details
+      const payload = {
+        rows: importedVouchers,
         companyId,
-        ownerType: userType,
-        ownerId: userId,
+        ownerType,
+        ownerId,
       };
 
-      // 🔹 Items Mapping for Sales / Purchase Only
-      if (voucher.items && (voucher.voucherType === "sales" || voucher.voucherType === "purchase")) {
-        payload.entries = voucher.items.map(item => ({
-          itemId: 1, // TODO → Auto Item Mapping Later
-          quantity: item.quantity,
-          rate: item.rate,
-          amount: item.amount,
-          cgstRate: item.gstRate ? item.gstRate / 2 : 0,
-          sgstRate: item.gstRate ? item.gstRate / 2 : 0,
-          igstRate: 0,
-          hsnCode: item.hsnCode || "",
-          discount: 0,
-        }));
+      console.log("📤 Sending Import Data:", payload);
 
-        payload.mode = "item-invoice";
-      }
+      const endpoint =
+        selectedTemplate === "sales"
+          ? `${import.meta.env.VITE_API_URL}/api/sales_import`
+          : `${import.meta.env.VITE_API_URL}/api/purchase_import`;
 
-      // 🔹 API URL Detection
-      switch (voucher.voucherType) {
-        case "sales":
-          apiUrl = `${import.meta.env.VITE_API_URL}/api/sales-vouchers`;
-          break;
-        case "purchase":
-          apiUrl = `${import.meta.env.VITE_API_URL}/api/purchase-vouchers`;
-          break;
-        case "payment":
-          apiUrl = `${import.meta.env.VITE_API_URL}/api/vouchers`;
-          break;
-        case "receipt":
-          apiUrl = `${import.meta.env.VITE_API_URL}/api/receipt-vouchers`;
-          break;
-        case "bank":
-          apiUrl = `${import.meta.env.VITE_API_URL}/api/bank-vouchers`;
-          break;
-        default:
-          console.warn("❓ Unknown type:", voucher.voucherType);
-          continue;
-      }
-
-      console.log("📤 Sending →", apiUrl);
-      console.log("📦 Payload:", payload);
-
-      const res = await fetch(apiUrl, {
+      const res = await fetch(endpoint, {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: {
+          "Content-Type": "application/json",
+        },
         body: JSON.stringify(payload),
-      });
+      }
+      );
 
       const result = await res.json();
-      console.log("📥 Response:", result);
+
+      console.log("📥 Import Result:", result);
 
       if (result.success) {
-        voucher.status = "imported";
+        alert(`✅ Imported Successfully: ${result.imported}`);
       } else {
-        voucher.status = "error";
-        voucher.errorMessage = result.message;
+        alert("⚠️ Some rows failed. Check console for errors.");
+        console.log("Errors:", result.errors);
       }
+    } catch (err) {
+      console.error("Import Error:", err);
+      alert("❌ Import Failed!");
+    } finally {
+      setIsProcessing(false);
     }
+  };
 
-    setImportedVouchers([...importedVouchers]);
-    alert("✨ All vouchers saved successfully!");
-  } catch (error) {
-    console.error("❌ Save failed:", error);
-    alert("Error occurred while saving vouchers!");
-  } finally {
-    setIsProcessing(false);
-  }
-};
 
 
 
@@ -482,11 +434,10 @@ const saveImportedVouchers = async () => {
               onClick={() =>
                 setActiveTab(tab.id as "import" | "preview" | "templates")
               }
-              className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${
-                activeTab === tab.id
-                  ? "border-blue-500 text-blue-600"
-                  : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
-              }`}
+              className={`py-2 px-1 border-b-2 font-medium text-sm flex items-center space-x-2 ${activeTab === tab.id
+                ? "border-blue-500 text-blue-600"
+                : "border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300"
+                }`}
             >
               {tab.icon}
               <span>{tab.label}</span>
@@ -519,11 +470,10 @@ const saveImportedVouchers = async () => {
 
           {/* File Upload Area */}
           <div
-            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${
-              dragActive
-                ? "border-blue-500 bg-blue-50"
-                : "border-gray-300 hover:border-gray-400"
-            }`}
+            className={`border-2 border-dashed rounded-lg p-8 text-center transition-colors ${dragActive
+              ? "border-blue-500 bg-blue-50"
+              : "border-gray-300 hover:border-gray-400"
+              }`}
             onDragEnter={handleDrag}
             onDragLeave={handleDrag}
             onDragOver={handleDrag}
@@ -659,70 +609,65 @@ const saveImportedVouchers = async () => {
               <table className="w-full">
                 <thead className="bg-gray-50">
                   <tr>
+                    {/* Status Column (Fixed) */}
                     <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                       Status
                     </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Date
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Voucher No
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Type
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Party
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Amount
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                      Narration
-                    </th>
+
+                    {/* Dynamic Columns from Excel */}
+                    {importedVouchers.length > 0 &&
+                      Object.keys(importedVouchers[0]).map((key) => (
+                        <th
+                          key={key}
+                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                        >
+                          {key}
+                        </th>
+                      ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {importedVouchers.map((voucher) => (
-                    <tr key={voucher.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            voucher.status === "pending"
-                              ? "bg-yellow-100 text-yellow-800"
-                              : voucher.status === "imported"
-                              ? "bg-green-100 text-green-800"
-                              : "bg-red-100 text-red-800"
-                          }`}
+                  {importedVouchers.map((row: any, rowIndex: number) => (
+                    <tr key={rowIndex} className="hover:bg-gray-50">
+                      {/* Status Cell */}
+                      <td className="px-4 py-3 text-sm">
+                        {row.status === "error" ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800">
+                            Error
+                          </span>
+                        ) : row.status === "imported" ? (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                            Imported
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">
+                            Ready
+                          </span>
+                        )}
+                        {row.errorMessage && (
+                          <div className="text-xs text-red-600 mt-1">
+                            {row.errorMessage}
+                          </div>
+                        )}
+                      </td>
+
+                      {/* Dynamic Data Cells */}
+                      {Object.keys(row).map((key, colIndex) => (
+                        <td
+                          key={`${rowIndex}-${colIndex}`}
+                          className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap"
                         >
-                          {voucher.status === "pending"
-                            ? "Ready"
-                            : voucher.status === "imported"
-                            ? "Imported"
-                            : "Error"}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {voucher.date}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {voucher.voucherNumber}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900 capitalize">
-                        {voucher.voucherType}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {voucher.partyName}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        ₹{voucher.amount.toLocaleString()}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-gray-900">
-                        {voucher.narration}
-                      </td>
+                          {key === "Date" || key.includes("Date")
+                            ? formatDate(row[key])
+                            : row[key] !== undefined && row[key] !== null
+                              ? String(row[key])
+                              : "-"}
+                        </td>
+                      ))}
                     </tr>
                   ))}
                 </tbody>
+
               </table>
             </div>
           </div>
