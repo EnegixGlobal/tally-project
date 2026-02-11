@@ -238,6 +238,7 @@ const PurchaseVoucher: React.FC = () => {
       godown: true,
       showReceiptDetails: true,
       tds: true,
+      enableTdsCredit: false,
     }
   );
 
@@ -547,6 +548,53 @@ const PurchaseVoucher: React.FC = () => {
               };
             }) || [],
         }));
+
+        // 🔹 Auto-detect if TDS was Credit (subtracted) or Debit (added)
+        // Re-calculate totals from raw data to check
+        let calcSubtotal = 0;
+        let calcGst = 0;
+        let calcDiscount = 0;
+
+        (data.entries || []).forEach((e: any) => {
+          const qty = Number(e.quantity || 0);
+          const rate = Number(e.rate || 0);
+          const discount = Number(e.discount || 0);
+          const base = qty * rate;
+
+          // GST
+          const cgst = Number(e.cgstRate || 0);
+          const sgst = Number(e.sgstRate || 0);
+          const igst = Number(e.igstRate || 0);
+          const totalTax = cgst + sgst + igst; // assuming simple sum for estimation
+
+          const gstAmt = (base * totalTax) / 100;
+
+          calcSubtotal += base;
+          calcGst += gstAmt;
+          calcDiscount += discount;
+        });
+
+        // Backend might have saved totals, let's use them if available for better accuracy
+        const sTotal = Number(data.subtotal || calcSubtotal);
+        const gTotal = Number(data.cgstTotal || 0) + Number(data.sgstTotal || 0) + Number(data.igstTotal || 0); // or use calculated
+        const dTotal = Number(data.discountTotal || calcDiscount);
+
+        // This is the TDS amount saved
+        const tTotal = Number(data.tdsTotal || 0);
+
+        // Calculate expected Grand Total if Credit (Subtracted)
+        const expectedTotalIfCredit = sTotal + gTotal - dTotal - tTotal;
+
+        // actual saved total
+        const actualTotal = Number(data.total || 0);
+
+        // Check matching (allow small float diff)
+        if (Math.abs(actualTotal - expectedTotalIfCredit) < 1.0) {
+          setVisibleColumns(prev => ({ ...prev, enableTdsCredit: true }));
+        } else {
+          setVisibleColumns(prev => ({ ...prev, enableTdsCredit: false }));
+        }
+
       })
       .catch((err) => console.error("Single voucher fetch error:", err));
   }, [id, isEditMode, stockItems]);
@@ -1483,7 +1531,9 @@ const PurchaseVoucher: React.FC = () => {
         tdsAmount,
         tdsTotal: tdsAmount, // ✅ Added for backend
         tdsRate: tdsRatePercent, // Keep percentage for UI if needed
-        total: totals.total + tdsAmount, // ✅ Added to total (118 + 8 = 126)
+        total: visibleColumns.enableTdsCredit
+          ? totals.total - tdsAmount // ✅ Subtracted (Credit behavior)
+          : totals.total + tdsAmount, // ✅ Added to total (Debit behavior)
       };
     }
     else {
@@ -2131,6 +2181,21 @@ const PurchaseVoucher: React.FC = () => {
                   setVisibleColumns((prev) => ({
                     ...prev,
                     showReceiptDetails: !prev.showReceiptDetails,
+                  }))
+                }
+              />
+            </label>
+
+            <label className="flex justify-between items-center mb-3 p-2 rounded hover:bg-gray-100 dark:hover:bg-gray-700 cursor-pointer transition-colors">
+              <span className="text-sm font-semibold">Enable TDS Credit</span>
+              <input
+                type="checkbox"
+                className="w-5 h-5 rounded text-blue-600 focus:ring-blue-500"
+                checked={visibleColumns.enableTdsCredit}
+                onChange={() =>
+                  setVisibleColumns((prev) => ({
+                    ...prev,
+                    enableTdsCredit: !prev.enableTdsCredit,
                   }))
                 }
               />

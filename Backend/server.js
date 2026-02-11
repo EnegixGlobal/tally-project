@@ -263,6 +263,9 @@ app.use("/api/header/", Header);
 const EwayBill = require("./routes/EwayBill");
 app.use("/api/", EwayBill);
 
+const VoucherImport = require("./routes/VoucherImport");
+app.use("/api/", VoucherImport);
+
 const GstAssisment = require("./routes/GstAssisment");
 app.use("/api/gst-assessment", GstAssisment);
 

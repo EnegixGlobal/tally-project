@@ -314,13 +314,19 @@ router.post("/", async (req, res) => {
 
     // ================= FINAL TOTAL FIX =================
 
-    const finalTotal =
-      Number(subtotal || 0) +
-      Number(finalCgst || 0) +
-      Number(finalSgst || 0) +
-      Number(finalIgst || 0) -
-      Number(discountTotal || 0) +
-      Number(tdsTotal || 0);
+
+    let finalTotal;
+    if (total !== undefined && total !== null) {
+      finalTotal = Number(total);
+    } else {
+      finalTotal =
+        Number(subtotal || 0) +
+        Number(finalCgst || 0) +
+        Number(finalSgst || 0) +
+        Number(finalIgst || 0) -
+        Number(discountTotal || 0) +
+        Number(tdsTotal || 0);
+    }
 
 
     // ================= DISPATCH =================
@@ -972,13 +978,19 @@ router.put("/:id", async (req, res) => {
     }
 
     // ================= FINAL TOTAL FIX =================
-    const finalTotal =
-      Number(subtotal || 0) +
-      Number(finalCgst || 0) +
-      Number(finalSgst || 0) +
-      Number(finalIgst || 0) -
-      Number(discountTotal || 0) +
-      Number(tdsTotal || 0);
+    // ================= FINAL TOTAL FIX =================
+    let finalTotal;
+    if (total !== undefined && total !== null) {
+      finalTotal = Number(total);
+    } else {
+      finalTotal =
+        Number(subtotal || 0) +
+        Number(finalCgst || 0) +
+        Number(finalSgst || 0) +
+        Number(finalIgst || 0) -
+        Number(discountTotal || 0) +
+        Number(tdsTotal || 0);
+    }
 
     // =====================================================================
 

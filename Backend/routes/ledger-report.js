@@ -466,8 +466,26 @@ ORDER BY vm.date ASC
       }
 
       /* ========= TDS ========= */
+      /* ========= TDS ========= */
       else if (currentLedger === Number(pv.tdsRate)) {
-        debit = Number(pv.tdsTotal || 0);
+        // Calculate what the total WOULD be if TDS was subtracted (Credit behavior)
+        const totalIfCredit =
+          Number(pv.subtotal || 0) +
+          Number(pv.cgstTotal || 0) +
+          Number(pv.sgstTotal || 0) +
+          Number(pv.igstTotal || 0) -
+          Number(pv.discountTotal || 0) -
+          Number(pv.tdsTotal || 0);
+
+        // Check if the actual stored total matches this credit calculation
+        // Allowing for small floating point differences
+        const isCredit = Math.abs(Number(pv.total) - totalIfCredit) < 0.01;
+
+        if (isCredit) {
+          credit = Number(pv.tdsTotal || 0); // Show in Credit
+        } else {
+          debit = Number(pv.tdsTotal || 0);  // Show in Debit (Default)
+        }
         particulars = pv.partyName;
       }
 

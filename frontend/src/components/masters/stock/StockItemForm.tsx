@@ -387,6 +387,54 @@ const StockItemForm = () => {
     }
   }, [id]);
 
+  // Handle barcode scanning from POS device
+  useEffect(() => {
+    let buffer = "";
+    let lastKeyTime = Date.now();
+
+    const handleGlobalKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+
+      // Ignore if user is typing in a text input field
+      const isTextInput =
+        target.tagName === "TEXTAREA" ||
+        target.isContentEditable ||
+        (target.tagName === "INPUT" &&
+          !["checkbox", "radio", "button", "submit", "reset", "image", "file"].includes((target as HTMLInputElement).type));
+
+      if (isTextInput) return;
+
+      const currentTime = Date.now();
+
+      // Reset buffer if keystrokes are too slow (manual typing vs scanner speed)
+      if (currentTime - lastKeyTime > 100) {
+        buffer = "";
+      }
+      lastKeyTime = currentTime;
+
+      if (e.key === "Enter") {
+        if (buffer.length > 3) { // Minimum length to avoid accidental simple Enters
+          e.preventDefault(); // Prevent form submission
+          setBarcode(buffer);
+          Swal.fire({
+            toast: true,
+            position: 'top-end',
+            icon: 'success',
+            title: 'Barcode Scanned',
+            showConfirmButton: false,
+            timer: 1500
+          });
+          buffer = "";
+        }
+      } else if (e.key.length === 1) { // Capture printable characters
+        buffer += e.key;
+      }
+    };
+
+    window.addEventListener("keydown", handleGlobalKeyDown);
+    return () => window.removeEventListener("keydown", handleGlobalKeyDown);
+  }, []);
+
   interface FormData {
     name: string;
     stockGroupId: string;
@@ -1046,7 +1094,7 @@ const StockItemForm = () => {
 
             {/* ---------------------------------------------------------------- */}
 
-            <div>
+            <div className="flex flex-col gap-2">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input
                   type="checkbox"
@@ -1057,12 +1105,36 @@ const StockItemForm = () => {
                 />
                 Allow Negative Stock
               </label>
+
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input
+                  type="checkbox"
+                  checked={barcode === ""}
+                  onChange={(e) => {
+                    if (e.target.checked) {
+                      setBarcode(""); // Clear for scanning
+                    } else {
+                      setBarcode(generateEAN13()); // Regenerate
+                    }
+                  }}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                Scan Barcode with POS (Clear & Scan)
+              </label>
             </div>
-            <div></div>
-            {barcode && (
-              <div className="mb-4">
-                <h3>Generated Barcode</h3>
-                <Barcode value={barcode} width={1} height={40} fontSize={16} />
+
+            {barcode ? (
+              <div className="mb-4 mt-2">
+                <h3>{id ? 'Barcode' : 'Generated/Scanned Barcode'}</h3>
+                <div className="border p-2 rounded flex flex-col items-center bg-white">
+                  <Barcode value={barcode} width={1} height={40} fontSize={16} />
+                </div>
+                <p className="text-xs text-xs text-gray-500 mt-1">Scan a barcode with your POS scanner to update automatically.</p>
+              </div>
+            ) : (
+              <div className="mb-4 mt-2 p-4 border border-blue-300 bg-blue-50 rounded text-center">
+                <p className="font-semibold text-blue-700 animate-pulse">Waiting for POS Scan...</p>
+                <p className="text-xs text-blue-600">Please scan the product barcode now.</p>
               </div>
             )}
 
