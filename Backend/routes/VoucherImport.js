@@ -690,8 +690,6 @@ router.post("/payment_import", async (req, res) => {
     try {
         const { rows, companyId, ownerType, ownerId } = req.body;
 
-        console.log("Rows:", rows?.length);
-
         // ================= VALIDATION =================
 
         if (!rows || !rows.length) {

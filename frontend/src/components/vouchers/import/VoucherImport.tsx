@@ -489,7 +489,6 @@ const VoucherImport: React.FC = () => {
               <option value="purchase">Purchase Voucher</option>
               <option value="payment">Payment Voucher</option>
               <option value="receipt">Receipt Voucher</option>
-              <option value="journal">Journal Voucher</option>
             </select>
           </div>
 
