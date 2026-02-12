@@ -21,12 +21,19 @@ interface DayBookEntry {
   credit: number;
   voucherId: string;
   narration?: string;
-  // Item fields
+
+
   itemId?: string;
   quantity?: number;
   rate?: number;
   hsnCode?: string;
+
+
+  isParty?: boolean;
+  isChild?: boolean;
+  amount?: number;
 }
+
 
 interface VoucherGroup {
   voucherId: string;
@@ -1072,7 +1079,7 @@ const DayBook: React.FC = () => {
                                 </td>
 
                                 <td className="px-3 py-2 text-right font-mono">
-                                  {formatCurrency(partyEntry.amount)}
+                                  {formatCurrency(partyEntry.amount ?? 0)}
                                 </td>
                               </tr>
                             )}
