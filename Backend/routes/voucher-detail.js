@@ -172,14 +172,27 @@ router.get("/:id", async (req, res) => {
                         voucher.entries.push({ id: `PUR-SGST-${voucherId}`, ledger_name: `SGST @ ${rate}%`, amount: Number(voucher.sgstTotal), entry_type: 'debit', isChild: true });
                     }
 
-                    // TDS Logic: If Positive (Debit), If Negative (Credit)
+                    // TDS Logic: Check if it was subtracted (Credit) or Added (Debit)
                     if (Number(voucher.tdsTotal) !== 0) {
                         const rate = ((Math.abs(voucher.tdsTotal) / subtotal) * 100).toFixed(2);
+
+                        // Calculate expected total if TDS is Credit (Subtracted)
+                        const totalIfCredit =
+                            Number(voucher.subtotal || 0) +
+                            Number(voucher.cgstTotal || 0) +
+                            Number(voucher.sgstTotal || 0) +
+                            Number(voucher.igstTotal || 0) -
+                            Number(voucher.discountTotal || 0) -
+                            Math.abs(Number(voucher.tdsTotal || 0));
+
+                        // Compare with actual total
+                        const isCredit = Math.abs(Number(voucher.total) - totalIfCredit) < 0.05;
+
                         voucher.entries.push({
                             id: `PUR-TDS-${voucherId}`,
                             ledger_name: `TDS @ ${rate}%`,
                             amount: Math.abs(Number(voucher.tdsTotal)),
-                            entry_type: 'credit',
+                            entry_type: isCredit ? 'credit' : 'debit',
                             isChild: true
                         });
                     }

@@ -1337,24 +1337,7 @@ const LedgerReport: React.FC = () => {
                 >
                   Close
                 </button>
-                <button
-                  onClick={() => {
-                    if (selectedVoucher.voucherType === "Quotation") {
-                      navigate(`/app/vouchers/sales/edit/${selectedVoucher.id.replace('SAL-', '')}`);
-                    } else if (selectedVoucher.voucherType.toLowerCase() === "purchase") {
-                      navigate(`/app/vouchers/purchase/edit/${selectedVoucher.id.replace('PUR-', '')}`);
-                    } else if (selectedVoucher.voucherType.toLowerCase() === "sales") {
-                      navigate(`/app/vouchers/sales/edit/${selectedVoucher.id.replace('SAL-', '')}`);
-                    }
-                    else {
-                      // default
-                      navigate(`/app/vouchers/${selectedVoucher.voucherType.toLowerCase()}/${selectedVoucher.id.split('-')[1]}`);
-                    }
-                  }}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
-                >
-                  Edit Voucher
-                </button>
+
               </div>
             </div>
           </div>
