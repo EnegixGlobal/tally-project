@@ -243,13 +243,7 @@ const ProfitLoss: React.FC = () => {
     }, 0);
   };
 
-  // Calculate closing stock from Stock-in-hand ledgers
-  const getClosingStock = () => {
-    return stockLedgers.reduce((sum, l) => {
-      const balance = Number(l.closing_balance || 0);
-      return sum + balance;
-    }, 0);
-  };
+
 
   // Income calculations
   const getSalesTotal = () => {
@@ -297,6 +291,22 @@ const ProfitLoss: React.FC = () => {
       (sum, item) => sum + (ledgerBalances[item.id]?.debit || 0),
       0
     );
+  };
+
+  // Calculate closing stock: 0 if Opening, Purchase, and Sales are all 0
+  const getClosingStock = () => {
+    const opening = getOpeningStock();
+    const purchase = getPurchaseTotal();
+    const sales = getSalesTotal();
+
+    if (opening === 0 && purchase === 0 && sales === 0) {
+      return 0;
+    }
+
+    return stockLedgers.reduce((sum, l) => {
+      const balance = Number(l.closing_balance || 0);
+      return sum + balance;
+    }, 0);
   };
 
   // Trading Account calculations (Gross Profit/Loss)

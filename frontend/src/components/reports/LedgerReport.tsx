@@ -75,7 +75,7 @@ const LedgerReport: React.FC = () => {
     { key: "03", name: "March" },
   ];
 
-  const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [showFilterPanel, setShowFilterPanel] = useState(true);
   const [viewMode, setViewMode] = useState<"detailed" | "monthly" | "daily">(
     "detailed"
   );
