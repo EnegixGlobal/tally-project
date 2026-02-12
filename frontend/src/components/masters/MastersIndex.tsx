@@ -12,6 +12,7 @@ import {
   DollarSign,
   FileText,
   BarChart2,
+  ScanBarcode,
   Settings,
 } from "lucide-react";
 
@@ -87,6 +88,11 @@ const MastersIndex: React.FC = () => {
           icon: <BarChart2 size={20} />,
           name: "Batch Managment",
           path: "/app/masters/stock-item/batches",
+        },
+        {
+          icon: <ScanBarcode  size={20} />,
+          name: "Barcode Managment",
+          // path: "/app/masters/stock-item/batches",
         },
       ],
     },

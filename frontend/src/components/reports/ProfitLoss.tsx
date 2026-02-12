@@ -864,23 +864,6 @@ const ProfitLoss: React.FC = () => {
                 )}
               </div>
 
-              {/* Total Row */}
-              <div className="flex justify-between py-2 font-bold text-lg border-t-2 border-gray-400 dark:border-gray-500">
-                <span>Total</span>
-                <span className="font-mono">
-                  {getTradingDebitTotal().toLocaleString()}
-                </span>
-              </div>
-
-              {getGrossProfit() > 0 && (
-                <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 font-semibold text-green-600">
-                  <span>To Gross Profit c/o</span>
-                  <span className="font-mono">
-                    {getGrossProfit().toLocaleString()}
-                  </span>
-                </div>
-              )}
-
               <div className="py-2 border-b border-gray-300 dark:border-gray-600">
                 {/* Header – Always visible */}
                 <div className="flex justify-between font-semibold cursor-pointer">
@@ -935,6 +918,26 @@ const ProfitLoss: React.FC = () => {
                     ))}
                   </div>
                 )}
+              </div>
+
+              {getGrossProfit() > 0 && (
+                <div className="flex justify-between py-2 border-b border-gray-300 dark:border-gray-600 font-semibold text-green-600">
+                  <span>To Gross Profit c/o</span>
+                  <span className="font-mono">
+                    {getGrossProfit().toLocaleString()}
+                  </span>
+                </div>
+              )}
+
+              {/* Total Row */}
+              <div className="flex justify-between py-2 font-bold text-lg border-t-2 border-gray-400 dark:border-gray-500">
+                <span>Total</span>
+                <span className="font-mono">
+                  {Math.max(
+                    getTradingDebitTotal(),
+                    getTradingCreditTotal()
+                  ).toLocaleString()}
+                </span>
               </div>
             </div>
           </div>
