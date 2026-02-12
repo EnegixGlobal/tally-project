@@ -236,14 +236,15 @@ router.get("/", async (req, res) => {
           }
 
           // TDS (LAST)
-          if (Number(v.tdsTotal) > 0) {
-            const tdsRate = ((v.tdsTotal / subtotal) * 100).toFixed(2);
+          // Purchase: Party Cr, Expense Dr, TDS Cr
+          if (Number(v.tdsTotal) !== 0) {
+            const tdsRate = ((Math.abs(v.tdsTotal) / subtotal) * 100).toFixed(2);
             v.entries.push({
               id: `PUR-TDS-${vid}`,
               ledger_id: null,
               ledger_name: `TDS @ ${tdsRate}%`,
-              amount: Number(v.tdsTotal),
-              entry_type: "debit",
+              amount: Math.abs(Number(v.tdsTotal)),
+              entry_type: "credit",
               narration: "TDS",
               isParty: false,
               isChild: true,

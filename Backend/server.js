@@ -269,6 +269,9 @@ app.use("/api/", VoucherImport);
 const GstAssisment = require("./routes/GstAssisment");
 app.use("/api/gst-assessment", GstAssisment);
 
+const voucherDetailRouter = require("./routes/voucher-detail");
+app.use("/api/voucher-detail", voucherDetailRouter);
+
 // ✅ Start Server
 const PORT = process.env.PORT || 5000;
 

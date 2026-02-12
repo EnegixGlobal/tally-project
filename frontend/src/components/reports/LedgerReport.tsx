@@ -7,8 +7,42 @@ import {
   Download,
   Filter,
   Calendar,
+  Eye,
 } from "lucide-react";
-import type { Ledger } from "../../types";
+
+interface DayBookEntry {
+  id: string;
+  date: string;
+  voucherType: string;
+  voucherNo: string;
+  particulars: string;
+  ledgerName: string;
+  debit: number;
+  credit: number;
+  voucherId: string;
+  narration?: string;
+  itemId?: string;
+  quantity?: number;
+  rate?: number;
+  hsnCode?: string;
+  isParty?: boolean; // Added for modal
+  isChild?: boolean; // Added for modal
+  amount?: number; // Added for modal
+}
+
+interface VoucherDetail {
+  id: string;
+  voucherNo: string;
+  voucherType: string;
+  date: string;
+  entries: DayBookEntry[]; // Changed from simple fields to entries array
+  narration?: string;
+  amount: number; // Keep for compatibility or remove if unused 
+  totalDebit?: number;
+  totalCredit?: number;
+  reference?: string;
+  particulars?: string; // Keep for compatibility
+}
 
 interface LedgerTransaction {
   id: string;
@@ -31,6 +65,7 @@ interface LedgerApiResponse {
   ledger: Ledger;
   message?: string;
   transactions: LedgerTransaction[];
+  transactionCount: number;
   summary: {
     openingBalance: number;
     closingBalance: number;
@@ -493,6 +528,42 @@ const LedgerReport: React.FC = () => {
     return daily;
   }, [ledgerData, dailyBreakupMonth, dailyBreakupYear]);
 
+
+  const handleViewVoucher = async (txn: LedgerTransaction) => {
+    let id = txn.id;
+    const type = txn.voucherType.toLowerCase();
+
+    if (type === "purchase") id = `PUR-${txn.id}`;
+    else if (type === "sales") id = `SAL-${txn.id}`;
+    else if (["payment", "receipt", "contra", "journal"].includes(type))
+      id = `ACC-${txn.id}`;
+
+    // DN and CN often have prefixes like DN-123-456, so we might need to handle it.
+    // Based on backend logic:
+    // "DN-" prefixed IDs already include the ID. 
+    // If txn.id is "DN-123-456", then id is correct.
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/voucher-detail/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+      );
+      const data = await res.json();
+
+      if (res.ok) {
+        if (data) {
+          setSelectedVoucher({
+            ...data,
+            amount: data.total || 0,
+          });
+        }
+      } else {
+        console.error("Failed to fetch voucher details");
+      }
+    } catch (err) {
+      console.error("Error fetching voucher details", err);
+    }
+  };
+
   return (
     <div className="pt-[56px] px-4 ">
       <div className="flex items-center mb-6">
@@ -856,6 +927,9 @@ const LedgerReport: React.FC = () => {
                       <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider">
                         Closing Balance
                       </th>
+                      <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
+                        View
+                      </th>
                     </tr>
                   </thead>
 
@@ -925,6 +999,22 @@ const LedgerReport: React.FC = () => {
                                   : (txn.runningBalance || 0) < 0
                                     ? isDebitLedger ? " Cr" : " Dr"
                                     : ""}
+                              </td>
+
+                              <td className="px-4 py-3 text-center">
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleViewVoucher(first);
+                                  }}
+                                  className={`p-1 rounded ${theme === "dark"
+                                    ? "hover:bg-gray-600"
+                                    : "hover:bg-gray-200"
+                                    }`}
+                                  title="View Details"
+                                >
+                                  <Eye size={16} />
+                                </button>
                               </td>
                             </tr>
                           ))}
@@ -1162,107 +1252,108 @@ const LedgerReport: React.FC = () => {
 
           </div>
         </>
-      )}
+      )
+      }
 
       {/* Voucher Detail Modal */}
       {selectedVoucher && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div
-            className={`w-full max-w-2xl mx-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white"
-              }`}
-          >
-            <div className="p-6">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className={`w-full max-w-4xl max-h-[90vh] rounded-lg overflow-hidden flex flex-col ${theme === "dark" ? "bg-gray-800" : "bg-white"}`}>
+            {/* Header */}
+            <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="flex justify-between items-center mb-4">
-                <h3 className="text-lg font-semibold">Voucher Details</h3>
+                <h3 className="text-lg font-semibold">Voucher Details - {selectedVoucher.voucherNo}</h3>
                 <button
                   onClick={() => setSelectedVoucher(null)}
-                  className={`p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
-                    }`}
+                  className={`p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
                 >
                   ×
                 </button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4 mb-4">
+              <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Voucher No
-                  </label>
+                  <label className="block text-sm font-medium mb-1">Voucher No</label>
                   <div className="font-mono">{selectedVoucher.voucherNo}</div>
                 </div>
                 <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Voucher Type
-                  </label>
-                  <div>{selectedVoucher.voucherType}</div>
+                  <label className="block text-sm font-medium mb-1">Voucher Type</label>
+                  <div className="capitalize">{selectedVoucher.voucherType}</div>
                 </div>
                 <div>
                   <label className="block text-sm font-medium mb-1">Date</label>
                   <div>{formatDate(selectedVoucher.date)}</div>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium mb-1">
-                    Amount
-                  </label>
-                  <div className="font-medium">
-                    {formatCurrency(selectedVoucher.amount)}
-                  </div>
+              </div>
+            </div>
+
+            {/* Body */}
+            <div className="flex-1 overflow-y-auto p-6">
+              <div className="mb-4">
+                <label className="block text-sm font-medium mb-2">Voucher Entries</label>
+                <div className="overflow-x-auto">
+                  <table className="w-full text-sm">
+                    <thead className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                      <tr>
+                        <th className="px-3 py-2 text-left">Item / Ledger</th>
+                        <th className="px-3 py-2 text-right">Debit</th>
+                        <th className="px-3 py-2 text-right">Credit</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {selectedVoucher.entries && selectedVoucher.entries.map((entr, idx) => (
+                        <tr key={idx} className="border-t border-gray-200 dark:border-gray-600">
+                          <td className={`px-3 py-2 ${entr.isChild ? "pl-10 text-gray-600" : ""}`}>
+                            {entr.ledgerName || entr.ledger_name}
+                            {entr.narration && <div className="text-xs text-gray-400">{entr.narration}</div>}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            {entr.entry_type === "debit" || (entr.debit > 0) ? formatCurrency(entr.amount || entr.debit || 0) : "-"}
+                          </td>
+                          <td className="px-3 py-2 text-right font-mono">
+                            {entr.entry_type === "credit" || (entr.credit > 0) ? formatCurrency(entr.amount || entr.credit || 0) : "-"}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">
-                  Particulars
-                </label>
-                <div>{selectedVoucher.particulars}</div>
-              </div>
-
-              <div className="mb-4">
-                <label className="block text-sm font-medium mb-1">
-                  Narration
-                </label>
-                <div className="text-gray-600 dark:text-gray-400">
-                  {selectedVoucher.narration}
-                </div>
-              </div>
-
-              {selectedVoucher.reference && (
+              {selectedVoucher.narration && (
                 <div className="mb-4">
-                  <label className="block text-sm font-medium mb-1">
-                    Reference
-                  </label>
-                  <div>{selectedVoucher.reference}</div>
+                  <label className="block text-sm font-medium mb-1">Narration</label>
+                  <div className="text-gray-600 dark:text-gray-400">{selectedVoucher.narration}</div>
                 </div>
               )}
+            </div>
 
+            {/* Footer */}
+            <div className="p-6 border-t border-gray-200 dark:border-gray-700 flex-shrink-0">
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setSelectedVoucher(null)}
-                  className={`px-4 py-2 rounded ${theme === "dark"
-                    ? "bg-gray-700 hover:bg-gray-600"
-                    : "bg-gray-100 hover:bg-gray-200"
-                    }`}
+                  className={`px-4 py-2 rounded ${theme === "dark" ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"}`}
                 >
                   Close
                 </button>
                 <button
                   onClick={() => {
-                    // Navigate to voucher details page
-                    // If it's a quotation, navigate to sales edit page
                     if (selectedVoucher.voucherType === "Quotation") {
-                      navigate(
-                        `/app/vouchers/sales/edit/${selectedVoucher.id}`
-                      );
-                    } else {
-                      navigate(
-                        `/app/vouchers/${selectedVoucher.voucherType.toLowerCase()}/${selectedVoucher.id
-                        }`
-                      );
+                      navigate(`/app/vouchers/sales/edit/${selectedVoucher.id.replace('SAL-', '')}`);
+                    } else if (selectedVoucher.voucherType.toLowerCase() === "purchase") {
+                      navigate(`/app/vouchers/purchase/edit/${selectedVoucher.id.replace('PUR-', '')}`);
+                    } else if (selectedVoucher.voucherType.toLowerCase() === "sales") {
+                      navigate(`/app/vouchers/sales/edit/${selectedVoucher.id.replace('SAL-', '')}`);
+                    }
+                    else {
+                      // default
+                      navigate(`/app/vouchers/${selectedVoucher.voucherType.toLowerCase()}/${selectedVoucher.id.split('-')[1]}`);
                     }
                   }}
                   className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
                 >
-                  View Full Details
+                  Edit Voucher
                 </button>
               </div>
             </div>
@@ -1280,8 +1371,9 @@ const LedgerReport: React.FC = () => {
           to refresh.
         </p>
       </div>
-    </div>
+    </div >
   );
 };
 
 export default LedgerReport;
+
