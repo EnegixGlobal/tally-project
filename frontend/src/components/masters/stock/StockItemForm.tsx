@@ -358,6 +358,7 @@ const StockItemForm = () => {
                   batchManufacturingDate: b.batchManufacturingDate || "",
                   openingValue: Number(b.openingValue) || rate * qty, // Always calculated
                   mode: b.mode,
+                  mrp: b.mrp || "",
                 };
               })
             );
@@ -524,6 +525,7 @@ const StockItemForm = () => {
       batchQuantity: "",
       batchRate: "",
       openingRate: 0,
+      mrp: "",
     },
   ]);
   const [errors, setErrors] = useState<Errors>({});
@@ -552,6 +554,7 @@ const StockItemForm = () => {
         batchQuantity: "",
         batchRate: "",
         openingRate: 0,
+        mrp: "",
       },
     ]);
   };
@@ -987,7 +990,7 @@ const StockItemForm = () => {
               {batchRows.map((row, index) => (
                 <div
                   key={row.id}
-                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-6 gap-3 items-end w-full"
+                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3 items-end w-full"
                 >
                   {formData.enableBatchTracking && (
                     <div className="flex-1 min-w-[120px]">
@@ -1040,6 +1043,17 @@ const StockItemForm = () => {
                       onChange={() => { }}
                       error={errors[`openingRate-${index}`]}
                       disabled
+                    />
+                  </div>
+                  <div className="flex-1 min-w-[120px]">
+                    <InputField
+                      id={`mrp-${index}`}
+                      name={`mrp-${index}`}
+                      label="MRP"
+                      type="number"
+                      value={row.mrp || ""}
+                      onChange={(e) => updateBatchRow(index, "mrp", e.target.value)}
+                      error={errors[`mrp-${index}`]}
                     />
                   </div>
 

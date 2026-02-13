@@ -10,6 +10,7 @@ const ProfitLoss: React.FC = () => {
   const [showFullData, setShowFullData] = useState(false);
   const [showInventoryBreakup, setShowInventoryBreakup] = useState(false);
   const [showDetailed, setShowDetailed] = useState(false);
+  const [showItemWise, setShowItemWise] = useState(false);
   const [ledgerBalances, setLedgerBalances] = useState<Record<number, { debit: number; credit: number }>>({});
 
   const companyId = localStorage.getItem("company_id");
@@ -243,6 +244,28 @@ const ProfitLoss: React.FC = () => {
     }, 0);
   };
 
+  // Helper to calculate total opening stock from items (without filtering)
+  const getOpeningStockItemSum = () => {
+    return stockItems.reduce((totalSum, item) => {
+      const itemSum = (item.batches || [])
+        .filter((b: any) => b.openingRate)
+        .reduce((batchSum: number, b: any) => {
+          const qty = Number(b.batchQuantity || 0);
+          const rate = Number(b.openingRate || 0);
+          return batchSum + (qty * rate);
+        }, 0);
+      return totalSum + itemSum;
+    }, 0);
+  };
+
+  // Unified Opening Stock Value Accessor
+  const calculateOpeningStockValue = () => {
+    if (showItemWise && stockItems.length > 0) {
+      return getOpeningStockItemSum();
+    }
+    return getOpeningStock();
+  };
+
 
 
   // Income calculations
@@ -311,14 +334,11 @@ const ProfitLoss: React.FC = () => {
 
   // Trading Account calculations (Gross Profit/Loss)
   const getTradingDebitTotal = () => {
-    return getOpeningStock() + getPurchaseTotal() + getDirectExpensesTotal();
+    return calculateOpeningStockValue() + getPurchaseTotal() + getDirectExpensesTotal();
   };
 
-
-
-
   const getTradingCreditTotal = () => {
-    return getSalesTotal() + getClosingStock();
+    return getSalesTotal() + calculateClosingStockValue();
   };
 
 
@@ -426,6 +446,48 @@ const ProfitLoss: React.FC = () => {
     });
 
     return Array.from(itemMap.values()).filter((item) => item.value > 0);
+  };
+
+  // Helper to calculate total closing stock from items (without filtering)
+  const getClosingStockItemSum = () => {
+    const openingItems = getOpeningStockByItems();
+    const purchaseItems = getPurchaseByItems();
+    const salesItems = getSalesByItems();
+
+    // Create a map to store item IDs by name
+    const itemIdMap = new Map<string, string | number>();
+    openingItems.forEach((item) => itemIdMap.set(item.name, item.id));
+    stockItems.forEach((item: any) => {
+      if (!itemIdMap.has(item.name)) itemIdMap.set(item.name, item.id);
+    });
+
+    const itemMap = new Map<string, number>();
+
+    // Add opening
+    openingItems.forEach(item => itemMap.set(item.name, item.totalValue));
+
+    // Add purchase
+    purchaseItems.forEach(item => {
+      const current = itemMap.get(item.name) || 0;
+      itemMap.set(item.name, current + item.value);
+    });
+
+    // Subtract sales
+    salesItems.forEach(item => {
+      const current = itemMap.get(item.name) || 0;
+      itemMap.set(item.name, current - item.value);
+    });
+
+    // Sum up non-negative closing values
+    return Array.from(itemMap.values()).reduce((sum, val) => sum + Math.max(0, val), 0);
+  };
+
+  // Unified Closing Stock Value Accessor
+  const calculateClosingStockValue = () => {
+    if (showItemWise && stockItems.length > 0) {
+      return getClosingStockItemSum();
+    }
+    return getClosingStock();
   };
 
   const getClosingStockByItems = () => {
@@ -655,6 +717,20 @@ const ProfitLoss: React.FC = () => {
                   Detailed
                 </label>
 
+                {/* Item wise */}
+                <label
+                  htmlFor="itemWise"
+                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 border-t border-gray-200"
+                >
+                  <input
+                    type="checkbox"
+                    id="itemWise"
+                    checked={showItemWise}
+                    onChange={(e) => setShowItemWise(e.target.checked)}
+                  />
+                  Item wise
+                </label>
+
                 {/* Inventory */}
                 <label
                   htmlFor="inventoryBreakup"
@@ -760,7 +836,7 @@ const ProfitLoss: React.FC = () => {
                     To Opening Stock
                   </span>
                   <span className="font-mono font-semibold">
-                    {getOpeningStock().toLocaleString()}
+                    {calculateOpeningStockValue().toLocaleString()}
                   </span>
                 </div>
 
@@ -1053,7 +1129,7 @@ const ProfitLoss: React.FC = () => {
                     By Closing Stock
                   </span>
                   <span className="font-mono font-semibold">
-                    {getClosingStock().toLocaleString()}
+                    {calculateClosingStockValue().toLocaleString()}
                   </span>
                 </div>
 
