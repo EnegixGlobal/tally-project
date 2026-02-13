@@ -527,6 +527,7 @@ router.post("/", upload.single("image"), async (req, res) => {
         batchExpiryDate: sanitize(b.batchExpiryDate),
         batchManufacturingDate: sanitize(b.batchManufacturingDate),
         mode: "opening",
+        mrp: Number(b.mrp) || 0,
       };
     });
 
@@ -1005,6 +1006,7 @@ router.post("/:id/batches", async (req, res) => {
       batchExpiryDate = null,
       batchManufacturingDate = null,
       mode = "purchase",
+      mrp = 0,
       company_id,
       owner_type,
       owner_id,
@@ -1058,6 +1060,7 @@ router.post("/:id/batches", async (req, res) => {
       batchExpiryDate: batchExpiryDate || null,
       mode: mode || "purchase",
       batchManufacturingDate: batchManufacturingDate || null,
+      mrp: Number(mrp) || 0,
     };
 
 
@@ -1361,6 +1364,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
         batchExpiryDate: sanitize(b.batchExpiryDate),
         batchManufacturingDate: sanitize(b.batchManufacturingDate),
         mode: "opening",
+        mrp: Number(b.mrp) || 0,
       };
     });
 

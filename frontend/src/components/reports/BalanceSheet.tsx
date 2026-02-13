@@ -123,8 +123,8 @@ const BalanceSheet: React.FC = () => {
       FixedAssets: fixedAssets,
       CurrentAssets: CurrentAssets,
       TDSPayable: tdsPayable,
-      LaiblityTotal: capitalTotal + loanLability + currentLiability + (netProfit - netLoss - transferredProfit + transferredLoss),
-      AssetTotal: fixedAssets + CurrentAssets + tdsPayable,
+      LaiblityTotal: capitalTotal + loanLability + currentLiability + tdsPayable + (netProfit - netLoss - transferredProfit + transferredLoss),
+      AssetTotal: fixedAssets + CurrentAssets,
     });
   }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss, transferredProfit, transferredLoss]);
 
@@ -281,6 +281,15 @@ const BalanceSheet: React.FC = () => {
                   {isDetailedView && renderDetailedGroupItems(-6)}
                 </div>
 
+                {/* TDS Payable */}
+                <div>
+                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-19)}>
+                    <span className="text-blue-600 font-semibold ">TDS Payable</span>
+                    <span className="text-right font-mono font-bold">{calculatedTotal.TDSPayable.toLocaleString()}</span>
+                  </div>
+                  {isDetailedView && renderDetailedGroupItems(-19)}
+                </div>
+
                 {/* Profit & Loss A/c (Restored to standalone row) */}
                 <div className="border-b border-gray-300 pb-2">
                   {/* Header */}
@@ -292,7 +301,8 @@ const BalanceSheet: React.FC = () => {
                       Profit & Loss A/c
                     </span>
                     <span className="text-right font-mono font-bold">
-                      {(netProfit - netLoss - transferredProfit + transferredLoss).toLocaleString()}
+                      {/* {(netProfit - netLoss - transferredProfit + transferredLoss).toLocaleString()} */}
+                      0
                     </span>
                   </div>
 
@@ -340,14 +350,7 @@ const BalanceSheet: React.FC = () => {
                   {isDetailedView && renderDetailedGroupItems(-9)}
                 </div>
 
-                {/* TDS Payable */}
-                <div>
-                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-19)}>
-                    <span className="text-blue-600 font-semibold ">TDS Payable</span>
-                    <span className="text-right font-mono font-bold">{calculatedTotal.TDSPayable.toLocaleString()}</span>
-                  </div>
-                  {isDetailedView && renderDetailedGroupItems(-19)}
-                </div>
+
 
                 {/* Current Assets */}
                 <div>

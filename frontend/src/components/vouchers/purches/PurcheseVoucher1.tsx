@@ -1674,6 +1674,7 @@ const PurchaseVoucher: React.FC = () => {
               batchRate: entry.batchMeta.rate,
               batchExpiryDate: entry.batchMeta.expDate || null,
               batchManufacturingDate: entry.batchMeta.mfgDate || null,
+              mrp: entry.batchMeta.mrp || 0,
               mode: "purchase",
               company_id: companyId,
               owner_type: ownerType,
@@ -1982,6 +1983,7 @@ const PurchaseVoucher: React.FC = () => {
         batchName: pb.batchName,
         batchQuantity: qty,
         batchRate: rate,
+        batchMrp: pb.batchMrp,
         batchManufacturingDate: pb.batchManufacturingDate || null,
         batchExpiryDate: pb.batchExpiryDate || null,
         mode: "purchase", // ✅ HARD CODED
@@ -2007,6 +2009,7 @@ const PurchaseVoucher: React.FC = () => {
           batchName: pb.batchName,
           quantity: qty,
           rate: rate,
+          mrp: pb.batchMrp,
           mfgDate: pb.batchManufacturingDate || null,
           expDate: pb.batchExpiryDate || null,
           mode: "purchase", // ✅ HARD CODED
@@ -2026,6 +2029,7 @@ const PurchaseVoucher: React.FC = () => {
         batchName: "",
         batchQuantity: 0,
         batchRate: 0,
+        batchMrp: 0,
         batchExpiryDate: "",
         batchManufacturingDate: "",
         mode: "purchase", // ✅ HARD CODED
@@ -2587,6 +2591,7 @@ const PurchaseVoucher: React.FC = () => {
                                         batchName: "",
                                         batchQuantity: 0,
                                         batchRate: entry.rate ?? 0,
+                                        batchMrp: 0,
                                         batchExpiryDate: "",
                                         batchManufacturingDate: "",
                                       },
@@ -2598,6 +2603,7 @@ const PurchaseVoucher: React.FC = () => {
                                         batchName: "",
                                         batchQuantity: 0,
                                         batchRate: entry.rate ?? 0,
+                                        batchMrp: 0,
                                         batchExpiryDate: "",
                                         batchManufacturingDate: "",
                                       },
@@ -2662,7 +2668,7 @@ const PurchaseVoucher: React.FC = () => {
                                         />
                                       </div>
 
-                                      <div className="grid grid-cols-2 gap-3">
+                                      <div className="grid grid-cols-3 gap-3">
                                         <div>
                                           <label className="block font-medium">
                                             Quantity
@@ -2701,6 +2707,28 @@ const PurchaseVoucher: React.FC = () => {
                                               handleAddBatchFieldChange(
                                                 addBatchModal.index!,
                                                 "batchRate",
+                                                Number(e.target.value)
+                                              )
+                                            }
+                                          />
+                                        </div>
+
+                                        <div>
+                                          <label className="block font-medium">
+                                            MRP
+                                          </label>
+                                          <input
+                                            type="number"
+                                            className="w-full border rounded p-2"
+                                            value={
+                                              pendingBatches[
+                                                addBatchModal.index!
+                                              ]?.batchMrp || 0
+                                            }
+                                            onChange={(e) =>
+                                              handleAddBatchFieldChange(
+                                                addBatchModal.index!,
+                                                "batchMrp",
                                                 Number(e.target.value)
                                               )
                                             }

@@ -392,6 +392,7 @@ router.put("/:id", async (req, res) => {
     panNumber,
     state,
     district,
+    closingBalance,
   } = req.body;
 
   if (isNaN(ledgerId)) {
@@ -447,7 +448,8 @@ router.put("/:id", async (req, res) => {
           gst_number = ?, 
           pan_number = ?,
           state = ?,
-          district = ?
+          district = ?,
+          closing_balance = ?
       WHERE id = ? 
       AND owner_type = ?
       AND owner_id = ? 
@@ -466,6 +468,7 @@ router.put("/:id", async (req, res) => {
       panNumber || "",
       state || "",
       district || "",
+      closingBalance !== undefined ? closingBalance : openingBalance || 0,
       ledgerId,
       owner_type,
       owner_id,

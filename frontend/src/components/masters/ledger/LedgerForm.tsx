@@ -28,6 +28,7 @@ const LedgerForm: React.FC = () => {
     name: "",
     groupId: "",
     openingBalance: 0,
+    closingBalance: 0,
     balanceType: "debit",
     address: "",
     email: "",
@@ -41,26 +42,26 @@ const LedgerForm: React.FC = () => {
 
   //by default 
   const baseGroups = [
-  { id: -1, name: "Bank Accounts", nature: "Assets" },
-  { id: -2, name: "Bank OD A/c", nature: "Assets" },
-  { id: -3, name: "Branch/Division", nature: "Assets" },
-  { id: -4, name: "Capital Account", nature: "Liabilities" },
-  { id: -5, name: "Current Assets", nature: "Assets" },
-  { id: -6, name: "Current Liabilities", nature: "Liabilities" },
-  { id: -7, name: "Direct Expenses", nature: "Expenses" },
-  { id: -8, name: "Direct Income", nature: "Income" },
-  { id: -9, name: "Fixed Assets", nature: "Assets" },
-  { id: -10, name: "Indirect Expenses", nature: "Expenses" },
-  { id: -11, name: "Indirect Income", nature: "Income" },
-  { id: -12, name: "Investments", nature: "Assets" },
-  { id: -13, name: "Loan(Liability)", nature: "Liabilities" },
-  { id: -14, name: "Misc expenses (Assets)", nature: "Assets" },
-  { id: -15, name: "Purchase Accounts", nature: "Expenses" },
-  { id: -16, name: "Sales Accounts", nature: "Income" },
-  { id: -17, name: "Suspense A/C", nature: "Assets" },
-  { id: -18, name: "Profit/Loss", nature: "Liabilities" },
-  { id: -19, name: "TDS Payables", nature: "Liabilities" },
-];
+    { id: -1, name: "Bank Accounts", nature: "Assets" },
+    { id: -2, name: "Bank OD A/c", nature: "Assets" },
+    { id: -3, name: "Branch/Division", nature: "Assets" },
+    { id: -4, name: "Capital Account", nature: "Liabilities" },
+    { id: -5, name: "Current Assets", nature: "Assets" },
+    { id: -6, name: "Current Liabilities", nature: "Liabilities" },
+    { id: -7, name: "Direct Expenses", nature: "Expenses" },
+    { id: -8, name: "Direct Income", nature: "Income" },
+    { id: -9, name: "Fixed Assets", nature: "Assets" },
+    { id: -10, name: "Indirect Expenses", nature: "Expenses" },
+    { id: -11, name: "Indirect Income", nature: "Income" },
+    { id: -12, name: "Investments", nature: "Assets" },
+    { id: -13, name: "Loan(Liability)", nature: "Liabilities" },
+    { id: -14, name: "Misc expenses (Assets)", nature: "Assets" },
+    { id: -15, name: "Purchase Accounts", nature: "Expenses" },
+    { id: -16, name: "Sales Accounts", nature: "Income" },
+    { id: -17, name: "Suspense A/C", nature: "Assets" },
+    { id: -18, name: "Profit/Loss", nature: "Liabilities" },
+    { id: -19, name: "TDS Payables", nature: "Liabilities" },
+  ];
 
   // Indian States list with codes
   const states = [
@@ -106,8 +107,7 @@ const LedgerForm: React.FC = () => {
     const fetchLedgerGroups = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
@@ -127,8 +127,7 @@ const LedgerForm: React.FC = () => {
     const fetchLedgerById = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
@@ -138,6 +137,7 @@ const LedgerForm: React.FC = () => {
             name: data.name || "",
             groupId: data.groupId || "",
             openingBalance: data.opening_balance || 0,
+            closingBalance: data.closing_balance || 0,
             balanceType: data.balance_type || "debit",
             address: data.address || "",
             email: data.email || "",
@@ -150,6 +150,11 @@ const LedgerForm: React.FC = () => {
 
           if (data.groupName) {
             setChekStock(data.groupName);
+          } else {
+            const base = baseGroups.find(
+              (g) => g.id.toString() === data.groupId?.toString()
+            );
+            if (base) setChekStock(base.name);
           }
         } else {
           console.error("Failed to fetch ledger by ID:", data.message);
@@ -163,42 +168,43 @@ const LedgerForm: React.FC = () => {
   }, [id, isEditMode, companyId, ownerType, ownerId]);
 
   // Prefill from context if available
- useEffect(() => {
-  if (!isEditMode || !id) return;
+  useEffect(() => {
+    if (!isEditMode || !id) return;
 
-  const fetchLedgerById = async () => {
-    try {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-      );
-      const data = await res.json();
+    const fetchLedgerById = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const data = await res.json();
 
-      if (res.ok && data) {
-        setFormData({
-          name: data.name || "",
-          groupId: data.groupId?.toString() || "",
-          openingBalance: Number(data.openingBalance) || 0,
-          balanceType: data.balanceType || "debit",
-          address: data.address || "",
-          email: data.email || "",
-          phone: data.phone || "",
-          gstNumber: data.gstNumber || "",
-          panNumber: data.panNumber || "",
-          state: data.state || "",
-          district: data.district || "",
-        });
+        if (res.ok && data) {
+          setFormData({
+            name: data.name || "",
+            groupId: data.groupId?.toString() || "",
+            openingBalance: Number(data.openingBalance) || 0,
+            closingBalance: Number(data.closingBalance) || 0,
+            balanceType: data.balanceType || "debit",
+            address: data.address || "",
+            email: data.email || "",
+            phone: data.phone || "",
+            gstNumber: data.gstNumber || "",
+            panNumber: data.panNumber || "",
+            state: data.state || "",
+            district: data.district || "",
+          });
 
-        if (data.groupName) {
-          setChekStock(data.groupName);
+          if (data.groupName) {
+            setChekStock(data.groupName);
+          }
         }
+      } catch (err) {
+        console.error("Error fetching ledger:", err);
       }
-    } catch (err) {
-      console.error("Error fetching ledger:", err);
-    }
-  };
+    };
 
-  fetchLedgerById();
-}, [id, isEditMode, companyId, ownerType, ownerId]);
+    fetchLedgerById();
+  }, [id, isEditMode, companyId, ownerType, ownerId]);
 
 
   // Handle input changes
@@ -224,7 +230,9 @@ const LedgerForm: React.FC = () => {
     }
 
     if (name === "groupId") {
-      const findGroup = ledgerGroups.find((g) => g.id.toString() === value);
+      const findGroup =
+        ledgerGroups.find((g) => g.id.toString() === value) ||
+        baseGroups.find((g) => g.id.toString() === value);
       if (findGroup) {
         setChekStock(findGroup.name);
       }
@@ -278,8 +286,7 @@ const LedgerForm: React.FC = () => {
       const payload = { ...formData, companyId, ownerType, ownerId };
 
       const res = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
         {
           method: "PUT",
@@ -323,9 +330,8 @@ const LedgerForm: React.FC = () => {
       <div className="flex items-center mb-6">
         <button
           onClick={() => navigate("/app/masters/ledger")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
           aria-label="Back"
         >
           <ArrowLeft size={20} />
@@ -336,9 +342,8 @@ const LedgerForm: React.FC = () => {
       </div>
 
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <form onSubmit={handleSubmit}>
           {/* Ledger Info */}
@@ -354,13 +359,12 @@ const LedgerForm: React.FC = () => {
                 value={formData.name}
                 onChange={handleChange}
                 required
-                className={`w-full p-2 rounded border ${
-                  errors.name
-                    ? "border-red-500 focus:border-red-500"
-                    : theme === "dark"
+                className={`w-full p-2 rounded border ${errors.name
+                  ? "border-red-500 focus:border-red-500"
+                  : theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                     : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
+                  } outline-none transition-colors`}
               />
               {errors.name && (
                 <p className="text-red-500 text-xs mt-1">{errors.name}</p>
@@ -380,13 +384,12 @@ const LedgerForm: React.FC = () => {
                 value={formData.groupId}
                 onChange={handleChange}
                 required
-                className={`w-full p-2 rounded border ${
-                  errors.groupId
-                    ? "border-red-500 focus:border-red-500"
-                    : theme === "dark"
+                className={`w-full p-2 rounded border ${errors.groupId
+                  ? "border-red-500 focus:border-red-500"
+                  : theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                     : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
+                  } outline-none transition-colors`}
               >
                 <option value="">Select Group</option>
                 {ledgerGroups.map((group: LedgerGroup) => (
@@ -419,13 +422,14 @@ const LedgerForm: React.FC = () => {
                 value={formData.openingBalance}
                 onChange={handleChange}
                 step="0.01"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
+                  } outline-none transition-colors`}
               />
             </div>
+
+
 
             <div>
               <label
@@ -460,13 +464,35 @@ const LedgerForm: React.FC = () => {
               </div>
             </div>
 
+            {chekStock && chekStock.toLowerCase().replace(/[\s-]/g, "") === "stockinhand" && (
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="closingBalance"
+                >
+                  Closing Balance
+                </label>
+                <input
+                  type="number"
+                  id="closingBalance"
+                  name="closingBalance"
+                  value={formData.closingBalance}
+                  onChange={handleChange}
+                  step="0.01"
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                    : "bg-white border-gray-300 focus:border-blue-500"
+                    } outline-none transition-colors`}
+                />
+              </div>
+            )}
+
           </div>
 
           {/* Additional Info */}
           <div
-            className={`p-4 mb-6 rounded ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-            }`}
+            className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+              }`}
           >
             <h3 className="font-semibold mb-4">Additional Information</h3>
 
@@ -484,11 +510,10 @@ const LedgerForm: React.FC = () => {
                   value={formData.address}
                   onChange={handleChange}
                   rows={3}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                      : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none transition-colors`}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                    : "bg-white border-gray-300 focus:border-blue-500"
+                    } outline-none transition-colors`}
                 />
               </div>
 
@@ -506,11 +531,10 @@ const LedgerForm: React.FC = () => {
                     name="email"
                     value={formData.email}
                     onChange={handleChange}
-                    className={`w-full p-2 rounded border ${
-                      theme === "dark"
-                        ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                        : "bg-white border-gray-300 focus:border-blue-500"
-                    } outline-none transition-colors`}
+                    className={`w-full p-2 rounded border ${theme === "dark"
+                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                      : "bg-white border-gray-300 focus:border-blue-500"
+                      } outline-none transition-colors`}
                   />
                 </div>
 
@@ -527,11 +551,10 @@ const LedgerForm: React.FC = () => {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className={`w-full p-2 rounded border ${
-                      theme === "dark"
-                        ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                        : "bg-white border-gray-300 focus:border-blue-500"
-                    } outline-none transition-colors`}
+                    className={`w-full p-2 rounded border ${theme === "dark"
+                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                      : "bg-white border-gray-300 focus:border-blue-500"
+                      } outline-none transition-colors`}
                   />
                 </div>
               </div>
@@ -554,13 +577,12 @@ const LedgerForm: React.FC = () => {
                   onChange={handleChange}
                   placeholder="22AAAAA0000A1Z5 or UIN Number"
                   maxLength={15}
-                  className={`w-full p-2 rounded border ${
-                    errors.gstNumber
-                      ? "border-red-500 focus:border-red-500"
-                      : theme === "dark"
+                  className={`w-full p-2 rounded border ${errors.gstNumber
+                    ? "border-red-500 focus:border-red-500"
+                    : theme === "dark"
                       ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                       : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none transition-colors`}
+                    } outline-none transition-colors`}
                 />
                 {errors.gstNumber && (
                   <p className="text-red-500 text-xs mt-1">
@@ -586,11 +608,10 @@ const LedgerForm: React.FC = () => {
                   name="panNumber"
                   value={formData.panNumber}
                   onChange={handleChange}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                      : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none transition-colors`}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                    : "bg-white border-gray-300 focus:border-blue-500"
+                    } outline-none transition-colors`}
                 />
               </div>
             </div>
@@ -608,11 +629,10 @@ const LedgerForm: React.FC = () => {
                   name="state"
                   value={formData.state}
                   onChange={handleChange}
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                      : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none transition-colors`}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                    : "bg-white border-gray-300 focus:border-blue-500"
+                    } outline-none transition-colors`}
                 >
                   <option value="">Select State</option>
                   {states.map((state) => (
@@ -637,11 +657,10 @@ const LedgerForm: React.FC = () => {
                   value={formData.district}
                   onChange={handleChange}
                   placeholder="Enter district name"
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
-                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                      : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none transition-colors`}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                    : "bg-white border-gray-300 focus:border-blue-500"
+                    } outline-none transition-colors`}
                 />
               </div>
             </div>
@@ -652,21 +671,19 @@ const LedgerForm: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate("/app/masters/ledger")}
-              className={`px-4 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-gray-200 hover:bg-gray-300"
-              }`}
+              className={`px-4 py-2 rounded ${theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600"
+                : "bg-gray-200 hover:bg-gray-300"
+                }`}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className={`flex items-center px-4 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
+              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
             >
               <Save size={18} className="mr-1" />
               {isEditMode ? "Update" : "Save"}

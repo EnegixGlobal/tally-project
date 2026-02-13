@@ -88,7 +88,7 @@ export type Ledger = {
   name: string;
   groupId: string;
   openingBalance: number;
-  balance_type: "debit" | "credit";
+  balanceType: "debit" | "credit";
   address?: string;
   email?: string;
   phone?: string;
@@ -97,6 +97,7 @@ export type Ledger = {
   type?: LedgerType;
   state?: string;
   district?: string;
+  closingBalance?: number;
 };
 export interface LedgerWithGroup extends Ledger {
   groupName?: string;

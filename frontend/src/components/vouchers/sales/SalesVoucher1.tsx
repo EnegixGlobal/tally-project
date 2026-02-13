@@ -899,9 +899,9 @@ const SalesVoucher: React.FC = () => {
             const companyState = safeCompanyInfo?.state || "";
             const statesMatch =
               Boolean(companyState &&
-              partyState &&
-              companyState.toLowerCase().trim() ===
-              partyState.toLowerCase().trim());
+                partyState &&
+                companyState.toLowerCase().trim() ===
+                partyState.toLowerCase().trim());
 
             // ✅ Extract GST % from ledger names
             const extractGstPercent = (ledgerId: any) => {
@@ -981,7 +981,17 @@ const SalesVoucher: React.FC = () => {
     }
   };
 
-  const applyProfit = (baseRate: number) => {
+  const applyProfit = (baseRate: number, mrp: number = 0) => {
+    // 1️⃣ On MRP (Retailer only)
+    if (
+      profitConfig.customerType === "retailer" &&
+      profitConfig.method === "on_mrp"
+    ) {
+      // If MRP exists, use it. Otherwise fall back to baseRate (or 0)
+      return mrp > 0 ? mrp : baseRate;
+    }
+
+    // 2️⃣ Profit Percentage (Saved Rule)
     if (
       pricingRule.method === "profit_percentage" &&
       Number(pricingRule.value) > 0
@@ -995,24 +1005,43 @@ const SalesVoucher: React.FC = () => {
   };
 
   useEffect(() => {
-    // ❌ agar profit rule hi select nahi hai → kuch mat karo
-    if (
-      pricingRule.method !== "profit_percentage" ||
-      Number(pricingRule.value) <= 0
-    ) {
+    const isProfitPerc =
+      pricingRule.method === "profit_percentage" &&
+      Number(pricingRule.value) > 0;
+    const isOnMrp =
+      profitConfig.method === "on_mrp" &&
+      profitConfig.customerType === "retailer";
+
+    // If neither rule is active, do nothing
+    if (!isProfitPerc && !isOnMrp) {
       return;
     }
 
     setFormData((prev) => {
       const updatedEntries = prev.entries.map((entry) => {
         // ❌ empty rows skip
-        if (!entry.rate || entry.rate <= 0) return entry;
+        if (!entry.itemId) return entry;
+
+        // Fetch MRP from Item or Batch
+        const details = getItemDetails(entry.itemId);
+        let mrp = details.mrp || 0;
+
+        // If batch selected, try to get batch-specific MRP
+        if (entry.batchNumber && entry.batches) {
+          const batch = entry.batches.find(b => b.batchName === entry.batchNumber);
+          if (batch && (batch.mrp || batch.MRP)) {
+            mrp = Number(batch.mrp || batch.MRP);
+          }
+        }
 
         // 🟢 original/base rate nikalo
-        // NOTE: assume current rate is base if profit pehle applied nahi hua
-        const baseRate = Number(entry.rate);
+        // We use the current rate as baseRate if we are just switching rules,
+        // BUT for 'On MRP', we really just want the MRP.
+        // If we switch BACK to profit %, we need a base rate. 
+        // Ideally we should store 'baseRate' separately, but for now we rely on existing logic.
+        const baseRate = Number(entry.rate || 0);
 
-        const newRate = applyProfit(baseRate);
+        const newRate = applyProfit(baseRate, mrp);
 
         // ❌ agar same hai to re-render avoid karo
         if (newRate === entry.rate) return entry;
@@ -1021,13 +1050,17 @@ const SalesVoucher: React.FC = () => {
           ...entry,
           rate: newRate,
           amount: (entry.quantity || 0) * newRate - (entry.discount || 0),
-
         };
       });
 
       return { ...prev, entries: updatedEntries };
     });
-  }, [pricingRule.method, pricingRule.value]);
+  }, [
+    pricingRule.method,
+    pricingRule.value,
+    profitConfig.method,
+    profitConfig.customerType,
+  ]);
 
   const handleEntryChange = async (
     index: number,
@@ -1092,6 +1125,29 @@ const SalesVoucher: React.FC = () => {
           igstRate = extractedIgst;
         }
 
+        // 🟢 original/base rate nikalo
+        // Always use MRP as the primary source
+        let itemMrp = Number(details.mrp || 0);
+        let initialRate = itemMrp > 0 ? itemMrp : Number(details.rate || 0);
+        let defaultQty = 0;
+
+        // 🔍 Check for Default Batch (null batchName)
+        if (details.batches?.length) {
+          const defaultBatch = details.batches.find((b: any) => !b.batchName);
+          if (defaultBatch) {
+            // Found a batch with null name -> Auto fill details
+            if (defaultBatch.mrp || defaultBatch.MRP) {
+              itemMrp = Number(defaultBatch.mrp || defaultBatch.MRP);
+              initialRate = itemMrp;
+            }
+            if (defaultBatch.batchQuantity) {
+              defaultQty = Number(defaultBatch.batchQuantity);
+            }
+          }
+        }
+
+        const newRate = applyProfit(initialRate, itemMrp);
+
         updatedEntries[index] = {
           ...entry,
           itemId: value,
@@ -1100,8 +1156,8 @@ const SalesVoucher: React.FC = () => {
           unitLabel: details.unitLabel || "",
           batches: details.batches || [],
           batchNumber: "",
-          rate: details.rate || 0,
-          quantity: 0,
+          rate: newRate,
+          quantity: defaultQty, // ✅ Auto-fill Quantity from default batch
           gstRate: gst,
           cgstRate: cgstRate,
           sgstRate: sgstRate,
@@ -1158,13 +1214,15 @@ const SalesVoucher: React.FC = () => {
           selected.batchQuantity ?? selected.quantity ?? 0
         );
 
+        // ✅ Batch MRP (Check lowercase 'mrp' first based on user data)
+        const batchMrp = Number(selected.mrp || selected.MRP || 0);
+
         // ✅ base rate nikalo
-        const baseRate = Number(
-          selected.rate ?? selected.openingRate ?? entry.rate ?? 0
-        );
+        // Create base rate from MRP -> effectively setting Rate to MRP
+        const baseRate = batchMrp > 0 ? batchMrp : Number(selected.rate ?? selected.openingRate ?? entry.rate ?? 0);
 
         // ✅ profit apply karo
-        const finalRate = applyProfit(baseRate);
+        const finalRate = applyProfit(baseRate, batchMrp);
 
         updatedEntries[index] = {
           ...entry,
@@ -1663,10 +1721,15 @@ const SalesVoucher: React.FC = () => {
           entry.batches?.length &&
           !entry.batchNumber
         ) {
-          pushError(
-            `entry.${index}.batchNumber`,
-            `Row ${row}: Batch selection is required`
-          );
+          // Check if the only batch is a default/null batch
+          const hasOnlyDefaultBatch = entry.batches.length === 1 && !entry.batches[0].batchName;
+
+          if (!hasOnlyDefaultBatch) {
+            pushError(
+              `entry.${index}.batchNumber`,
+              `Row ${row}: Batch selection is required`
+            );
+          }
         }
 
         if (
@@ -1882,7 +1945,18 @@ const SalesVoucher: React.FC = () => {
       // ================= STOCK DEDUCTION (FINAL & IMPORTANT) =================
       await Promise.all(
         formData.entries.map((entry) => {
-          if (!entry.itemId || !entry.batchNumber) return;
+          if (!entry.itemId) return;
+
+          // Logic: If batchNumber is present -> use it.
+          // If NOT present, implicitly use "" (default batch) IF we allowed it in validation.
+          // The backend should handle batchName="" to find null/empty batch.
+          const targetBatchName = entry.batchNumber || "";
+
+          // Original check was: if (!entry.itemId || !entry.batchNumber) return;
+          // We modify it to proceed if itemId matches.
+
+          // But wait, if an item HAS batches and user didn't select one (validation failure), we shouldn't be here.
+          // If validation passed (because of our change above), then targetBatchName="" is correct.
 
           return fetch(
             `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId
@@ -1891,7 +1965,7 @@ const SalesVoucher: React.FC = () => {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                batchName: entry.batchNumber,
+                batchName: entry.batchNumber ?? "", // Send empty string if null/undefined
                 quantity: -Number(entry.quantity || 0), // 🔴 subtract stock
                 mode: "add", // ✅ Incremental update
               }),

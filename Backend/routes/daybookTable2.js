@@ -102,6 +102,7 @@ router.get("/", async (req, res) => {
     pv.sgstTotal,
     pv.igstTotal,
     pv.tdsTotal,
+    pv.discountTotal,
     pv.total,
 
     pi.purchaseLedgerId,
@@ -146,6 +147,7 @@ router.get("/", async (req, res) => {
           sgstTotal: row.sgstTotal,
           igstTotal: row.igstTotal,
           tdsTotal: row.tdsTotal,
+          discountTotal: row.discountTotal,
           total: row.total,
           partyId: row.partyId,
           partyName: row.party_name,
@@ -235,15 +237,28 @@ router.get("/", async (req, res) => {
             });
           }
 
-          // TDS (LAST)
-          if (Number(v.tdsTotal) > 0) {
-            const tdsRate = ((v.tdsTotal / subtotal) * 100).toFixed(2);
+          // TDS (Check if Credit (Subtracted) or Debit (Added))
+          if (Number(v.tdsTotal) !== 0) {
+            const tdsRate = ((Math.abs(v.tdsTotal) / subtotal) * 100).toFixed(2);
+
+            // Calculate expected total if TDS is Credit (Subtracted)
+            const totalIfCredit =
+              Number(v.subtotal || 0) +
+              Number(v.cgstTotal || 0) +
+              Number(v.sgstTotal || 0) +
+              Number(v.igstTotal || 0) -
+              Number(v.discountTotal || 0) -
+              Math.abs(Number(v.tdsTotal || 0));
+
+            // Compare with actual total
+            const isCredit = Math.abs(Number(v.total) - totalIfCredit) < 0.05;
+
             v.entries.push({
               id: `PUR-TDS-${vid}`,
               ledger_id: null,
               ledger_name: `TDS @ ${tdsRate}%`,
-              amount: Number(v.tdsTotal),
-              entry_type: "debit",
+              amount: Math.abs(Number(v.tdsTotal)),
+              entry_type: isCredit ? "credit" : "debit",
               narration: "TDS",
               isParty: false,
               isChild: true,

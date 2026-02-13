@@ -60,8 +60,8 @@ const ReportsIndex: React.FC = () => {
       title: 'Purchase Reports',
       items: [
         { icon: <BookOpen size={20} />, name: 'Extract Purchase', path: '/app/reports/extract-purchase' },
-        { icon: <Calendar size={20} />, name: 'Purchase Invoice Matching', path: '/app/reports/purchase-invoice-matching' },
         { icon: <Activity size={20} />, name: 'Purchase Report', path: '/app/reports/purchase-report' },
+        { icon: <Calendar size={20} />, name: 'Purchase Invoice Matching', path: '/app/reports/purchase-invoice-matching' },
         { icon: <Calendar size={20} />, name: 'B2B', path: '/app/reports/b2bpurchase' },
         { icon: <Calendar size={20} />, name: 'B2C', path: '/app/reports/b2cpurchase' },
         { icon: <Calendar size={20} />, name: 'B2B HSN', path: '/app/reports/b2bhsnpurchase' },
