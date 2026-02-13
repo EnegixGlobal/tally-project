@@ -140,10 +140,12 @@ const PurchaseReport1: React.FC = () => {
     | "summary"
     | "detailed"
     | "extract"
+    | "columnar"
     | "itemwise"
     | "partywise"
     | "billwise"
     | "billwiseprofit"
+
   >("summary");
   const [filters, setFilters] = useState<FilterState>({
     dateRange: "this-month",
@@ -352,6 +354,113 @@ const PurchaseReport1: React.FC = () => {
     });
 
     return groups;
+  }, [filteredVouchers]);
+
+  // 🔹 COLUMNAR DATA PREPARATION
+  const columnarData = useMemo(() => {
+    const purchaseColumns = new Set<string>();
+    const taxColumns = new Set<string>();
+    const tdsColumns = new Set<string>();
+
+    // 1. Collect all unique Ledger Names for Headers
+    filteredVouchers.forEach(voucher => {
+      // Purchase Ledgers & Tax Ledgers from items
+      if (voucher.items) {
+        voucher.items.forEach(item => {
+          if (item.purchaseLedgerName) purchaseColumns.add(item.purchaseLedgerName);
+          if (item.cgstLedgerName) taxColumns.add(item.cgstLedgerName);
+          if (item.sgstLedgerName) taxColumns.add(item.sgstLedgerName);
+          if (item.igstLedgerName) taxColumns.add(item.igstLedgerName);
+          if (item.tdsLedgerName) tdsColumns.add(item.tdsLedgerName);
+        });
+      }
+    });
+
+    const sortedPurchaseCols = Array.from(purchaseColumns).sort();
+    const sortedTaxCols = Array.from(taxColumns).sort();
+    const sortedTdsCols = Array.from(tdsColumns).sort();
+
+    const allDynamicCols = [...sortedPurchaseCols, ...sortedTaxCols, ...sortedTdsCols];
+
+    // 2. Prepare Row Data
+    const rows = filteredVouchers.map(voucher => {
+      const row: any = {
+        id: voucher.id,
+        date: voucher.date,
+        partyName: voucher.partyName,
+        voucherNo: voucher.voucherNo,
+        voucherType: "Purchase", // Static for now
+        total: Number(voucher.netAmount || voucher.total || 0),
+        quantity: 0,
+        rate: 0,
+      };
+
+      // Sum Quantity and determine Rate
+      let totalQty = 0;
+      let consistentRate = -1; // -1 indicates not set
+      let isMixedRate = false;
+
+      if (voucher.items) {
+        voucher.items.forEach(i => {
+          const qty = Number(i.quantity || 0);
+          const rate = Number(i.rate || 0);
+          totalQty += qty;
+
+          if (consistentRate === -1) {
+            consistentRate = rate;
+          } else if (consistentRate !== rate) {
+            isMixedRate = true;
+          }
+        });
+      }
+      row.quantity = totalQty;
+      row.rate = isMixedRate ? 0 : (consistentRate === -1 ? 0 : consistentRate);
+
+      // Map Amounts to Columns
+      if (voucher.items) {
+        voucher.items.forEach(item => {
+          // Purchase Amount
+          if (item.purchaseLedgerName) {
+            row[item.purchaseLedgerName] = (row[item.purchaseLedgerName] || 0) + Number(item.amount || 0);
+          }
+        });
+
+        // Taxes: Start by creating a set of ledgers present in this voucher
+        const vCgstLedgers = new Set<string>();
+        const vSgstLedgers = new Set<string>();
+        const vIgstLedgers = new Set<string>();
+        const vTdsLedgers = new Set<string>();
+
+        voucher.items.forEach(item => {
+          if (item.cgstLedgerName) vCgstLedgers.add(item.cgstLedgerName);
+          if (item.sgstLedgerName) vSgstLedgers.add(item.sgstLedgerName);
+          if (item.igstLedgerName) vIgstLedgers.add(item.igstLedgerName);
+          if (item.tdsLedgerName) vTdsLedgers.add(item.tdsLedgerName);
+        });
+
+        // Distribute Voucher Tax Totals to the FIRST found ledger of that type
+        if (vCgstLedgers.size > 0) {
+          const first = Array.from(vCgstLedgers)[0];
+          row[first] = (row[first] || 0) + Number(voucher.cgstAmount || 0);
+        }
+        if (vSgstLedgers.size > 0) {
+          const first = Array.from(vSgstLedgers)[0];
+          row[first] = (row[first] || 0) + Number(voucher.sgstAmount || 0);
+        }
+        if (vIgstLedgers.size > 0) {
+          const first = Array.from(vIgstLedgers)[0];
+          row[first] = (row[first] || 0) + Number(voucher.igstAmount || 0);
+        }
+        if (vTdsLedgers.size > 0) {
+          const first = Array.from(vTdsLedgers)[0];
+          row[first] = (row[first] || 0) + Number(voucher.tdsAmount || 0);
+        }
+      }
+
+      return row;
+    });
+
+    return { headers: allDynamicCols, rows };
   }, [filteredVouchers]);
 
 
@@ -574,6 +683,7 @@ const PurchaseReport1: React.FC = () => {
               label: "Extract",
               icon: <ListFilter size={16} />,
             },
+            { key: "columnar", label: "Columnar", icon: <ListFilter size={16} /> },
             {
               key: "billwise",
               label: "Bill-wise",
@@ -603,8 +713,9 @@ const PurchaseReport1: React.FC = () => {
                   | "partywise"
                   | "billwise"
                   | "billwiseprofit"
+                  | "columnar"
                 );
-                if (view.key !== "detailed" && view.key !== "extract") setSelectedMonth(null);
+                if (view.key !== "detailed" && view.key !== "extract" && view.key !== "columnar") setSelectedMonth(null);
               }}
               className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${selectedView === view.key
                 ? theme === "dark"
@@ -1144,6 +1255,84 @@ const PurchaseReport1: React.FC = () => {
                             minimumFractionDigits: 2,
                           })}
                       </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
+
+            {/* Columnar View */}
+            {selectedView === "columnar" && (
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <tr>
+                      <th className="px-2 py-3 text-left font-medium min-w-[100px]">Date</th>
+                      <th className="px-2 py-3 text-left font-medium min-w-[200px]">Particulars</th>
+                      <th className="px-2 py-3 text-left font-medium">Vch No.</th>
+                      <th className="px-2 py-3 text-right font-medium">Quantity</th>
+                      <th className="px-2 py-3 text-right font-medium">Rate</th>
+                      <th className="px-2 py-3 text-right font-medium">Total</th>
+                      {columnarData.headers.map((col) => (
+                        <th key={col} className="px-2 py-3 text-right font-medium whitespace-nowrap">
+                          {col}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-200">
+                    {columnarData.rows.map((row, index) => (
+                      <tr
+                        key={row.id || index}
+                        className={`hover:bg-opacity-50 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"}`}
+                      >
+                        <td className="px-2 py-2">
+                          {new Date(row.date).toLocaleDateString("en-IN")}
+                        </td>
+                        <td className="px-2 py-2 font-medium">{row.partyName}</td>
+                        <td className="px-2 py-2">{row.voucherNo}</td>
+                        <td className="px-2 py-2 text-right">{row.quantity}</td>
+                        <td className="px-2 py-2 text-right">
+                          {row.rate > 0 ? row.rate.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "-"}
+                        </td>
+                        <td className="px-2 py-2 text-right font-semibold">
+                          {row.total?.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </td>
+                        {/* Dynamic Columns */}
+                        {columnarData.headers.map((col) => (
+                          <td key={col} className="px-2 py-2 text-right text-xs">
+                            {row[col]
+                              ? Number(row[col]).toLocaleString("en-IN", { minimumFractionDigits: 2 })
+                              : "-"}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {columnarData.rows.length === 0 && (
+                      <tr>
+                        <td colSpan={5 + columnarData.headers.length} className="px-4 py-8 text-center opacity-50">
+                          No transactions found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                    <tr className="font-semibold">
+                      <td colSpan={3} className="px-2 py-3 text-right">Total</td>
+                      <td className="px-2 py-3 text-right">
+                        {columnarData.rows.reduce((sum, r) => sum + r.quantity, 0)}
+                      </td>
+                      <td className="px-2 py-3 text-right">
+                        {columnarData.rows.reduce((sum, r) => sum + r.rate, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-2 py-3 text-right">
+                        {columnarData.rows.reduce((sum, r) => sum + r.total, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                      {columnarData.headers.map(col => (
+                        <td key={col} className="px-2 py-3 text-right">
+                          {columnarData.rows.reduce((sum, r) => sum + (r[col] || 0), 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                        </td>
+                      ))}
                     </tr>
                   </tfoot>
                 </table>
