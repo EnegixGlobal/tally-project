@@ -30,9 +30,26 @@ interface SalesData {
   cgstAmount: number;
   sgstAmount: number;
   igstAmount: number;
+  tdsAmount?: number;
   cessAmount: number;
   totalTaxAmount: number;
   netAmount: number;
+  items?: {
+    id: number;
+    voucherId: number;
+    purchaseLedgerId: number;
+    purchaseLedgerName: string;
+    purchaseLedgerGroupId: number;
+    purchaseLedgerGroupName: string;
+    cgstLedgerName?: string;
+    sgstLedgerName?: string;
+    igstLedgerName?: string;
+    tdsLedgerName?: string;
+    itemName?: string;
+    quantity?: number;
+    rate?: number;
+    amount?: number;
+  }[];
   itemDetails: {
     itemName: string;
     hsnCode: string;
@@ -46,6 +63,8 @@ interface SalesData {
   status: "Paid" | "Unpaid" | "Partially Paid" | "Overdue";
   reference?: string;
   narration?: string;
+  groupName?: string;
+  groupId?: number;
 }
 
 interface FilterState {
@@ -192,37 +211,144 @@ const PurchaseReport1: React.FC = () => {
     const groups: Record<
       string,
       {
-        debit: number;
-        credit: number;
-        ledgers: Record<string, { debit: number; credit: number }>;
+        totalDebit: number;
+        totalCredit: number;
+        transactions: {
+          name: string;
+          debit: number;
+          credit: number;
+        }[];
       }
     > = {};
 
     filteredVouchers.forEach((voucher) => {
-      const groupId = voucher.group_id;
-      const groupName = GROUP_NAMES[groupId] || `Group ${groupId}`;
-      const ledgerName = voucher.partyName || "Unknown Ledger";
-      const amount = Number(voucher.netAmount) || 0;
+      // 1️⃣ PARTY SIDE (Credit / Liability)
+      const groupName = voucher.groupName || voucher.group_name || "Current Liabilities";
+      const partyAmount = Number(voucher.netAmount || voucher.total || 0);
 
       if (!groups[groupName]) {
         groups[groupName] = {
-          debit: 0,
-          credit: 0,
-          ledgers: {},
+          totalDebit: 0,
+          totalCredit: 0,
+          transactions: [],
         };
       }
 
-      // Purchase voucher → Party credited
-      groups[groupName].credit += amount;
+      groups[groupName].totalCredit += partyAmount;
+      groups[groupName].transactions.push({
+        name: voucher.partyName || "Unknown Party",
+        debit: 0,
+        credit: partyAmount,
+      });
 
-      if (!groups[groupName].ledgers[ledgerName]) {
-        groups[groupName].ledgers[ledgerName] = {
-          debit: 0,
-          credit: 0,
-        };
+      // 2️⃣ PURCHASE SIDE (Debit / Expense) via Items
+      if (voucher.items && voucher.items.length > 0) {
+        voucher.items.forEach((item) => {
+          // Use hardcoded "Purchase Account" as requested, or derive if needed
+          // The user specifically asked for "Purchase Account"
+          const itemGroupName = "Purchase Account";
+
+          if (!groups[itemGroupName]) {
+            groups[itemGroupName] = {
+              totalDebit: 0,
+              totalCredit: 0,
+              transactions: [],
+            };
+          }
+
+          const itemAmount = Number(item.amount || 0);
+
+          groups[itemGroupName].totalDebit += itemAmount;
+          groups[itemGroupName].transactions.push({
+            name: item.purchaseLedgerName || "Unknown Purchase Ledger",
+            debit: itemAmount,
+            credit: 0,
+          });
+        });
       }
 
-      groups[groupName].ledgers[ledgerName].credit += amount;
+      // 3️⃣ DUTIES & TAXES (Debit / Asset or Liability Redn)
+      const taxGroupName = "Duties & Taxes";
+
+      // Extract Unique Tax Ledger Names from Items
+      const cgstLedgers = new Set<string>();
+      const sgstLedgers = new Set<string>();
+      const igstLedgers = new Set<string>();
+
+      if (voucher.items) {
+        voucher.items.forEach(i => {
+          if (i.cgstLedgerName) cgstLedgers.add(i.cgstLedgerName);
+          if (i.sgstLedgerName) sgstLedgers.add(i.sgstLedgerName);
+          if (i.igstLedgerName) igstLedgers.add(i.igstLedgerName);
+        });
+      }
+
+      const cgst = Number(voucher.cgstAmount || 0);
+      const sgst = Number(voucher.sgstAmount || 0);
+      const igst = Number(voucher.igstAmount || 0);
+
+      if (cgst > 0 || sgst > 0 || igst > 0) {
+        if (!groups[taxGroupName]) {
+          groups[taxGroupName] = {
+            totalDebit: 0,
+            totalCredit: 0,
+            transactions: [],
+          };
+        }
+
+        if (cgst > 0) {
+          groups[taxGroupName].totalDebit += cgst;
+          groups[taxGroupName].transactions.push({
+            name: Array.from(cgstLedgers).join(", ") || "Input CGST",
+            debit: cgst,
+            credit: 0,
+          });
+        }
+        if (sgst > 0) {
+          groups[taxGroupName].totalDebit += sgst;
+          groups[taxGroupName].transactions.push({
+            name: Array.from(sgstLedgers).join(", ") || "Input SGST",
+            debit: sgst,
+            credit: 0,
+          });
+        }
+        if (igst > 0) {
+          groups[taxGroupName].totalDebit += igst;
+          groups[taxGroupName].transactions.push({
+            name: Array.from(igstLedgers).join(", ") || "Input IGST",
+            debit: igst,
+            credit: 0,
+          });
+        }
+      }
+
+      // 4️⃣ TDS (Credit / Liability)
+      const tdsAmount = Number(voucher.tdsAmount || 0);
+      if (tdsAmount > 0) {
+        // Find distinct TDS ledger names from items
+        const tdsLedgers = new Set<string>();
+        if (voucher.items) {
+          voucher.items.forEach(i => {
+            if (i.tdsLedgerName) tdsLedgers.add(i.tdsLedgerName);
+          });
+        }
+
+        const tdsGroupName = "TDS Payable"; // Or derive group if possible
+        if (!groups[tdsGroupName]) {
+          groups[tdsGroupName] = {
+            totalDebit: 0,
+            totalCredit: 0,
+            transactions: [],
+          };
+        }
+
+        groups[tdsGroupName].totalCredit += tdsAmount;
+        groups[tdsGroupName].transactions.push({
+          name: Array.from(tdsLedgers).join(", ") || "TDS Ledger",
+          debit: 0,
+          credit: tdsAmount,
+        });
+      }
     });
 
     return groups;
@@ -350,6 +476,7 @@ const PurchaseReport1: React.FC = () => {
       });
   }, [companyId, ownerType, ownerId]);
 
+  /*
   useEffect(() => {
     if (selectedView === "extract" && !ledgerReportData && companyId && ownerType && ownerId) {
       const url = `${import.meta.env.VITE_API_URL
@@ -367,6 +494,7 @@ const PurchaseReport1: React.FC = () => {
         });
     }
   }, [selectedView, companyId, ownerType, ownerId, ledgerReportData]);
+  */
 
   // calculate total sales
   const totalSales = useMemo(() => {
@@ -911,246 +1039,116 @@ const PurchaseReport1: React.FC = () => {
 
 
             {/* Extract View */}
-            {/* Extract View */}
-{selectedView === "extract" && ledgerReportData && (
-  <div className="overflow-x-auto">
-    <table className="w-full">
-      <thead className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
-        <tr>
-          <th className="px-4 py-3 text-left font-medium w-1/2">
-            Particulars
-          </th>
-          <th className="px-4 py-3 text-right font-medium">
-            Debit
-          </th>
-          <th className="px-4 py-3 text-right font-medium">
-            Credit
-          </th>
-        </tr>
-      </thead>
+            {selectedView === "extract" && (
+              <div className="overflow-x-auto">
+                <table className="w-full">
+                  <thead className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
+                    <tr>
+                      <th className="px-4 py-3 text-left font-medium w-1/2">
+                        Particulars
+                      </th>
+                      <th className="px-4 py-3 text-right font-medium">
+                        Debit
+                      </th>
+                      <th className="px-4 py-3 text-right font-medium">
+                        Credit
+                      </th>
+                    </tr>
+                  </thead>
 
-      <tbody className="divide-y divide-gray-200">
-
-        {Object.entries(ledgerReportData).map(
-          ([groupId, group]: [string, any]) => {
-
-            const ledgerArray = group?.ledgers || [];
-            const subGroups = group?.subGroups || {};
-
-            const groupTotalDebit = ledgerArray.reduce(
-              (sum: number, l: any) =>
-                sum +
-                (l.balance_type === "Dr"
-                  ? Number(l.closing_balance) || 0
-                  : 0),
-              0
-            );
-
-            const groupTotalCredit = ledgerArray.reduce(
-              (sum: number, l: any) =>
-                sum +
-                (l.balance_type === "Cr"
-                  ? Number(l.closing_balance) || 0
-                  : 0),
-              0
-            );
-
-            return (
-              <React.Fragment key={groupId}>
-                {/* 🔹 Group Header */}
-                <tr className={`${theme === "dark" ? "bg-gray-800" : "bg-gray-50"} font-bold`}>
-                  <td className="px-4 py-3 text-left text-blue-600">
-                    {group.name}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {groupTotalDebit > 0
-                      ? groupTotalDebit.toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                        })
-                      : "-"}
-                  </td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {groupTotalCredit > 0
-                      ? groupTotalCredit.toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                        })
-                      : "-"}
-                  </td>
-                </tr>
-
-                {/* 🔹 Ledgers Under Group */}
-                {ledgerArray.map((ledger: any) => (
-                  <tr
-                    key={ledger.id}
-                    className={`hover:bg-opacity-50 ${
-                      theme === "dark"
-                        ? "hover:bg-gray-700"
-                        : "hover:bg-gray-50"
-                    }`}
-                  >
-                    <td className="px-4 py-2 pl-8 text-sm italic">
-                      {ledger.name}
-                    </td>
-
-                    <td className="px-4 py-2 text-right text-sm font-mono">
-                      {ledger.balance_type === "Dr"
-                        ? Number(ledger.closing_balance).toLocaleString(
-                            "en-IN",
-                            { minimumFractionDigits: 2 }
-                          )
-                        : ""}
-                    </td>
-
-                    <td className="px-4 py-2 text-right text-sm font-mono">
-                      {ledger.balance_type === "Cr"
-                        ? Number(ledger.closing_balance).toLocaleString(
-                            "en-IN",
-                            { minimumFractionDigits: 2 }
-                          )
-                        : ""}
-                    </td>
-                  </tr>
-                ))}
-
-                {/* 🔹 SubGroups (Duties & Taxes etc.) */}
-                {Object.entries(subGroups).map(
-                  ([subName, subLedgers]: [string, any]) => {
-
-                    const subArray = subLedgers || [];
-
-                    const subDebit = subArray.reduce(
-                      (sum: number, l: any) =>
-                        sum +
-                        (l.balance_type === "Dr"
-                          ? Number(l.closing_balance) || 0
-                          : 0),
-                      0
-                    );
-
-                    const subCredit = subArray.reduce(
-                      (sum: number, l: any) =>
-                        sum +
-                        (l.balance_type === "Cr"
-                          ? Number(l.closing_balance) || 0
-                          : 0),
-                      0
-                    );
-
-                    return (
-                      <React.Fragment key={subName}>
-                        {/* SubGroup Header */}
-                        <tr className="font-semibold bg-yellow-50">
-                          <td className="px-4 py-2 pl-12">
-                            {subName}
+                  <tbody className="divide-y divide-gray-200">
+                    {/* Render Grouped Data */}
+                    {Object.entries(groupedExtractData).map(([groupName, group]) => (
+                      <React.Fragment key={groupName}>
+                        {/* 🔹 Group Header */}
+                        <tr className={`${theme === "dark" ? "bg-gray-800" : "bg-gray-50"} font-bold`}>
+                          <td className="px-4 py-3 text-left text-blue-600">
+                            {groupName}
                           </td>
-                          <td className="px-4 py-2 text-right font-mono">
-                            {subDebit > 0
-                              ? subDebit.toLocaleString("en-IN", {
-                                  minimumFractionDigits: 2,
-                                })
+                          <td className="px-4 py-3 text-right font-mono">
+                            {group.totalDebit > 0
+                              ? group.totalDebit.toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                              })
                               : "-"}
                           </td>
-                          <td className="px-4 py-2 text-right font-mono">
-                            {subCredit > 0
-                              ? subCredit.toLocaleString("en-IN", {
-                                  minimumFractionDigits: 2,
-                                })
+                          <td className="px-4 py-3 text-right font-mono">
+                            {group.totalCredit > 0
+                              ? group.totalCredit.toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                              })
                               : "-"}
                           </td>
                         </tr>
 
-                        {/* SubGroup Ledgers */}
-                        {subArray.map((ledger: any) => (
-                          <tr key={ledger.id}>
-                            <td className="px-4 py-2 pl-16 text-sm">
-                              {ledger.name}
+                        {/* 🔹 Transactions Under Group */}
+                        {group.transactions.map((txn, index) => (
+                          <tr
+                            key={`${groupName}-${index}`}
+                            className={`hover:bg-opacity-50 ${theme === "dark"
+                              ? "hover:bg-gray-700"
+                              : "hover:bg-gray-50"
+                              }`}
+                          >
+                            <td className="px-4 py-2 pl-8 text-sm italic">
+                              {txn.name}
                             </td>
-                            <td className="px-4 py-2 text-right font-mono text-sm">
-                              {ledger.balance_type === "Dr"
-                                ? Number(
-                                    ledger.closing_balance
-                                  ).toLocaleString("en-IN", {
-                                    minimumFractionDigits: 2,
-                                  })
-                                : ""}
+
+                            <td className="px-4 py-2 text-right text-sm font-mono">
+                              {txn.debit > 0
+                                ? txn.debit.toLocaleString("en-IN", {
+                                  minimumFractionDigits: 2,
+                                })
+                                : "-"}
                             </td>
-                            <td className="px-4 py-2 text-right font-mono text-sm">
-                              {ledger.balance_type === "Cr"
-                                ? Number(
-                                    ledger.closing_balance
-                                  ).toLocaleString("en-IN", {
-                                    minimumFractionDigits: 2,
-                                  })
-                                : ""}
+
+                            <td className="px-4 py-2 text-right text-sm font-mono">
+                              {txn.credit > 0
+                                ? txn.credit.toLocaleString("en-IN", {
+                                  minimumFractionDigits: 2,
+                                })
+                                : "-"}
                             </td>
                           </tr>
                         ))}
                       </React.Fragment>
-                    );
-                  }
-                )}
-              </React.Fragment>
-            );
-          }
-        )}
+                    ))}
 
-        {/* No Data */}
-        {Object.keys(ledgerReportData).length === 0 && (
-          <tr>
-            <td colSpan={3} className="px-4 py-8 text-center opacity-50">
-              No transactions found.
-            </td>
-          </tr>
-        )}
-      </tbody>
+                    {/* No Data */}
+                    {Object.keys(groupedExtractData).length === 0 && (
+                      <tr>
+                        <td colSpan={3} className="px-4 py-8 text-center opacity-50">
+                          No transactions found.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
 
-      {/* 🔹 Grand Total */}
-      <tfoot className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
-        <tr className="font-semibold">
-          <td className="px-4 py-3">Grand Total</td>
+                  {/* 🔹 Grand Total */}
+                  <tfoot className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                    <tr className="font-semibold">
+                      <td className="px-4 py-3">Grand Total</td>
 
-          <td className="px-4 py-3 text-right font-mono">
-            {Object.values(ledgerReportData)
-              .flatMap((group: any) => [
-                ...(group.ledgers || []),
-                ...Object.values(group.subGroups || {}).flat(),
-              ])
-              .reduce(
-                (sum: number, l: any) =>
-                  sum +
-                  (l.balance_type === "Dr"
-                    ? Number(l.closing_balance) || 0
-                    : 0),
-                0
-              )
-              .toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-              })}
-          </td>
+                      <td className="px-4 py-3 text-right font-mono">
+                        {Object.values(groupedExtractData)
+                          .reduce((sum, group) => sum + group.totalDebit, 0)
+                          .toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                      </td>
 
-          <td className="px-4 py-3 text-right font-mono">
-            {Object.values(ledgerReportData)
-              .flatMap((group: any) => [
-                ...(group.ledgers || []),
-                ...Object.values(group.subGroups || {}).flat(),
-              ])
-              .reduce(
-                (sum: number, l: any) =>
-                  sum +
-                  (l.balance_type === "Cr"
-                    ? Number(l.closing_balance) || 0
-                    : 0),
-                0
-              )
-              .toLocaleString("en-IN", {
-                minimumFractionDigits: 2,
-              })}
-          </td>
-        </tr>
-      </tfoot>
-    </table>
-  </div>
-)}
+                      <td className="px-4 py-3 text-right font-mono">
+                        {Object.values(groupedExtractData)
+                          .reduce((sum, group) => sum + group.totalCredit, 0)
+                          .toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            )}
 
 
             {selectedView === "partywise" && (
