@@ -14,7 +14,7 @@ const PrivacyPolicyPage: React.FC = () => {
           <p className="text-sm text-gray-500 mb-8">Last updated: {new Date().toLocaleDateString()}</p>
           
           <p className="text-xl text-gray-600 mb-8">
-            At TallyPrime, we take your privacy seriously. This Privacy Policy explains how we collect, 
+            At ApnaBook, we take your privacy seriously. This Privacy Policy explains how we collect, 
             use, and protect your personal information.
           </p>
           
@@ -72,9 +72,9 @@ const PrivacyPolicyPage: React.FC = () => {
           </p>
           <div className="bg-gray-50 p-6 rounded-lg">
             <p className="text-gray-700">
-              <strong>Email:</strong> privacy@tallyprime.com<br />
+              <strong>Email:</strong> privacy@apnabook.com<br />
               <strong>Phone:</strong> +91-80-1234-5678<br />
-              <strong>Address:</strong> TallyPrime Technologies Pvt. Ltd.<br />
+              <strong>Address:</strong> ApnaBook Technologies Pvt. Ltd.<br />
               123 Business Park, Bangalore, Karnataka 560001
             </p>
           </div>

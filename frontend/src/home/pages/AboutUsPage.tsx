@@ -61,7 +61,7 @@ const AboutUsPage: React.FC = () => {
       <section className="bg-gradient-to-br from-[#6D30D4] to-[#9D78DB] text-white py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center">
-            <h1 className="text-5xl font-bold mb-6">About TallyPrime</h1>
+            <h1 className="text-5xl font-bold mb-6">About ApnaBook</h1>
             <p className="text-xl text-white/90 max-w-3xl mx-auto leading-relaxed">
               Empowering Indian businesses with modern, cloud-based accounting solutions. 
               We make financial management simple, secure, and compliant.
@@ -92,7 +92,7 @@ const AboutUsPage: React.FC = () => {
               </div>
               <h3 className="text-2xl font-bold text-gray-900 text-center mb-4">Trusted by Businesses</h3>
               <p className="text-gray-600 text-center">
-                From startups to established enterprises, thousands of businesses trust TallyPrime 
+                From startups to established enterprises, thousands of businesses trust ApnaBook 
                 for their accounting and financial management needs.
               </p>
             </div>
@@ -122,7 +122,7 @@ const AboutUsPage: React.FC = () => {
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose TallyPrime?</h2>
+            <h2 className="text-4xl font-bold text-gray-900 mb-4">Why Choose ApnaBook?</h2>
             <p className="text-xl text-gray-600">Everything you need to manage your business finances</p>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -177,7 +177,7 @@ const AboutUsPage: React.FC = () => {
           </div>
           <h2 className="text-4xl font-bold mb-6">Ready to Transform Your Business?</h2>
           <p className="text-xl text-white/90 mb-8 leading-relaxed">
-            Join thousands of businesses that have already simplified their accounting with TallyPrime. 
+            Join thousands of businesses that have already simplified their accounting with ApnaBook. 
             Start your journey towards better financial management today.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

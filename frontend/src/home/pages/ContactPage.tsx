@@ -11,7 +11,7 @@ const ContactPage: React.FC = () => {
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Contact Sales</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Ready to transform your business with TallyPrime? Get in touch with our sales team 
+            Ready to transform your business with ApnaBook? Get in touch with our sales team 
             to discuss your needs and find the perfect solution.
           </p>
         </div>
@@ -122,7 +122,7 @@ const ContactPage: React.FC = () => {
           {/* Contact Information */}
           <div className="space-y-8">
             <div className="bg-gradient-to-br from-[#6D30D4] to-[#9D78DB] rounded-lg p-8 text-white">
-              <h3 className="text-2xl font-bold mb-6">Why Choose TallyPrime?</h3>
+              <h3 className="text-2xl font-bold mb-6">Why Choose ApnaBook?</h3>
               <ul className="space-y-4">
                 <li className="flex items-start">
                   <div className="w-2 h-2 bg-white rounded-full mt-2 mr-3 flex-shrink-0"></div>
@@ -152,18 +152,18 @@ const ContactPage: React.FC = () => {
               <div className="space-y-4">
                 <div>
                   <h4 className="font-semibold text-gray-900">Sales Team</h4>
-                  <p className="text-gray-600">sales@tallyprime.com</p>
+                  <p className="text-gray-600">sales@apnabook.com</p>
                   <p className="text-gray-600">+91-80-1234-5678</p>
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-900">Support Team</h4>
-                  <p className="text-gray-600">support@tallyprime.com</p>
+                  <p className="text-gray-600">support@apnabook.com</p>
                   <p className="text-gray-600">+91-80-1234-5679</p>
                 </div>
                 <div>
                   <h4 className="font-semibold text-gray-900">Office</h4>
                   <p className="text-gray-600">
-                    TallyPrime Technologies Pvt. Ltd.<br />
+                    ApnaBook Technologies Pvt. Ltd.<br />
                     123 Business Park<br />
                     Bangalore, Karnataka 560001
                   </p>

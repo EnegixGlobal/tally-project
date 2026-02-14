@@ -66,9 +66,10 @@ interface FilterState {
 }
 
 type ViewType =
-  | "dashboard"
-  | "transactions"
+  | "summary"
+  | "detailed"
   | "columnar"
+  | "extract"
   | "partners"
   | "analytics"
   | "contracts";
@@ -91,7 +92,7 @@ const B2B: React.FC = () => {
     ) || "";
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [selectedView, setSelectedView] = useState<ViewType>("dashboard");
+  const [selectedView, setSelectedView] = useState<ViewType>("summary");
   const [filters, setFilters] = useState<FilterState>({
     dateRange: "this-month",
     fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -234,7 +235,7 @@ const B2B: React.FC = () => {
 
   //disabled block
   const isTabDisabled = (view: ViewType) => {
-    return view !== "dashboard" && view !== "columnar";
+    return view !== "columnar" && view !== "extract" && view !== "summary" && view !== "detailed";
   };
 
   const [saleData, setSaleData] = useState<any[]>([]);
@@ -484,6 +485,210 @@ const B2B: React.FC = () => {
     return { headers: allDynamicCols, rows };
   }, [matchedSales, ledgerMap]);
 
+  // 🔹 MONTHLY DATA LOGIC
+  const MONTHS = [
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+    "January",
+    "February",
+    "March",
+  ];
+
+  const monthIndexToName: Record<number, string> = {
+    0: "January",
+    1: "February",
+    2: "March",
+    3: "April",
+    4: "May",
+    5: "June",
+    6: "July",
+    7: "August",
+    8: "September",
+    9: "October",
+    10: "November",
+    11: "December",
+  };
+
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const filteredDetailedData = useMemo(() => {
+    let data = [...matchedSales];
+
+    if (selectedMonth) {
+      data = data.filter((item) => {
+        if (!item.date) return false;
+        const d = new Date(item.date);
+        const monthName = monthIndexToName[d.getMonth()];
+        return monthName === selectedMonth;
+      });
+    }
+
+    return data;
+  }, [matchedSales, selectedMonth]);
+
+  const summaryData = useMemo(() => {
+    const map: Record<string, { debit: number; closingBalance: number }> = {};
+    MONTHS.forEach((m) => {
+      map[m] = { debit: 0, closingBalance: 0 };
+    });
+
+    matchedSales.forEach((row) => {
+      if (!row.date || !row.total) return;
+
+      const d = new Date(row.date);
+      const monthName = monthIndexToName[d.getMonth()];
+      const amount = Number(row.total) || 0;
+
+      if (map[monthName]) {
+        map[monthName].debit += amount;
+      }
+    });
+
+    let runningTotal = 0;
+    MONTHS.forEach((m) => {
+      runningTotal += map[m].debit;
+      map[m].closingBalance = runningTotal;
+    });
+
+    return map;
+  }, [matchedSales]);
+
+  const totalSalesValue = useMemo(() => {
+    return matchedSales.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
+  }, [matchedSales]);
+
+  // 🔹 EXTRACT LOGIC (Group by Ledger Groups like 'Sales Accounts', 'Duties & Taxes')
+  const extractData = useMemo(() => {
+    const groups: Record<
+      string,
+      {
+        totalDebit: number;
+        totalCredit: number;
+        transactions: {
+          name: string;
+          debit: number;
+          credit: number;
+        }[];
+      }
+    > = {};
+
+    matchedSales.forEach((voucher: any) => {
+      // 1️⃣ PARTY SIDE (Debit / Asset - Sundry Debtors)
+      // Check if groupName exists, otherwise default to Sundry Debtors. 
+      // Note: B2B might not have groupName populated on voucher, so default is important.
+      const groupName = voucher.groupName || "Sundry Debtors";
+      const partyAmount = Number(voucher.netAmount || voucher.total || 0);
+
+      if (!groups[groupName]) {
+        groups[groupName] = {
+          totalDebit: 0,
+          totalCredit: 0,
+          transactions: [],
+        };
+      }
+
+      groups[groupName].totalDebit += partyAmount;
+      groups[groupName].transactions.push({
+        name: voucher.partyName || "Unknown Party",
+        debit: partyAmount,
+        credit: 0,
+      });
+
+      // 2️⃣ SALES SIDE (Credit / Income) via Items
+      if (voucher.items && voucher.items.length > 0) {
+        voucher.items.forEach((item: any) => {
+          const itemGroupName = "Sales Account";
+
+          if (!groups[itemGroupName]) {
+            groups[itemGroupName] = {
+              totalDebit: 0,
+              totalCredit: 0,
+              transactions: [],
+            };
+          }
+
+          const itemAmount = Number(item.amount || 0);
+
+          groups[itemGroupName].totalCredit += itemAmount;
+          groups[itemGroupName].transactions.push({
+            name: item.salesLedgerName || "Unknown Sales Ledger",
+            debit: 0,
+            credit: itemAmount,
+          });
+        });
+      }
+
+      // 3️⃣ DUTIES & TAXES (Credit / Liability - Output Tax)
+      const taxGroupName = "Duties & Taxes";
+
+      // Extract Unique Tax Ledger Names from Items
+      const cgstLedgers = new Set<string>();
+      const sgstLedgers = new Set<string>();
+      const igstLedgers = new Set<string>();
+
+      if (voucher.items) {
+        voucher.items.forEach((i: any) => {
+          if (i.cgstLedgerName) cgstLedgers.add(i.cgstLedgerName);
+          if (i.sgstLedgerName) sgstLedgers.add(i.sgstLedgerName);
+          if (i.igstLedgerName) igstLedgers.add(i.igstLedgerName);
+        });
+      }
+
+      // In B2B, voucher has cgstTotal etc. mapped from cgstAmount. 
+      // Use the mapped fields if consistent, or check item sums? 
+      // SalesReport checks voucher.cgstAmount. 
+      // In B2B loadSalesVouchers: cgstTotal: v.cgstAmount || v.cgstTotal
+      // So use voucher.cgstTotal
+      const cgst = Number(voucher.cgstTotal || 0);
+      const sgst = Number(voucher.sgstTotal || 0);
+      const igst = Number(voucher.igstTotal || 0);
+
+      if (cgst > 0 || sgst > 0 || igst > 0) {
+        if (!groups[taxGroupName]) {
+          groups[taxGroupName] = {
+            totalDebit: 0,
+            totalCredit: 0,
+            transactions: [],
+          };
+        }
+
+        if (cgst > 0) {
+          groups[taxGroupName].totalCredit += cgst;
+          groups[taxGroupName].transactions.push({
+            name: Array.from(cgstLedgers).join(", ") || "Output CGST",
+            debit: 0,
+            credit: cgst,
+          });
+        }
+        if (sgst > 0) {
+          groups[taxGroupName].totalCredit += sgst;
+          groups[taxGroupName].transactions.push({
+            name: Array.from(sgstLedgers).join(", ") || "Output SGST",
+            debit: 0,
+            credit: sgst,
+          });
+        }
+        if (igst > 0) {
+          groups[taxGroupName].totalCredit += igst;
+          groups[taxGroupName].transactions.push({
+            name: Array.from(igstLedgers).join(", ") || "Output IGST",
+            debit: 0,
+            credit: igst,
+          });
+        }
+      }
+    });
+
+    return groups;
+  }, [matchedSales]);
+
   return (
     <div className="pt-[56px] px-4">
       {/* Header */}
@@ -647,9 +852,10 @@ const B2B: React.FC = () => {
       <div className="flex space-x-2 mb-6 overflow-x-auto">
         {(
           [
-            "dashboard",
+            "summary",
+            "detailed",
+            "extract",
             "columnar",
-            "transactions",
             "partners",
             "analytics",
             "contracts",
@@ -662,7 +868,10 @@ const B2B: React.FC = () => {
               key={view}
               disabled={disabled}
               onClick={() => {
-                if (!disabled) setSelectedView(view);
+                if (!disabled) {
+                  setSelectedView(view);
+                  if (view !== 'detailed') setSelectedMonth(null);
+                }
               }}
               className={`px-4 py-2 rounded-lg capitalize whitespace-nowrap
           ${selectedView === view
@@ -687,115 +896,164 @@ const B2B: React.FC = () => {
       </div>
 
       <div ref={printRef}>
-        {/* Dashboard View */}
-        {selectedView === "dashboard" && (
-          <>
-            <div
-              className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-                }`}
-            >
-              <h3 className="text-lg font-semibold mb-4">Recent Orders</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead
-                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                      }`}
+
+        {/* Summary View */}
+        {selectedView === "summary" && (
+          <div
+            className={`rounded-lg overflow-hidden mb-6 ${theme === "dark"
+              ? "bg-gray-800 text-white"
+              : "bg-white text-black"
+              }`}
+          >
+            {/* 🔹 TOP BORDER */}
+            <div className="border-t border-b border-gray-400">
+              {/* Header */}
+              <div className="grid grid-cols-4 px-4 py-2 font-semibold border-b border-gray-400">
+                <div>Particulars</div>
+                <div className="text-right">Debit</div>
+                <div className="text-right">Credit</div>
+                <div className="text-right">Closing</div>
+              </div>
+
+              {/* Month Rows */}
+              {MONTHS.map((month) => {
+                const row = summaryData[month] || {
+                  debit: 0,
+                  closingBalance: 0,
+                };
+
+                return (
+                  <div
+                    key={month}
+                    onClick={() => {
+                      setSelectedMonth(month);
+                      setSelectedView("detailed");
+                    }}
+                    className={`grid grid-cols-4 px-4 py-2 text-sm cursor-pointer ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                   >
-                    <tr>
-                      <th className="text-left p-3">Customer</th>
-                      <th className="text-left p-3">Voucher No</th>
-                      <th className="text-left p-3">GST No</th>
-                      <th className="text-left p-3">QTY</th>
-                      <th className="text-left p-3">Rate</th>
-                      <th className="text-left p-3">Amount</th>
-                      {/* <th className="text-left p-3">Tax Value</th> */}
-                      <th className="text-left p-3">IGST</th>
-                      <th className="text-left p-3">CGST</th>
-                      <th className="text-left p-3">SGST</th>
-                      <th className="text-left p-3">Total Amount</th>
-                      <th className="text-left p-3">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {matchedSales
-                      .slice(0, 5)
-                      .map((sale: any, index: number) => {
-                        const partyLedger = ledgerMap.get(sale.partyId);
+                    <div className="font-medium">{month}</div>
 
-                        return (
-                          <tr
-                            key={sale.id || `order-${index}`}
-                            className={`border-b ${theme === "dark"
-                              ? "border-gray-700"
-                              : "border-gray-200"
-                              }`}
-                          >
-                            {/* Customer */}
-                            <td className="p-3">
-                              <div className="font-medium">
-                                {partyLedger?.name || "Unknown Party"}
-                              </div>
-                            </td>
+                    {/* Debit (Sales Value) */}
+                    <div className="text-right font-mono">
+                      {row.debit ? row.debit.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
+                    </div>
 
-                            {/* Voucher No */}
-                            <td className="p-3 font-mono">{sale.number}</td>
+                    {/* Credit (Empty) */}
+                    <div className="text-right opacity-40"></div>
 
-                            {/* GST No */}
-                            <td className="p-3">
-                              {partyLedger?.gstNumber || "-"}
-                            </td>
+                    {/* Closing */}
+                    <div className="text-right font-mono">
+                      {row.closingBalance
+                        ? row.closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })
+                        : ""}
+                    </div>
+                  </div>
+                );
+              })}
 
-                            {/* QTY */}
-                            <td className="p-3">
-                              {getQtyByVoucher(sale.number)}
-                            </td>
-
-                            {/* Rate */}
-                            <td className="p-3">
-                              {getRateByVoucher(sale.number)}
-                            </td>
-
-                            {/* Amount (Taxable) */}
-                            <td className="p-3">
-                              ₹{Number(sale.subtotal || 0).toFixed(2)}
-                            </td>
-
-                            {/* Tax Value
-                            <td className="p-3">
-                              ₹{(Number(sale.igstTotal || 0) +
-                                Number(sale.cgstTotal || 0) +
-                                Number(sale.sgstTotal || 0)).toFixed(2)}
-                            </td> */}
-
-                            {/* IGST */}
-                            <td className="p-3">{sale.igstTotal || 0}</td>
-
-                            {/* CGST */}
-                            <td className="p-3">{sale.cgstTotal || 0}</td>
-
-                            {/* SGST */}
-                            <td className="p-3">{sale.sgstTotal || 0}</td>
-
-                            {/* Total Amount */}
-                            <td className="p-3 font-semibold">
-                              ₹{Number(sale.total || 0).toFixed(2)}
-                            </td>
-
-                            {/* Date */}
-                            <td className="p-3">
-                              {new Date(sale.date).toLocaleDateString("en-IN")}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
+              {/* 🔹 BOTTOM BORDER + GRAND TOTAL */}
+              <div className="border-t border-gray-400">
+                <div className="grid grid-cols-4 px-4 py-3 font-bold">
+                  <div>Grand Total</div>
+                  <div className="text-right font-mono">
+                    {totalSalesValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-right opacity-40">—</div>
+                  <div className="text-right font-mono">
+                    {totalSalesValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
               </div>
             </div>
-          </>
+          </div>
         )}
 
-        
+        {/* Detailed (Transactions) View */}
+        {selectedView === 'detailed' && (
+          <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+            }`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Detailed Transactions {selectedMonth ? `(${selectedMonth})` : ''}</h3>
+              {selectedMonth && (
+                <button
+                  onClick={() => setSelectedMonth(null)}
+                  className="text-sm text-blue-500 hover:text-blue-700 underline"
+                >
+                  Clear Filter
+                </button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
+                  }`}>
+                  <tr>
+                    <th className="text-left p-3">Customer</th>
+                    <th className="text-left p-3">Voucher No</th>
+                    <th className="text-left p-3">GST No</th>
+                    <th className="text-left p-3">QTY</th>
+                    <th className="text-left p-3">Rate</th>
+                    <th className="text-left p-3">Amount</th>
+                    <th className="text-left p-3">IGST</th>
+                    <th className="text-left p-3">CGST</th>
+                    <th className="text-left p-3">SGST</th>
+                    <th className="text-left p-3">Total Amount</th>
+                    <th className="text-left p-3">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDetailedData.map((sale: any, index: number) => {
+                    const partyLedger = ledgerMap.get(sale.partyId);
+
+                    return (
+                      <tr key={sale.id || index} className={`border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+                        }`}>
+                        {/* Customer */}
+                        <td className="p-3">
+                          <div className="font-medium">{partyLedger?.name || "Unknown Party"}</div>
+                        </td>
+
+                        {/* Voucher No */}
+                        <td className="p-3 font-mono">{sale.number}</td>
+
+                        {/* GST No */}
+                        <td className="p-3">
+                          {partyLedger?.gstNumber || "-"}
+                        </td>
+
+                        {/* QTY */}
+                        <td className="p-3">{getQtyByVoucher(sale.number)}</td>
+
+                        {/* Rate */}
+                        <td className="p-3">{getRateByVoucher(sale.number)}</td>
+
+                        {/* Amount (Taxable) */}
+                        <td className="p-3">₹{Number(sale.subtotal || 0).toFixed(2)}</td>
+
+                        {/* IGST */}
+                        <td className="p-3">{sale.igstTotal || 0}</td>
+
+                        {/* CGST */}
+                        <td className="p-3">{sale.cgstTotal || 0}</td>
+
+                        {/* SGST */}
+                        <td className="p-3">{sale.sgstTotal || 0}</td>
+
+                        {/* Total Amount */}
+                        <td className="p-3 font-semibold">₹{Number(sale.total || 0).toFixed(2)}</td>
+
+                        {/* Date */}
+                        <td className="p-3">{new Date(sale.date).toLocaleDateString('en-IN')}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
 
         {/* Columnar View */}
         {selectedView === "columnar" && (
@@ -885,8 +1143,135 @@ const B2B: React.FC = () => {
           </div>
         )}
 
-        {/* Transactions View */}
-        {selectedView === "transactions" && <></>}
+        {/* Extract View */}
+        {selectedView === "extract" && (
+          <div
+            className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+              }`}
+          >
+            <h3 className="text-lg font-semibold mb-4">Account Head-wise Extract</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                    }`}
+                >
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium w-1/2">
+                      Particulars
+                    </th>
+                    <th className="px-4 py-3 text-right font-medium">
+                      Debit
+                    </th>
+                    <th className="px-4 py-3 text-right font-medium">
+                      Credit
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {Object.entries(extractData).map(
+                    ([groupName, group]) => (
+                      <React.Fragment key={groupName}>
+                        {/* 🔹 Group Header */}
+                        <tr
+                          className={`${theme === "dark" ? "bg-gray-700/50" : "bg-gray-100"
+                            } font-bold`}
+                        >
+                          <td className="px-4 py-3 text-left text-blue-600">
+                            {groupName}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">
+                            {group.totalDebit > 0
+                              ? group.totalDebit.toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                              })
+                              : "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">
+                            {group.totalCredit > 0
+                              ? group.totalCredit.toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                              })
+                              : "-"}
+                          </td>
+                        </tr>
+
+                        {/* 🔹 Transactions Under Group */}
+                        {group.transactions.map((txn, index) => (
+                          <tr
+                            key={`${groupName}-${index}`}
+                            className={`hover:bg-opacity-50 ${theme === "dark"
+                              ? "hover:bg-gray-700"
+                              : "hover:bg-gray-50"
+                              }`}
+                          >
+                            <td className="px-4 py-2 pl-8 text-sm italic">
+                              {txn.name}
+                            </td>
+
+                            <td className="px-4 py-2 text-right text-sm font-mono">
+                              {txn.debit > 0
+                                ? txn.debit.toLocaleString("en-IN", {
+                                  minimumFractionDigits: 2,
+                                })
+                                : "-"}
+                            </td>
+
+                            <td className="px-4 py-2 text-right text-sm font-mono">
+                              {txn.credit > 0
+                                ? txn.credit.toLocaleString("en-IN", {
+                                  minimumFractionDigits: 2,
+                                })
+                                : "-"}
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    )
+                  )}
+
+                  {/* No Data */}
+                  {Object.keys(extractData).length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-4 py-8 text-center opacity-50"
+                      >
+                        No extraction data available.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                {/* 🔹 Grand Total */}
+                <tfoot
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                    }`}
+                >
+                  <tr className="font-semibold">
+                    <td className="px-4 py-3">Grand Total</td>
+
+                    <td className="px-4 py-3 text-right font-mono">
+                      {Object.values(extractData)
+                        .reduce((sum, group) => sum + group.totalDebit, 0)
+                        .toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-mono">
+                      {Object.values(extractData)
+                        .reduce((sum, group) => sum + group.totalCredit, 0)
+                        .toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+
 
         {/* Partners View */}
         {selectedView === "partners" && <></>}

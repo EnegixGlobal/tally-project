@@ -138,9 +138,11 @@ ORDER BY pv.date ASC
     MAX(svi.cgstRate) AS cgstRate,
     MAX(svi.sgstRate) AS sgstRate,
     MAX(svi.igstRate) AS igstRate,
+    MAX(svi.discountLedgerId) AS discountLedgerId,
 
     MAX(l_party.name) AS partyName,
-    MAX(l_sales.name) AS salesLedgerName
+    MAX(l_sales.name) AS salesLedgerName,
+    MAX(sv.discountTotal) AS discountTotal
 
   FROM sales_vouchers sv
 
@@ -156,6 +158,7 @@ ORDER BY pv.date ASC
   WHERE
        sv.partyId = ?
     OR svi.salesLedgerId = ?
+    OR svi.discountLedgerId = ?
     OR svi.cgstRate = ?
     OR svi.sgstRate = ?
     OR svi.igstRate = ?
@@ -164,7 +167,7 @@ ORDER BY pv.date ASC
 
   ORDER BY sv.date ASC
   `,
-      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
+      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
     );
 
     /* ===============================
@@ -554,12 +557,19 @@ ORDER BY vm.date ASC
         particulars = sv.partyName; // ✅ Party
       }
 
+      /* ========= DISCOUNT ========= */
+      else if (currentLedger === Number(sv.discountLedgerId)) {
+        debit = Number(sv.discountTotal || 0);
+        particulars = sv.partyName; // ✅ Party
+      }
+
       if (debit === 0 && credit === 0) return;
 
       // Balance sirf Party + Sales pe
       if (
         currentLedger === Number(sv.partyId) ||
-        currentLedger === Number(sv.salesLedgerId)
+        currentLedger === Number(sv.salesLedgerId) ||
+        currentLedger === Number(sv.discountLedgerId)
       ) {
         balance += debit - credit;
       }

@@ -176,7 +176,7 @@ console.log("📨 Raw Response:");
           <div className="bg-white/10 backdrop-blur-lg rounded-3xl shadow-2xl p-8 border border-white/20">
             <div className="text-center mb-8">
               <h2 className="text-3xl font-bold text-white mb-2">Create Account</h2>
-              <p className="text-white/80">Join thousands of businesses using TallyPrime</p>
+              <p className="text-white/80">Join thousands of businesses using Apna Book</p>
             </div>
 
             <form className="space-y-4" onSubmit={handleSubmit}>

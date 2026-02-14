@@ -528,8 +528,8 @@ const SalesReport: React.FC = () => {
       {/* Header */}
       <div
         className={`p-4 border-b ${theme === "dark"
-            ? "border-gray-700 bg-gray-800"
-            : "border-gray-200 bg-white"
+          ? "border-gray-700 bg-gray-800"
+          : "border-gray-200 bg-white"
           }`}
       >
         <div className="flex items-center justify-between">
@@ -618,14 +618,14 @@ const SalesReport: React.FC = () => {
               onClick={() => {
                 setSelectedView(
                   view.key as
-                    | "summary"
-                    | "detailed"
-                    | "extract"
-                    | "columnar"
-                    | "itemwise"
-                    | "partywise"
-                    | "billwise"
-                    | "billwiseprofit"
+                  | "summary"
+                  | "detailed"
+                  | "extract"
+                  | "columnar"
+                  | "itemwise"
+                  | "partywise"
+                  | "billwise"
+                  | "billwiseprofit"
                 );
                 if (
                   view.key !== "detailed" &&
@@ -635,15 +635,14 @@ const SalesReport: React.FC = () => {
                   setSelectedMonth(null);
                 }
               }}
-              className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${
-                selectedView === view.key
+              className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${selectedView === view.key
                   ? theme === "dark"
                     ? "bg-blue-600 text-white"
                     : "bg-blue-500 text-white"
                   : theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-gray-200 hover:bg-gray-300"
-              }`}
+                    ? "bg-gray-700 hover:bg-gray-600"
+                    : "bg-gray-200 hover:bg-gray-300"
+                }`}
             >
               {view.icon}
               <span>{view.label}</span>
@@ -656,8 +655,8 @@ const SalesReport: React.FC = () => {
       {showFilterPanel && (
         <div
           className={`p-4 border-b ${theme === "dark"
-              ? "border-gray-700 bg-gray-800"
-              : "border-gray-200 bg-white"
+            ? "border-gray-700 bg-gray-800"
+            : "border-gray-200 bg-white"
             }`}
         >
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
@@ -671,8 +670,8 @@ const SalesReport: React.FC = () => {
                 value={filters.dateRange}
                 onChange={(e) => handleDateRangeChange(e.target.value)}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none`}
               >
                 <option value="today">Today</option>
@@ -698,8 +697,8 @@ const SalesReport: React.FC = () => {
                   setFilters((prev) => ({ ...prev, fromDate: e.target.value }))
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none`}
               />
             </div>
@@ -715,8 +714,8 @@ const SalesReport: React.FC = () => {
                   setFilters((prev) => ({ ...prev, toDate: e.target.value }))
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none`}
               />
             </div>
@@ -735,8 +734,8 @@ const SalesReport: React.FC = () => {
                   }))
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none`}
               />
             </div>
@@ -754,8 +753,8 @@ const SalesReport: React.FC = () => {
                   }))
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none`}
               >
                 <option value="">All Status</option>
@@ -782,8 +781,8 @@ const SalesReport: React.FC = () => {
                   }))
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none`}
               />
             </div>
@@ -803,8 +802,8 @@ const SalesReport: React.FC = () => {
                   }))
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none`}
               />
             </div>
@@ -832,8 +831,8 @@ const SalesReport: React.FC = () => {
                   })
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-600 hover:bg-gray-500 border-gray-600"
-                    : "bg-gray-100 hover:bg-gray-200 border-gray-300"
+                  ? "bg-gray-600 hover:bg-gray-500 border-gray-600"
+                  : "bg-gray-100 hover:bg-gray-200 border-gray-300"
                   } transition-colors`}
               >
                 Clear Filters
@@ -849,8 +848,8 @@ const SalesReport: React.FC = () => {
         {selectedView === "summary" && (
           <div
             className={`rounded-lg overflow-hidden ${theme === "dark"
-                ? "bg-gray-800 text-white"
-                : "bg-white text-black"
+              ? "bg-gray-800 text-white"
+              : "bg-white text-black"
               }`}
           >
             {/* 🔹 TOP BORDER */}
@@ -932,11 +931,10 @@ const SalesReport: React.FC = () => {
                     <select
                       value={selectedMonth || ""}
                       onChange={(e) => setSelectedMonth(e.target.value)}
-                      className={`cursor-pointer p-1 pr-8 rounded border outline-none ${
-                        theme === "dark"
+                      className={`cursor-pointer p-1 pr-8 rounded border outline-none ${theme === "dark"
                           ? "bg-gray-700 border-gray-600 text-white"
                           : "bg-white border-gray-300 text-black"
-                      }`}
+                        }`}
                     >
                       <option value="" disabled>
                         Select Month
@@ -958,9 +956,8 @@ const SalesReport: React.FC = () => {
 
                 <table className="w-full">
                   <thead
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                      }`}
                   >
                     <tr>
                       <th
@@ -1004,11 +1001,10 @@ const SalesReport: React.FC = () => {
                       filteredVouchers.map((voucher, index) => (
                         <tr
                           key={voucher.id || index}
-                          className={`hover:bg-opacity-50 ${
-                            theme === "dark"
+                          className={`hover:bg-opacity-50 ${theme === "dark"
                               ? "hover:bg-gray-700"
                               : "hover:bg-gray-50"
-                          }`}
+                            }`}
                         >
                           {/* Date */}
                           <td className="px-4 py-3 text-sm">
@@ -1055,9 +1051,8 @@ const SalesReport: React.FC = () => {
 
                   {/* Footer Totals */}
                   <tfoot
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <tr className="font-semibold">
                       <td colSpan={4} className="px-4 py-3">
@@ -1089,9 +1084,8 @@ const SalesReport: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                      }`}
                   >
                     <tr>
                       <th className="px-4 py-3 text-left font-medium w-1/2">
@@ -1113,9 +1107,8 @@ const SalesReport: React.FC = () => {
                         <React.Fragment key={groupName}>
                           {/* 🔹 Group Header */}
                           <tr
-                            className={`${
-                              theme === "dark" ? "bg-gray-800" : "bg-gray-50"
-                            } font-bold`}
+                            className={`${theme === "dark" ? "bg-gray-800" : "bg-gray-50"
+                              } font-bold`}
                           >
                             <td className="px-4 py-3 text-left text-blue-600">
                               {groupName}
@@ -1123,15 +1116,15 @@ const SalesReport: React.FC = () => {
                             <td className="px-4 py-3 text-right font-mono">
                               {group.totalDebit > 0
                                 ? group.totalDebit.toLocaleString("en-IN", {
-                                    minimumFractionDigits: 2,
-                                  })
+                                  minimumFractionDigits: 2,
+                                })
                                 : "-"}
                             </td>
                             <td className="px-4 py-3 text-right font-mono">
                               {group.totalCredit > 0
                                 ? group.totalCredit.toLocaleString("en-IN", {
-                                    minimumFractionDigits: 2,
-                                  })
+                                  minimumFractionDigits: 2,
+                                })
                                 : "-"}
                             </td>
                           </tr>
@@ -1140,11 +1133,10 @@ const SalesReport: React.FC = () => {
                           {group.transactions.map((txn, index) => (
                             <tr
                               key={`${groupName}-${index}`}
-                              className={`hover:bg-opacity-50 ${
-                                theme === "dark"
+                              className={`hover:bg-opacity-50 ${theme === "dark"
                                   ? "hover:bg-gray-700"
                                   : "hover:bg-gray-50"
-                              }`}
+                                }`}
                             >
                               <td className="px-4 py-2 pl-8 text-sm italic">
                                 {txn.name}
@@ -1153,16 +1145,16 @@ const SalesReport: React.FC = () => {
                               <td className="px-4 py-2 text-right text-sm font-mono">
                                 {txn.debit > 0
                                   ? txn.debit.toLocaleString("en-IN", {
-                                      minimumFractionDigits: 2,
-                                    })
+                                    minimumFractionDigits: 2,
+                                  })
                                   : "-"}
                               </td>
 
                               <td className="px-4 py-2 text-right text-sm font-mono">
                                 {txn.credit > 0
                                   ? txn.credit.toLocaleString("en-IN", {
-                                      minimumFractionDigits: 2,
-                                    })
+                                    minimumFractionDigits: 2,
+                                  })
                                   : "-"}
                               </td>
                             </tr>
@@ -1186,9 +1178,8 @@ const SalesReport: React.FC = () => {
 
                   {/* 🔹 Grand Total */}
                   <tfoot
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <tr className="font-semibold">
                       <td className="px-4 py-3">Grand Total</td>
@@ -1219,9 +1210,8 @@ const SalesReport: React.FC = () => {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                      }`}
                   >
                     <tr>
                       <th className="px-2 py-3 text-left font-medium min-w-[100px]">
@@ -1254,11 +1244,10 @@ const SalesReport: React.FC = () => {
                     {columnarData.rows.map((row, index) => (
                       <tr
                         key={row.id || index}
-                        className={`hover:bg-opacity-50 ${
-                          theme === "dark"
+                        className={`hover:bg-opacity-50 ${theme === "dark"
                             ? "hover:bg-gray-700"
                             : "hover:bg-gray-50"
-                        }`}
+                          }`}
                       >
                         <td className="px-2 py-2">
                           {new Date(row.date).toLocaleDateString("en-IN")}
@@ -1271,8 +1260,8 @@ const SalesReport: React.FC = () => {
                         <td className="px-2 py-2 text-right">
                           {row.rate > 0
                             ? row.rate.toLocaleString("en-IN", {
-                                minimumFractionDigits: 2,
-                              })
+                              minimumFractionDigits: 2,
+                            })
                             : "-"}
                         </td>
                         <td className="px-2 py-2 text-right font-semibold">
@@ -1288,8 +1277,8 @@ const SalesReport: React.FC = () => {
                           >
                             {row[col]
                               ? Number(row[col]).toLocaleString("en-IN", {
-                                  minimumFractionDigits: 2,
-                                })
+                                minimumFractionDigits: 2,
+                              })
                               : "-"}
                           </td>
                         ))}
@@ -1307,9 +1296,8 @@ const SalesReport: React.FC = () => {
                     )}
                   </tbody>
                   <tfoot
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
                     <tr className="font-semibold">
                       <td colSpan={3} className="px-2 py-3 text-right">
