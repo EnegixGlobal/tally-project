@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Filter, Building2 } from "lucide-react";
+import { ArrowLeft, Download, Filter, Building2, ListFilter } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./reports.css";
 interface B2BTransactionLine {
@@ -68,6 +68,7 @@ interface FilterState {
 type ViewType =
   | "dashboard"
   | "transactions"
+  | "columnar"
   | "partners"
   | "analytics"
   | "contracts";
@@ -233,7 +234,7 @@ const B2B: React.FC = () => {
 
   //disabled block
   const isTabDisabled = (view: ViewType) => {
-    return view !== "dashboard";
+    return view !== "dashboard" && view !== "columnar";
   };
 
   const [saleData, setSaleData] = useState<any[]>([]);
@@ -249,22 +250,41 @@ const B2B: React.FC = () => {
 
     const loadSalesVouchers = async () => {
       try {
+        // Use sales-report endpoint to get items and ledger details
         const url = `${import.meta.env.VITE_API_URL
-          }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          }/api/sales-report?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
         const res = await fetch(url);
         const json = await res.json();
 
-        const vouchers = json?.data || json || [];
+        let vouchers = [];
+        if (Array.isArray(json)) {
+          vouchers = json;
+        } else if (Array.isArray(json?.data)) {
+          vouchers = json.data;
+        }
 
-        const allPartyIds = vouchers
+        // Map to expected structure and filter for items
+        const mappedVouchers = vouchers.map((v: any) => ({
+          ...v,
+          id: v.id,
+          partyId: v.ledgerId || v.partyId, // Ensure partyId is present
+          number: v.voucherNo || v.number, // Map voucherNo from report to number
+          subtotal: v.taxableAmount || v.subtotal,
+          total: v.netAmount || v.total,
+          cgstTotal: v.cgstAmount || v.cgstTotal,
+          sgstTotal: v.sgstAmount || v.sgstTotal,
+          igstTotal: v.igstAmount || v.igstTotal,
+        }));
+
+        const allPartyIds = mappedVouchers
           .map((v: any) => v.partyId)
           .filter((id: any) => id !== null && id !== undefined);
 
-        setSaleData(vouchers);
+        setSaleData(mappedVouchers);
         setPartyIds(allPartyIds);
       } catch (err) {
-        console.error("Failed to fetch sales vouchers:", err);
+        console.error("Failed to fetch sales report data:", err);
         setSaleData([]);
         setPartyIds([]);
       }
@@ -301,7 +321,11 @@ const B2B: React.FC = () => {
 
     const filteredLedgers = ledger.filter((l: any) => {
       return (
-        partyIdSet.has(l.id) && l.gstNumber && String(l.gstNumber).trim() !== ""
+        partyIdSet.has(l.id) &&
+        l.gstNumber &&
+        String(l.gstNumber).trim() !== "" &&
+        // Basic check to ensure valid format (simple length check or alphanumeric)
+        String(l.gstNumber).length >= 15
       );
     });
 
@@ -368,6 +392,98 @@ const B2B: React.FC = () => {
     return map;
   }, [ledger]);
 
+  // 🔹 COLUMNAR DATA LOGIC
+  const columnarData = useMemo(() => {
+    if (!matchedSales.length) return { headers: [], rows: [] };
+
+    const salesColumns = new Set<string>();
+    const taxColumns = new Set<string>();
+
+    // 1. Collect Columns
+    matchedSales.forEach((voucher: any) => {
+      if (voucher.items) {
+        voucher.items.forEach((item: any) => {
+          if (item.salesLedgerName) salesColumns.add(item.salesLedgerName);
+          if (item.cgstLedgerName) taxColumns.add(item.cgstLedgerName);
+          if (item.sgstLedgerName) taxColumns.add(item.sgstLedgerName);
+          if (item.igstLedgerName) taxColumns.add(item.igstLedgerName);
+        });
+      }
+    });
+
+    const sortedSalesCols = Array.from(salesColumns).sort();
+    const sortedTaxCols = Array.from(taxColumns).sort();
+    const allDynamicCols = [...sortedSalesCols, ...sortedTaxCols];
+
+    // 2. Prepare Rows
+    const rows = matchedSales.map((voucher: any) => {
+      const row: any = {
+        id: voucher.id,
+        date: voucher.date,
+        partyName: voucher.partyName || ledgerMap.get(voucher.partyId)?.name,
+        voucherNo: voucher.number,
+        total: Number(voucher.total || 0),
+        quantity: 0,
+        rate: 0,
+      };
+
+      let totalQty = 0;
+      let consistentRate = -1;
+      let isMixedRate = false;
+
+      if (voucher.items) {
+        voucher.items.forEach((i: any) => {
+          const qty = Number(i.quantity || 0);
+          const rate = Number(i.rate || 0);
+          totalQty += qty;
+
+          if (consistentRate === -1) {
+            consistentRate = rate;
+          } else if (consistentRate !== rate) {
+            isMixedRate = true;
+          }
+
+          // Sales Ledger Amount
+          if (i.salesLedgerName) {
+            row[i.salesLedgerName] =
+              (row[i.salesLedgerName] || 0) + Number(i.amount || 0);
+          }
+        });
+
+        // Taxes
+        const vCgstLedgers = new Set<string>();
+        const vSgstLedgers = new Set<string>();
+        const vIgstLedgers = new Set<string>();
+
+        voucher.items.forEach((item: any) => {
+          if (item.cgstLedgerName) vCgstLedgers.add(item.cgstLedgerName);
+          if (item.sgstLedgerName) vSgstLedgers.add(item.sgstLedgerName);
+          if (item.igstLedgerName) vIgstLedgers.add(item.igstLedgerName);
+        });
+
+        if (vCgstLedgers.size > 0) {
+          const first = Array.from(vCgstLedgers)[0];
+          row[first] = (row[first] || 0) + Number(voucher.cgstTotal || 0);
+        }
+        if (vSgstLedgers.size > 0) {
+          const first = Array.from(vSgstLedgers)[0];
+          row[first] = (row[first] || 0) + Number(voucher.sgstTotal || 0);
+        }
+        if (vIgstLedgers.size > 0) {
+          const first = Array.from(vIgstLedgers)[0];
+          row[first] = (row[first] || 0) + Number(voucher.igstTotal || 0);
+        }
+      }
+
+      row.quantity = totalQty;
+      row.rate = isMixedRate ? 0 : consistentRate === -1 ? 0 : consistentRate;
+
+      return row;
+    });
+
+    return { headers: allDynamicCols, rows };
+  }, [matchedSales, ledgerMap]);
+
   return (
     <div className="pt-[56px] px-4">
       {/* Header */}
@@ -377,8 +493,8 @@ const B2B: React.FC = () => {
             onClick={() => navigate("/app/reports")}
             title="Back to Reports"
             className={`p-2 rounded-lg mr-3 ${theme === "dark"
-                ? "bg-gray-700 hover:bg-gray-600 text-white"
-                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+              ? "bg-gray-700 hover:bg-gray-600 text-white"
+              : "bg-gray-100 hover:bg-gray-200 text-gray-700"
               }`}
           >
             <ArrowLeft size={20} />
@@ -408,12 +524,12 @@ const B2B: React.FC = () => {
             onClick={() => setShowFilterPanel(!showFilterPanel)}
             title="Toggle Filters"
             className={`p-2 rounded-lg ${showFilterPanel
-                ? theme === "dark"
-                  ? "bg-blue-600"
-                  : "bg-blue-500 text-white"
-                : theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-gray-100 hover:bg-gray-200"
+              ? theme === "dark"
+                ? "bg-blue-600"
+                : "bg-blue-500 text-white"
+              : theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600"
+                : "bg-gray-100 hover:bg-gray-200"
               }`}
           >
             <Filter size={16} />
@@ -422,8 +538,8 @@ const B2B: React.FC = () => {
             onClick={handleExport}
             title="Export to Excel"
             className={`p-2 rounded-lg ${theme === "dark"
-                ? "bg-gray-700 hover:bg-gray-600"
-                : "bg-gray-100 hover:bg-gray-200"
+              ? "bg-gray-700 hover:bg-gray-600"
+              : "bg-gray-100 hover:bg-gray-200"
               }`}
           >
             <Download size={16} />
@@ -447,8 +563,8 @@ const B2B: React.FC = () => {
                 onChange={(e) => handleDateRangeChange(e.target.value)}
                 title="Select date range"
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-black"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300 text-black"
                   } outline-none`}
               >
                 <option value="today">Today</option>
@@ -472,8 +588,8 @@ const B2B: React.FC = () => {
                   handleFilterChange("businessFilter", e.target.value)
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-black"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300 text-black"
                   } outline-none`}
               />
             </div>
@@ -489,8 +605,8 @@ const B2B: React.FC = () => {
                 }
                 title="Select transaction type"
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-black"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300 text-black"
                   } outline-none`}
               >
                 <option value="">All Types</option>
@@ -510,8 +626,8 @@ const B2B: React.FC = () => {
                 }
                 title="Select status filter"
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-black"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300 text-black"
                   } outline-none`}
               >
                 <option value="">All Status</option>
@@ -532,6 +648,7 @@ const B2B: React.FC = () => {
         {(
           [
             "dashboard",
+            "columnar",
             "transactions",
             "partners",
             "analytics",
@@ -609,8 +726,8 @@ const B2B: React.FC = () => {
                           <tr
                             key={sale.id || `order-${index}`}
                             className={`border-b ${theme === "dark"
-                                ? "border-gray-700"
-                                : "border-gray-200"
+                              ? "border-gray-700"
+                              : "border-gray-200"
                               }`}
                           >
                             {/* Customer */}
@@ -676,6 +793,96 @@ const B2B: React.FC = () => {
               </div>
             </div>
           </>
+        )}
+
+        
+
+        {/* Columnar View */}
+        {selectedView === "columnar" && (
+          <div
+            className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+              }`}
+          >
+            <h3 className="text-lg font-semibold mb-4">Columnar Report</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                    }`}
+                >
+                  <tr>
+                    <th className="px-2 py-3 text-left font-medium min-w-[100px]">
+                      Date
+                    </th>
+                    <th className="px-2 py-3 text-left font-medium min-w-[200px]">
+                      Particulars
+                    </th>
+                    <th className="px-2 py-3 text-left font-medium">Vch No.</th>
+                    <th className="px-2 py-3 text-right font-medium">
+                      Quantity
+                    </th>
+                    <th className="px-2 py-3 text-right font-medium">Rate</th>
+                    <th className="px-2 py-3 text-right font-medium">Total</th>
+                    {columnarData.headers.map((col) => (
+                      <th
+                        key={col}
+                        className="px-2 py-3 text-right font-medium whitespace-nowrap"
+                      >
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {columnarData.rows.map((row, index) => (
+                    <tr
+                      key={row.id || index}
+                      className={`hover:bg-opacity-50 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                        }`}
+                    >
+                      <td className="px-2 py-2">
+                        {new Date(row.date).toLocaleDateString("en-IN")}
+                      </td>
+                      <td className="px-2 py-2 font-medium">{row.partyName}</td>
+                      <td className="px-2 py-2">{row.voucherNo}</td>
+                      <td className="px-2 py-2 text-right">{row.quantity}</td>
+                      <td className="px-2 py-2 text-right">
+                        {row.rate > 0
+                          ? row.rate.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })
+                          : "-"}
+                      </td>
+                      <td className="px-2 py-2 text-right font-semibold">
+                        {row.total?.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                      {columnarData.headers.map((col) => (
+                        <td key={col} className="px-2 py-2 text-right text-xs">
+                          {row[col]
+                            ? Number(row[col]).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                            })
+                            : "-"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {columnarData.rows.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={6 + columnarData.headers.length}
+                        className="px-4 py-8 text-center opacity-50"
+                      >
+                        No transactions found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
         )}
 
         {/* Transactions View */}
