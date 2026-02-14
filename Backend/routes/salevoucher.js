@@ -99,6 +99,30 @@ async function ensureSalesLedgerColumn() {
   }
 }
 
+// ================= AUTO CHECK DISCOUNT LEDGER COLUMN =================
+async function ensureDiscountLedgerColumn() {
+  const [rows] = await db.query(
+    `
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'sales_voucher_items'
+      AND COLUMN_NAME = 'discountLedgerId'
+    `
+  );
+
+  if (rows.length === 0) {
+    console.log("⚠️ discountLedgerId missing → creating...");
+
+    await db.query(`
+      ALTER TABLE sales_voucher_items
+      ADD COLUMN discountLedgerId INT NULL
+    `);
+
+    console.log("✅ discountLedgerId column created");
+  }
+}
+
 // ================= AUTO CHECK DISPATCH COLUMNS =================
 async function ensureDispatchColumns() {
   const columns = [
@@ -128,7 +152,7 @@ async function ensureDispatchColumns() {
         ADD COLUMN ${col.name} ${col.type} NULL
       `);
 
-      console.log(`✅ ${col.name} column created`);
+      // console.log(`✅ ${col.name} column created`);
     }
   }
 }
@@ -140,6 +164,7 @@ router.post("/", async (req, res) => {
   try {
     // ✅ Ensure column exists first
     await ensureSalesLedgerColumn();
+    await ensureDiscountLedgerColumn();
     await ensureDispatchColumns();
 
     const {
@@ -322,6 +347,7 @@ router.post("/", async (req, res) => {
             e.godownId ?? null,
 
             Number(e.salesLedgerId || 0),
+            Number(e.discountLedgerId || 0),
           ];
         }
 
@@ -342,6 +368,7 @@ router.post("/", async (req, res) => {
           e.godownId ?? null,
 
           Number(e.salesLedgerId || 0),
+          Number(e.discountLedgerId || 0),
         ];
       });
 
@@ -361,7 +388,8 @@ router.post("/", async (req, res) => {
           hsnCode,
           batchNumber,
           godownId,
-          salesLedgerId
+          salesLedgerId,
+          discountLedgerId
         )
         VALUES ?
         `,
@@ -643,7 +671,9 @@ router.get("/:id", async (req, res) => {
         igstRate: item.igstRate,
 
         godownId: item.godownId,
+        godownId: item.godownId,
         salesLedgerId: item.salesLedgerId,
+        discountLedgerId: item.discountLedgerId,
 
         // 🔥 FROM HISTORY
         batchNumber: historyRow?.batchNumber || "",
@@ -736,6 +766,7 @@ router.put("/:id", async (req, res) => {
 
   try {
     await ensureSalesLedgerColumn();
+    await ensureDiscountLedgerColumn();
     await ensureDispatchColumns();
 
     // ---- 1) UPDATE MAIN TABLE ----
@@ -807,11 +838,12 @@ router.put("/:id", async (req, res) => {
         e.batchNumber || "",
         e.godownId || null,
         Number(e.salesLedgerId || 0),
+        Number(e.discountLedgerId || 0),
       ]);
 
       await db.query(
         `INSERT INTO sales_voucher_items 
-        (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId, salesLedgerId)
+        (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId, salesLedgerId, discountLedgerId)
         VALUES ?`,
         [itemValues]
       );

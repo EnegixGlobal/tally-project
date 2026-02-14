@@ -172,7 +172,7 @@ const PricingPage: React.FC = () => {
             Ready to Get Started?
           </h2>
           <p className="text-xl text-indigo-100 mb-8 max-w-3xl mx-auto">
-            Join thousands of businesses that trust TallyPrime for their accounting needs. 
+            Join thousands of businesses that trust ApnaBook for their accounting needs. 
             Start your free trial today - no credit card required.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">

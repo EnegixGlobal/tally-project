@@ -58,7 +58,7 @@ const HomePage: React.FC = () => {
     {
       name: "Rajesh Kumar",
       company: "Kumar Enterprises",
-      content: "TallyPrime SaaS has transformed our accounting operations. The GST compliance features are outstanding!",
+      content: "ApnaBook SaaS has transformed our accounting operations. The GST compliance features are outstanding!",
       rating: 5
     },
     {
@@ -88,7 +88,7 @@ const HomePage: React.FC = () => {
               <span className="block text-[#9D78DB]">Made Simple</span>
             </h1>
             <p className="text-xl md:text-2xl mb-8 text-gray-100 max-w-3xl mx-auto">
-              Experience the power of TallyPrime in the cloud. Manage your business finances with ease, 
+              Experience the power of Apnabook in the cloud. Manage your business finances with ease, 
               stay GST compliant, and access your data from anywhere.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
@@ -292,7 +292,7 @@ const HomePage: React.FC = () => {
             Ready to Transform Your Business?
           </h2>
           <p className="text-xl mb-8 text-gray-100 max-w-2xl mx-auto">
-            Join thousands of businesses that trust TallyPrime SaaS for their accounting needs.
+            Join thousands of businesses that trust ApnaBook SaaS for their accounting needs.
             Start your free trial today!
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">

@@ -20,7 +20,7 @@ const Navigation: React.FC<NavigationProps> = ({ transparent = false, centered =
           {!centered && (
             <div className="flex items-center">
               <Link to="/home" className="flex-shrink-0">
-                <h1 className="text-2xl font-bold text-[#6D30D4]">TallyPrime</h1>
+                <h1 className="text-2xl font-bold text-[#6D30D4]">ApnaBook</h1>
               </Link>
               <div className="hidden md:block ml-10">
                 <div className="flex items-baseline space-x-4">

@@ -9,9 +9,24 @@ const ProfitLoss: React.FC = () => {
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showFullData, setShowFullData] = useState(false);
   const [showInventoryBreakup, setShowInventoryBreakup] = useState(false);
-  const [showDetailed, setShowDetailed] = useState(false);
-  const [showItemWise, setShowItemWise] = useState(false);
+  const [showDetailed, setShowDetailed] = useState(
+    localStorage.getItem("PL_SHOW_DETAILED") === "true"
+  );
+  const [showItemWise, setShowItemWise] = useState(
+    localStorage.getItem("PL_SHOW_ITEM_WISE") === "true"
+  );
   const [ledgerBalances, setLedgerBalances] = useState<Record<number, { debit: number; credit: number }>>({});
+
+  // Persist view settings
+  useEffect(() => {
+    localStorage.setItem("PL_SHOW_DETAILED", String(showDetailed));
+  }, [showDetailed]);
+
+  useEffect(() => {
+    localStorage.setItem("PL_SHOW_ITEM_WISE", String(showItemWise));
+  }, [showItemWise]);
+
+
 
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");

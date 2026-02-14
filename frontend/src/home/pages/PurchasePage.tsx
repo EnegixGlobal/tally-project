@@ -123,7 +123,7 @@ const PurchasePage: React.FC = () => {
           <div className="flex justify-between items-center h-16">
             <div className="flex items-center">
               <Link to="/" className="flex-shrink-0">
-                <h1 className="text-2xl font-bold text-indigo-600">TallyPrime</h1>
+                <h1 className="text-2xl font-bold text-indigo-600">ApnaBook</h1>
               </Link>
             </div>
             <div className="flex items-center space-x-4">
@@ -146,7 +146,7 @@ const PurchasePage: React.FC = () => {
             Complete Your Setup
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Choose your plan to unlock the full power of TallyPrime. 
+            Choose your plan to unlock the full power of ApnaBook. 
             You can change or cancel your subscription at any time.
           </p>
         </div>
@@ -166,7 +166,7 @@ const PurchasePage: React.FC = () => {
               <div className="mt-2 text-sm text-green-700">
                 <p>
                   You have full access to all features during your trial period. 
-                  Subscribe now to continue using TallyPrime after your trial ends.
+                  Subscribe now to continue using ApnaBook after your trial ends.
                 </p>
               </div>
             </div>

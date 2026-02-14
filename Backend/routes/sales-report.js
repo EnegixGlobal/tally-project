@@ -3,40 +3,130 @@ const router = express.Router();
 const pool = require("../db");
 
 router.get("/", async (req, res) => {
-
-  const { owner_type, owner_id, company_id } = req.query;
-
-  if (!owner_type || !owner_id) {
-    return res.status(400).json({
-      message: "owner_type & owner_id are required",
-    });
-  }
-
   try {
-    let sql = `
-      SELECT 
-        id, number, date, partyId, referenceNo, supplierInvoiceDate,
-        subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total,
-        salesLedgerId, company_id
-      FROM sales_vouchers
-      WHERE owner_type = ? AND owner_id = ?
-    `;
+    const finalCompanyId = req.query.company_id || req.body?.companyId;
+    const finalOwnerType = req.query.owner_type || req.body?.ownerType;
+    const finalOwnerId = req.query.owner_id || req.body?.ownerId;
 
-    const params = [owner_type, owner_id];
-
-    if (company_id) {
-      sql += " AND company_id = ?";
-      params.push(company_id);
+    if (!finalCompanyId || !finalOwnerType || !finalOwnerId) {
+      return res.status(401).json({
+        success: false,
+        message: "Unauthorized",
+      });
     }
 
-    sql += " ORDER BY id DESC";
+    const [rows] = await pool.execute(
+      `SELECT 
+          sv.id,
+          sv.number AS voucherNo,
+          sv.date,
+          sv.total AS netAmount,
+          sv.total,
+          sv.subtotal AS taxableAmount,
+          sv.cgstTotal AS cgstAmount,
+          sv.sgstTotal AS sgstAmount,
+          sv.igstTotal AS igstAmount,
+          
+          l.id AS ledgerId,
+          l.name AS partyName,
+          l.group_id AS groupId,
+          lg.name AS groupName,
+          l.gst_number AS partyGSTIN
 
-    const [voucherRows] = await pool.execute(sql, params);
+        FROM sales_vouchers sv
+        LEFT JOIN ledgers l 
+          ON sv.partyId = l.id
+        LEFT JOIN ledger_groups lg 
+          ON l.group_id = lg.id
 
-    return res.status(200).json(voucherRows);
+        WHERE sv.company_id = ?
+          AND sv.owner_type = ?
+          AND sv.owner_id = ?
+
+        ORDER BY sv.date DESC`,
+      [finalCompanyId, finalOwnerType, finalOwnerId]
+    );
+
+    // =========================================================
+    // 🔹 FETCH ITEMS FOR THESE VOUCHERS
+    // =========================================================
+    if (rows.length > 0) {
+      const voucherIds = rows.map(row => row.id);
+
+      // Use .query for array expansion support
+      const [items] = await pool.query(
+        `SELECT 
+            svi.id, svi.voucherId, svi.itemId, 
+            svi.quantity, svi.rate, svi.amount,
+            svi.cgstRate, svi.sgstRate, svi.igstRate, 
+            svi.discount, 
+            svi.salesLedgerId,
+            
+            sl.name AS salesLedgerName, 
+            sl.group_id AS salesLedgerGroupId,
+            lg.name AS salesLedgerGroupName,
+
+            l_cgst.name AS cgstLedgerName,
+            l_sgst.name AS sgstLedgerName,
+            l_igst.name AS igstLedgerName
+
+         FROM sales_voucher_items svi
+         
+         LEFT JOIN ledgers sl ON svi.salesLedgerId = sl.id
+         LEFT JOIN ledger_groups lg ON sl.group_id = lg.id
+
+         LEFT JOIN ledgers l_cgst ON svi.cgstRate = l_cgst.id
+         LEFT JOIN ledgers l_sgst ON svi.sgstRate = l_sgst.id
+         LEFT JOIN ledgers l_igst ON svi.igstRate = l_igst.id
+
+         WHERE svi.voucherId IN (?)`,
+        [voucherIds]
+      );
+
+      // Attach items to their respective vouchers with numeric conversion
+      const itemsMap = {};
+      items.forEach(item => {
+        if (!itemsMap[item.voucherId]) {
+          itemsMap[item.voucherId] = [];
+        }
+
+        // Convert rates/amounts to numbers
+        itemsMap[item.voucherId].push({
+          ...item,
+          quantity: Number(item.quantity) || 0,
+          rate: Number(item.rate) || 0,
+          amount: Number(item.amount) || 0,
+          discount: Number(item.discount) || 0,
+          cgstRate: Number(item.cgstRate) || 0,
+          sgstRate: Number(item.sgstRate) || 0,
+          igstRate: Number(item.igstRate) || 0,
+        });
+      });
+
+      rows.forEach(row => {
+        row.items = itemsMap[row.id] || [];
+
+        // Ensure voucher level totals are numbers
+        row.netAmount = Number(row.netAmount) || 0;
+        row.total = Number(row.total) || 0;
+        row.taxableAmount = Number(row.taxableAmount) || 0;
+        row.cgstAmount = Number(row.cgstAmount) || 0;
+        row.sgstAmount = Number(row.sgstAmount) || 0;
+        row.igstAmount = Number(row.igstAmount) || 0;
+      });
+    }
+
+    res.json({
+      success: true,
+      data: rows,
+    });
+
   } catch (err) {
-    console.error("Failed to load sales vouchers:", err);
-    return res.status(500).json({ message: err.message });
+    console.error("Sales Report Error:", err);
+    res.status(500).json({
+      success: false,
+      error: err.message,
+    });
   }
 });
 
@@ -119,8 +209,8 @@ router.get("/month-wise", async (req, res) => {
 
     const [rows] = await pool.execute(sql, params);
 
-  
-   
+
+
     return res.status(200).json({
       success: true,
       month: month || null,

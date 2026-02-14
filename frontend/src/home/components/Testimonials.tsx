@@ -17,7 +17,7 @@ interface TestimonialsProps {
 const Testimonials: React.FC<TestimonialsProps> = ({ 
   testimonials, 
   title = "Trusted by Thousands of Businesses",
-  subtitle = "See what our customers have to say about their experience with TallyPrime."
+  subtitle = "See what our customers have to say about their experience with ApnaBook."
 }) => {
   return (
     <section className="py-20 bg-white">

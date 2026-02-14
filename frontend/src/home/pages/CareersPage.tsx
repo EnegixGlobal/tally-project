@@ -8,7 +8,7 @@ const CareersPage: React.FC = () => {
       <Navigation />
       
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
-        <h1 className="text-4xl font-bold text-gray-900 mb-8">Careers at TallyPrime</h1>
+        <h1 className="text-4xl font-bold text-gray-900 mb-8">Careers at ApnaBook</h1>
         
         <div className="prose prose-lg max-w-none">
           <p className="text-xl text-gray-600 mb-8">
@@ -57,7 +57,7 @@ const CareersPage: React.FC = () => {
               <h3 className="text-xl font-semibold text-gray-900 mb-2">Customer Success Manager</h3>
               <p className="text-gray-600 mb-4">Mumbai • Full-time</p>
               <p className="text-gray-700 mb-4">
-                Help our customers succeed with TallyPrime by providing excellent support 
+                Help our customers succeed with ApnaBook by providing excellent support 
                 and guidance.
               </p>
               <button className="bg-[#6922DF] text-white px-6 py-2 rounded-lg hover:bg-[#5a1cbf] transition duration-150">

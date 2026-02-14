@@ -347,6 +347,7 @@ const SalesVoucher: React.FC = () => {
           godownId: "",
           salesLedgerId: "",
           discount: 0,
+          discountLedgerId: "",
           hsnCode: "",
         },
       ],
@@ -438,6 +439,7 @@ const SalesVoucher: React.FC = () => {
           godownId: "",
           salesLedgerId: "",
           discount: 0,
+          discountLedgerId: "",
           hsnCode: "",
         },
       ],
@@ -645,6 +647,9 @@ const SalesVoucher: React.FC = () => {
 
             batchNumber: e.batchNumber || "",
 
+            // Restore Discount Ledger if saved
+            discountLedgerId: e.discountLedgerId || "",
+
             type: "debit",
           })),
 
@@ -725,6 +730,26 @@ const SalesVoucher: React.FC = () => {
           if (entry.igstLedgerId) {
             const r = extract(entry.igstLedgerId);
             if (r !== updatedEntry.igstRate) { updatedEntry.igstRate = r; entryChanged = true; }
+          }
+
+          // --- 3. Hydrate Discount Ledger (if discount amount exists but no ledger) ---
+          if (!updatedEntry.discountLedgerId && updatedEntry.discount > 0 && updatedEntry.rate > 0) {
+            const amount = (updatedEntry.quantity || 0) * (updatedEntry.rate || 0);
+            if (amount > 0) {
+              const discountPercent = (updatedEntry.discount / amount) * 100;
+              // Find a discount ledger that roughly matches this percent
+              const discountLedger = ledgers.find(l => {
+                if (!l.name.toLowerCase().includes("discount")) return false;
+                const m = l.name.match(/(\d+(\.\d+)?)/);
+                if (!m) return false;
+                const p = Number(m[1]);
+                return Math.abs(p - discountPercent) < 0.1; // tolerance
+              });
+              if (discountLedger) {
+                updatedEntry.discountLedgerId = discountLedger.id;
+                entryChanged = true;
+              }
+            }
           }
         }
 
@@ -1256,6 +1281,20 @@ const SalesVoucher: React.FC = () => {
         if (!entry.batchNumber) {
           // update UI first
           updatedEntries[index].quantity = newQty;
+
+          // Recalculate discount if percentage ledger selected
+          if (updatedEntries[index].discountLedgerId) {
+            const ledger = safeLedgers.find(l => String(l.id) === String(updatedEntries[index].discountLedgerId));
+            if (ledger) {
+              const m = ledger.name.match(/(\d+(\.\d+)?)/);
+              const percent = m ? Number(m[1]) : 0;
+              if (percent > 0) {
+                const baseAmount = newQty * (Number(updatedEntries[index].rate) || 0);
+                updatedEntries[index].discount = (baseAmount * percent) / 100;
+              }
+            }
+          }
+
           updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
           setFormData((p) => ({ ...p, entries: updatedEntries }));
 
@@ -1396,6 +1435,20 @@ const SalesVoucher: React.FC = () => {
         // Rate: update shown value immediately, then debounce applying profit percentage
         const rawRate = Number(value) || 0;
         updatedEntries[index].rate = rawRate;
+
+        // Recalculate discount if a percentage ledger is selected
+        if (updatedEntries[index].discountLedgerId) {
+          const ledger = safeLedgers.find(l => String(l.id) === String(updatedEntries[index].discountLedgerId));
+          if (ledger) {
+            const m = ledger.name.match(/(\d+(\.\d+)?)/);
+            const percent = m ? Number(m[1]) : 0;
+            if (percent > 0) {
+              const baseAmount = (Number(updatedEntries[index].quantity) || 0) * rawRate;
+              updatedEntries[index].discount = (baseAmount * percent) / 100;
+            }
+          }
+        }
+
         updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
         setFormData((p) => ({ ...p, entries: updatedEntries }));
 
@@ -1433,6 +1486,19 @@ const SalesVoucher: React.FC = () => {
               target.rate = rateToUse;
             }
 
+            // Recalculate discount again after profit adjustment
+            if (target.discountLedgerId) {
+              const ledger = safeLedgers.find(l => String(l.id) === String(target.discountLedgerId));
+              if (ledger) {
+                const m = ledger.name.match(/(\d+(\.\d+)?)/);
+                const percent = m ? Number(m[1]) : 0;
+                if (percent > 0) {
+                  const baseAmount = (Number(target.quantity) || 0) * (Number(target.rate) || 0);
+                  target.discount = (baseAmount * percent) / 100;
+                }
+              }
+            }
+
             target.amount = recalcAmount(target);
 
             // clear stored timer
@@ -1444,7 +1510,29 @@ const SalesVoucher: React.FC = () => {
 
         return;
       }
+
+      // 5️⃣ Discount Ledger Select
+      if (name === "discountLedgerId") {
+        updatedEntries[index].discountLedgerId = value;
+
+        if (!value) {
+          updatedEntries[index].discount = 0;
+        } else {
+          const ledger = safeLedgers.find(l => String(l.id) === String(value));
+          if (ledger) {
+            const m = ledger.name.match(/(\d+(\.\d+)?)/);
+            const percent = m ? Number(m[1]) : 0;
+            const baseAmount = (Number(updatedEntries[index].quantity) || 0) * (Number(updatedEntries[index].rate) || 0);
+            updatedEntries[index].discount = (baseAmount * percent) / 100;
+          }
+        }
+
+        updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+        setFormData((p) => ({ ...p, entries: updatedEntries }));
+        return;
+      }
     }
+
 
     updatedEntries[index][name] =
       type === "number" ? Number(value) || 0 : value;
@@ -1470,6 +1558,7 @@ const SalesVoucher: React.FC = () => {
           godownId: "",
           salesLedgerId: "",
           discount: 0,
+          discountLedgerId: "", // Init
           hsnCode: "", // Add HSN code for manual editing
         },
       ],
@@ -2587,9 +2676,9 @@ const SalesVoucher: React.FC = () => {
                           })()}
 
 
+                        <th className="px-4 py-2 text-right">Amount</th>
                         {columnSettings.showDiscount && <th>Discount</th>}
 
-                        <th className="px-4 py-2 text-right">Amount</th>
                         {godownEnabled === "yes" && (
                           <th className="px-4 py-2 text-left">Godown</th>
                         )}
@@ -2765,23 +2854,30 @@ const SalesVoucher: React.FC = () => {
                               })()}
 
 
-                            {/* DISCOUNT */}
-                            <td className="px-1 py-2 min-w-[70px]">
-                              <input
-                                type="number"
-                                name="discount"
-                                value={entry.discount ?? ""}
-                                onChange={(e) => handleEntryChange(index, e)}
-                                className={`${FORM_STYLES.tableInput(
-                                  theme
-                                )} text-right text-xs`}
-                              />
-                            </td>
-
                             {/* AMOUNT */}
                             <td className="px-1 py-2 text-right min-w-[75px] font-medium text-xs">
                               {Number(entry.amount ?? 0).toLocaleString()}
                             </td>
+
+                            {/* DISCOUNT */}
+                            <td className="px-1 py-2 min-w-[70px]">
+                              <select
+                                name="discountLedgerId"
+                                value={entry.discountLedgerId || ""}
+                                onChange={(e) => handleEntryChange(index, e)}
+                                className={`${FORM_STYLES.tableSelect(theme)} text-xs min-w-[100px]`}
+                              >
+                                <option value="">Select Discount</option>
+                                {safeLedgers
+                                  .filter(l => l.name.toLowerCase().includes("discount"))
+                                  .map(l => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
+                                  ))
+                                }
+                              </select>
+                            </td>
+
+
 
                             {/* GODOWN */}
                             {godownEnabled === "yes" && (

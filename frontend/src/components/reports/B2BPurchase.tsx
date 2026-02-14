@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Filter, Building2 } from "lucide-react";
+import { ArrowLeft, Download, Filter, Building2, ListFilter } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./reports.css";
 interface B2BTransactionLine {
@@ -66,8 +66,10 @@ interface FilterState {
 }
 
 type ViewType =
-  | "dashboard"
-  | "transactions"
+  | "detailed"
+  | "columnar"
+  | "extract"
+  | "summary"
   | "partners"
   | "analytics"
   | "contracts";
@@ -90,7 +92,7 @@ const B2BPurchase: React.FC = () => {
     ) || "";
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [selectedView, setSelectedView] = useState<ViewType>("dashboard");
+  const [selectedView, setSelectedView] = useState<ViewType>("summary");
   const [filters, setFilters] = useState<FilterState>({
     dateRange: "this-month",
     fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -233,7 +235,7 @@ const B2BPurchase: React.FC = () => {
 
   //disabled block
   const isTabDisabled = (view: ViewType) => {
-    return view !== "dashboard";
+    return   view !== "columnar" && view !== "extract" && view !== "summary" && view !== "detailed";
   };
 
   const [saleData, setSaleData] = useState<any[]>([]);
@@ -247,30 +249,49 @@ const B2BPurchase: React.FC = () => {
   useEffect(() => {
     if (!companyId || !ownerType || !ownerId) return;
 
-    const loadSalesVouchers = async () => {
+    const loadPurchaseVouchers = async () => {
       try {
+        // Use purchase-report endpoint for detailed item data
         const url = `${import.meta.env.VITE_API_URL
-          }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          }/api/purchase-report?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
         const res = await fetch(url);
         const json = await res.json();
 
-        const vouchers = json?.data || json || [];
+        let vouchers = [];
+        if (Array.isArray(json)) {
+          vouchers = json;
+        } else if (Array.isArray(json?.data)) {
+          vouchers = json.data;
+        }
 
-        const allPartyIds = vouchers
+        // Map to expected structure
+        const mappedVouchers = vouchers.map((v: any) => ({
+          ...v,
+          id: v.id,
+          partyId: v.ledgerId || v.partyId,
+          number: v.voucherNo || v.number,
+          subtotal: v.taxableAmount || v.subtotal,
+          total: v.netAmount || v.total,
+          cgstTotal: v.cgstAmount || v.cgstTotal,
+          sgstTotal: v.sgstAmount || v.sgstTotal,
+          igstTotal: v.igstAmount || v.igstTotal,
+        }));
+
+        const allPartyIds = mappedVouchers
           .map((v: any) => v.partyId)
           .filter((id: any) => id !== null && id !== undefined);
 
-        setSaleData(vouchers);
+        setSaleData(mappedVouchers);
         setPartyIds(allPartyIds);
       } catch (err) {
-        console.error("Failed to fetch sales vouchers:", err);
+        console.error("Failed to fetch purchase report data:", err);
         setSaleData([]);
         setPartyIds([]);
       }
     };
 
-    loadSalesVouchers();
+    loadPurchaseVouchers();
   }, [companyId, ownerType, ownerId]);
 
   // ledger get
@@ -368,6 +389,317 @@ const B2BPurchase: React.FC = () => {
     return map;
   }, [ledger]);
 
+  // 🔹 COLUMNAR DATA LOGIC
+  const columnarData = useMemo(() => {
+    if (!matchedSales.length) return { headers: [], rows: [] };
+
+    const purchaseColumns = new Set<string>();
+    const taxColumns = new Set<string>();
+
+    // 1. Collect Columns
+    matchedSales.forEach((voucher: any) => {
+      if (voucher.items) {
+        voucher.items.forEach((item: any) => {
+          if (item.purchaseLedgerName)
+            purchaseColumns.add(item.purchaseLedgerName);
+          if (item.cgstLedgerName) taxColumns.add(item.cgstLedgerName);
+          if (item.sgstLedgerName) taxColumns.add(item.sgstLedgerName);
+          if (item.igstLedgerName) taxColumns.add(item.igstLedgerName);
+          if (item.tdsLedgerName) taxColumns.add(item.tdsLedgerName);
+        });
+      }
+    });
+
+    const sortedPurchaseCols = Array.from(purchaseColumns).sort();
+    const sortedTaxCols = Array.from(taxColumns).sort();
+    const allDynamicCols = [...sortedPurchaseCols, ...sortedTaxCols];
+
+    // 2. Prepare Rows
+    const rows = matchedSales.map((voucher: any) => {
+      const row: any = {
+        id: voucher.id,
+        date: voucher.date,
+        partyName: voucher.partyName || ledgerMap.get(voucher.partyId)?.name,
+        voucherNo: voucher.number,
+        total: Number(voucher.total || 0),
+        quantity: 0,
+        rate: 0,
+      };
+
+      let totalQty = 0;
+      let consistentRate = -1;
+      let isMixedRate = false;
+
+      if (voucher.items) {
+        voucher.items.forEach((i: any) => {
+          const qty = Number(i.quantity || 0);
+          const rate = Number(i.rate || 0);
+          totalQty += qty;
+
+          if (consistentRate === -1) {
+            consistentRate = rate;
+          } else if (consistentRate !== rate) {
+            isMixedRate = true;
+          }
+
+          // Purchase Ledger Amount
+          if (i.purchaseLedgerName) {
+            row[i.purchaseLedgerName] =
+              (row[i.purchaseLedgerName] || 0) + Number(i.amount || 0);
+          }
+        });
+
+        // Taxes
+        const vCgstLedgers = new Set<string>();
+        const vSgstLedgers = new Set<string>();
+        const vIgstLedgers = new Set<string>();
+        const vTdsLedgers = new Set<string>();
+
+        voucher.items.forEach((item: any) => {
+          if (item.cgstLedgerName) vCgstLedgers.add(item.cgstLedgerName);
+          if (item.sgstLedgerName) vSgstLedgers.add(item.sgstLedgerName);
+          if (item.igstLedgerName) vIgstLedgers.add(item.igstLedgerName);
+          if (item.tdsLedgerName) vTdsLedgers.add(item.tdsLedgerName);
+        });
+
+        if (vCgstLedgers.size > 0) {
+          const first = Array.from(vCgstLedgers)[0];
+          row[first] = (row[first] || 0) + Number(voucher.cgstTotal || 0);
+        }
+        if (vSgstLedgers.size > 0) {
+          const first = Array.from(vSgstLedgers)[0];
+          row[first] = (row[first] || 0) + Number(voucher.sgstTotal || 0);
+        }
+        if (vIgstLedgers.size > 0) {
+          const first = Array.from(vIgstLedgers)[0];
+          row[first] = (row[first] || 0) + Number(voucher.igstTotal || 0);
+        }
+        if (vTdsLedgers.size > 0) {
+          const first = Array.from(vTdsLedgers)[0];
+          // TDS is usually a deduction, but for columnar expense booking it might be shown positively or negatively.
+          // In purchase report, TDS is deducted from total payable but is a liability.
+          // Let's just show the amount.
+          row[first] = (row[first] || 0) + Number(voucher.tdsAmount || 0);
+        }
+      }
+
+      row.quantity = totalQty;
+      row.rate = isMixedRate ? 0 : consistentRate === -1 ? 0 : consistentRate;
+
+      return row;
+    });
+
+    return { headers: allDynamicCols, rows };
+  }, [matchedSales, ledgerMap]);
+
+  // 🔹 MONTHLY DATA LOGIC
+  const MONTHS = [
+    "April",
+    "May",
+    "June",
+    "July",
+    "August",
+    "September",
+    "October",
+    "November",
+    "December",
+    "January",
+    "February",
+    "March",
+  ];
+
+  const monthIndexToName: Record<number, string> = {
+    0: "January",
+    1: "February",
+    2: "March",
+    3: "April",
+    4: "May",
+    5: "June",
+    6: "July",
+    7: "August",
+    8: "September",
+    9: "October",
+    10: "November",
+    11: "December",
+  };
+
+  const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+
+  const filteredDetailedData = useMemo(() => {
+    let data = [...matchedSales];
+
+    if (selectedMonth) {
+      data = data.filter((item) => {
+        if (!item.date) return false;
+        const d = new Date(item.date);
+        const monthName = monthIndexToName[d.getMonth()];
+        return monthName === selectedMonth;
+      });
+    }
+
+    return data;
+  }, [matchedSales, selectedMonth]);
+
+  const summaryData = useMemo(() => {
+    const map: Record<string, { debit: number; closingBalance: number }> = {};
+    MONTHS.forEach((m) => {
+      map[m] = { debit: 0, closingBalance: 0 };
+    });
+
+    matchedSales.forEach((row) => {
+      if (!row.date || !row.total) return;
+
+      const d = new Date(row.date);
+      const monthName = monthIndexToName[d.getMonth()];
+      const amount = Number(row.total) || 0;
+
+      if (map[monthName]) {
+        map[monthName].debit += amount;
+      }
+    });
+
+    let runningTotal = 0;
+    MONTHS.forEach((m) => {
+      runningTotal += map[m].debit;
+      map[m].closingBalance = runningTotal;
+    });
+
+    return map;
+  }, [matchedSales]);
+
+  const totalPurchaseValue = useMemo(() => {
+    return matchedSales.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
+  }, [matchedSales]);
+
+  // 🔹 EXTRACT LOGIC (Group by Ledger Groups like 'Purchase Accounts', 'Duties & Taxes')
+  const extractData = useMemo(() => {
+    const groups: Record<
+      string,
+      {
+        totalDebit: number;
+        totalCredit: number;
+        transactions: {
+          name: string;
+          debit: number;
+          credit: number;
+        }[];
+      }
+    > = {};
+
+    matchedSales.forEach((voucher: any) => {
+      // 1️⃣ PARTY SIDE (Credit / Liability - Sundry Creditors)
+      const groupName = voucher.groupName || "Sundry Creditors";
+      const partyAmount = Number(voucher.netAmount || voucher.total || 0);
+
+      if (!groups[groupName]) {
+        groups[groupName] = {
+          totalDebit: 0,
+          totalCredit: 0,
+          transactions: [],
+        };
+      }
+
+      groups[groupName].totalCredit += partyAmount;
+      groups[groupName].transactions.push({
+        name: voucher.partyName || "Unknown Party",
+        debit: 0,
+        credit: partyAmount,
+      });
+
+      // 2️⃣ PURCHASE SIDE (Debit / Expense) via Items
+      if (voucher.items && voucher.items.length > 0) {
+        voucher.items.forEach((item: any) => {
+          const itemGroupName = "Purchase Account";
+
+          if (!groups[itemGroupName]) {
+            groups[itemGroupName] = {
+              totalDebit: 0,
+              totalCredit: 0,
+              transactions: [],
+            };
+          }
+
+          const itemAmount = Number(item.amount || 0);
+
+          groups[itemGroupName].totalDebit += itemAmount;
+          groups[itemGroupName].transactions.push({
+            name: item.purchaseLedgerName || "Unknown Purchase Ledger",
+            debit: itemAmount,
+            credit: 0,
+          });
+        });
+      }
+
+      // 3️⃣ DUTIES & TAXES (Debit / Asset - Input Tax)
+      const taxGroupName = "Duties & Taxes";
+
+      // Extract Unique Tax Ledger Names from Items
+      const cgstLedgers = new Set<string>();
+      const sgstLedgers = new Set<string>();
+      const igstLedgers = new Set<string>();
+      const tdsLedgers = new Set<string>();
+
+      if (voucher.items) {
+        voucher.items.forEach((i: any) => {
+          if (i.cgstLedgerName) cgstLedgers.add(i.cgstLedgerName);
+          if (i.sgstLedgerName) sgstLedgers.add(i.sgstLedgerName);
+          if (i.igstLedgerName) igstLedgers.add(i.igstLedgerName);
+          if (i.tdsLedgerName) tdsLedgers.add(i.tdsLedgerName);
+        });
+      }
+
+      const cgst = Number(voucher.cgstTotal || 0);
+      const sgst = Number(voucher.sgstTotal || 0);
+      const igst = Number(voucher.igstTotal || 0);
+      const tds = Number(voucher.tdsAmount || 0);
+
+      if (cgst > 0 || sgst > 0 || igst > 0 || tds > 0) {
+        if (!groups[taxGroupName]) {
+          groups[taxGroupName] = {
+            totalDebit: 0,
+            totalCredit: 0,
+            transactions: [],
+          };
+        }
+
+        if (cgst > 0) {
+          groups[taxGroupName].totalDebit += cgst;
+          groups[taxGroupName].transactions.push({
+            name: Array.from(cgstLedgers).join(", ") || "Input CGST",
+            debit: cgst,
+            credit: 0,
+          });
+        }
+        if (sgst > 0) {
+          groups[taxGroupName].totalDebit += sgst;
+          groups[taxGroupName].transactions.push({
+            name: Array.from(sgstLedgers).join(", ") || "Input SGST",
+            debit: sgst,
+            credit: 0,
+          });
+        }
+        if (igst > 0) {
+          groups[taxGroupName].totalDebit += igst;
+          groups[taxGroupName].transactions.push({
+            name: Array.from(igstLedgers).join(", ") || "Input IGST",
+            debit: igst,
+            credit: 0,
+          });
+        }
+        if (tds > 0) {
+          groups[taxGroupName].totalCredit += tds; // TDS Payable is Credit
+          groups[taxGroupName].transactions.push({
+            name: Array.from(tdsLedgers).join(", ") || "TDS Payable",
+            debit: 0,
+            credit: tds,
+          });
+        }
+      }
+    });
+
+    return groups;
+  }, [matchedSales]);
+
   return (
     <div className="pt-[56px] px-4">
       {/* Header */}
@@ -377,8 +709,8 @@ const B2BPurchase: React.FC = () => {
             onClick={() => navigate("/app/reports")}
             title="Back to Reports"
             className={`p-2 rounded-lg mr-3 ${theme === "dark"
-                ? "bg-gray-700 hover:bg-gray-600 text-white"
-                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+              ? "bg-gray-700 hover:bg-gray-600 text-white"
+              : "bg-gray-100 hover:bg-gray-200 text-gray-700"
               }`}
           >
             <ArrowLeft size={20} />
@@ -408,12 +740,12 @@ const B2BPurchase: React.FC = () => {
             onClick={() => setShowFilterPanel(!showFilterPanel)}
             title="Toggle Filters"
             className={`p-2 rounded-lg ${showFilterPanel
-                ? theme === "dark"
-                  ? "bg-blue-600"
-                  : "bg-blue-500 text-white"
-                : theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-gray-100 hover:bg-gray-200"
+              ? theme === "dark"
+                ? "bg-blue-600"
+                : "bg-blue-500 text-white"
+              : theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600"
+                : "bg-gray-100 hover:bg-gray-200"
               }`}
           >
             <Filter size={16} />
@@ -422,8 +754,8 @@ const B2BPurchase: React.FC = () => {
             onClick={handleExport}
             title="Export to Excel"
             className={`p-2 rounded-lg ${theme === "dark"
-                ? "bg-gray-700 hover:bg-gray-600"
-                : "bg-gray-100 hover:bg-gray-200"
+              ? "bg-gray-700 hover:bg-gray-600"
+              : "bg-gray-100 hover:bg-gray-200"
               }`}
           >
             <Download size={16} />
@@ -447,8 +779,8 @@ const B2BPurchase: React.FC = () => {
                 onChange={(e) => handleDateRangeChange(e.target.value)}
                 title="Select date range"
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-black"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300 text-black"
                   } outline-none`}
               >
                 <option value="today">Today</option>
@@ -472,8 +804,8 @@ const B2BPurchase: React.FC = () => {
                   handleFilterChange("businessFilter", e.target.value)
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-black"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300 text-black"
                   } outline-none`}
               />
             </div>
@@ -489,8 +821,8 @@ const B2BPurchase: React.FC = () => {
                 }
                 title="Select transaction type"
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-black"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300 text-black"
                   } outline-none`}
               >
                 <option value="">All Types</option>
@@ -510,8 +842,8 @@ const B2BPurchase: React.FC = () => {
                 }
                 title="Select status filter"
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-black"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300 text-black"
                   } outline-none`}
               >
                 <option value="">All Status</option>
@@ -531,8 +863,10 @@ const B2BPurchase: React.FC = () => {
       <div className="flex space-x-2 mb-6 overflow-x-auto">
         {(
           [
-            "dashboard",
-            "transactions",
+            "summary",
+            "detailed",
+            "extract",
+            "columnar",
             "partners",
             "analytics",
             "contracts",
@@ -545,7 +879,10 @@ const B2BPurchase: React.FC = () => {
               key={view}
               disabled={disabled}
               onClick={() => {
-                if (!disabled) setSelectedView(view);
+                if (!disabled) {
+                  setSelectedView(view);
+                  if (view !== 'detailed') setSelectedMonth(null);
+                }
               }}
               className={`px-4 py-2 rounded-lg capitalize whitespace-nowrap
           ${selectedView === view
@@ -570,108 +907,384 @@ const B2BPurchase: React.FC = () => {
       </div>
 
       <div ref={printRef}>
-        {/* Dashboard View */}
-        {selectedView === "dashboard" && (
-          <>
-            <div
-              className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-                }`}
-            >
-              <h3 className="text-lg font-semibold mb-4">Recent Purchase Orders</h3>
-              <div className="overflow-x-auto">
-                <table className="w-full">
-                  <thead
-                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                      }`}
+
+        {/* Summary View */}
+        {selectedView === "summary" && (
+          <div
+            className={`rounded-lg overflow-hidden mb-6 ${theme === "dark"
+              ? "bg-gray-800 text-white"
+              : "bg-white text-black"
+              }`}
+          >
+            {/* 🔹 TOP BORDER */}
+            <div className="border-t border-b border-gray-400">
+              {/* Header */}
+              <div className="grid grid-cols-4 px-4 py-2 font-semibold border-b border-gray-400">
+                <div>Particulars</div>
+                <div className="text-right">Debit</div>
+                <div className="text-right">Credit</div>
+                <div className="text-right">Closing</div>
+              </div>
+
+              {/* Month Rows */}
+              {MONTHS.map((month) => {
+                const row = summaryData[month] || {
+                  debit: 0,
+                  closingBalance: 0,
+                };
+
+                return (
+                  <div
+                    key={month}
+                    onClick={() => {
+                      setSelectedMonth(month);
+                      setSelectedView("detailed");
+                    }}
+                    className={`grid grid-cols-4 px-4 py-2 text-sm cursor-pointer ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                   >
-                    <tr>
-                      <th className="text-left p-3">Supplier</th>
-                      <th className="text-left p-3">Voucher No</th>
-                      <th className="text-left p-3">GST No</th>
-                      <th className="text-left p-3">QTY</th>
-                      <th className="text-left p-3">Rate</th>
-                      <th className="text-left p-3">Amount</th>
-                      <th className="text-left p-3">IGST</th>
-                      <th className="text-left p-3">CGST</th>
-                      <th className="text-left p-3">SGST</th>
-                      <th className="text-left p-3">Total Amount</th>
-                      <th className="text-left p-3">Date</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {matchedSales
-                      .slice(0, 5)
-                      .map((sale: any, index: number) => {
-                        const partyLedger = ledgerMap.get(sale.partyId);
+                    <div className="font-medium">{month}</div>
 
-                        return (
-                          <tr
-                            key={sale.id || `order-${index}`}
-                            className={`border-b ${theme === "dark"
-                                ? "border-gray-700"
-                                : "border-gray-200"
-                              }`}
-                          >
-                            {/* Supplier */}
-                            <td className="p-3">
-                              <div className="font-medium">
-                                {partyLedger?.name || "Unknown Party"}
-                              </div>
-                            </td>
+                    {/* Debit (Purchase Value) */}
+                    <div className="text-right font-mono">
+                      {row.debit ? row.debit.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : ""}
+                    </div>
 
-                            {/* Voucher No */}
-                            <td className="p-3 font-mono">{sale.number}</td>
+                    {/* Credit (Empty) */}
+                    <div className="text-right opacity-40"></div>
 
-                            {/* GST No */}
-                            <td className="p-3">
-                              {partyLedger?.gstNumber || "-"}
-                            </td>
+                    {/* Closing */}
+                    <div className="text-right font-mono">
+                      {row.closingBalance
+                        ? row.closingBalance.toLocaleString("en-IN", { minimumFractionDigits: 2 })
+                        : ""}
+                    </div>
+                  </div>
+                );
+              })}
 
-                            {/* QTY */}
-                            <td className="p-3">
-                              {getQtyByVoucher(sale.number)}
-                            </td>
-
-                            {/* Rate */}
-                            <td className="p-3">
-                              {getRateByVoucher(sale.number)}
-                            </td>
-
-                            {/* Amount (Taxable) */}
-                            <td className="p-3">
-                              ₹{Number(sale.subtotal || 0).toFixed(2)}
-                            </td>
-
-                            {/* IGST */}
-                            <td className="p-3">{sale.igstTotal || 0}</td>
-
-                            {/* CGST */}
-                            <td className="p-3">{sale.cgstTotal || 0}</td>
-
-                            {/* SGST */}
-                            <td className="p-3">{sale.sgstTotal || 0}</td>
-
-                            {/* Total Amount */}
-                            <td className="p-3 font-semibold">
-                              ₹{Number(sale.total || 0).toFixed(2)}
-                            </td>
-
-                            {/* Date */}
-                            <td className="p-3">
-                              {new Date(sale.date).toLocaleDateString("en-IN")}
-                            </td>
-                          </tr>
-                        );
-                      })}
-                  </tbody>
-                </table>
+              {/* 🔹 BOTTOM BORDER + GRAND TOTAL */}
+              <div className="border-t border-gray-400">
+                <div className="grid grid-cols-4 px-4 py-3 font-bold">
+                  <div>Grand Total</div>
+                  <div className="text-right font-mono">
+                    {totalPurchaseValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </div>
+                  <div className="text-right opacity-40">—</div>
+                  <div className="text-right font-mono">
+                    {totalPurchaseValue.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                  </div>
+                </div>
               </div>
             </div>
-          </>
+          </div>
         )}
 
+        {/* Detailed (Transactions) View */}
+        {selectedView === 'detailed' && (
+          <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+            }`}>
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Detailed Transactions {selectedMonth ? `(${selectedMonth})` : ''}</h3>
+              {selectedMonth && (
+                <button
+                  onClick={() => setSelectedMonth(null)}
+                  className="text-sm text-blue-500 hover:text-blue-700 underline"
+                >
+                  Clear Filter
+                </button>
+              )}
+            </div>
+
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
+                  }`}>
+                  <tr>
+                    <th className="text-left p-3">Supplier</th>
+                    <th className="text-left p-3">Voucher No</th>
+                    <th className="text-left p-3">GST No</th>
+                    <th className="text-left p-3">QTY</th>
+                    <th className="text-left p-3">Rate</th>
+                    <th className="text-left p-3">Amount</th>
+                    <th className="text-left p-3">IGST</th>
+                    <th className="text-left p-3">CGST</th>
+                    <th className="text-left p-3">SGST</th>
+                    <th className="text-left p-3">Total Amount</th>
+                    <th className="text-left p-3">Date</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filteredDetailedData.map((sale: any, index: number) => {
+                    const partyLedger = ledgerMap.get(sale.partyId);
+
+                    return (
+                      <tr key={sale.id || index} className={`border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+                        }`}>
+                        {/* Supplier */}
+                        <td className="p-3">
+                          <div className="font-medium">{partyLedger?.name || "Unknown Party"}</div>
+                        </td>
+
+                        {/* Voucher No */}
+                        <td className="p-3 font-mono">{sale.number}</td>
+
+                        {/* GST No */}
+                        <td className="p-3">
+                          {partyLedger?.gstNumber || "-"}
+                        </td>
+
+                        {/* QTY */}
+                        <td className="p-3">{getQtyByVoucher(sale.number)}</td>
+
+                        {/* Rate */}
+                        <td className="p-3">{getRateByVoucher(sale.number)}</td>
+
+                        {/* Amount (Taxable) */}
+                        <td className="p-3">₹{Number(sale.subtotal || 0).toFixed(2)}</td>
+
+                        {/* IGST */}
+                        <td className="p-3">{sale.igstTotal || 0}</td>
+
+                        {/* CGST */}
+                        <td className="p-3">{sale.cgstTotal || 0}</td>
+
+                        {/* SGST */}
+                        <td className="p-3">{sale.sgstTotal || 0}</td>
+
+                        {/* Total Amount */}
+                        <td className="p-3 font-semibold">₹{Number(sale.total || 0).toFixed(2)}</td>
+
+                        {/* Date */}
+                        <td className="p-3">{new Date(sale.date).toLocaleDateString('en-IN')}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+        
+
+        {/* Extract View */}
+        {selectedView === "extract" && (
+          <div
+            className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+              }`}
+          >
+            <h3 className="text-lg font-semibold mb-4">Account Head-wise Extract</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                    }`}
+                >
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium w-1/2">
+                      Particulars
+                    </th>
+                    <th className="px-4 py-3 text-right font-medium">
+                      Debit
+                    </th>
+                    <th className="px-4 py-3 text-right font-medium">
+                      Credit
+                    </th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {Object.entries(extractData).map(
+                    ([groupName, group]) => (
+                      <React.Fragment key={groupName}>
+                        {/* 🔹 Group Header */}
+                        <tr
+                          className={`${theme === "dark" ? "bg-gray-700/50" : "bg-gray-100"
+                            } font-bold`}
+                        >
+                          <td className="px-4 py-3 text-left text-blue-600">
+                            {groupName}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">
+                            {group.totalDebit > 0
+                              ? group.totalDebit.toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                              })
+                              : "-"}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">
+                            {group.totalCredit > 0
+                              ? group.totalCredit.toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                              })
+                              : "-"}
+                          </td>
+                        </tr>
+
+                        {/* 🔹 Transactions Under Group */}
+                        {group.transactions.map((txn, index) => (
+                          <tr
+                            key={`${groupName}-${index}`}
+                            className={`hover:bg-opacity-50 ${theme === "dark"
+                              ? "hover:bg-gray-700"
+                              : "hover:bg-gray-50"
+                              }`}
+                          >
+                            <td className="px-4 py-2 pl-8 text-sm italic">
+                              {txn.name}
+                            </td>
+
+                            <td className="px-4 py-2 text-right text-sm font-mono">
+                              {txn.debit > 0
+                                ? txn.debit.toLocaleString("en-IN", {
+                                  minimumFractionDigits: 2,
+                                })
+                                : "-"}
+                            </td>
+
+                            <td className="px-4 py-2 text-right text-sm font-mono">
+                              {txn.credit > 0
+                                ? txn.credit.toLocaleString("en-IN", {
+                                  minimumFractionDigits: 2,
+                                })
+                                : "-"}
+                            </td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                    )
+                  )}
+
+                  {/* No Data */}
+                  {Object.keys(extractData).length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={3}
+                        className="px-4 py-8 text-center opacity-50"
+                      >
+                        No extraction data available.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                {/* 🔹 Grand Total */}
+                <tfoot
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                    }`}
+                >
+                  <tr className="font-semibold">
+                    <td className="px-4 py-3">Grand Total</td>
+
+                    <td className="px-4 py-3 text-right font-mono">
+                      {Object.values(extractData)
+                        .reduce((sum, group) => sum + group.totalDebit, 0)
+                        .toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-mono">
+                      {Object.values(extractData)
+                        .reduce((sum, group) => sum + group.totalCredit, 0)
+                        .toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Columnar View */}
+        {selectedView === "columnar" && (
+          <div
+            className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+              }`}
+          >
+            <h3 className="text-lg font-semibold mb-4">Columnar Report</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                    }`}
+                >
+                  <tr>
+                    <th className="px-2 py-3 text-left font-medium min-w-[100px]">
+                      Date
+                    </th>
+                    <th className="px-2 py-3 text-left font-medium min-w-[200px]">
+                      Particulars
+                    </th>
+                    <th className="px-2 py-3 text-left font-medium">Vch No.</th>
+                    <th className="px-2 py-3 text-right font-medium">
+                      Quantity
+                    </th>
+                    <th className="px-2 py-3 text-right font-medium">Rate</th>
+                    <th className="px-2 py-3 text-right font-medium">Total</th>
+                    {columnarData.headers.map((col) => (
+                      <th
+                        key={col}
+                        className="px-2 py-3 text-right font-medium whitespace-nowrap"
+                      >
+                        {col}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {columnarData.rows.map((row, index) => (
+                    <tr
+                      key={row.id || index}
+                      className={`hover:bg-opacity-50 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"
+                        }`}
+                    >
+                      <td className="px-2 py-2">
+                        {new Date(row.date).toLocaleDateString("en-IN")}
+                      </td>
+                      <td className="px-2 py-2 font-medium">{row.partyName}</td>
+                      <td className="px-2 py-2">{row.voucherNo}</td>
+                      <td className="px-2 py-2 text-right">{row.quantity}</td>
+                      <td className="px-2 py-2 text-right">
+                        {row.rate > 0
+                          ? row.rate.toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })
+                          : "-"}
+                      </td>
+                      <td className="px-2 py-2 text-right font-semibold">
+                        {row.total?.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                      {columnarData.headers.map((col) => (
+                        <td key={col} className="px-2 py-2 text-right text-xs">
+                          {row[col]
+                            ? Number(row[col]).toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                            })
+                            : "-"}
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                  {columnarData.rows.length === 0 && (
+                    <tr>
+                      <td
+                        colSpan={6 + columnarData.headers.length}
+                        className="px-4 py-8 text-center opacity-50"
+                      >
+                        No transactions found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+
         {/* Transactions View */}
-        {selectedView === "transactions" && <></>}
 
         {/* Partners View */}
         {selectedView === "partners" && <></>}
