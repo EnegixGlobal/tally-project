@@ -34,7 +34,6 @@ router.get("/purchase-history", async (req, res) => {
           batchNumber VARCHAR(255),
           purchaseQuantity INT,
           purchaseDate DATE,
-          mrp DECIMAL(10,2),
           companyId VARCHAR(100),
           ownerType VARCHAR(50),
           ownerId VARCHAR(100),
@@ -59,7 +58,6 @@ router.get("/purchase-history", async (req, res) => {
         purchaseDate,
         voucherNumber,
         godownId,
-        mrp,
         companyId,
         ownerType,
         ownerId,
@@ -1164,7 +1162,6 @@ router.post("/purchase-history", async (req, res) => {
       ownerId: "VARCHAR(100)",
       type: "VARCHAR(50) DEFAULT 'purchase'",
       godownId: "INT", // ✅ NEW FIELD (ONLY ID)
-      mrp: "DECIMAL(10,2)",
     };
 
     /* ================================
@@ -1185,8 +1182,7 @@ router.post("/purchase-history", async (req, res) => {
           ownerType VARCHAR(50),
           ownerId VARCHAR(100),
           type VARCHAR(50) DEFAULT 'purchase',
-          godownId INT,
-          mrp DECIMAL(10,2)
+          godownId INT
         )
       `);
     } else {
@@ -1220,8 +1216,7 @@ router.post("/purchase-history", async (req, res) => {
         ownerType,
         ownerId,
         type,
-        godownId,
-        mrp
+        godownId
       )
       VALUES ?
     `;
@@ -1239,7 +1234,6 @@ router.post("/purchase-history", async (req, res) => {
       e.ownerId || null,
       e.type || "purchase",
       Number(e.godownId) || null, // ✅ ONLY ID SAVED
-      Number(e.mrp) || 0,
     ]);
 
     /* ================================
