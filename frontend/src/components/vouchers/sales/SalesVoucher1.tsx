@@ -2587,9 +2587,9 @@ const SalesVoucher: React.FC = () => {
                           })()}
 
 
+                        <th className="px-4 py-2 text-right">Amount</th>
                         {columnSettings.showDiscount && <th>Discount</th>}
 
-                        <th className="px-4 py-2 text-right">Amount</th>
                         {godownEnabled === "yes" && (
                           <th className="px-4 py-2 text-left">Godown</th>
                         )}
@@ -2765,6 +2765,11 @@ const SalesVoucher: React.FC = () => {
                               })()}
 
 
+                              {/* AMOUNT */}
+                            <td className="px-1 py-2 text-right min-w-[75px] font-medium text-xs">
+                              {Number(entry.amount ?? 0).toLocaleString()}
+                            </td>
+
                             {/* DISCOUNT */}
                             <td className="px-1 py-2 min-w-[70px]">
                               <input
@@ -2778,10 +2783,7 @@ const SalesVoucher: React.FC = () => {
                               />
                             </td>
 
-                            {/* AMOUNT */}
-                            <td className="px-1 py-2 text-right min-w-[75px] font-medium text-xs">
-                              {Number(entry.amount ?? 0).toLocaleString()}
-                            </td>
+                            
 
                             {/* GODOWN */}
                             {godownEnabled === "yes" && (
