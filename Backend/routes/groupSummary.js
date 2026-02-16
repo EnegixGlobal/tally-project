@@ -162,6 +162,23 @@ router.get("/api/group", async (req, res) => {
           AND sv.owner_id = ?
 
 
+        /* ================= SALES DISCOUNT ================= */
+
+        UNION ALL
+
+        SELECT
+          CAST(MAX(svi.discountLedgerId) AS UNSIGNED) AS ledgerId,
+          MAX(sv.discountTotal),
+          0
+        FROM sales_voucher_items svi
+        JOIN sales_vouchers sv ON svi.voucherId = sv.id
+        WHERE svi.discountLedgerId IN (?)
+          AND sv.company_id = ?
+          AND sv.owner_type = ?
+          AND sv.owner_id = ?
+        GROUP BY sv.id
+
+
         /* ================= PARTY ================= */
 
         UNION ALL
@@ -230,6 +247,7 @@ router.get("/api/group", async (req, res) => {
         idArray, company_id, owner_type, owner_id,
 
         // Sales
+        idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
