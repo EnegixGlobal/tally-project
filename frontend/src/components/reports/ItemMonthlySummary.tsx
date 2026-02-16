@@ -23,23 +23,23 @@ const ItemMonthlySummary = () => {
     if (!itemName || !batchName) return;
     loadMonthlySummary();
   }, [itemName, batchName]);
-    
-    const getFinancialMonths = () => {
-      return [
-        "April",
-        "May",
-        "June",
-        "July",
-        "August",
-        "September",
-        "October",
-        "November",
-        "December",
-        "January",
-        "February",
-        "March",
-      ];
-    };
+
+  const getFinancialMonths = () => {
+    return [
+      "April",
+      "May",
+      "June",
+      "July",
+      "August",
+      "September",
+      "October",
+      "November",
+      "December",
+      "January",
+      "February",
+      "March",
+    ];
+  };
 
 
   const loadMonthlySummary = async () => {
@@ -51,21 +51,37 @@ const ItemMonthlySummary = () => {
       owner_id,
     });
 
-    const [purchaseRes, salesRes] = await Promise.all([
+    const [purchaseRes, salesRes, stockItemRes] = await Promise.all([
       fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/purchase-vouchers/purchase-history?${params}`
       ),
       fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/sales-vouchers/sale-history?${params}`
+      ),
+      fetch(
+        `${import.meta.env.VITE_API_URL
+        }/api/stock-items?${params}`
       ),
     ]);
 
     const purchaseData = (await purchaseRes.json()).data || [];
     const salesData = (await salesRes.json()).data || [];
+    const stockItemsData = (await stockItemRes.json()).data || [];
+
+    // ✅ Get Opening Balance from Batch
+    let batchCurrentQty = 0;
+    let batchOpeningRate = 0;
+
+    const itemData = stockItemsData.find((i: any) => i.name === itemName);
+    if (itemData && itemData.batches) {
+      const batch = itemData.batches.find((b: any) => b.batchName === batchName);
+      if (batch) {
+        batchCurrentQty = Number(batch.batchQuantity || 0);
+        batchOpeningRate = Number(batch.openingRate || 0);
+      }
+    }
 
     // ✅ Filter by item + batch
     const purchases = purchaseData.filter(
@@ -76,91 +92,168 @@ const ItemMonthlySummary = () => {
       (s: any) => s.itemName === itemName && s.batchNumber === batchName
     );
 
+    // ✅ Calculate Totals for Back-Calculation
+    const totalInwardQty = purchases.reduce((sum: number, p: any) => sum + Number(p.purchaseQuantity || 0), 0);
+    const totalOutwardQty = sales.reduce((sum: number, s: any) => sum + Math.abs(Number(s.qtyChange || 0)), 0);
+
+    // ✅ Back-Calculate Opening Quantity
+    // Opening = Closing (Current) - Inward + Outward
+    let openingQty = batchCurrentQty - totalInwardQty + totalOutwardQty;
+
+    // ✅ Calculate Opening Value
+    // We use the derived Opening Qty * Opening Rate from batch to get consistent Opening Value
+    let openingValue = openingQty * batchOpeningRate;
+
+    // Handle small precision errors or negative zero
+    if (Math.abs(openingQty) < 0.001) openingQty = 0;
+    if (Math.abs(openingValue) < 0.01) openingValue = 0;
+
     // ✅ Group by Month
-      // const monthMap: any = {};
-      const monthMap: Record<string, any> = {};
-      const months = getFinancialMonths();
+    const monthMap: Record<string, any> = {};
+    const months = getFinancialMonths();
 
-      // pick year dynamically from data
-      const baseYear =
-        purchases[0]?.purchaseDate ||
-        sales[0]?.movementDate ||
-        new Date().toISOString();
+    // pick year dynamically from data
+    const baseYear =
+      purchases[0]?.purchaseDate ||
+      sales[0]?.movementDate ||
+      new Date().toISOString();
 
-      const fyStartYear =
-        new Date(baseYear).getMonth() >= 3
-          ? new Date(baseYear).getFullYear()
-          : new Date(baseYear).getFullYear() - 1;
+    const fyStartYear =
+      new Date(baseYear).getMonth() >= 3
+        ? new Date(baseYear).getFullYear()
+        : new Date(baseYear).getFullYear() - 1;
 
-      // Initialize all months with zero
-      months.forEach((m, index) => {
-        const year = index <= 8 ? fyStartYear : fyStartYear + 1;
-        const key = `${m} ${year}`;
-        monthMap[key] = { inQty: 0, inValue: 0, outQty: 0, outValue: 0 };
-      });
+    // Initialize all months with zero
+    months.forEach((m, index) => {
+      const year = index <= 8 ? fyStartYear : fyStartYear + 1;
+      const key = `${m} ${year}`;
+      monthMap[key] = { inQty: 0, inValue: 0, outQty: 0, outValue: 0 };
+    });
 
+    const getMonthKey = (date: string) => {
+      const d = new Date(date);
+      const month = d.toLocaleString("en-IN", { month: "long" });
+      const year = d.getFullYear();
+      return `${month} ${year}`;
+    };
 
-    // const addMonth = (date: string) => {
-    //   const d = new Date(date);
-    //   return d.toLocaleString("en-IN", { month: "long", year: "numeric" });
-    // };
-const getMonthKey = (date: string) => {
-  const d = new Date(date);
-  const month = d.toLocaleString("en-IN", { month: "long" });
-  const year = d.getFullYear();
-  return `${month} ${year}`;
-};
+    purchases.forEach((p: any) => {
+      const key = getMonthKey(p.purchaseDate);
+      if (!monthMap[key]) return;
 
-    // purchases.forEach((p: any) => {
-    //   const m = addMonth(p.purchaseDate);
-    //   if (!monthMap[m])
-    //     monthMap[m] = { inQty: 0, inValue: 0, outQty: 0, outValue: 0 };
-    //   monthMap[m].inQty += Number(p.purchaseQuantity || 0);
-    //   monthMap[m].inValue +=
-    //     Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
-      // });
-      purchases.forEach((p: any) => {
-        const key = getMonthKey(p.purchaseDate);
-        if (!monthMap[key]) return;
+      monthMap[key].inQty += Number(p.purchaseQuantity || 0);
+      monthMap[key].inValue +=
+        Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
+    });
 
-        monthMap[key].inQty += Number(p.purchaseQuantity || 0);
-        monthMap[key].inValue +=
-          Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
-      });
+    sales.forEach((s: any) => {
+      const key = getMonthKey(s.movementDate);
+      if (!monthMap[key]) return;
 
-
-    // sales.forEach((s: any) => {
-    //   const m = addMonth(s.movementDate);
-    //   if (!monthMap[m])
-    //     monthMap[m] = { inQty: 0, inValue: 0, outQty: 0, outValue: 0 };
-    //   const qty = Math.abs(Number(s.qtyChange || 0));
-    //   monthMap[m].outQty += qty;
-    //   monthMap[m].outValue += qty * Number(s.rate || 0);
-      // });
-      
-      sales.forEach((s: any) => {
-        const key = getMonthKey(s.movementDate);
-        if (!monthMap[key]) return;
-
-        const qty = Math.abs(Number(s.qtyChange || 0));
-        monthMap[key].outQty += qty;
-        monthMap[key].outValue += qty * Number(s.rate || 0);
-      });
+      const qty = Math.abs(Number(s.qtyChange || 0));
+      monthMap[key].outQty += qty;
+      monthMap[key].outValue += qty * Number(s.rate || 0);
+    });
 
 
     // ✅ Running closing (Tally logic)
-    let runningQty = 0;
-    let runningValue = 0;
+    let runningQty = openingQty;
+    let runningValue = openingValue;
 
-    const finalRows = Object.entries(monthMap).map(([month, v]: any) => {
+    // Find the first month with any activity (Opening > 0, Inward > 0, Outward > 0)
+    // Actually, Tally shows all months but values appear starting from when?
+    // User wants: "jis month me entry ho usi month se valu show kare baki upar walle month me khul vallu show na ho"
+    // Meaning: Hide Closing Qty/Value for months BEFORE the first meaningful transaction or opening balance usage?
+
+    // But wait, if there is Opening Balance (from batch), it applies from April usually. 
+    // If the user says "Opening Value ... 10", and then April... 10, May... 10.
+    // If the batch starts in April, then April should show 10.
+    // Maybe the user means if a batch was purchased in July, April-June should be blank?
+
+    // Let's determine the "Start Month" for this batch.
+    // If batch mode is Opening -> Start is Start of Year (April).
+    // If batch is Purchase/Manufacture -> Start is Purchase Date.
+
+    let startMonthIndex = 0; // Default to April
+    // Find the earliest date in purchases or sales for this batch if NOT opening mode
+
+    let isOpeningMode = false;
+    if (itemData && itemData.batches) {
+      const batch = itemData.batches.find((b: any) => b.batchName === batchName);
+      if (batch && batch.mode === 'opening') {
+        isOpeningMode = true;
+      }
+    }
+
+    if (!isOpeningMode) {
+      // Reset opening values for non-opening batches
+      openingQty = 0;
+      openingValue = 0;
+
+      // Find earliest transaction date
+      let earliestDate: Date | null = null;
+
+      purchases.forEach((p: any) => {
+        const d = new Date(p.purchaseDate);
+        if (!earliestDate || d < earliestDate) earliestDate = d;
+      });
+
+      // Sales usually happen after purchase, but check just in case
+      sales.forEach((s: any) => {
+        const d = new Date(s.movementDate || s.date);
+        if (!earliestDate || d < earliestDate) earliestDate = d;
+      });
+
+      if (earliestDate) {
+        // Calculate month index relative to Financial Year start (April)
+        // FY Start Year is calculated above as 'fyStartYear'
+        // format: April msg = index 0.
+
+        const ed = earliestDate as Date;
+        const month = ed.getMonth(); // 0-11
+        const year = ed.getFullYear();
+
+        // Convert to financial month index (0 = April, 11 = March)
+        // April (3) -> 0. March (2) -> 11.
+        // If year == fyStartYear
+        // month >= 3 (April) -> index = month - 3
+        // If year == fyStartYear + 1
+        // month < 3 (Jan-Mar) -> index = month + 9
+
+        let fIndex = 0;
+        if (year === fyStartYear) {
+          if (month >= 3) fIndex = month - 3;
+          else {
+            // Should not happen if fyStartYear is correct for the data
+            // If data is earlier than fyStartYear, default to 0
+            fIndex = 0;
+          }
+        } else if (year > fyStartYear) {
+          // Assume next year Jan-Mar
+          fIndex = month + 9;
+        }
+
+        startMonthIndex = fIndex;
+      }
+    }
+
+
+    const finalRows = Object.entries(monthMap).map(([month, v]: any, index) => {
+      // Calculate running total regardless of display
       runningQty = runningQty + v.inQty - v.outQty;
       runningValue = runningValue + v.inValue - v.outValue;
+
+      // Determine if we should SHOW the closing balance
+      // Show only if index >= startMonthIndex
+      const showValues = index >= startMonthIndex;
 
       return {
         month,
         ...v,
-        closingQty: runningQty,
-        closingValue: runningValue,
+        closingQty: showValues ? runningQty : "",
+        closingValue: showValues ? runningValue : "",
+        openingQty,
+        openingValue
       };
     });
 
@@ -273,6 +366,15 @@ const getMonthKey = (date: string) => {
                 </tr>
               </thead>
               <tbody>
+                <tr className="font-semibold bg-gray-50">
+                  <td className="border p-1">Opening Value</td>
+                  <td className="border p-1 text-right"></td>
+                  <td className="border p-1 text-right"></td>
+                  <td className="border p-1 text-right"></td>
+                  <td className="border p-1 text-right"></td>
+                  <td className="border p-1 text-right">{rows.length > 0 ? rows[0].openingQty || "" : ""}</td>
+                  <td className="border p-1 text-right">{rows.length > 0 ? (rows[0].openingValue ? rows[0].openingValue.toFixed(2) : "") : ""}</td>
+                </tr>
                 {rows.map((r, i) => (
                   <tr
                     key={i}
@@ -284,17 +386,17 @@ const getMonthKey = (date: string) => {
                     }}
                   >
                     <td className="border p-1">{r.month}</td>
-                    <td className="border p-1 text-right">{r.inQty}</td>
+                    <td className="border p-1 text-right">{r.inQty || ""}</td>
                     <td className="border p-1 text-right">
-                      {r.inValue.toFixed(2)}
+                      {r.inValue ? r.inValue.toFixed(2) : ""}
                     </td>
-                    <td className="border p-1 text-right">{r.outQty}</td>
+                    <td className="border p-1 text-right">{r.outQty || ""}</td>
                     <td className="border p-1 text-right">
-                      {r.outValue.toFixed(2)}
+                      {r.outValue ? r.outValue.toFixed(2) : ""}
                     </td>
-                    <td className="border p-1 text-right">{r.closingQty}</td>
+                    <td className="border p-1 text-right">{r.closingQty || ""}</td>
                     <td className="border p-1 text-right">
-                      {r.closingValue.toFixed(2)}
+                      {r.closingValue ? r.closingValue.toFixed(2) : ""}
                     </td>
                   </tr>
                 ))}

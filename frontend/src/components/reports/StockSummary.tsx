@@ -444,16 +444,29 @@ const StockSummary: React.FC = () => {
           batch.outward.qty > 0 ? batch.outward.value / batch.outward.qty : 0;
       });
 
-      // 4️⃣ CLOSING (TALLY LOGIC)
+      // 4️⃣ CLOSING (TALLY LOGIC) & BACK-CALCULATION FIX
       Object.values(itemMap).forEach((item: any) => {
         Object.values(item.batches).forEach((b: any) => {
+          // ✅ BACK CALCULATION: stored 'opening.qty' is actually Current Closing from Master
+          const currentClosingQty = b.opening.qty;
+
+          // Derive Real Opening
+          b.opening.qty = currentClosingQty - b.inward.qty + b.outward.qty;
+
+          // Fix Value (Opening Qty * Opening Rate)
+          b.opening.value = b.opening.qty * b.opening.rate;
+
+          // Handle precision
+          if (Math.abs(b.opening.qty) < 0.001) b.opening.qty = 0;
+          if (Math.abs(b.opening.value) < 0.01) b.opening.value = 0;
+
+          // Calculate Closing
           b.closing.qty = b.opening.qty + b.inward.qty - b.outward.qty;
 
           const totalInQty = b.opening.qty + b.inward.qty;
           const totalInValue = b.opening.value + b.inward.value;
 
           b.closing.rate = totalInQty > 0 ? totalInValue / totalInQty : 0;
-
           b.closing.value = b.closing.qty * b.closing.rate;
         });
       });
@@ -1799,3 +1812,4 @@ const StockSummary: React.FC = () => {
 };
 
 export default StockSummary;
+

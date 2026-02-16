@@ -257,8 +257,8 @@ const GodownMovementRegister: React.FC = () => {
             <button
               onClick={() => setViewMode("summary")}
               className={`px-4 py-2 rounded font-medium transition-all ${viewMode === "summary"
-                  ? "bg-blue-500 text-white"
-                  : "bg-transparent text-gray-700 hover:bg-gray-200"
+                ? "bg-blue-500 text-white"
+                : "bg-transparent text-gray-700 hover:bg-gray-200"
                 }`}
             >
               Summary View
@@ -266,8 +266,8 @@ const GodownMovementRegister: React.FC = () => {
             <button
               onClick={() => setViewMode("detail")}
               className={`px-4 py-2 rounded font-medium transition-all ${viewMode === "detail"
-                  ? "bg-blue-500 text-white"
-                  : "bg-transparent text-gray-700 hover:bg-gray-200"
+                ? "bg-blue-500 text-white"
+                : "bg-transparent text-gray-700 hover:bg-gray-200"
                 }`}
             >
               Detail View
@@ -448,6 +448,9 @@ const GodownMovementRegister: React.FC = () => {
                           <th className="border px-4 py-3 text-center font-semibold text-gray-700">
                             Date
                           </th>
+                          <th className="border px-4 py-3 text-center font-semibold text-gray-700">
+                            Opening
+                          </th>
                           <th className="border px-4 py-3 text-center font-semibold text-green-700">
                             Inward
                           </th>
@@ -466,6 +469,8 @@ const GodownMovementRegister: React.FC = () => {
                           let currentClosing = 0;
 
                           return itemTransactions.map((transaction, idx) => {
+                            const openingBalance = currentClosing;
+
                             if (transaction.type === "Inward") {
                               currentClosing += transaction.qty;
                             } else {
@@ -486,6 +491,9 @@ const GodownMovementRegister: React.FC = () => {
                                 ) : null}
                                 <td className="border px-4 py-3 text-center text-gray-600">
                                   {formatDate(transaction.date)}
+                                </td>
+                                <td className="border px-4 py-3 text-center text-gray-600">
+                                  {openingBalance}
                                 </td>
                                 <td className="border px-4 py-3 text-center font-semibold text-green-700">
                                   {transaction.type === "Inward" ? transaction.qty : "-"}

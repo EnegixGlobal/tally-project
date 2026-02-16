@@ -245,13 +245,25 @@ const SubGroupSummary: React.FC = () => {
 
   const getGroupTotals = (groupId: number) => {
     const groupLedgers = ledgersByGroup[groupId] || [];
-    const totalDebit = groupLedgers.reduce((sum, ledger) => {
-      return sum + (debitCreditData[ledger.id]?.debit || 0);
-    }, 0);
-    const totalCredit = groupLedgers.reduce((sum, ledger) => {
-      return sum + (debitCreditData[ledger.id]?.credit || 0);
-    }, 0);
-    return { totalDebit, totalCredit };
+
+    let totalOpDr = 0;
+    let totalOpCr = 0;
+    let totalTransDr = 0;
+    let totalTransCr = 0;
+
+    groupLedgers.forEach((ledger) => {
+      const op = Number(ledger.openingBalance) || 0;
+      if (ledger.balanceType === 'debit') totalOpDr += op;
+      else totalOpCr += op;
+
+      totalTransDr += (debitCreditData[ledger.id]?.debit || 0);
+      totalTransCr += (debitCreditData[ledger.id]?.credit || 0);
+    });
+
+    const opening = totalOpDr - totalOpCr;
+    const closing = (totalOpDr + totalTransDr) - (totalOpCr + totalTransCr);
+
+    return { opening, debit: totalTransDr, credit: totalTransCr, closing };
   };
 
   // 3. Handlers
@@ -505,16 +517,22 @@ const SubGroupSummary: React.FC = () => {
                     <tr className="border-b-2 dark:border-gray-700 border-gray-400">
                       <th className="py-3 px-4 font-semibold">Group Name</th>
                       <th className="py-3 px-4 text-right font-semibold">
-                        Total Debit
+                        Opening Balance
                       </th>
                       <th className="py-3 px-4 text-right font-semibold">
-                        Total Credit
+                        Debit
+                      </th>
+                      <th className="py-3 px-4 text-right font-semibold">
+                        Credit
+                      </th>
+                      <th className="py-3 px-4 text-right font-semibold">
+                        Closing Balance
                       </th>
                     </tr>
                   </thead>
                   <tbody>
                     {subGroups.map((group) => {
-                      const { totalDebit, totalCredit } = getGroupTotals(
+                      const totals = getGroupTotals(
                         group.id
                       );
                       const groupLedgers = ledgersByGroup[group.id] || [];
@@ -541,11 +559,17 @@ const SubGroupSummary: React.FC = () => {
                               </span>
                             )}
                           </td>
-                          <td className="py-3 px-4 text-right font-mono font-semibold">
-                            {totalDebit.toLocaleString()}
+                          <td className="py-3 px-4 text-right font-mono font-semibold text-sm">
+                            {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : ""}
                           </td>
                           <td className="py-3 px-4 text-right font-mono font-semibold">
-                            {totalCredit.toLocaleString()}
+                            {totals.debit > 0 ? totals.debit.toLocaleString() : ""}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-semibold">
+                            {totals.credit > 0 ? totals.credit.toLocaleString() : ""}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono font-semibold text-sm">
+                            {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : ""}
                           </td>
                         </tr>
                       );
