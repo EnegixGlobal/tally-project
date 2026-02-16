@@ -17,16 +17,19 @@ router.get("/purchase-history", async (req, res) => {
       });
     }
 
-    // Ensure table and `type` column exist before selecting
+    // 🔍 Column check
     const existingColsQuery = `
-      SELECT COLUMN_NAME FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'purchase_history'
+      SELECT COLUMN_NAME 
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'purchase_history'
     `;
     const [colsRows] = await db.execute(existingColsQuery);
     const existingCols = colsRows.map((r) => r.COLUMN_NAME);
 
+    // 🏗️ Create table if not exists
     if (existingCols.length === 0) {
-      const createTableSql = `
+      await db.execute(`
         CREATE TABLE IF NOT EXISTS purchase_history (
           id INT AUTO_INCREMENT PRIMARY KEY,
           itemName VARCHAR(255),
@@ -37,48 +40,89 @@ router.get("/purchase-history", async (req, res) => {
           companyId VARCHAR(100),
           ownerType VARCHAR(50),
           ownerId VARCHAR(100),
-          type VARCHAR(50) DEFAULT 'purchase'
+          type VARCHAR(50) DEFAULT 'purchase',
+          rate DECIMAL(10,2),
+          voucherNumber VARCHAR(100),
+          godownId INT,
+          mrp DECIMAL(10,2)
         )
-      `;
-      await db.execute(createTableSql);
+      `);
     } else if (!existingCols.includes("type")) {
-      await db.execute(
-        "ALTER TABLE purchase_history ADD COLUMN type VARCHAR(50) DEFAULT 'purchase'"
-      );
+      await db.execute(`
+        ALTER TABLE purchase_history 
+        ADD COLUMN type VARCHAR(50) DEFAULT 'purchase'
+      `);
     }
 
+    // ✅ FINAL QUERY WITH LEDGER NAME
     const selectSql = `
       SELECT 
-        id,
-        itemName,
-        hsnCode,
-        batchNumber,
-        purchaseQuantity,
-        rate,
-        purchaseDate,
-        voucherNumber,
-        godownId,
-        companyId,
-        ownerType,
-        ownerId,
-        type
-      FROM purchase_history
-      WHERE companyId = ? AND ownerType = ? AND ownerId = ?
-      ORDER BY purchaseDate DESC, id DESC
+        ph.id,
+        ph.itemName,
+        ph.hsnCode,
+        ph.batchNumber,
+        ph.purchaseQuantity,
+        ph.rate,
+        ph.purchaseDate,
+        ph.voucherNumber,
+        ph.godownId,
+        ph.companyId,
+        ph.ownerType,
+        ph.ownerId,
+        ph.type,
+
+        -- 🎯 LEDGER RESULT
+        l.id   AS ledgerId,
+        l.name AS ledgerName
+
+      FROM purchase_history ph
+
+      -- 🔗 purchase_history → purchase_vouchers
+      LEFT JOIN purchase_vouchers pv
+        ON pv.number = ph.voucherNumber
+        AND pv.company_id = ?
+        AND pv.owner_type = ?
+        AND pv.owner_id = ?
+
+      -- 🔗 purchase_vouchers → purchase_voucher_items
+      LEFT JOIN purchase_voucher_items pvi
+        ON pvi.voucherId = pv.id
+
+      -- 🔗 purchase_voucher_items → ledgers
+      LEFT JOIN ledgers l
+        ON l.id = pvi.purchaseLedgerId
+
+      WHERE ph.companyId = ?
+        AND ph.ownerType = ?
+        AND ph.ownerId = ?
+
+      ORDER BY ph.purchaseDate DESC, ph.id DESC
     `;
 
     const [rows] = await db.execute(selectSql, [
       company_id,
       owner_type,
       owner_id,
+      company_id,
+      owner_type,
+      owner_id,
     ]);
 
-    return res.status(200).json({ success: true, data: rows });
+    return res.status(200).json({
+      success: true,
+      data: rows,
+    });
   } catch (error) {
     console.error("🔥 Fetch purchase history failed:", error);
-    return res.status(500).json({ success: false, error: error.message });
+    return res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 });
+
+
+
 
 // GET Ledgers
 router.get("/ledgers", async (req, res) => {

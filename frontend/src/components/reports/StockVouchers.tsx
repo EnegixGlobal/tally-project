@@ -52,21 +52,48 @@ const StockVouchers = () => {
       owner_id,
     });
 
-    const [purchaseRes, salesRes] = await Promise.all([
+    const [purchaseRes, salesRes, stockItemRes] = await Promise.all([
       fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/purchase-vouchers/purchase-history?${params}`
       ),
       fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/sales-vouchers/sale-history?${params}`
       ),
+      fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params}`),
     ]);
 
     const purchases = (await purchaseRes.json()).data || [];
+    console.log('pur', purchases)
     const sales = (await salesRes.json()).data || [];
+    const stockItemsData = (await stockItemRes.json()).data || [];
+
+    // ✅ Calculate Correct Opening Balance (Back-Calc)
+    const itemData = stockItemsData.find((i: any) => i.name === itemName);
+
+    let batchCurrentQty = 0;
+    let batchOpeningRate = 0;
+
+    if (itemData && itemData.batches) {
+      const batch = itemData.batches.find((b: any) => b.batchName === batchName);
+      if (batch) {
+        batchCurrentQty = Number(batch.batchQuantity || 0);
+        batchOpeningRate = Number(batch.openingRate || 0);
+      }
+    }
+
+    const totalInward = purchases.reduce((sum: number, p: any) =>
+      (p.itemName === itemName && p.batchNumber === batchName) ? sum + Number(p.purchaseQuantity || 0) : sum, 0);
+
+    const totalOutward = sales.reduce((sum: number, s: any) =>
+      (s.itemName === itemName && s.batchNumber === batchName) ? sum + Math.abs(Number(s.qtyChange || 0)) : sum, 0);
+
+    let openingQty = batchCurrentQty - totalInward + totalOutward;
+    let openingValue = openingQty * batchOpeningRate;
+
+    if (Math.abs(openingQty) < 0.001) openingQty = 0;
+    if (Math.abs(openingValue) < 0.01) openingValue = 0;
 
     const tempRows: any[] = [];
 
@@ -81,9 +108,9 @@ const StockVouchers = () => {
       ) {
         tempRows.push({
           date: d,
-          party: p.partyName || p.ledgerName || "-",
+          party: p.partyName || p.ledgerName || p.ledger || "-",
           type: "Purchase",
-          vchNo: getVoucherNumber(p),
+          vchNo: p.voucherNumber,
           inQty: Number(p.purchaseQuantity || 0),
           inValue: Number(p.purchaseQuantity || 0) * Number(p.rate || 0),
           outQty: 0,
@@ -104,9 +131,9 @@ const StockVouchers = () => {
         const qty = Math.abs(Number(s.qtyChange || 0));
         tempRows.push({
           date: d,
-          party: s.partyName || s.ledgerName || "-",
+          party: s.partyName || s.ledgerName || s.ledger || "-",
           type: "Sales",
-          vchNo: getVoucherNumber(s),
+          vchNo: s.voucherNumber, // ✅ Correctly mapped
           inQty: 0,
           inValue: 0,
           outQty: qty,
@@ -118,18 +145,69 @@ const StockVouchers = () => {
     /* 🔹 Sort by date */
     tempRows.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    /* 🔹 Running closing (Tally logic) */
-    let runningQty = 0;
-    let runningValue = 0;
+    // Calculate accumulation of ALL transactions BEFORE the start date
+    let accumulatedQty = openingQty;
+    let accumulatedValue = openingValue;
 
-    tempRows.forEach((r) => {
-      runningQty += r.inQty - r.outQty;
-      runningValue += r.inValue - r.outValue;
-      r.closingQty = runningQty;
-      r.closingValue = runningValue;
+    purchases.forEach((p: any) => {
+      const d = new Date(p.purchaseDate);
+      if (p.itemName === itemName && p.batchNumber === batchName && d < start) {
+        accumulatedQty += Number(p.purchaseQuantity || 0);
+        accumulatedValue += Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
+      }
     });
 
-    setRows(tempRows);
+    sales.forEach((s: any) => {
+      const d = new Date(s.movementDate || s.date);
+      if (s.itemName === itemName && s.batchNumber === batchName && d < start) {
+        const qty = Math.abs(Number(s.qtyChange || 0));
+        accumulatedQty -= qty;
+        accumulatedValue -= qty * Number(s.rate || 0);
+      }
+    });
+
+    const openingRow = {
+      date: start, // Start of the month
+      party: "Opening Balance",
+      type: "",
+      vchNo: "",
+      inQty: 0,
+      inValue: 0,
+      outQty: 0,
+      outValue: 0,
+      closingQty: accumulatedQty,
+      closingValue: accumulatedValue,
+      isOpening: true
+    };
+
+    // Recalculate running totals starting from the accumulated opening
+    let currentQty = accumulatedQty;
+    let currentValue = accumulatedValue;
+
+    tempRows.forEach((r) => {
+      currentQty += r.inQty - r.outQty;
+      currentValue += r.inValue - r.outValue;
+      r.closingQty = currentQty;
+      r.closingValue = currentValue;
+    });
+
+    // ✅ Check if batch is explicitly an "Opening" batch from Item Master
+    let isOpeningBatch = false;
+    if (itemData && itemData.batches) {
+      const batch = itemData.batches.find((b: any) => b.batchName === batchName);
+      if (batch && batch.mode === "opening") {
+        isOpeningBatch = true;
+      }
+    }
+
+    // ✅ Display "Opening Balance" row ONLY if:
+    // 1. It is an "Opening" batch (mode="opening")
+    // 2. It is April (Start of Financial Year)
+    if (isOpeningBatch && monthLabel?.startsWith("April")) {
+      setRows([openingRow, ...tempRows]);
+    } else {
+      setRows(tempRows);
+    }
     setLoading(false);
   };
 
@@ -190,28 +268,45 @@ const StockVouchers = () => {
 
               <tbody>
                 {rows.map((r, i) => (
-                  <tr key={i} className="hover:bg-yellow-100">
-                    <td className="border p-1">
-                      {r.date.toLocaleDateString("en-GB")}
-                    </td>
-                    <td className="border p-1">{r.party}</td>
-                    <td className="border p-1">{r.type}</td>
-                    <td className="border p-1 font-semibold">{r.vchNo}</td>
+                  <tr key={i} className={r.isOpening ? "bg-gray-100 font-bold" : "hover:bg-yellow-100"}>
+                    {r.isOpening ? (
+                      <>
+                        <td className="border p-2 text-center text-sm">{r.date.toLocaleDateString("en-GB")}</td>
+                        <td className="border p-2 font-bold text-sm text-gray-800" colSpan={3}>Opening Balance</td>
+                        <td className="border p-2 text-right text-sm font-bold">{r.closingQty || ""}</td>
+                        <td className="border p-2 text-right text-sm font-bold">{r.closingValue ? r.closingValue.toFixed(2) : ""}</td>
+                        <td className="border p-2 text-right text-sm"></td>
+                        <td className="border p-2 text-right text-sm"></td>
+                        <td className="border p-2 text-right font-bold text-sm">{r.closingQty || ""}</td>
+                        <td className="border p-2 text-right font-bold text-sm">{r.closingValue ? r.closingValue.toFixed(2) : ""}</td>
+                      </>
+                    ) : (
+                      <>
+                        <td className="border p-2 text-center text-sm">
+                          {r.date.toLocaleDateString("en-GB")}
+                        </td>
+                        <td className="border p-2 font-medium text-sm text-gray-700">
+                          {r.party || "Particulars"}
+                        </td>
+                        <td className="border p-2 text-center text-sm">{r.type}</td>
+                        <td className="border p-2 text-center font-semibold text-sm">{r.vchNo}</td>
 
-                    <td className="border p-1 text-right">{r.inQty || ""}</td>
-                    <td className="border p-1 text-right">
-                      {r.inValue ? r.inValue.toFixed(2) : ""}
-                    </td>
+                        <td className="border p-2 text-right text-sm">{r.inQty || ""}</td>
+                        <td className="border p-2 text-right text-sm">
+                          {r.inValue ? r.inValue.toFixed(2) : ""}
+                        </td>
 
-                    <td className="border p-1 text-right">{r.outQty || ""}</td>
-                    <td className="border p-1 text-right">
-                      {r.outValue ? r.outValue.toFixed(2) : ""}
-                    </td>
+                        <td className="border p-2 text-right text-sm">{r.outQty || ""}</td>
+                        <td className="border p-2 text-right text-sm">
+                          {r.outValue ? r.outValue.toFixed(2) : ""}
+                        </td>
 
-                    <td className="border p-1 text-right">{r.closingQty}</td>
-                    <td className="border p-1 text-right">
-                      {r.closingValue.toFixed(2)}
-                    </td>
+                        <td className="border p-2 text-right font-bold text-sm">{r.closingQty || ""}</td>
+                        <td className="border p-2 text-right font-bold text-sm">
+                          {r.closingValue ? r.closingValue.toFixed(2) : ""}
+                        </td>
+                      </>
+                    )}
                   </tr>
                 ))}
               </tbody>

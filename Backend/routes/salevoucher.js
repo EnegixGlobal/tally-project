@@ -469,24 +469,51 @@ router.get("/sale-history", async (req, res) => {
 
     const fetchSql = `
       SELECT 
-        id,
-        itemName,
-        hsnCode,
-        batchNumber,
-        qtyChange,
-        rate,
-        movementDate,
-        godownId,
-        voucherNumber,
-        companyId,
-        ownerType,
-        ownerId
-      FROM sale_history
-      WHERE companyId = ? AND ownerType = ? AND ownerId = ?
-      ORDER BY movementDate DESC, id DESC
+        sh.id,
+        sh.itemName,
+        sh.hsnCode,
+        sh.batchNumber,
+        sh.qtyChange,
+        sh.rate,
+        sh.movementDate,
+        sh.godownId,
+        sh.voucherNumber,
+        sh.companyId,
+        sh.ownerType,
+        sh.ownerId,
+
+        -- ✅ SALES LEDGER
+        svi.salesLedgerId,
+        l.name AS ledgerName
+
+      FROM sale_history sh
+
+      -- 🔗 sale_history → sales_vouchers
+      LEFT JOIN sales_vouchers sv
+        ON sv.number = sh.voucherNumber
+        AND sv.company_id = ?
+        AND sv.owner_type = ?
+        AND sv.owner_id = ?
+
+      -- 🔗 sales_vouchers → sales_voucher_items
+      LEFT JOIN sales_voucher_items svi
+        ON svi.voucherId = sv.id
+
+      -- 🔗 sales_voucher_items → ledgers
+      LEFT JOIN ledgers l
+        ON l.id = svi.salesLedgerId
+
+      WHERE sh.companyId = ?
+        AND sh.ownerType = ?
+        AND sh.ownerId = ?
+
+      ORDER BY sh.movementDate DESC, sh.id DESC
     `;
 
     const [rows] = await db.execute(fetchSql, [
+      company_id,
+      owner_type,
+      owner_id,
       company_id,
       owner_type,
       owner_id,
@@ -504,6 +531,8 @@ router.get("/sale-history", async (req, res) => {
     });
   }
 });
+
+
 
 // get sales vouchers
 router.get("/", async (req, res) => {
