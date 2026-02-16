@@ -612,8 +612,9 @@ const StockSummary: React.FC = () => {
         { header: "Item", accessor: "itemName", align: "center" as const },
         { header: "HSN", accessor: "hsnCode", align: "center" as const },
         { header: "Batch", accessor: "batchNumber", align: "center" as const },
-        { header: "Qty ", accessor: "qty", align: "center" as const, render: (r: any) => `${r.qty}`, },
-        { header: "Rate", accessor: "rate", align: "center" as const, render: (r: any) => formatCurrency(Number(r.rate || 0)), },
+        { header: "Qty ", accessor: "qty", align: "right" as const, render: (r: any) => `${r.qty}`, },
+        { header: "Rate", accessor: "rate", align: "right" as const, render: (r: any) => formatCurrency(Number(r.rate || 0)), },
+        { header: "Value", accessor: "value", align: "right" as const, render: (r: any) => formatCurrency(Number(r.qty || 0) * Number(r.rate || 0)), },
         { header: "Date", accessor: "date", align: "center" as const, render: (r: any) => formatDate(r.date), },
       ];
     }
@@ -624,8 +625,9 @@ const StockSummary: React.FC = () => {
         { header: "Item", accessor: "itemName", align: "center" as const },
         { header: "HSN", accessor: "hsnCode", align: "center" as const },
         { header: "Batch", accessor: "batchNumber", align: "center" as const },
-        { header: "Qty", accessor: "qty", align: "center" as const, render: (r: any) => `${r.qty}`, },
-        { header: "Rate", accessor: "rate", align: "center" as const, render: (r: any) => formatCurrency(Number(r.rate || 0)), },
+        { header: "Qty", accessor: "qty", align: "right" as const, render: (r: any) => `${r.qty}`, },
+        { header: "Rate", accessor: "rate", align: "right" as const, render: (r: any) => formatCurrency(Number(r.rate || 0)), },
+        { header: "Value", accessor: "value", align: "right" as const, render: (r: any) => formatCurrency(Number(r.qty || 0) * Number(r.rate || 0)), },
         { header: "Sale Date", accessor: "date", align: "center" as const, render: (r: any) => formatDate(r.date), },
       ];
     }
@@ -1622,6 +1624,17 @@ const StockSummary: React.FC = () => {
                                   -
                                 </td>
                               )}
+                              {/* Value placeholder */}
+                              {reportView !== "Closing" && (
+                                <td
+                                  className={`p-2 border ${theme === "dark"
+                                    ? "border-gray-500"
+                                    : "border-gray-400"
+                                    } text-center`}
+                                >
+                                  -
+                                </td>
+                              )}
                               {/* Date placeholder */}
                               {reportView !== "Closing" && (
                                 <td
@@ -1749,6 +1762,14 @@ const StockSummary: React.FC = () => {
                                             } text-right font-mono`}
                                         >
                                           {formatCurrency(Number(transaction.rate || 0))}
+                                        </td>
+                                        <td
+                                          className={`p-2 border ${theme === "dark"
+                                            ? "border-gray-500"
+                                            : "border-gray-400"
+                                            } text-right font-mono`}
+                                        >
+                                          {formatCurrency((Number(transaction.qty) || 0) * (Number(transaction.rate) || 0))}
                                         </td>
                                         <td
                                           className={`p-2 border ${theme === "dark"

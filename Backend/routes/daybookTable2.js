@@ -288,10 +288,13 @@ router.get("/", async (req, res) => {
     sv.cgstTotal,
     sv.sgstTotal,
     sv.igstTotal,
+    sv.discountTotal,
     sv.total,
 
     si.salesLedgerId,
+    si.discountLedgerId,
     l.name AS sales_ledger_name,
+    dl.name AS discount_ledger_name,
 
     si.amount AS item_amount
 
@@ -305,6 +308,9 @@ router.get("/", async (req, res) => {
 
   LEFT JOIN ledgers party
     ON party.id = sv.partyId
+
+  LEFT JOIN ledgers dl
+    ON dl.id = si.discountLedgerId
 
   WHERE sv.company_id = ?
     AND sv.owner_type = ?
@@ -333,9 +339,12 @@ router.get("/", async (req, res) => {
           cgstTotal: row.cgstTotal,
           sgstTotal: row.sgstTotal,
           igstTotal: row.igstTotal,
+          discountTotal: row.discountTotal,
           total: row.total,
           partyId: row.partyId,
           partyName: row.party_name,
+          discountLedgerId: row.discountLedgerId,
+          discountLedgerName: row.discount_ledger_name,
           entries: [],
         };
 
@@ -349,6 +358,12 @@ router.get("/", async (req, res) => {
           narration: "Sales Party",
           isParty: true,
         });
+      }
+
+      // Capture discount info if not already captured
+      if (!vouchers[key].discountLedgerId && row.discountLedgerId) {
+        vouchers[key].discountLedgerId = row.discountLedgerId;
+        vouchers[key].discountLedgerName = row.discount_ledger_name;
       }
 
       /* ================================
@@ -377,6 +392,20 @@ router.get("/", async (req, res) => {
         const vid = v.id.split("-")[1];
 
         if (subtotal > 0) {
+          // DISCOUNT
+          if (Number(v.discountTotal) > 0) {
+            v.entries.push({
+              id: `SAL-DISC-${vid}`,
+              ledger_id: v.discountLedgerId,
+              ledger_name: v.discountLedgerName || "Discount",
+              amount: Number(v.discountTotal),
+              entry_type: "debit",
+              narration: "Discount",
+              isParty: false,
+              isChild: true,
+            });
+          }
+
           // IGST
           if (Number(v.igstTotal) > 0) {
             const igstRate = ((v.igstTotal / subtotal) * 100).toFixed(2);
