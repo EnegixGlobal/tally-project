@@ -213,14 +213,18 @@ router.get("/:id", async (req, res) => {
           sv.cgstTotal,
           sv.sgstTotal,
           sv.igstTotal,
+          sv.discountTotal,
           sv.total,
           si.salesLedgerId,
+          si.discountLedgerId,
           l.name AS sales_ledger_name,
+          dl.name AS discount_ledger_name,
           si.amount AS item_amount
         FROM sales_vouchers sv
         LEFT JOIN sales_voucher_items si ON si.voucherId = sv.id
         LEFT JOIN ledgers l ON l.id = si.salesLedgerId
         LEFT JOIN ledgers party ON party.id = sv.partyId
+        LEFT JOIN ledgers dl ON dl.id = si.discountLedgerId
         WHERE sv.id = ? AND sv.company_id = ?
         `,
                 [voucherId, company_id]
@@ -237,6 +241,7 @@ router.get("/:id", async (req, res) => {
                     cgstTotal: row.cgstTotal,
                     sgstTotal: row.sgstTotal,
                     igstTotal: row.igstTotal,
+                    discountTotal: row.discountTotal,
                     total: row.total,
                     partyId: row.partyId,
                     partyName: row.party_name,
@@ -270,6 +275,22 @@ router.get("/:id", async (req, res) => {
 
                 const subtotal = Number(voucher.subtotal || 0);
                 if (subtotal > 0) {
+                    if (Number(voucher.discountTotal) > 0) {
+                        // Find the first row with discountLedgerId
+                        const discountRow = rows.find(r => r.discountLedgerId);
+                        const discountLedgerName = discountRow ? discountRow.discount_ledger_name : "Discount";
+                        const discountLedgerId = discountRow ? discountRow.discountLedgerId : null;
+
+                        voucher.entries.push({
+                            id: `SAL-DISC-${voucherId}`,
+                            ledger_name: discountLedgerName,
+                            ledger_id: discountLedgerId,
+                            amount: Number(voucher.discountTotal),
+                            entry_type: 'debit',
+                            isChild: true
+                        });
+                    }
+
                     if (Number(voucher.igstTotal) > 0) {
                         const rate = ((voucher.igstTotal / subtotal) * 100).toFixed(2);
                         voucher.entries.push({ id: `SAL-IGST-${voucherId}`, ledger_name: `IGST @ ${rate}%`, amount: Number(voucher.igstTotal), entry_type: 'credit', isChild: true });
