@@ -13,7 +13,7 @@ router.get("/ewailbill", async (req, res) => {
       });
     }
 
-   const [rows] = await pool.query(
+ const [rows] = await pool.query(
 `
 SELECT
   sv.id,
@@ -21,14 +21,12 @@ SELECT
   sv.date,
   sv.partyId,
 
-  -- Dispatch / Transport
   sv.referenceNo,
   sv.dispatchDocNo,
   sv.dispatchThrough,
   sv.destination,
   sv.approxDistance,
 
-  -- Party Details
   l.name AS partyName,
   l.address,
   l.email,
@@ -37,7 +35,6 @@ SELECT
   l.state,
   l.district,
 
-  -- Amount Details
   sv.subtotal,
   sv.cgstTotal,
   sv.sgstTotal,
@@ -45,7 +42,6 @@ SELECT
   sv.discountTotal,
   sv.total,
 
-  -- Product Details (FROM sale_history)
   svi.itemName,
   svi.qtyChange,
   svi.rate,
@@ -57,7 +53,8 @@ LEFT JOIN ledgers l
   ON l.id = sv.partyId
 
 LEFT JOIN sale_history svi
-  ON svi.voucherNumber = sv.number
+  ON svi.voucherNumber COLLATE utf8mb4_general_ci
+     = sv.number COLLATE utf8mb4_general_ci
 
 WHERE sv.company_id = ?
   AND sv.owner_type COLLATE utf8mb4_general_ci = ?
