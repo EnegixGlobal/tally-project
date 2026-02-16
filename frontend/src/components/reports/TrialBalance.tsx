@@ -134,29 +134,31 @@ const TrialBalance: React.FC = () => {
     const allGroupIds = findSubGroups(groupId);
     const recursiveLedgers = ledgers.filter(l => allGroupIds.includes(Number(l.groupId)));
 
-    let totalDebit = 0;
-    let totalCredit = 0;
+    let totalOpDr = 0;
+    let totalOpCr = 0;
+    let totalTransDr = 0;
+    let totalTransCr = 0;
 
     recursiveLedgers.forEach(ledger => {
-      const balance = calculateClosingBalance(ledger);
-      if (balance > 0) {
-        // Based on Tally logic, if net balance for group/ledger is positive it's usually one side
-        // But for Trial Balance we show the net closing in Debit or Credit column.
-        if (ledger.balanceType === 'debit') {
-          if (balance >= 0) totalDebit += balance; else totalCredit += Math.abs(balance);
-        } else {
-          if (balance >= 0) totalCredit += balance; else totalDebit += Math.abs(balance);
-        }
-      } else if (balance < 0) {
-        if (ledger.balanceType === 'debit') {
-          totalCredit += Math.abs(balance);
-        } else {
-          totalDebit += Math.abs(balance);
-        }
-      }
+      // Opening
+      const op = Number(ledger.openingBalance) || 0;
+      if (ledger.balanceType === 'debit') totalOpDr += op;
+      else totalOpCr += op;
+
+      // Transactions
+      totalTransDr += Number(debitCreditData[ledger.id]?.debit) || 0;
+      totalTransCr += Number(debitCreditData[ledger.id]?.credit) || 0;
     });
 
-    return { debit: totalDebit, credit: totalCredit };
+    const netOpening = totalOpDr - totalOpCr;
+    const netClosing = (totalOpDr + totalTransDr) - (totalOpCr + totalTransCr);
+
+    return {
+      opening: netOpening, // +ve is Dr
+      debit: totalTransDr,
+      credit: totalTransCr,
+      closing: netClosing // +ve is Dr
+    };
   };
 
   const trialGroups = [
@@ -190,7 +192,7 @@ const TrialBalance: React.FC = () => {
       <>
         {subGroups.map(group => {
           const totals = calculateGroupTotals(group.id);
-          const hasBalance = totals.debit !== 0 || totals.credit !== 0;
+          const hasBalance = totals.opening !== 0 || totals.debit !== 0 || totals.credit !== 0 || totals.closing !== 0;
           if (!hasBalance && !isDetailedView) return null;
 
           return (
@@ -202,8 +204,14 @@ const TrialBalance: React.FC = () => {
                 <td className="py-2 px-4" style={{ paddingLeft: `${(level + 1) * 1.5}rem` }}>
                   <span className="italic font-semibold text-blue-500">{group.name}</span>
                 </td>
+                <td className="py-2 px-4 text-right font-mono text-xs">
+                  {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : ""}
+                </td>
                 <td className="py-2 px-4 text-right font-mono text-xs">{totals.debit > 0 ? totals.debit.toLocaleString() : ""}</td>
                 <td className="py-2 px-4 text-right font-mono text-xs">{totals.credit > 0 ? totals.credit.toLocaleString() : ""}</td>
+                <td className="py-2 px-4 text-right font-mono text-xs">
+                  {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : ""}
+                </td>
               </tr>
               {isDetailedView && renderGroupRows(group.id, level + 1)}
             </React.Fragment>
@@ -211,16 +219,20 @@ const TrialBalance: React.FC = () => {
         })}
 
         {directLedgers.map(ledger => {
-          const balance = calculateClosingBalance(ledger);
-          if (balance === 0 && !isDetailedView) return null;
+          // Opening
+          const op = Number(ledger.openingBalance) || 0;
+          const opDr = ledger.balanceType === 'debit' ? op : 0;
+          const opCr = ledger.balanceType === 'credit' ? op : 0;
+          const netOp = opDr - opCr;
 
-          let d = 0;
-          let c = 0;
-          if (ledger.balanceType === 'debit') {
-            if (balance >= 0) d = balance; else c = Math.abs(balance);
-          } else {
-            if (balance >= 0) c = balance; else d = Math.abs(balance);
-          }
+          // Trans
+          const d = Number(debitCreditData[ledger.id]?.debit) || 0;
+          const c = Number(debitCreditData[ledger.id]?.credit) || 0;
+
+          // Closing
+          const netClose = (opDr + d) - (opCr + c);
+
+          if (netOp === 0 && d === 0 && c === 0 && netClose === 0 && !isDetailedView) return null;
 
           return (
             <tr
@@ -231,8 +243,14 @@ const TrialBalance: React.FC = () => {
               <td className="py-1 px-4" style={{ paddingLeft: `${(level + 1) * 1.5}rem` }}>
                 {ledger.name}
               </td>
+              <td className="py-1 px-4 text-right font-mono">
+                {netOp !== 0 ? `${Math.abs(netOp).toLocaleString()} ${netOp > 0 ? "Dr" : "Cr"}` : ""}
+              </td>
               <td className="py-1 px-4 text-right font-mono">{d > 0 ? d.toLocaleString() : ""}</td>
               <td className="py-1 px-4 text-right font-mono">{c > 0 ? c.toLocaleString() : ""}</td>
+              <td className="py-1 px-4 text-right font-mono">
+                {netClose !== 0 ? `${Math.abs(netClose).toLocaleString()} ${netClose > 0 ? "Dr" : "Cr"}` : ""}
+              </td>
             </tr>
           );
         })}
@@ -287,16 +305,30 @@ const TrialBalance: React.FC = () => {
             <thead>
               <tr className="border-b-2 border-gray-400 font-bold text-sm">
                 <th className="py-3 px-4">Particulars</th>
+                <th className="py-3 px-4 text-right">Opening Balance</th>
                 <th className="py-3 px-4 text-right">Debit</th>
                 <th className="py-3 px-4 text-right">Credit</th>
+                <th className="py-3 px-4 text-right">Closing Balance</th>
               </tr>
             </thead>
             <tbody>
               {trialGroups.map(tg => {
+                const totals = calculateGroupTotals(tg.id);
+
+                // Special handling for Profit & Loss (id -18)
                 if (tg.id === -18) {
+                  // Logic for P&L presentation in TB can be complex. 
+                  // To keep it simple and consistent with user request:
+                  // We will just show the calculated totals if they exist, 
+                  // or the net profit/loss if handled externally.
+                  // Previous code calculated it from netProfit/netLoss states.
+
                   const plVal = netProfit - netLoss - transferredProfit + transferredLoss;
-                  let d = 0; let c = 0;
-                  if (plVal > 0) c = plVal; else d = Math.abs(plVal);
+                  let closingDr = 0, closingCr = 0;
+                  if (plVal > 0) closingCr = plVal; else closingDr = Math.abs(plVal);
+
+                  // P&L usually accumulated in closing, opening implies retained earnings? 
+                  // For now, mirroring previous logic but fitting columns.
                   if (plVal === 0 && !isDetailedView) return null;
 
                   return (
@@ -306,25 +338,35 @@ const TrialBalance: React.FC = () => {
                         onClick={() => navigate("/app/reports/profit-loss")}
                       >
                         <td className="py-3 px-4 text-blue-600">{tg.name}</td>
-                        <td className="py-3 px-4 text-right font-mono">{d > 0 ? d.toLocaleString() : ""}</td>
-                        <td className="py-3 px-4 text-right font-mono">{c > 0 ? c.toLocaleString() : ""}</td>
+                        <td className="py-3 px-4 text-right font-mono text-gray-400">-</td>
+                        <td className="py-3 px-4 text-right font-mono text-gray-400">-</td>
+                        <td className="py-3 px-4 text-right font-mono text-gray-400">-</td>
+                        <td className="py-3 px-4 text-right font-mono">
+                          {closingDr > 0 ? `${closingDr.toLocaleString()} Dr` : ""}
+                          {closingCr > 0 ? `${closingCr.toLocaleString()} Cr` : ""}
+                        </td>
                       </tr>
                     </React.Fragment>
                   );
                 }
 
-                const totals = calculateGroupTotals(tg.id);
-                if (totals.debit === 0 && totals.credit === 0 && !isDetailedView) return null;
+                if (totals.opening === 0 && totals.debit === 0 && totals.credit === 0 && totals.closing === 0 && !isDetailedView) return null;
 
                 return (
                   <React.Fragment key={tg.id}>
                     <tr
-                      className="border-b border-gray-300 font-semibold cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-00"
+                      className="border-b border-gray-300 font-semibold cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
                       onClick={() => navigate(`/app/reports/sub-group-summary/${tg.id}`)}
                     >
-                      <td className="py-3 px-4 text-blue-600 ">{tg.name}</td>
+                      <td className="py-3 px-4 text-blue-600">{tg.name}</td>
+                      <td className="py-3 px-4 text-right font-mono">
+                        {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : ""}
+                      </td>
                       <td className="py-3 px-4 text-right font-mono">{totals.debit > 0 ? totals.debit.toLocaleString() : ""}</td>
                       <td className="py-3 px-4 text-right font-mono">{totals.credit > 0 ? totals.credit.toLocaleString() : ""}</td>
+                      <td className="py-3 px-4 text-right font-mono">
+                        {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : ""}
+                      </td>
                     </tr>
                     {isDetailedView && renderGroupRows(tg.id)}
                   </React.Fragment>
@@ -334,8 +376,14 @@ const TrialBalance: React.FC = () => {
             <tfoot>
               <tr className="font-bold text-lg border-t-2 border-gray-400">
                 <td className="py-3 px-4">Grand Total</td>
+                <td className="py-3 px-4 text-right text-indigo-600 font-mono">
+                  {/* Grand Total Opening is usually balanced to 0 in double entry, but might filter specific groups */}
+                </td>
                 <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.debit.toLocaleString()}</td>
                 <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.credit.toLocaleString()}</td>
+                <td className="py-3 px-4 text-right text-indigo-600 font-mono">
+                  {/* Grand Total Closing is usually balanced */}
+                </td>
               </tr>
             </tfoot>
           </table>
