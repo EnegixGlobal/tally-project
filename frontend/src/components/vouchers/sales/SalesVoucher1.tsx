@@ -236,8 +236,8 @@ const SalesVoucher: React.FC = () => {
         if (json?.success) {
           setSalesTypes(json?.data || []);
           // Auto-select default Sales type (id=1) if not in edit mode
-          if (!isEditMode && !selectedSalesTypeId) {
-            setSelectedSalesTypeId("1");
+          if (!isEditMode) {
+            setSelectedSalesTypeId((prev) => prev || "custom");
           }
         } else {
           setSalesTypes([]);
@@ -251,26 +251,7 @@ const SalesVoucher: React.FC = () => {
   }, []);
 
   // Bill No. preview based on selected sales type (prefix + (current_no+1) + suffix)
-  const selectedSalesType = useMemo(() => {
-    if (!selectedSalesTypeId) return null;
-    return (
-      salesTypes.find((st) => String(st.id) === String(selectedSalesTypeId)) ||
-      null
-    );
-  }, [salesTypes, selectedSalesTypeId]);
 
-  const billNoPreview = useMemo(() => {
-    if (!selectedSalesType) return "";
-
-    const prefix = (selectedSalesType.prefix || "").trim();
-    const suffix = (selectedSalesType.suffix || "").trim();
-    const nextNo = Number(selectedSalesType.current_no || 0) + 1;
-
-    // If both prefix and suffix are empty -> show only next number
-    if (!prefix && !suffix) return String(nextNo);
-    // If one side missing, it will just concatenate the available parts
-    return `${prefix}${nextNo}${suffix}`;
-  }, [selectedSalesType]);
 
   // Check localStorage for companyInfo as fallback
   useEffect(() => {
@@ -357,6 +338,29 @@ const SalesVoucher: React.FC = () => {
   const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>(() =>
     getInitialFormData()
   );
+
+  // Bill No. preview based on selected sales type (prefix + (current_no+1) + suffix)
+  const selectedSalesType = useMemo(() => {
+    if (!selectedSalesTypeId) return null;
+    return (
+      salesTypes.find((st) => String(st.id) === String(selectedSalesTypeId)) ||
+      null
+    );
+  }, [salesTypes, selectedSalesTypeId]);
+
+  const billNoPreview = useMemo(() => {
+    if (selectedSalesTypeId === "custom") return formData.number; // Return manual entry for custom
+    if (!selectedSalesType) return "";
+
+    const prefix = (selectedSalesType.prefix || "").trim();
+    const suffix = (selectedSalesType.suffix || "").trim();
+    const nextNo = Number(selectedSalesType.current_no || 0) + 1;
+
+    // If both prefix and suffix are empty -> show only next number
+    if (!prefix && !suffix) return String(nextNo);
+    // If one side missing, it will just concatenate the available parts
+    return `${prefix}${nextNo}${suffix}`;
+  }, [selectedSalesType, selectedSalesTypeId, formData.number]);
 
   // --- DRAFT PERSISTENCE (RESTORE) ---
   useEffect(() => {
@@ -770,6 +774,7 @@ const SalesVoucher: React.FC = () => {
 
   // voucher no logic
   useEffect(() => {
+    if (selectedSalesTypeId === "custom") return; // Skip auto-generation for custom
     if (!selectedSalesType || isEditMode) return;
 
     const prefix = (selectedSalesType.prefix || "").trim();
@@ -788,7 +793,7 @@ const SalesVoucher: React.FC = () => {
       ...prev,
       number: voucherNo,
     }));
-  }, [selectedSalesType]);
+  }, [selectedSalesType, selectedSalesTypeId]);
 
   // Set party state when ledgers are loaded and party is selected
   useEffect(() => {
@@ -1933,7 +1938,7 @@ const SalesVoucher: React.FC = () => {
       entries: entriesWithGST,
 
       // Sales Type and Bill No.
-      sales_type_id: selectedSalesTypeId ? Number(selectedSalesTypeId) : null,
+      sales_type_id: (selectedSalesTypeId && selectedSalesTypeId !== "custom") ? Number(selectedSalesTypeId) : null,
       bill_no: billNoPreview || null,
 
       // Ensure totals are properly formatted as numbers with 2 decimal places
@@ -2268,6 +2273,7 @@ const SalesVoucher: React.FC = () => {
               title="Sales Voucher Type"
             >
               <option value="">Select Sales Type</option>
+              <option value="custom">Custom</option>
               {salesTypes.map((s) => (
                 <option key={String(s.id)} value={String(s.id)}>
                   {s.sales_type}
@@ -2320,7 +2326,12 @@ const SalesVoucher: React.FC = () => {
                     id="number"
                     name="number"
                     value={formData.number}
-                    readOnly
+                    onChange={(e) => {
+                      if (selectedSalesTypeId === "custom") {
+                        handleChange(e);
+                      }
+                    }}
+                    readOnly={selectedSalesTypeId !== "custom"}
                     className={`${FORM_STYLES.input(theme, !!errors.number)} ${theme === "dark" ? "bg-gray-700/50" : "bg-gray-100"}`}
                   />
                   {errors.number && <p className="text-red-500 text-xs mt-1">{errors.number}</p>}
