@@ -467,7 +467,7 @@ router.get("/sale-history", async (req, res) => {
       });
     }
 
- const fetchSql = `
+    const fetchSql = `
   SELECT 
     sh.id,
     sh.itemName,
@@ -512,6 +512,7 @@ router.get("/sale-history", async (req, res) => {
       owner_type,
       owner_id,
     ]);
+
 
     return res.status(200).json({
       success: true,
@@ -567,6 +568,7 @@ router.get("/", async (req, res) => {
     sql += " ORDER BY id DESC";
 
     const [voucherRows] = await db.execute(sql, params);
+
 
     return res.status(200).json(voucherRows);
   } catch (err) {
