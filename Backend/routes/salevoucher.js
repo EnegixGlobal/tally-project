@@ -482,9 +482,9 @@ router.get("/sale-history", async (req, res) => {
         sh.ownerType,
         sh.ownerId,
 
-        -- ✅ SALES LEDGER
-        svi.salesLedgerId,
-        l.name AS ledgerName
+        -- ✅ PARTY RESULT (FROM sales_vouchers)
+        sv.partyId AS partyId,
+        l.name     AS partyName
 
       FROM sale_history sh
 
@@ -495,13 +495,9 @@ router.get("/sale-history", async (req, res) => {
         AND sv.owner_type = ?
         AND sv.owner_id = ?
 
-      -- 🔗 sales_vouchers → sales_voucher_items
-      LEFT JOIN sales_voucher_items svi
-        ON svi.voucherId = sv.id
-
-      -- 🔗 sales_voucher_items → ledgers
+      -- 🔗 sales_vouchers → ledgers (PARTY)
       LEFT JOIN ledgers l
-        ON l.id = svi.salesLedgerId
+        ON l.id = sv.partyId
 
       WHERE sh.companyId = ?
         AND sh.ownerType = ?
@@ -531,6 +527,7 @@ router.get("/sale-history", async (req, res) => {
     });
   }
 });
+
 
 
 

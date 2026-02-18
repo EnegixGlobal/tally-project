@@ -56,48 +56,45 @@ router.get("/purchase-history", async (req, res) => {
 
     // ✅ FINAL QUERY WITH LEDGER NAME
     const selectSql = `
-      SELECT 
-        ph.id,
-        ph.itemName,
-        ph.hsnCode,
-        ph.batchNumber,
-        ph.purchaseQuantity,
-        ph.rate,
-        ph.purchaseDate,
-        ph.voucherNumber,
-        ph.godownId,
-        ph.companyId,
-        ph.ownerType,
-        ph.ownerId,
-        ph.type,
+  SELECT 
+    ph.id,
+    ph.itemName,
+    ph.hsnCode,
+    ph.batchNumber,
+    ph.purchaseQuantity,
+    ph.rate,
+    ph.purchaseDate,
+    ph.voucherNumber,
+    ph.godownId,
+    ph.companyId,
+    ph.ownerType,
+    ph.ownerId,
+    ph.type,
 
-        -- 🎯 LEDGER RESULT
-        l.id   AS ledgerId,
-        l.name AS ledgerName
+    -- ✅ PARTY RESULT (FROM purchase_vouchers)
+    pv.partyId AS partyId,
+    l.name     AS partyName
 
-      FROM purchase_history ph
+  FROM purchase_history ph
 
-      -- 🔗 purchase_history → purchase_vouchers
-      LEFT JOIN purchase_vouchers pv
-        ON pv.number = ph.voucherNumber
-        AND pv.company_id = ?
-        AND pv.owner_type = ?
-        AND pv.owner_id = ?
+  -- 🔗 purchase_history → purchase_vouchers
+  LEFT JOIN purchase_vouchers pv
+    ON pv.number = ph.voucherNumber
+    AND pv.company_id = ?
+    AND pv.owner_type = ?
+    AND pv.owner_id = ?
 
-      -- 🔗 purchase_vouchers → purchase_voucher_items
-      LEFT JOIN purchase_voucher_items pvi
-        ON pvi.voucherId = pv.id
+  -- 🔗 purchase_vouchers → ledgers (PARTY)
+  LEFT JOIN ledgers l
+    ON l.id = pv.partyId
 
-      -- 🔗 purchase_voucher_items → ledgers
-      LEFT JOIN ledgers l
-        ON l.id = pvi.purchaseLedgerId
+  WHERE ph.companyId = ?
+    AND ph.ownerType = ?
+    AND ph.ownerId = ?
 
-      WHERE ph.companyId = ?
-        AND ph.ownerType = ?
-        AND ph.ownerId = ?
+  ORDER BY ph.purchaseDate DESC, ph.id DESC
+`;
 
-      ORDER BY ph.purchaseDate DESC, ph.id DESC
-    `;
 
     const [rows] = await db.execute(selectSql, [
       company_id,
@@ -107,6 +104,7 @@ router.get("/purchase-history", async (req, res) => {
       owner_type,
       owner_id,
     ]);
+
 
     return res.status(200).json({
       success: true,
