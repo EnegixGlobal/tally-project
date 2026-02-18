@@ -1088,17 +1088,17 @@ const StockSummary: React.FC = () => {
                             {isExpanded &&
                               batches.map((b: any, bIdx: number) => (
                                 <tr key={bIdx} className="bg-white hover:bg-yellow-50">
-                                  <td className="border pl-8 italic">{b.batchName}</td>
+                                  <td className="border pl-8 italic">{b?.batchName || "-"}</td>
                                   <td className="border"></td>
                                   <td className="border"></td>
                                   <td className="border"></td>
                                   <td className="border"></td>
-                                  <td className="border p-2 text-right">{b.opening.qty}</td>
+                                  <td className="border p-2 text-right">{b?.opening?.qty || 0}</td>
                                   <td className="border p-2 text-right">
-                                    {formatCurrency(b.opening.rate)}
+                                    {formatCurrency(b?.opening?.rate || 0)}
                                   </td>
                                   <td className="border p-2 text-right">
-                                    {formatCurrency(b.opening.value)}
+                                    {formatCurrency(b?.opening?.value || 0)}
                                   </td>
                                 </tr>
                               ))}
@@ -1346,7 +1346,7 @@ const StockSummary: React.FC = () => {
                                 : "bg-gray-50 hover:bg-gray-100"
                                 }`}
                               onClick={() => {
-                                if (batches.length === 1 && batches[0].batchName === "Default") {
+                                if (batches.length === 1 && batches[0]?.batchName === "Default") {
                                   navigate(
                                     `/app/reports/item-monthly-summary?item=${item.itemName}&batch=Default`
                                   );
@@ -1358,7 +1358,7 @@ const StockSummary: React.FC = () => {
                               <td className="border p-2">
                                 <div className="flex items-center gap-2">
                                   {/* Hide Chevron if Single Default Batch (Direct Navigation) */
-                                    (batches.length === 1 && batches[0].batchName === "Default") ? null :
+                                    (batches.length === 1 && batches[0]?.batchName === "Default") ? null :
                                       isExpanded ? (
                                         <ChevronDown size={16} />
                                       ) : (
