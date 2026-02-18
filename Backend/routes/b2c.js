@@ -4,6 +4,7 @@ const router = express.Router();
 const pool = require('../db'); // Your configured MySQL connection pool
 
 router.get('/b2c-customers', async (req, res) => {
+  console.log('hit this route')
   try {
     const { company_id, owner_type, owner_id } = req.query;
     if (!company_id || !owner_type || !owner_id) {

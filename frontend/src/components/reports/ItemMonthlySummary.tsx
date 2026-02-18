@@ -7,7 +7,9 @@ const ItemMonthlySummary = () => {
   const navigate = useNavigate();
 
   const itemName = params.get("item");
-  const batchName = params.get("batch");
+  const rawBatch = params.get("batch");
+  // Handle cases where batch is string "null" or "undefined" from URL
+  const batchName = (rawBatch === "null" || rawBatch === "undefined" || !rawBatch) ? "Default" : rawBatch;
 
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
@@ -71,26 +73,39 @@ const ItemMonthlySummary = () => {
     const stockItemsData = (await stockItemRes.json()).data || [];
 
     // ✅ Get Opening Balance from Batch
-    let batchCurrentQty = 0;
-    let batchOpeningRate = 0;
-
     const itemData = stockItemsData.find((i: any) => i.name === itemName);
+    const isDefaultBatch = batchName === "Default";
+
+    // If Default, init with Item Level, else 0
+    let batchCurrentQty = isDefaultBatch ? Number(itemData?.openingBalance || 0) : 0;
+    let batchOpeningRate = isDefaultBatch ? Number(itemData?.openingRate || 0) : 0;
+
     if (itemData && itemData.batches) {
-      const batch = itemData.batches.find((b: any) => b.batchName === batchName);
+      const batch = itemData.batches.find((b: any) =>
+        b.batchName === batchName || (isDefaultBatch && !b.batchName)
+      );
       if (batch) {
         batchCurrentQty = Number(batch.batchQuantity || 0);
         batchOpeningRate = Number(batch.openingRate || 0);
       }
     }
 
-    // ✅ Filter by item + batch
-    const purchases = purchaseData.filter(
-      (p: any) => p.itemName === itemName && p.batchNumber === batchName
-    );
+    // ✅ Filter by item + batch (Smart Match for "Default")
 
-    const sales = salesData.filter(
-      (s: any) => s.itemName === itemName && s.batchNumber === batchName
-    );
+
+    const purchases = purchaseData.filter((p: any) => {
+      if (p.itemName !== itemName) return false;
+      if (p.batchNumber === batchName) return true;
+      if (isDefaultBatch && (!p.batchNumber || p.batchNumber === "default")) return true;
+      return false;
+    });
+
+    const sales = salesData.filter((s: any) => {
+      if (s.itemName !== itemName) return false;
+      if (s.batchNumber === batchName) return true;
+      if (isDefaultBatch && (!s.batchNumber || s.batchNumber === "default")) return true;
+      return false;
+    });
 
     // ✅ Calculate Totals for Back-Calculation
     const totalInwardQty = purchases.reduce((sum: number, p: any) => sum + Number(p.purchaseQuantity || 0), 0);
@@ -179,7 +194,9 @@ const ItemMonthlySummary = () => {
 
     let isOpeningMode = false;
     if (itemData && itemData.batches) {
-      const batch = itemData.batches.find((b: any) => b.batchName === batchName);
+      const batch = itemData.batches.find((b: any) =>
+        b.batchName === batchName || (isDefaultBatch && !b.batchName)
+      );
       if (batch && batch.mode === 'opening') {
         isOpeningMode = true;
       }

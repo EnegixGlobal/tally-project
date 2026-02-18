@@ -65,7 +65,7 @@ interface Order {
   gstNumber?: string | null; // For filtering - should always be null/empty for B2C
 }
 
-type ViewType =  'detailed' | 'columnar' | 'extract' | 'summary' | 'analytics';
+type ViewType = 'detailed' | 'columnar' | 'extract' | 'summary' | 'analytics';
 
 const B2C: React.FC = () => {
   const { theme } = useAppContext();
@@ -584,13 +584,17 @@ const B2C: React.FC = () => {
             };
           }
 
-          const itemAmount = Number(item.amount || 0);
+          // ✅ ADJUSTED FOR DISCOUNT: Sales Value should be Gross (Amount + Discount)
+          // because we are accounting for Discount as a separate DEBIT.
+          const discount = Number(item.discount || 0);
+          const netAmount = Number(item.amount || 0);
+          const grossAmount = netAmount + discount;
 
-          groups[itemGroupName].totalCredit += itemAmount;
+          groups[itemGroupName].totalCredit += grossAmount;
           groups[itemGroupName].transactions.push({
             name: item.salesLedgerName || "Unknown Sales Ledger",
             debit: 0,
-            credit: itemAmount,
+            credit: grossAmount,
           });
         });
       }
@@ -654,6 +658,40 @@ const B2C: React.FC = () => {
           });
         }
       }
+
+
+      // 4️⃣ DISCOUNT SIDE (Debit / Expense)
+      const voucherDiscounts: Record<string, number> = {};
+
+      if (voucher.items) {
+        voucher.items.forEach((item: any) => {
+          const discount = Number(item.discount || 0);
+
+          if (discount > 0) {
+            const ledgerName = item.discountLedgerName || "Discount";
+            voucherDiscounts[ledgerName] = (voucherDiscounts[ledgerName] || 0) + discount;
+          }
+        });
+      }
+
+      Object.entries(voucherDiscounts).forEach(([name, amount]) => {
+        const discountGroupName = "Discount";
+
+        if (!groups[discountGroupName]) {
+          groups[discountGroupName] = {
+            totalDebit: 0,
+            totalCredit: 0,
+            transactions: [],
+          };
+        }
+
+        groups[discountGroupName].totalDebit += amount;
+        groups[discountGroupName].transactions.push({
+          name: name,
+          debit: amount,
+          credit: 0
+        });
+      });
     });
 
     return groups;
@@ -1177,7 +1215,7 @@ const B2C: React.FC = () => {
 
         {/* View Selector */}
         <div className="flex space-x-2 mb-6 overflow-x-auto">
-          {([ 'summary', 'detailed', 'extract', 'columnar', 'analytics'] as ViewType[]).map((view) => (
+          {(['summary', 'detailed', 'extract', 'columnar', 'analytics'] as ViewType[]).map((view) => (
             <button
               key={view}
               onClick={() => {

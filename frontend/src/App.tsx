@@ -233,6 +233,8 @@ import GstrB2cs from "./components/modules/gst/Gstr1/GstrB2cs";
 import HSNSummary from "./components/modules/gst/Gstr1/HSNSummary";
 import PurchaseOrderRegister from "./components/voucherRegister/PurchaseOrderRegister";
 import DebitNoteRegiser from "./components/voucherRegister/DebitNoteRegiser";
+import AllSaleHsn from "./components/reports/AllSaleHsn";
+import AllHsnPurachase from "./components/reports/AllHsnPurachase";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -1361,6 +1363,14 @@ function App() {
                   }
                 />
                 <Route
+                  path="reports/allhsn"
+                  element={
+                    <RequireCompany>
+                      <AllSaleHsn />
+                    </RequireCompany>
+                  }
+                />
+                <Route
                   path="reports/b2bpurchase"
                   element={
                     <RequireCompany>
@@ -1389,6 +1399,14 @@ function App() {
                   element={
                     <RequireCompany>
                       <B2CHsnPurchase />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="reports/allhsnpurchase"
+                  element={
+                    <RequireCompany>
+                      <AllHsnPurachase />
                     </RequireCompany>
                   }
                 />
