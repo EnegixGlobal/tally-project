@@ -72,11 +72,17 @@ const StockVouchers = () => {
     // ✅ Calculate Correct Opening Balance (Back-Calc)
     const itemData = stockItemsData.find((i: any) => i.name === itemName);
 
-    let batchCurrentQty = 0;
-    let batchOpeningRate = 0;
+    const isDefaultBatch = batchName === "Default";
 
-    if (itemData && itemData.batches) {
-      const batch = itemData.batches.find((b: any) => b.batchName === batchName);
+    // If Default, init with Item Level, else 0
+    let batchCurrentQty = isDefaultBatch ? Number(itemData?.openingBalance || 0) : 0;
+    // For rate, if item level has it
+    let batchOpeningRate = isDefaultBatch ? Number(itemData?.openingRate || 0) : 0;
+
+    if (itemData && itemData.batches && itemData.batches.length > 0) {
+      const batch = itemData.batches.find((b: any) =>
+        b.batchName === batchName || (isDefaultBatch && !b.batchName)
+      );
       if (batch) {
         batchCurrentQty = Number(batch.batchQuantity || 0);
         batchOpeningRate = Number(batch.openingRate || 0);
@@ -84,10 +90,10 @@ const StockVouchers = () => {
     }
 
     const totalInward = purchases.reduce((sum: number, p: any) =>
-      (p.itemName === itemName && p.batchNumber === batchName) ? sum + Number(p.purchaseQuantity || 0) : sum, 0);
+      (p.itemName === itemName && (p.batchNumber === batchName || (isDefaultBatch && !p.batchNumber))) ? sum + Number(p.purchaseQuantity || 0) : sum, 0);
 
     const totalOutward = sales.reduce((sum: number, s: any) =>
-      (s.itemName === itemName && s.batchNumber === batchName) ? sum + Math.abs(Number(s.qtyChange || 0)) : sum, 0);
+      (s.itemName === itemName && (s.batchNumber === batchName || (isDefaultBatch && !s.batchNumber))) ? sum + Math.abs(Number(s.qtyChange || 0)) : sum, 0);
 
     let openingQty = batchCurrentQty - totalInward + totalOutward;
     let openingValue = openingQty * batchOpeningRate;
@@ -102,7 +108,7 @@ const StockVouchers = () => {
       const d = new Date(p.purchaseDate);
       if (
         p.itemName === itemName &&
-        p.batchNumber === batchName &&
+        (p.batchNumber === batchName || (isDefaultBatch && !p.batchNumber)) &&
         d >= start &&
         d <= end
       ) {
@@ -124,7 +130,7 @@ const StockVouchers = () => {
       const d = new Date(s.movementDate || s.date);
       if (
         s.itemName === itemName &&
-        s.batchNumber === batchName &&
+        (s.batchNumber === batchName || (isDefaultBatch && !s.batchNumber)) &&
         d >= start &&
         d <= end
       ) {
@@ -133,7 +139,7 @@ const StockVouchers = () => {
           date: d,
           party: s.partyName || s.ledgerName || s.ledger || "-",
           type: "Sales",
-          vchNo: s.voucherNumber, // ✅ Correctly mapped
+          vchNo: s.voucherNumber,
           inQty: 0,
           inValue: 0,
           outQty: qty,
@@ -151,7 +157,7 @@ const StockVouchers = () => {
 
     purchases.forEach((p: any) => {
       const d = new Date(p.purchaseDate);
-      if (p.itemName === itemName && p.batchNumber === batchName && d < start) {
+      if (p.itemName === itemName && (p.batchNumber === batchName || (isDefaultBatch && !p.batchNumber)) && d < start) {
         accumulatedQty += Number(p.purchaseQuantity || 0);
         accumulatedValue += Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
       }
@@ -159,7 +165,7 @@ const StockVouchers = () => {
 
     sales.forEach((s: any) => {
       const d = new Date(s.movementDate || s.date);
-      if (s.itemName === itemName && s.batchNumber === batchName && d < start) {
+      if (s.itemName === itemName && (s.batchNumber === batchName || (isDefaultBatch && !s.batchNumber)) && d < start) {
         const qty = Math.abs(Number(s.qtyChange || 0));
         accumulatedQty -= qty;
         accumulatedValue -= qty * Number(s.rate || 0);
@@ -193,8 +199,14 @@ const StockVouchers = () => {
 
     // ✅ Check if batch is explicitly an "Opening" batch from Item Master
     let isOpeningBatch = false;
+
+    // If Default batch and has opening balance, treat as opening batch
+    if (isDefaultBatch && Number(itemData?.openingBalance || 0) > 0) {
+      isOpeningBatch = true;
+    }
+
     if (itemData && itemData.batches) {
-      const batch = itemData.batches.find((b: any) => b.batchName === batchName);
+      const batch = itemData.batches.find((b: any) => b.batchName === batchName || (isDefaultBatch && !b.batchName));
       if (batch && batch.mode === "opening") {
         isOpeningBatch = true;
       }

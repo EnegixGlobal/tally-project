@@ -386,25 +386,62 @@ const StockSummary: React.FC = () => {
 
       // 1️⃣ OPENING STOCK (BATCH-WISE)
       stockItemsData.data.forEach((item: any) => {
-        itemMap[item.name] = {
-          itemName: item.name,
+        const itemName = item.name;
+        itemMap[itemName] = {
+          itemName: itemName,
           unitName: units.find((u) => u.id === item.unit)?.name ?? "",
           batches: {},
         };
 
-        item.batches?.forEach((b: any) => {
-          itemMap[item.name].batches[b.batchName] = {
-            batchName: b.batchName,
-            opening: {
-              qty: Number(b.batchQuantity || 0),
-              rate: Number(b.openingRate || 0),
-              value: Number(b.batchQuantity || 0) * Number(b.openingRate || 0),
-            },
-            inward: { qty: 0, rate: 0, value: 0 },
-            outward: { qty: 0, rate: 0, value: 0 },
-            closing: { qty: 0, rate: 0, value: 0 },
-          };
-        });
+        let batchesProcessed = false;
+
+        if (item.batches && item.batches.length > 0) {
+          item.batches.forEach((b: any) => {
+            const batchName = b.batchName || "Default";
+
+            if (!itemMap[itemName].batches[batchName]) {
+              itemMap[itemName].batches[batchName] = {
+                batchName: batchName,
+                opening: { qty: 0, rate: 0, value: 0 },
+                inward: { qty: 0, rate: 0, value: 0 },
+                outward: { qty: 0, rate: 0, value: 0 },
+                closing: { qty: 0, rate: 0, value: 0 },
+              };
+            }
+
+            const batch = itemMap[itemName].batches[batchName];
+            batch.opening.qty += Number(b.batchQuantity || 0);
+            batch.opening.value += Number(b.batchQuantity || 0) * Number(b.openingRate || 0);
+
+            // Re-calculate rate based on total value/qty
+            batch.opening.rate = batch.opening.qty !== 0 ? batch.opening.value / batch.opening.qty : 0;
+
+            batchesProcessed = true;
+          });
+        }
+
+        // ✅ Handle Case: Item has Opening Balance but NO Batches (Non-Batched Item)
+        // If no batches were processed (or explicitly empty), but item has master opening balance
+        if (!batchesProcessed && (Number(item.openingBalance) > 0 || Number(item.quantity) > 0)) {
+          const batchName = "Default";
+          if (!itemMap[itemName].batches[batchName]) {
+            itemMap[itemName].batches[batchName] = {
+              batchName: batchName,
+              opening: { qty: 0, rate: 0, value: 0 },
+              inward: { qty: 0, rate: 0, value: 0 },
+              outward: { qty: 0, rate: 0, value: 0 },
+              closing: { qty: 0, rate: 0, value: 0 },
+            };
+          }
+
+          const batch = itemMap[itemName].batches[batchName];
+          const opQty = Number(item.openingBalance || item.quantity || 0);
+          const opRate = Number(item.openingRate || item.rate || 0); // Check field names from API
+
+          batch.opening.qty += opQty;
+          batch.opening.value += opQty * opRate;
+          batch.opening.rate = opRate;
+        }
       });
 
       // 2️⃣ PURCHASES (INWARD)
@@ -412,10 +449,12 @@ const StockSummary: React.FC = () => {
         const item = itemMap[p.itemName];
         if (!item) return;
 
+        const batchName = p.batchNumber || "Default";
+
         const batch =
-          item.batches[p.batchNumber] ??
-          (item.batches[p.batchNumber] = {
-            batchName: p.batchNumber,
+          item.batches[batchName] ??
+          (item.batches[batchName] = {
+            batchName: batchName,
             opening: { qty: 0, rate: 0, value: 0 },
             inward: { qty: 0, rate: 0, value: 0 },
             outward: { qty: 0, rate: 0, value: 0 },
@@ -434,8 +473,21 @@ const StockSummary: React.FC = () => {
         const item = itemMap[s.itemName];
         if (!item) return;
 
-        const batch = item.batches[s.batchNumber];
-        if (!batch) return;
+        const batchName = s.batchNumber || "Default";
+        // If sales has a batch that wasn't in opening or purchases, we should probably create it or ignore it safely
+        // Usually sales must happen from existing batch, but data might be inconsistent
+        let batch = item.batches[batchName];
+
+        if (!batch) {
+          // Create if missing (e.g. direct negative stock sale without purchase, though typical logic prevents this)
+          batch = item.batches[batchName] = {
+            batchName: batchName,
+            opening: { qty: 0, rate: 0, value: 0 },
+            inward: { qty: 0, rate: 0, value: 0 },
+            outward: { qty: 0, rate: 0, value: 0 },
+            closing: { qty: 0, rate: 0, value: 0 },
+          };
+        }
 
         const qty = Math.abs(Number(s.qtyChange || 0));
         batch.outward.qty += qty;
@@ -1293,15 +1345,25 @@ const StockSummary: React.FC = () => {
                                 ? "bg-gray-800 text-white hover:bg-gray-700"
                                 : "bg-gray-50 hover:bg-gray-100"
                                 }`}
-                              onClick={() => toggleItem(item.itemName)}
+                              onClick={() => {
+                                if (batches.length === 1 && batches[0].batchName === "Default") {
+                                  navigate(
+                                    `/app/reports/item-monthly-summary?item=${item.itemName}&batch=Default`
+                                  );
+                                } else {
+                                  toggleItem(item.itemName);
+                                }
+                              }}
                             >
                               <td className="border p-2">
                                 <div className="flex items-center gap-2">
-                                  {isExpanded ? (
-                                    <ChevronDown size={16} />
-                                  ) : (
-                                    <ChevronRight size={16} />
-                                  )}
+                                  {/* Hide Chevron if Single Default Batch (Direct Navigation) */
+                                    (batches.length === 1 && batches[0].batchName === "Default") ? null :
+                                      isExpanded ? (
+                                        <ChevronDown size={16} />
+                                      ) : (
+                                        <ChevronRight size={16} />
+                                      )}
                                   {item.itemName}
                                 </div>
                               </td>
@@ -1341,82 +1403,80 @@ const StockSummary: React.FC = () => {
                               </td>
                             </tr>
 
-                            {/* 🔽 BATCH ROWS */}
-                            {isExpanded &&
-                              batches.map((b: any, bIdx: number) => (
-                                // <tr
-                                //   key={bIdx}
-                                //   className={
-                                //     theme === "dark"
-                                //       ? "bg-gray-900"
-                                //       : "bg-white"
-                                //   }
-                                // >
-                                <tr
-                                  key={bIdx}
-                                  className={`cursor-pointer ${theme === "dark"
-                                    ? "bg-gray-900"
-                                    : "bg-white"
-                                    } hover:bg-yellow-100`}
-                                  onClick={() =>
-                                    navigate(
-                                      `/app/reports/item-monthly-summary?item=${item.itemName}&batch=${b.batchName}`
-                                    )
-                                  }
-                                >
-                                  <td className="border pl-8 italic">
-                                    {b.batchName}
-                                  </td>
+                            {/* 🔽 BATCH ROWS - Hide if only one batch and it's Default */}
+                            {isExpanded && (batches.length > 1 || (batches[0].batchName !== "Default")) &&
+                              batches.map((b: any, bIdx: number) => {
+                                // Optional: Hide completely empty Default batches if desired, 
+                                // but usually we want to see them if they have data.
+                                // if (b.batchName === "Default" && b.opening.qty === 0 && b.inward.qty === 0 && b.outward.qty === 0 && b.closing.qty === 0) return null;
 
-                                  <td className="border p-2 text-right align-middle">
-                                    {b.opening.qty || ""}
-                                  </td>
-                                  <td className="border p-2 text-right align-middle">
-                                    {formatCurrency(b.opening.rate)}
-                                  </td>
-                                  <td className="border p-2 text-right align-middle">
-                                    {formatCurrency(b.opening.value)}
-                                  </td>
+                                return (
+                                  <tr
+                                    key={bIdx}
+                                    className={`cursor-pointer ${theme === "dark"
+                                      ? "bg-gray-900"
+                                      : "bg-white"
+                                      } hover:bg-yellow-100`}
+                                    onClick={() =>
+                                      navigate(
+                                        `/app/reports/item-monthly-summary?item=${item.itemName}&batch=${b.batchName}`
+                                      )
+                                    }
+                                  >
+                                    <td className="border pl-8 italic">
+                                      {b.batchName}
+                                    </td>
 
-                                  <td className="border p-2 text-right align-middle">
-                                    {b.inward.qty || ""}
-                                  </td>
-                                  <td className="border p-2 text-right align-middle">
-                                    {b.inward.rate
-                                      ? formatCurrency(b.inward.rate)
-                                      : ""}
-                                  </td>
-                                  <td className="border p-2 text-right align-middle">
-                                    {b.inward.value
-                                      ? formatCurrency(b.inward.value)
-                                      : ""}
-                                  </td>
+                                    <td className="border p-2 text-right align-middle">
+                                      {b.opening.qty || ""}
+                                    </td>
+                                    <td className="border p-2 text-right align-middle">
+                                      {formatCurrency(b.opening.rate)}
+                                    </td>
+                                    <td className="border p-2 text-right align-middle">
+                                      {formatCurrency(b.opening.value)}
+                                    </td>
 
-                                  <td className="border p-2 text-right align-middle">
-                                    {b.outward.qty || ""}
-                                  </td>
-                                  <td className="border p-2 text-right align-middle">
-                                    {b.outward.rate
-                                      ? formatCurrency(b.outward.rate)
-                                      : ""}
-                                  </td>
-                                  <td className="border p-2 text-right align-middle">
-                                    {b.outward.value
-                                      ? formatCurrency(b.outward.value)
-                                      : ""}
-                                  </td>
+                                    <td className="border p-2 text-right align-middle">
+                                      {b.inward.qty || ""}
+                                    </td>
+                                    <td className="border p-2 text-right align-middle">
+                                      {b.inward.rate
+                                        ? formatCurrency(b.inward.rate)
+                                        : ""}
+                                    </td>
+                                    <td className="border p-2 text-right align-middle">
+                                      {b.inward.value
+                                        ? formatCurrency(b.inward.value)
+                                        : ""}
+                                    </td>
 
-                                  <td className="border p-2 text-right align-middle">
-                                    {b.closing.qty}
-                                  </td>
-                                  <td className="border p-2 text-right align-middle">
-                                    {formatCurrency(b.closing.rate)}
-                                  </td>
-                                  <td className="border p-2 text-right align-middle">
-                                    {formatCurrency(b.closing.value)}
-                                  </td>
-                                </tr>
-                              ))}
+                                    <td className="border p-2 text-right align-middle">
+                                      {b.outward.qty || ""}
+                                    </td>
+                                    <td className="border p-2 text-right align-middle">
+                                      {b.outward.rate
+                                        ? formatCurrency(b.outward.rate)
+                                        : ""}
+                                    </td>
+                                    <td className="border p-2 text-right align-middle">
+                                      {b.outward.value
+                                        ? formatCurrency(b.outward.value)
+                                        : ""}
+                                    </td>
+
+                                    <td className="border p-2 text-right align-middle">
+                                      {b.closing.qty}
+                                    </td>
+                                    <td className="border p-2 text-right align-middle">
+                                      {formatCurrency(b.closing.rate)}
+                                    </td>
+                                    <td className="border p-2 text-right align-middle">
+                                      {formatCurrency(b.closing.value)}
+                                    </td>
+                                  </tr>
+                                )
+                              })}
                           </React.Fragment>
                         );
                       })}

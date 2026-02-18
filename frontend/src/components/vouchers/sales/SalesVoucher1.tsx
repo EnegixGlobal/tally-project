@@ -1309,76 +1309,27 @@ const SalesVoucher: React.FC = () => {
             return nameEmpty && hasQtyMeta;
           });
 
-          // Stock diff: positive = add to stock, negative = reduce stock
-          const stockDiff = Number(oldQty) - Number(newQty);
 
-          const itemId = entry.itemId;
+          // Stock diff logic removed - we should not patch stock on input change
+          // Stock will be deducted ONLY on Voucher Save
 
-          // If candidate batch found, enforce available qty and sync to backend
-          if (itemId && candidateBatch && stockDiff !== 0) {
-            const availableQty = Number(
-              candidateBatch.batchQuantity ?? candidateBatch.quantity ?? 0
-            );
-
-            // If trying to reduce more than available -> cap and warn
-            if (stockDiff < 0 && Math.abs(stockDiff) > availableQty) {
+          // Optional: Client-side validation against available stock (if desired)
+          if (candidateBatch) {
+            const availableQty = Number(candidateBatch.batchQuantity ?? candidateBatch.quantity ?? 0);
+            if (newQty > availableQty) {
               Swal.fire({
                 icon: "warning",
-                title: "Stock Not Available",
-                text: `Only ${availableQty} available in batch`,
+                title: "Stock Warning",
+                text: `Only ${availableQty} available in stock.`,
+                timer: 2000,
+                showConfirmButton: false
               });
-
-              // adjust to max available reduction
-              const allowedReduction = availableQty;
-              const adjustedNewQty = Number(oldQty) - allowedReduction;
-              updatedEntries[index].quantity = adjustedNewQty;
-              updatedEntries[index].amount = recalcAmount(
-                updatedEntries[index]
-              );
-              setFormData((p) => ({ ...p, entries: updatedEntries }));
-
-              // recalc stockDiff to send
-              const adjustedStockDiff = oldQty - adjustedNewQty;
-
-              fetch(
-                `${import.meta.env.VITE_API_URL
-                }/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-                {
-                  method: "PATCH",
-                  headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify({
-                    batchName: candidateBatch.batchName ?? "",
-                    quantity: adjustedStockDiff,
-                    mode: "add",
-                  }),
-                }
-              )
-                .then((res) => res.json())
-                .then((d) => console.log("Batch qty synced (adjusted):", d))
-                .catch((err) => console.error("Batch qty sync error:", err));
-
-              return;
+              // We allow the user to enter it (maybe negative stock allowed?), 
+              // or you can cap it here if strictly enforced:
+              // updatedEntries[index].quantity = availableQty;
+              // finalQty = availableQty; 
             }
-
-            // Send the actual stock diff (negative for sale)
-            fetch(
-              `${import.meta.env.VITE_API_URL
-              }/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-              {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  batchName: candidateBatch.batchName ?? "",
-                  quantity: stockDiff,
-                  mode: "add", // ✅ Incremental update
-                }),
-              }
-            )
-              .then((res) => res.json())
-              .then((d) => console.log("Batch qty synced:", d))
-              .catch((err) => console.error("Batch qty sync error:", err));
           }
-
           return;
         }
 
