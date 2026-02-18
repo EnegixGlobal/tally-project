@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { 
+import {
   Activity,
   BarChart2,
   BookOpen,
@@ -53,7 +53,8 @@ const ReportsIndex: React.FC = () => {
         { icon: <Calendar size={20} />, name: 'B2B', path: '/app/reports/b2b' },
         { icon: <Calendar size={20} />, name: 'B2C', path: '/app/reports/b2c' },
         { icon: <Calendar size={20} />, name: 'B2B HSN', path: '/app/reports/b2bhsn' },
-        { icon: <Calendar size={20} />, name: 'B2C HSN', path: '/app/reports/b2chsn' }
+        { icon: <Calendar size={20} />, name: 'B2C HSN', path: '/app/reports/b2chsn' },
+        { icon: <Calendar size={20} />, name: 'All HSN', path: '/app/reports/allhsn' }
       ]
     },
     {
@@ -65,7 +66,8 @@ const ReportsIndex: React.FC = () => {
         { icon: <Calendar size={20} />, name: 'B2B', path: '/app/reports/b2bpurchase' },
         { icon: <Calendar size={20} />, name: 'B2C', path: '/app/reports/b2cpurchase' },
         { icon: <Calendar size={20} />, name: 'B2B HSN', path: '/app/reports/b2bhsnpurchase' },
-        { icon: <Calendar size={20} />, name: 'B2C HSN', path: '/app/reports/b2chsnpurchase' }
+        { icon: <Calendar size={20} />, name: 'B2C HSN', path: '/app/reports/b2chsnpurchase' },
+        { icon: <Calendar size={20} />, name: 'All HSN', path: '/app/reports/allhsnpurchase' }
       ]
     }
   ];
@@ -73,48 +75,45 @@ const ReportsIndex: React.FC = () => {
   return (
     <div className='pt-[56px] px-4 '>
       <h1 className="text-2xl font-bold mb-6">Reports</h1>
-      
+
       <div className="grid grid-cols-1 gap-6">
         {reportCategories.map((category, index) => (
-          <div 
+          <div
             key={index}
             className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}
           >
             <h2 className="text-xl font-semibold mb-4">{category.title}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-4">
               {category.items
-                .filter(item => 
+                .filter(item =>
                   // 🚫 hide Consolidation for CA + CA Employee
-                  !( (role === 'ca' || role === 'ca_employee') && item.name === 'Consolidation' )
+                  !((role === 'ca' || role === 'ca_employee') && item.name === 'Consolidation')
                 )
                 .map((item, itemIndex) => (
                   <button
                     key={itemIndex}
                     onClick={() => navigate(item.path)}
-                    className={`p-4 rounded-lg flex flex-col items-center text-center transition-colors ${
-                      theme === 'dark' 
-                        ? 'bg-gray-700 hover:bg-gray-600' 
+                    className={`p-4 rounded-lg flex flex-col items-center text-center transition-colors ${theme === 'dark'
+                        ? 'bg-gray-700 hover:bg-gray-600'
                         : 'bg-gray-50 hover:bg-gray-100'
-                    }`}
+                      }`}
                   >
-                    <div className={`p-2 rounded-full mb-2 ${
-                      theme === 'dark' 
-                        ? 'bg-gray-600' 
+                    <div className={`p-2 rounded-full mb-2 ${theme === 'dark'
+                        ? 'bg-gray-600'
                         : 'bg-blue-50'
-                    }`}>
+                      }`}>
                       {item.icon}
                     </div>
                     <span>{item.name}</span>
                   </button>
-              ))}
+                ))}
             </div>
           </div>
         ))}
       </div>
-      
-      <div className={`mt-6 p-4 rounded ${
-        theme === 'dark' ? 'bg-gray-800' : 'bg-blue-50'
-      }`}>
+
+      <div className={`mt-6 p-4 rounded ${theme === 'dark' ? 'bg-gray-800' : 'bg-blue-50'
+        }`}>
         <p className="text-sm">
           <span className="font-semibold">Pro Tip:</span> Press Alt+F9 to quickly access Reports, or use F5 to refresh the current report.
         </p>
