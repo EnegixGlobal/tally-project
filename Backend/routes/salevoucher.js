@@ -467,44 +467,42 @@ router.get("/sale-history", async (req, res) => {
       });
     }
 
-    const fetchSql = `
-      SELECT 
-        sh.id,
-        sh.itemName,
-        sh.hsnCode,
-        sh.batchNumber,
-        sh.qtyChange,
-        sh.rate,
-        sh.movementDate,
-        sh.godownId,
-        sh.voucherNumber,
-        sh.companyId,
-        sh.ownerType,
-        sh.ownerId,
+ const fetchSql = `
+  SELECT 
+    sh.id,
+    sh.itemName,
+    sh.hsnCode,
+    sh.batchNumber,
+    sh.qtyChange,
+    sh.rate,
+    sh.movementDate,
+    sh.godownId,
+    sh.voucherNumber,
+    sh.companyId,
+    sh.ownerType,
+    sh.ownerId,
 
-        -- ✅ PARTY RESULT (FROM sales_vouchers)
-        sv.partyId AS partyId,
-        l.name     AS partyName
+    sv.partyId AS partyId,
+    l.name     AS partyName
 
-      FROM sale_history sh
+  FROM sale_history sh
 
-      -- 🔗 sale_history → sales_vouchers
-      LEFT JOIN sales_vouchers sv
-        ON sv.number = sh.voucherNumber
-        AND sv.company_id = ?
-        AND sv.owner_type = ?
-        AND sv.owner_id = ?
+  LEFT JOIN sales_vouchers sv
+    ON sv.number COLLATE utf8mb4_general_ci
+     = sh.voucherNumber COLLATE utf8mb4_general_ci
+    AND sv.company_id = ?
+    AND sv.owner_type = ?
+    AND sv.owner_id = ?
 
-      -- 🔗 sales_vouchers → ledgers (PARTY)
-      LEFT JOIN ledgers l
-        ON l.id = sv.partyId
+  LEFT JOIN ledgers l
+    ON l.id = sv.partyId
 
-      WHERE sh.companyId = ?
-        AND sh.ownerType = ?
-        AND sh.ownerId = ?
+  WHERE sh.companyId = ?
+    AND sh.ownerType = ?
+    AND sh.ownerId = ?
 
-      ORDER BY sh.movementDate DESC, sh.id DESC
-    `;
+  ORDER BY sh.movementDate DESC, sh.id DESC
+`;
 
     const [rows] = await db.execute(fetchSql, [
       company_id,

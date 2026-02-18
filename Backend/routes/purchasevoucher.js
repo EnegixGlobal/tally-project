@@ -55,7 +55,7 @@ router.get("/purchase-history", async (req, res) => {
     }
 
     // ✅ FINAL QUERY WITH LEDGER NAME
-    const selectSql = `
+ const selectSql = `
   SELECT 
     ph.id,
     ph.itemName,
@@ -71,20 +71,18 @@ router.get("/purchase-history", async (req, res) => {
     ph.ownerId,
     ph.type,
 
-    -- ✅ PARTY RESULT (FROM purchase_vouchers)
     pv.partyId AS partyId,
     l.name     AS partyName
 
   FROM purchase_history ph
 
-  -- 🔗 purchase_history → purchase_vouchers
   LEFT JOIN purchase_vouchers pv
-    ON pv.number = ph.voucherNumber
+    ON pv.number COLLATE utf8mb4_general_ci
+     = ph.voucherNumber COLLATE utf8mb4_general_ci
     AND pv.company_id = ?
     AND pv.owner_type = ?
     AND pv.owner_id = ?
 
-  -- 🔗 purchase_vouchers → ledgers (PARTY)
   LEFT JOIN ledgers l
     ON l.id = pv.partyId
 
