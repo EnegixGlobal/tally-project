@@ -161,6 +161,7 @@ const SalesReport: React.FC = () => {
   };
 
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [columnarDrillDown, setColumnarDrillDown] = useState<string | null>(null); // New state for drill-down
 
   const filteredVouchers = useMemo(() => {
     let data = [...salesVouchers];
@@ -330,12 +331,32 @@ const SalesReport: React.FC = () => {
 
   // 🔹 COLUMNAR DATA PREPARATION
   const columnarData = useMemo(() => {
+    // Apply Drill-Down Filter if active
+    let vouchersToProcess = filteredVouchers;
+    if (columnarDrillDown) {
+      vouchersToProcess = filteredVouchers.filter(v => {
+        // Check Party Name
+        if ((v.partyName || "Unknown Party") === columnarDrillDown) return true;
+
+        // Check Items for Ledgers (Sales, Tax)
+        if (v.items) {
+          return v.items.some((item: any) =>
+            (item.salesLedgerName === columnarDrillDown) ||
+            (item.cgstLedgerName === columnarDrillDown) ||
+            (item.sgstLedgerName === columnarDrillDown) ||
+            (item.igstLedgerName === columnarDrillDown)
+          );
+        }
+        return false;
+      });
+    }
+
     const salesColumns = new Set<string>();
     const taxColumns = new Set<string>();
     const tdsColumns = new Set<string>(); // If needed
 
     // 1. Collect all unique Ledger Names for Headers
-    filteredVouchers.forEach((voucher) => {
+    vouchersToProcess.forEach((voucher) => {
       if (voucher.items) {
         voucher.items.forEach((item: any) => {
           if (item.salesLedgerName) salesColumns.add(item.salesLedgerName);
@@ -351,7 +372,7 @@ const SalesReport: React.FC = () => {
     const allDynamicCols = [...sortedSalesCols, ...sortedTaxCols];
 
     // 2. Prepare Row Data
-    const rows = filteredVouchers.map((voucher) => {
+    const rows = vouchersToProcess.map((voucher) => {
       const row: any = {
         id: voucher.id,
         date: voucher.date,
@@ -424,7 +445,7 @@ const SalesReport: React.FC = () => {
     });
 
     return { headers: allDynamicCols, rows };
-  }, [filteredVouchers]);
+  }, [filteredVouchers, columnarDrillDown]);
 
   const handleDateRangeChange = (range: string) => {
     const today = new Date();
@@ -657,6 +678,8 @@ const SalesReport: React.FC = () => {
                 ) {
                   setSelectedMonth(null);
                 }
+                // Clear drill-down filter when manually switching tabs
+                setColumnarDrillDown(null);
               }}
               className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${selectedView === view.key
                 ? theme === "dark"
@@ -1161,7 +1184,13 @@ const SalesReport: React.FC = () => {
                                 : "hover:bg-gray-50"
                                 }`}
                             >
-                              <td className="px-4 py-2 pl-8 text-sm italic">
+                              <td
+                                className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
+                                onClick={() => {
+                                  setColumnarDrillDown(txn.name);
+                                  setSelectedView("columnar");
+                                }}
+                              >
                                 {txn.name}
                               </td>
 
@@ -1231,6 +1260,20 @@ const SalesReport: React.FC = () => {
             {/* Columnar View */}
             {selectedView === "columnar" && (
               <div className="overflow-x-auto">
+                {/* Drill-down Reset Header */}
+                {columnarDrillDown && (
+                  <div className="p-2 mb-2 bg-blue-50 dark:bg-blue-900/20 rounded flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      Filtered by: <span className="font-bold">{columnarDrillDown}</span>
+                    </span>
+                    <button
+                      onClick={() => setColumnarDrillDown(null)}
+                      className="text-xs px-2 py-1 bg-white dark:bg-gray-800 border rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      Clear Filter
+                    </button>
+                  </div>
+                )}
                 <table className="w-full text-sm">
                   <thead
                     className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"

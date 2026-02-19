@@ -162,6 +162,7 @@ const PurchaseReport1: React.FC = () => {
   });
 
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [columnarDrillDown, setColumnarDrillDown] = useState<string | null>(null); // New state for drill-down
   const [salesVouchers, setSalesVouchers] = useState<any[]>([]);
   const [ledgerReportData, setLedgerReportData] = useState<any>(null);
 
@@ -378,12 +379,33 @@ const PurchaseReport1: React.FC = () => {
 
   // 🔹 COLUMNAR DATA PREPARATION
   const columnarData = useMemo(() => {
+    // Apply Drill-Down Filter if active
+    let vouchersToProcess = filteredVouchers;
+    if (columnarDrillDown) {
+      vouchersToProcess = filteredVouchers.filter(v => {
+        // Check Party Name
+        if ((v.partyName || "Unknown Party") === columnarDrillDown) return true;
+
+        // Check Items for Ledgers (Purchase, Tax, TDS)
+        if (v.items) {
+          return v.items.some((item: any) =>
+            (item.purchaseLedgerName === columnarDrillDown) ||
+            (item.cgstLedgerName === columnarDrillDown) ||
+            (item.sgstLedgerName === columnarDrillDown) ||
+            (item.igstLedgerName === columnarDrillDown) ||
+            (item.tdsLedgerName === columnarDrillDown)
+          );
+        }
+        return false;
+      });
+    }
+
     const purchaseColumns = new Set<string>();
     const taxColumns = new Set<string>();
     const tdsColumns = new Set<string>();
 
     // 1. Collect all unique Ledger Names for Headers
-    filteredVouchers.forEach(voucher => {
+    vouchersToProcess.forEach(voucher => {
       // Purchase Ledgers & Tax Ledgers from items
       if (voucher.items) {
         voucher.items.forEach(item => {
@@ -403,7 +425,7 @@ const PurchaseReport1: React.FC = () => {
     const allDynamicCols = [...sortedPurchaseCols, ...sortedTaxCols, ...sortedTdsCols];
 
     // 2. Prepare Row Data
-    const rows = filteredVouchers.map(voucher => {
+    const rows = vouchersToProcess.map(voucher => {
       const row: any = {
         id: voucher.id,
         date: voucher.date,
@@ -481,7 +503,7 @@ const PurchaseReport1: React.FC = () => {
     });
 
     return { headers: allDynamicCols, rows };
-  }, [filteredVouchers]);
+  }, [filteredVouchers, columnarDrillDown]);
 
 
 
@@ -735,7 +757,11 @@ const PurchaseReport1: React.FC = () => {
                   | "billwiseprofit"
                   | "columnar"
                 );
-                if (view.key !== "detailed" && view.key !== "extract" && view.key !== "columnar") setSelectedMonth(null);
+                if (view.key !== "detailed" && view.key !== "extract" && view.key !== "columnar") {
+                  setSelectedMonth(null);
+                }
+                // Clear drill-down filter when manually switching tabs
+                setColumnarDrillDown(null);
               }}
               className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${selectedView === view.key
                 ? theme === "dark"
@@ -1221,7 +1247,13 @@ const PurchaseReport1: React.FC = () => {
                               : "hover:bg-gray-50"
                               }`}
                           >
-                            <td className="px-4 py-2 pl-8 text-sm italic">
+                            <td
+                              className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
+                              onClick={() => {
+                                setColumnarDrillDown(txn.name);
+                                setSelectedView("columnar");
+                              }}
+                            >
                               {txn.name}
                             </td>
 
@@ -1284,6 +1316,20 @@ const PurchaseReport1: React.FC = () => {
             {/* Columnar View */}
             {selectedView === "columnar" && (
               <div className="overflow-x-auto">
+                {/* Drill-down Reset Header */}
+                {columnarDrillDown && (
+                  <div className="p-2 mb-2 bg-blue-50 dark:bg-blue-900/20 rounded flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      Filtered by: <span className="font-bold">{columnarDrillDown}</span>
+                    </span>
+                    <button
+                      onClick={() => setColumnarDrillDown(null)}
+                      className="text-xs px-2 py-1 bg-white dark:bg-gray-800 border rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      Clear Filter
+                    </button>
+                  </div>
+                )}
                 <table className="w-full text-sm">
                   <thead className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
                     <tr>
