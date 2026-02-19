@@ -605,8 +605,11 @@ const PurchaseReport1: React.FC = () => {
   useEffect(() => {
     if (!companyId || !ownerType || !ownerId) return;
 
-    const url = `${import.meta.env.VITE_API_URL
-      }/api/purchase-report?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+    let url = `${import.meta.env.VITE_API_URL}/api/purchase-report?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+
+    if (filters.fromDate && filters.toDate) {
+      url += `&from_date=${filters.fromDate}&to_date=${filters.toDate}`;
+    }
 
     fetch(url)
       .then((res) => res.json())
@@ -625,7 +628,7 @@ const PurchaseReport1: React.FC = () => {
         console.error("Sales voucher fetch error:", err);
         setSalesVouchers([]);
       });
-  }, [companyId, ownerType, ownerId]);
+  }, [companyId, ownerType, ownerId, filters.fromDate, filters.toDate]);
 
   /*
   useEffect(() => {
@@ -840,94 +843,6 @@ const PurchaseReport1: React.FC = () => {
                 value={filters.toDate}
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, toDate: e.target.value }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              />
-            </div>
-
-            {/* Party Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Party</label>
-              <input
-                type="text"
-                placeholder="Search party..."
-                value={filters.partyFilter}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    partyFilter: e.target.value,
-                  }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              />
-            </div>
-
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Status</label>
-              <select
-                title="Select Status Filter"
-                value={filters.statusFilter}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    statusFilter: e.target.value,
-                  }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              >
-                <option value="">All Status</option>
-                <option value="Paid">Paid</option>
-                <option value="Unpaid">Unpaid</option>
-                <option value="Partially Paid">Partially Paid</option>
-                <option value="Overdue">Overdue</option>
-              </select>
-            </div>
-
-            {/* Amount Range */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Min Amount
-              </label>
-              <input
-                type="number"
-                placeholder="Min amount..."
-                value={filters.amountRangeMin}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    amountRangeMin: e.target.value,
-                  }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Max Amount
-              </label>
-              <input
-                type="number"
-                placeholder="Max amount..."
-                value={filters.amountRangeMax}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    amountRangeMax: e.target.value,
-                  }))
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 focus:border-blue-500"
