@@ -216,11 +216,20 @@ const SalesReport: React.FC = () => {
       }
 
       groups[groupName].totalDebit += partyAmount;
-      groups[groupName].transactions.push({
-        name: voucher.partyName || "Unknown Party",
-        debit: partyAmount,
-        credit: 0,
-      });
+
+      const existingParty = groups[groupName].transactions.find(
+        (t) => t.name === (voucher.partyName || "Unknown Party")
+      );
+
+      if (existingParty) {
+        existingParty.debit += partyAmount;
+      } else {
+        groups[groupName].transactions.push({
+          name: voucher.partyName || "Unknown Party",
+          debit: partyAmount,
+          credit: 0,
+        });
+      }
 
       // 2️⃣ SALES SIDE (Credit / Income) via Items
       if (voucher.items && voucher.items.length > 0) {
@@ -238,11 +247,21 @@ const SalesReport: React.FC = () => {
           const itemAmount = Number(item.amount || 0);
 
           groups[itemGroupName].totalCredit += itemAmount;
-          groups[itemGroupName].transactions.push({
-            name: item.salesLedgerName || "Unknown Sales Ledger",
-            debit: 0,
-            credit: itemAmount,
-          });
+
+          const ledgerName = item.salesLedgerName || "Unknown Sales Ledger";
+          const existingItem = groups[itemGroupName].transactions.find(
+            (t) => t.name === ledgerName
+          );
+
+          if (existingItem) {
+            existingItem.credit += itemAmount;
+          } else {
+            groups[itemGroupName].transactions.push({
+              name: ledgerName,
+              debit: 0,
+              credit: itemAmount,
+            });
+          }
         });
       }
 
@@ -275,30 +294,34 @@ const SalesReport: React.FC = () => {
           };
         }
 
-        if (cgst > 0) {
-          groups[taxGroupName].totalCredit += cgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(cgstLedgers).join(", ") || "Output CGST",
-            debit: 0,
-            credit: cgst,
-          });
-        }
-        if (sgst > 0) {
-          groups[taxGroupName].totalCredit += sgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(sgstLedgers).join(", ") || "Output SGST",
-            debit: 0,
-            credit: sgst,
-          });
-        }
-        if (igst > 0) {
-          groups[taxGroupName].totalCredit += igst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(igstLedgers).join(", ") || "Output IGST",
-            debit: 0,
-            credit: igst,
-          });
-        }
+        const addTaxTransaction = (
+          amount: number,
+          ledgers: Set<string>,
+          defaultName: string
+        ) => {
+          if (amount > 0) {
+            const name = Array.from(ledgers).sort().join(", ") || defaultName;
+            groups[taxGroupName].totalCredit += amount;
+
+            const existingTax = groups[taxGroupName].transactions.find(
+              (t) => t.name === name
+            );
+
+            if (existingTax) {
+              existingTax.credit += amount;
+            } else {
+              groups[taxGroupName].transactions.push({
+                name: name,
+                debit: 0,
+                credit: amount,
+              });
+            }
+          }
+        };
+
+        addTaxTransaction(cgst, cgstLedgers, "Output CGST");
+        addTaxTransaction(sgst, sgstLedgers, "Output SGST");
+        addTaxTransaction(igst, igstLedgers, "Output IGST");
       }
     });
 
@@ -636,12 +659,12 @@ const SalesReport: React.FC = () => {
                 }
               }}
               className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${selectedView === view.key
-                  ? theme === "dark"
-                    ? "bg-blue-600 text-white"
-                    : "bg-blue-500 text-white"
-                  : theme === "dark"
-                    ? "bg-gray-700 hover:bg-gray-600"
-                    : "bg-gray-200 hover:bg-gray-300"
+                ? theme === "dark"
+                  ? "bg-blue-600 text-white"
+                  : "bg-blue-500 text-white"
+                : theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-200 hover:bg-gray-300"
                 }`}
             >
               {view.icon}
@@ -932,8 +955,8 @@ const SalesReport: React.FC = () => {
                       value={selectedMonth || ""}
                       onChange={(e) => setSelectedMonth(e.target.value)}
                       className={`cursor-pointer p-1 pr-8 rounded border outline-none ${theme === "dark"
-                          ? "bg-gray-700 border-gray-600 text-white"
-                          : "bg-white border-gray-300 text-black"
+                        ? "bg-gray-700 border-gray-600 text-white"
+                        : "bg-white border-gray-300 text-black"
                         }`}
                     >
                       <option value="" disabled>
@@ -1002,8 +1025,8 @@ const SalesReport: React.FC = () => {
                         <tr
                           key={voucher.id || index}
                           className={`hover:bg-opacity-50 ${theme === "dark"
-                              ? "hover:bg-gray-700"
-                              : "hover:bg-gray-50"
+                            ? "hover:bg-gray-700"
+                            : "hover:bg-gray-50"
                             }`}
                         >
                           {/* Date */}
@@ -1134,8 +1157,8 @@ const SalesReport: React.FC = () => {
                             <tr
                               key={`${groupName}-${index}`}
                               className={`hover:bg-opacity-50 ${theme === "dark"
-                                  ? "hover:bg-gray-700"
-                                  : "hover:bg-gray-50"
+                                ? "hover:bg-gray-700"
+                                : "hover:bg-gray-50"
                                 }`}
                             >
                               <td className="px-4 py-2 pl-8 text-sm italic">
@@ -1245,8 +1268,8 @@ const SalesReport: React.FC = () => {
                       <tr
                         key={row.id || index}
                         className={`hover:bg-opacity-50 ${theme === "dark"
-                            ? "hover:bg-gray-700"
-                            : "hover:bg-gray-50"
+                          ? "hover:bg-gray-700"
+                          : "hover:bg-gray-50"
                           }`}
                       >
                         <td className="px-2 py-2">

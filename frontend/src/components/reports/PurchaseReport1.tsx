@@ -237,17 +237,24 @@ const PurchaseReport1: React.FC = () => {
       }
 
       groups[groupName].totalCredit += partyAmount;
-      groups[groupName].transactions.push({
-        name: voucher.partyName || "Unknown Party",
-        debit: 0,
-        credit: partyAmount,
-      });
+
+      const partyName = voucher.partyName || "Unknown Party";
+      const existingParty = groups[groupName].transactions.find(t => t.name === partyName);
+
+      if (existingParty) {
+        existingParty.credit += partyAmount;
+      } else {
+        groups[groupName].transactions.push({
+          name: partyName,
+          debit: 0,
+          credit: partyAmount,
+        });
+      }
 
       // 2️⃣ PURCHASE SIDE (Debit / Expense) via Items
       if (voucher.items && voucher.items.length > 0) {
         voucher.items.forEach((item) => {
           // Use hardcoded "Purchase Account" as requested, or derive if needed
-          // The user specifically asked for "Purchase Account"
           const itemGroupName = "Purchase Account";
 
           if (!groups[itemGroupName]) {
@@ -259,13 +266,20 @@ const PurchaseReport1: React.FC = () => {
           }
 
           const itemAmount = Number(item.amount || 0);
-
           groups[itemGroupName].totalDebit += itemAmount;
-          groups[itemGroupName].transactions.push({
-            name: item.purchaseLedgerName || "Unknown Purchase Ledger",
-            debit: itemAmount,
-            credit: 0,
-          });
+
+          const ledgerName = item.purchaseLedgerName || "Unknown Purchase Ledger";
+          const existingItem = groups[itemGroupName].transactions.find(t => t.name === ledgerName);
+
+          if (existingItem) {
+            existingItem.debit += itemAmount;
+          } else {
+            groups[itemGroupName].transactions.push({
+              name: ledgerName,
+              debit: itemAmount,
+              credit: 0,
+            });
+          }
         });
       }
 
@@ -298,30 +312,28 @@ const PurchaseReport1: React.FC = () => {
           };
         }
 
-        if (cgst > 0) {
-          groups[taxGroupName].totalDebit += cgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(cgstLedgers).join(", ") || "Input CGST",
-            debit: cgst,
-            credit: 0,
-          });
-        }
-        if (sgst > 0) {
-          groups[taxGroupName].totalDebit += sgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(sgstLedgers).join(", ") || "Input SGST",
-            debit: sgst,
-            credit: 0,
-          });
-        }
-        if (igst > 0) {
-          groups[taxGroupName].totalDebit += igst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(igstLedgers).join(", ") || "Input IGST",
-            debit: igst,
-            credit: 0,
-          });
-        }
+        const addTaxTransaction = (amount: number, ledgers: Set<string>, defaultName: string) => {
+          if (amount <= 0) return;
+
+          const name = Array.from(ledgers).sort().join(", ") || defaultName;
+          groups[taxGroupName].totalDebit += amount;
+
+          const existingTax = groups[taxGroupName].transactions.find(t => t.name === name);
+
+          if (existingTax) {
+            existingTax.debit += amount;
+          } else {
+            groups[taxGroupName].transactions.push({
+              name,
+              debit: amount,
+              credit: 0,
+            });
+          }
+        };
+
+        addTaxTransaction(cgst, cgstLedgers, "Input CGST");
+        addTaxTransaction(sgst, sgstLedgers, "Input SGST");
+        addTaxTransaction(igst, igstLedgers, "Input IGST");
       }
 
       // 4️⃣ TDS (Credit / Liability)
@@ -344,12 +356,20 @@ const PurchaseReport1: React.FC = () => {
           };
         }
 
+        const name = Array.from(tdsLedgers).sort().join(", ") || "TDS Ledger";
         groups[tdsGroupName].totalCredit += tdsAmount;
-        groups[tdsGroupName].transactions.push({
-          name: Array.from(tdsLedgers).join(", ") || "TDS Ledger",
-          debit: 0,
-          credit: tdsAmount,
-        });
+
+        const existingTds = groups[tdsGroupName].transactions.find(t => t.name === name);
+
+        if (existingTds) {
+          existingTds.credit += tdsAmount;
+        } else {
+          groups[tdsGroupName].transactions.push({
+            name,
+            debit: 0,
+            credit: tdsAmount,
+          });
+        }
       }
     });
 
