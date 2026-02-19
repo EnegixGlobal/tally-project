@@ -55,7 +55,7 @@ router.get("/purchase-history", async (req, res) => {
     }
 
     // ✅ FINAL QUERY WITH LEDGER NAME
- const selectSql = `
+    const selectSql = `
   SELECT 
     ph.id,
     ph.itemName,
@@ -272,6 +272,7 @@ const ensureTDSColumns = async () => {
 router.post("/", async (req, res) => {
   const {
     date,
+    number,
     narration,
     partyId,
     referenceNo,
@@ -377,13 +378,19 @@ router.post("/", async (req, res) => {
 
     // ================= GENERATE NUMBER =================
 
-    const voucherNumber = await generateVoucherNumber({
-      companyId: finalCompanyId,
-      ownerType: finalOwnerType,
-      ownerId: finalOwnerId,
-      voucherType: "PRV",
-      date,
-    });
+    // ================= GENERATE NUMBER =================
+
+    let voucherNumber = number; // ✅ Use frontend number if exists
+
+    if (!voucherNumber) {
+      voucherNumber = await generateVoucherNumber({
+        companyId: finalCompanyId,
+        ownerType: finalOwnerType,
+        ownerId: finalOwnerId,
+        voucherType: "PRV",
+        date,
+      });
+    }
 
     // ================= VALIDATION =================
 

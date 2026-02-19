@@ -243,6 +243,7 @@ const PurchaseVoucher: React.FC = () => {
   );
 
   const [isReadyToSave, setIsReadyToSave] = useState(false);
+  const [voucherMode, setVoucherMode] = useState<"auto" | "custom">("custom");
 
   // Barcode State
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -1347,7 +1348,7 @@ const PurchaseVoucher: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isEditMode) return;
+    if (isEditMode || voucherMode === "custom") return; // Skip fetching if in custom mode or edit mode
 
     const fetchNextVoucherNumber = async () => {
       try {
@@ -1374,7 +1375,7 @@ const PurchaseVoucher: React.FC = () => {
     };
 
     fetchNextVoucherNumber();
-  }, [formData.date]);
+  }, [formData.date, voucherMode]);
 
   const removeEntry = (index: number) => {
     if (formData.entries.length <= 1) return;
@@ -2127,15 +2128,32 @@ const PurchaseVoucher: React.FC = () => {
 
         <h1 className="text-2xl font-bold">Purchase Voucher</h1>
 
-        {/* ⚙ SETTINGS BUTTON */}
-        <button
-          type="button"
-          onClick={() => setShowTableConfig(!showTableConfig)}
-          className="ml-auto p-2 rounded-full hover:bg-gray-200"
-          title="Table Settings"
-        >
-          <Settings size={20} />
-        </button>
+        <div className="ml-auto flex items-center gap-3">
+          <select
+            value={voucherMode}
+            onChange={(e) => {
+              const newMode = e.target.value as "auto" | "custom";
+              setVoucherMode(newMode);
+              if (newMode === "custom") {
+                setFormData((prev) => ({ ...prev, number: "" }));
+              }
+            }}
+            className={`${getSelectClasses(theme)} min-w-[150px] text-sm font-semibold border-2 border-blue-100 dark:border-blue-900 focus:border-blue-500`}
+          >
+            <option value="auto">Auto Numbering</option>
+            <option value="custom">Custom Number</option>
+          </select>
+
+          {/* ⚙ SETTINGS BUTTON */}
+          <button
+            type="button"
+            onClick={() => setShowTableConfig(!showTableConfig)}
+            className="p-2 rounded-full hover:bg-gray-200"
+            title="Table Settings"
+          >
+            <Settings size={20} />
+          </button>
+        </div>
       </div>
       {showTableConfig && (
         <div
@@ -2265,8 +2283,10 @@ const PurchaseVoucher: React.FC = () => {
                   id="number"
                   name="number"
                   value={formData.number}
-                  readOnly
-                  className={`${getInputClasses(theme, !!errors.number)} bg-opacity-60 cursor-not-allowed font-mono`}
+                  onChange={handleChange}
+                  readOnly={voucherMode === "auto"}
+                  placeholder={voucherMode === "auto" ? "Auto-Generated" : "Enter Number"}
+                  className={`${getInputClasses(theme, !!errors.number)} ${voucherMode === "auto" ? "opacity-70 cursor-not-allowed" : ""} font-mono font-bold`}
                 />
                 {errors.number && (
                   <p className="text-red-500 text-xs mt-1">{errors.number}</p>
