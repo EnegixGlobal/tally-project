@@ -161,6 +161,7 @@ const SalesReport: React.FC = () => {
   };
 
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [columnarDrillDown, setColumnarDrillDown] = useState<string | null>(null); // New state for drill-down
 
   const filteredVouchers = useMemo(() => {
     let data = [...salesVouchers];
@@ -173,6 +174,14 @@ const SalesReport: React.FC = () => {
         const monthName = monthIndexToName[d.getMonth()];
         return monthName === selectedMonth;
       });
+    } else {
+      // Filter by Date Range (From/To) if no specific month is selected
+      if (filters.fromDate) {
+        data = data.filter((item) => item.date >= filters.fromDate);
+      }
+      if (filters.toDate) {
+        data = data.filter((item) => item.date <= filters.toDate);
+      }
     }
 
     // Sort
@@ -186,7 +195,7 @@ const SalesReport: React.FC = () => {
       });
     }
     return data;
-  }, [salesVouchers, selectedMonth, sortConfig]);
+  }, [salesVouchers, selectedMonth, sortConfig, filters.fromDate, filters.toDate]);
 
   const groupedExtractData = useMemo(() => {
     const groups: Record<
@@ -216,11 +225,20 @@ const SalesReport: React.FC = () => {
       }
 
       groups[groupName].totalDebit += partyAmount;
-      groups[groupName].transactions.push({
-        name: voucher.partyName || "Unknown Party",
-        debit: partyAmount,
-        credit: 0,
-      });
+
+      const existingParty = groups[groupName].transactions.find(
+        (t) => t.name === (voucher.partyName || "Unknown Party")
+      );
+
+      if (existingParty) {
+        existingParty.debit += partyAmount;
+      } else {
+        groups[groupName].transactions.push({
+          name: voucher.partyName || "Unknown Party",
+          debit: partyAmount,
+          credit: 0,
+        });
+      }
 
       // 2️⃣ SALES SIDE (Credit / Income) via Items
       if (voucher.items && voucher.items.length > 0) {
@@ -238,11 +256,21 @@ const SalesReport: React.FC = () => {
           const itemAmount = Number(item.amount || 0);
 
           groups[itemGroupName].totalCredit += itemAmount;
-          groups[itemGroupName].transactions.push({
-            name: item.salesLedgerName || "Unknown Sales Ledger",
-            debit: 0,
-            credit: itemAmount,
-          });
+
+          const ledgerName = item.salesLedgerName || "Unknown Sales Ledger";
+          const existingItem = groups[itemGroupName].transactions.find(
+            (t) => t.name === ledgerName
+          );
+
+          if (existingItem) {
+            existingItem.credit += itemAmount;
+          } else {
+            groups[itemGroupName].transactions.push({
+              name: ledgerName,
+              debit: 0,
+              credit: itemAmount,
+            });
+          }
         });
       }
 
@@ -275,30 +303,34 @@ const SalesReport: React.FC = () => {
           };
         }
 
-        if (cgst > 0) {
-          groups[taxGroupName].totalCredit += cgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(cgstLedgers).join(", ") || "Output CGST",
-            debit: 0,
-            credit: cgst,
-          });
-        }
-        if (sgst > 0) {
-          groups[taxGroupName].totalCredit += sgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(sgstLedgers).join(", ") || "Output SGST",
-            debit: 0,
-            credit: sgst,
-          });
-        }
-        if (igst > 0) {
-          groups[taxGroupName].totalCredit += igst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(igstLedgers).join(", ") || "Output IGST",
-            debit: 0,
-            credit: igst,
-          });
-        }
+        const addTaxTransaction = (
+          amount: number,
+          ledgers: Set<string>,
+          defaultName: string
+        ) => {
+          if (amount > 0) {
+            const name = Array.from(ledgers).sort().join(", ") || defaultName;
+            groups[taxGroupName].totalCredit += amount;
+
+            const existingTax = groups[taxGroupName].transactions.find(
+              (t) => t.name === name
+            );
+
+            if (existingTax) {
+              existingTax.credit += amount;
+            } else {
+              groups[taxGroupName].transactions.push({
+                name: name,
+                debit: 0,
+                credit: amount,
+              });
+            }
+          }
+        };
+
+        addTaxTransaction(cgst, cgstLedgers, "Output CGST");
+        addTaxTransaction(sgst, sgstLedgers, "Output SGST");
+        addTaxTransaction(igst, igstLedgers, "Output IGST");
       }
     });
 
@@ -307,12 +339,32 @@ const SalesReport: React.FC = () => {
 
   // 🔹 COLUMNAR DATA PREPARATION
   const columnarData = useMemo(() => {
+    // Apply Drill-Down Filter if active
+    let vouchersToProcess = filteredVouchers;
+    if (columnarDrillDown) {
+      vouchersToProcess = filteredVouchers.filter(v => {
+        // Check Party Name
+        if ((v.partyName || "Unknown Party") === columnarDrillDown) return true;
+
+        // Check Items for Ledgers (Sales, Tax)
+        if (v.items) {
+          return v.items.some((item: any) =>
+            (item.salesLedgerName === columnarDrillDown) ||
+            (item.cgstLedgerName === columnarDrillDown) ||
+            (item.sgstLedgerName === columnarDrillDown) ||
+            (item.igstLedgerName === columnarDrillDown)
+          );
+        }
+        return false;
+      });
+    }
+
     const salesColumns = new Set<string>();
     const taxColumns = new Set<string>();
     const tdsColumns = new Set<string>(); // If needed
 
     // 1. Collect all unique Ledger Names for Headers
-    filteredVouchers.forEach((voucher) => {
+    vouchersToProcess.forEach((voucher) => {
       if (voucher.items) {
         voucher.items.forEach((item: any) => {
           if (item.salesLedgerName) salesColumns.add(item.salesLedgerName);
@@ -328,7 +380,7 @@ const SalesReport: React.FC = () => {
     const allDynamicCols = [...sortedSalesCols, ...sortedTaxCols];
 
     // 2. Prepare Row Data
-    const rows = filteredVouchers.map((voucher) => {
+    const rows = vouchersToProcess.map((voucher) => {
       const row: any = {
         id: voucher.id,
         date: voucher.date,
@@ -401,7 +453,7 @@ const SalesReport: React.FC = () => {
     });
 
     return { headers: allDynamicCols, rows };
-  }, [filteredVouchers]);
+  }, [filteredVouchers, columnarDrillDown]);
 
   const handleDateRangeChange = (range: string) => {
     const today = new Date();
@@ -491,8 +543,11 @@ const SalesReport: React.FC = () => {
   useEffect(() => {
     if (!companyId || !ownerType || !ownerId) return;
 
-    const url = `${import.meta.env.VITE_API_URL
-      }/api/sales-report?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+    let url = `${import.meta.env.VITE_API_URL}/api/sales-report?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+
+    if (filters.fromDate && filters.toDate) {
+      url += `&from_date=${filters.fromDate}&to_date=${filters.toDate}`;
+    }
 
     fetch(url)
       .then((res) => res.json())
@@ -511,7 +566,7 @@ const SalesReport: React.FC = () => {
         console.error("Sales voucher fetch error:", err);
         setSalesVouchers([]);
       });
-  }, [companyId, ownerType, ownerId]);
+  }, [companyId, ownerType, ownerId, filters.fromDate, filters.toDate]);
 
   // calculate total sales
   const totalSales = useMemo(() => {
@@ -634,14 +689,16 @@ const SalesReport: React.FC = () => {
                 ) {
                   setSelectedMonth(null);
                 }
+                // Clear drill-down filter when manually switching tabs
+                setColumnarDrillDown(null);
               }}
               className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${selectedView === view.key
-                  ? theme === "dark"
-                    ? "bg-blue-600 text-white"
-                    : "bg-blue-500 text-white"
-                  : theme === "dark"
-                    ? "bg-gray-700 hover:bg-gray-600"
-                    : "bg-gray-200 hover:bg-gray-300"
+                ? theme === "dark"
+                  ? "bg-blue-600 text-white"
+                  : "bg-blue-500 text-white"
+                : theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-200 hover:bg-gray-300"
                 }`}
             >
               {view.icon}
@@ -712,94 +769,6 @@ const SalesReport: React.FC = () => {
                 value={filters.toDate}
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, toDate: e.target.value }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              />
-            </div>
-
-            {/* Party Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Party</label>
-              <input
-                type="text"
-                placeholder="Search party..."
-                value={filters.partyFilter}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    partyFilter: e.target.value,
-                  }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              />
-            </div>
-
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Status</label>
-              <select
-                title="Select Status Filter"
-                value={filters.statusFilter}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    statusFilter: e.target.value,
-                  }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              >
-                <option value="">All Status</option>
-                <option value="Paid">Paid</option>
-                <option value="Unpaid">Unpaid</option>
-                <option value="Partially Paid">Partially Paid</option>
-                <option value="Overdue">Overdue</option>
-              </select>
-            </div>
-
-            {/* Amount Range */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Min Amount
-              </label>
-              <input
-                type="number"
-                placeholder="Min amount..."
-                value={filters.amountRangeMin}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    amountRangeMin: e.target.value,
-                  }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Max Amount
-              </label>
-              <input
-                type="number"
-                placeholder="Max amount..."
-                value={filters.amountRangeMax}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    amountRangeMax: e.target.value,
-                  }))
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 focus:border-blue-500"
@@ -932,8 +901,8 @@ const SalesReport: React.FC = () => {
                       value={selectedMonth || ""}
                       onChange={(e) => setSelectedMonth(e.target.value)}
                       className={`cursor-pointer p-1 pr-8 rounded border outline-none ${theme === "dark"
-                          ? "bg-gray-700 border-gray-600 text-white"
-                          : "bg-white border-gray-300 text-black"
+                        ? "bg-gray-700 border-gray-600 text-white"
+                        : "bg-white border-gray-300 text-black"
                         }`}
                     >
                       <option value="" disabled>
@@ -1002,8 +971,8 @@ const SalesReport: React.FC = () => {
                         <tr
                           key={voucher.id || index}
                           className={`hover:bg-opacity-50 ${theme === "dark"
-                              ? "hover:bg-gray-700"
-                              : "hover:bg-gray-50"
+                            ? "hover:bg-gray-700"
+                            : "hover:bg-gray-50"
                             }`}
                         >
                           {/* Date */}
@@ -1134,11 +1103,17 @@ const SalesReport: React.FC = () => {
                             <tr
                               key={`${groupName}-${index}`}
                               className={`hover:bg-opacity-50 ${theme === "dark"
-                                  ? "hover:bg-gray-700"
-                                  : "hover:bg-gray-50"
+                                ? "hover:bg-gray-700"
+                                : "hover:bg-gray-50"
                                 }`}
                             >
-                              <td className="px-4 py-2 pl-8 text-sm italic">
+                              <td
+                                className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
+                                onClick={() => {
+                                  setColumnarDrillDown(txn.name);
+                                  setSelectedView("columnar");
+                                }}
+                              >
                                 {txn.name}
                               </td>
 
@@ -1208,6 +1183,20 @@ const SalesReport: React.FC = () => {
             {/* Columnar View */}
             {selectedView === "columnar" && (
               <div className="overflow-x-auto">
+                {/* Drill-down Reset Header */}
+                {columnarDrillDown && (
+                  <div className="p-2 mb-2 bg-blue-50 dark:bg-blue-900/20 rounded flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      Filtered by: <span className="font-bold">{columnarDrillDown}</span>
+                    </span>
+                    <button
+                      onClick={() => setColumnarDrillDown(null)}
+                      className="text-xs px-2 py-1 bg-white dark:bg-gray-800 border rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      Clear Filter
+                    </button>
+                  </div>
+                )}
                 <table className="w-full text-sm">
                   <thead
                     className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
@@ -1245,8 +1234,8 @@ const SalesReport: React.FC = () => {
                       <tr
                         key={row.id || index}
                         className={`hover:bg-opacity-50 ${theme === "dark"
-                            ? "hover:bg-gray-700"
-                            : "hover:bg-gray-50"
+                          ? "hover:bg-gray-700"
+                          : "hover:bg-gray-50"
                           }`}
                       >
                         <td className="px-2 py-2">

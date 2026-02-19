@@ -2238,6 +2238,15 @@ const SalesVoucher: React.FC = () => {
     (l) => String(l.id) === String(formData.salesLedgerId)
   );
 
+  const discount = safeLedgers.filter(
+    ledger =>
+      ledger.groupId === -10 &&
+      ledger.name.toLowerCase().includes("discount")
+  );
+
+
+
+
   return (
     <React.Fragment>
       <div className="pt-[56px] px-4">
@@ -2830,11 +2839,9 @@ const SalesVoucher: React.FC = () => {
                                 className={`${FORM_STYLES.tableSelect(theme)} text-xs min-w-[100px]`}
                               >
                                 <option value="">Select Discount</option>
-                                {safeLedgers
-                                  .filter(l => l.name.toLowerCase().includes("discount"))
-                                  .map(l => (
-                                    <option key={l.id} value={l.id}>{l.name}</option>
-                                  ))
+                                {discount.map(l => (
+                                  <option key={l.id} value={l.id}>{l.name}</option>
+                                ))
                                 }
                               </select>
                             </td>

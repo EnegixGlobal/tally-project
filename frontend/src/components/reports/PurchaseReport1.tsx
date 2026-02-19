@@ -162,6 +162,7 @@ const PurchaseReport1: React.FC = () => {
   });
 
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [columnarDrillDown, setColumnarDrillDown] = useState<string | null>(null); // New state for drill-down
   const [salesVouchers, setSalesVouchers] = useState<any[]>([]);
   const [ledgerReportData, setLedgerReportData] = useState<any>(null);
 
@@ -237,17 +238,24 @@ const PurchaseReport1: React.FC = () => {
       }
 
       groups[groupName].totalCredit += partyAmount;
-      groups[groupName].transactions.push({
-        name: voucher.partyName || "Unknown Party",
-        debit: 0,
-        credit: partyAmount,
-      });
+
+      const partyName = voucher.partyName || "Unknown Party";
+      const existingParty = groups[groupName].transactions.find(t => t.name === partyName);
+
+      if (existingParty) {
+        existingParty.credit += partyAmount;
+      } else {
+        groups[groupName].transactions.push({
+          name: partyName,
+          debit: 0,
+          credit: partyAmount,
+        });
+      }
 
       // 2️⃣ PURCHASE SIDE (Debit / Expense) via Items
       if (voucher.items && voucher.items.length > 0) {
         voucher.items.forEach((item) => {
           // Use hardcoded "Purchase Account" as requested, or derive if needed
-          // The user specifically asked for "Purchase Account"
           const itemGroupName = "Purchase Account";
 
           if (!groups[itemGroupName]) {
@@ -259,13 +267,20 @@ const PurchaseReport1: React.FC = () => {
           }
 
           const itemAmount = Number(item.amount || 0);
-
           groups[itemGroupName].totalDebit += itemAmount;
-          groups[itemGroupName].transactions.push({
-            name: item.purchaseLedgerName || "Unknown Purchase Ledger",
-            debit: itemAmount,
-            credit: 0,
-          });
+
+          const ledgerName = item.purchaseLedgerName || "Unknown Purchase Ledger";
+          const existingItem = groups[itemGroupName].transactions.find(t => t.name === ledgerName);
+
+          if (existingItem) {
+            existingItem.debit += itemAmount;
+          } else {
+            groups[itemGroupName].transactions.push({
+              name: ledgerName,
+              debit: itemAmount,
+              credit: 0,
+            });
+          }
         });
       }
 
@@ -298,30 +313,28 @@ const PurchaseReport1: React.FC = () => {
           };
         }
 
-        if (cgst > 0) {
-          groups[taxGroupName].totalDebit += cgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(cgstLedgers).join(", ") || "Input CGST",
-            debit: cgst,
-            credit: 0,
-          });
-        }
-        if (sgst > 0) {
-          groups[taxGroupName].totalDebit += sgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(sgstLedgers).join(", ") || "Input SGST",
-            debit: sgst,
-            credit: 0,
-          });
-        }
-        if (igst > 0) {
-          groups[taxGroupName].totalDebit += igst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(igstLedgers).join(", ") || "Input IGST",
-            debit: igst,
-            credit: 0,
-          });
-        }
+        const addTaxTransaction = (amount: number, ledgers: Set<string>, defaultName: string) => {
+          if (amount <= 0) return;
+
+          const name = Array.from(ledgers).sort().join(", ") || defaultName;
+          groups[taxGroupName].totalDebit += amount;
+
+          const existingTax = groups[taxGroupName].transactions.find(t => t.name === name);
+
+          if (existingTax) {
+            existingTax.debit += amount;
+          } else {
+            groups[taxGroupName].transactions.push({
+              name,
+              debit: amount,
+              credit: 0,
+            });
+          }
+        };
+
+        addTaxTransaction(cgst, cgstLedgers, "Input CGST");
+        addTaxTransaction(sgst, sgstLedgers, "Input SGST");
+        addTaxTransaction(igst, igstLedgers, "Input IGST");
       }
 
       // 4️⃣ TDS (Credit / Liability)
@@ -344,12 +357,20 @@ const PurchaseReport1: React.FC = () => {
           };
         }
 
+        const name = Array.from(tdsLedgers).sort().join(", ") || "TDS Ledger";
         groups[tdsGroupName].totalCredit += tdsAmount;
-        groups[tdsGroupName].transactions.push({
-          name: Array.from(tdsLedgers).join(", ") || "TDS Ledger",
-          debit: 0,
-          credit: tdsAmount,
-        });
+
+        const existingTds = groups[tdsGroupName].transactions.find(t => t.name === name);
+
+        if (existingTds) {
+          existingTds.credit += tdsAmount;
+        } else {
+          groups[tdsGroupName].transactions.push({
+            name,
+            debit: 0,
+            credit: tdsAmount,
+          });
+        }
       }
     });
 
@@ -358,12 +379,33 @@ const PurchaseReport1: React.FC = () => {
 
   // 🔹 COLUMNAR DATA PREPARATION
   const columnarData = useMemo(() => {
+    // Apply Drill-Down Filter if active
+    let vouchersToProcess = filteredVouchers;
+    if (columnarDrillDown) {
+      vouchersToProcess = filteredVouchers.filter(v => {
+        // Check Party Name
+        if ((v.partyName || "Unknown Party") === columnarDrillDown) return true;
+
+        // Check Items for Ledgers (Purchase, Tax, TDS)
+        if (v.items) {
+          return v.items.some((item: any) =>
+            (item.purchaseLedgerName === columnarDrillDown) ||
+            (item.cgstLedgerName === columnarDrillDown) ||
+            (item.sgstLedgerName === columnarDrillDown) ||
+            (item.igstLedgerName === columnarDrillDown) ||
+            (item.tdsLedgerName === columnarDrillDown)
+          );
+        }
+        return false;
+      });
+    }
+
     const purchaseColumns = new Set<string>();
     const taxColumns = new Set<string>();
     const tdsColumns = new Set<string>();
 
     // 1. Collect all unique Ledger Names for Headers
-    filteredVouchers.forEach(voucher => {
+    vouchersToProcess.forEach(voucher => {
       // Purchase Ledgers & Tax Ledgers from items
       if (voucher.items) {
         voucher.items.forEach(item => {
@@ -383,7 +425,7 @@ const PurchaseReport1: React.FC = () => {
     const allDynamicCols = [...sortedPurchaseCols, ...sortedTaxCols, ...sortedTdsCols];
 
     // 2. Prepare Row Data
-    const rows = filteredVouchers.map(voucher => {
+    const rows = vouchersToProcess.map(voucher => {
       const row: any = {
         id: voucher.id,
         date: voucher.date,
@@ -461,7 +503,7 @@ const PurchaseReport1: React.FC = () => {
     });
 
     return { headers: allDynamicCols, rows };
-  }, [filteredVouchers]);
+  }, [filteredVouchers, columnarDrillDown]);
 
 
 
@@ -563,8 +605,11 @@ const PurchaseReport1: React.FC = () => {
   useEffect(() => {
     if (!companyId || !ownerType || !ownerId) return;
 
-    const url = `${import.meta.env.VITE_API_URL
-      }/api/purchase-report?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+    let url = `${import.meta.env.VITE_API_URL}/api/purchase-report?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+
+    if (filters.fromDate && filters.toDate) {
+      url += `&from_date=${filters.fromDate}&to_date=${filters.toDate}`;
+    }
 
     fetch(url)
       .then((res) => res.json())
@@ -583,7 +628,7 @@ const PurchaseReport1: React.FC = () => {
         console.error("Sales voucher fetch error:", err);
         setSalesVouchers([]);
       });
-  }, [companyId, ownerType, ownerId]);
+  }, [companyId, ownerType, ownerId, filters.fromDate, filters.toDate]);
 
   /*
   useEffect(() => {
@@ -715,7 +760,11 @@ const PurchaseReport1: React.FC = () => {
                   | "billwiseprofit"
                   | "columnar"
                 );
-                if (view.key !== "detailed" && view.key !== "extract" && view.key !== "columnar") setSelectedMonth(null);
+                if (view.key !== "detailed" && view.key !== "extract" && view.key !== "columnar") {
+                  setSelectedMonth(null);
+                }
+                // Clear drill-down filter when manually switching tabs
+                setColumnarDrillDown(null);
               }}
               className={`px-4 py-2 rounded-lg flex items-center space-x-2 transition-colors ${selectedView === view.key
                 ? theme === "dark"
@@ -794,94 +843,6 @@ const PurchaseReport1: React.FC = () => {
                 value={filters.toDate}
                 onChange={(e) =>
                   setFilters((prev) => ({ ...prev, toDate: e.target.value }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              />
-            </div>
-
-            {/* Party Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Party</label>
-              <input
-                type="text"
-                placeholder="Search party..."
-                value={filters.partyFilter}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    partyFilter: e.target.value,
-                  }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              />
-            </div>
-
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium mb-1">Status</label>
-              <select
-                title="Select Status Filter"
-                value={filters.statusFilter}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    statusFilter: e.target.value,
-                  }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              >
-                <option value="">All Status</option>
-                <option value="Paid">Paid</option>
-                <option value="Unpaid">Unpaid</option>
-                <option value="Partially Paid">Partially Paid</option>
-                <option value="Overdue">Overdue</option>
-              </select>
-            </div>
-
-            {/* Amount Range */}
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Min Amount
-              </label>
-              <input
-                type="number"
-                placeholder="Min amount..."
-                value={filters.amountRangeMin}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    amountRangeMin: e.target.value,
-                  }))
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Max Amount
-              </label>
-              <input
-                type="number"
-                placeholder="Max amount..."
-                value={filters.amountRangeMax}
-                onChange={(e) =>
-                  setFilters((prev) => ({
-                    ...prev,
-                    amountRangeMax: e.target.value,
-                  }))
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 focus:border-blue-500"
@@ -1201,7 +1162,13 @@ const PurchaseReport1: React.FC = () => {
                               : "hover:bg-gray-50"
                               }`}
                           >
-                            <td className="px-4 py-2 pl-8 text-sm italic">
+                            <td
+                              className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
+                              onClick={() => {
+                                setColumnarDrillDown(txn.name);
+                                setSelectedView("columnar");
+                              }}
+                            >
                               {txn.name}
                             </td>
 
@@ -1264,6 +1231,20 @@ const PurchaseReport1: React.FC = () => {
             {/* Columnar View */}
             {selectedView === "columnar" && (
               <div className="overflow-x-auto">
+                {/* Drill-down Reset Header */}
+                {columnarDrillDown && (
+                  <div className="p-2 mb-2 bg-blue-50 dark:bg-blue-900/20 rounded flex items-center justify-between">
+                    <span className="text-sm font-medium">
+                      Filtered by: <span className="font-bold">{columnarDrillDown}</span>
+                    </span>
+                    <button
+                      onClick={() => setColumnarDrillDown(null)}
+                      className="text-xs px-2 py-1 bg-white dark:bg-gray-800 border rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+                    >
+                      Clear Filter
+                    </button>
+                  </div>
+                )}
                 <table className="w-full text-sm">
                   <thead className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
                     <tr>

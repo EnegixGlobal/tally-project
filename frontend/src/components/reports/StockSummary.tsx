@@ -1064,6 +1064,10 @@ const StockSummary: React.FC = () => {
                         const isExpanded = expandedItems.has(item.itemName);
                         const batches = item.batches || [];
 
+                        const totalQty = batches.reduce((sum: number, b: any) => sum + Number(b.opening?.qty || 0), 0);
+                        const totalValue = batches.reduce((sum: number, b: any) => sum + Number(b.opening?.value || 0), 0);
+                        const avgRate = totalQty !== 0 ? totalValue / totalQty : 0;
+
                         return (
                           <React.Fragment key={idx}>
                             {/* ITEM ROW */}
@@ -1079,9 +1083,9 @@ const StockSummary: React.FC = () => {
                               <td className="border p-2 text-center">{item.hsnCode}</td>
                               <td className="border p-2 text-center">{item.gstRate}%</td>
                               <td className="border p-2 text-center">{item.taxType}</td>
-                              <td className="border"></td>
-                              <td className="border"></td>
-                              <td className="border"></td>
+                              <td className="border p-2 text-right">{totalQty}</td>
+                              <td className="border p-2 text-right">{formatCurrency(avgRate)}</td>
+                              <td className="border p-2 text-right">{formatCurrency(totalValue)}</td>
                             </tr>
 
                             {/* BATCH ROWS */}
@@ -1337,6 +1341,21 @@ const StockSummary: React.FC = () => {
                             ? totals.closingValue / totals.closingQty
                             : 0;
 
+                        const openingRate =
+                          totals.openingQty > 0
+                            ? totals.openingValue / totals.openingQty
+                            : 0;
+
+                        const inwardRate =
+                          totals.inwardQty > 0
+                            ? totals.inwardValue / totals.inwardQty
+                            : 0;
+
+                        const outwardRate =
+                          totals.outwardQty > 0
+                            ? totals.outwardValue / totals.outwardQty
+                            : 0;
+
                         return (
                           <React.Fragment key={idx}>
                             {/* ITEM ROW */}
@@ -1371,7 +1390,9 @@ const StockSummary: React.FC = () => {
                               <td className="border p-2 text-right align-middle">
                                 {totals.openingQty || ""}
                               </td>
-                              <td className="border"></td>
+                              <td className="border p-2 text-right align-middle">
+                                {formatCurrency(openingRate)}
+                              </td>
                               <td className="border p-2 text-right align-middle">
                                 {formatCurrency(totals.openingValue)}
                               </td>
@@ -1379,7 +1400,9 @@ const StockSummary: React.FC = () => {
                               <td className="border p-2 text-right align-middle">
                                 {totals.inwardQty || ""}
                               </td>
-                              <td className="border"></td>
+                              <td className="border p-2 text-right align-middle">
+                                {formatCurrency(inwardRate)}
+                              </td>
                               <td className="border p-2 text-right align-middle">
                                 {formatCurrency(totals.inwardValue)}
                               </td>
@@ -1387,7 +1410,9 @@ const StockSummary: React.FC = () => {
                               <td className="border p-2 text-right align-middle">
                                 {totals.outwardQty || ""}
                               </td>
-                              <td className="border"></td>
+                              <td className="border p-2 text-right align-middle">
+                                {formatCurrency(outwardRate)}
+                              </td>
                               <td className="border p-2 text-right align-middle">
                                 {formatCurrency(totals.outwardValue)}
                               </td>

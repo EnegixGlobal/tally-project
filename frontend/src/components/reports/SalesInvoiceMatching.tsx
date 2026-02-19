@@ -371,8 +371,8 @@ const SalesInvoiceMatching: React.FC = () => {
                   // Row Background based on status
                   let rowBg = theme === 'dark' ? 'hover:bg-gray-800' : 'hover:bg-gray-50';
                   if (matchStats) {
-                    if (row.matchStatus === 'MISMATCH') rowBg = theme === 'dark' ? 'bg-red-900/10 hover:bg-red-900/20' : 'bg-red-50 hover:bg-red-100';
-                    if (row.matchStatus === 'MATCHED') rowBg = theme === 'dark' ? 'bg-green-900/5 hover:bg-green-900/10' : 'bg-green-50/30 hover:bg-green-50';
+                    if (row.matchStatus === 'MISMATCH') rowBg = theme === 'dark' ? 'bg-red-900/10 hover:bg-red-900/20' : 'bg-red-200 hover:bg-red-100';
+                    if (row.matchStatus === 'MATCHED') rowBg = theme === 'dark' ? 'bg-green-900/5 hover:bg-green-900/10' : 'bg-green-200 hover:bg-green-50';
                   }
 
                   return (

@@ -7,6 +7,8 @@ router.get("/", async (req, res) => {
     const finalCompanyId = req.query.company_id || req.body?.companyId;
     const finalOwnerType = req.query.owner_type || req.body?.ownerType;
     const finalOwnerId = req.query.owner_id || req.body?.ownerId;
+    const fromDate = req.query.from_date;
+    const toDate = req.query.to_date;
 
     if (!finalCompanyId || !finalOwnerType || !finalOwnerId) {
       return res.status(401).json({
@@ -15,8 +17,7 @@ router.get("/", async (req, res) => {
       });
     }
 
-    const [rows] = await pool.execute(
-      `SELECT 
+    let query = `SELECT 
           sv.id,
           sv.number AS voucherNo,
           sv.date,
@@ -41,11 +42,18 @@ router.get("/", async (req, res) => {
 
         WHERE sv.company_id = ?
           AND sv.owner_type = ?
-          AND sv.owner_id = ?
+          AND sv.owner_id = ?`;
 
-        ORDER BY sv.date DESC`,
-      [finalCompanyId, finalOwnerType, finalOwnerId]
-    );
+    const queryParams = [finalCompanyId, finalOwnerType, finalOwnerId];
+
+    if (fromDate && toDate) {
+      query += ` AND sv.date BETWEEN ? AND ?`;
+      queryParams.push(fromDate, toDate);
+    }
+
+    query += ` ORDER BY sv.date DESC`;
+
+    const [rows] = await pool.execute(query, queryParams);
 
     // =========================================================
     // 🔹 FETCH ITEMS FOR THESE VOUCHERS

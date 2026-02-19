@@ -47,27 +47,27 @@ const ReportsIndex: React.FC = () => {
     {
       title: 'Sales Reports',
       items: [
-        { icon: <BookOpen size={20} />, name: 'Extract Sales', path: '/app/reports/extract-sales' },
+        // { icon: <BookOpen size={20} />, name: 'Extract Sales', path: '/app/reports/extract-sales' },
         { icon: <Activity size={20} />, name: 'Sales Report', path: '/app/reports/sales-report' },
         { icon: <Calendar size={20} />, name: 'Sales Invoice Matching', path: '/app/reports/sales-invoice-matching' },
         { icon: <Calendar size={20} />, name: 'B2B', path: '/app/reports/b2b' },
         { icon: <Calendar size={20} />, name: 'B2C', path: '/app/reports/b2c' },
         { icon: <Calendar size={20} />, name: 'B2B HSN', path: '/app/reports/b2bhsn' },
         { icon: <Calendar size={20} />, name: 'B2C HSN', path: '/app/reports/b2chsn' },
-        { icon: <Calendar size={20} />, name: 'All HSN', path: '/app/reports/allhsn' }
+        { icon: <BookOpen size={20} />, name: 'All HSN', path: '/app/reports/allhsn' }
       ]
     },
     {
       title: 'Purchase Reports',
       items: [
-        { icon: <BookOpen size={20} />, name: 'Extract Purchase', path: '/app/reports/extract-purchase' },
+        // { icon: <BookOpen size={20} />, name: 'Extract Purchase', path: '/app/reports/extract-purchase' },
         { icon: <Activity size={20} />, name: 'Purchase Report', path: '/app/reports/purchase-report' },
         { icon: <Calendar size={20} />, name: 'Purchase Invoice Matching', path: '/app/reports/purchase-invoice-matching' },
         { icon: <Calendar size={20} />, name: 'B2B', path: '/app/reports/b2bpurchase' },
         { icon: <Calendar size={20} />, name: 'B2C', path: '/app/reports/b2cpurchase' },
         { icon: <Calendar size={20} />, name: 'B2B HSN', path: '/app/reports/b2bhsnpurchase' },
         { icon: <Calendar size={20} />, name: 'B2C HSN', path: '/app/reports/b2chsnpurchase' },
-        { icon: <Calendar size={20} />, name: 'All HSN', path: '/app/reports/allhsnpurchase' }
+        { icon: <BookOpen size={20} />, name: 'All HSN', path: '/app/reports/allhsnpurchase' }
       ]
     }
   ];

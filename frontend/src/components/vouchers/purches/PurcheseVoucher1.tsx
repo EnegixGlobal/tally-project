@@ -243,6 +243,7 @@ const PurchaseVoucher: React.FC = () => {
   );
 
   const [isReadyToSave, setIsReadyToSave] = useState(false);
+  const [voucherMode, setVoucherMode] = useState<"auto" | "custom">("custom");
 
   // Barcode State
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -368,6 +369,7 @@ const PurchaseVoucher: React.FC = () => {
             batchNumber: "",
             godownId: "",
             discount: 0,
+            discountLedgerId: "",
             purchaseLedgerId: matchingPurchaseLedger?.id || prev.purchaseLedgerId || "",
 
             // Fill other required fields based on Type
@@ -540,6 +542,7 @@ const PurchaseVoucher: React.FC = () => {
 
                 // Discount
                 discount: e.discount || 0,
+                discountLedgerId: e.discountLedgerId || "",
 
                 // Ledger Mode Support
                 ledgerId: e.ledgerId || "",
@@ -699,6 +702,12 @@ const PurchaseVoucher: React.FC = () => {
   // Purchase-specific suppliers (sundry-creditors)
   const safeLedgers = ledgers;
 
+  const discount = safeLedgers.filter(
+    (l) =>
+      l.groupId === -11 &&
+      String(l.name).toLowerCase().includes("discount")
+  );
+
   // 🟢 Backend se aaye final formatted godown list
 
   const [godowndata, setGodownData] = useState([]);
@@ -795,6 +804,7 @@ const PurchaseVoucher: React.FC = () => {
 
         godownId: "",
         discount: 0,
+        discountLedgerId: "",
         batchNumber: "",
         batchExpiryDate: "",
         batchManufacturingDate: "",
@@ -1188,6 +1198,40 @@ const PurchaseVoucher: React.FC = () => {
         return;
       }
 
+      // 🆕 DISCOUNT LEDGER CHANGE
+      if (name === "discountLedgerId") {
+        let newDiscount = 0;
+        if (value) {
+          const ledger = safeLedgers.find((l) => String(l.id) === String(value));
+          if (ledger) {
+            const m = ledger.name.match(/(\d+(\.\d+)?)/);
+            const percent = m ? Number(m[1]) : 0;
+            const qty = Number(entry.quantity || 0);
+            const rate = Number(entry.rate || 0);
+            const baseAmount = qty * rate;
+            newDiscount = (baseAmount * percent) / 100;
+          }
+        }
+
+        const calculated = calculateEntryValues(
+          Number(entry.quantity || 0),
+          Number(entry.rate || 0),
+          newDiscount,
+          Number(entry.gstRate || 0),
+          companyState || "",
+          supplierState
+        );
+
+        updatedEntries[index] = {
+          ...entry,
+          discountLedgerId: value,
+          discount: newDiscount,
+          amount: calculated.amount,
+        };
+        setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+        return;
+      }
+
       // 3️⃣ QUANTITY / RATE / DISCOUNT CHANGE
       if (["quantity", "rate", "discount"].includes(name)) {
         const newVal = Number(value || 0);
@@ -1336,6 +1380,7 @@ const PurchaseVoucher: React.FC = () => {
           igstRate: 0,
           godownId: "",
           discount: 0,
+          discountLedgerId: "",
           batchNumber: "",
           batchExpiryDate: "",
           batchManufacturingDate: "",
@@ -1347,7 +1392,7 @@ const PurchaseVoucher: React.FC = () => {
   };
 
   useEffect(() => {
-    if (isEditMode) return;
+    if (isEditMode || voucherMode === "custom") return; // Skip fetching if in custom mode or edit mode
 
     const fetchNextVoucherNumber = async () => {
       try {
@@ -1374,7 +1419,7 @@ const PurchaseVoucher: React.FC = () => {
     };
 
     fetchNextVoucherNumber();
-  }, [formData.date]);
+  }, [formData.date, voucherMode]);
 
   const removeEntry = (index: number) => {
     if (formData.entries.length <= 1) return;
@@ -2127,15 +2172,32 @@ const PurchaseVoucher: React.FC = () => {
 
         <h1 className="text-2xl font-bold">Purchase Voucher</h1>
 
-        {/* ⚙ SETTINGS BUTTON */}
-        <button
-          type="button"
-          onClick={() => setShowTableConfig(!showTableConfig)}
-          className="ml-auto p-2 rounded-full hover:bg-gray-200"
-          title="Table Settings"
-        >
-          <Settings size={20} />
-        </button>
+        <div className="ml-auto flex items-center gap-3">
+          <select
+            value={voucherMode}
+            onChange={(e) => {
+              const newMode = e.target.value as "auto" | "custom";
+              setVoucherMode(newMode);
+              if (newMode === "custom") {
+                setFormData((prev) => ({ ...prev, number: "" }));
+              }
+            }}
+            className={`${getSelectClasses(theme)} min-w-[150px] text-sm font-semibold border-2 border-blue-100 dark:border-blue-900 focus:border-blue-500`}
+          >
+            <option value="auto">Auto Numbering</option>
+            <option value="custom">Custom Number</option>
+          </select>
+
+          {/* ⚙ SETTINGS BUTTON */}
+          <button
+            type="button"
+            onClick={() => setShowTableConfig(!showTableConfig)}
+            className="p-2 rounded-full hover:bg-gray-200"
+            title="Table Settings"
+          >
+            <Settings size={20} />
+          </button>
+        </div>
       </div>
       {showTableConfig && (
         <div
@@ -2265,8 +2327,10 @@ const PurchaseVoucher: React.FC = () => {
                   id="number"
                   name="number"
                   value={formData.number}
-                  readOnly
-                  className={`${getInputClasses(theme, !!errors.number)} bg-opacity-60 cursor-not-allowed font-mono`}
+                  onChange={handleChange}
+                  readOnly={voucherMode === "auto"}
+                  placeholder={voucherMode === "auto" ? "Auto-Generated" : "Enter Number"}
+                  className={`${getInputClasses(theme, !!errors.number)} ${voucherMode === "auto" ? "opacity-70 cursor-not-allowed" : ""} font-mono font-bold`}
                 />
                 {errors.number && (
                   <p className="text-red-500 text-xs mt-1">{errors.number}</p>
@@ -2891,13 +2955,19 @@ const PurchaseVoucher: React.FC = () => {
 
                           {/* DISCOUNT */}
                           <td className="px-1 py-2 min-w-[70px]">
-                            <input
-                              type="number"
-                              name="discount"
-                              value={entry.discount ?? ""}
+                            <select
+                              name="discountLedgerId"
+                              value={(entry as any).discountLedgerId || ""}
                               onChange={(e) => handleEntryChange(index, e)}
-                              className={`${TABLE_STYLES.input} text-right text-xs`}
-                            />
+                              className={`${TABLE_STYLES.select} text-xs min-w-[100px]`}
+                            >
+                              <option value="">Select Discount</option>
+                              {discount.map((l) => (
+                                <option key={l.id} value={l.id}>
+                                  {l.name}
+                                </option>
+                              ))}
+                            </select>
                           </td>
 
                           {/* AMOUNT */}
