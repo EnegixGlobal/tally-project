@@ -369,6 +369,7 @@ const PurchaseVoucher: React.FC = () => {
             batchNumber: "",
             godownId: "",
             discount: 0,
+            discountLedgerId: "",
             purchaseLedgerId: matchingPurchaseLedger?.id || prev.purchaseLedgerId || "",
 
             // Fill other required fields based on Type
@@ -541,6 +542,7 @@ const PurchaseVoucher: React.FC = () => {
 
                 // Discount
                 discount: e.discount || 0,
+                discountLedgerId: e.discountLedgerId || "",
 
                 // Ledger Mode Support
                 ledgerId: e.ledgerId || "",
@@ -700,6 +702,12 @@ const PurchaseVoucher: React.FC = () => {
   // Purchase-specific suppliers (sundry-creditors)
   const safeLedgers = ledgers;
 
+  const discount = safeLedgers.filter(
+    (l) =>
+      l.groupId === -11 &&
+      String(l.name).toLowerCase().includes("discount")
+  );
+
   // 🟢 Backend se aaye final formatted godown list
 
   const [godowndata, setGodownData] = useState([]);
@@ -796,6 +804,7 @@ const PurchaseVoucher: React.FC = () => {
 
         godownId: "",
         discount: 0,
+        discountLedgerId: "",
         batchNumber: "",
         batchExpiryDate: "",
         batchManufacturingDate: "",
@@ -1189,6 +1198,40 @@ const PurchaseVoucher: React.FC = () => {
         return;
       }
 
+      // 🆕 DISCOUNT LEDGER CHANGE
+      if (name === "discountLedgerId") {
+        let newDiscount = 0;
+        if (value) {
+          const ledger = safeLedgers.find((l) => String(l.id) === String(value));
+          if (ledger) {
+            const m = ledger.name.match(/(\d+(\.\d+)?)/);
+            const percent = m ? Number(m[1]) : 0;
+            const qty = Number(entry.quantity || 0);
+            const rate = Number(entry.rate || 0);
+            const baseAmount = qty * rate;
+            newDiscount = (baseAmount * percent) / 100;
+          }
+        }
+
+        const calculated = calculateEntryValues(
+          Number(entry.quantity || 0),
+          Number(entry.rate || 0),
+          newDiscount,
+          Number(entry.gstRate || 0),
+          companyState || "",
+          supplierState
+        );
+
+        updatedEntries[index] = {
+          ...entry,
+          discountLedgerId: value,
+          discount: newDiscount,
+          amount: calculated.amount,
+        };
+        setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+        return;
+      }
+
       // 3️⃣ QUANTITY / RATE / DISCOUNT CHANGE
       if (["quantity", "rate", "discount"].includes(name)) {
         const newVal = Number(value || 0);
@@ -1337,6 +1380,7 @@ const PurchaseVoucher: React.FC = () => {
           igstRate: 0,
           godownId: "",
           discount: 0,
+          discountLedgerId: "",
           batchNumber: "",
           batchExpiryDate: "",
           batchManufacturingDate: "",
@@ -2911,13 +2955,19 @@ const PurchaseVoucher: React.FC = () => {
 
                           {/* DISCOUNT */}
                           <td className="px-1 py-2 min-w-[70px]">
-                            <input
-                              type="number"
-                              name="discount"
-                              value={entry.discount ?? ""}
+                            <select
+                              name="discountLedgerId"
+                              value={(entry as any).discountLedgerId || ""}
                               onChange={(e) => handleEntryChange(index, e)}
-                              className={`${TABLE_STYLES.input} text-right text-xs`}
-                            />
+                              className={`${TABLE_STYLES.select} text-xs min-w-[100px]`}
+                            >
+                              <option value="">Select Discount</option>
+                              {discount.map((l) => (
+                                <option key={l.id} value={l.id}>
+                                  {l.name}
+                                </option>
+                              ))}
+                            </select>
                           </td>
 
                           {/* AMOUNT */}

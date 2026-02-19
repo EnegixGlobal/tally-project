@@ -107,6 +107,21 @@ router.get("/api/group", async (req, res) => {
           AND pv.owner_id = ?
 
 
+        /* ================= PURCHASE DISCOUNT ================= */
+        UNION ALL
+
+        SELECT
+          CAST(pvi.discountLedgerId AS UNSIGNED) AS ledgerId,
+          0 AS debit,
+          pvi.discount AS credit
+        FROM purchase_voucher_items pvi
+        JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
+        WHERE pvi.discountLedgerId IN (?)
+          AND pv.company_id = ?
+          AND pv.owner_type = ?
+          AND pv.owner_id = ?
+
+
         /* ================= SALES ================= */
 
         UNION ALL
@@ -240,6 +255,7 @@ router.get("/api/group", async (req, res) => {
       [
 
         // Purchase
+        idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,
         idArray, company_id, owner_type, owner_id,

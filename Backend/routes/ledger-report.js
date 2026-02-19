@@ -87,6 +87,8 @@ SELECT
   MAX(pvi.sgstRate)        AS sgstRate,
   MAX(pvi.igstRate)        AS igstRate,
   MAX(pvi.tdsRate)         AS tdsRate,
+  MAX(pvi.discountLedgerId) AS discountLedgerId,
+  SUM(CASE WHEN pvi.discountLedgerId = ? THEN pvi.discount ELSE 0 END) AS specificDiscount,
 
   MAX(l_party.name)    AS partyName,
   MAX(l_purchase.name) AS purchaseLedgerName
@@ -109,12 +111,13 @@ WHERE
   OR pvi.sgstRate = ?
   OR pvi.igstRate = ?
   OR pvi.tdsRate = ?
+  OR pvi.discountLedgerId = ?
 
 GROUP BY pv.id
 
 ORDER BY pv.date ASC
 `,
-      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
+      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
     );
 
 
@@ -470,6 +473,14 @@ ORDER BY vm.date ASC
 
       /* ========= TDS ========= */
       /* ========= TDS ========= */
+      /* ========= DISCOUNT ========= */
+      /* ========= DISCOUNT ========= */
+      else if (Number(pv.specificDiscount) > 0) {
+        credit = Number(pv.specificDiscount || 0); // Income/Rebate
+        particulars = pv.partyName;
+      }
+
+      /* ========= TDS ========= */
       else if (currentLedger === Number(pv.tdsRate)) {
         // Calculate what the total WOULD be if TDS was subtracted (Credit behavior)
         const totalIfCredit =
@@ -501,7 +512,8 @@ ORDER BY vm.date ASC
         currentLedger === Number(pv.cgstRate) ||
         currentLedger === Number(pv.sgstRate) ||
         currentLedger === Number(pv.igstRate) ||
-        currentLedger === Number(pv.tdsRate)
+        currentLedger === Number(pv.tdsRate) ||
+        Number(pv.specificDiscount) > 0
       ) {
         balance += debit - credit;
       }

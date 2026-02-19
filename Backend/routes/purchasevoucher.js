@@ -183,6 +183,7 @@ router.get("/next-number", async (req, res) => {
 
     // ✅ Create TDS columns if they don't exist
     await ensureTDSColumns();
+    await ensureDiscountLedgerColumn();
 
     return res.json({
       success: true,
@@ -265,6 +266,30 @@ const ensureTDSColumns = async () => {
   isTDSChecked = true;
 };
 
+// ================= AUTO CHECK DISCOUNT LEDGER COLUMN =================
+async function ensureDiscountLedgerColumn() {
+  const [rows] = await db.query(
+    `
+    SELECT COLUMN_NAME
+    FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+      AND TABLE_NAME = 'purchase_voucher_items'
+      AND COLUMN_NAME = 'discountLedgerId'
+    `
+  );
+
+  if (rows.length === 0) {
+    console.log("⚠️ discountLedgerId missing → creating...");
+
+    await db.query(`
+      ALTER TABLE purchase_voucher_items
+      ADD COLUMN discountLedgerId INT NULL
+    `);
+
+    console.log("✅ discountLedgerId column created");
+  }
+}
+
 
 
 // ================= ROUTE =================
@@ -313,6 +338,7 @@ router.post("/", async (req, res) => {
     // ================= FETCH STATES =================
     await ensurePurchaseLedgerColumn();
     await ensureTDSColumns();
+    await ensureDiscountLedgerColumn();
 
     let companyState = "";
     let partyState = "";
@@ -493,7 +519,8 @@ router.post("/", async (req, res) => {
         amount,
         tdsRate,
         godownId,
-        purchaseLedgerId
+        purchaseLedgerId,
+        discountLedgerId
       ) VALUES ?
     `;
 
@@ -521,6 +548,7 @@ router.post("/", async (req, res) => {
           e.godownId || null,
 
           e.purchaseLedgerId || purchaseLedgerId || null,
+          Number(e.discountLedgerId || 0),
         ];
       }
 
@@ -544,6 +572,7 @@ router.post("/", async (req, res) => {
         e.godownId || null,
 
         e.purchaseLedgerId || purchaseLedgerId || null,
+        Number(e.discountLedgerId || 0),
       ];
     });
 
@@ -849,6 +878,7 @@ router.get("/:id", async (req, res) => {
         godownId: item.godownId,
         purchaseLedgerId: item.purchaseLedgerId,
         tdsRate: item.tdsRate, // ✅ Added
+        discountLedgerId: item.discountLedgerId,
 
         // 🔥 FROM HISTORY
         batchNumber: historyRow?.batchNumber || "",
@@ -985,6 +1015,7 @@ router.put("/:id", async (req, res) => {
     // ================= STATES & GST LOGIC (COPIED FROM POST) =================
     await ensurePurchaseLedgerColumn();
     await ensureTDSColumns();
+    await ensureDiscountLedgerColumn();
 
     let companyState = "";
     let partyState = "";
@@ -1118,7 +1149,8 @@ router.put("/:id", async (req, res) => {
           amount,
           tdsRate,
           godownId,
-          purchaseLedgerId
+          purchaseLedgerId,
+          discountLedgerId
         ) VALUES ?
       `;
 
@@ -1138,6 +1170,7 @@ router.put("/:id", async (req, res) => {
             Number(e.tdsRate || 0),
             e.godownId || null,
             e.purchaseLedgerId || purchaseLedgerId || null,
+            Number(e.discountLedgerId || 0),
           ];
         }
 
@@ -1156,6 +1189,7 @@ router.put("/:id", async (req, res) => {
           Number(e.tdsRate || 0),
           e.godownId || null,
           e.purchaseLedgerId || purchaseLedgerId || null,
+          Number(e.discountLedgerId || 0),
         ];
       });
 
