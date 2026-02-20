@@ -56,7 +56,7 @@ router.post('/', async (req, res) => {
       if (!rows.length) continue;
 
       const user = rows[0];
-    
+
       if (!user[passwordField]) {
         return res.status(500).json({ message: 'User password not set' });
       }
@@ -67,7 +67,7 @@ router.post('/', async (req, res) => {
       let employeeId = null;
       let companyRow = null;
 
-      
+
 
       if (role === 'employee') {
         // It's an employee; use own id
@@ -76,7 +76,7 @@ router.post('/', async (req, res) => {
         // Optionally, get company for info (if needed)
         const [[company]] = await db.query('SELECT * FROM tbcompanies WHERE employee_id = ?', [user[idField]]);
         companyRow = company || null;
-       
+
 
       } else if (role === 'ca') {
         // It's a CA; get their company by fdAccountantName, fetch its employee_id
@@ -131,6 +131,12 @@ router.post('/', async (req, res) => {
           id: user[idField],
           name: nameField(user),
           email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          pan: user.pan,
+          phoneNumber: user.phoneNumber,
+          userLimit: user.userLimit,
+          companyName: companyRow ? companyRow.name : "",
         }
       });
     }

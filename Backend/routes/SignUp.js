@@ -8,9 +8,9 @@ const bcrypt = require("bcryptjs");
 const JWT_SECRET = process.env.JWT_SECRET || "8fbd@hG35kd93JK!hG2c90MZ";
 
 router.post("/register", async (req, res) => {
-  console.log("📥 /register hit");
+  // console.log("/register hit");
 
-  const { firstName, lastName, email, phoneNumber, password, userLimit } =
+  const { firstName, lastName, email, phoneNumber, pan, password, userLimit } =
     req.body;
 
   if (
@@ -19,12 +19,13 @@ router.post("/register", async (req, res) => {
     !email ||
     !password ||
     !phoneNumber ||
+    !pan ||
     !userLimit
   ) {
     return res.status(400).json({ message: "All fields are required" });
   }
 
-  console.log(firstName, !lastName, email, password, phoneNumber, userLimit);
+  console.log(firstName, !lastName, email, password, phoneNumber, pan, userLimit);
 
   try {
     // 🔍 Check if email already exists
@@ -44,8 +45,8 @@ router.post("/register", async (req, res) => {
 
     // 📥 Insert into DB
     const sql = `
-      INSERT INTO tbemployees (firstName, lastName, email, phoneNumber, password, userLimit, token)
-      VALUES (?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tbemployees (firstName, lastName, email, phoneNumber, pan, password, userLimit, token)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const [result] = await db.query(sql, [
@@ -53,6 +54,7 @@ router.post("/register", async (req, res) => {
       lastName,
       email,
       phoneNumber,
+      pan,
       hashedPassword,
       userLimit,
       token,

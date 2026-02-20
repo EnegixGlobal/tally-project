@@ -33,6 +33,26 @@ router.post('/company', async (req, res) => {
   await connection.beginTransaction();
 
   try {
+    // Check user limit before creating company
+    const [userRows] = await connection.query(
+      'SELECT userLimit FROM tbemployees WHERE id = ?',
+      [employeeId]
+    );
+
+    const userLimit = userRows.length > 0 ? userRows[0].userLimit : 1;
+
+    const [existingCompanies] = await connection.query(
+      'SELECT COUNT(*) as count FROM tbcompanies WHERE employee_id = ?',
+      [employeeId]
+    );
+
+    if (existingCompanies[0].count >= userLimit) {
+      await connection.rollback();
+      connection.release();
+      return res.status(403).json({
+        message: `Company limit reached. Your limit is ${userLimit} companies.`
+      });
+    }
 
     const [columns] = await connection.query(`
       SHOW COLUMNS FROM tbcompanies LIKE 'tan_number'
