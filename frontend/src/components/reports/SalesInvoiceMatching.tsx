@@ -138,11 +138,23 @@ const SalesInvoiceMatching: React.FC = () => {
 
     let matched = 0;
 
+    // 3. Track Consumed Excel Rows
+    const matchedExcelIndices = new Set<number>();
+
     const matchedRows = baseRows.map(row => {
       // 1. Voucher Number Match
       if (!vchKey) return { ...row, matchStatus: 'UNKNOWN_KEYS' };
       const bookVch = String(row.number || '').trim();
-      const excelRow = importedData.find(ex => String(ex[vchKey] || '').trim() === bookVch);
+
+      // Find FIRST unused match in Excel
+      const excelIndex = importedData.findIndex((ex, idx) =>
+        !matchedExcelIndices.has(idx) &&
+        String(ex[vchKey] || '').trim() === bookVch
+      );
+
+      const excelRow = excelIndex !== -1 ? importedData[excelIndex] : undefined;
+      // Mark as matched if found
+      if (excelIndex !== -1) matchedExcelIndices.add(excelIndex);
 
       let status = 'MISSING_IN_EXCEL';
       let failureReason = '';
@@ -225,12 +237,61 @@ const SalesInvoiceMatching: React.FC = () => {
       return { ...row, matchStatus: status, excelMatchAmount: excelAmt, matchFailureReason: failureReason };
     });
 
+    // 4. Identify Extra Excel Rows (Missing in Books)
+    const extraRows = importedData
+      .map((row, index) => ({ row, index }))
+      .filter(({ index }) => !matchedExcelIndices.has(index))
+      .map(({ row }) => {
+        // Map Excel row to table structure with robust fallback
+        const dateRaw = row[dateKey];
+        let dateVal = '-';
+
+        // Try parsing Excel date (Serial or String)
+        if (typeof dateRaw === 'number' && dateRaw > 20000) {
+          try {
+            const dateObj = new Date(Math.round((dateRaw - 25569) * 864e5));
+            dateVal = dateObj.toISOString();
+          } catch (e) { dateVal = String(dateRaw); }
+        } else if (dateRaw) {
+          dateVal = String(dateRaw);
+        }
+
+        const voucherNo = row[vchKey];
+        const partyName = row[partyKey];
+        const itemName = row[itemKey];
+
+        const taxable = taxableKey ? Number(row[taxableKey] || 0) : 0;
+        const cgst = cgstKey ? Number(row[cgstKey] || 0) : 0;
+        const sgst = sgstKey ? Number(row[sgstKey] || 0) : 0;
+        const igst = igstKey ? Number(row[igstKey] || 0) : 0;
+        const total = amtKey ? Number(row[amtKey] || 0) : 0;
+
+        return {
+          _id: `excel-extra-${Math.random()}`,
+          date: dateVal,
+          number: voucherNo,
+          resolvedPartyName: partyName || 'Unknown (Excel)',
+          itemName: itemName || '-',
+          subtotal: taxable,
+          cgstTotal: cgst,
+          sgstTotal: sgst,
+          igstTotal: igst,
+          total: total,
+          matchStatus: 'MISSING_IN_BOOKS',
+          source: 'EXCEL'
+        } as any;
+      });
+
+    const finalMerged = [...matchedRows, ...extraRows];
+
     return {
-      mergedData: matchedRows,
+      mergedData: finalMerged,
       matchStats: {
-        total: baseRows.length,
+        totalBooks: baseRows.length,
+        totalExcel: importedData.length,
         matched,
-        percentage: baseRows.length > 0 ? ((matched / baseRows.length) * 100).toFixed(1) : 0
+        percentage: baseRows.length > 0 ? ((matched / baseRows.length) * 100).toFixed(1) : 0,
+        extraInExcel: extraRows.length
       }
     };
 
@@ -285,10 +346,13 @@ const SalesInvoiceMatching: React.FC = () => {
 
         {/* Animated Summary Stats */}
         {!loading && !matching && matchStats && (
-          <div className="mt-4 grid grid-cols-1 md:grid-cols-4 gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
+          <div className="mt-4 grid grid-cols-1 md:grid-cols-5 gap-4 animate-in fade-in slide-in-from-top-4 duration-700">
             <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-blue-100'} shadow-sm transition-transform hover:scale-105 duration-300 cursor-default`}>
               <p className="text-xs opacity-70 uppercase font-bold tracking-wider">Total Vouchers</p>
-              <p className="text-2xl font-black mt-1">{matchStats.total}</p>
+              <div className="flex items-baseline gap-2">
+                <p className="text-2xl font-black mt-1" title="Books">{matchStats.totalBooks}</p>
+                <span className="text-xs opacity-50">/ {matchStats.totalExcel} Excel</span>
+              </div>
             </div>
             <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-green-900/20 border-green-800' : 'bg-green-50 border-green-100'} shadow-sm transition-transform hover:scale-105 duration-300 cursor-default`}>
               <p className="text-xs text-green-600 uppercase font-bold tracking-wider">Matched</p>
@@ -301,6 +365,10 @@ const SalesInvoiceMatching: React.FC = () => {
             <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-orange-900/20 border-orange-800' : 'bg-orange-50 border-orange-100'} shadow-sm transition-transform hover:scale-105 duration-300 cursor-default`}>
               <p className="text-xs text-orange-600 uppercase font-bold tracking-wider">Missing in Excel</p>
               <p className="text-2xl font-black text-orange-600 mt-1">{mergedRows.filter(r => r.matchStatus === 'MISSING_IN_EXCEL').length}</p>
+            </div>
+            <div className={`p-4 rounded-xl border ${theme === 'dark' ? 'bg-purple-900/20 border-purple-800' : 'bg-purple-50 border-purple-100'} shadow-sm transition-transform hover:scale-105 duration-300 cursor-default`}>
+              <p className="text-xs text-purple-600 uppercase font-bold tracking-wider">Extra in Excel</p>
+              <p className="text-2xl font-black text-purple-600 mt-1">{matchStats.extraInExcel}</p>
             </div>
           </div>
         )}
@@ -380,7 +448,13 @@ const SalesInvoiceMatching: React.FC = () => {
                       key={idx}
                       className={`${rowBg} transition-colors duration-200`}
                     >
-                      <td className="px-6 py-4">{date ? new Date(date).toLocaleDateString('en-IN') : '-'}</td>
+                      <td className="px-6 py-4">
+                        {(() => {
+                          if (!date) return '-';
+                          const d = new Date(date);
+                          return isNaN(d.getTime()) ? date : d.toLocaleDateString('en-IN');
+                        })()}
+                      </td>
                       <td className="px-6 py-4 font-semibold">{voucherNo || '-'}</td>
                       <td className="px-6 py-4 font-semibold">{partyName}</td>
                       <td className="px-6 py-4 text-xs opacity-80 max-w-[150px] truncate" title={row.itemName}>{row.itemName}</td>
@@ -411,6 +485,11 @@ const SalesInvoiceMatching: React.FC = () => {
                           {row.matchStatus === 'MISSING_IN_EXCEL' && (
                             <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-orange-100 text-orange-700 border border-orange-200 text-xs font-bold shadow-sm">
                               <AlertTriangle size={14} className="stroke-2" /> Missing in Excel
+                            </span>
+                          )}
+                          {row.matchStatus === 'MISSING_IN_BOOKS' && (
+                            <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-purple-100 text-purple-700 border border-purple-200 text-xs font-bold shadow-sm">
+                              <AlertTriangle size={14} className="stroke-2" /> Missing in Books
                             </span>
                           )}
                           {row.matchStatus === 'UNKNOWN_KEYS' && <span className="text-gray-500 text-xs text-center block">⚠ Keys Not Found</span>}
