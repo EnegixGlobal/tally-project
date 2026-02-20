@@ -53,68 +53,75 @@ const StockVouchers = () => {
     });
 
     const [purchaseRes, salesRes, stockItemRes] = await Promise.all([
-      fetch(
-        `${import.meta.env.VITE_API_URL
-        }/api/purchase-vouchers/purchase-history?${params}`
-      ),
-      fetch(
-        `${import.meta.env.VITE_API_URL
-        }/api/sales-vouchers/sale-history?${params}`
-      ),
+      fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?${params}`),
+      fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers/sale-history?${params}`),
       fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params}`),
     ]);
 
     const purchases = (await purchaseRes.json()).data || [];
-    console.log('pur', purchases)
     const sales = (await salesRes.json()).data || [];
     const stockItemsData = (await stockItemRes.json()).data || [];
 
-    // ✅ Calculate Correct Opening Balance (Back-Calc)
     const itemData = stockItemsData.find((i: any) => i.name === itemName);
-
     const isDefaultBatch = batchName === "Default";
 
-    // If Default, init with Item Level, else 0
-    let batchCurrentQty = isDefaultBatch ? Number(itemData?.openingBalance || 0) : 0;
-    // For rate, if item level has it
-    let batchOpeningRate = isDefaultBatch ? Number(itemData?.openingRate || 0) : 0;
+    // 🔹 Detect REAL opening batch
+    // 🔹 Match Logic Helper (Consistent with ItemMonthlySummary)
+    const isMatch = (itemBatch: string | null | undefined) => {
+      if (itemBatch === batchName) return true;
+      if (isDefaultBatch && (!itemBatch || itemBatch === "default")) return true;
+      return false;
+    };
 
-    if (itemData && itemData.batches && itemData.batches.length > 0) {
-      const batch = itemData.batches.find((b: any) =>
-        b.batchName === batchName || (isDefaultBatch && !b.batchName)
-      );
-      if (batch) {
-        batchCurrentQty = Number(batch.batchQuantity || 0);
-        batchOpeningRate = Number(batch.openingRate || 0);
+    /* ------------------------------------------------------------------
+     * 1. Calculate Opening Balance (Forward Calculation)
+     *    Use Master Opening Balance as the true starting point.
+     * ------------------------------------------------------------------ */
+
+    let openingQty = 0;
+    let openingValue = 0;
+
+    if (itemData) {
+      if (isDefaultBatch) {
+        // 1. Default to Item Level Opening Balance
+        openingQty = Number(itemData.openingBalance || 0);
+        openingValue = openingQty * Number(itemData.openingRate || 0);
+      }
+
+      // 2. Check Batches (Validation/Override)
+      if (itemData.batches && Array.isArray(itemData.batches)) {
+        const batch = itemData.batches.find((b: any) =>
+          b.batchName === batchName ||
+          (isDefaultBatch && (!b.batchName || b.batchName === "Default"))
+        );
+
+        if (batch && batch.mode === 'opening') {
+          openingQty = Number(batch.batchQuantity || 0);
+          openingValue = openingQty * Number(batch.openingRate || 0);
+        }
       }
     }
 
-    const totalInward = purchases.reduce((sum: number, p: any) =>
-      (p.itemName === itemName && (p.batchNumber === batchName || (isDefaultBatch && !p.batchNumber))) ? sum + Number(p.purchaseQuantity || 0) : sum, 0);
-
-    const totalOutward = sales.reduce((sum: number, s: any) =>
-      (s.itemName === itemName && (s.batchNumber === batchName || (isDefaultBatch && !s.batchNumber))) ? sum + Math.abs(Number(s.qtyChange || 0)) : sum, 0);
-
-    let openingQty = batchCurrentQty - totalInward + totalOutward;
-    let openingValue = openingQty * batchOpeningRate;
-
+    // Handle small precision errors
     if (Math.abs(openingQty) < 0.001) openingQty = 0;
     if (Math.abs(openingValue) < 0.01) openingValue = 0;
 
+    /* ------------------------------------------------------------------
+     * 2. Build Voucher Rows (Current Month)
+     * ------------------------------------------------------------------ */
     const tempRows: any[] = [];
 
-    /* 🔹 Purchases */
     purchases.forEach((p: any) => {
       const d = new Date(p.purchaseDate);
       if (
         p.itemName === itemName &&
-        (p.batchNumber === batchName || (isDefaultBatch && !p.batchNumber)) &&
+        isMatch(p.batchNumber) &&
         d >= start &&
         d <= end
       ) {
         tempRows.push({
           date: d,
-          party: p.partyName || p.ledgerName || p.ledger || "-",
+          party: p.partyName || p.ledgerName || "-",
           type: "Purchase",
           vchNo: p.voucherNumber,
           inQty: Number(p.purchaseQuantity || 0),
@@ -125,19 +132,18 @@ const StockVouchers = () => {
       }
     });
 
-    /* 🔹 Sales */
     sales.forEach((s: any) => {
       const d = new Date(s.movementDate || s.date);
       if (
         s.itemName === itemName &&
-        (s.batchNumber === batchName || (isDefaultBatch && !s.batchNumber)) &&
+        isMatch(s.batchNumber) &&
         d >= start &&
         d <= end
       ) {
         const qty = Math.abs(Number(s.qtyChange || 0));
         tempRows.push({
           date: d,
-          party: s.partyName || s.ledgerName || s.ledger || "-",
+          party: s.partyName || s.ledgerName || "-",
           type: "Sales",
           vchNo: s.voucherNumber,
           inQty: 0,
@@ -148,16 +154,19 @@ const StockVouchers = () => {
       }
     });
 
-    /* 🔹 Sort by date */
     tempRows.sort((a, b) => a.date.getTime() - b.date.getTime());
 
-    // Calculate accumulation of ALL transactions BEFORE the start date
+    // 🔹 Accumulated opening (before month)
     let accumulatedQty = openingQty;
     let accumulatedValue = openingValue;
 
     purchases.forEach((p: any) => {
       const d = new Date(p.purchaseDate);
-      if (p.itemName === itemName && (p.batchNumber === batchName || (isDefaultBatch && !p.batchNumber)) && d < start) {
+      if (
+        p.itemName === itemName &&
+        isMatch(p.batchNumber) &&
+        d < start
+      ) {
         accumulatedQty += Number(p.purchaseQuantity || 0);
         accumulatedValue += Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
       }
@@ -165,61 +174,47 @@ const StockVouchers = () => {
 
     sales.forEach((s: any) => {
       const d = new Date(s.movementDate || s.date);
-      if (s.itemName === itemName && (s.batchNumber === batchName || (isDefaultBatch && !s.batchNumber)) && d < start) {
+      if (
+        s.itemName === itemName &&
+        isMatch(s.batchNumber) &&
+        d < start
+      ) {
         const qty = Math.abs(Number(s.qtyChange || 0));
         accumulatedQty -= qty;
         accumulatedValue -= qty * Number(s.rate || 0);
       }
     });
 
-    const openingRow = {
-      date: start, // Start of the month
-      party: "Opening Balance",
-      type: "",
-      vchNo: "",
-      inQty: 0,
-      inValue: 0,
-      outQty: 0,
-      outValue: 0,
-      closingQty: accumulatedQty,
-      closingValue: accumulatedValue,
-      isOpening: true
-    };
-
-    // Recalculate running totals starting from the accumulated opening
+    // 🔹 Running closing
     let currentQty = accumulatedQty;
     let currentValue = accumulatedValue;
+    const finalRows: any[] = [];
+
+    // Add Opening Row if there is a balance brought forward
+    // OR if we want to show "Opening Balance" explicitly at the top of the vouchers list
+    // usually Tally shows "Opening Balance" as the first line if it's non-zero
+    if (Math.abs(accumulatedQty) > 0.001 || Math.abs(accumulatedValue) > 0.01) {
+      finalRows.push({
+        isOpening: true,
+        date: start, // First day of month
+        closingQty: accumulatedQty,
+        closingValue: accumulatedValue,
+        inQty: 0,
+        outQty: 0,
+        inValue: 0,
+        outValue: 0
+      });
+    }
 
     tempRows.forEach((r) => {
       currentQty += r.inQty - r.outQty;
       currentValue += r.inValue - r.outValue;
       r.closingQty = currentQty;
       r.closingValue = currentValue;
+      finalRows.push(r);
     });
 
-    // ✅ Check if batch is explicitly an "Opening" batch from Item Master
-    let isOpeningBatch = false;
-
-    // If Default batch and has opening balance, treat as opening batch
-    if (isDefaultBatch && Number(itemData?.openingBalance || 0) > 0) {
-      isOpeningBatch = true;
-    }
-
-    if (itemData && itemData.batches) {
-      const batch = itemData.batches.find((b: any) => b.batchName === batchName || (isDefaultBatch && !b.batchName));
-      if (batch && batch.mode === "opening") {
-        isOpeningBatch = true;
-      }
-    }
-
-    // ✅ Display "Opening Balance" row ONLY if:
-    // 1. It is an "Opening" batch (mode="opening")
-    // 2. It is April (Start of Financial Year)
-    if (isOpeningBatch && monthLabel?.startsWith("April")) {
-      setRows([openingRow, ...tempRows]);
-    } else {
-      setRows(tempRows);
-    }
+    setRows(finalRows);
     setLoading(false);
   };
 
@@ -280,28 +275,61 @@ const StockVouchers = () => {
 
               <tbody>
                 {rows.map((r, i) => (
-                  <tr key={i} className={r.isOpening ? "bg-gray-100 font-bold" : "hover:bg-yellow-100"}>
+                  <tr
+                    key={i}
+                    className={r.isOpening ? "bg-gray-100 font-bold" : "hover:bg-yellow-100"}
+                  >
                     {r.isOpening ? (
                       <>
-                        <td className="border p-2 text-center text-sm">{r.date.toLocaleDateString("en-GB")}</td>
-                        <td className="border p-2 font-bold text-sm text-gray-800" colSpan={3}>Opening Balance</td>
-                        <td className="border p-2 text-right text-sm font-bold">{r.closingQty || ""}</td>
-                        <td className="border p-2 text-right text-sm font-bold">{r.closingValue ? r.closingValue.toFixed(2) : ""}</td>
+                        <td className="border p-2 text-center text-sm">
+                          {r.date.toLocaleDateString("en-GB")}
+                        </td>
+
+                        <td
+                          className="border p-2 font-bold text-sm text-gray-800"
+                          colSpan={3}
+                        >
+                          Opening Balance
+                        </td>
+
+                        {/* Opening Inward */}
+                        <td className="border p-2 text-right text-sm font-bold">
+                          {r.closingQty !== "" ? Math.abs(r.closingQty) : ""}
+                        </td>
+                        <td className="border p-2 text-right text-sm font-bold">
+                          {r.closingValue !== ""
+                            ? Math.abs(r.closingValue).toFixed(2)
+                            : ""}
+                        </td>
+
                         <td className="border p-2 text-right text-sm"></td>
                         <td className="border p-2 text-right text-sm"></td>
-                        <td className="border p-2 text-right font-bold text-sm">{r.closingQty || ""}</td>
-                        <td className="border p-2 text-right font-bold text-sm">{r.closingValue ? r.closingValue.toFixed(2) : ""}</td>
+
+                        {/* Opening Closing */}
+                        <td className="border p-2 text-right font-bold text-sm">
+                          {r.closingQty !== "" ? Math.abs(r.closingQty) : ""}
+                        </td>
+                        <td className="border p-2 text-right font-bold text-sm">
+                          {r.closingValue !== ""
+                            ? Math.abs(r.closingValue).toFixed(2)
+                            : ""}
+                        </td>
                       </>
                     ) : (
                       <>
                         <td className="border p-2 text-center text-sm">
                           {r.date.toLocaleDateString("en-GB")}
                         </td>
+
                         <td className="border p-2 font-medium text-sm text-gray-700">
                           {r.party || "Particulars"}
                         </td>
+
                         <td className="border p-2 text-center text-sm">{r.type}</td>
-                        <td className="border p-2 text-center font-semibold text-sm">{r.vchNo}</td>
+
+                        <td className="border p-2 text-center font-semibold text-sm">
+                          {r.vchNo}
+                        </td>
 
                         <td className="border p-2 text-right text-sm">{r.inQty || ""}</td>
                         <td className="border p-2 text-right text-sm">
@@ -313,9 +341,14 @@ const StockVouchers = () => {
                           {r.outValue ? r.outValue.toFixed(2) : ""}
                         </td>
 
-                        <td className="border p-2 text-right font-bold text-sm">{r.closingQty || ""}</td>
                         <td className="border p-2 text-right font-bold text-sm">
-                          {r.closingValue ? r.closingValue.toFixed(2) : ""}
+                          {r.closingQty !== "" ? Math.abs(r.closingQty) : ""}
+                        </td>
+
+                        <td className="border p-2 text-right font-bold text-sm">
+                          {r.closingValue !== ""
+                            ? Math.abs(r.closingValue).toFixed(2)
+                            : ""}
                         </td>
                       </>
                     )}

@@ -12,13 +12,14 @@ const Register: React.FC = () => {
     password: '',
     confirmPassword: '',
     phoneNumber: '',
+    pan: '',
     agreeToTerms: false
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
 
   const location = useLocation();
-  const userLimit = location.state?.userLimit || 1; 
+  const userLimit = location.state?.userLimit || 1;
   // const { isAuthenticated } = useAuth();
   const navigate = useNavigate();
 
@@ -28,7 +29,7 @@ const Register: React.FC = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -75,6 +76,10 @@ const Register: React.FC = () => {
       newErrors.phoneNumber = 'Phone number is required';
     }
 
+    if (!formData.pan.trim()) {
+      newErrors.pan = 'PAN number is required';
+    }
+
     if (!formData.agreeToTerms) {
       newErrors.agreeToTerms = 'You must agree to the terms and conditions';
     }
@@ -83,65 +88,66 @@ const Register: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-const handleSubmit = async (e: React.FormEvent) => {
-  e.preventDefault();
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
 
-  if (!validateForm()) return;
+    if (!validateForm()) return;
 
-  setIsLoading(true);
-  setErrors({});
-console.log("📨 Raw Response:");
+    setIsLoading(true);
+    setErrors({});
+    console.log("📨 Raw Response:");
 
 
-  try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/SignUp/register`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        firstName:   formData.firstName,
-        lastName:    formData.lastName,
-        email:       formData.email,
-        password:    formData.password,
-        phoneNumber: formData.phoneNumber,
-        userLimit: userLimit    // <--- Add this line
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/SignUp/register`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          firstName: formData.firstName,
+          lastName: formData.lastName,
+          email: formData.email,
+          password: formData.password,
+          phoneNumber: formData.phoneNumber,
+          pan: formData.pan,
+          userLimit: userLimit    // <--- Add this line
 
-      })
-    });
+        })
+      });
 
-    console.log("📨 Raw Response:", res);
+      console.log("📨 Raw Response:", res);
 
-    const data = await res.json();
+      const data = await res.json();
 
-    console.log("✅ Response Status:", res.status);
-    console.log("✅ Response Body:", data);
+      console.log("✅ Response Status:", res.status);
+      console.log("✅ Response Body:", data);
 
-    if (res.ok) {
-      Swal.fire({
-                icon: 'success',
-                title: 'Success',
-                text: data.message,
-              }).then(() => {
-                navigate('/login'); // or your route to go back
-              });
-      
-    }else{
+      if (res.ok) {
+        Swal.fire({
+          icon: 'success',
+          title: 'Success',
+          text: data.message,
+        }).then(() => {
+          navigate('/login'); // or your route to go back
+        });
+
+      } else {
         setErrors({ submit: data.message || 'Registration failed. Please try again.' });
-      return;
-    }
+        return;
+      }
 
-    
-  } catch (err) {
-    console.error('❌ Register fetch error:', err);
-    setErrors({ submit: 'Network error — please try again.' });
-  } finally {
-    setIsLoading(false);
-  }
-};
+
+    } catch (err) {
+      console.error('❌ Register fetch error:', err);
+      setErrors({ submit: 'Network error — please try again.' });
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500/80 via-purple-600/80 to-purple-800/80 bg-[url('/src/assets/bg-1.svg')] bg-cover bg-center bg-no-repeat bg-blend-overlay">
-      
+
       <div className="flex items-center justify-center w-full max-w-7xl mx-auto px-4 py-8">
         {/* Left Side - Illustration */}
         <div className="hidden lg:flex lg:w-1/2 items-center justify-center">
@@ -196,9 +202,8 @@ console.log("📨 Raw Response:");
                     required
                     value={formData.firstName}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border-2 ${
-                      errors.firstName ? 'border-red-300' : 'border-white/30'
-                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
+                    className={`w-full px-4 py-3 border-2 ${errors.firstName ? 'border-red-300' : 'border-white/30'
+                      } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
                     placeholder="First Name"
                   />
                   {errors.firstName && (
@@ -213,9 +218,8 @@ console.log("📨 Raw Response:");
                     required
                     value={formData.lastName}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border-2 ${
-                      errors.lastName ? 'border-red-300' : 'border-white/30'
-                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
+                    className={`w-full px-4 py-3 border-2 ${errors.lastName ? 'border-red-300' : 'border-white/30'
+                      } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
                     placeholder="Last Name"
                   />
                   {errors.lastName && (
@@ -234,9 +238,8 @@ console.log("📨 Raw Response:");
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border-2 ${
-                    errors.email ? 'border-red-300' : 'border-white/30'
-                  } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
+                  className={`w-full px-4 py-3 border-2 ${errors.email ? 'border-red-300' : 'border-white/30'
+                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
                   placeholder="Email Address"
                 />
                 {errors.email && (
@@ -250,16 +253,33 @@ console.log("📨 Raw Response:");
                   id="userLimit"
                   name="userLimit"
                   type="text"
-                  
+
                   value={`No of Company Allotted ${userLimit}`}
                   readOnly
-                  
-                  className={`w-full px-4 py-3 border-2 ${
-                    errors.companyName ? 'border-red-300' : 'border-white/30'
-                  } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
+
+                  className={`w-full px-4 py-3 border-2 ${errors.companyName ? 'border-red-300' : 'border-white/30'
+                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
                   placeholder="Company Name"
                 />
-                
+
+              </div>
+
+              {/* PAN Number */}
+              <div>
+                <input
+                  id="pan"
+                  name="pan"
+                  type="text"
+                  required
+                  value={formData.pan}
+                  onChange={handleInputChange}
+                  className={`w-full px-4 py-3 border-2 ${errors.pan ? 'border-red-300' : 'border-white/30'
+                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
+                  placeholder="PAN Number"
+                />
+                {errors.pan && (
+                  <p className="mt-1 text-sm text-red-600">{errors.pan}</p>
+                )}
               </div>
 
               {/* Phone Number */}
@@ -271,9 +291,8 @@ console.log("📨 Raw Response:");
                   required
                   value={formData.phoneNumber}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border-2 ${
-                    errors.phoneNumber ? 'border-red-300' : 'border-white/30'
-                  } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
+                  className={`w-full px-4 py-3 border-2 ${errors.phoneNumber ? 'border-red-300' : 'border-white/30'
+                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
                   placeholder="Phone Number"
                 />
                 {errors.phoneNumber && (
@@ -292,9 +311,8 @@ console.log("📨 Raw Response:");
                     required
                     value={formData.password}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border-2 ${
-                      errors.password ? 'border-red-300' : 'border-white/30'
-                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
+                    className={`w-full px-4 py-3 border-2 ${errors.password ? 'border-red-300' : 'border-white/30'
+                      } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
                     placeholder="Password"
                   />
                   {errors.password && (
@@ -310,9 +328,8 @@ console.log("📨 Raw Response:");
                     required
                     value={formData.confirmPassword}
                     onChange={handleInputChange}
-                    className={`w-full px-4 py-3 border-2 ${
-                      errors.confirmPassword ? 'border-red-300' : 'border-white/30'
-                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
+                    className={`w-full px-4 py-3 border-2 ${errors.confirmPassword ? 'border-red-300' : 'border-white/30'
+                      } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
                     placeholder="Confirm Password"
                   />
                   {errors.confirmPassword && (

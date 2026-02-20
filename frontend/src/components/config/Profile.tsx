@@ -72,6 +72,7 @@ interface InputFieldProps {
   icon?: React.ReactNode;
   theme: string;
   title?: string;
+  disabled?: boolean;
 }
 
 const InputField: React.FC<InputFieldProps> = ({
@@ -86,6 +87,7 @@ const InputField: React.FC<InputFieldProps> = ({
   icon,
   theme,
   title,
+  disabled = false,
 }) => (
   <div>
     <label className="block text-sm font-medium mb-1" htmlFor={id}>
@@ -101,7 +103,8 @@ const InputField: React.FC<InputFieldProps> = ({
       required={required}
       placeholder={placeholder}
       title={title}
-      className={`w-full p-2 rounded border ${theme === "dark"
+      disabled={disabled}
+      className={`w-full p-2 rounded border ${disabled ? (theme === "dark" ? "bg-gray-600 cursor-not-allowed opacity-70" : "bg-gray-100 cursor-not-allowed opacity-70") : ""} ${theme === "dark"
         ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
         : "bg-white border-gray-300 focus:border-blue-500"
         } outline-none transition-colors`}
@@ -163,7 +166,7 @@ const SelectField: React.FC<SelectFieldProps> = ({
 
 const Profile: React.FC = () => {
   const { theme, setCompanyInfo } = useAppContext();
-  const { updateCompany } = useAuth();
+  const { user, updateCompany } = useAuth();
   const navigate = useNavigate();
   const [company, setCompany] = useState<CompanyInfo>({
     name: "",
@@ -225,7 +228,7 @@ const Profile: React.FC = () => {
           pin: data.pin || "",
           phoneNumber: data.phoneNumber || "",
           email: data.email || "",
-          panNumber: data.panNumber || "",
+          panNumber: user?.pan || data.panNumber || "",
           tanNumber: data.tanNumber || "",
           gstNumber: data.gstNumber || "",
           vatNumber: data.vatNumber || "",
@@ -248,6 +251,16 @@ const Profile: React.FC = () => {
 
     fetchCompanyById();
   }, [companyId]);
+
+  // Pre-fill PAN from user
+  useEffect(() => {
+    if (user && user.pan) {
+      setCompany((prev) => ({
+        ...prev,
+        panNumber: user.pan,
+      }));
+    }
+  }, [user]);
 
   // Form validation errors
 
@@ -748,6 +761,7 @@ const Profile: React.FC = () => {
                     icon={<CreditCard size={16} />}
                     theme={theme}
                     placeholder="e.g., ABCDE1234F"
+                    disabled={true}
                   />
                   {errors.panNumber && (
                     <p className="text-red-500 text-sm mt-1">

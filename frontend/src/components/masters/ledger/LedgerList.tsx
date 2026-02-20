@@ -444,7 +444,7 @@ const LedgerList: React.FC = () => {
                   <td></td>
                   <td className="px-4 py-3 text-right">Total Debit</td>
 
-                  <td className="px-4 py-3 text-right font-mono text-red-600">
+                  <td className="px-4 py-3 text-right font-mono text-blue-800">
                     {totalDebit.toFixed(2)}
                   </td>
 
@@ -459,8 +459,23 @@ const LedgerList: React.FC = () => {
                   <td></td>
                   <td className="px-4 py-3 text-right">Total Credit</td>
 
-                  <td className="px-4 py-3 text-right font-mono text-green-600">
+                  <td className="px-4 py-3 text-right font-mono text-green-800">
                     {totalCredit.toFixed(2)}
+                  </td>
+
+                  <td></td>
+                  <td></td>
+                  <td></td>
+                </tr>
+
+                 {/* TOTAL DIFFERENCE */}
+                <tr className="font-semibold">
+                  <td></td>
+                  <td></td>
+                  <td className="px-4 py-3 text-right">Total Difference</td>
+
+                  <td className="px-4 py-3 text-right font-mono text-red-800">
+                    {(totalCredit - totalDebit).toFixed(2)}
                   </td>
 
                   <td></td>

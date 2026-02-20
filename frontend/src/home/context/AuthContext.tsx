@@ -7,7 +7,11 @@ interface User {
   lastName: string;
   companyName: string;
   phoneNumber: string;
+  pan: string;
+  userLimit: number;
   hasSubscription: boolean;
+  hasCompany?: boolean;
+  companyId?: string | null;
   subscriptionPlan?: "basic" | "professional" | "enterprise";
   createdAt?: string;
   lastLoginAt?: string;
@@ -33,6 +37,7 @@ interface RegisterData {
   password: string;
   companyName: string;
   phoneNumber: string;
+  pan: string;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -110,8 +115,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           userFromResponse.companyName ?? userFromResponse.company_name ?? "",
         phoneNumber:
           userFromResponse.phoneNumber ?? userFromResponse.phone_number ?? "",
+        pan:
+          userFromResponse.pan ?? "",
+        userLimit:
+          userFromResponse.userLimit ?? 1,
         hasSubscription:
           !!userFromResponse.hasSubscription || !!data.hasCompany || false,
+        hasCompany: data.hasCompany ?? false,
+        companyId: data.companyId?.toString() ?? null,
         subscriptionPlan: userFromResponse.subscriptionPlan,
         createdAt: userFromResponse.createdAt ?? userFromResponse.created_at,
         lastLoginAt:
@@ -119,7 +130,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       };
 
       setUser(newUser);
-      
+
 
       try {
         if (data.token) localStorage.setItem("token", data.token);
@@ -139,14 +150,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         console.warn("Could not write all items to localStorage:", e);
       }
 
-        // Ensure React state reflects backend-provided company info immediately
-        if (data.hasCompany !== undefined) setHasCompany(Boolean(data.hasCompany));
-        if (data.companyId !== undefined) setCompanyId(String(data.companyId));
-        // Also accept backend key `company_id`
-        if ((data as any).company_id !== undefined) {
-          setCompanyId(String((data as any).company_id));
-          setHasCompany(true);
-        }
+      // Ensure React state reflects backend-provided company info immediately
+      if (data.hasCompany !== undefined) setHasCompany(Boolean(data.hasCompany));
+      if (data.companyId !== undefined) setCompanyId(String(data.companyId));
+      // Also accept backend key `company_id`
+      if ((data as any).company_id !== undefined) {
+        setCompanyId(String((data as any).company_id));
+        setHasCompany(true);
+      }
 
       setIsLoading(false);
       return true;
@@ -181,6 +192,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         lastName: userData.lastName,
         companyName: userData.companyName,
         phoneNumber: userData.phoneNumber,
+        pan: userData.pan || "",
+        userLimit: 1,
         hasSubscription: false,
         createdAt: new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
@@ -198,16 +211,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   };
 
   const logout = () => {
-  try {
-    setUser(null);
-    localStorage.clear(); 
-    window.location.href = "/login"; 
-  } catch (error) {
-    console.error("Error during logout:", error);
-    setUser(null);
-    window.location.href = "/login";
-  }
-};
+    try {
+      setUser(null);
+      localStorage.clear();
+      window.location.href = "/login";
+    } catch (error) {
+      console.error("Error during logout:", error);
+      setUser(null);
+      window.location.href = "/login";
+    }
+  };
 
 
   const updateSubscription = (

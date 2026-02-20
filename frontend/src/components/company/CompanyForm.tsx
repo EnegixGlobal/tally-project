@@ -73,6 +73,7 @@ interface InputFieldProps {
   icon?: React.ReactNode;
   theme: string;
   title?: string;
+  disabled?: boolean;
 }
 
 const InputField: React.FC<InputFieldProps> = ({
@@ -86,7 +87,8 @@ const InputField: React.FC<InputFieldProps> = ({
   placeholder,
   icon,
   theme,
-  title
+  title,
+  disabled = false
 }) => (
   <div>
     <label className="block text-sm font-medium mb-1" htmlFor={id}>
@@ -102,7 +104,8 @@ const InputField: React.FC<InputFieldProps> = ({
       required={required}
       placeholder={placeholder}
       title={title}
-      className={`w-full p-2 rounded border ${theme === "dark"
+      disabled={disabled}
+      className={`w-full p-2 rounded border ${disabled ? (theme === "dark" ? "bg-gray-600 cursor-not-allowed opacity-70" : "bg-gray-100 cursor-not-allowed opacity-70") : ""} ${theme === "dark"
         ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
         : "bg-white border-gray-300 focus:border-blue-500"
         } outline-none transition-colors`}
@@ -167,9 +170,11 @@ const CompanyForm: React.FC = () => {
 
 
   const { theme, setCompanyInfo } = useAppContext();
-  const { updateCompany } = useAuth();
-  const { switchCompany, addCompany, setCompanies } = useCompany();
+  const { user, updateCompany, isLoading: isAuthLoading } = useAuth();
+  const { companies, switchCompany, addCompany, setCompanies, isLoading: isCompanyLoading } = useCompany();
   const navigate = useNavigate();
+
+  const isDataLoading = isAuthLoading || isCompanyLoading;
   const [company, setCompany] = useState<CompanyInfo>({
     name: "",
     financialYear: "",
@@ -207,8 +212,50 @@ const CompanyForm: React.FC = () => {
   const [showVaultPassword, setShowVaultPassword] = useState<boolean>(false);
 
   // Form validation errors
+  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
+  // Pre-fill PAN from user
+  useEffect(() => {
+    if (user && user.pan) {
+      setCompany(prev => ({
+        ...prev,
+        panNumber: user.pan
+      }));
+    }
+  }, [user]);
 
+  // Redirect if limit reached
+  useEffect(() => {
+    const verifyLimit = async () => {
+      if (isDataLoading || !user) return;
+
+      try {
+        // Fetch latest count from server to be sure
+        const empId = localStorage.getItem("employee_id");
+        if (!empId) return;
+
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-employee?employee_id=${empId}`);
+        const data = await res.json();
+
+        const currentCompanies = data.companies || [];
+        const limit = user.userLimit || 1;
+
+        if (currentCompanies.length >= limit) {
+          await Swal.fire({
+            title: "Limit Reached",
+            text: `You have reached your company limit of ${limit}. You cannot create more companies.`,
+            icon: "warning",
+            confirmButtonColor: "#3085d6",
+          });
+          navigate("/app");
+        }
+      } catch (error) {
+        console.error("Error verifying company limit:", error);
+      }
+    };
+
+    verifyLimit();
+  }, [user, navigate, isDataLoading]);
 
   useEffect(() => {
     const fetchAccountants = async () => {
@@ -230,8 +277,6 @@ const CompanyForm: React.FC = () => {
     }
   }, [company.maintainBy]);
 
-  // Form validation errors
-  const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -288,7 +333,7 @@ const CompanyForm: React.FC = () => {
       newErrors.tanNumber = "TAN number is required";
     }
 
-    
+
 
     // Format validations
     if (company.panNumber && !panRegex.test(company.panNumber)) {
@@ -429,6 +474,17 @@ const CompanyForm: React.FC = () => {
       return;
     }
 
+    // Check user limit
+    if (user && companies.length >= (user.userLimit || 1)) {
+      await Swal.fire({
+        title: "Limit Reached",
+        text: `You have reached your company limit of ${user.userLimit}. Please upgrade your plan to create more companies.`,
+        icon: "warning",
+        confirmButtonColor: "#3085d6",
+      });
+      return;
+    }
+
     try {
       // Step 1: Vault password confirmation
       const vaultConfirmed = await handleVaultConfirmation();
@@ -553,6 +609,19 @@ const CompanyForm: React.FC = () => {
 
 
 
+
+  if (isDataLoading) {
+    return (
+      <div className="pt-[56px] px-4 flex justify-center items-center h-[200px]">
+        <div className="text-gray-500">Checking subscription limits...</div>
+      </div>
+    );
+  }
+
+  // Prevent rendering if limit is reached
+  if (user && companies.length >= (user.userLimit || 1)) {
+    return null;
+  }
 
   return (
     <div className="pt-[56px] px-4">
@@ -718,6 +787,7 @@ const CompanyForm: React.FC = () => {
                     icon={<CreditCard size={16} />}
                     theme={theme}
                     placeholder="e.g., ABCDE1234F"
+                    disabled={true}
                   />
                   {errors.panNumber && (
                     <p className="text-red-500 text-sm mt-1">{errors.panNumber}</p>

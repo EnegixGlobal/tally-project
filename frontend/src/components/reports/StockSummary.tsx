@@ -497,31 +497,63 @@ const StockSummary: React.FC = () => {
       });
 
       // 4️⃣ CLOSING (TALLY LOGIC) & BACK-CALCULATION FIX
-      Object.values(itemMap).forEach((item: any) => {
-        Object.values(item.batches).forEach((b: any) => {
-          // ✅ BACK CALCULATION: stored 'opening.qty' is actually Current Closing from Master
-          const currentClosingQty = b.opening.qty;
+      // 4️⃣ CLOSING (TALLY LOGIC) – FIXED (NO NEGATIVE OPENING)
+Object.values(itemMap).forEach((item: any) => {
+  Object.values(item.batches).forEach((b: any) => {
+    /*
+      b.opening.qty at this point can be:
+      - real opening (from master)
+      - OR current closing (if coming from back-calculated master)
+    */
 
-          // Derive Real Opening
-          b.opening.qty = currentClosingQty - b.inward.qty + b.outward.qty;
+    // 🔹 Detect if REAL opening exists
+    const hasOpening =
+      (b.opening?.qty ?? 0) > 0 || (b.opening?.value ?? 0) > 0;
 
-          // Fix Value (Opening Qty * Opening Rate)
-          b.opening.value = b.opening.qty * b.opening.rate;
+    let openingQty = 0;
+    let openingValue = 0;
 
-          // Handle precision
-          if (Math.abs(b.opening.qty) < 0.001) b.opening.qty = 0;
-          if (Math.abs(b.opening.value) < 0.01) b.opening.value = 0;
+    if (hasOpening) {
+      // ✅ Opening exists → Back-calc allowed
+      const currentClosingQty = b.opening.qty;
 
-          // Calculate Closing
-          b.closing.qty = b.opening.qty + b.inward.qty - b.outward.qty;
+      openingQty =
+        currentClosingQty - b.inward.qty + b.outward.qty;
 
-          const totalInQty = b.opening.qty + b.inward.qty;
-          const totalInValue = b.opening.value + b.inward.value;
+      if (openingQty < 0) openingQty = 0;
 
-          b.closing.rate = totalInQty > 0 ? totalInValue / totalInQty : 0;
-          b.closing.value = b.closing.qty * b.closing.rate;
-        });
-      });
+      openingValue = openingQty * (b.opening.rate || 0);
+    } else {
+      // ❌ No opening → DO NOT back-calc
+      openingQty = 0;
+      openingValue = 0;
+    }
+
+    // ✅ Assign opening
+    b.opening.qty = openingQty;
+    b.opening.value = openingValue;
+    b.opening.rate =
+      openingQty > 0 ? openingValue / openingQty : 0;
+
+    // ✅ Closing is ALWAYS forward calculated
+    b.closing.qty =
+      b.opening.qty + b.inward.qty - b.outward.qty;
+
+    const totalInQty = b.opening.qty + b.inward.qty;
+    const totalInValue = b.opening.value + b.inward.value;
+
+    b.closing.rate =
+      totalInQty > 0 ? totalInValue / totalInQty : 0;
+
+    b.closing.value = b.closing.qty * b.closing.rate;
+
+    // 🔹 Safety (precision)
+    if (Math.abs(b.opening.qty) < 0.001) b.opening.qty = 0;
+    if (Math.abs(b.opening.value) < 0.01) b.opening.value = 0;
+    if (Math.abs(b.closing.qty) < 0.001) b.closing.qty = 0;
+    if (Math.abs(b.closing.value) < 0.01) b.closing.value = 0;
+  });
+});
 
       // 5️⃣ FINAL ARRAY
       const finalData = Object.values(itemMap).map((item: any) => ({
@@ -1418,13 +1450,13 @@ const StockSummary: React.FC = () => {
                               </td>
 
                               <td className="border p-2 text-right align-middle">
-                                {totals.closingQty}
+                                {Math.abs(totals.closingQty)}
                               </td>
                               <td className="border p-2 text-right align-middle">
-                                {formatCurrency(closingRate)}
+                                {formatCurrency(Math.abs(closingRate))}
                               </td>
                               <td className="border p-2 text-right align-middle">
-                                {formatCurrency(totals.closingValue)}
+                                {formatCurrency(Math.abs(totals.closingValue))}
                               </td>
                             </tr>
 
@@ -1491,13 +1523,13 @@ const StockSummary: React.FC = () => {
                                     </td>
 
                                     <td className="border p-2 text-right align-middle">
-                                      {b.closing.qty}
+                                      {Math.abs(b.closing.qty)}
                                     </td>
                                     <td className="border p-2 text-right align-middle">
-                                      {formatCurrency(b.closing.rate)}
+                                      {formatCurrency(Math.abs(b.closing.rate))}
                                     </td>
                                     <td className="border p-2 text-right align-middle">
-                                      {formatCurrency(b.closing.value)}
+                                      {formatCurrency(Math.abs(b.closing.value))}
                                     </td>
                                   </tr>
                                 )
@@ -1595,13 +1627,13 @@ const StockSummary: React.FC = () => {
 
                             {/* Closing */}
                             <td className="border p-2 text-right align-middle">
-                              {grand.closingQty || ""}
+                              {Math.abs(grand.closingQty) || ""}
                             </td>
                             <td className="border p-2 text-right align-middle">
                               {/* Rate */}
                             </td>
                             <td className="border p-2 text-right align-middle">
-                              {formatCurrency(grand.closingValue)}
+                              {formatCurrency(Math.abs(grand.closingValue))}
                             </td>
                           </tr>
                         );

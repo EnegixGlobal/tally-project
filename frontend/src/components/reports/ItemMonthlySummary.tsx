@@ -72,27 +72,43 @@ const ItemMonthlySummary = () => {
     const salesData = (await salesRes.json()).data || [];
     const stockItemsData = (await stockItemRes.json()).data || [];
 
-    // ✅ Get Opening Balance from Batch
+    // ✅ Get Opening Balance (Forward Calculation)
     const itemData = stockItemsData.find((i: any) => i.name === itemName);
     const isDefaultBatch = batchName === "Default";
 
-    // If Default, init with Item Level, else 0
-    let batchCurrentQty = isDefaultBatch ? Number(itemData?.openingBalance || 0) : 0;
-    let batchOpeningRate = isDefaultBatch ? Number(itemData?.openingRate || 0) : 0;
+    let openingQty = 0;
+    let openingRate = 0;
 
-    if (itemData && itemData.batches) {
-      const batch = itemData.batches.find((b: any) =>
-        b.batchName === batchName || (isDefaultBatch && !b.batchName)
-      );
-      if (batch) {
-        batchCurrentQty = Number(batch.batchQuantity || 0);
-        batchOpeningRate = Number(batch.openingRate || 0);
+    if (itemData) {
+      if (isDefaultBatch) {
+        // 1. Default to Item Level Opening Balance
+        openingQty = Number(itemData.openingBalance || 0);
+        openingRate = Number(itemData.openingRate || 0);
+      }
+
+      // 2. Check Batches (Validation/Override)
+      if (itemData.batches && Array.isArray(itemData.batches)) {
+        const batch = itemData.batches.find((b: any) =>
+          b.batchName === batchName ||
+          (isDefaultBatch && (!b.batchName || b.batchName === "Default"))
+        );
+
+        // If we found a specific Opening Batch, it supercedes/defines the opening
+        if (batch && batch.mode === 'opening') {
+          openingQty = Number(batch.batchQuantity || 0);
+          openingRate = Number(batch.openingRate || 0);
+        }
       }
     }
 
-    // ✅ Filter by item + batch (Smart Match for "Default")
+    // ✅ Calculate Opening Value
+    let openingValue = openingQty * openingRate;
 
+    // Handle small precision errors
+    if (Math.abs(openingQty) < 0.001) openingQty = 0;
+    if (Math.abs(openingValue) < 0.01) openingValue = 0;
 
+    // ✅ Filter Transactions
     const purchases = purchaseData.filter((p: any) => {
       if (p.itemName !== itemName) return false;
       if (p.batchNumber === batchName) return true;
@@ -106,22 +122,6 @@ const ItemMonthlySummary = () => {
       if (isDefaultBatch && (!s.batchNumber || s.batchNumber === "default")) return true;
       return false;
     });
-
-    // ✅ Calculate Totals for Back-Calculation
-    const totalInwardQty = purchases.reduce((sum: number, p: any) => sum + Number(p.purchaseQuantity || 0), 0);
-    const totalOutwardQty = sales.reduce((sum: number, s: any) => sum + Math.abs(Number(s.qtyChange || 0)), 0);
-
-    // ✅ Back-Calculate Opening Quantity
-    // Opening = Closing (Current) - Inward + Outward
-    let openingQty = batchCurrentQty - totalInwardQty + totalOutwardQty;
-
-    // ✅ Calculate Opening Value
-    // We use the derived Opening Qty * Opening Rate from batch to get consistent Opening Value
-    let openingValue = openingQty * batchOpeningRate;
-
-    // Handle small precision errors or negative zero
-    if (Math.abs(openingQty) < 0.001) openingQty = 0;
-    if (Math.abs(openingValue) < 0.01) openingValue = 0;
 
     // ✅ Group by Month
     const monthMap: Record<string, any> = {};
@@ -403,17 +403,31 @@ const ItemMonthlySummary = () => {
                     }}
                   >
                     <td className="border p-1">{r.month}</td>
-                    <td className="border p-1 text-right">{r.inQty || ""}</td>
+
+                    <td className="border p-1 text-right">
+                      {r.inQty || ""}
+                    </td>
+
                     <td className="border p-1 text-right">
                       {r.inValue ? r.inValue.toFixed(2) : ""}
                     </td>
-                    <td className="border p-1 text-right">{r.outQty || ""}</td>
+
+                    <td className="border p-1 text-right">
+                      {r.outQty || ""}
+                    </td>
+
                     <td className="border p-1 text-right">
                       {r.outValue ? r.outValue.toFixed(2) : ""}
                     </td>
-                    <td className="border p-1 text-right">{r.closingQty || ""}</td>
+
                     <td className="border p-1 text-right">
-                      {r.closingValue ? r.closingValue.toFixed(2) : ""}
+                      {r.closingQty !== "" ? Math.abs(r.closingQty) : ""}
+                    </td>
+
+                    <td className="border p-1 text-right">
+                      {r.closingValue !== ""
+                        ? Math.abs(r.closingValue).toFixed(2)
+                        : ""}
                     </td>
                   </tr>
                 ))}
