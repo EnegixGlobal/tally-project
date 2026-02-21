@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Edit, Trash2, Ban, Play } from 'lucide-react';
+import { Search, Filter, Edit, Trash2, Ban, Play, Users } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { format } from 'date-fns';
 import api from '../../services/api';
+import Swal from 'sweetalert2';
 
 interface User {
   id: string;
@@ -37,7 +38,11 @@ const UserManagement: React.FC = () => {
       setUsers(res.data);
     } catch (err: any) {
       console.error(err);
-      alert('Error fetching users: ' + (err.response?.data?.error || err.message));
+      Swal.fire({
+        icon: 'error',
+        title: 'Fetch Failed',
+        text: err.response?.data?.error || err.message,
+      });
     }
   };
 
@@ -54,9 +59,22 @@ const UserManagement: React.FC = () => {
 
   const handleAddUser = async () => {
     if (newUser.password !== newUser.confirmPassword) {
-      alert('Passwords do not match');
+      Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Passwords do not match',
+      });
       return;
     }
+
+    Swal.fire({
+      title: 'Adding User...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
+
     try {
       const res = await api.post('/api/adminUser', {
         name: newUser.name,
@@ -67,19 +85,42 @@ const UserManagement: React.FC = () => {
       });
       setUsers((prev) => [...prev, res.data]);
       resetForm();
+      Swal.fire({
+        icon: 'success',
+        title: 'User Added',
+        text: 'The new admin has been created successfully.',
+        timer: 2000,
+        showConfirmButton: false
+      });
     } catch (err: any) {
       console.error(err);
-      alert(err.response?.data?.error || 'Failed to add user');
+      Swal.fire({
+        icon: 'error',
+        title: 'Operation Failed',
+        text: err.response?.data?.error || 'Failed to add user',
+      });
     }
   };
 
   const handleUpdateUser = async () => {
     if (!editingUser) return;
 
-    if (newUser.password !== newUser.confirmPassword) {
-      alert('Passwords do not match');
+    if (newUser.password && newUser.password !== newUser.confirmPassword) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Validation Error',
+        text: 'Passwords do not match',
+      });
       return;
     }
+
+    Swal.fire({
+      title: 'Updating User...',
+      allowOutsideClick: false,
+      didOpen: () => {
+        Swal.showLoading();
+      }
+    });
 
     try {
       const payload: any = {
@@ -96,30 +137,77 @@ const UserManagement: React.FC = () => {
         prev.map((u) => (u.id === editingUser.id ? res.data : u))
       );
       resetForm();
+      Swal.fire({
+        icon: 'success',
+        title: 'User Updated',
+        text: 'User profile has been updated successfully.',
+        timer: 2000,
+        showConfirmButton: false
+      });
     } catch (err: any) {
       console.error('Update failed:', err);
-      alert('Failed to update user: ' + (err.response?.data?.error || err.message));
+      Swal.fire({
+        icon: 'error',
+        title: 'Update Failed',
+        text: err.response?.data?.error || err.message,
+      });
     }
   };
 
 
   const handleDeleteUser = async (id: string) => {
-    try {
-      await api.delete(`/api/adminUser/${id}`);
-      setUsers((prev) => prev.filter((u) => u.id !== id));
-    } catch (err: any) {
-      alert('Delete failed: ' + (err.response?.data?.error || err.message));
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: "You won't be able to revert this user deletion!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: 'Yes, delete it!'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await api.delete(`/api/adminUser/${id}`);
+        setUsers((prev) => prev.filter((u) => u.id !== id));
+        Swal.fire(
+          'Deleted!',
+          'User has been removed from the system.',
+          'success'
+        );
+      } catch (err: any) {
+        Swal.fire({
+          icon: 'error',
+          title: 'Delete Failed',
+          text: err.response?.data?.error || err.message,
+        });
+      }
     }
   };
 
   const handleStatusChange = async (id: string, status: 'active' | 'suspended') => {
     try {
       await api.patch(`/api/adminUser/${id}/status`, { status });
-      // Reload the page after successful update
-      window.location.reload();
+
+      // Update local state instead of reloading
+      setUsers(prev => prev.map(u => u.id === id ? { ...u, status } : u));
+
+      Swal.fire({
+        toast: true,
+        position: 'top-end',
+        icon: 'success',
+        title: `User status changed to ${status}`,
+        showConfirmButton: false,
+        timer: 3000
+      });
+
     } catch (err: any) {
       console.error('Status update failed:', err);
-      alert('Failed to update user status: ' + (err.response?.data?.error || err.message));
+      Swal.fire({
+        icon: 'error',
+        title: 'Status Update Failed',
+        text: err.response?.data?.error || err.message,
+      });
     }
   };
 
@@ -134,6 +222,8 @@ const UserManagement: React.FC = () => {
       status: user.status || 'active',
     });
     setShowAddForm(true);
+    // Scroll to form
+    window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
   const resetForm = () => {
@@ -170,36 +260,38 @@ const UserManagement: React.FC = () => {
           <h1 className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'} text-2xl font-bold`}>User Management</h1>
           <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Manage users</p>
         </div>
-        <button onClick={() => setShowAddForm(true)} className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primaryDark">Add New User</button>
+        <button onClick={() => setShowAddForm(true)} className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primaryDark transition-all active:scale-95 shadow-lg shadow-primary/20">Add New User</button>
       </div>
 
       {/* Add/Edit Form */}
       {showAddForm && (
-        <div className={`rounded-xl border p-4 sm:p-6 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
-          <h3 className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'} text-lg font-semibold mb-4`}>
-            {editingUser ? 'Edit User' : 'Add New User'}
+        <div className={`rounded-xl border p-4 sm:p-6 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} shadow-xl animate-in fade-in slide-in-from-top-4 duration-300`}>
+          <h3 className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'} text-lg font-semibold mb-4 flex items-center`}>
+            {editingUser ? <Edit className="w-5 h-5 mr-2 text-primary" /> : <Users className="w-5 h-5 mr-2 text-primary" />}
+            {editingUser ? 'Edit Admin Profile' : 'Create New Admin'}
           </h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
             {['name', 'phone', 'email', 'password', 'confirmPassword'].map((field) => (
               <div key={field}>
                 <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                   {field.replace(/([A-Z])/g, ' $1').replace(/^./, (str) => str.toUpperCase())}
+                  {field === 'password' && editingUser && <span className="text-xs text-gray-400 font-normal ml-2">(Leave blank to keep current)</span>}
                 </label>
                 <input
                   type={field.includes('password') ? 'password' : field === 'email' ? 'email' : 'text'}
                   value={newUser[field as keyof typeof newUser] || ''}
                   onChange={(e) => setNewUser((prev) => ({ ...prev, [field]: e.target.value }))}
-                  className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
-                  placeholder={`Enter ${field}`}
+                  className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
+                  placeholder={`Enter ${field.toLowerCase()}...`}
                 />
               </div>
             ))}
             <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Status</label>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Account Status</label>
               <select
                 value={newUser.status}
                 onChange={(e) => setNewUser((prev) => ({ ...prev, status: e.target.value as 'active' | 'suspended' | 'pending' }))}
-                className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
               >
                 <option value="active">Active</option>
                 <option value="suspended">Suspended</option>
@@ -207,9 +299,11 @@ const UserManagement: React.FC = () => {
               </select>
             </div>
           </div>
-          <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
-            <button onClick={resetForm} className={`px-4 py-2 border rounded-lg ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-300 hover:bg-gray-50'}`}>Cancel</button>
-            <button onClick={editingUser ? handleUpdateUser : handleAddUser} className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primaryDark">{editingUser ? 'Update User' : 'Add User'}</button>
+          <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8 border-t border-gray-700/10 pt-6">
+            <button onClick={resetForm} className={`px-6 py-2.5 border rounded-xl font-medium transition-all ${theme === 'dark' ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>Cancel</button>
+            <button onClick={editingUser ? handleUpdateUser : handleAddUser} className="px-8 py-2.5 bg-primary text-white rounded-xl font-semibold hover:bg-primaryDark active:scale-95 shadow-lg shadow-primary/20">
+              {editingUser ? 'Update Profile' : 'Create Admin'}
+            </button>
           </div>
         </div>
       )}
@@ -221,10 +315,10 @@ const UserManagement: React.FC = () => {
             <Search className="w-5 h-5 absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400" />
             <input
               type="text"
-              placeholder="Search users..."
+              placeholder="Search by name or email..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full pl-10 pr-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+              className={`w-full pl-10 pr-4 py-2 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
             />
           </div>
           <div className="flex items-center gap-2">
@@ -232,7 +326,7 @@ const UserManagement: React.FC = () => {
             <select
               value={statusFilter}
               onChange={(e) => setStatusFilter(e.target.value)}
-              className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-300 bg-white text-gray-900'}`}
+              className={`px-4 py-2 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary cursor-pointer ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -244,49 +338,76 @@ const UserManagement: React.FC = () => {
       </div>
 
       {/* Users Table */}
-      <div className={`rounded-xl shadow-sm border overflow-hidden ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
+      <div className={`rounded-xl shadow-xl border overflow-hidden ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'}`}>
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+          <table className="w-full text-sm">
+            <thead className={`${theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
               <tr>
-                <th className={`px-4 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'}`}>User</th>
-                <th className={`px-4 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'}`}>Status</th>
-                <th className={`px-4 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'}`}>Phone</th>
-                <th className={`px-4 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider hidden md:table-cell ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'}`}>Last Login</th>
-                <th className={`px-4 sm:px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'}`}>Actions</th>
+                <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Admin User</th>
+                <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Status</th>
+                <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Phone Number</th>
+                <th className={`px-4 sm:px-6 py-3 text-left font-semibold uppercase tracking-wider hidden md:table-cell ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Last Activity</th>
+                <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Actions</th>
               </tr>
             </thead>
             <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
-              {filteredUsers.map((user) => (
-                <tr key={user.id} className={`${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}`}>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+              {filteredUsers.length > 0 ? filteredUsers.map((user) => (
+                <tr key={user.id} className={`${theme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-blue-50/30'} transition-colors`}>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex flex-col">
-                      <span className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'} font-medium`}>{user.name}</span>
-                      <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-xs`}>{user.email}</span>
+                      <span className={`${theme === 'dark' ? 'text-white' : 'text-gray-900'} font-semibold`}>{user.name}</span>
+                      <span className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-xs italic`}>{user.email}</span>
                     </div>
                   </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(user.status)}`}>{user.status}</span>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <span className={`px-3 py-1 text-xs font-bold rounded-full ${getStatusBadge(user.status)} shadow-sm`}>
+                      {user.status.toUpperCase()}
+                    </span>
                   </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm">{user.phone}</td>
-                  <td className={`px-4 sm:px-6 py-4 whitespace-nowrap text-sm hidden md:table-cell ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {user.lastLogin ? format(new Date(user.lastLogin), 'MMM dd, yyyy') : 'Never'}
+                  <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    {user.phone || 'N/A'}
                   </td>
-                  <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <button title="Edit User" onClick={() => handleEdit(user)} className="text-primary hover:text-primaryDark dark:text-purple-400 dark:hover:text-purple-200">
+                  <td className={`px-4 sm:px-6 py-4 whitespace-nowrap hidden md:table-cell ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {user.lastLogin ? format(new Date(user.lastLogin), 'MMM dd, yyyy HH:mm') : 'Never'}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center gap-3">
+                      <button
+                        title="Edit Admin"
+                        onClick={() => handleEdit(user)}
+                        className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all transform hover:scale-110 shadow-sm"
+                      >
                         <Edit className="w-4 h-4" />
                       </button>
-                      <button onClick={() => handleStatusChange(user.id, user.status === 'active' ? 'suspended' : 'active')} className={`${user.status === 'active' ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'}`}>
+
+                      <button
+                        title={user.status === 'active' ? 'Suspend Account' : 'Activate Account'}
+                        onClick={() => handleStatusChange(user.id, user.status === 'active' ? 'suspended' : 'active')}
+                        className={`p-2 rounded-lg transition-all transform hover:scale-110 shadow-sm ${user.status === 'active'
+                            ? 'bg-amber-100 text-amber-600 hover:bg-amber-600 hover:text-white'
+                            : 'bg-green-100 text-green-600 hover:bg-green-600 hover:text-white'
+                          }`}
+                      >
                         {user.status === 'active' ? <Ban className="w-4 h-4" /> : <Play className="w-4 h-4" />}
                       </button>
-                      <button title="Delete User" onClick={() => handleDeleteUser(user.id)} className={`${theme === 'dark' ? 'text-red-400 hover:text-red-200' : 'text-red-600 hover:text-red-800'}`}>
+
+                      <button
+                        title="Delete Permanently"
+                        onClick={() => handleDeleteUser(user.id)}
+                        className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all transform hover:scale-110 shadow-sm"
+                      >
                         <Trash2 className="w-4 h-4" />
                       </button>
                     </div>
                   </td>
                 </tr>
-              ))}
+              )) : (
+                <tr>
+                  <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">
+                    No users found matching your search...
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
