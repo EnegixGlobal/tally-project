@@ -34,7 +34,7 @@ const Settings: React.FC = () => {
                   <input
                   title='Company Name'
                     type="text"
-                    value="Tally Prime SaaS"
+                    value="Apna Book SaaS"
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                       theme === 'dark' 
                         ? 'border-gray-600 bg-gray-700 text-white' 
@@ -152,7 +152,7 @@ const Settings: React.FC = () => {
             <div>
               <h3 className={`text-lg font-semibold mb-4 ${
                 theme === 'dark' ? 'text-white' : 'text-gray-900'
-              }`}>Tally Integration Settings</h3>
+              }`}>Apna Book Integration Settings</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className={`block text-sm font-medium mb-2 ${

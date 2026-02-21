@@ -918,16 +918,16 @@ const Profile: React.FC = () => {
                 }`}
             >
               <Lock size={20} className="inline mr-2" />
-              Tally Vault Security (Optional)
+              Apna Book Vault Security (Optional)
             </h3>
 
             <div className="space-y-4">
               <div>
                 <label className="block text-sm font-medium mb-2">
-                  Set Tally Vault Password?
+                  Set Apna Book Vault Password?
                 </label>
                 <select
-                  title="Enable or disable Tally Vault password protection"
+                  title="Enable or disable Apna Book Vault password protection"
                   value={vaultEnabled ? "yes" : "no"}
                   onChange={(e) => setVaultEnabled(e.target.value === "yes")}
                   className={`w-full p-2 rounded border ${theme === "dark"
@@ -952,7 +952,7 @@ const Profile: React.FC = () => {
                         className="text-orange-500 mr-2 mt-0.5"
                       />
                       <div className="text-sm">
-                        <strong>Warning:</strong> If you forget your Tally Vault
+                        <strong>Warning:</strong> If you forget your Apna Book Vault
                         password, you will permanently lose access to this
                         company.
                       </div>

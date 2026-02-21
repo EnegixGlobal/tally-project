@@ -12,6 +12,7 @@ import {
 import AddCaEmployeeForm from "./caemployee"; // adjust path as needed
 import AssignCompaniesModal from "./AssignCompaniesModal"; // Adjust path accordingly
 import DashboardCaEmployee from "./DashboardCaEmployee";
+import CompanyLoginModal from "./CompanyLoginModal";
 
 const Dashboard: React.FC = () => {
 
@@ -66,6 +67,7 @@ const Dashboard: React.FC = () => {
     pan_number: ReactNode;
     id: number;
     name: string;
+    isLocked?: boolean | number;
   };
   const [companies, setCompanies] = useState<Company[]>([]);
 
@@ -104,6 +106,10 @@ const Dashboard: React.FC = () => {
   });
 
   const [showModal, setShowModal] = useState(false);
+  const [showLoginModal, setShowLoginModal] = useState(false);
+  const [companyToUnlock, setCompanyToUnlock] = useState<any>(null);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
+  const [isVerificationLoading, setIsVerificationLoading] = useState(false);
 
   const employeeId = localStorage.getItem("employee_id");
 
@@ -311,6 +317,49 @@ const Dashboard: React.FC = () => {
     );
   }
 
+  const handleVerifyAccess = async (username: string, password: string) => {
+    if (!companyToUnlock) return;
+
+    setIsVerificationLoading(true);
+    setVerificationError(null);
+
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/login/verify-company-access`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          company_id: companyToUnlock.id,
+          username,
+          password,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        // Success! Now switch
+        if (suppl === "employee") {
+          await switchCompany(companyToUnlock.id);
+          setSelectedCompany(companyToUnlock.id.toString());
+        } else if (suppl === "ca") {
+          localStorage.setItem("company_id", companyToUnlock.id.toString());
+          setSelectedCaCompany(companyToUnlock.id.toString());
+          window.location.reload();
+          return;
+        }
+        setShowLoginModal(false);
+        setCompanyToUnlock(null);
+      } else {
+        setVerificationError(data.message || "Invalid credentials");
+      }
+    } catch (err) {
+      console.error("Verification error:", err);
+      setVerificationError("Internal server error. Please try again.");
+    } finally {
+      setIsVerificationLoading(false);
+    }
+  };
+
   return (
     <>
       {suppl === "employee" ? (
@@ -350,10 +399,18 @@ const Dashboard: React.FC = () => {
                     value={activeCompanyId || selectedCompany}
                     onChange={async (e) => {
                       const companyId = e.target.value;
-                      if (companyId) {
+                      if (!companyId) return;
+
+                      const targetCompany = allCompanies.find(c => c.id.toString() === companyId);
+
+                      // Check if locked
+                      if (targetCompany && targetCompany.isLocked) {
+                        setCompanyToUnlock(targetCompany);
+                        setShowLoginModal(true);
+                        setVerificationError(null);
+                      } else {
                         try {
                           // Use CompanyContext to switch company
-                          // This automatically updates active_company_id and companyInfo
                           await switchCompany(companyId);
                           setSelectedCompany(companyId);
 
@@ -372,7 +429,7 @@ const Dashboard: React.FC = () => {
                         }
                       }
                     }}
-                    className="border rounded px-3 py-2 w-full max-w-xs bg-white"
+                    className="border rounded px-3 py-2 w-full max-w-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer"
                   >
                     <option value="">Select Company</option>
                     {allCompanies.map((c) => (
@@ -404,8 +461,8 @@ const Dashboard: React.FC = () => {
                   <div
                     key={c.id}
                     className={`rounded-2xl p-6 hover:shadow-xl transition-all border-2 ${isSelected
-                        ? "bg-gradient-to-b from-indigo-100 to-purple-100 shadow-lg border-indigo-500 ring-2 ring-indigo-300 ring-offset-2"
-                        : "bg-gradient-to-b from-purple-50 to-blue-50 shadow-md border-indigo-100"
+                      ? "bg-gradient-to-b from-indigo-100 to-purple-100 shadow-lg border-indigo-500 ring-2 ring-indigo-300 ring-offset-2"
+                      : "bg-gradient-to-b from-purple-50 to-blue-50 shadow-md border-indigo-100"
                       }`}
                   >
                     <div className="flex items-center justify-between mb-1">
@@ -447,7 +504,7 @@ const Dashboard: React.FC = () => {
                 }`}
             >
               {/* <h2 className="text-xl font-semibold mb-4">
-                Welcome to Tally Prime
+                Welcome to Apna Book 
               </h2>
               <p className="mb-4">
                 No company is currently open. Use the button below to create
@@ -582,13 +639,21 @@ const Dashboard: React.FC = () => {
                 value={selectedCaCompany}
                 onChange={(e) => {
                   const companyId = e.target.value;
-                  if (companyId) {
+                  if (!companyId) return;
+
+                  const targetCompany = caAllCompanies.find(c => c.id.toString() === companyId);
+
+                  if (targetCompany && targetCompany.isLocked) {
+                    setCompanyToUnlock(targetCompany);
+                    setShowLoginModal(true);
+                    setVerificationError(null);
+                  } else {
                     localStorage.setItem("company_id", companyId);
                     setSelectedCaCompany(companyId);
                     window.location.reload();
                   }
                 }}
-                className="border rounded px-3 py-2 w-full max-w-xs bg-white"
+                className="border rounded px-3 py-2 w-full max-w-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-all"
               >
                 <option value="">Select Company</option>
                 {caAllCompanies.map((c) => (
@@ -762,6 +827,19 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {showLoginModal && companyToUnlock && (
+        <CompanyLoginModal
+          companyName={companyToUnlock.name}
+          onLogin={handleVerifyAccess}
+          onClose={() => {
+            setShowLoginModal(false);
+            setCompanyToUnlock(null);
+          }}
+          isLoading={isVerificationLoading}
+          error={verificationError}
+        />
       )}
     </>
   );

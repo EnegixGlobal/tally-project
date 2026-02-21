@@ -79,7 +79,7 @@ const Login: React.FC = () => {
                   <div className="w-16 h-16 xl:w-20 xl:h-20 2xl:w-24 2xl:h-24 mx-auto mb-4 xl:mb-6 bg-gradient-to-br from-violet-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
                     <Database className="w-8 h-8 xl:w-10 xl:h-10 2xl:w-12 2xl:h-12 text-white" />
                   </div>
-                  <p className="text-lg xl:text-xl 2xl:text-2xl font-semibold">Tally Prime Admin</p>
+                  <p className="text-lg xl:text-xl 2xl:text-2xl font-semibold">Apna Book Admin</p>
                   <p className="text-sm xl:text-base 2xl:text-lg opacity-80">Secure Admin Access</p>
                 </div>
               </div>
@@ -95,7 +95,7 @@ const Login: React.FC = () => {
           >
             {/* Header */}
             <div className="text-center mb-6 xl:mb-8">
-              <h2 className="text-3xl xl:text-4xl 2xl:text-5xl font-bold text-white mb-2 xl:mb-3">Tally Prime Admin</h2>
+              <h2 className="text-3xl xl:text-4xl 2xl:text-5xl font-bold text-white mb-2 xl:mb-3">Apna Book Admin</h2>
               <p className="text-white/80 text-sm xl:text-base 2xl:text-lg">Sign in to your admin dashboard</p>
             </div>
 

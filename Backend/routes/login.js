@@ -150,4 +150,37 @@ router.post('/', async (req, res) => {
   }
 });
 
+router.post('/verify-company-access', async (req, res) => {
+  const { company_id, username, password } = req.body;
+
+
+  if (!company_id || !username || !password) {
+    return res.status(400).json({ success: false, message: 'All fields are required' });
+  }
+
+  try {
+    const [rows] = await db.query(
+      'SELECT * FROM tbUsers WHERE company_id = ? AND username = ?',
+      [company_id, username]
+    );
+
+    if (rows.length === 0) {
+      return res.status(401).json({ success: false, message: 'Invalid username or password' });
+    }
+
+    const user = rows[0];
+
+    const match = await bcrypt.compare(password.trim(), user.password);
+
+    if (!match) {
+      return res.status(401).json({ success: false, message: 'Invalid username or password' });
+    }
+
+    res.json({ success: true, message: 'Access granted' });
+  } catch (err) {
+    console.error('Error verifying company access:', err);
+    res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 module.exports = router;

@@ -192,7 +192,7 @@ const StockVouchers = () => {
 
     // Add Opening Row if there is a balance brought forward
     // OR if we want to show "Opening Balance" explicitly at the top of the vouchers list
-    // usually Tally shows "Opening Balance" as the first line if it's non-zero
+    // usually Apna Book shows "Opening Balance" as the first line if it's non-zero
     if (Math.abs(accumulatedQty) > 0.001 || Math.abs(accumulatedValue) > 0.01) {
       finalRows.push({
         isOpening: true,

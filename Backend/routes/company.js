@@ -119,13 +119,18 @@ router.post('/company', async (req, res) => {
     const companyId = companyResult.insertId;
 
     if (accessControlEnabled && username && password) {
-
       const hashedPassword = await bcrypt.hash(password, 10);
 
+      // Try to get 'Admin' role ID
+      const [roleRows] = await connection.query(
+        "SELECT role_id FROM tbRoles WHERE LOWER(role_name) = 'admin' LIMIT 1"
+      );
+      const roleId = roleRows.length > 0 ? roleRows[0].role_id : 0;
+
       await connection.query(`
-        INSERT INTO tbUsers (company_id, username, password)
-        VALUES (?, ?, ?)
-      `, [companyId, username, hashedPassword]);
+        INSERT INTO tbUsers (company_id, username, password, employee_id, email, role_id, status)
+        VALUES (?, ?, ?, ?, ?, ?, 'active')
+      `, [companyId, username, hashedPassword, employeeId, email, roleId]);
     }
 
     await connection.commit();
@@ -265,16 +270,22 @@ router.put('/company/:companyId', async (req, res) => {
         await connection.query(`
           UPDATE tbUsers SET
             username = ?,
-            password = COALESCE(?, password)
+            password = COALESCE(?, password),
+            email = ?
           WHERE company_id = ?
-        `, [username, hashedPassword, companyId]);
+        `, [username, hashedPassword, email, companyId]);
 
       } else {
+        // Try to get 'Admin' role ID
+        const [roleRows] = await connection.query(
+          "SELECT role_id FROM tbRoles WHERE LOWER(role_name) = 'admin' LIMIT 1"
+        );
+        const roleId = roleRows.length > 0 ? roleRows[0].role_id : 0;
 
         await connection.query(`
-          INSERT INTO tbUsers (company_id, username, password)
-          VALUES (?, ?, ?)
-        `, [companyId, username, hashedPassword]);
+          INSERT INTO tbUsers (company_id, username, password, employee_id, email, role_id, status)
+          VALUES (?, ?, ?, ?, ?, ?, 'active')
+        `, [companyId, username, hashedPassword, employeeId, email, roleId]);
 
       }
     }

@@ -29,6 +29,7 @@ router.get('/dashboard-data', async (req, res) => {
 
 router.get('/companies-by-employee', async (req, res) => {
   const { employee_id } = req.query;
+  
 
   if (!employee_id) {
     return res.status(400).json({ success: false, error: 'employee_id required' });
@@ -36,7 +37,9 @@ router.get('/companies-by-employee', async (req, res) => {
 
   try {
     const [companies] = await db.query(
-      'SELECT id, name FROM tbcompanies WHERE employee_id = ?',
+      `SELECT c.id, c.name, 
+       (SELECT COUNT(*) FROM tbUsers u WHERE u.company_id = c.id) > 0 as isLocked 
+       FROM tbcompanies c WHERE c.employee_id = ?`,
       [employee_id]
     );
 
@@ -48,6 +51,7 @@ router.get('/companies-by-employee', async (req, res) => {
 });
 // Assuming CA's ID is available as req.query.ca_id
 router.get('/companies-by-ca', async (req, res) => {
+ 
   const caId = req.query.ca_id;
   if (!caId) return res.status(400).json({ message: 'Missing ca_id' });
 
@@ -55,7 +59,9 @@ router.get('/companies-by-ca', async (req, res) => {
     const connection = await db.getConnection();
     // Customize this query for your schema
     const [rows] = await connection.query(
-      'SELECT id, name, employee_id, pan_number FROM tbcompanies WHERE fdAccountantName = ?',
+      `SELECT id, name, employee_id, pan_number,
+       (SELECT COUNT(*) FROM tbUsers u WHERE u.company_id = tbcompanies.id) > 0 as isLocked
+       FROM tbcompanies WHERE fdAccountantName = ?`,
       [caId]
     );
     connection.release();
