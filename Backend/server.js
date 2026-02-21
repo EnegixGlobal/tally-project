@@ -92,7 +92,7 @@ const companyRoutes = require("./routes/company");
 app.use("/api/company", companyRoutes);
 
 const adminloginRoute = require("./routes/adminlogin");
-app.use("/api/admin/login", adminloginRoute);
+app.use("/api/admin", adminloginRoute);
 
 const ledgerDropdown = require("./routes/ledgerDropdown");
 app.use("/api/ledger-dropdown", ledgerDropdown);
@@ -250,8 +250,9 @@ app.use("/api/", b2cRoutes);
 
 const purchaseinvoicematching = require("./routes/purchaseinvoicematching");
 app.use("/api/", purchaseinvoicematching);
+const authMiddleware = require("./middlewares/authMiddleware");
 const AdminUser = require("./routes/AdminUser");
-app.use("/api/adminUser", AdminUser);
+app.use("/api/adminUser", authMiddleware, AdminUser);
 const caEmployee = require("./routes/caemployee");
 app.use("/api/", caEmployee);
 

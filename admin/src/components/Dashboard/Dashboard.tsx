@@ -1,19 +1,53 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { gsap } from 'gsap';
 import { useTheme } from '../../context/ThemeContext';
 import StatsCard from './StatsCard';
 import RevenueChart from './RevenueChart';
-import { mockStats, mockChartData } from '../../data/mockData';
-import { Users, CreditCard, DollarSign, AlertTriangle,  Receipt } from 'lucide-react'; //TrendingUp,
+import { mockChartData } from '../../data/mockData';
+import { Users, Building2, UserCheck, DollarSign, Receipt, AlertTriangle } from 'lucide-react';
+import { formatDistanceToNow } from 'date-fns';
+
+interface DashboardStats {
+  totalCA: number;
+  totalEmployees: number;
+  totalCompanies: number;
+  monthlyRevenue: number;
+  failedPayments: number;
+}
+
+interface Activity {
+  type: string;
+  title: string;
+  time: string;
+  user: string;
+  owner: string;
+}
+
+import api from '../../services/api';
 
 const Dashboard: React.FC = () => {
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
+  const [stats, setStats] = useState<DashboardStats | null>(null);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+
+  const fetchDashboardData = async () => {
+    try {
+      const response = await api.get('/api/admin/dashboard-stats');
+      setStats(response.data.stats);
+      setActivities(response.data.recentActivity);
+    } catch (error) {
+      console.error('Failed to fetch dashboard data:', error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   useEffect(() => {
+    fetchDashboardData();
     const tl = gsap.timeline();
-    
-    tl.fromTo(containerRef.current, 
+    tl.fromTo(containerRef.current,
       { opacity: 0, y: 20 },
       { opacity: 1, y: 0, duration: 0.6 }
     );
@@ -28,6 +62,14 @@ const Dashboard: React.FC = () => {
     }).format(value);
   };
 
+  if (isLoading) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
   return (
     <div ref={containerRef} className="space-y-6">
       {/* Page Header */}
@@ -37,10 +79,11 @@ const Dashboard: React.FC = () => {
           <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Welcome back! Here's what's happening with your business today.</p>
         </div>
         <div className="flex items-center space-x-3 w-full sm:w-auto">
-          <button className={`px-4 py-2 text-white rounded-lg transition-colors ${
-            theme === 'dark' ? 'bg-blue-600 hover:bg-blue-700' : 'bg-blue-600 hover:bg-blue-700'
-          }`}>
-            Generate Report
+          <button
+            onClick={fetchDashboardData}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primaryDark transition-colors"
+          >
+            Refresh Data
           </button>
         </div>
       </div>
@@ -48,36 +91,36 @@ const Dashboard: React.FC = () => {
       {/* Stats Cards */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4 lg:gap-6">
         <StatsCard
-          title="Total Users"
-          value={mockStats.totalUsers.toLocaleString()}
-          change="+12.5% from last month"
+          title="Total Admin Users"
+          value={stats?.totalCA.toLocaleString() || '0'}
+          change="+2 from last week"
           changeType="positive"
-          icon={Users}
+          icon={UserCheck}
           color="bg-primary"
         />
         <StatsCard
-          title="Active Subscriptions"
-          value={mockStats.activeSubscriptions.toLocaleString()}
-          change="+8.2% from last month"
+          title="Total App Users"
+          value={stats?.totalEmployees.toLocaleString() || '0'}
+          change="+12% from last month"
           changeType="positive"
-          icon={CreditCard}
+          icon={Users}
+          color="bg-blue-600"
+        />
+        <StatsCard
+          title="Total Companies"
+          value={stats?.totalCompanies.toLocaleString() || '0'}
+          change="+5 new today"
+          changeType="positive"
+          icon={Building2}
           color="bg-green-600"
         />
         <StatsCard
           title="Monthly Revenue"
-          value={formatCurrency(mockStats.monthlyRevenue)}
+          value={formatCurrency(stats?.monthlyRevenue || 0)}
           change="+15.3% from last month"
           changeType="positive"
           icon={DollarSign}
           color="bg-purple-600"
-        />
-        <StatsCard
-          title="Failed Payments"
-          value={mockStats.failedPayments.toString()}
-          change="+2.1% from last month"
-          changeType="negative"
-          icon={Receipt}
-          color="bg-red-600"
         />
       </div>
 
@@ -96,73 +139,38 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Recent Activity */}
-      <div className={`rounded-xl shadow-sm border p-6 ${
-        theme === 'dark' 
-          ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white border-gray-200'
-      }`}>
-        <h3 className={`text-lg font-semibold mb-4 ${
-          theme === 'dark' ? 'text-white' : 'text-gray-900'
-        }`}>Recent Activity</h3>
+      <div className={`rounded-xl shadow-sm border p-6 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+        <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+          }`}>Recent Activity</h3>
         <div className="space-y-3">
-          <div className={`flex items-center justify-between py-3 border-b ${
-            theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-          }`}>
-            <div className="flex items-center space-x-3 flex-1 min-w-0">
-              <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
-                <Users className="w-4 h-4 text-green-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}>New user registered</p>
-                <p className={`text-xs ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}>2 minutes ago</p>
-              </div>
-            </div>
-            <span className={`text-sm ml-2 flex-shrink-0 ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-            }`}>John Doe</span>
-          </div>
-          <div className={`flex items-center justify-between py-3 border-b ${
-            theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-          }`}>
-            <div className="flex items-center space-x-3 flex-1 min-w-0">
-              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
-                <CreditCard className="w-4 h-4 text-blue-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}>Payment received</p>
-                <p className={`text-xs ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}>5 minutes ago</p>
+          {activities.length > 0 ? activities.map((activity, index) => (
+            <div key={index} className={`flex items-center justify-between py-3 border-b last:border-0 ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
+              }`}>
+              <div className="flex items-center space-x-3 flex-1 min-w-0">
+                <div className={`w-10 h-10 rounded-full flex items-center justify-center ${activity.type === 'company_created' ? 'bg-green-100' : 'bg-blue-100'
+                  }`}>
+                  {activity.type === 'company_created' ? (
+                    <Building2 className="w-5 h-5 text-green-600" />
+                  ) : (
+                    <Users className="w-5 h-5 text-blue-600" />
+                  )}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'
+                    }`}>
+                    {activity.title}: <span className="text-primary">{activity.user}</span>
+                  </p>
+                  <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
+                    }`}>
+                    {formatDistanceToNow(new Date(activity.time), { addSuffix: true })} • Owner: {activity.owner || 'System'}
+                  </p>
+                </div>
               </div>
             </div>
-            <span className={`text-sm ml-2 flex-shrink-0 ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-            }`}>₹2,999</span>
-          </div>
-          <div className="flex items-center justify-between py-3">
-            <div className="flex items-center space-x-3 flex-1 min-w-0">
-              <div className="w-8 h-8 bg-orange-100 rounded-full flex items-center justify-center">
-                <AlertTriangle className="w-4 h-4 text-orange-600" />
-              </div>
-              <div className="min-w-0 flex-1">
-                <p className={`text-sm font-medium ${
-                  theme === 'dark' ? 'text-white' : 'text-gray-900'
-                }`}>Payment failed</p>
-                <p className={`text-xs ${
-                  theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-                }`}>10 minutes ago</p>
-              </div>
-            </div>
-            <span className={`text-sm ml-2 flex-shrink-0 ${
-              theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
-            }`}>₹1,499</span>
-          </div>
+          )) : (
+            <p className="text-center py-4 text-gray-500">No recent activity found.</p>
+          )}
         </div>
       </div>
     </div>

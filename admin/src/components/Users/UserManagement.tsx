@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Search, Filter, Edit, Trash2, Ban, Play } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
 import { format } from 'date-fns';
+import api from '../../services/api';
 
 interface User {
   id: string;
@@ -29,18 +30,14 @@ const UserManagement: React.FC = () => {
     status: 'active' as 'active' | 'suspended' | 'pending',
   });
 
-  const API_URL = `${import.meta.env.VITE_API_URL}/api/adminUser`;
-
   // Fetch users
   const fetchUsers = async () => {
     try {
-      const res = await fetch(API_URL);
-      if (!res.ok) throw new Error('Failed to fetch users');
-      const data = await res.json();
-      setUsers(data);
-    } catch (err) {
+      const res = await api.get('/api/adminUser');
+      setUsers(res.data);
+    } catch (err: any) {
       console.error(err);
-      alert('Error fetching users');
+      alert('Error fetching users: ' + (err.response?.data?.error || err.message));
     }
   };
 
@@ -61,105 +58,70 @@ const UserManagement: React.FC = () => {
       return;
     }
     try {
-      const res = await fetch(API_URL, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          name: newUser.name,
-          phone: newUser.phone,
-          email: newUser.email,
-          password: newUser.password,
-          status: newUser.status,
-        }),
+      const res = await api.post('/api/adminUser', {
+        name: newUser.name,
+        phone: newUser.phone,
+        email: newUser.email,
+        password: newUser.password,
+        status: newUser.status,
       });
-      if (!res.ok) {
-        const errData = await res.json();
-        throw new Error(errData.error || 'Failed to add user');
-      }
-      const data = await res.json();
-      setUsers((prev) => [...prev, data]);
+      setUsers((prev) => [...prev, res.data]);
       resetForm();
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert(err);
+      alert(err.response?.data?.error || 'Failed to add user');
     }
   };
 
-const handleUpdateUser = async () => {
-  if (!editingUser) return;
+  const handleUpdateUser = async () => {
+    if (!editingUser) return;
 
-  if (newUser.password !== newUser.confirmPassword) {
-    alert('Passwords do not match');
-    return;
-  }
-
-  try {
-    // Only send fields expected by the backend
-    const payload: any = {
-      name: newUser.name,
-      phone: newUser.phone,
-      email: newUser.email,
-      status: newUser.status,
-    };
-    if (newUser.password) payload.password = newUser.password; // send password only if updated
-
-    const res = await fetch(`${API_URL}/${editingUser.id}`, {
-      method: 'PUT',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-
-    if (!res.ok) {
-      const errData = await res.json();
-      throw new Error(errData.error || 'Failed to update user');
+    if (newUser.password !== newUser.confirmPassword) {
+      alert('Passwords do not match');
+      return;
     }
 
-    const data = await res.json();
-    setUsers((prev) =>
-      prev.map((u) => (u.id === editingUser.id ? data : u))
-    );
-    resetForm();
-  } catch (err) {
-    console.error('Update failed:', err);
-    alert('Failed to update user: ' + err);
-  }
-};
+    try {
+      const payload: any = {
+        name: newUser.name,
+        phone: newUser.phone,
+        email: newUser.email,
+        status: newUser.status,
+      };
+      if (newUser.password) payload.password = newUser.password;
+
+      const res = await api.put(`/api/adminUser/${editingUser.id}`, payload);
+
+      setUsers((prev) =>
+        prev.map((u) => (u.id === editingUser.id ? res.data : u))
+      );
+      resetForm();
+    } catch (err: any) {
+      console.error('Update failed:', err);
+      alert('Failed to update user: ' + (err.response?.data?.error || err.message));
+    }
+  };
 
 
   const handleDeleteUser = async (id: string) => {
-    await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
-    setUsers((prev) => prev.filter((u) => u.id !== id));
+    try {
+      await api.delete(`/api/adminUser/${id}`);
+      setUsers((prev) => prev.filter((u) => u.id !== id));
+    } catch (err: any) {
+      alert('Delete failed: ' + (err.response?.data?.error || err.message));
+    }
   };
 
-const handleStatusChange = async (id: string, status: 'active' | 'suspended') => {
-  try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/adminUser/${id}/status`, {
-      method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ status }),
-    });
-
-    if (!res.ok) {
-      const text = await res.text(); // capture HTML or error message
-      throw new Error(`API Error: ${text}`);
+  const handleStatusChange = async (id: string, status: 'active' | 'suspended') => {
+    try {
+      await api.patch(`/api/adminUser/${id}/status`, { status });
+      // Reload the page after successful update
+      window.location.reload();
+    } catch (err: any) {
+      console.error('Status update failed:', err);
+      alert('Failed to update user status: ' + (err.response?.data?.error || err.message));
     }
-
-    const data = await res.json();
-    console.log('Status updated:', data);
-
-    // Reload the page after successful update
-    window.location.reload();
-
-  } catch (err: any) {
-    console.error('Status update failed:', err);
-    alert('Failed to update user status: ' + err.message);
-  }
-};
-
-
-
-
-
+  };
 
   const handleEdit = (user: User) => {
     setEditingUser(user);
