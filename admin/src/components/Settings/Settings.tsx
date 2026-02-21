@@ -35,7 +35,7 @@ const Settings: React.FC = () => {
                   <input
                   title='Company Name'
                     type="text"
-                    value="Tally Prime SaaS"
+                    value="ApnaBook SaaS"
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                       theme === 'dark' 
                         ? 'border-gray-600 bg-gray-700 text-white' 
