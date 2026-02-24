@@ -273,7 +273,7 @@ router.put('/company/:companyId', async (req, res) => {
             password = COALESCE(?, password),
             email = ?
           WHERE company_id = ?
-        `, [username, hashedPassword, email, companyId]);
+        `, [username, hashedPassword || null, email, companyId]);
 
       } else {
         // Try to get 'Admin' role ID
@@ -288,6 +288,12 @@ router.put('/company/:companyId', async (req, res) => {
         `, [companyId, username, hashedPassword, employeeId, email, roleId]);
 
       }
+    } else if (accessControlEnabled === false) {
+      // If access control is explicitly disabled, remove the company users
+      await connection.query(
+        `DELETE FROM tbusers WHERE company_id = ?`,
+        [companyId]
+      );
     }
 
     await connection.commit();
@@ -342,25 +348,30 @@ router.get('/company/:companyId', async (req, res) => {
 
     const [rows] = await connection.query(`
       SELECT 
-        id,
-        name,
-        financial_year AS financialYear,
-        books_beginning_year AS booksBeginningYear,
-        address,
-        pin,
-        phone_number AS phoneNumber,
-        email,
-        pan_number AS panNumber,
-        tan_number AS tanNumber,     
-        gst_number AS gstNumber,
-        vat_number AS vatNumber,
-        state,
-        country,
-        tax_type AS taxType,
-        fdAccountType AS maintainBy,
-        fdAccountantName AS accountantName
-      FROM tbcompanies
-      WHERE id = ?
+        c.id,
+        c.name,
+        c.financial_year AS financialYear,
+        c.books_beginning_year AS booksBeginningYear,
+        c.address,
+        c.pin,
+        c.phone_number AS phoneNumber,
+        c.email,
+        c.pan_number AS panNumber,
+        c.tan_number AS tanNumber,     
+        c.gst_number AS gstNumber,
+        c.vat_number AS vatNumber,
+        c.state,
+        c.country,
+        c.tax_type AS taxType,
+        c.fdAccountType AS maintainBy,
+        c.fdAccountantName AS accountantName,
+        c.vault_password IS NOT NULL as vaultEnabled,
+        u.username,
+        (u.id IS NOT NULL) as accessControlEnabled
+      FROM tbcompanies c
+      LEFT JOIN tbusers u ON c.id = u.company_id
+      WHERE c.id = ?
+      LIMIT 1
     `, [companyId]);
 
     if (rows.length === 0) {

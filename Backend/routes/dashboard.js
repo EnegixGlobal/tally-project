@@ -11,7 +11,12 @@ router.get('/dashboard-data', async (req, res) => {
     const [[companyInfo]] = await db.query('SELECT * FROM tbcompanies WHERE employee_id = ?', [employee_id]);
     const [userLimitRows] = await db.query('SELECT userLimit FROM tbemployees WHERE id = ?', [employee_id]);
     const userLimit = userLimitRows && userLimitRows.length > 0 ? userLimitRows[0].userLimit : 1;
-    const [companies] = await db.query('SELECT * FROM tbcompanies WHERE employee_id = ?', [employee_id]);
+    const [companies] = await db.query(
+      `SELECT c.*, 
+       (SELECT COUNT(*) FROM tbUsers u WHERE u.company_id = c.id) > 0 as isLocked 
+       FROM tbcompanies c WHERE c.employee_id = ?`,
+      [employee_id]
+    );
     res.json({
       success: true,
       companyInfo: companyInfo || null,
