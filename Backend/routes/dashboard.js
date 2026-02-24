@@ -29,7 +29,7 @@ router.get('/dashboard-data', async (req, res) => {
 
 router.get('/companies-by-employee', async (req, res) => {
   const { employee_id } = req.query;
-  
+
 
   if (!employee_id) {
     return res.status(400).json({ success: false, error: 'employee_id required' });
@@ -51,7 +51,7 @@ router.get('/companies-by-employee', async (req, res) => {
 });
 // Assuming CA's ID is available as req.query.ca_id
 router.get('/companies-by-ca', async (req, res) => {
- 
+
   const caId = req.query.ca_id;
   if (!caId) return res.status(400).json({ message: 'Missing ca_id' });
 
