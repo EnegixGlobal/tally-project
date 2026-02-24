@@ -1,10 +1,18 @@
 const jwt = require('jsonwebtoken');
-const JWT_SECRET = process.env.JWT_SECRET || 'your_fallback_secret';
+const JWT_SECRET = process.env.JWT_SECRET;
 
 module.exports = function authMiddleware(req, res, next) {
-    if (req.path === '/api/login') {
-    return next(); // Skip auth for login route
+  // Public routes
+  const publicPaths = [
+    '/api/login',
+    '/api/admin/login',
+    '/api/SignUp'
+  ];
+
+  if (publicPaths.includes(req.path)) {
+    return next();
   }
+
   const authHeader = req.headers.authorization;
 
   if (!authHeader || !authHeader.startsWith('Bearer ')) {
@@ -12,16 +20,14 @@ module.exports = function authMiddleware(req, res, next) {
   }
 
   const token = authHeader.split(' ')[1];
-  console.log("JWT token received:", token);
 
   try {
     const decoded = jwt.verify(token, JWT_SECRET);
-      console.log("Token decoded:", decoded);
-
     req.user = {
       id: decoded.id,
       email: decoded.email,
-      type: decoded.type, // 'employee' or 'user'
+      role: decoded.role,
+      type: decoded.type, // keeping type for backward compatibility
     };
     next();
   } catch (err) {

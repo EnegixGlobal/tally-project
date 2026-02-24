@@ -15,8 +15,10 @@ import {
   LogOut
 } from 'lucide-react';
 
+import api from '../../services/api';
+
 const Sidebar: React.FC = () => {
-  const { sidebarOpen, setSidebarOpen, setIsAuthenticated } = useAdmin();
+  const { sidebarOpen, setSidebarOpen, logout } = useAdmin();
   const { theme, isDark, toggleTheme } = useTheme();
   const navigate = useNavigate();
   const location = useLocation();
@@ -47,110 +49,111 @@ const Sidebar: React.FC = () => {
     }
   };
 
-  const handleLogout = () => {
-    setIsAuthenticated(false);
+  const handleLogout = async () => {
+    try {
+      await api.post('/api/admin/logout');
+    } catch (error) {
+      console.error('Logout error:', error);
+    }
+    logout();
+    navigate('/login');
   };
 
   return (
     <>
       {/* Mobile overlay */}
       {sidebarOpen && (
-        <div 
+        <div
           className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden transition-opacity duration-50"
           onClick={() => setSidebarOpen(false)}
         />
       )}
-      
+
       {/* Sidebar */}
       <div
         ref={sidebarRef}
-        className={`fixed left-0 top-0 h-full shadow-xl z-50 lg:relative flex flex-col transition-all duration-50 ${
-          theme === 'dark' ? 'bg-gray-800 text-gray-200' : 'bg-white text-gray-900'
-        } ${
-          sidebarOpen 
-            ? 'w-70 translate-x-0' 
+        className={`fixed left-0 top-0 h-full shadow-xl z-50 lg:relative flex flex-col transition-all duration-50 ${theme === 'dark' ? 'bg-gray-800 text-gray-200' : 'bg-white text-gray-900'
+          } ${sidebarOpen
+            ? 'w-70 translate-x-0'
             : 'w-0 -translate-x-full lg:w-0 lg:translate-x-0 overflow-hidden'
-        }`}
+          }`}
       >
-          {/* Header */}
-          <div className={`flex items-center justify-between p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-            <div className="flex items-center space-x-3">
-              <div className="w-10 h-10 bg-violet-600 rounded-lg flex items-center justify-center">
-                <LayoutDashboard className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Tally Admin</h1>
-                <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Subscription Manager</p>
-              </div>
+        {/* Header */}
+        <div className={`flex items-center justify-between p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 bg-violet-600 rounded-lg flex items-center justify-center">
+              <LayoutDashboard className="w-6 h-6 text-white" />
             </div>
-            <button
-              title='Close Sidebar'
-              onClick={() => setSidebarOpen(false)}
-              className={`lg:hidden p-2 rounded-lg ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
-            >
-              <X className={`w-5 h-5 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
-            </button>
+            <div>
+              <h1 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>ApnaBook Admin</h1>
+              <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Subscription Manager</p>
+            </div>
           </div>
+          <button
+            title='Close Sidebar'
+            onClick={() => setSidebarOpen(false)}
+            className={`lg:hidden p-2 rounded-lg ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
+          >
+            <X className={`w-5 h-5 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`} />
+          </button>
+        </div>
 
-          {/* Navigation */}
-          <nav className="flex-1 px-4 py-6">
-            <ul className="space-y-2">
-              {menuItems.map((item) => {
-                const Icon = item.icon;
-                return (
-                  <li key={item.id}>
-                    <button
-                      onClick={() => handleMenuClick(item.path)}
-                      className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${
-                        location.pathname === item.path
-                          ? theme === 'dark' 
-                            ? 'bg-violet-900 text-violet-100' 
-                            : 'bg-violet-100 text-violet-700'
-                          : theme === 'dark'
-                            ? 'text-gray-300 hover:bg-gray-700'
-                            : 'text-gray-700 hover:bg-gray-100'
+        {/* Navigation */}
+        <nav className="flex-1 px-4 py-6">
+          <ul className="space-y-2">
+            {menuItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <li key={item.id}>
+                  <button
+                    onClick={() => handleMenuClick(item.path)}
+                    className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${location.pathname === item.path
+                      ? theme === 'dark'
+                        ? 'bg-violet-900 text-violet-100'
+                        : 'bg-violet-100 text-violet-700'
+                      : theme === 'dark'
+                        ? 'text-gray-300 hover:bg-gray-700'
+                        : 'text-gray-700 hover:bg-gray-100'
                       }`}
-                    >
-                      <Icon className="w-5 h-5 mr-3" />
-                      <span className="text-sm font-medium">{item.label}</span>
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </nav>
+                  >
+                    <Icon className="w-5 h-5 mr-3" />
+                    <span className="text-sm font-medium">{item.label}</span>
+                  </button>
+                </li>
+              );
+            })}
+          </ul>
+        </nav>
 
-          {/* Footer */}
-          <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
-            <button
-              onClick={handleLogout}
-              className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors mb-2 ${
-                theme === 'dark' 
-                  ? 'text-gray-300 hover:bg-gray-700' 
-                  : 'text-gray-700 hover:bg-gray-100'
+        {/* Footer */}
+        <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+          <button
+            onClick={handleLogout}
+            className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors mb-2 ${theme === 'dark'
+              ? 'text-gray-300 hover:bg-gray-700'
+              : 'text-gray-700 hover:bg-gray-100'
               }`}
-            >
-              <LogOut className="w-5 h-5 mr-3" />
-              <span className="text-sm font-medium">Logout</span>
-            </button>
-            <button
-              onClick={toggleTheme}
-              className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${
-                theme === 'dark' 
-                  ? 'text-gray-300 hover:bg-gray-700' 
-                  : 'text-gray-700 hover:bg-gray-100'
+          >
+            <LogOut className="w-5 h-5 mr-3" />
+            <span className="text-sm font-medium">Logout</span>
+          </button>
+          <button
+            onClick={toggleTheme}
+            className={`w-full flex items-center px-4 py-3 rounded-lg transition-colors ${theme === 'dark'
+              ? 'text-gray-300 hover:bg-gray-700'
+              : 'text-gray-700 hover:bg-gray-100'
               }`}
-            >
-              {isDark ? (
-                <Sun className="w-5 h-5 mr-3" />
-              ) : (
-                <Moon className="w-5 h-5 mr-3" />
-              )}
-              <span className="text-sm font-medium">
-                {isDark ? 'Light Mode' : 'Dark Mode'}
-              </span>
-            </button>
-          </div>
+          >
+            {isDark ? (
+              <Sun className="w-5 h-5 mr-3" />
+            ) : (
+              <Moon className="w-5 h-5 mr-3" />
+            )}
+            <span className="text-sm font-medium">
+              {isDark ? 'Light Mode' : 'Dark Mode'}
+            </span>
+          </button>
+        </div>
       </div>
     </>
   );

@@ -4,7 +4,6 @@ const db = require('../db'); // Promise-based MySQL pool
 const bcrypt = require('bcryptjs');
 
 // ✅ Get all admin users
-
 router.get('/', async (req, res) => {
   try {
     const [users] = await db.query(`
@@ -59,7 +58,6 @@ router.post('/', async (req, res) => {
       now
     ]);
 
-    // Send response after successful insertion
     res.status(201).json({
       id: result.insertId,
       name,
@@ -76,28 +74,34 @@ router.post('/', async (req, res) => {
 });
 
 
-
-
+// ✅ Update admin user
 router.put('/:id', async (req, res) => {
   const { name, phone, email, password, status } = req.body;
   const userId = req.params.id;
 
   try {
-    let hashedPassword = password;
+    let query;
+    let params;
 
-    // Only hash if password is provided
     if (password) {
       const salt = await bcrypt.genSalt(10);
-      hashedPassword = await bcrypt.hash(password, salt);
+      const hashedPassword = await bcrypt.hash(password, salt);
+      query = `
+        UPDATE tbCA 
+        SET fdname = ?, fdphone = ?, email = ?, fdpassword = ?, fdstatus = ?
+        WHERE fdSiNo = ?
+      `;
+      params = [name, phone, email, hashedPassword, status, userId];
+    } else {
+      query = `
+        UPDATE tbCA 
+        SET fdname = ?, fdphone = ?, email = ?, fdstatus = ?
+        WHERE fdSiNo = ?
+      `;
+      params = [name, phone, email, status, userId];
     }
 
-    const query = `
-      UPDATE tbCA 
-      SET fdname = ?, fdphone = ?, email = ?, fdpassword = ?, fdstatus = ?
-      WHERE fdSiNo = ?
-    `;
-
-    const [result] = await db.query(query, [name, phone, email, hashedPassword, status, userId]);
+    await db.query(query, params);
 
     res.json({ id: userId, name, phone, email, status, message: 'Admin user updated' });
   } catch (err) {
@@ -111,7 +115,6 @@ router.put('/:id', async (req, res) => {
 router.delete('/:id', async (req, res) => {
   try {
     const userId = parseInt(req.params.id, 10);
-
     const [result] = await db.query('DELETE FROM tbCA WHERE fdSiNo = ?', [userId]);
 
     if (result.affectedRows === 0) {
@@ -125,21 +128,16 @@ router.delete('/:id', async (req, res) => {
   }
 });
 
-// ✅ Update last login
-// Assuming Express + MySQL
+// ✅ Update status
 router.patch('/:id/status', async (req, res) => {
   try {
     const { status } = req.body;
     const userId = parseInt(req.params.id, 10);
 
-    console.log('PATCH request received:', userId, { status });
-
     const [result] = await db.query(
       'UPDATE tbCA SET fdstatus = ? WHERE fdSiNo = ?',
       [status, userId]
     );
-
-    console.log('DB update result:', result);
 
     if (result.affectedRows === 0) {
       return res.status(404).json({ error: 'User not found' });
@@ -151,8 +149,5 @@ router.patch('/:id/status', async (req, res) => {
     res.status(500).json({ error: err.message });
   }
 });
-
-
-
 
 module.exports = router;

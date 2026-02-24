@@ -190,7 +190,7 @@ const [error, setError] = useState<string|null>(null);
               Bill-wise Payables
             </h2>
             <p className={`mt-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-              Complete bill-wise payables analysis - Tally Style
+              Complete bill-wise payables analysis - Apna Book
             </p>
           </div>
           {loading && <div className="py-6 text-center">Loading...</div>}

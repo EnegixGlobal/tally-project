@@ -39,8 +39,8 @@ const TallyIntegration: React.FC = () => {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Tally Integration</h1>
-          <p className="text-gray-500 dark:text-gray-400">Monitor Tally connections and sync status</p>
+          <h1 className="text-2xl font-bold text-gray-900 dark:text-white">Apna Book Integration</h1>
+          <p className="text-gray-500 dark:text-gray-400">Monitor Apna Book connections and sync status</p>
         </div>
         <div className="flex items-center gap-3">
           <button className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors flex items-center gap-2">
@@ -124,10 +124,10 @@ const TallyIntegration: React.FC = () => {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Tally Server URL
+              Apna Book Server URL
             </label>
             <input
-            title='Tally Server URL'
+            title='Apna Server URL'
               type="text"
               value="http://localhost:9000"
               className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
