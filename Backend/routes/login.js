@@ -208,7 +208,7 @@ router.post('/verify-company-access', async (req, res) => {
 
   try {
     const [rows] = await db.query(
-      'SELECT * FROM tbUsers WHERE company_id = ? AND username = ?',
+      'SELECT * FROM tbusers WHERE company_id = ? AND username = ?',
       [company_id, username]
     );
 
