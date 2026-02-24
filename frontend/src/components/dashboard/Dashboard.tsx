@@ -245,6 +245,28 @@ const Dashboard: React.FC = () => {
       .then((data) => setCaEmployees(data.employees || []))
       .catch(console.error);
   }, [caId, showAddForm]); // Also refetch list when the add modal closes
+
+  // Auto-unlock logic: If the active company has no password, skip the gate.
+  useEffect(() => {
+    if (loading || companies.length === 0 || unlockedCompanyId) return;
+
+    const currentId = activeCompanyId || selectedCompany;
+    if (!currentId) {
+      // If no company selected, check if we have any company to default to
+      const firstUnlocked = companies.find(c => !c.isLocked);
+      if (firstUnlocked) {
+        handleCompanyUnlock(firstUnlocked.id.toString());
+      }
+      return;
+    }
+
+    const target = companies.find(c => c.id.toString() === currentId);
+    if (target && !target.isLocked) {
+      // Company has no password set (isLocked is false/0)
+      handleCompanyUnlock(target.id.toString());
+    }
+  }, [companies, activeCompanyId, selectedCompany, loading, unlockedCompanyId]);
+
   const openAssignModal = (employeeId: number, employeeName: string) => {
     setSelectedEmployeeId(employeeId);
     setSelectedEmployeeName(employeeName);
@@ -384,13 +406,18 @@ const Dashboard: React.FC = () => {
   // STRICT FILTERING: If a company is unlocked, we hide all others everywhere
   const visibleCompanies = unlockedCompanyId
     ? companies.filter(c => c.id.toString() === unlockedCompanyId)
-    : []; // Show nothing until unlocked or if user wants select screen
+    : companies; // Show all if not yet blocking via Gate
 
   const visibleAllCompanies = unlockedCompanyId
     ? allCompanies.filter(c => c.id.toString() === unlockedCompanyId)
-    : [];
+    : allCompanies;
 
-  if (!unlockedCompanyId && employeeId) {
+  // Auto-unlock logic was moved to top of component to follow rules of hooks
+
+
+  const hasAnyLockedCompany = companies.some(c => c.isLocked);
+
+  if (!unlockedCompanyId && employeeId && companies.length > 0 && hasAnyLockedCompany) {
     return <CompanyGate onUnlock={handleCompanyUnlock} employeeId={employeeId} />;
   }
 

@@ -93,8 +93,8 @@ const CompanyGate: React.FC<CompanyGateProps> = ({ onUnlock, employeeId }) => {
                             type="submit"
                             disabled={loading}
                             className={`w-full group relative flex items-center justify-center gap-3 py-4 px-6 rounded-2xl text-white font-bold shadow-xl shadow-indigo-100 transition-all active:scale-[0.98] ${loading
-                                    ? 'bg-indigo-400 cursor-not-allowed'
-                                    : 'bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600'
+                                ? 'bg-indigo-400 cursor-not-allowed'
+                                : 'bg-gradient-to-r from-indigo-600 to-indigo-700 hover:from-indigo-500 hover:to-indigo-600'
                                 }`}
                         >
                             {loading ? (
