@@ -123,12 +123,12 @@ router.post('/company', async (req, res) => {
 
       // Try to get 'Admin' role ID
       const [roleRows] = await connection.query(
-        "SELECT role_id FROM tbRoles WHERE LOWER(role_name) = 'admin' LIMIT 1"
+        "SELECT role_id FROM tbroles WHERE LOWER(role_name) = 'admin' LIMIT 1"
       );
       const roleId = roleRows.length > 0 ? roleRows[0].role_id : 0;
 
       await connection.query(`
-        INSERT INTO tbUsers (company_id, username, password, employee_id, email, role_id, status)
+        INSERT INTO tbusers (company_id, username, password, employee_id, email, role_id, status)
         VALUES (?, ?, ?, ?, ?, ?, 'active')
       `, [companyId, username, hashedPassword, employeeId, email, roleId]);
     }
@@ -261,14 +261,14 @@ router.put('/company/:companyId', async (req, res) => {
       }
 
       const [existingUser] = await connection.query(
-        `SELECT id FROM tbUsers WHERE company_id = ?`,
+        `SELECT id FROM tbusers WHERE company_id = ?`,
         [companyId]
       );
 
       if (existingUser.length > 0) {
 
         await connection.query(`
-          UPDATE tbUsers SET
+          UPDATE tbusers SET
             username = ?,
             password = COALESCE(?, password),
             email = ?
@@ -278,12 +278,12 @@ router.put('/company/:companyId', async (req, res) => {
       } else {
         // Try to get 'Admin' role ID
         const [roleRows] = await connection.query(
-          "SELECT role_id FROM tbRoles WHERE LOWER(role_name) = 'admin' LIMIT 1"
+          "SELECT role_id FROM tbroles WHERE LOWER(role_name) = 'admin' LIMIT 1"
         );
         const roleId = roleRows.length > 0 ? roleRows[0].role_id : 0;
 
         await connection.query(`
-          INSERT INTO tbUsers (company_id, username, password, employee_id, email, role_id, status)
+          INSERT INTO tbusers (company_id, username, password, employee_id, email, role_id, status)
           VALUES (?, ?, ?, ?, ?, ?, 'active')
         `, [companyId, username, hashedPassword, employeeId, email, roleId]);
 
