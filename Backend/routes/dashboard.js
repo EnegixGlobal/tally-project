@@ -13,7 +13,7 @@ router.get('/dashboard-data', async (req, res) => {
     const userLimit = userLimitRows && userLimitRows.length > 0 ? userLimitRows[0].userLimit : 1;
     const [companies] = await db.query(
       `SELECT c.*, 
-       (SELECT COUNT(*) FROM tbUsers u WHERE u.company_id = c.id) > 0 as isLocked 
+       (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = c.id) > 0 as isLocked 
        FROM tbcompanies c WHERE c.employee_id = ?`,
       [employee_id]
     );
@@ -43,7 +43,7 @@ router.get('/companies-by-employee', async (req, res) => {
   try {
     const [companies] = await db.query(
       `SELECT c.id, c.name, 
-       (SELECT COUNT(*) FROM tbUsers u WHERE u.company_id = c.id) > 0 as isLocked 
+       (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = c.id) > 0 as isLocked 
        FROM tbcompanies c WHERE c.employee_id = ?`,
       [employee_id]
     );
@@ -65,7 +65,7 @@ router.get('/companies-by-ca', async (req, res) => {
     // Customize this query for your schema
     const [rows] = await connection.query(
       `SELECT id, name, employee_id, pan_number,
-       (SELECT COUNT(*) FROM tbUsers u WHERE u.company_id = tbcompanies.id) > 0 as isLocked
+       (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = tbcompanies.id) > 0 as isLocked
        FROM tbcompanies WHERE fdAccountantName = ?`,
       [caId]
     );
