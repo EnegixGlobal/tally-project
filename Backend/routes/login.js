@@ -169,7 +169,7 @@ router.post('/global-verify-company-access', async (req, res) => {
 
     // Check if username exists in any of these companies
     const [users] = await db.query(
-      'SELECT * FROM tbUsers WHERE company_id IN (?) AND username = ?',
+      'SELECT * FROM tbusers WHERE company_id IN (?) AND username = ?',
       [companyIds, username]
     );
 
