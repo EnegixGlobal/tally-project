@@ -199,6 +199,7 @@ const Profile: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] =
     useState<boolean>(false);
   const [accountantsList, setAccountantsList] = useState<Accountant[]>([]);
+  const [initialAccessControl, setInitialAccessControl] = useState<boolean>(false);
   const [vaultEnabled, setVaultEnabled] = useState<boolean>(false);
   const [vaultPassword, setVaultPassword] = useState<string>("");
   const [showVaultPassword, setShowVaultPassword] = useState<boolean>(false);
@@ -239,6 +240,13 @@ const Profile: React.FC = () => {
           maintainBy: data.maintainBy || "self",
           accountantName: data.accountantName || "",
         });
+
+        // Set Security States
+        const isAccessEnabled = !!data.accessControlEnabled;
+        setAccessControlEnabled(isAccessEnabled);
+        setInitialAccessControl(isAccessEnabled);
+        setVaultEnabled(!!data.vaultEnabled);
+        if (data.username) setUsername(data.username);
       } catch (err) {
         console.error("❌ Fetch company error:", err);
         Swal.fire({
@@ -412,12 +420,12 @@ const Profile: React.FC = () => {
           "Username is required when access control is enabled";
       }
 
-      if (!password.trim()) {
+      if (!password.trim() && !initialAccessControl) {
         newErrors.password =
           "Password is required when access control is enabled";
       }
 
-      if (password.length < 8) {
+      if (password.trim() && password.length < 8) {
         newErrors.password = "Password must be at least 8 characters";
       }
 
