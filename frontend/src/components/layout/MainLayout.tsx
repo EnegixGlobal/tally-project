@@ -6,6 +6,7 @@ import Sidebar from './Sidebar';
 import ShortcutsHelp from './ShortcutsHelp';
 import HorizontalMenu from './HorizontalMenu';
 import { useAuth } from '../../home/context/AuthContext';
+import { useCompany } from '../../context/CompanyContext';
 import ErrorBoundary from './ErrorBoundary';
 
 
@@ -13,8 +14,11 @@ const MainLayout: React.FC = () => {
   const { theme } = useAppContext();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const { isAuthenticated, isLoading, hasCompany } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, hasCompany } = useAuth();
+  const { unlockedCompanyId, isLoading: companyLoading } = useCompany();
   const navigate = useNavigate();
+
+  const isLoading = authLoading || companyLoading;
 
   const location = useLocation();
 
@@ -61,11 +65,21 @@ const MainLayout: React.FC = () => {
     );
   }
 
+  if (!unlockedCompanyId && isAuthenticated && hasCompany) {
+    return (
+      <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-[#f8fafc]'}`}>
+        <ErrorBoundary>
+          <Outlet />
+        </ErrorBoundary>
+      </div>
+    );
+  }
+
   return (
     <div className={`min-h-screen flex flex-col ${theme === 'dark' ? 'bg-gray-900 text-gray-200' : 'bg-gray-100 text-gray-900'}`}>
       <Header toggleSidebar={() => setSidebarOpen(prev => !prev)} />
-        {/* <HorizontalMenu /> */}
-        <HorizontalMenu sidebarOpen={sidebarOpen} />
+      {/* <HorizontalMenu /> */}
+      <HorizontalMenu sidebarOpen={sidebarOpen} />
       <div className="flex flex-1">
         <Sidebar isOpen={sidebarOpen} />
         <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-60' : 'ml-16'} pt-12`}>

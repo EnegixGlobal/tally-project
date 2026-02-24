@@ -8,11 +8,14 @@ import {
   ShoppingBag,
   Activity,
   PlusCircle,
+  Lock as LucideLock,
 } from "lucide-react";
 import AddCaEmployeeForm from "./caemployee"; // adjust path as needed
 import AssignCompaniesModal from "./AssignCompaniesModal"; // Adjust path accordingly
 import DashboardCaEmployee from "./DashboardCaEmployee";
 import CompanyLoginModal from "./CompanyLoginModal";
+import CompanyGate from "./CompanyGate";
+import { Lock } from "lucide-react";
 
 const Dashboard: React.FC = () => {
 
@@ -22,7 +25,7 @@ const Dashboard: React.FC = () => {
   };
 
   const { theme, setCompanyInfo } = useAppContext();
-  const { switchCompany, activeCompanyId, setCompanies: setContextCompanies } = useCompany();
+  const { switchCompany, activeCompanyId, setCompanies: setContextCompanies, unlockedCompanyId, setUnlockedCompany } = useCompany();
   const navigate = useNavigate();
   const [companyInfo, setCompanyInfoState] = useState<any>(null);
   const [ledgers, setLedgers] = useState<any[]>([]);
@@ -110,6 +113,24 @@ const Dashboard: React.FC = () => {
   const [companyToUnlock, setCompanyToUnlock] = useState<any>(null);
   const [verificationError, setVerificationError] = useState<string | null>(null);
   const [isVerificationLoading, setIsVerificationLoading] = useState(false);
+
+  const handleCompanyUnlock = async (id: string) => {
+    setUnlockedCompany(id);
+
+    // Switch to that company in context immediately
+    if (suppl === "employee") {
+      await switchCompany(id);
+      setSelectedCompany(id);
+    } else {
+      localStorage.setItem("company_id", id);
+      setSelectedCaCompany(id);
+      window.location.reload();
+    }
+  };
+
+  const handleCompanyLogout = () => {
+    setUnlockedCompany(null);
+  };
 
   const employeeId = localStorage.getItem("employee_id");
 
@@ -360,10 +381,23 @@ const Dashboard: React.FC = () => {
     }
   };
 
+  // STRICT FILTERING: If a company is unlocked, we hide all others everywhere
+  const visibleCompanies = unlockedCompanyId
+    ? companies.filter(c => c.id.toString() === unlockedCompanyId)
+    : []; // Show nothing until unlocked or if user wants select screen
+
+  const visibleAllCompanies = unlockedCompanyId
+    ? allCompanies.filter(c => c.id.toString() === unlockedCompanyId)
+    : [];
+
+  if (!unlockedCompanyId && employeeId) {
+    return <CompanyGate onUnlock={handleCompanyUnlock} employeeId={employeeId} />;
+  }
+
   return (
     <>
       {suppl === "employee" ? (
-        <div className="pt-[10px] px-4 ">
+        <div className="pt-[40px] px-4 ">
           {/* <h1 className="text-2xl font-bold mb-6">Dashboard</h1> */}
 
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
@@ -390,49 +424,21 @@ const Dashboard: React.FC = () => {
                 </span>
               )}
 
-              {allCompanies.length > 0 && (
-                <div className="mb-6">
-                  <label className="block mb-2 font-medium text-gray-700 text-sm">
-                    Switch Company
-                  </label>
+              <button
+                onClick={handleCompanyLogout}
+                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm font-bold transition-all active:scale-95"
+              >
+                Switch Business
+              </button>
+
+              {visibleAllCompanies.length > 0 && (
+                <div className="mb-0">
                   <select
                     value={activeCompanyId || selectedCompany}
-                    onChange={async (e) => {
-                      const companyId = e.target.value;
-                      if (!companyId) return;
-
-                      const targetCompany = allCompanies.find(c => c.id.toString() === companyId);
-
-                      // Check if locked
-                      if (targetCompany && targetCompany.isLocked) {
-                        setCompanyToUnlock(targetCompany);
-                        setShowLoginModal(true);
-                        setVerificationError(null);
-                      } else {
-                        try {
-                          // Use CompanyContext to switch company
-                          await switchCompany(companyId);
-                          setSelectedCompany(companyId);
-
-                          // Update companies list in context
-                          if (allCompanies.length > 0) {
-                            const formattedCompanies = allCompanies.map((c: any) => ({
-                              id: c.id,
-                              name: c.name,
-                              ...c,
-                            }));
-                            setContextCompanies(formattedCompanies);
-                          }
-                        } catch (error) {
-                          console.error("Failed to switch company:", error);
-                          alert("Failed to switch company. Please try again.");
-                        }
-                      }
-                    }}
-                    className="border rounded px-3 py-2 w-full max-w-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-none transition-all cursor-pointer"
+                    disabled
+                    className="border rounded-xl px-4 py-2 w-full max-w-[200px] bg-gray-50 text-gray-400 outline-none cursor-not-allowed font-medium"
                   >
-                    <option value="">Select Company</option>
-                    {allCompanies.map((c) => (
+                    {visibleAllCompanies.map((c) => (
                       <option key={c.id} value={c.id.toString()}>
                         {c.name}
                       </option>
@@ -455,7 +461,7 @@ const Dashboard: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-              {companies.map((c) => {
+              {visibleCompanies.map((c) => {
                 const isSelected = c.id.toString() === selectedCompany;
                 return (
                   <div
@@ -470,11 +476,14 @@ const Dashboard: React.FC = () => {
                         }`}>
                         {c.name}
                       </h3>
-                      {isSelected && (
-                        <span className="bg-indigo-600 text-white text-xs px-2 py-1 rounded-full font-semibold">
-                          Active
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <LucideLock className="w-4 h-4 text-green-500" />
+                        {isSelected && (
+                          <span className="bg-indigo-600 text-white text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+                            Active Session
+                          </span>
+                        )}
+                      </div>
                     </div>
 
                     <div className={`text-sm mb-3 ${isSelected ? "text-gray-600" : "text-gray-500"

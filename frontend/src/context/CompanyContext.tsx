@@ -20,12 +20,14 @@ interface CompanyContextProps {
   companies: Company[];
   activeCompanyId: string | null;
   companyInfo: CompanyInfo | null;
+  unlockedCompanyId: string | null;
   isLoading: boolean;
   error: string | null;
 
   // Actions
   switchCompany: (companyId: string | number) => Promise<void>;
   setCompanies: (companies: Company[]) => void;
+  setUnlockedCompany: (companyId: string | null) => void;
   addCompany: (company: Company) => void;
   updateCompany: (companyId: string | number, updates: Partial<CompanyInfo>) => void;
   refreshCompanyInfo: () => Promise<void>;
@@ -93,6 +95,7 @@ function convertToCompanyInfo(company: Company): CompanyInfo {
     phoneNumber: (company as any).phoneNumber || (company as any).phone_number || '',
     email: (company as any).email || '',
     panNumber: (company as any).panNumber || (company as any).pan_number || '',
+    tanNumber: (company as any).tanNumber || (company as any).tan_number || '',
     gstNumber: (company as any).gstNumber || (company as any).gst_number || '',
     vatNumber: (company as any).vatNumber || (company as any).vat_number || '',
     cinNumber: (company as any).cinNumber || (company as any).cin_number || '',
@@ -102,10 +105,10 @@ function convertToCompanyInfo(company: Company): CompanyInfo {
     maintainBy: (company as any).maintainBy || (company as any).maintain_by || 'self',
     accountantName: (company as any).accountantName || (company as any).accountant_name || '',
   };
-  
+
   // Include any additional properties from company, but don't overwrite existing ones
   const { id, name, ...additionalProps } = company;
-  
+
   return { ...baseInfo, ...additionalProps } as CompanyInfo;
 }
 
@@ -193,6 +196,9 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [companies, setCompaniesState] = useState<Company[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
+  const [unlockedCompanyId, setUnlockedCompanyId] = useState<string | null>(() => {
+    return sessionStorage.getItem('active_unlocked_company_id');
+  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -215,7 +221,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
           safeSetItem(STORAGE_KEYS.ACTIVE_COMPANY_ID, storedActiveId);
         }
       }
-      
+
       if (storedActiveId) {
         setActiveCompanyId(storedActiveId);
       }
@@ -243,7 +249,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
    */
   const switchCompany = useCallback(async (companyId: string | number): Promise<void> => {
     const companyIdStr = String(companyId);
-    
+
     // Validate company exists if we have companies list
     if (companies.length > 0) {
       const company = findCompanyById(companies, companyId);
@@ -256,10 +262,10 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
 
     // Update active_company_id in state
     setActiveCompanyId(companyIdStr);
-    
+
     // Update localStorage
     safeSetItem(STORAGE_KEYS.ACTIVE_COMPANY_ID, companyIdStr);
-    
+
     // Also update legacy key for backward compatibility
     safeSetItem('company_id', companyIdStr);
 
@@ -280,6 +286,18 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   }, []);
 
   /**
+   * Set unlocked company ID
+   */
+  const setUnlockedCompany = useCallback((id: string | null) => {
+    setUnlockedCompanyId(id);
+    if (id) {
+      sessionStorage.setItem('active_unlocked_company_id', id);
+    } else {
+      sessionStorage.removeItem('active_unlocked_company_id');
+    }
+  }, []);
+
+  /**
    * Add a new company
    */
   const addCompany = useCallback((company: Company) => {
@@ -295,8 +313,8 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
    */
   const updateCompany = useCallback((companyId: string | number, updates: Partial<CompanyInfo>) => {
     setCompaniesState(prev => {
-      const updated = prev.map(c => 
-        String(c.id) === String(companyId) 
+      const updated = prev.map(c =>
+        String(c.id) === String(companyId)
           ? { ...c, ...updates }
           : c
       );
@@ -333,10 +351,12 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
         companies,
         activeCompanyId,
         companyInfo,
+        unlockedCompanyId,
         isLoading,
         error,
         switchCompany,
         setCompanies,
+        setUnlockedCompany,
         addCompany,
         updateCompany,
         refreshCompanyInfo,

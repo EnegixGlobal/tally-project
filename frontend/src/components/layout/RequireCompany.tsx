@@ -1,20 +1,30 @@
 import React from 'react';
 import { useAuth } from '../../home/context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useCompany } from '../../context/CompanyContext';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 interface RequireCompanyProps {
   children: React.ReactNode;
 }
 
 const RequireCompany: React.FC<RequireCompanyProps> = ({ children }) => {
-  const { hasCompany, isLoading, isAuthenticated } = useAuth();
+  const { hasCompany, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { unlockedCompanyId, isLoading: companyLoading } = useCompany();
   const navigate = useNavigate();
+  const location = useLocation();
+
+  const isLoading = authLoading || companyLoading;
 
   React.useEffect(() => {
-    if (!isLoading && isAuthenticated && !hasCompany) {
-      navigate('/app/company');
+    if (!isLoading && isAuthenticated) {
+      if (!hasCompany) {
+        navigate('/app/company');
+      } else if (!unlockedCompanyId && location.pathname !== '/app') {
+        // If company is not unlocked, force them to the dashboard (gate)
+        navigate('/app');
+      }
     }
-  }, [isLoading, isAuthenticated, hasCompany, navigate]);
+  }, [isLoading, isAuthenticated, hasCompany, unlockedCompanyId, navigate, location.pathname]);
 
   if (isLoading) {
     return (
