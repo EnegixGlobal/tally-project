@@ -115,7 +115,28 @@ router.post('/', async (req, res) => {
         { expiresIn: '7d' }
       );
 
-      console.log()
+      console.log({
+        success: true,
+        token,
+        role,
+        supplier,
+        userid,
+        companyId,
+        hasCompany,
+        companyInfo: companyRow || null,
+        employee_id: employeeId,
+        user: {
+          id: user[idField],
+          name: nameField(user),
+          email: user.email,
+          firstName: user.firstName,
+          lastName: user.lastName,
+          pan: user.pan,
+          phoneNumber: user.phoneNumber,
+          userLimit: user.userLimit,
+          companyName: companyRow ? companyRow.name : "",
+        }
+      });
 
       return res.json({
         success: true,
@@ -123,6 +144,7 @@ router.post('/', async (req, res) => {
         role,
         supplier,
         userid,
+        user_id: user[idField],
         companyId,
         hasCompany,
         companyInfo: companyRow || null,

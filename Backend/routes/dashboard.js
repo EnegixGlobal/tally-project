@@ -56,23 +56,34 @@ router.get('/companies-by-employee', async (req, res) => {
 });
 // Assuming CA's ID is available as req.query.ca_id
 router.get('/companies-by-ca', async (req, res) => {
-
   const caId = req.query.ca_id;
   if (!caId) return res.status(400).json({ message: 'Missing ca_id' });
 
+  let connection;
   try {
-    const connection = await db.getConnection();
-    // Customize this query for your schema
+    connection = await db.getConnection();
+
+    // 1. Look up the CA's name using their ID (fdSiNo)
+    const [caRows] = await connection.query('SELECT fdname FROM tbca WHERE fdSiNo = ?', [caId]);
+
+    const caName = caRows.length > 0 ? caRows[0].fdname.trim() : null;
+
+    // 2. Find companies linked to this CA (as accountant or owner)
+    // We search by name (common for CAs) and also by caId as owner
     const [rows] = await connection.query(
       `SELECT id, name, employee_id, pan_number,
        (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = tbcompanies.id) > 0 as isLocked
-       FROM tbcompanies WHERE fdAccountantName = ?`,
-      [caId]
+       FROM tbcompanies 
+       WHERE (fdAccountantName = ?) OR (employee_id = ?)`,
+      [caName, caId]
     );
-    connection.release();
+
     res.json({ companies: rows });
   } catch (err) {
+    console.error('Error fetching companies by CA ID:', err);
     res.status(500).json({ message: err.message });
+  } finally {
+    if (connection) connection.release();
   }
 });
 

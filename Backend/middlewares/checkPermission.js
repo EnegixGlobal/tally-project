@@ -5,7 +5,7 @@ function checkPermission(requiredPermission) {
       console.log('User permissions:', req.user?.permissions);
       console.log('Checking for permission:', requiredPermission);
       const userPermissions = req.user?.permissions || [];
-      if (userPermissions.includes(requiredPermission) || userPermissions.includes('admin')|| userPermissions.includes('all')) {
+      if (userPermissions.includes(requiredPermission) || userPermissions.includes('admin') || userPermissions.includes('all')) {
         return next();
       }
       return res.status(403).json({ error: 'Forbidden: insufficient permission' });

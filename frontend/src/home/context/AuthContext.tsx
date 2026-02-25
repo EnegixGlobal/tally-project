@@ -144,6 +144,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           localStorage.setItem("companyInfo", JSON.stringify(data.companyInfo));
         if (data.employee_id !== undefined)
           localStorage.setItem("employee_id", String(data.employee_id));
+        if (data.user_id !== undefined)
+          localStorage.setItem("user_id", String(data.user_id));
         if (data.supplier !== undefined)
           localStorage.setItem("supplier", String(data.supplier));
       } catch (e) {

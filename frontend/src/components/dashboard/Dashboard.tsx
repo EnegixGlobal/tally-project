@@ -40,7 +40,7 @@ const Dashboard: React.FC = () => {
   });
   const [caEmployees, setCaEmployees] = useState<any[]>([]); // Optional to reload list after create
   const [showAddForm, setShowAddForm] = useState(false);
-  const caId = localStorage.getItem("user_id");
+  const caId = localStorage.getItem("user_id") || localStorage.getItem("employee_id");
   const suppl: string | null = localStorage.getItem("supplier"); // employee | ca | ca_employee
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(
@@ -416,6 +416,7 @@ const Dashboard: React.FC = () => {
 
 
   const hasAnyLockedCompany = companies.some(c => c.isLocked);
+  console.log('yes', hasAnyLockedCompany)
 
   if (!unlockedCompanyId && employeeId && companies.length > 0 && hasAnyLockedCompany) {
     return <CompanyGate onUnlock={handleCompanyUnlock} employeeId={employeeId} />;

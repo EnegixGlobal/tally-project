@@ -22,7 +22,7 @@ const LoginPage: React.FC = () => {
       ...prev,
       [name]: type === 'checkbox' ? checked : value
     }));
-    
+
     // Clear error when user starts typing
     if (errors[name]) {
       setErrors(prev => ({
@@ -50,7 +50,7 @@ const LoginPage: React.FC = () => {
   };
 
 
-  
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -92,7 +92,7 @@ const LoginPage: React.FC = () => {
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-500/80 via-purple-600/80 to-purple-800/80 bg-[url('/src/assets/bg-1.svg')] bg-cover bg-center bg-no-repeat bg-blend-overlay">
-      
+
       <div className="flex items-center justify-center w-full max-w-6xl mx-auto px-4">
         {/* Left Side - Illustration */}
         <div className="hidden lg:flex lg:w-1/2 items-center justify-center">
@@ -145,9 +145,8 @@ const LoginPage: React.FC = () => {
                   required
                   value={formData.email}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border-2 ${
-                    errors.email ? 'border-red-300' : 'border-white/30'
-                  } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
+                  className={`w-full px-4 py-3 border-2 ${errors.email ? 'border-red-300' : 'border-white/30'
+                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
                   placeholder="Username"
                 />
                 {errors.email && (
@@ -164,9 +163,8 @@ const LoginPage: React.FC = () => {
                   required
                   value={formData.password}
                   onChange={handleInputChange}
-                  className={`w-full px-4 py-3 border-2 ${
-                    errors.password ? 'border-red-300' : 'border-white/30'
-                  } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
+                  className={`w-full px-4 py-3 border-2 ${errors.password ? 'border-red-300' : 'border-white/30'
+                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200`}
                   placeholder="Password"
                 />
                 {errors.password && (

@@ -21,25 +21,28 @@ const AddCaEmployeeForm: React.FC<AddCaEmployeeFormProps> = ({ caId, onSuccess }
   });
   const [companies, setCompanies] = useState<Company[]>([]);
   const [loading, setLoading] = useState(false);
-useEffect(() => {
-    const caId = localStorage.getItem("employee_id");
-    if (!caId) return;
+  useEffect(() => {
+    const cachedCaId = caId || localStorage.getItem("user_id") || localStorage.getItem("employee_id");
+    if (!cachedCaId) return;
 
-    fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-ca?ca_id=${caId}`)
+    fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-ca?ca_id=${cachedCaId}`)
       .then((res) => res.json())
-      .then((data) => setCompanies(data.companies || []))
+      .then((data) => {
+        console.log("Fetched companies for dropdown:", data.companies);
+        setCompanies(data.companies || []);
+      })
       .catch((err) => console.error("Error fetching CA companies:", err));
-  }, []);
+  }, [caId]);
 
-  
+
 
   // Fetch only companies assigned to this CA
-//   useEffect(() => {
-//     fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-employee?employee_id=${caId}`)
-//       .then((res) => res.json())
-//       .then((data) => setCompanies(data.companies || []))
-//       .catch(console.error);
-//   }, [caId]);
+  //   useEffect(() => {
+  //     fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-employee?employee_id=${caId}`)
+  //       .then((res) => res.json())
+  //       .then((data) => setCompanies(data.companies || []))
+  //       .catch(console.error);
+  //   }, [caId]);
 
   const handleInput = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -47,28 +50,47 @@ useEffect(() => {
   };
 
   const handleCompanySelect = (e: React.ChangeEvent<HTMLSelectElement>) => {
-  const selectedOptions = Array.from(e.target.selectedOptions).map((opt) => Number(opt.value));
-  setForm((prev) => ({ ...prev, assignedCompanyIds: selectedOptions }));
-};
+    const selectedOptions = Array.from(e.target.selectedOptions).map((opt) => Number(opt.value));
+    setForm((prev) => ({ ...prev, assignedCompanyIds: selectedOptions }));
+  };
 
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
+    // Ensure we have a valid caId
+    let finalCaId = caId;
+    if (!finalCaId) {
+      finalCaId = localStorage.getItem("employee_id") || "";
+      if (!finalCaId) {
+        const storedUser = localStorage.getItem("user");
+        if (storedUser) {
+          try {
+            finalCaId = JSON.parse(storedUser).id || "";
+          } catch (e) {
+            console.error("Error parsing user from localStorage", e);
+          }
+        }
+      }
+    }
+
     try {
       // 1. Create CA Employee
+      const payload = {
+        ca_id: finalCaId,
+        name: form.name,
+        email: form.email,
+        phone: form.phone,
+        adhar: form.adhar,
+        password: form.password,
+      };
+      console.log("Submitting CA employee:", payload);
+
       const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ca-employee`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          ca_id: caId,
-          name: form.name,
-          email: form.email,
-          phone: form.phone,
-          adhar: form.adhar,
-          password: form.password,
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.message || "Failed to create CA employee");
@@ -116,15 +138,15 @@ useEffect(() => {
       <input name="password" type="password" value={form.password} onChange={handleInput} placeholder="Password *" required className="border p-2 rounded w-full" />
       <label className="block font-medium">Assign Companies *</label>
       <select
-            multiple
-            value={form.assignedCompanyIds.map(String)}
-            onChange={handleCompanySelect}
-            className="border p-2 rounded w-full h-28"
-            >
-            {companies.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-            ))}
-            </select>
+        multiple
+        value={form.assignedCompanyIds.map(String)}
+        onChange={handleCompanySelect}
+        className="border p-2 rounded w-full h-28"
+      >
+        {companies.map((c) => (
+          <option key={c.id} value={c.id}>{c.name}</option>
+        ))}
+      </select>
 
       <button type="submit" disabled={loading} className="bg-blue-600 text-white px-4 py-2 rounded w-full mt-2">
         {loading ? "Adding..." : "Add Employee"}
