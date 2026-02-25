@@ -15,7 +15,7 @@ const MainLayout: React.FC = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const { isAuthenticated, isLoading: authLoading, hasCompany } = useAuth();
-  const { unlockedCompanyId, isLoading: companyLoading } = useCompany();
+  const { isLoading: companyLoading } = useCompany();
   const navigate = useNavigate();
 
   const isLoading = authLoading || companyLoading;
@@ -65,15 +65,8 @@ const MainLayout: React.FC = () => {
     );
   }
 
-  if (!unlockedCompanyId && isAuthenticated && hasCompany) {
-    return (
-      <div className={`min-h-screen ${theme === 'dark' ? 'bg-gray-900' : 'bg-[#f8fafc]'}`}>
-        <ErrorBoundary>
-          <Outlet />
-        </ErrorBoundary>
-      </div>
-    );
-  }
+  // Removed the unlockedCompanyId check - All companies are now directly accessible with full UI
+
 
   return (
     <div className={`min-h-screen flex flex-col ${theme === 'dark' ? 'bg-gray-900 text-gray-200' : 'bg-gray-100 text-gray-900'}`}>

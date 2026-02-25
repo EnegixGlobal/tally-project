@@ -20,14 +20,12 @@ interface CompanyContextProps {
   companies: Company[];
   activeCompanyId: string | null;
   companyInfo: CompanyInfo | null;
-  unlockedCompanyId: string | null;
   isLoading: boolean;
   error: string | null;
 
   // Actions
   switchCompany: (companyId: string | number) => Promise<void>;
   setCompanies: (companies: Company[]) => void;
-  setUnlockedCompany: (companyId: string | null) => void;
   addCompany: (company: Company) => void;
   updateCompany: (companyId: string | number, updates: Partial<CompanyInfo>) => void;
   refreshCompanyInfo: () => Promise<void>;
@@ -196,9 +194,6 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [companies, setCompaniesState] = useState<Company[]>([]);
   const [activeCompanyId, setActiveCompanyId] = useState<string | null>(null);
   const [companyInfo, setCompanyInfo] = useState<CompanyInfo | null>(null);
-  const [unlockedCompanyId, setUnlockedCompanyId] = useState<string | null>(() => {
-    return sessionStorage.getItem('active_unlocked_company_id');
-  });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -285,17 +280,7 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
     safeSetItem(STORAGE_KEYS.COMPANIES, JSON.stringify(newCompanies));
   }, []);
 
-  /**
-   * Set unlocked company ID
-   */
-  const setUnlockedCompany = useCallback((id: string | null) => {
-    setUnlockedCompanyId(id);
-    if (id) {
-      sessionStorage.setItem('active_unlocked_company_id', id);
-    } else {
-      sessionStorage.removeItem('active_unlocked_company_id');
-    }
-  }, []);
+  // setUnlockedCompany logic removed - Direct access enabled
 
   /**
    * Add a new company
@@ -351,12 +336,10 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
         companies,
         activeCompanyId,
         companyInfo,
-        unlockedCompanyId,
         isLoading,
         error,
         switchCompany,
         setCompanies,
-        setUnlockedCompany,
         addCompany,
         updateCompany,
         refreshCompanyInfo,

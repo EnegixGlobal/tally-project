@@ -9,12 +9,11 @@ import {
   Activity,
   PlusCircle,
   Lock as LucideLock,
+  Building,
 } from "lucide-react";
 import AddCaEmployeeForm from "./caemployee"; // adjust path as needed
 import AssignCompaniesModal from "./AssignCompaniesModal"; // Adjust path accordingly
 import DashboardCaEmployee from "./DashboardCaEmployee";
-import CompanyLoginModal from "./CompanyLoginModal";
-import CompanyGate from "./CompanyGate";
 import { Lock } from "lucide-react";
 
 const Dashboard: React.FC = () => {
@@ -25,7 +24,7 @@ const Dashboard: React.FC = () => {
   };
 
   const { theme, setCompanyInfo } = useAppContext();
-  const { switchCompany, activeCompanyId, setCompanies: setContextCompanies, unlockedCompanyId, setUnlockedCompany } = useCompany();
+  const { switchCompany, activeCompanyId, setCompanies: setContextCompanies } = useCompany();
   const navigate = useNavigate();
   const [companyInfo, setCompanyInfoState] = useState<any>(null);
   const [ledgers, setLedgers] = useState<any[]>([]);
@@ -109,14 +108,8 @@ const Dashboard: React.FC = () => {
   });
 
   const [showModal, setShowModal] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [companyToUnlock, setCompanyToUnlock] = useState<any>(null);
-  const [verificationError, setVerificationError] = useState<string | null>(null);
-  const [isVerificationLoading, setIsVerificationLoading] = useState(false);
 
   const handleCompanyUnlock = async (id: string) => {
-    setUnlockedCompany(id);
-
     // Switch to that company in context immediately
     if (suppl === "employee") {
       await switchCompany(id);
@@ -126,10 +119,6 @@ const Dashboard: React.FC = () => {
       setSelectedCaCompany(id);
       window.location.reload();
     }
-  };
-
-  const handleCompanyLogout = () => {
-    setUnlockedCompany(null);
   };
 
   const employeeId = localStorage.getItem("employee_id");
@@ -246,26 +235,7 @@ const Dashboard: React.FC = () => {
       .catch(console.error);
   }, [caId, showAddForm]); // Also refetch list when the add modal closes
 
-  // Auto-unlock logic: If the active company has no password, skip the gate.
-  useEffect(() => {
-    if (loading || companies.length === 0 || unlockedCompanyId) return;
-
-    const currentId = activeCompanyId || selectedCompany;
-    if (!currentId) {
-      // If no company selected, check if we have any company to default to
-      const firstUnlocked = companies.find(c => !c.isLocked);
-      if (firstUnlocked) {
-        handleCompanyUnlock(firstUnlocked.id.toString());
-      }
-      return;
-    }
-
-    const target = companies.find(c => c.id.toString() === currentId);
-    if (target && !target.isLocked) {
-      // Company has no password set (isLocked is false/0)
-      handleCompanyUnlock(target.id.toString());
-    }
-  }, [companies, activeCompanyId, selectedCompany, loading, unlockedCompanyId]);
+  // Auto-unlock logic removed - Direct access enabled
 
   const openAssignModal = (employeeId: number, employeeName: string) => {
     setSelectedEmployeeId(employeeId);
@@ -360,67 +330,9 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const handleVerifyAccess = async (username: string, password: string) => {
-    if (!companyToUnlock) return;
+  // Verification logic removed - Direct access enabled
 
-    setIsVerificationLoading(true);
-    setVerificationError(null);
-
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/login/verify-company-access`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company_id: companyToUnlock.id,
-          username,
-          password,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        // Success! Now switch
-        if (suppl === "employee") {
-          await switchCompany(companyToUnlock.id);
-          setSelectedCompany(companyToUnlock.id.toString());
-        } else if (suppl === "ca") {
-          localStorage.setItem("company_id", companyToUnlock.id.toString());
-          setSelectedCaCompany(companyToUnlock.id.toString());
-          window.location.reload();
-          return;
-        }
-        setShowLoginModal(false);
-        setCompanyToUnlock(null);
-      } else {
-        setVerificationError(data.message || "Invalid credentials");
-      }
-    } catch (err) {
-      console.error("Verification error:", err);
-      setVerificationError("Internal server error. Please try again.");
-    } finally {
-      setIsVerificationLoading(false);
-    }
-  };
-
-  // STRICT FILTERING: If a company is unlocked, we hide all others everywhere
-  const visibleCompanies = unlockedCompanyId
-    ? companies.filter(c => c.id.toString() === unlockedCompanyId)
-    : companies; // Show all if not yet blocking via Gate
-
-  const visibleAllCompanies = unlockedCompanyId
-    ? allCompanies.filter(c => c.id.toString() === unlockedCompanyId)
-    : allCompanies;
-
-  // Auto-unlock logic was moved to top of component to follow rules of hooks
-
-
-  const hasAnyLockedCompany = companies.some(c => c.isLocked);
-  console.log('yes', hasAnyLockedCompany)
-
-  if (!unlockedCompanyId && employeeId && companies.length > 0 && hasAnyLockedCompany) {
-    return <CompanyGate onUnlock={handleCompanyUnlock} employeeId={employeeId} />;
-  }
+  // Company gate logic removed - Direct access enabled
 
   return (
     <>
@@ -437,7 +349,7 @@ const Dashboard: React.FC = () => {
                 {companyCount} of {userLimit} allowed
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+            <div className="flex flex-col sm:flex-row items-center gap-4">
               {canCreateCompany ? (
                 <button
                   onClick={handleCreateCompany}
@@ -452,21 +364,16 @@ const Dashboard: React.FC = () => {
                 </span>
               )}
 
-              <button
-                onClick={handleCompanyLogout}
-                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm font-bold transition-all active:scale-95"
-              >
-                Switch Business
-              </button>
-
-              {visibleAllCompanies.length > 0 && (
-                <div className="mb-0">
+              {allCompanies.length > 0 && (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-gray-400 invisible sm:visible">Active:</span>
                   <select
                     value={activeCompanyId || selectedCompany}
-                    disabled
-                    className="border rounded-xl px-4 py-2 w-full max-w-[200px] bg-gray-50 text-gray-400 outline-none cursor-not-allowed font-medium"
+                    onChange={(e) => handleCompanyUnlock(e.target.value)}
+                    className="border-2 border-indigo-100 rounded-xl px-4 py-2 w-full sm:w-[220px] bg-white text-gray-700 outline-none focus:border-indigo-500 transition-all font-bold cursor-pointer"
                   >
-                    {visibleAllCompanies.map((c) => (
+                    <option value="" disabled>Select Company</option>
+                    {allCompanies.map((c) => (
                       <option key={c.id} value={c.id.toString()}>
                         {c.name}
                       </option>
@@ -489,7 +396,7 @@ const Dashboard: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-              {visibleCompanies.map((c) => {
+              {companies.map((c) => {
                 const isSelected = c.id.toString() === selectedCompany;
                 return (
                   <div
@@ -663,6 +570,7 @@ const Dashboard: React.FC = () => {
                 </div>
               </div>
             </>
+
           )}
         </div>
       ) : suppl === "ca" ? (
@@ -678,19 +586,11 @@ const Dashboard: React.FC = () => {
                   const companyId = e.target.value;
                   if (!companyId) return;
 
-                  const targetCompany = caAllCompanies.find(c => c.id.toString() === companyId);
-
-                  if (targetCompany && targetCompany.isLocked) {
-                    setCompanyToUnlock(targetCompany);
-                    setShowLoginModal(true);
-                    setVerificationError(null);
-                  } else {
-                    localStorage.setItem("company_id", companyId);
-                    setSelectedCaCompany(companyId);
-                    window.location.reload();
-                  }
+                  localStorage.setItem("company_id", companyId);
+                  setSelectedCaCompany(companyId);
+                  window.location.reload();
                 }}
-                className="border rounded px-3 py-2 w-full max-w-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-all"
+                className="border rounded px-3 py-2 w-full max-w-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-all font-bold"
               >
                 <option value="">Select Company</option>
                 {caAllCompanies.map((c) => (
@@ -864,19 +764,6 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {showLoginModal && companyToUnlock && (
-        <CompanyLoginModal
-          companyName={companyToUnlock.name}
-          onLogin={handleVerifyAccess}
-          onClose={() => {
-            setShowLoginModal(false);
-            setCompanyToUnlock(null);
-          }}
-          isLoading={isVerificationLoading}
-          error={verificationError}
-        />
       )}
     </>
   );
