@@ -167,14 +167,21 @@ const Dashboard: React.FC = () => {
         if (data.success) {
           setCompanyInfoState((prev: any) => {
             if (isSameCompany(prev, data.companyInfo)) {
-              return prev; // same company hai → dobara set mat karo
+              return prev;
             }
             return data.companyInfo;
           });
-          // Don't call setCompanyInfo here - it causes infinite loop
-          // CompanyContext will sync automatically based on active_company_id
           setUserLimit(data.userLimit ?? 1);
-          setCompanies(data.companies || []);
+
+          // Filter companies if role is company_user
+          const userType = localStorage.getItem("userType");
+          const restrictedId = localStorage.getItem("company_id");
+          let filteredCompanies = data.companies || [];
+          if (userType === 'company_user' && restrictedId) {
+            filteredCompanies = filteredCompanies.filter((c: any) => String(c.id) === String(restrictedId));
+          }
+          setCompanies(filteredCompanies);
+
           setLedgers(data.ledgers || []);
           setVouchers(data.vouchers || []);
         } else {
@@ -206,7 +213,13 @@ const Dashboard: React.FC = () => {
     )
       .then((res) => res.json())
       .then((data) => {
-        setAllCompanies(data.companies || []);
+        const userType = localStorage.getItem("userType");
+        const restrictedId = localStorage.getItem("company_id");
+        let filteredAll = data.companies || [];
+        if (userType === 'company_user' && restrictedId) {
+          filteredAll = filteredAll.filter((c: any) => String(c.id) === String(restrictedId));
+        }
+        setAllCompanies(filteredAll);
       })
       .catch((err) => console.error("Error fetching companies:", err));
   }, []);
@@ -313,7 +326,8 @@ const Dashboard: React.FC = () => {
   ];
 
   const companyCount = companies.length;
-  const canCreateCompany = companyCount < userLimit;
+  const userType = localStorage.getItem("userType");
+  const canCreateCompany = companyCount < userLimit && userType !== "company_user";
 
   const handleAddEmployee = () => {
     if (!newEmployee.name || !newEmployee.adhar || !newEmployee.phone) return;
@@ -350,21 +364,23 @@ const Dashboard: React.FC = () => {
               </div>
             </div>
             <div className="flex flex-col sm:flex-row items-center gap-4">
-              {canCreateCompany ? (
-                <button
-                  onClick={handleCreateCompany}
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg shadow-md hover:scale-105 transition-transform font-medium"
-                >
-                  <PlusCircle className="w-5 h-5" />
-                  Create Company
-                </button>
-              ) : (
-                <span className="bg-red-100 text-red-700 px-4 py-2 rounded-full font-semibold text-sm">
-                  Company Limit Reached ({companyCount}/{userLimit})
-                </span>
+              {userType !== "company_user" && (
+                canCreateCompany ? (
+                  <button
+                    onClick={handleCreateCompany}
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg shadow-md hover:scale-105 transition-transform font-medium"
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                    Create Company
+                  </button>
+                ) : (
+                  <span className="bg-red-100 text-red-700 px-4 py-2 rounded-full font-semibold text-sm">
+                    Company Limit Reached ({companyCount}/{userLimit})
+                  </span>
+                )
               )}
 
-              {allCompanies.length > 0 && (
+              {userType !== "company_user" && allCompanies.length > 1 && (
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-bold text-gray-400 invisible sm:visible">Active:</span>
                   <select
@@ -396,48 +412,56 @@ const Dashboard: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-              {companies.map((c) => {
-                const isSelected = c.id.toString() === selectedCompany;
-                return (
-                  <div
-                    key={c.id}
-                    className={`rounded-2xl p-6 hover:shadow-xl transition-all border-2 ${isSelected
-                      ? "bg-gradient-to-b from-indigo-100 to-purple-100 shadow-lg border-indigo-500 ring-2 ring-indigo-300 ring-offset-2"
-                      : "bg-gradient-to-b from-purple-50 to-blue-50 shadow-md border-indigo-100"
-                      }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className={`text-lg font-bold ${isSelected ? "text-indigo-800" : "text-gray-800"
+              {companies
+                .filter(c => {
+                  if (userType === 'company_user') {
+                    const restrictedId = localStorage.getItem("company_id");
+                    return String(c.id) === String(restrictedId);
+                  }
+                  return true;
+                })
+                .map((c) => {
+                  const isSelected = c.id.toString() === selectedCompany;
+                  return (
+                    <div
+                      key={c.id}
+                      className={`rounded-2xl p-6 hover:shadow-xl transition-all border-2 ${isSelected
+                        ? "bg-gradient-to-b from-indigo-100 to-purple-100 shadow-lg border-indigo-500 ring-2 ring-indigo-300 ring-offset-2"
+                        : "bg-gradient-to-b from-purple-50 to-blue-50 shadow-md border-indigo-100"
+                        }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className={`text-lg font-bold ${isSelected ? "text-indigo-800" : "text-gray-800"
+                          }`}>
+                          {c.name}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <LucideLock className="w-4 h-4 text-green-500" />
+                          {isSelected && (
+                            <span className="bg-indigo-600 text-white text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+                              Active Session
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className={`text-sm mb-3 ${isSelected ? "text-gray-600" : "text-gray-500"
                         }`}>
-                        {c.name}
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <LucideLock className="w-4 h-4 text-green-500" />
-                        {isSelected && (
-                          <span className="bg-indigo-600 text-white text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">
-                            Active Session
-                          </span>
-                        )}
+                        {c.address || "—"}
+                      </div>
+
+                      <div className="flex flex-col gap-1 text-xs">
+                        <span className={isSelected ? "text-gray-700" : "opacity-70"}>
+                          GST: {c.gst_number || c.gstNumber || "—"}
+                        </span>
+
+                        <span className={isSelected ? "text-gray-700" : "opacity-70"}>
+                          PAN: {c.pan_number || c.panNumber || "—"}
+                        </span>
                       </div>
                     </div>
-
-                    <div className={`text-sm mb-3 ${isSelected ? "text-gray-600" : "text-gray-500"
-                      }`}>
-                      {c.address || "—"}
-                    </div>
-
-                    <div className="flex flex-col gap-1 text-xs">
-                      <span className={isSelected ? "text-gray-700" : "opacity-70"}>
-                        GST: {c.gst_number || c.gstNumber || "—"}
-                      </span>
-
-                      <span className={isSelected ? "text-gray-700" : "opacity-70"}>
-                        PAN: {c.pan_number || c.panNumber || "—"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
 
