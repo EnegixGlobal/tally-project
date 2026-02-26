@@ -39,7 +39,7 @@ router.post('/', async (req, res) => {
       {
         table: 'tbcaemployees',
         role: 'ca_employee',
-        supplier: 'ca_employee',
+        supplier: 'employee',
         passwordField: 'password',
         idField: 'id',
         nameField: (u) => u.name,
@@ -48,6 +48,7 @@ router.post('/', async (req, res) => {
 
 
 
+    // 1. Search in main role tables (employees, ca, ca_employees)
     for (const { table, role, supplier, passwordField, idField, nameField } of roleTables) {
       const [rows] = await db.query(
         `SELECT * FROM ${table} WHERE email = ?`,
@@ -56,7 +57,6 @@ router.post('/', async (req, res) => {
       if (!rows.length) continue;
 
       const user = rows[0];
-
       if (!user[passwordField]) {
         return res.status(500).json({ message: 'User password not set' });
       }
@@ -67,19 +67,11 @@ router.post('/', async (req, res) => {
       let employeeId = null;
       let companyRow = null;
 
-
-
       if (role === 'employee') {
-        // It's an employee; use own id
         employeeId = user[idField];
-
-        // Optionally, get company for info (if needed)
         const [[company]] = await db.query('SELECT * FROM tbcompanies WHERE employee_id = ?', [user[idField]]);
         companyRow = company || null;
-
-
       } else if (role === 'ca') {
-        // It's a CA; get their company by fdAccountantName, fetch its employee_id
         const [[company]] = await db.query(
           'SELECT * FROM tbcompanies WHERE fdAccountantName = ?',
           [user['fdname']]
@@ -88,20 +80,21 @@ router.post('/', async (req, res) => {
         if (companyRow && companyRow.employee_id) {
           employeeId = companyRow.employee_id;
         }
-        // Optionally, fallback to null if not mapped or multiple companies -- adapt as needed
-
       } else if (role === 'ca_employee') {
-        // It's a CA Employee; get their ca_id, then company's employee_id via fdAccountantName
-        const caId = user['ca_id'];
-
-        // Find company where fdAccountantName = ca_id (the main CA for this employee's assignments)
-        const [[company]] = await db.query(
-          'SELECT * FROM tbcompanies WHERE fdAccountantName = ?',
-          [caId]
+        const [assignedCompanies] = await db.query(
+          `SELECT c.* FROM tbcompanies c
+           INNER JOIN tbcaemployeecompanies ec ON c.id = ec.company_id
+           WHERE ec.ca_employee_id = ?`,
+          [user[idField]]
         );
-        companyRow = company || null;
-        if (companyRow && companyRow.employee_id) {
-          employeeId = companyRow.employee_id;
+
+        if (assignedCompanies.length > 0) {
+          companyRow = assignedCompanies[0];
+          user.assignedCompanies = assignedCompanies;
+          // Set employeeId to the company's owner ID so dashboard fetches their data
+          if (companyRow.employee_id) {
+            employeeId = companyRow.employee_id;
+          }
         }
       }
 
@@ -115,33 +108,85 @@ router.post('/', async (req, res) => {
         { expiresIn: '7d' }
       );
 
-      console.log()
-
       return res.json({
         success: true,
         token,
         role,
         supplier,
         userid,
+        user_id: user[idField],
         companyId,
         hasCompany,
         companyInfo: companyRow || null,
-        employee_id: employeeId, // Always per your mapping
+        companies: user.assignedCompanies || (companyRow ? [companyRow] : []),
+        employee_id: employeeId,
         user: {
           id: user[idField],
           name: nameField(user),
           email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
+          firstName: user.firstName || user.name || nameField(user),
+          lastName: user.lastName || '',
           pan: user.pan,
           phoneNumber: user.phoneNumber,
           userLimit: user.userLimit,
           companyName: companyRow ? companyRow.name : "",
+          userType: role, // Add userType here too
         }
       });
     }
 
-    // No match found
+    // 2. Search in tbusers for direct company access login (Access Control Restricted)
+    const [userRows] = await db.query(
+      'SELECT * FROM tbusers WHERE username = ? OR email = ?',
+      [emailTrimmed, emailTrimmed]
+    );
+
+    if (userRows.length > 0) {
+      for (const userRow of userRows) {
+        const match = await bcrypt.compare(passwordTrimmed, userRow.password);
+        if (match) {
+          const [[company]] = await db.query('SELECT * FROM tbcompanies WHERE id = ?', [userRow.company_id]);
+          const companyRow = company || null;
+
+          if (!companyRow) continue;
+
+          const token = jwt.sign(
+            { id: userRow.id, role: 'company_user' },
+            JWT_SECRET,
+            { expiresIn: '7d' }
+          );
+
+          return res.json({
+            success: true,
+            token,
+            role: 'company_user',
+            userType: 'company_user', // Added for consistency
+            supplier: 'employee',
+            userid: 'employee',
+            user_id: userRow.id,
+            companyId: userRow.company_id,
+            hasCompany: true,
+            companyInfo: companyRow,
+            companies: [companyRow], // CRITICAL: Restrict dashboard to ONLY this company
+            employee_id: userRow.employee_id,
+            user: {
+              id: userRow.id,
+              name: userRow.username,
+              email: userRow.email || userRow.username,
+              firstName: userRow.username,
+              lastName: '',
+              pan: '',
+              phoneNumber: '',
+              userLimit: 1,
+              companyName: companyRow.name,
+              userType: 'company_user', // Added here too
+            }
+          });
+        }
+      }
+    }
+
+    // No match found in any table
     return res.status(401).json({ message: 'Invalid email or password' });
 
   } catch (err) {

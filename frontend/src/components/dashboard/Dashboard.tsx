@@ -9,23 +9,24 @@ import {
   Activity,
   PlusCircle,
   Lock as LucideLock,
+  Building,
 } from "lucide-react";
 import AddCaEmployeeForm from "./caemployee"; // adjust path as needed
 import AssignCompaniesModal from "./AssignCompaniesModal"; // Adjust path accordingly
+import PermissionsModal from "./PermissionsModal";
 import DashboardCaEmployee from "./DashboardCaEmployee";
-import CompanyLoginModal from "./CompanyLoginModal";
-import CompanyGate from "./CompanyGate";
-import { Lock } from "lucide-react";
+import { useAuth } from "../../home/context/AuthContext";
+import { Lock, ShieldCheck } from "lucide-react";
 
 const Dashboard: React.FC = () => {
-
   const isSameCompany = (a: any, b: any) => {
     if (!a || !b) return false;
     return String(a.id) === String(b.id);
   };
 
   const { theme, setCompanyInfo } = useAppContext();
-  const { switchCompany, activeCompanyId, setCompanies: setContextCompanies, unlockedCompanyId, setUnlockedCompany } = useCompany();
+  const { switchCompany, activeCompanyId, setCompanies: setContextCompanies } = useCompany();
+  const { checkPermission } = useAuth();
   const navigate = useNavigate();
   const [companyInfo, setCompanyInfoState] = useState<any>(null);
   const [ledgers, setLedgers] = useState<any[]>([]);
@@ -40,13 +41,27 @@ const Dashboard: React.FC = () => {
   });
   const [caEmployees, setCaEmployees] = useState<any[]>([]); // Optional to reload list after create
   const [showAddForm, setShowAddForm] = useState(false);
-  const caId = localStorage.getItem("user_id");
+  const caId = localStorage.getItem("user_id") || localStorage.getItem("employee_id");
   const suppl: string | null = localStorage.getItem("supplier"); // employee | ca | ca_employee
+  const userType = localStorage.getItem("userType");
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(
     null
   );
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>("");
+
+  const openPermissionsModal = (employeeId: number, employeeName: string) => {
+    setSelectedEmployeeId(employeeId);
+    setSelectedEmployeeName(employeeName);
+    setShowPermissionsModal(true);
+  };
+
+  const closePermissionsModal = () => {
+    setSelectedEmployeeId(null);
+    setSelectedEmployeeName("");
+    setShowPermissionsModal(false);
+  };
 
   type Company = {
     id: string | number;
@@ -109,14 +124,8 @@ const Dashboard: React.FC = () => {
   });
 
   const [showModal, setShowModal] = useState(false);
-  const [showLoginModal, setShowLoginModal] = useState(false);
-  const [companyToUnlock, setCompanyToUnlock] = useState<any>(null);
-  const [verificationError, setVerificationError] = useState<string | null>(null);
-  const [isVerificationLoading, setIsVerificationLoading] = useState(false);
 
   const handleCompanyUnlock = async (id: string) => {
-    setUnlockedCompany(id);
-
     // Switch to that company in context immediately
     if (suppl === "employee") {
       await switchCompany(id);
@@ -126,10 +135,6 @@ const Dashboard: React.FC = () => {
       setSelectedCaCompany(id);
       window.location.reload();
     }
-  };
-
-  const handleCompanyLogout = () => {
-    setUnlockedCompany(null);
   };
 
   const employeeId = localStorage.getItem("employee_id");
@@ -162,30 +167,49 @@ const Dashboard: React.FC = () => {
     async function fetchData() {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL
-          }/api/dashboard-data?employee_id=${employeeId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        const ownerType = localStorage.getItem("supplier");
+        const restrictedId = localStorage.getItem("company_id");
+
+        let ownerId =
+          ownerType === "employee"
+            ? localStorage.getItem("employee_id")
+            : localStorage.getItem("user_id");
+
+        // For CA employees, we want to see the owner's data
+        let fetchOwnerType = ownerType;
+        let fetchOwnerId = ownerId;
+
+        if (userType === "ca_employee") {
+          fetchOwnerType = "employee";
+          fetchOwnerId = localStorage.getItem("employee_id");
+        }
+
+        let url = `${import.meta.env.VITE_API_URL}/api/dashboard-data?employee_id=${fetchOwnerId}`;
+
+        if ((userType === 'company_user' || userType === 'ca_employee') && restrictedId) {
+          url += `&company_id=${restrictedId}`;
+        }
+
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
 
         const data = await res.json();
         // console.log("this is data", data.companyInfo);
         if (data.success) {
           setCompanyInfoState((prev: any) => {
             if (isSameCompany(prev, data.companyInfo)) {
-              return prev; // same company hai → dobara set mat karo
+              return prev;
             }
             return data.companyInfo;
           });
-          // Don't call setCompanyInfo here - it causes infinite loop
-          // CompanyContext will sync automatically based on active_company_id
           setUserLimit(data.userLimit ?? 1);
+
           setCompanies(data.companies || []);
+
           setLedgers(data.ledgers || []);
           setVouchers(data.vouchers || []);
         } else {
@@ -208,8 +232,26 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const employeeId = localStorage.getItem("employee_id");
+    const caEmployeeId = localStorage.getItem("user_id");
 
-    if (!employeeId) return;
+    if (!employeeId && userType !== "ca_employee") return;
+
+    if (userType === "ca_employee" && caEmployeeId) {
+      fetch(
+        `${import.meta.env.VITE_API_URL}/api/companies-by-ca-employee?ca_employee_id=${caEmployeeId}`
+      )
+        .then((res) => res.json())
+        .then((data) => {
+          const restrictedId = localStorage.getItem("company_id");
+          let filteredAll = data.companies || [];
+          if (restrictedId) {
+            filteredAll = filteredAll.filter((c: any) => String(c.id) === String(restrictedId));
+          }
+          setAllCompanies(filteredAll);
+        })
+        .catch((err) => console.error("Error fetching CA employee companies:", err));
+      return;
+    }
 
     fetch(
       `${import.meta.env.VITE_API_URL
@@ -217,7 +259,12 @@ const Dashboard: React.FC = () => {
     )
       .then((res) => res.json())
       .then((data) => {
-        setAllCompanies(data.companies || []);
+        const restrictedId = localStorage.getItem("company_id");
+        let filteredAll = data.companies || [];
+        if (userType === 'company_user' && restrictedId) {
+          filteredAll = filteredAll.filter((c: any) => String(c.id) === String(restrictedId));
+        }
+        setAllCompanies(filteredAll);
       })
       .catch((err) => console.error("Error fetching companies:", err));
   }, []);
@@ -246,26 +293,7 @@ const Dashboard: React.FC = () => {
       .catch(console.error);
   }, [caId, showAddForm]); // Also refetch list when the add modal closes
 
-  // Auto-unlock logic: If the active company has no password, skip the gate.
-  useEffect(() => {
-    if (loading || companies.length === 0 || unlockedCompanyId) return;
-
-    const currentId = activeCompanyId || selectedCompany;
-    if (!currentId) {
-      // If no company selected, check if we have any company to default to
-      const firstUnlocked = companies.find(c => !c.isLocked);
-      if (firstUnlocked) {
-        handleCompanyUnlock(firstUnlocked.id.toString());
-      }
-      return;
-    }
-
-    const target = companies.find(c => c.id.toString() === currentId);
-    if (target && !target.isLocked) {
-      // Company has no password set (isLocked is false/0)
-      handleCompanyUnlock(target.id.toString());
-    }
-  }, [companies, activeCompanyId, selectedCompany, loading, unlockedCompanyId]);
+  // Auto-unlock logic removed - Direct access enabled
 
   const openAssignModal = (employeeId: number, employeeName: string) => {
     setSelectedEmployeeId(employeeId);
@@ -307,6 +335,7 @@ const Dashboard: React.FC = () => {
       .catch(console.error);
   };
 
+
   const stats = [
     {
       title: "Ledger Accounts",
@@ -343,7 +372,8 @@ const Dashboard: React.FC = () => {
   ];
 
   const companyCount = companies.length;
-  const canCreateCompany = companyCount < userLimit;
+  const canCreateCompany = companyCount < userLimit && userType === "employee";
+  // Note: For 'ca_employee', userType is 'ca_employee', so canCreateCompany will be false.
 
   const handleAddEmployee = () => {
     if (!newEmployee.name || !newEmployee.adhar || !newEmployee.phone) return;
@@ -360,70 +390,13 @@ const Dashboard: React.FC = () => {
     );
   }
 
-  const handleVerifyAccess = async (username: string, password: string) => {
-    if (!companyToUnlock) return;
+  // Verification logic removed - Direct access enabled
 
-    setIsVerificationLoading(true);
-    setVerificationError(null);
-
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/login/verify-company-access`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          company_id: companyToUnlock.id,
-          username,
-          password,
-        }),
-      });
-
-      const data = await res.json();
-
-      if (data.success) {
-        // Success! Now switch
-        if (suppl === "employee") {
-          await switchCompany(companyToUnlock.id);
-          setSelectedCompany(companyToUnlock.id.toString());
-        } else if (suppl === "ca") {
-          localStorage.setItem("company_id", companyToUnlock.id.toString());
-          setSelectedCaCompany(companyToUnlock.id.toString());
-          window.location.reload();
-          return;
-        }
-        setShowLoginModal(false);
-        setCompanyToUnlock(null);
-      } else {
-        setVerificationError(data.message || "Invalid credentials");
-      }
-    } catch (err) {
-      console.error("Verification error:", err);
-      setVerificationError("Internal server error. Please try again.");
-    } finally {
-      setIsVerificationLoading(false);
-    }
-  };
-
-  // STRICT FILTERING: If a company is unlocked, we hide all others everywhere
-  const visibleCompanies = unlockedCompanyId
-    ? companies.filter(c => c.id.toString() === unlockedCompanyId)
-    : companies; // Show all if not yet blocking via Gate
-
-  const visibleAllCompanies = unlockedCompanyId
-    ? allCompanies.filter(c => c.id.toString() === unlockedCompanyId)
-    : allCompanies;
-
-  // Auto-unlock logic was moved to top of component to follow rules of hooks
-
-
-  const hasAnyLockedCompany = companies.some(c => c.isLocked);
-
-  if (!unlockedCompanyId && employeeId && companies.length > 0 && hasAnyLockedCompany) {
-    return <CompanyGate onUnlock={handleCompanyUnlock} employeeId={employeeId} />;
-  }
+  // Company gate logic removed - Direct access enabled
 
   return (
     <>
-      {suppl === "employee" ? (
+      {suppl === "employee" || suppl === "ca_employee" ? (
         <div className="pt-[40px] px-4 ">
           {/* <h1 className="text-2xl font-bold mb-6">Dashboard</h1> */}
 
@@ -436,36 +409,33 @@ const Dashboard: React.FC = () => {
                 {companyCount} of {userLimit} allowed
               </div>
             </div>
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
-              {canCreateCompany ? (
-                <button
-                  onClick={handleCreateCompany}
-                  className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg shadow-md hover:scale-105 transition-transform font-medium"
-                >
-                  <PlusCircle className="w-5 h-5" />
-                  Create Company
-                </button>
-              ) : (
-                <span className="bg-red-100 text-red-700 px-4 py-2 rounded-full font-semibold text-sm">
-                  Company Limit Reached ({companyCount}/{userLimit})
-                </span>
+            <div className="flex flex-col sm:flex-row items-center gap-4">
+              {userType !== "company_user" && (
+                canCreateCompany ? (
+                  <button
+                    onClick={handleCreateCompany}
+                    className="inline-flex items-center gap-2 bg-gradient-to-r from-indigo-500 to-purple-600 text-white px-6 py-2 rounded-lg shadow-md hover:scale-105 transition-transform font-medium"
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                    Create Company
+                  </button>
+                ) : (
+                  <span className="bg-red-100 text-red-700 px-4 py-2 rounded-full font-semibold text-sm">
+                    Company Limit Reached ({companyCount}/{userLimit})
+                  </span>
+                )
               )}
 
-              <button
-                onClick={handleCompanyLogout}
-                className="px-4 py-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 text-sm font-bold transition-all active:scale-95"
-              >
-                Switch Business
-              </button>
-
-              {visibleAllCompanies.length > 0 && (
-                <div className="mb-0">
+              {userType === "employee" && allCompanies.length > 1 && (
+                <div className="flex items-center gap-3">
+                  <span className="text-sm font-bold text-gray-400 invisible sm:visible">Active:</span>
                   <select
                     value={activeCompanyId || selectedCompany}
-                    disabled
-                    className="border rounded-xl px-4 py-2 w-full max-w-[200px] bg-gray-50 text-gray-400 outline-none cursor-not-allowed font-medium"
+                    onChange={(e) => handleCompanyUnlock(e.target.value)}
+                    className="border-2 border-indigo-100 rounded-xl px-4 py-2 w-full sm:w-[220px] bg-white text-gray-700 outline-none focus:border-indigo-500 transition-all font-bold cursor-pointer"
                   >
-                    {visibleAllCompanies.map((c) => (
+                    <option value="" disabled>Select Company</option>
+                    {allCompanies.map((c) => (
                       <option key={c.id} value={c.id.toString()}>
                         {c.name}
                       </option>
@@ -488,48 +458,56 @@ const Dashboard: React.FC = () => {
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
-              {visibleCompanies.map((c) => {
-                const isSelected = c.id.toString() === selectedCompany;
-                return (
-                  <div
-                    key={c.id}
-                    className={`rounded-2xl p-6 hover:shadow-xl transition-all border-2 ${isSelected
-                      ? "bg-gradient-to-b from-indigo-100 to-purple-100 shadow-lg border-indigo-500 ring-2 ring-indigo-300 ring-offset-2"
-                      : "bg-gradient-to-b from-purple-50 to-blue-50 shadow-md border-indigo-100"
-                      }`}
-                  >
-                    <div className="flex items-center justify-between mb-1">
-                      <h3 className={`text-lg font-bold ${isSelected ? "text-indigo-800" : "text-gray-800"
+              {companies
+                .filter(c => {
+                  if (userType === 'company_user' || userType === 'ca_employee') {
+                    const restrictedId = localStorage.getItem("company_id");
+                    return String(c.id) === String(restrictedId);
+                  }
+                  return true;
+                })
+                .map((c) => {
+                  const isSelected = c.id.toString() === selectedCompany;
+                  return (
+                    <div
+                      key={c.id}
+                      className={`rounded-2xl p-6 hover:shadow-xl transition-all border-2 ${isSelected
+                        ? "bg-gradient-to-b from-indigo-100 to-purple-100 shadow-lg border-indigo-500 ring-2 ring-indigo-300 ring-offset-2"
+                        : "bg-gradient-to-b from-purple-50 to-blue-50 shadow-md border-indigo-100"
+                        }`}
+                    >
+                      <div className="flex items-center justify-between mb-1">
+                        <h3 className={`text-lg font-bold ${isSelected ? "text-indigo-800" : "text-gray-800"
+                          }`}>
+                          {c.name}
+                        </h3>
+                        <div className="flex items-center gap-2">
+                          <LucideLock className="w-4 h-4 text-green-500" />
+                          {isSelected && (
+                            <span className="bg-indigo-600 text-white text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">
+                              Active Session
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className={`text-sm mb-3 ${isSelected ? "text-gray-600" : "text-gray-500"
                         }`}>
-                        {c.name}
-                      </h3>
-                      <div className="flex items-center gap-2">
-                        <LucideLock className="w-4 h-4 text-green-500" />
-                        {isSelected && (
-                          <span className="bg-indigo-600 text-white text-[10px] px-2 py-1 rounded-full font-bold uppercase tracking-wider">
-                            Active Session
-                          </span>
-                        )}
+                        {c.address || "—"}
+                      </div>
+
+                      <div className="flex flex-col gap-1 text-xs">
+                        <span className={isSelected ? "text-gray-700" : "opacity-70"}>
+                          GST: {c.gst_number || c.gstNumber || "—"}
+                        </span>
+
+                        <span className={isSelected ? "text-gray-700" : "opacity-70"}>
+                          PAN: {c.pan_number || c.panNumber || "—"}
+                        </span>
                       </div>
                     </div>
-
-                    <div className={`text-sm mb-3 ${isSelected ? "text-gray-600" : "text-gray-500"
-                      }`}>
-                      {c.address || "—"}
-                    </div>
-
-                    <div className="flex flex-col gap-1 text-xs">
-                      <span className={isSelected ? "text-gray-700" : "opacity-70"}>
-                        GST: {c.gst_number || c.gstNumber || "—"}
-                      </span>
-
-                      <span className={isSelected ? "text-gray-700" : "opacity-70"}>
-                        PAN: {c.pan_number || c.panNumber || "—"}
-                      </span>
-                    </div>
-                  </div>
-                );
-              })}
+                  );
+                })}
             </div>
           )}
 
@@ -599,69 +577,74 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                {stats.map((stat, index) => (
-                  <div
-                    key={index}
-                    className={`p-6 rounded-lg ${stat.color} ${theme === "dark" ? "" : "shadow"
-                      }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm opacity-75 mb-1">{stat.title}</p>
-                        <p className="text-2xl font-semibold">{stat.value}</p>
-                      </div>
+              {checkPermission('reports') && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    {stats.map((stat, index) => (
                       <div
-                        className={`p-2 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-white"
+                        key={index}
+                        className={`p-6 rounded-lg ${stat.color} ${theme === "dark" ? "" : "shadow"
                           }`}
                       >
-                        {stat.icon}
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm opacity-75 mb-1">{stat.title}</p>
+                            <p className="text-2xl font-semibold">{stat.value}</p>
+                          </div>
+                          <div
+                            className={`p-2 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-white"
+                              }`}
+                          >
+                            {stat.icon}
+                          </div>
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                  {/* Extra Reports Section */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    {/* Sales Report */}
+                    <div className="p-6 rounded-xl bg-gradient-to-r from-green-50 to-green-100 shadow hover:shadow-lg transition">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        Sales Report
+                      </h3>
+                      <p className="text-2xl font-bold text-green-700">
+                        ₹ 1,25,000
+                      </p>
+                      <p className="text-sm text-gray-500">This Month</p>
+                    </div>
+
+                    {/* Purchase Report */}
+                    <div className="p-6 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 shadow hover:shadow-lg transition">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        Purchase Report
+                      </h3>
+                      <p className="text-2xl font-bold text-blue-700">₹ 75,000</p>
+                      <p className="text-sm text-gray-500">This Month</p>
+                    </div>
+
+                    {/* Input Tax */}
+                    <div className="p-6 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 shadow hover:shadow-lg transition">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        Input Tax
+                      </h3>
+                      <p className="text-2xl font-bold text-purple-700">₹ 15,000</p>
+                      <p className="text-sm text-gray-500">This Month</p>
+                    </div>
+
+                    {/* Output Tax */}
+                    <div className="p-6 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 shadow hover:shadow-lg transition">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        Output Tax
+                      </h3>
+                      <p className="text-2xl font-bold text-orange-700">₹ 20,000</p>
+                      <p className="text-sm text-gray-500">This Month</p>
                     </div>
                   </div>
-                ))}
-              </div>
-              {/* Extra Reports Section */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                {/* Sales Report */}
-                <div className="p-6 rounded-xl bg-gradient-to-r from-green-50 to-green-100 shadow hover:shadow-lg transition">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Sales Report
-                  </h3>
-                  <p className="text-2xl font-bold text-green-700">
-                    ₹ 1,25,000
-                  </p>
-                  <p className="text-sm text-gray-500">This Month</p>
-                </div>
-
-                {/* Purchase Report */}
-                <div className="p-6 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 shadow hover:shadow-lg transition">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Purchase Report
-                  </h3>
-                  <p className="text-2xl font-bold text-blue-700">₹ 75,000</p>
-                  <p className="text-sm text-gray-500">This Month</p>
-                </div>
-
-                {/* Input Tax */}
-                <div className="p-6 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 shadow hover:shadow-lg transition">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Input Tax
-                  </h3>
-                  <p className="text-2xl font-bold text-purple-700">₹ 15,000</p>
-                  <p className="text-sm text-gray-500">This Month</p>
-                </div>
-
-                {/* Output Tax */}
-                <div className="p-6 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 shadow hover:shadow-lg transition">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Output Tax
-                  </h3>
-                  <p className="text-2xl font-bold text-orange-700">₹ 20,000</p>
-                  <p className="text-sm text-gray-500">This Month</p>
-                </div>
-              </div>
+                </>
+              )}
             </>
+
           )}
         </div>
       ) : suppl === "ca" ? (
@@ -677,19 +660,11 @@ const Dashboard: React.FC = () => {
                   const companyId = e.target.value;
                   if (!companyId) return;
 
-                  const targetCompany = caAllCompanies.find(c => c.id.toString() === companyId);
-
-                  if (targetCompany && targetCompany.isLocked) {
-                    setCompanyToUnlock(targetCompany);
-                    setShowLoginModal(true);
-                    setVerificationError(null);
-                  } else {
-                    localStorage.setItem("company_id", companyId);
-                    setSelectedCaCompany(companyId);
-                    window.location.reload();
-                  }
+                  localStorage.setItem("company_id", companyId);
+                  setSelectedCaCompany(companyId);
+                  window.location.reload();
                 }}
-                className="border rounded px-3 py-2 w-full max-w-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-all"
+                className="border rounded px-3 py-2 w-full max-w-xs bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer transition-all font-bold"
               >
                 <option value="">Select Company</option>
                 {caAllCompanies.map((c) => (
@@ -708,8 +683,7 @@ const Dashboard: React.FC = () => {
               <thead className="bg-gray-100">
                 <tr>
                   <th className="border p-2">Company Name</th>
-                  <th className="border p-2">Tax Type</th>
-                  <th className="border p-2">Employees</th>
+                  <th className="border p-2">Pan</th>
                 </tr>
               </thead>
               <tbody>
@@ -717,7 +691,6 @@ const Dashboard: React.FC = () => {
                   <tr key={company.id}>
                     <td className="border p-2">{company.name}</td>
                     <td className="border p-2">{company.pan_number}</td>
-                    <td className="border p-2">{company.employee_id}</td>
                   </tr>
                 ))}
               </tbody>
@@ -755,27 +728,42 @@ const Dashboard: React.FC = () => {
               <thead className="bg-gray-100">
                 <tr>
                   <th className="border p-2">Employee Name</th>
+                  <th className="border p-2">Email</th>
+                  <th className="border p-2">Password</th>
                   <th className="border p-2">Company Name</th>
                   <th className="border p-2">Adhar Number</th>
                   <th className="border p-2">Phone Number</th>
-                  <th className="border p-2">Actions</th> {/* New */}
+                  <th className="border p-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {caEmployees.map((emp, idx) => (
-                  <tr key={emp.employee_id || idx}>
+                  <tr key={emp.employee_id || idx} className="text-center">
                     <td className="border p-2">{emp.name}</td>
+                    <td className="border p-2">{emp.email}</td>
+                    <td className="border p-2">{emp.password || "*****"}</td>
                     <td className="border p-2">{emp.company_names || "—"}</td>
                     <td className="border p-2">{emp.adhar}</td>
                     <td className="border p-2">{emp.phone}</td>
-                    <td className="border p-2">
+                    <td className="border p-2 flex gap-2 justify-center cursor-pointer">
                       <button
-                        className="text-blue-600 hover:underline"
+                        className="text-blue-600 hover:underline flex items-center gap-1"
                         onClick={() =>
                           openAssignModal(emp.employee_id, emp.name)
                         }
                       >
                         Edit
+                      </button>
+
+
+                      <button
+                        className="text-green-600 hover:underline flex items-center gap-1"
+                        onClick={() =>
+                          openPermissionsModal(emp.employee_id, emp.name)
+                        }
+                      >
+                        <ShieldCheck size={14} />
+                        Access
                       </button>
                     </td>
                   </tr>
@@ -794,10 +782,6 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
-      ) : suppl === "ca_employee" ? (
-        <div className="pt-[56px] px-4">
-          <DashboardCaEmployee />
-        </div>
       ) : null}
       {showAssignModal && selectedEmployeeId !== null && (
         <AssignCompaniesModal
@@ -808,6 +792,14 @@ const Dashboard: React.FC = () => {
           onAssigned={() => {
             fetchEmployees(); // refresh list after update
           }}
+        />
+      )}
+
+      {showPermissionsModal && selectedEmployeeId !== null && (
+        <PermissionsModal
+          employeeId={selectedEmployeeId}
+          employeeName={selectedEmployeeName}
+          onClose={closePermissionsModal}
         />
       )}
 
@@ -863,19 +855,6 @@ const Dashboard: React.FC = () => {
             </div>
           </div>
         </div>
-      )}
-
-      {showLoginModal && companyToUnlock && (
-        <CompanyLoginModal
-          companyName={companyToUnlock.name}
-          onLogin={handleVerifyAccess}
-          onClose={() => {
-            setShowLoginModal(false);
-            setCompanyToUnlock(null);
-          }}
-          isLoading={isVerificationLoading}
-          error={verificationError}
-        />
       )}
     </>
   );

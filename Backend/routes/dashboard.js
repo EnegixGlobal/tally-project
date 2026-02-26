@@ -3,28 +3,47 @@ const router = express.Router();
 const db = require('../db');
 
 router.get('/dashboard-data', async (req, res) => {
-  const { employee_id } = req.query;
+  const { employee_id, company_id } = req.query;
 
   if (!employee_id) return res.status(400).json({ success: false, error: 'employee_id required' });
 
   try {
-    const [[companyInfo]] = await db.query('SELECT * FROM tbcompanies WHERE employee_id = ?', [employee_id]);
+    let companyInfoQuery = 'SELECT * FROM tbcompanies WHERE employee_id = ?';
+    let companiesQuery = `SELECT c.*, 
+       (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = c.id) > 0 as isLocked 
+       FROM tbcompanies c WHERE c.employee_id = ?`;
+    let queryParams = [employee_id];
+
+    if (company_id) {
+      companyInfoQuery += ' AND id = ?';
+      companiesQuery += ' AND c.id = ?';
+      queryParams.push(company_id);
+    }
+
+    const [[companyInfo]] = await db.query(companyInfoQuery, queryParams);
     const [userLimitRows] = await db.query('SELECT userLimit FROM tbemployees WHERE id = ?', [employee_id]);
     const userLimit = userLimitRows && userLimitRows.length > 0 ? userLimitRows[0].userLimit : 1;
-    const [companies] = await db.query(
-      `SELECT c.*, 
-       (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = c.id) > 0 as isLocked 
-       FROM tbcompanies c WHERE c.employee_id = ?`,
-      [employee_id]
-    );
+    const [companies] = await db.query(companiesQuery, queryParams);
+
+    // Fetch ledgers and vouchers for the specific company (using the first one found or the company_id provided)
+    const activeCompanyId = company_id || (companyInfo ? companyInfo.id : null);
+    let ledgers = [];
+    let vouchers = [];
+
+    if (activeCompanyId) {
+      const [ledgerRows] = await db.query('SELECT * FROM ledgers WHERE company_id = ?', [activeCompanyId]);
+      const [voucherRows] = await db.query('SELECT * FROM voucher_main WHERE company_id = ?', [activeCompanyId]);
+      ledgers = ledgerRows;
+      vouchers = voucherRows;
+    }
+
     res.json({
       success: true,
       companyInfo: companyInfo || null,
-      companies: companies || [],    // <--- return array!
-
+      companies: companies || [],
       userLimit,
-      //   ledgers,
-      //   vouchers
+      ledgers,
+      vouchers
     });
   } catch (err) {
     console.error('Error fetching dashboard data:', err);
@@ -56,23 +75,34 @@ router.get('/companies-by-employee', async (req, res) => {
 });
 // Assuming CA's ID is available as req.query.ca_id
 router.get('/companies-by-ca', async (req, res) => {
-
   const caId = req.query.ca_id;
   if (!caId) return res.status(400).json({ message: 'Missing ca_id' });
 
+  let connection;
   try {
-    const connection = await db.getConnection();
-    // Customize this query for your schema
+    connection = await db.getConnection();
+
+    // 1. Look up the CA's name using their ID (fdSiNo)
+    const [caRows] = await connection.query('SELECT fdname FROM tbca WHERE fdSiNo = ?', [caId]);
+
+    const caName = caRows.length > 0 ? caRows[0].fdname.trim() : null;
+
+    // 2. Find companies linked to this CA (as accountant or owner)
+    // We search by name (common for CAs) and also by caId as owner
     const [rows] = await connection.query(
       `SELECT id, name, employee_id, pan_number,
        (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = tbcompanies.id) > 0 as isLocked
-       FROM tbcompanies WHERE fdAccountantName = ?`,
-      [caId]
+       FROM tbcompanies 
+       WHERE (fdAccountantName = ?) OR (employee_id = ?)`,
+      [caName, caId]
     );
-    connection.release();
+
     res.json({ companies: rows });
   } catch (err) {
+    console.error('Error fetching companies by CA ID:', err);
     res.status(500).json({ message: err.message });
+  } finally {
+    if (connection) connection.release();
   }
 });
 

@@ -133,42 +133,72 @@ router.post('/logout', (req, res) => {
 });
 
 // ✅ Admin Dashboard Stats
-// router.get('/dashboard-stats', authMiddleware, async (req, res) => {
-//   try {
-//     const [[{ totalCA }]] = await db.query('SELECT COUNT(*) as totalCA FROM tbCA');
-//     const [[{ totalEmployees }]] = await db.query('SELECT COUNT(*) as totalEmployees FROM tbemployees');
-//     const [[{ totalCompanies }]] = await db.query('SELECT COUNT(*) as totalCompanies FROM tbcompanies');
+// ✅ Admin Dashboard Stats
+router.get('/dashboard-stats', authMiddleware, async (req, res) => {
+  try {
+    const { id, role } = req.user;
 
-//     // Recent activity (last 5 companies)
-//     const [recentCompanies] = await db.query(`
-//       SELECT c.name, c.created_at, e.fdname as owner
-//       FROM tbcompanies c
-//       LEFT JOIN tbemployees e ON c.employee_id = e.id
-//       ORDER BY c.created_at DESC
-//       LIMIT 5
-//     `);
+    let totalCA, totalEmployees, totalCompanies, recentCompanies;
 
-//     res.json({
-//       stats: {
-//         totalCA,
-//         totalEmployees,
-//         totalCompanies,
-//         // Mocking revenue since table not found, you can update this later
-//         monthlyRevenue: 125000,
-//         failedPayments: 3
-//       },
-//       recentActivity: recentCompanies.map(c => ({
-//         type: 'company_created',
-//         title: 'New company registered',
-//         time: c.created_at,
-//         user: c.name,
-//         owner: c.owner
-//       }))
-//     });
-//   } catch (err) {
-//     console.error('Stats fetch error:', err);
-//     res.status(500).json({ message: 'Server error', error: err.message });
-//   }
-// });
+    if (role === 'super_admin') {
+      // Global stats for Super Admin
+      [[{ totalCA }]] = await db.query('SELECT COUNT(*) as totalCA FROM tbCA');
+      [[{ totalEmployees }]] = await db.query('SELECT COUNT(*) as totalEmployees FROM tbemployees');
+      [[{ totalCompanies }]] = await db.query('SELECT COUNT(*) as totalCompanies FROM tbcompanies');
+
+      [recentCompanies] = await db.query(`
+        SELECT c.name, c.created_at, e.fdname as owner
+        FROM tbcompanies c
+        LEFT JOIN tbCA e ON c.fdAccountantName = e.fdname
+        ORDER BY c.created_at DESC
+        LIMIT 5
+      `);
+    } else {
+      // Stats for specific CA Admin
+      const [[caUser]] = await db.query('SELECT fdname FROM tbCA WHERE fdSiNo = ?', [id]);
+      const caName = caUser ? caUser.fdname : null;
+
+      totalCA = 1; // Only themselves
+
+      // Companies assigned to this CA
+      [[{ totalCompanies }]] = await db.query('SELECT COUNT(*) as totalCompanies FROM tbcompanies WHERE fdAccountantName = ?', [caName]);
+
+      // Employees associated with these companies (optional lookup)
+      [[{ totalEmployees }]] = await db.query(`
+        SELECT COUNT(DISTINCT employee_id) as totalEmployees 
+        FROM tbcompanies 
+        WHERE fdAccountantName = ? AND employee_id IS NOT NULL`,
+        [caName]);
+
+      [recentCompanies] = await db.query(`
+        SELECT c.name, c.created_at, ? as owner
+        FROM tbcompanies c
+        WHERE c.fdAccountantName = ?
+        ORDER BY c.created_at DESC
+        LIMIT 5
+      `, [caName, caName]);
+    }
+
+    res.json({
+      stats: {
+        totalCA,
+        totalEmployees,
+        totalCompanies,
+        monthlyRevenue: 125000, // Mocked
+        failedPayments: 3       // Mocked
+      },
+      recentActivity: recentCompanies.map(c => ({
+        type: 'company_created',
+        title: 'New company registered',
+        time: c.created_at,
+        user: c.name,
+        owner: c.owner
+      }))
+    });
+  } catch (err) {
+    console.error('Stats fetch error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
 
 module.exports = router;

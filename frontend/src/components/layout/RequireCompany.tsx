@@ -9,7 +9,7 @@ interface RequireCompanyProps {
 
 const RequireCompany: React.FC<RequireCompanyProps> = ({ children }) => {
   const { hasCompany, isLoading: authLoading, isAuthenticated } = useAuth();
-  const { unlockedCompanyId, isLoading: companyLoading } = useCompany();
+  const { isLoading: companyLoading } = useCompany();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -19,12 +19,9 @@ const RequireCompany: React.FC<RequireCompanyProps> = ({ children }) => {
     if (!isLoading && isAuthenticated) {
       if (!hasCompany) {
         navigate('/app/company');
-      } else if (!unlockedCompanyId && location.pathname !== '/app') {
-        // If company is not unlocked, force them to the dashboard (gate)
-        navigate('/app');
       }
     }
-  }, [isLoading, isAuthenticated, hasCompany, unlockedCompanyId, navigate, location.pathname]);
+  }, [isLoading, isAuthenticated, hasCompany, navigate, location.pathname]);
 
   if (isLoading) {
     return (
