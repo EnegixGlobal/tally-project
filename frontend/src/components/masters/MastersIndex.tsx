@@ -90,7 +90,7 @@ const MastersIndex: React.FC = () => {
           path: "/app/masters/stock-item/batches",
         },
         {
-          icon: <ScanBarcode  size={20} />,
+          icon: <ScanBarcode size={20} />,
           name: "Barcode Managment",
           // path: "/app/masters/stock-item/batches",
         },
@@ -123,9 +123,8 @@ const MastersIndex: React.FC = () => {
         {masterCategories.map((category, index) => (
           <div
             key={index}
-            className={`p-6 rounded-lg ${
-              theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-            }`}
+            className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+              }`}
           >
             <h2 className="text-xl font-semibold mb-4">{category.title}</h2>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
@@ -133,16 +132,14 @@ const MastersIndex: React.FC = () => {
                 <button
                   key={itemIndex}
                   onClick={() => navigate(item.path)}
-                  className={`p-4 rounded-lg flex flex-col items-center text-center transition-colors ${
-                    theme === "dark"
+                  className={`p-4 rounded-lg flex flex-col items-center text-center transition-colors ${theme === "dark"
                       ? "bg-gray-700 hover:bg-gray-600"
                       : "bg-gray-50 hover:bg-gray-100"
-                  }`}
+                    }`}
                 >
                   <div
-                    className={`p-2 rounded-full mb-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-blue-50"
-                    }`}
+                    className={`p-2 rounded-full mb-2 ${theme === "dark" ? "bg-gray-600" : "bg-blue-50"
+                      }`}
                   >
                     {item.icon}
                   </div>
@@ -155,9 +152,8 @@ const MastersIndex: React.FC = () => {
       </div>
 
       <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <p className="text-sm">
           <span className="font-semibold">Pro Tip:</span> Press Alt+F3 to

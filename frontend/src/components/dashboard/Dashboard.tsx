@@ -13,11 +13,11 @@ import {
 } from "lucide-react";
 import AddCaEmployeeForm from "./caemployee"; // adjust path as needed
 import AssignCompaniesModal from "./AssignCompaniesModal"; // Adjust path accordingly
+import PermissionsModal from "./PermissionsModal";
 import DashboardCaEmployee from "./DashboardCaEmployee";
-import { Lock } from "lucide-react";
+import { Lock, ShieldCheck } from "lucide-react";
 
 const Dashboard: React.FC = () => {
-
   const isSameCompany = (a: any, b: any) => {
     if (!a || !b) return false;
     return String(a.id) === String(b.id);
@@ -42,10 +42,23 @@ const Dashboard: React.FC = () => {
   const caId = localStorage.getItem("user_id") || localStorage.getItem("employee_id");
   const suppl: string | null = localStorage.getItem("supplier"); // employee | ca | ca_employee
   const [showAssignModal, setShowAssignModal] = useState(false);
+  const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(
     null
   );
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>("");
+
+  const openPermissionsModal = (employeeId: number, employeeName: string) => {
+    setSelectedEmployeeId(employeeId);
+    setSelectedEmployeeName(employeeName);
+    setShowPermissionsModal(true);
+  };
+
+  const closePermissionsModal = () => {
+    setSelectedEmployeeId(null);
+    setSelectedEmployeeName("");
+    setShowPermissionsModal(false);
+  };
 
   type Company = {
     id: string | number;
@@ -289,6 +302,7 @@ const Dashboard: React.FC = () => {
       .then((data) => setCaEmployees(data.employees || []))
       .catch(console.error);
   };
+
 
   const stats = [
     {
@@ -633,8 +647,7 @@ const Dashboard: React.FC = () => {
               <thead className="bg-gray-100">
                 <tr>
                   <th className="border p-2">Company Name</th>
-                  <th className="border p-2">Tax Type</th>
-                  <th className="border p-2">Employees</th>
+                  <th className="border p-2">Pan</th>
                 </tr>
               </thead>
               <tbody>
@@ -642,7 +655,6 @@ const Dashboard: React.FC = () => {
                   <tr key={company.id}>
                     <td className="border p-2">{company.name}</td>
                     <td className="border p-2">{company.pan_number}</td>
-                    <td className="border p-2">{company.employee_id}</td>
                   </tr>
                 ))}
               </tbody>
@@ -680,27 +692,50 @@ const Dashboard: React.FC = () => {
               <thead className="bg-gray-100">
                 <tr>
                   <th className="border p-2">Employee Name</th>
+                  <th className="border p-2">Email</th>
+                  <th className="border p-2">Password</th>
                   <th className="border p-2">Company Name</th>
                   <th className="border p-2">Adhar Number</th>
                   <th className="border p-2">Phone Number</th>
-                  <th className="border p-2">Actions</th> {/* New */}
+                  <th className="border p-2">Actions</th>
                 </tr>
               </thead>
               <tbody>
                 {caEmployees.map((emp, idx) => (
-                  <tr key={emp.employee_id || idx}>
+                  <tr key={emp.employee_id || idx} className="text-center">
                     <td className="border p-2">{emp.name}</td>
+                    <td className="border p-2">{emp.email}</td>
+                    <td className="border p-2">{emp.password || "*****"}</td>
                     <td className="border p-2">{emp.company_names || "—"}</td>
                     <td className="border p-2">{emp.adhar}</td>
                     <td className="border p-2">{emp.phone}</td>
-                    <td className="border p-2">
+                    <td className="border p-2 flex gap-2 justify-center cursor-pointer">
                       <button
-                        className="text-blue-600 hover:underline"
+                        className="text-blue-600 hover:underline flex items-center gap-1"
                         onClick={() =>
                           openAssignModal(emp.employee_id, emp.name)
                         }
                       >
                         Edit
+                      </button>
+
+                      <button
+                        className="text-red-600 hover:underline flex items-center gap-1"
+                        onClick={() =>
+                          openAssignModal(emp.employee_id, emp.name)
+                        }
+                      >
+                        Manage
+                      </button>
+
+                      <button
+                        className="text-green-600 hover:underline flex items-center gap-1"
+                        onClick={() =>
+                          openPermissionsModal(emp.employee_id, emp.name)
+                        }
+                      >
+                        <ShieldCheck size={14} />
+                        Access
                       </button>
                     </td>
                   </tr>
@@ -733,6 +768,14 @@ const Dashboard: React.FC = () => {
           onAssigned={() => {
             fetchEmployees(); // refresh list after update
           }}
+        />
+      )}
+
+      {showPermissionsModal && selectedEmployeeId !== null && (
+        <PermissionsModal
+          employeeId={selectedEmployeeId}
+          employeeName={selectedEmployeeName}
+          onClose={closePermissionsModal}
         />
       )}
 

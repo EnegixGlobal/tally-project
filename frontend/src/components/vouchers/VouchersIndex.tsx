@@ -1,12 +1,14 @@
 import React from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { useAuth } from '../../home/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import { 
-  DollarSign, ArrowRightCircle, ArrowLeftCircle, 
-  FileText, ShoppingCart, ShoppingBag, 
-  FileMinus, FilePlus, Truck,  Clipboard,
-  Package, 
-  ImportIcon
+import {
+  DollarSign, ArrowRightCircle, ArrowLeftCircle,
+  FileText, ShoppingCart, ShoppingBag,
+  FileMinus, FilePlus, Truck, Clipboard,
+  Package,
+  ImportIcon,
+  Lock
 } from 'lucide-react';
 
 interface VoucherType {
@@ -17,7 +19,7 @@ interface VoucherType {
   color: string;
   iconBg: string;
   description: string;
-  category: 'accounting' | 'trading' | 'inventory' | 'import' ;
+  category: 'accounting' | 'trading' | 'inventory' | 'import';
 }
 
 interface VoucherSection {
@@ -29,6 +31,7 @@ interface VoucherSection {
 
 const VouchersIndex: React.FC = () => {
   const { theme, vouchers, ledgers } = useAppContext();
+  const { checkPermission } = useAuth();
   const navigate = useNavigate();
 
   // Safe fallbacks with proper typing
@@ -191,7 +194,7 @@ const VouchersIndex: React.FC = () => {
           description: 'Credit adjustments',
           category: 'trading'
         },
-        
+
         // {
         //   id: 'sales-return',
         //   icon: <RotateCcw size={20} />,
@@ -258,7 +261,7 @@ const VouchersIndex: React.FC = () => {
         }
       ]
     },
-    
+
   ];
 
   return (
@@ -270,7 +273,7 @@ const VouchersIndex: React.FC = () => {
           Create, manage, and track all your vouchers in one place
         </p>
       </div>
-      
+
       {/* Voucher Types by Section */}
       <div className="space-y-6 mb-6">
         {voucherSections.map((section, sectionIndex) => (
@@ -286,25 +289,38 @@ const VouchersIndex: React.FC = () => {
                 </p>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-4">
-              {section.vouchers.map((voucher) => (
-                <button
-                  key={voucher.id}
-                  onClick={() => handleVoucherClick(voucher)}
-                  className={`p-4 rounded-lg flex flex-col items-center text-center transition-all duration-200 transform hover:scale-105 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${voucher.color} group`}
-                  aria-label={`Create ${voucher.name} voucher - ${voucher.description}`}
-                  title={voucher.description}
-                >
-                  <div className={`p-3 rounded-full mb-3 transition-colors group-hover:scale-110 ${voucher.iconBg}`}>
-                    {voucher.icon}
-                  </div>
-                  <span className="font-medium text-sm leading-tight">{voucher.name}</span>
-                  <span className={`text-xs mt-1 opacity-70 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                    {voucher.category}
-                  </span>
-                </button>
-              ))}
+              {section.vouchers.map((voucher) => {
+                const isAllowed = checkPermission(voucher.id);
+
+                return (
+                  <button
+                    key={voucher.id}
+                    onClick={() => isAllowed && handleVoucherClick(voucher)}
+                    disabled={!isAllowed}
+                    className={`p-4 rounded-lg flex flex-col items-center text-center transition-all duration-200 transform ${isAllowed
+                        ? 'hover:scale-105 hover:shadow-lg translate-y-0 active:scale-95 cursor-pointer'
+                        : 'opacity-50 grayscale cursor-not-allowed scale-100'
+                      } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${voucher.color} group relative`}
+                    aria-label={`Create ${voucher.name} voucher - ${voucher.description}`}
+                    title={isAllowed ? voucher.description : "You don't have permission to access this module"}
+                  >
+                    {!isAllowed && (
+                      <div className="absolute top-2 right-2 text-red-500 bg-white/80 rounded-full p-1 shadow-sm">
+                        <Lock size={12} />
+                      </div>
+                    )}
+                    <div className={`p-3 rounded-full mb-3 transition-colors ${isAllowed ? 'group-hover:scale-110' : ''} ${voucher.iconBg}`}>
+                      {voucher.icon}
+                    </div>
+                    <span className="font-medium text-sm leading-tight">{voucher.name}</span>
+                    <span className={`text-xs mt-1 opacity-70 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      {voucher.category}
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -316,17 +332,16 @@ const VouchersIndex: React.FC = () => {
           <FileText className="mr-2" size={20} />
           Recent Vouchers
         </h2>
-        
+
         {safeVouchers && safeVouchers.length > 0 ? (
           <div className="space-y-3">
             {safeVouchers.slice(-5).reverse().map((voucher, index) => (
               <div
                 key={voucher.id || `voucher-${index}`}
-                className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700/50 border-gray-600 hover:bg-gray-700 hover:border-gray-500' 
-                    : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
-                }`}
+                className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${theme === 'dark'
+                  ? 'bg-gray-700/50 border-gray-600 hover:bg-gray-700 hover:border-gray-500'
+                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
+                  }`}
                 onClick={() => {
                   console.log('Voucher details:', voucher);
                   // In a real app, this would navigate to voucher details
@@ -348,15 +363,14 @@ const VouchersIndex: React.FC = () => {
                       <span className="font-semibold text-sm truncate">
                         {voucher.number}
                       </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium uppercase tracking-wide ${
-                        voucher.type === 'quotation' || voucher.isQuotation === true
-                          ? theme === 'dark' ? 'bg-violet-900/50 text-violet-300' : 'bg-violet-100 text-violet-700'
-                          : theme === 'dark' ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-700'
-                      }`}>
+                      <span className={`px-2 py-1 rounded-full text-xs font-medium uppercase tracking-wide ${voucher.type === 'quotation' || voucher.isQuotation === true
+                        ? theme === 'dark' ? 'bg-violet-900/50 text-violet-300' : 'bg-violet-100 text-violet-700'
+                        : theme === 'dark' ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-700'
+                        }`}>
                         {voucher.type === 'quotation' || voucher.isQuotation === true ? 'Quotation' : voucher.type}
                       </span>
                     </div>
-                    
+
                     <div className={`text-xs space-y-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                       <div className="flex items-center">
                         <span className="font-medium mr-2">Date:</span>
@@ -368,14 +382,13 @@ const VouchersIndex: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div className="text-right ml-4 flex-shrink-0">
                     <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
                       {voucher.entries?.length || 0} items
                     </div>
-                    <div className={`text-xs mt-1 px-2 py-1 rounded ${
-                      theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'
-                    }`}>
+                    <div className={`text-xs mt-1 px-2 py-1 rounded ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'
+                      }`}>
                       {voucher.mode || 'item-invoice'}
                     </div>
                   </div>
@@ -391,13 +404,12 @@ const VouchersIndex: React.FC = () => {
           </div>
         )}
       </div>
-      
+
       {/* Pro Tips Section */}
-      <div className={`mt-6 p-4 rounded-lg border-l-4 ${
-        theme === 'dark' 
-          ? 'bg-blue-900/20 border-blue-500 text-blue-200' 
-          : 'bg-blue-50 border-blue-400 text-blue-700'
-      }`}>
+      <div className={`mt-6 p-4 rounded-lg border-l-4 ${theme === 'dark'
+        ? 'bg-blue-900/20 border-blue-500 text-blue-200'
+        : 'bg-blue-50 border-blue-400 text-blue-700'
+        }`}>
         <h3 className="font-semibold text-sm mb-2">💡 Pro Tips</h3>
         <ul className="text-sm space-y-1">
           <li>• Press <kbd className={`px-1 py-0.5 rounded text-xs ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border'}`}>Alt+F5</kbd> to quickly access Vouchers</li>

@@ -150,4 +150,66 @@ router.get('/ca-employees-with-companies', async (req, res) => {
   }
 });
 
+router.get('/ca-employee-permissions', async (req, res) => {
+  const { ca_employee_id } = req.query;
+  if (!ca_employee_id) return res.status(400).json({ message: "Missing ca_employee_id" });
+
+  let connection;
+  try {
+    connection = await db.getConnection();
+    const [rows] = await connection.query(
+      `SELECT permissions FROM tbcaemployeepermissions WHERE ca_employee_id = ?`,
+      [ca_employee_id]
+    );
+
+    if (rows.length > 0) {
+      res.json({ permissions: rows[0].permissions });
+    } else {
+      res.json({ permissions: {} });
+    }
+  } catch (err) {
+    console.error("Error fetching permissions:", err);
+    res.status(500).json({ message: err.message });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
+router.post('/update-ca-employee-permissions', async (req, res) => {
+  const { ca_employee_id, permissions } = req.body;
+  if (!ca_employee_id || !permissions) {
+    return res.status(400).json({ message: "ca_employee_id and permissions are required" });
+  }
+
+  let connection;
+  try {
+    connection = await db.getConnection();
+
+    // Check if permissions already exist
+    const [rows] = await connection.query(
+      `SELECT id FROM tbcaemployeepermissions WHERE ca_employee_id = ?`,
+      [ca_employee_id]
+    );
+
+    if (rows.length > 0) {
+      await connection.query(
+        `UPDATE tbcaemployeepermissions SET permissions = ? WHERE ca_employee_id = ?`,
+        [JSON.stringify(permissions), ca_employee_id]
+      );
+    } else {
+      await connection.query(
+        `INSERT INTO tbcaemployeepermissions (ca_employee_id, permissions) VALUES (?, ?)`,
+        [ca_employee_id, JSON.stringify(permissions)]
+      );
+    }
+
+    res.json({ message: 'Permissions updated successfully' });
+  } catch (err) {
+    console.error("Error updating permissions:", err);
+    res.status(500).json({ message: err.message });
+  } finally {
+    if (connection) connection.release();
+  }
+});
+
 module.exports = router;

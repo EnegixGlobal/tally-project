@@ -28,6 +28,8 @@ interface AuthContextType {
   companyId: string | null;
   updateCompany: (companyId: string, companyInfo?: any) => void;
   isAuthenticated: boolean;
+  permissions: Record<string, boolean>;
+  checkPermission: (moduleId: string) => boolean;
 }
 
 interface RegisterData {
@@ -49,16 +51,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [companyId, setCompanyId] = useState<string | null>(null);
   const [hasCompany, setHasCompany] = useState<boolean>(false);
+  const [permissions, setPermissions] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     // Check if user is logged in on app start
     try {
       const savedUser = localStorage.getItem("user");
+      const savedUserType = localStorage.getItem("userType");
+      const employeeId = localStorage.getItem("employee_id");
+
       console.log(savedUser);
       if (savedUser) {
         const parsedUser = JSON.parse(savedUser);
         setUser(parsedUser);
       }
+
+      // If CA employee, fetch permissions
+      if (savedUserType === "ca_employee" && employeeId) {
+        fetch(`${import.meta.env.VITE_API_URL}/api/ca-employee-permissions?ca_employee_id=${employeeId}`)
+          .then(res => res.json())
+          .then(data => {
+            setPermissions(data.permissions || {});
+          })
+          .catch(err => console.error("Error loading permissions:", err));
+      }
+
       // read company info from localStorage
       const savedCompany = localStorage.getItem("company");
       const savedCompanyId = localStorage.getItem("company_id");
@@ -278,6 +295,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     }
   };
 
+  const checkPermission = (moduleId: string) => {
+    const userType = localStorage.getItem("userType");
+    // If not CA employee, grant all permissions
+    if (userType !== "ca_employee") return true;
+
+    // Check if module is allowed
+    return !!permissions[moduleId];
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -291,6 +317,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         companyId,
         updateCompany,
         isAuthenticated: !!user,
+        permissions,
+        checkPermission,
       }}
     >
       {children}
