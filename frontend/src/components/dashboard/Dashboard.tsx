@@ -709,18 +709,22 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
             {showAddForm && (
-              <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-                <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md relative">
+              <div className="fixed inset-0 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm z-50 p-4 transition-all duration-300">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl relative animate-in zoom-in-95 duration-200 overflow-hidden border border-white/20">
                   <button
                     onClick={() => setShowAddForm(false)}
-                    className="absolute top-2 right-2 text-gray-400 hover:text-black"
+                    className="absolute top-4 right-4 text-gray-400 hover:text-gray-600 hover:bg-gray-100 p-2 rounded-full transition-all z-10"
                   >
-                    ×
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
                   </button>
-                  <AddCaEmployeeForm
-                    caId={caId || ""}
-                    onSuccess={() => setShowAddForm(false)}
-                  />
+                  <div className="max-h-[90vh] overflow-y-auto no-scrollbar">
+                    <AddCaEmployeeForm
+                      caId={caId || ""}
+                      onSuccess={() => setShowAddForm(false)}
+                    />
+                  </div>
                 </div>
               </div>
             )}
@@ -771,15 +775,7 @@ const Dashboard: React.FC = () => {
               </tbody>
             </table>
 
-            {/* Submit Employees */}
-            <div className="mt-6 flex justify-end">
-              <button
-                onClick={() => console.log("Submitted Employees:", employees)}
-                className="bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700 transition"
-              >
-                Submit
-              </button>
-            </div>
+
           </div>
         </div>
       ) : null}
@@ -805,11 +801,16 @@ const Dashboard: React.FC = () => {
 
       {/* Modal for Adding Employee */}
       {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50">
-          <div className="bg-white rounded-xl shadow-lg p-6 w-full max-w-md">
-            <h3 className="text-lg font-semibold mb-4">Add New Employee</h3>
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm z-50 p-4 transition-all duration-300">
+          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative animate-in zoom-in-95 duration-200 overflow-hidden border border-white/20 p-8">
+            <div className="text-center mb-8">
+              <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                Add New Employee
+              </h3>
+              <p className="text-sm text-gray-500 mt-1">Fill in the details to add a new employee</p>
+            </div>
 
-            <div className="space-y-3">
+            <div className="space-y-4">
               <input
                 type="text"
                 placeholder="Employee Name"
@@ -817,7 +818,7 @@ const Dashboard: React.FC = () => {
                 onChange={(e) =>
                   setNewEmployee({ ...newEmployee, name: e.target.value })
                 }
-                className="border rounded-lg p-2 w-full"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400 text-gray-800 font-medium"
               />
               <input
                 type="text"
@@ -826,7 +827,7 @@ const Dashboard: React.FC = () => {
                 onChange={(e) =>
                   setNewEmployee({ ...newEmployee, adhar: e.target.value })
                 }
-                className="border rounded-lg p-2 w-full"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400 text-gray-800 font-medium"
               />
               <input
                 type="text"
@@ -835,20 +836,20 @@ const Dashboard: React.FC = () => {
                 onChange={(e) =>
                   setNewEmployee({ ...newEmployee, phone: e.target.value })
                 }
-                className="border rounded-lg p-2 w-full"
+                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400 text-gray-800 font-medium"
               />
             </div>
 
-            <div className="flex justify-end gap-3 mt-6">
+            <div className="flex flex-col sm:flex-row gap-3 mt-8">
               <button
                 onClick={() => setShowModal(false)}
-                className="px-4 py-2 rounded-lg border hover:bg-gray-100"
+                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 font-semibold text-gray-600 hover:bg-gray-50 transition-all active:scale-95"
               >
                 Cancel
               </button>
               <button
                 onClick={handleAddEmployee}
-                className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700"
+                className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
               >
                 Add Employee
               </button>

@@ -85,19 +85,19 @@ const PermissionsModal: React.FC<PermissionsModalProps> = ({ employeeId, employe
     const categories = Array.from(new Set(MODULES.map(m => m.category)));
 
     return (
-        <div className="fixed inset-0 flex items-center justify-center bg-black bg-opacity-50 z-50 p-4">
-            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-                <div className="p-6 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
+        <div className="fixed inset-0 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm z-50 p-4 transition-all duration-300">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200 border border-white/20">
+                <div className="p-8 border-b flex justify-between items-center bg-gradient-to-r from-blue-600 to-indigo-600 text-white">
                     <div>
-                        <h2 className="text-xl font-bold">Manage Permissions</h2>
-                        <p className="text-blue-100 text-sm">Assign access for {employeeName}</p>
+                        <h2 className="text-2xl font-bold">Manage Permissions</h2>
+                        <p className="text-blue-100 text-sm mt-1">Assign access for {employeeName}</p>
                     </div>
-                    <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-colors text-2xl leading-none">
+                    <button onClick={onClose} className="hover:bg-white/20 p-2 rounded-full transition-all text-3xl leading-none">
                         &times;
                     </button>
                 </div>
 
-                <div className="flex-1 overflow-y-auto p-6 space-y-6">
+                <div className="flex-1 overflow-y-auto p-8 space-y-8 scrollbar-thin scrollbar-thumb-gray-200">
                     {loading ? (
                         <div className="flex justify-center items-center h-40">
                             <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600"></div>
@@ -130,16 +130,16 @@ const PermissionsModal: React.FC<PermissionsModalProps> = ({ employeeId, employe
                     )}
                 </div>
 
-                <div className="p-6 border-t bg-gray-50 flex justify-end gap-3">
+                <div className="p-8 border-t flex justify-end gap-3 transition-all duration-300">
                     <button
                         onClick={onClose}
-                        className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 font-medium hover:bg-gray-100 transition-colors"
+                        className="px-6 py-3 border border-gray-200 rounded-xl text-gray-600 font-semibold hover:bg-gray-50 transition-all active:scale-95"
                     >
                         Cancel
                     </button>
                     <button
                         onClick={handleSave}
-                        className="px-8 py-2 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all active:scale-95"
+                        className="px-10 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
                     >
                         Save Permissions
                     </button>
