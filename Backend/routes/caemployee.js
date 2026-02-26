@@ -91,6 +91,32 @@ router.get('/ca-employee-companies', async (req, res) => {
     if (connection) connection.release();
   }
 });
+
+// Alias for frontend compatibility
+router.get('/companies-by-ca-employee', async (req, res) => {
+  const ca_employee_id = req.query.ca_employee_id;
+  if (!ca_employee_id) {
+    return res.status(400).json({ message: 'ca_employee_id is required' });
+  }
+
+  let connection;
+  try {
+    connection = await db.getConnection();
+    const [rows] = await connection.query(
+      `SELECT c.*
+       FROM tbcompanies c
+       INNER JOIN tbcaemployeecompanies a ON c.id = a.company_id
+       WHERE a.ca_employee_id = ?`,
+      [ca_employee_id]
+    );
+    res.json({ companies: rows });
+  } catch (err) {
+    console.error("Error fetching CA employee companies:", err);
+    res.status(500).json({ message: err.message });
+  } finally {
+    if (connection) connection.release();
+  }
+});
 router.post('/ca-employee-login', async (req, res) => {
   const { email, password } = req.body;
   if (!email || !password) return res.status(400).json({ message: 'Email and password required' });
@@ -163,7 +189,15 @@ router.get('/ca-employee-permissions', async (req, res) => {
     );
 
     if (rows.length > 0) {
-      res.json({ permissions: rows[0].permissions });
+      let permissions = rows[0].permissions;
+      if (typeof permissions === 'string') {
+        try {
+          permissions = JSON.parse(permissions);
+        } catch (e) {
+          permissions = {};
+        }
+      }
+      res.json({ permissions: permissions || {} });
     } else {
       res.json({ permissions: {} });
     }

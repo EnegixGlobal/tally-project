@@ -116,13 +116,23 @@ const DayBook: React.FC = () => {
   useEffect(() => {
     const company_id = localStorage.getItem("company_id");
     const owner_type = localStorage.getItem("supplier");
-    const owner_id = localStorage.getItem("employee_id");
+    const userType = localStorage.getItem("userType");
 
-    if (!company_id || !owner_type || !owner_id) return;
+    let fetchOwnerType = owner_type;
+    let fetchOwnerId = owner_type === "employee"
+      ? localStorage.getItem("employee_id")
+      : localStorage.getItem("user_id");
+
+    if (userType === "ca_employee") {
+      fetchOwnerType = "employee";
+      fetchOwnerId = localStorage.getItem("employee_id");
+    }
+
+    if (!company_id || !fetchOwnerType || !fetchOwnerId) return;
 
     fetch(
       `${import.meta.env.VITE_API_URL
-      }/api/daybookTable2?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
+      }/api/daybookTable2?company_id=${company_id}&owner_type=${fetchOwnerType}&owner_id=${fetchOwnerId}`
     )
       .then((res) => res.json())
       .then((data) => {

@@ -14,6 +14,7 @@ import {
   BookKey,
   Wallet,
   LogOut,
+  Lock,
 } from "lucide-react";
 
 interface SidebarProps {

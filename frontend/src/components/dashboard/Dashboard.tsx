@@ -15,6 +15,7 @@ import AddCaEmployeeForm from "./caemployee"; // adjust path as needed
 import AssignCompaniesModal from "./AssignCompaniesModal"; // Adjust path accordingly
 import PermissionsModal from "./PermissionsModal";
 import DashboardCaEmployee from "./DashboardCaEmployee";
+import { useAuth } from "../../home/context/AuthContext";
 import { Lock, ShieldCheck } from "lucide-react";
 
 const Dashboard: React.FC = () => {
@@ -25,6 +26,7 @@ const Dashboard: React.FC = () => {
 
   const { theme, setCompanyInfo } = useAppContext();
   const { switchCompany, activeCompanyId, setCompanies: setContextCompanies } = useCompany();
+  const { checkPermission } = useAuth();
   const navigate = useNavigate();
   const [companyInfo, setCompanyInfoState] = useState<any>(null);
   const [ledgers, setLedgers] = useState<any[]>([]);
@@ -41,6 +43,7 @@ const Dashboard: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const caId = localStorage.getItem("user_id") || localStorage.getItem("employee_id");
   const suppl: string | null = localStorage.getItem("supplier"); // employee | ca | ca_employee
+  const userType = localStorage.getItem("userType");
   const [showAssignModal, setShowAssignModal] = useState(false);
   const [showPermissionsModal, setShowPermissionsModal] = useState(false);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<number | null>(
@@ -164,16 +167,35 @@ const Dashboard: React.FC = () => {
     async function fetchData() {
       try {
         const token = localStorage.getItem("token");
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL
-          }/api/dashboard-data?employee_id=${employeeId}`,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              "Content-Type": "application/json",
-            },
-          }
-        );
+        const ownerType = localStorage.getItem("supplier");
+        const restrictedId = localStorage.getItem("company_id");
+
+        let ownerId =
+          ownerType === "employee"
+            ? localStorage.getItem("employee_id")
+            : localStorage.getItem("user_id");
+
+        // For CA employees, we want to see the owner's data
+        let fetchOwnerType = ownerType;
+        let fetchOwnerId = ownerId;
+
+        if (userType === "ca_employee") {
+          fetchOwnerType = "employee";
+          fetchOwnerId = localStorage.getItem("employee_id");
+        }
+
+        let url = `${import.meta.env.VITE_API_URL}/api/dashboard-data?employee_id=${fetchOwnerId}`;
+
+        if ((userType === 'company_user' || userType === 'ca_employee') && restrictedId) {
+          url += `&company_id=${restrictedId}`;
+        }
+
+        const res = await fetch(url, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
 
         const data = await res.json();
         // console.log("this is data", data.companyInfo);
@@ -186,14 +208,7 @@ const Dashboard: React.FC = () => {
           });
           setUserLimit(data.userLimit ?? 1);
 
-          // Filter companies if role is company_user
-          const userType = localStorage.getItem("userType");
-          const restrictedId = localStorage.getItem("company_id");
-          let filteredCompanies = data.companies || [];
-          if (userType === 'company_user' && restrictedId) {
-            filteredCompanies = filteredCompanies.filter((c: any) => String(c.id) === String(restrictedId));
-          }
-          setCompanies(filteredCompanies);
+          setCompanies(data.companies || []);
 
           setLedgers(data.ledgers || []);
           setVouchers(data.vouchers || []);
@@ -217,8 +232,26 @@ const Dashboard: React.FC = () => {
 
   useEffect(() => {
     const employeeId = localStorage.getItem("employee_id");
+    const caEmployeeId = localStorage.getItem("user_id");
 
-    if (!employeeId) return;
+    if (!employeeId && userType !== "ca_employee") return;
+
+    if (userType === "ca_employee" && caEmployeeId) {
+      fetch(
+        `${import.meta.env.VITE_API_URL}/api/companies-by-ca-employee?ca_employee_id=${caEmployeeId}`
+      )
+        .then((res) => res.json())
+        .then((data) => {
+          const restrictedId = localStorage.getItem("company_id");
+          let filteredAll = data.companies || [];
+          if (restrictedId) {
+            filteredAll = filteredAll.filter((c: any) => String(c.id) === String(restrictedId));
+          }
+          setAllCompanies(filteredAll);
+        })
+        .catch((err) => console.error("Error fetching CA employee companies:", err));
+      return;
+    }
 
     fetch(
       `${import.meta.env.VITE_API_URL
@@ -226,7 +259,6 @@ const Dashboard: React.FC = () => {
     )
       .then((res) => res.json())
       .then((data) => {
-        const userType = localStorage.getItem("userType");
         const restrictedId = localStorage.getItem("company_id");
         let filteredAll = data.companies || [];
         if (userType === 'company_user' && restrictedId) {
@@ -340,8 +372,8 @@ const Dashboard: React.FC = () => {
   ];
 
   const companyCount = companies.length;
-  const userType = localStorage.getItem("userType");
-  const canCreateCompany = companyCount < userLimit && userType !== "company_user";
+  const canCreateCompany = companyCount < userLimit && userType === "employee";
+  // Note: For 'ca_employee', userType is 'ca_employee', so canCreateCompany will be false.
 
   const handleAddEmployee = () => {
     if (!newEmployee.name || !newEmployee.adhar || !newEmployee.phone) return;
@@ -364,7 +396,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <>
-      {suppl === "employee" ? (
+      {suppl === "employee" || suppl === "ca_employee" ? (
         <div className="pt-[40px] px-4 ">
           {/* <h1 className="text-2xl font-bold mb-6">Dashboard</h1> */}
 
@@ -394,7 +426,7 @@ const Dashboard: React.FC = () => {
                 )
               )}
 
-              {userType !== "company_user" && allCompanies.length > 1 && (
+              {userType === "employee" && allCompanies.length > 1 && (
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-bold text-gray-400 invisible sm:visible">Active:</span>
                   <select
@@ -428,7 +460,7 @@ const Dashboard: React.FC = () => {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 mb-10">
               {companies
                 .filter(c => {
-                  if (userType === 'company_user') {
+                  if (userType === 'company_user' || userType === 'ca_employee') {
                     const restrictedId = localStorage.getItem("company_id");
                     return String(c.id) === String(restrictedId);
                   }
@@ -545,68 +577,72 @@ const Dashboard: React.FC = () => {
               </div>
 
               {/* Stats */}
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                {stats.map((stat, index) => (
-                  <div
-                    key={index}
-                    className={`p-6 rounded-lg ${stat.color} ${theme === "dark" ? "" : "shadow"
-                      }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <div>
-                        <p className="text-sm opacity-75 mb-1">{stat.title}</p>
-                        <p className="text-2xl font-semibold">{stat.value}</p>
-                      </div>
+              {checkPermission('reports') && (
+                <>
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    {stats.map((stat, index) => (
                       <div
-                        className={`p-2 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-white"
+                        key={index}
+                        className={`p-6 rounded-lg ${stat.color} ${theme === "dark" ? "" : "shadow"
                           }`}
                       >
-                        {stat.icon}
+                        <div className="flex justify-between items-start">
+                          <div>
+                            <p className="text-sm opacity-75 mb-1">{stat.title}</p>
+                            <p className="text-2xl font-semibold">{stat.value}</p>
+                          </div>
+                          <div
+                            className={`p-2 rounded-full ${theme === "dark" ? "bg-gray-700" : "bg-white"
+                              }`}
+                          >
+                            {stat.icon}
+                          </div>
+                        </div>
                       </div>
+                    ))}
+                  </div>
+                  {/* Extra Reports Section */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+                    {/* Sales Report */}
+                    <div className="p-6 rounded-xl bg-gradient-to-r from-green-50 to-green-100 shadow hover:shadow-lg transition">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        Sales Report
+                      </h3>
+                      <p className="text-2xl font-bold text-green-700">
+                        ₹ 1,25,000
+                      </p>
+                      <p className="text-sm text-gray-500">This Month</p>
+                    </div>
+
+                    {/* Purchase Report */}
+                    <div className="p-6 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 shadow hover:shadow-lg transition">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        Purchase Report
+                      </h3>
+                      <p className="text-2xl font-bold text-blue-700">₹ 75,000</p>
+                      <p className="text-sm text-gray-500">This Month</p>
+                    </div>
+
+                    {/* Input Tax */}
+                    <div className="p-6 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 shadow hover:shadow-lg transition">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        Input Tax
+                      </h3>
+                      <p className="text-2xl font-bold text-purple-700">₹ 15,000</p>
+                      <p className="text-sm text-gray-500">This Month</p>
+                    </div>
+
+                    {/* Output Tax */}
+                    <div className="p-6 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 shadow hover:shadow-lg transition">
+                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                        Output Tax
+                      </h3>
+                      <p className="text-2xl font-bold text-orange-700">₹ 20,000</p>
+                      <p className="text-sm text-gray-500">This Month</p>
                     </div>
                   </div>
-                ))}
-              </div>
-              {/* Extra Reports Section */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-                {/* Sales Report */}
-                <div className="p-6 rounded-xl bg-gradient-to-r from-green-50 to-green-100 shadow hover:shadow-lg transition">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Sales Report
-                  </h3>
-                  <p className="text-2xl font-bold text-green-700">
-                    ₹ 1,25,000
-                  </p>
-                  <p className="text-sm text-gray-500">This Month</p>
-                </div>
-
-                {/* Purchase Report */}
-                <div className="p-6 rounded-xl bg-gradient-to-r from-blue-50 to-blue-100 shadow hover:shadow-lg transition">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Purchase Report
-                  </h3>
-                  <p className="text-2xl font-bold text-blue-700">₹ 75,000</p>
-                  <p className="text-sm text-gray-500">This Month</p>
-                </div>
-
-                {/* Input Tax */}
-                <div className="p-6 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 shadow hover:shadow-lg transition">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Input Tax
-                  </h3>
-                  <p className="text-2xl font-bold text-purple-700">₹ 15,000</p>
-                  <p className="text-sm text-gray-500">This Month</p>
-                </div>
-
-                {/* Output Tax */}
-                <div className="p-6 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 shadow hover:shadow-lg transition">
-                  <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                    Output Tax
-                  </h3>
-                  <p className="text-2xl font-bold text-orange-700">₹ 20,000</p>
-                  <p className="text-sm text-gray-500">This Month</p>
-                </div>
-              </div>
+                </>
+              )}
             </>
 
           )}
@@ -719,14 +755,6 @@ const Dashboard: React.FC = () => {
                         Edit
                       </button>
 
-                      <button
-                        className="text-red-600 hover:underline flex items-center gap-1"
-                        onClick={() =>
-                          openAssignModal(emp.employee_id, emp.name)
-                        }
-                      >
-                        Manage
-                      </button>
 
                       <button
                         className="text-green-600 hover:underline flex items-center gap-1"
@@ -753,10 +781,6 @@ const Dashboard: React.FC = () => {
               </button>
             </div>
           </div>
-        </div>
-      ) : suppl === "ca_employee" ? (
-        <div className="pt-[56px] px-4">
-          <DashboardCaEmployee />
         </div>
       ) : null}
       {showAssignModal && selectedEmployeeId !== null && (

@@ -39,7 +39,7 @@ router.post('/', async (req, res) => {
       {
         table: 'tbcaemployees',
         role: 'ca_employee',
-        supplier: 'ca_employee',
+        supplier: 'employee',
         passwordField: 'password',
         idField: 'id',
         nameField: (u) => u.name,
@@ -81,14 +81,20 @@ router.post('/', async (req, res) => {
           employeeId = companyRow.employee_id;
         }
       } else if (role === 'ca_employee') {
-        const caId = user['ca_id'];
-        const [[company]] = await db.query(
-          'SELECT * FROM tbcompanies WHERE fdAccountantName = ?',
-          [caId]
+        const [assignedCompanies] = await db.query(
+          `SELECT c.* FROM tbcompanies c
+           INNER JOIN tbcaemployeecompanies ec ON c.id = ec.company_id
+           WHERE ec.ca_employee_id = ?`,
+          [user[idField]]
         );
-        companyRow = company || null;
-        if (companyRow && companyRow.employee_id) {
-          employeeId = companyRow.employee_id;
+
+        if (assignedCompanies.length > 0) {
+          companyRow = assignedCompanies[0];
+          user.assignedCompanies = assignedCompanies;
+          // Set employeeId to the company's owner ID so dashboard fetches their data
+          if (companyRow.employee_id) {
+            employeeId = companyRow.employee_id;
+          }
         }
       }
 
@@ -112,13 +118,14 @@ router.post('/', async (req, res) => {
         companyId,
         hasCompany,
         companyInfo: companyRow || null,
+        companies: user.assignedCompanies || (companyRow ? [companyRow] : []),
         employee_id: employeeId,
         user: {
           id: user[idField],
           name: nameField(user),
           email: user.email,
-          firstName: user.firstName,
-          lastName: user.lastName,
+          firstName: user.firstName || user.name || nameField(user),
+          lastName: user.lastName || '',
           pan: user.pan,
           phoneNumber: user.phoneNumber,
           userLimit: user.userLimit,

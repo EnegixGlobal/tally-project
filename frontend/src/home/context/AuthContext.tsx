@@ -58,7 +58,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       const savedUser = localStorage.getItem("user");
       const savedUserType = localStorage.getItem("userType");
-      const employeeId = localStorage.getItem("employee_id");
 
       console.log(savedUser);
       if (savedUser) {
@@ -66,12 +65,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setUser(parsedUser);
       }
 
+      const caEmployeeId = localStorage.getItem("user_id");
       // If CA employee, fetch permissions
-      if (savedUserType === "ca_employee" && employeeId) {
-        fetch(`${import.meta.env.VITE_API_URL}/api/ca-employee-permissions?ca_employee_id=${employeeId}`)
+      if (savedUserType === "ca_employee" && caEmployeeId) {
+        fetch(`${import.meta.env.VITE_API_URL}/api/ca-employee-permissions?ca_employee_id=${caEmployeeId}`)
           .then(res => res.json())
           .then(data => {
-            setPermissions(data.permissions || {});
+            let perms = data.permissions || {};
+            if (typeof perms === 'string') {
+              try { perms = JSON.parse(perms); } catch (e) { perms = {}; }
+            }
+            setPermissions(perms);
           })
           .catch(err => console.error("Error loading permissions:", err));
       }
@@ -152,11 +156,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       try {
         if (data.token) localStorage.setItem("token", data.token);
         localStorage.setItem("user", JSON.stringify(newUser));
-        if (data.userType) localStorage.setItem("userType", data.userType);
+        if (data.role) localStorage.setItem("userType", data.role);
         if (data.hasCompany !== undefined)
           localStorage.setItem("company", String(data.hasCompany));
-        if (data.companyId !== undefined)
+        if (data.companyId !== undefined) {
           localStorage.setItem("company_id", String(data.companyId));
+          localStorage.setItem("active_company_id", String(data.companyId));
+        }
         if (data.companyInfo)
           localStorage.setItem("companyInfo", JSON.stringify(data.companyInfo));
         if (data.employee_id !== undefined)
@@ -165,6 +171,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           localStorage.setItem("user_id", String(data.user_id));
         if (data.supplier !== undefined)
           localStorage.setItem("supplier", String(data.supplier));
+        if (data.companies !== undefined)
+          localStorage.setItem("companies", JSON.stringify(data.companies));
       } catch (e) {
         console.warn("Could not write all items to localStorage:", e);
       }
@@ -172,10 +180,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       // Ensure React state reflects backend-provided company info immediately
       if (data.hasCompany !== undefined) setHasCompany(Boolean(data.hasCompany));
       if (data.companyId !== undefined) setCompanyId(String(data.companyId));
-      // Also accept backend key `company_id`
       if ((data as any).company_id !== undefined) {
         setCompanyId(String((data as any).company_id));
         setHasCompany(true);
+      }
+
+      if (data.role === "ca_employee" && data.user_id) {
+        fetch(`${import.meta.env.VITE_API_URL}/api/ca-employee-permissions?ca_employee_id=${data.user_id}`)
+          .then(res => res.json())
+          .then(pData => {
+            let perms = pData.permissions || {};
+            if (typeof perms === 'string') {
+              try { perms = JSON.parse(perms); } catch (e) { perms = {}; }
+            }
+            setPermissions(perms);
+          })
+          .catch(err => console.error("Error loading permissions immediately:", err));
       }
 
       setIsLoading(false);

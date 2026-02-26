@@ -46,14 +46,20 @@ const LedgerList: React.FC = () => {
           localStorage.getItem("company_id") ||
           localStorage.getItem("company_id");
         const ownerType = localStorage.getItem("supplier");
-        const ownerId =
-          ownerType === "employee"
-            ? localStorage.getItem("employee_id") ||
-              localStorage.getItem("employee_id")
-            : localStorage.getItem("user_id") ||
-              localStorage.getItem("user_id");
+        const userType = localStorage.getItem("userType");
 
-        if (!companyId || !ownerType || !ownerId) {
+        // For CA employees, we want to see the owner's data
+        let fetchOwnerType = ownerType;
+        let fetchOwnerId = ownerType === "employee"
+          ? localStorage.getItem("employee_id")
+          : localStorage.getItem("user_id");
+
+        if (userType === "ca_employee") {
+          fetchOwnerType = "employee";
+          fetchOwnerId = localStorage.getItem("employee_id");
+        }
+
+        if (!companyId || !fetchOwnerType || !fetchOwnerId) {
           console.error("Missing required identifiers for ledger GET");
           setLedgers([]);
           return;
@@ -61,9 +67,8 @@ const LedgerList: React.FC = () => {
 
         // Fetch ledgers scoped to company & owner
         const ledgerRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
-          }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL
+          }/api/ledger?company_id=${companyId}&owner_type=${fetchOwnerType}&owner_id=${fetchOwnerId}`
         );
         const ledgerData = await ledgerRes.json();
 
@@ -75,11 +80,10 @@ const LedgerList: React.FC = () => {
           setLedgers([]);
         }
 
-        // Fetch ledger groups (no scoping in your current backend — optional to scope later)
+        // Fetch ledger groups
         const groupRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
-          }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL
+          }/api/ledger-groups?company_id=${companyId}&owner_type=${fetchOwnerType}&owner_id=${fetchOwnerId}`
         );
         const groupData = await groupRes.json();
         setLedgerGroups(Array.isArray(groupData) ? groupData : []);
@@ -114,18 +118,18 @@ const LedgerList: React.FC = () => {
 
   const filteredLedgers = Array.isArray(ledgers)
     ? ledgers.filter((ledger) => {
-        const matchesSearch = ledger.name
-          ?.toLowerCase()
-          .includes(searchTerm.toLowerCase());
-        const matchesCategory =
-          categoryFilter === "all" ||
-          (categoryFilter === "b2b" &&
-            ledger.gstNumber &&
-            ledger.gstNumber.trim().length > 0) ||
-          (categoryFilter === "b2c" &&
-            (!ledger.gstNumber || ledger.gstNumber.trim().length === 0));
-        return matchesSearch && matchesCategory;
-      })
+      const matchesSearch = ledger.name
+        ?.toLowerCase()
+        .includes(searchTerm.toLowerCase());
+      const matchesCategory =
+        categoryFilter === "all" ||
+        (categoryFilter === "b2b" &&
+          ledger.gstNumber &&
+          ledger.gstNumber.trim().length > 0) ||
+        (categoryFilter === "b2c" &&
+          (!ledger.gstNumber || ledger.gstNumber.trim().length === 0));
+      return matchesSearch && matchesCategory;
+    })
     : [];
 
   const handleDelete = async (id: string | number) => {
@@ -149,8 +153,7 @@ const LedgerList: React.FC = () => {
       );
 
       const res = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
         { method: "DELETE" }
       );
@@ -204,16 +207,14 @@ const LedgerList: React.FC = () => {
             <button
               title="Back to Group List"
               onClick={() => navigate("/app/masters")}
-              className={`mr-4 p-2 rounded-full ${
-                theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-              }`}
+              className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+                }`}
             >
               <ArrowLeft size={20} />
             </button>
             <h1
-              className={`text-2xl font-bold ${
-                theme === "dark" ? "text-gray-100" : "text-gray-900"
-              }`}
+              className={`text-2xl font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"
+                }`}
             >
               Ledger List
             </h1>
@@ -223,11 +224,10 @@ const LedgerList: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate("/app/masters/ledger/bulk-create")}
-              className={`flex items-center px-4 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-green-600 hover:bg-green-700 text-white"
-                  : "bg-green-600 hover:bg-green-700 text-white"
-              }`}
+              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                ? "bg-green-600 hover:bg-green-700 text-white"
+                : "bg-green-600 hover:bg-green-700 text-white"
+                }`}
             >
               <Plus size={18} className="mr-1" />
               Bulk Create
@@ -235,11 +235,10 @@ const LedgerList: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate("/app/masters/ledger/create")}
-              className={`flex items-center px-4 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
+              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
             >
               <Plus size={18} className="mr-1" />
               Create Ledger
@@ -249,17 +248,15 @@ const LedgerList: React.FC = () => {
 
         {/* table */}
         <div
-          className={`p-6 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <div className="flex items-center justify-between mb-4">
             {/* filters */}
             <div className="flex items-center space-x-4">
               <div
-                className={`flex items-center max-w-md px-3 py-2 rounded-md ${
-                  theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                }`}
+                className={`flex items-center max-w-md px-3 py-2 rounded-md ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                  }`}
               >
                 <Search size={18} className="mr-2 opacity-70" />
                 <input
@@ -267,11 +264,10 @@ const LedgerList: React.FC = () => {
                   placeholder="Search ledgers..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className={`w-full bg-transparent border-none outline-none ${
-                    theme === "dark"
-                      ? "placeholder-gray-500"
-                      : "placeholder-gray-400"
-                  }`}
+                  className={`w-full bg-transparent border-none outline-none ${theme === "dark"
+                    ? "placeholder-gray-500"
+                    : "placeholder-gray-400"
+                    }`}
                 />
               </div>
 
@@ -280,11 +276,10 @@ const LedgerList: React.FC = () => {
                 onChange={(e) =>
                   setCategoryFilter(e.target.value as "all" | "b2b" | "b2c")
                 }
-                className={`px-3 py-2 rounded-md border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-gray-900"
-                }`}
+                className={`px-3 py-2 rounded-md border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600 text-white"
+                  : "bg-white border-gray-300 text-gray-900"
+                  }`}
               >
                 <option value="all">All Ledgers</option>
                 <option value="b2b">B2B (With GST)</option>
@@ -295,11 +290,10 @@ const LedgerList: React.FC = () => {
             {/* stats */}
             <div className="flex items-center space-x-4 text-sm">
               <span
-                className={`${
-                  theme === "dark"
-                    ? "bg-blue-900 text-blue-200"
-                    : "bg-blue-100 text-blue-800"
-                } px-2 py-1 rounded`}
+                className={`${theme === "dark"
+                  ? "bg-blue-900 text-blue-200"
+                  : "bg-blue-100 text-blue-800"
+                  } px-2 py-1 rounded`}
               >
                 B2B:{" "}
                 {
@@ -309,11 +303,10 @@ const LedgerList: React.FC = () => {
                 }
               </span>
               <span
-                className={`${
-                  theme === "dark"
-                    ? "bg-purple-900 text-purple-200"
-                    : "bg-purple-100 text-purple-800"
-                } px-2 py-1 rounded`}
+                className={`${theme === "dark"
+                  ? "bg-purple-900 text-purple-200"
+                  : "bg-purple-100 text-purple-800"
+                  } px-2 py-1 rounded`}
               >
                 B2C:{" "}
                 {
@@ -350,11 +343,10 @@ const LedgerList: React.FC = () => {
                 {filteredLedgers.map((ledger) => (
                   <tr
                     key={ledger.id}
-                    className={`hover:bg-opacity-10 hover:bg-blue-500 ${
-                      theme === "dark"
-                        ? "border-b border-gray-700"
-                        : "border-b border-gray-200"
-                    }`}
+                    className={`hover:bg-opacity-10 hover:bg-blue-500 ${theme === "dark"
+                      ? "border-b border-gray-700"
+                      : "border-b border-gray-200"
+                      }`}
                   >
                     <td className="px-4 py-3">{ledger.name}</td>
                     <td className="px-4 py-3">
@@ -367,15 +359,14 @@ const LedgerList: React.FC = () => {
                     </td>
                     <td className="px-4 py-3 text-center">
                       <span
-                        className={`px-2 py-1 rounded text-xs ${
-                          ledger.balanceType === "debit"
-                            ? theme === "dark"
-                              ? "bg-red-900 text-red-200"
-                              : "bg-red-100 text-red-800"
-                            : theme === "dark"
+                        className={`px-2 py-1 rounded text-xs ${ledger.balanceType === "debit"
+                          ? theme === "dark"
+                            ? "bg-red-900 text-red-200"
+                            : "bg-red-100 text-red-800"
+                          : theme === "dark"
                             ? "bg-green-900 text-green-200"
                             : "bg-green-100 text-green-800"
-                        }`}
+                          }`}
                       >
                         {ledger.balanceType?.toUpperCase() || "N/A"}
                       </span>
@@ -384,11 +375,10 @@ const LedgerList: React.FC = () => {
                       {ledger.gstNumber ? (
                         <>
                           <span
-                            className={`${
-                              theme === "dark"
-                                ? "bg-blue-900 text-blue-200"
-                                : "bg-blue-100 text-blue-800"
-                            } px-2 py-1 rounded text-xs font-medium`}
+                            className={`${theme === "dark"
+                              ? "bg-blue-900 text-blue-200"
+                              : "bg-blue-100 text-blue-800"
+                              } px-2 py-1 rounded text-xs font-medium`}
                           >
                             B2B
                           </span>
@@ -398,11 +388,10 @@ const LedgerList: React.FC = () => {
                         </>
                       ) : (
                         <span
-                          className={`${
-                            theme === "dark"
-                              ? "bg-purple-900 text-purple-200"
-                              : "bg-purple-100 text-purple-800"
-                          } px-2 py-1 rounded text-xs font-medium`}
+                          className={`${theme === "dark"
+                            ? "bg-purple-900 text-purple-200"
+                            : "bg-purple-100 text-purple-800"
+                            } px-2 py-1 rounded text-xs font-medium`}
                         >
                           B2C
                         </span>
@@ -414,21 +403,19 @@ const LedgerList: React.FC = () => {
                           onClick={() =>
                             navigate(`/app/masters/ledger/edit/${ledger.id}`)
                           }
-                          className={`p-1 rounded ${
-                            theme === "dark"
-                              ? "hover:bg-gray-700"
-                              : "hover:bg-gray-100"
-                          }`}
+                          className={`p-1 rounded ${theme === "dark"
+                            ? "hover:bg-gray-700"
+                            : "hover:bg-gray-100"
+                            }`}
                         >
                           <Edit size={16} />
                         </button>
                         <button
                           onClick={() => handleDelete(ledger.id)}
-                          className={`p-1 rounded ${
-                            theme === "dark"
-                              ? "hover:bg-gray-700"
-                              : "hover:bg-gray-100"
-                          }`}
+                          className={`p-1 rounded ${theme === "dark"
+                            ? "hover:bg-gray-700"
+                            : "hover:bg-gray-100"
+                            }`}
                         >
                           <Trash2 size={16} />
                         </button>
@@ -468,7 +455,7 @@ const LedgerList: React.FC = () => {
                   <td></td>
                 </tr>
 
-                 {/* TOTAL DIFFERENCE */}
+                {/* TOTAL DIFFERENCE */}
                 <tr className="font-semibold">
                   <td></td>
                   <td></td>
