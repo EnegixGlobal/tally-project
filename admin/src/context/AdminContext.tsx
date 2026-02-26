@@ -29,6 +29,7 @@ export const AdminProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     localStorage.removeItem('adminData');
     setAdminData(null);
     setIsAuthenticated(false);
+    window.location.href = "/";
   };
 
   // Sync auth state if needed

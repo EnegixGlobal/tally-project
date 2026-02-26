@@ -216,11 +216,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     try {
       setUser(null);
       localStorage.clear();
-      window.location.href = "/login";
+      window.location.href = "/";
     } catch (error) {
       console.error("Error during logout:", error);
       setUser(null);
-      window.location.href = "/login";
+      window.location.href = "/";
     }
   };
 

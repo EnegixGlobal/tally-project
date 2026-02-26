@@ -56,7 +56,7 @@ const Sidebar: React.FC = () => {
       console.error('Logout error:', error);
     }
     logout();
-    navigate('/login');
+    navigate('/');
   };
 
   return (
