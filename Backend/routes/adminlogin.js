@@ -17,12 +17,12 @@ router.post('/login', async (req, res) => {
     // Find user - checking tbadmin (super admin)
     const [rows] = await db.query('SELECT * FROM tbadmin WHERE email = ?', [email]);
 
-    // If not found in tbadmin, check tbCA
+    // If not found in tbadmin, check tbca
     let user = rows[0];
     let role = 'super_admin';
 
     if (!user) {
-      const [caRows] = await db.query('SELECT * FROM tbCA WHERE email = ?', [email]);
+      const [caRows] = await db.query('SELECT * FROM tbca WHERE email = ?', [email]);
       if (caRows.length > 0) {
         user = caRows[0];
         role = 'ca_admin';
@@ -43,7 +43,7 @@ router.post('/login', async (req, res) => {
 
     // Update last login time for CA
     if (role === 'ca_admin') {
-      await db.query('UPDATE tbCA SET fdlast_login = NOW() WHERE fdSiNo = ?', [user.fdSiNo]);
+      await db.query('UPDATE tbca SET fdlast_login = NOW() WHERE fdSiNo = ?', [user.fdSiNo]);
     }
 
     // Generate JWT
@@ -82,7 +82,7 @@ router.get('/me', authMiddleware, async (req, res) => {
       const [rows] = await db.query('SELECT id, email, created_at FROM tbadmin WHERE id = ?', [id]);
       user = rows[0];
     } else {
-      const [rows] = await db.query('SELECT fdSiNo as id, fdname as name, fdphone as phone, email, fdstatus as status FROM tbCA WHERE fdSiNo = ?', [id]);
+      const [rows] = await db.query('SELECT fdSiNo as id, fdname as name, fdphone as phone, email, fdstatus as status FROM tbca WHERE fdSiNo = ?', [id]);
       user = rows[0];
     }
 
@@ -117,10 +117,10 @@ router.put('/update-profile', authMiddleware, async (req, res) => {
     } else {
       if (password) {
         const hashedPassword = await bcrypt.hash(password, 10);
-        updateQuery = 'UPDATE tbCA SET fdname = ?, fdphone = ?, email = ?, fdpassword = ? WHERE fdSiNo = ?';
+        updateQuery = 'UPDATE tbca SET fdname = ?, fdphone = ?, email = ?, fdpassword = ? WHERE fdSiNo = ?';
         params = [name, phone, email, hashedPassword, id];
       } else {
-        updateQuery = 'UPDATE tbCA SET fdname = ?, fdphone = ?, email = ? WHERE fdSiNo = ?';
+        updateQuery = 'UPDATE tbca SET fdname = ?, fdphone = ?, email = ? WHERE fdSiNo = ?';
         params = [name, phone, email, id];
       }
     }
@@ -147,20 +147,20 @@ router.get('/dashboard-stats', authMiddleware, async (req, res) => {
 
     if (role === 'super_admin') {
       // Global stats for Super Admin
-      [[{ totalCA }]] = await db.query('SELECT COUNT(*) as totalCA FROM tbCA');
+      [[{ totalCA }]] = await db.query('SELECT COUNT(*) as totalCA FROM tbca');
       [[{ totalEmployees }]] = await db.query('SELECT COUNT(*) as totalEmployees FROM tbemployees');
       [[{ totalCompanies }]] = await db.query('SELECT COUNT(*) as totalCompanies FROM tbcompanies');
 
       [recentCompanies] = await db.query(`
         SELECT c.name, c.created_at, e.fdname as owner
         FROM tbcompanies c
-        LEFT JOIN tbCA e ON c.fdAccountantName = e.fdname
+        LEFT JOIN tbca e ON c.fdAccountantName = e.fdname
         ORDER BY c.created_at DESC
         LIMIT 5
       `);
     } else {
       // Stats for specific CA Admin
-      const [[caUser]] = await db.query('SELECT fdname FROM tbCA WHERE fdSiNo = ?', [id]);
+      const [[caUser]] = await db.query('SELECT fdname FROM tbca WHERE fdSiNo = ?', [id]);
       const caName = caUser ? caUser.fdname : null;
 
       totalCA = 1; // Only themselves
