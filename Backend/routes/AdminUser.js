@@ -2,6 +2,43 @@ const express = require('express');
 const router = express.Router();
 const db = require('../db');
 const bcrypt = require('bcryptjs');
+const upload = require('../middlewares/userUpload');
+const cloudinary = require('../utils/cloudnary');
+const streamifier = require('streamifier');
+
+// Helper to upload to Cloudinary
+const uploadToCloudinary = (fileBuffer, folder = 'user_terms') => {
+  return new Promise((resolve, reject) => {
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        folder: folder,
+        resource_type: 'auto' // Important for handling both images and PDFs
+      },
+      (error, result) => {
+        if (error) reject(error);
+        else resolve(result);
+      }
+    );
+    streamifier.createReadStream(fileBuffer).pipe(uploadStream);
+  });
+};
+
+// Helper to ensure columns exist
+const ensureTermsColumn = async () => {
+  try {
+    const [caCols] = await db.query("SHOW COLUMNS FROM tbCA LIKE 'fdterms_file'");
+    if (caCols.length === 0) {
+      await db.query("ALTER TABLE tbCA ADD COLUMN fdterms_file VARCHAR(255) DEFAULT NULL");
+    }
+    const [empCols] = await db.query("SHOW COLUMNS FROM tbCAEmployees LIKE 'fdterms_file'");
+    if (empCols.length === 0) {
+      await db.query("ALTER TABLE tbCAEmployees ADD COLUMN fdterms_file VARCHAR(255) DEFAULT NULL");
+    }
+  } catch (err) {
+    console.error('Error ensuring terms column:', err);
+  }
+};
+ensureTermsColumn();
 
 // ✅ Get all users (Role-aware)
 router.get('/', async (req, res) => {
@@ -19,7 +56,8 @@ router.get('/', async (req, res) => {
           fdphone AS phone,
           email,
           fdstatus AS status,
-          fdlast_login AS last_login
+          fdlast_login AS last_login,
+          fdterms_file AS terms_file
         FROM tbCA
       `);
     } else if (role === 'ca_admin') {
@@ -31,7 +69,8 @@ router.get('/', async (req, res) => {
           phone,
           email,
           'active' AS status, 
-          created_at AS last_login 
+          created_at AS last_login,
+          fdterms_file AS terms_file
         FROM tbCAEmployees
         WHERE ca_id = ?
       `, [id]);
@@ -42,7 +81,7 @@ router.get('/', async (req, res) => {
     // Ensure dates are valid
     const formattedUsers = users.map(u => ({
       ...u,
-      last_login: u.last_login ? new Date(u.last_login).toISOString() : null
+      lastLogin: u.last_login ? new Date(u.last_login).toISOString() : null
     }));
 
 
@@ -54,10 +93,20 @@ router.get('/', async (req, res) => {
 });
 
 // ✅ Add new user (Role-aware)
-router.post('/', async (req, res) => {
+router.post('/', upload.single('terms_file'), async (req, res) => {
   try {
     const { id, role } = req.user;
     const { name, phone, email, password, status } = req.body;
+    let terms_file = null;
+
+    if (req.file) {
+      try {
+        const result = await uploadToCloudinary(req.file.buffer);
+        terms_file = result.secure_url;
+      } catch (uploadError) {
+        console.error("❌ Cloudinary Upload Error:", uploadError);
+      }
+    }
 
     if (!name || !email || !password) {
       return res.status(400).json({ error: 'Name, email, and password are required' });
@@ -68,18 +117,18 @@ router.post('/', async (req, res) => {
 
     if (role === 'super_admin') {
       const [result] = await db.query(`
-        INSERT INTO tbCA (fdname, fdphone, email, fdpassword, fdstatus, fdlast_login)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `, [name, phone, email, hashedPassword, status || 'active', now]);
+        INSERT INTO tbCA (fdname, fdphone, email, fdpassword, fdstatus, fdlast_login, fdterms_file)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+      `, [name, phone, email, hashedPassword, status || 'active', now, terms_file]);
 
-      res.status(201).json({ id: result.insertId, name, phone, email, status: status || 'active', last_login: now });
+      res.status(201).json({ id: result.insertId, name, phone, email, status: status || 'active', lastLogin: now, terms_file });
     } else if (role === 'ca_admin') {
       const [result] = await db.query(`
-        INSERT INTO tbCAEmployees (ca_id, name, email, phone, password)
-        VALUES (?, ?, ?, ?, ?)
-      `, [id, name, email, phone, hashedPassword]);
+        INSERT INTO tbCAEmployees (ca_id, name, email, phone, password, fdterms_file)
+        VALUES (?, ?, ?, ?, ?, ?)
+      `, [id, name, email, phone, hashedPassword, terms_file]);
 
-      res.status(201).json({ id: result.insertId, name, phone, email, status: 'active', last_login: now });
+      res.status(201).json({ id: result.insertId, name, phone, email, status: 'active', lastLogin: now, terms_file });
     } else {
       res.status(403).json({ error: 'Unauthorized' });
     }
@@ -91,39 +140,57 @@ router.post('/', async (req, res) => {
 });
 
 // ✅ Update user (Role-aware)
-router.put('/:userId', async (req, res) => {
+router.put('/:userId', upload.single('terms_file'), async (req, res) => {
   const { role } = req.user;
   const { name, phone, email, password, status } = req.body;
   const userId = req.params.userId;
+  let terms_file = null;
+
+  if (req.file) {
+    try {
+      const result = await uploadToCloudinary(req.file.buffer);
+      terms_file = result.secure_url;
+    } catch (uploadError) {
+      console.error("❌ Cloudinary Upload Error:", uploadError);
+    }
+  }
 
   try {
     if (role === 'super_admin') {
       let query, params;
       if (password) {
         const hashedPassword = await bcrypt.hash(password, 10);
-        query = 'UPDATE tbCA SET fdname = ?, fdphone = ?, email = ?, fdpassword = ?, fdstatus = ? WHERE fdSiNo = ?';
-        params = [name, phone, email, hashedPassword, status, userId];
+        query = 'UPDATE tbCA SET fdname = ?, fdphone = ?, email = ?, fdpassword = ?, fdstatus = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE fdSiNo = ?';
+        params = [name, phone, email, hashedPassword, status];
+        if (terms_file) params.push(terms_file);
+        params.push(userId);
       } else {
-        query = 'UPDATE tbCA SET fdname = ?, fdphone = ?, email = ?, fdstatus = ? WHERE fdSiNo = ?';
-        params = [name, phone, email, status, userId];
+        query = 'UPDATE tbCA SET fdname = ?, fdphone = ?, email = ?, fdstatus = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE fdSiNo = ?';
+        params = [name, phone, email, status];
+        if (terms_file) params.push(terms_file);
+        params.push(userId);
       }
       await db.query(query, params);
     } else if (role === 'ca_admin') {
       let query, params;
       if (password) {
         const hashedPassword = await bcrypt.hash(password, 10);
-        query = 'UPDATE tbCAEmployees SET name = ?, phone = ?, email = ?, password = ? WHERE id = ? AND ca_id = ?';
-        params = [name, phone, email, hashedPassword, userId, req.user.id];
+        query = 'UPDATE tbCAEmployees SET name = ?, phone = ?, email = ?, password = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE id = ? AND ca_id = ?';
+        params = [name, phone, email, hashedPassword];
+        if (terms_file) params.push(terms_file);
+        params.push(userId, req.user.id);
       } else {
-        query = 'UPDATE tbCAEmployees SET name = ?, phone = ?, email = ? WHERE id = ? AND ca_id = ?';
-        params = [name, phone, email, userId, req.user.id];
+        query = 'UPDATE tbCAEmployees SET name = ?, phone = ?, email = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE id = ? AND ca_id = ?';
+        params = [name, phone, email];
+        if (terms_file) params.push(terms_file);
+        params.push(userId, req.user.id);
       }
       await db.query(query, params);
     } else {
       return res.status(403).json({ error: 'Unauthorized' });
     }
 
-    res.json({ id: userId, name, phone, email, status, message: 'User updated' });
+    res.json({ id: userId, name, phone, email, status, terms_file, message: 'User updated' });
   } catch (err) {
     console.error(err);
     res.status(500).json({ error: err.message });

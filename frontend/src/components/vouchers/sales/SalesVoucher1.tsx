@@ -887,6 +887,7 @@ const SalesVoucher: React.FC = () => {
     >
   ) => {
     const { name, value } = e.target;
+    if (name === "date" && !isEditMode) return;
     if (name.startsWith("dispatchDetails.")) {
       const field = name.split(".")[1];
 
@@ -2321,7 +2322,10 @@ const SalesVoucher: React.FC = () => {
                     value={formData.date}
                     onChange={handleChange}
                     required
-                    className={FORM_STYLES.input(theme, !!errors.date)}
+                    readOnly={!isEditMode}
+                    min={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
+                    max={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
+                    className={`${FORM_STYLES.input(theme, !!errors.date)} ${!isEditMode ? "opacity-70 cursor-not-allowed" : ""}`}
                   />
                   {errors.date && <p className="text-red-500 text-xs mt-1">{errors.date}</p>}
                 </div>

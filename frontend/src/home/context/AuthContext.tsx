@@ -317,7 +317,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
   const checkPermission = (moduleId: string) => {
     const userType = localStorage.getItem("userType");
-    // If not CA employee, grant all permissions
+
+    // Restrictions for Trading (employee) and Trading Employee (company_user)
+    if (userType === "employee" || userType === "company_user") {
+      const restrictedModules = ["gst", "tds", "audit", "income-tax"];
+      if (restrictedModules.includes(moduleId)) {
+        return false;
+      }
+    }
+
+    // If not CA employee, grant all other permissions
     if (userType !== "ca_employee") return true;
 
     // Check if module is allowed

@@ -624,22 +624,26 @@ const Dashboard: React.FC = () => {
                     </div>
 
                     {/* Input Tax */}
-                    <div className="p-6 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 shadow hover:shadow-lg transition">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                        Input Tax
-                      </h3>
-                      <p className="text-2xl font-bold text-purple-700">₹ 15,000</p>
-                      <p className="text-sm text-gray-500">This Month</p>
-                    </div>
+                    {checkPermission('gst') && (
+                      <div className="p-6 rounded-xl bg-gradient-to-r from-purple-50 to-purple-100 shadow hover:shadow-lg transition">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                          Input Tax
+                        </h3>
+                        <p className="text-2xl font-bold text-purple-700">₹ 15,000</p>
+                        <p className="text-sm text-gray-500">This Month</p>
+                      </div>
+                    )}
 
                     {/* Output Tax */}
-                    <div className="p-6 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 shadow hover:shadow-lg transition">
-                      <h3 className="text-lg font-semibold text-gray-800 mb-2">
-                        Output Tax
-                      </h3>
-                      <p className="text-2xl font-bold text-orange-700">₹ 20,000</p>
-                      <p className="text-sm text-gray-500">This Month</p>
-                    </div>
+                    {checkPermission('gst') && (
+                      <div className="p-6 rounded-xl bg-gradient-to-r from-orange-50 to-orange-100 shadow hover:shadow-lg transition">
+                        <h3 className="text-lg font-semibold text-gray-800 mb-2">
+                          Output Tax
+                        </h3>
+                        <p className="text-2xl font-bold text-orange-700">₹ 20,000</p>
+                        <p className="text-sm text-gray-500">This Month</p>
+                      </div>
+                    )}
                   </div>
                 </>
               )}

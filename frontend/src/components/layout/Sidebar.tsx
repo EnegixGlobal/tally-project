@@ -33,10 +33,10 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
     { icon: <FileText size={18} />, title: "Vouchers", path: "/app/vouchers", permissionId: ['payment', 'receipt', 'contra', 'journal', 'sales', 'purchase', 'sales-order', 'purchase-order', 'quotation', 'debit-note', 'credit-note', 'stock-journal', 'delivery-note'] },
     { icon: <BookKey size={18} />, title: "Vouchers Register", path: "/app/voucher-register", permissionId: 'payment' }, // Using payment as proxy for general voucher access
     { icon: <BarChart2 size={18} />, title: "Reports", path: "/app/reports", permissionId: 'reports' },
-    { icon: <ShoppingCart size={18} />, title: "GST", path: "/app/gst", permissionId: 'reports' },
-    { icon: <Truck size={18} />, title: "TDS", path: "/app/tds", permissionId: 'reports' },
-    { icon: <Wallet size={18} />, title: "Income Tax", path: "/app/income-tax", permissionId: 'reports' },
-    { icon: <BookOpen size={18} />, title: "Audit", path: "/app/audit", permissionId: 'reports' },
+    { icon: <ShoppingCart size={18} />, title: "GST", path: "/app/gst", permissionId: 'gst' },
+    { icon: <Truck size={18} />, title: "TDS", path: "/app/tds", permissionId: 'tds' },
+    { icon: <Wallet size={18} />, title: "Income Tax", path: "/app/income-tax", permissionId: 'income-tax' },
+    { icon: <BookOpen size={18} />, title: "Audit", path: "/app/audit", permissionId: 'audit' },
     { icon: <Settings size={18} />, title: "Configuration", path: "/app/config" },
   ];
 

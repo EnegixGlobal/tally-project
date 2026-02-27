@@ -66,4 +66,36 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     }
 });
 
+// Get specific trader details, companies, and credentials
+router.get('/:id', authMiddleware, async (req, res) => {
+    const { id } = req.params;
+    try {
+        if (req.user.role !== 'super_admin') {
+            return res.status(403).json({ error: 'Unauthorized.' });
+        }
+
+        // Get trader info
+        const [trader] = await db.query('SELECT firstName, lastName, email, phoneNumber, pan FROM tbemployees WHERE id = ?', [id]);
+        if (trader.length === 0) return res.status(404).json({ error: 'Trader not found' });
+
+        // Get companies and their user accounts
+        const [companies] = await db.query(`
+            SELECT 
+                c.id, c.name, c.financial_year, c.address, c.gst_number,
+                u.username, u.password as hasPassword
+            FROM tbcompanies c
+            LEFT JOIN tbusers u ON c.id = u.company_id
+            WHERE c.employee_id = ?
+        `, [id]);
+
+        res.json({
+            info: trader[0],
+            companies: companies
+        });
+    } catch (err) {
+        console.error('Error fetching trader details:', err);
+        res.status(500).json({ error: err.message });
+    }
+});
+
 module.exports = router;

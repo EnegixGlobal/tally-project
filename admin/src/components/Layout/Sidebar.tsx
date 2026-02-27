@@ -37,7 +37,7 @@ const Sidebar: React.FC = () => {
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
-    { id: 'users', label: 'User Management', icon: Users, path: '/users' },
+    { id: 'users', label: 'CA Management', icon: Users, path: '/users' },
     { id: 'trader', label: 'Trader Management', icon: Building2, path: '/trader' },
     { id: 'subscriptions', label: 'Subscriptions', icon: CreditCard, path: '/subscriptions' },
     { id: 'payments', label: 'Payment History', icon: Receipt, path: '/payments' },

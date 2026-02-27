@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Edit, Trash2, Ban, Play, Users } from 'lucide-react';
+import { Search, Filter, Edit, Trash2, Ban, Play, Users, MoreVertical, X, ExternalLink, FileText } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAdmin } from '../../hooks/useAdmin';
 import { format } from 'date-fns';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
@@ -13,15 +14,31 @@ interface User {
   password: string;
   status: 'active' | 'suspended' | 'pending';
   lastLogin?: string | null;
+  terms_file?: string | null;
 }
 
 const UserManagement: React.FC = () => {
   const { theme } = useTheme();
+  const { adminData } = useAdmin();
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  // Details Modal States
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [caEmployees, setCaEmployees] = useState<any[]>([]);
+  const [employeeCompanies, setEmployeeCompanies] = useState<any[]>([]);
+
+  const getFileUrl = (filePath: string | null | undefined) => {
+    if (!filePath) return '';
+    if (filePath.startsWith('http')) return filePath;
+    return `${import.meta.env.VITE_API_URL}${filePath}`;
+  };
+
   const [newUser, setNewUser] = useState({
     name: '',
     phone: '',
@@ -29,6 +46,7 @@ const UserManagement: React.FC = () => {
     password: '',
     confirmPassword: '',
     status: 'active' as 'active' | 'suspended' | 'pending',
+    terms_file: null as File | null,
   });
 
   // Fetch users
@@ -76,12 +94,20 @@ const UserManagement: React.FC = () => {
     });
 
     try {
-      const res = await api.post('/api/adminUser', {
-        name: newUser.name,
-        phone: newUser.phone,
-        email: newUser.email,
-        password: newUser.password,
-        status: newUser.status,
+      const formData = new FormData();
+      formData.append('name', newUser.name);
+      formData.append('phone', newUser.phone);
+      formData.append('email', newUser.email);
+      formData.append('password', newUser.password);
+      formData.append('status', newUser.status);
+      if (newUser.terms_file) {
+        formData.append('terms_file', newUser.terms_file);
+      }
+
+      const res = await api.post('/api/adminUser', formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
       });
       setUsers((prev) => [...prev, res.data]);
       resetForm();
@@ -123,18 +149,24 @@ const UserManagement: React.FC = () => {
     });
 
     try {
-      const payload: any = {
-        name: newUser.name,
-        phone: newUser.phone,
-        email: newUser.email,
-        status: newUser.status,
-      };
-      if (newUser.password) payload.password = newUser.password;
+      const formData = new FormData();
+      formData.append('name', newUser.name);
+      formData.append('phone', newUser.phone);
+      formData.append('email', newUser.email);
+      formData.append('status', newUser.status);
+      if (newUser.password) formData.append('password', newUser.password);
+      if (newUser.terms_file) {
+        formData.append('terms_file', newUser.terms_file);
+      }
 
-      const res = await api.put(`/api/adminUser/${editingUser.id}`, payload);
+      const res = await api.put(`/api/adminUser/${editingUser.id}`, formData, {
+        headers: {
+          'Content-Type': 'multipart/form-data',
+        },
+      });
 
       setUsers((prev) =>
-        prev.map((u) => (u.id === editingUser.id ? res.data : u))
+        prev.map((u) => (u.id === editingUser.id ? { ...u, ...res.data } : u))
       );
       resetForm();
       Swal.fire({
@@ -211,6 +243,28 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const handleShowDetails = async (user: User) => {
+    setSelectedUser(user);
+    setShowDetailsModal(true);
+    setLoadingDetails(true);
+    setCaEmployees([]);
+    setEmployeeCompanies([]);
+
+    try {
+      if (adminData?.role === 'super_admin') {
+        const res = await api.get(`/api/ca-employees-with-companies?ca_id=${user.id}`);
+        setCaEmployees(res.data.employees || []);
+      } else if (adminData?.role === 'ca_admin') {
+        const res = await api.get(`/api/ca-employee-companies?ca_employee_id=${user.id}`);
+        setEmployeeCompanies(res.data.companies || []);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch details:', err);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
   const handleEdit = (user: User) => {
     setEditingUser(user);
     setNewUser({
@@ -220,6 +274,7 @@ const UserManagement: React.FC = () => {
       password: '',
       confirmPassword: '',
       status: user.status || 'active',
+      terms_file: null,
     });
     setShowAddForm(true);
     // Scroll to form
@@ -234,6 +289,7 @@ const UserManagement: React.FC = () => {
       password: '',
       confirmPassword: '',
       status: 'active',
+      terms_file: null,
     });
     setEditingUser(null);
     setShowAddForm(false);
@@ -298,6 +354,43 @@ const UserManagement: React.FC = () => {
                 <option value="pending">Pending</option>
               </select>
             </div>
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>Terms & Condition (PDF/JPG)</label>
+              <div className="flex gap-4 items-start">
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0] || null;
+                      setNewUser((prev) => ({ ...prev, terms_file: file }));
+                    }}
+                    className={`w-full px-4 py-2.5 border rounded-xl file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-gray-300 file:bg-gray-600 file:text-primary hover:file:bg-gray-500' : 'border-gray-200 bg-gray-50 text-gray-700 file:bg-blue-50 file:text-primary hover:file:bg-blue-100'} transition-all cursor-pointer`}
+                  />
+                </div>
+
+                {/* Immediate Preview Section */}
+                {newUser.terms_file && (
+                  <div className={`shrink-0 w-12 h-12 rounded-xl border-2 border-dashed flex items-center justify-center p-1 ${theme === 'dark' ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-white'}`}>
+                    {newUser.terms_file.type === 'application/pdf' ? (
+                      <FileText className="w-6 h-6 text-red-500" />
+                    ) : (
+                      <img
+                        src={URL.createObjectURL(newUser.terms_file)}
+                        alt="Preview"
+                        className="w-full h-full object-cover rounded-lg"
+                      />
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {editingUser?.terms_file && !newUser.terms_file && (
+                <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                  <ExternalLink className="w-3 h-3" /> Current file: <a href={getFileUrl(editingUser.terms_file)} target="_blank" rel="noreferrer" className="text-primary hover:underline">View Document</a>
+                </p>
+              )}
+            </div>
           </div>
           <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8 border-t border-gray-700/10 pt-6">
             <button onClick={resetForm} className={`px-6 py-2.5 border rounded-xl font-medium transition-all ${theme === 'dark' ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'}`}>Cancel</button>
@@ -347,6 +440,7 @@ const UserManagement: React.FC = () => {
                 <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Status</th>
                 <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Phone Number</th>
                 <th className={`px-4 sm:px-6 py-3 text-left font-semibold uppercase tracking-wider hidden md:table-cell ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Last Activity</th>
+                <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Terms</th>
                 <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Actions</th>
               </tr>
             </thead>
@@ -371,6 +465,37 @@ const UserManagement: React.FC = () => {
                     {user.lastLogin ? format(new Date(user.lastLogin), 'MMM dd, yyyy HH:mm') : 'Never'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
+                    {user.terms_file ? (
+                      <div className="flex items-center gap-2">
+                        {/* Thumbnail or Icon */}
+                        <div className={`w-8 h-8 rounded-lg border overflow-hidden flex items-center justify-center ${theme === 'dark' ? 'border-gray-600 bg-gray-700' : 'border-gray-200 bg-gray-50'}`}>
+                          {user.terms_file.toLowerCase().endsWith('.pdf') ? (
+                            <FileText className="w-4 h-4 text-red-500" />
+                          ) : (
+                            <img
+                              src={getFileUrl(user.terms_file)}
+                              alt="Terms"
+                              className="w-full h-full object-cover"
+                              onError={(e) => {
+                                (e.target as HTMLImageElement).src = 'https://via.placeholder.com/32?text=Doc';
+                              }}
+                            />
+                          )}
+                        </div>
+                        <a
+                          href={getFileUrl(user.terms_file)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className={`px-2 py-1 rounded-md text-[10px] font-bold transition-all ${theme === 'dark' ? 'bg-blue-900/40 text-blue-300 hover:bg-blue-800' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'}`}
+                        >
+                          OPEN
+                        </a>
+                      </div>
+                    ) : (
+                      <span className="text-gray-400 italic text-[10px]">No file</span>
+                    )}
+                  </td>
+                  <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center gap-3">
                       <button
                         title="Edit Admin"
@@ -381,11 +506,19 @@ const UserManagement: React.FC = () => {
                       </button>
 
                       <button
+                        title="View Details"
+                        onClick={() => handleShowDetails(user)}
+                        className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-600 hover:text-white transition-all transform hover:scale-110 shadow-sm"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      <button
                         title={user.status === 'active' ? 'Suspend Account' : 'Activate Account'}
                         onClick={() => handleStatusChange(user.id, user.status === 'active' ? 'suspended' : 'active')}
                         className={`p-2 rounded-lg transition-all transform hover:scale-110 shadow-sm ${user.status === 'active'
-                            ? 'bg-amber-100 text-amber-600 hover:bg-amber-600 hover:text-white'
-                            : 'bg-green-100 text-green-600 hover:bg-green-600 hover:text-white'
+                          ? 'bg-amber-100 text-amber-600 hover:bg-amber-600 hover:text-white'
+                          : 'bg-green-100 text-green-600 hover:bg-green-600 hover:text-white'
                           }`}
                       >
                         {user.status === 'active' ? <Ban className="w-4 h-4" /> : <Play className="w-4 h-4" />}
@@ -412,7 +545,117 @@ const UserManagement: React.FC = () => {
           </table>
         </div>
       </div>
-    </div>
+
+      {
+        showDetailsModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className={`w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border flex flex-col`}>
+              {/* Modal Header */}
+              <div className={`px-6 py-4 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700 bg-gray-800/50' : 'border-gray-100 bg-gray-50/50'}`}>
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-primary/10 rounded-lg">
+                    <Users className="w-5 h-5 text-primary" />
+                  </div>
+                  <div>
+                    <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                      {adminData?.role === 'super_admin' ? 'CA Employee Details' : 'Assigned Companies'}
+                    </h3>
+                    <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                      Viewing information for <span className="font-semibold text-primary">{selectedUser?.name}</span>
+                    </p>
+                  </div>
+                </div>
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className={`p-2 rounded-lg transition-colors ${theme === 'dark' ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+                >
+                  <X className="w-5 h-5" />
+                </button>
+              </div>
+
+              {/* Modal Content */}
+              <div className="flex-1 overflow-auto p-6">
+                {loadingDetails ? (
+                  <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                    <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                    <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Fetching details...</p>
+                  </div>
+                ) : adminData?.role === 'super_admin' ? (
+                  caEmployees.length > 0 ? (
+                    <div className={`rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+                      <table className="w-full text-sm">
+                        <thead className={`${theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
+                          <tr>
+                            <th className="px-4 py-3 text-left font-semibold">Employee Name</th>
+                            <th className="px-4 py-3 text-left font-semibold">Username (Email)</th>
+                            <th className="px-4 py-3 text-left font-semibold">Phone</th>
+                            <th className="px-4 py-3 text-left font-semibold">Allotted Companies</th>
+                          </tr>
+                        </thead>
+                        <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                          {caEmployees.map((emp) => (
+                            <tr key={emp.employee_id} className={theme === 'dark' ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50'}>
+                              <td className={`px-4 py-4 font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{emp.name}</td>
+                              <td className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} px-4 py-4 italic`}>{emp.email}</td>
+                              <td className={`px-4 py-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{emp.phone || 'N/A'}</td>
+                              <td className="px-4 py-4">
+                                <div className="flex flex-wrap gap-1">
+                                  {emp.company_names ? emp.company_names.split(',').map((c: string, i: number) => (
+                                    <span key={i} className={`px-2 py-0.5 text-[10px] font-medium rounded-md ${theme === 'dark' ? 'bg-blue-900/40 text-blue-200' : 'bg-blue-50 text-blue-700'}`}>
+                                      {c.trim()}
+                                    </span>
+                                  )) : (
+                                    <span className="text-gray-400 italic text-xs">No companies assigned</span>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 bg-gray-50/10 rounded-2xl border-2 border-dashed border-gray-700/20">
+                      <p className="text-gray-500 italic">No employees found for this CA admin.</p>
+                    </div>
+                  )
+                ) : (
+                  employeeCompanies.length > 0 ? (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {employeeCompanies.map((comp) => (
+                        <div key={comp.id} className={`p-4 rounded-xl border flex items-center justify-between group ${theme === 'dark' ? 'bg-gray-700/30 border-gray-600 hover:bg-gray-700/50' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'} transition-all`}>
+                          <div className="flex items-center gap-3">
+                            <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'}`}>
+                              <ExternalLink className={`w-4 h-4 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+                            </div>
+                            <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{comp.name}</span>
+                          </div>
+                          <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Allotted</span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-20 bg-gray-50/10 rounded-2xl border-2 border-dashed border-gray-700/20">
+                      <p className="text-gray-500 italic">No companies allotted to this employee yet.</p>
+                    </div>
+                  )
+                )}
+              </div>
+
+              {/* Modal Footer */}
+              <div className={`px-6 py-4 border-t flex justify-end ${theme === 'dark' ? 'border-gray-700 bg-gray-800' : 'border-gray-100 bg-gray-50'}`}>
+                <button
+                  onClick={() => setShowDetailsModal(false)}
+                  className="px-6 py-2 bg-primary text-white rounded-xl font-semibold hover:bg-primaryDark transition-all active:scale-95 shadow-lg shadow-primary/20"
+                >
+                  Close View
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 };
 

@@ -108,6 +108,11 @@ router.post('/', async (req, res) => {
         { expiresIn: '7d' }
       );
 
+      // Update last login time for CA
+      if (role === 'ca') {
+        await db.query('UPDATE tbca SET fdlast_login = NOW() WHERE fdSiNo = ?', [user[idField]]);
+      }
+
       return res.json({
         success: true,
         token,

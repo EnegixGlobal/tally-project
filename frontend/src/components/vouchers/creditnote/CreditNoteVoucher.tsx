@@ -182,6 +182,7 @@ const CreditNoteVoucher: React.FC = () => {
     >
   ) => {
     const { name, value } = e.target;
+    if (name === "date" && !isEditMode) return;
 
     if (name === "mode") {
       const newMode = value as "accounting-invoice" | "as-voucher";
@@ -453,11 +454,14 @@ const CreditNoteVoucher: React.FC = () => {
                 value={formData.date}
                 onChange={handleChange}
                 required
+                readOnly={!isEditMode}
+                min={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
+                max={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
                 className={`w-full p-2 rounded border ${
                   theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                     : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
+                } outline-none transition-colors ${!isEditMode ? "opacity-70 cursor-not-allowed" : ""}`}
               />
             </div>
 
