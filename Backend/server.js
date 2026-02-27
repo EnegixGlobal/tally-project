@@ -24,6 +24,7 @@ app.use(
 );
 
 app.use(bodyParser.json());
+app.use("/uploads", express.static("uploads"));
 // const authMiddleware = require('./middlewares/authMiddleware');
 // const loadPermissions = require('./middlewares/loadPermissions');
 const loginRoute = require("./routes/login");
