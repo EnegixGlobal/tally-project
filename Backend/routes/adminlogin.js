@@ -4,6 +4,52 @@ const db = require('../db');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const authMiddleware = require('../middlewares/authMiddleware');
+// ✅ Admin Signup (For Super Admin)
+router.post('/signup', async (req, res) => {
+  const { email, password } = req.body;
+
+  if (!email || !password) {
+    return res.status(400).json({ message: 'Email and password are required' });
+  }
+
+  try {
+    // Check if tbadmin has this email
+    const [adminRows] = await db.query('SELECT id FROM tbadmin WHERE email = ?', [email]);
+    if (adminRows.length > 0) {
+      return res.status(400).json({ message: 'Email already exists in super admin' });
+    }
+
+    // Hash the password
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const [result] = await db.query(
+      'INSERT INTO tbadmin (email, password) VALUES (?, ?)',
+      [email, hashedPassword]
+    );
+
+    // Generate token so they can log in immediately
+    const token = jwt.sign(
+      { id: result.insertId, email, role: 'super_admin' },
+      process.env.JWT_SECRET,
+      { expiresIn: '24h' }
+    );
+
+    res.status(201).json({
+      message: 'Signup successful',
+      token,
+      user: {
+        id: result.insertId,
+        email,
+        name: 'Admin',
+        role: 'super_admin'
+      }
+    });
+
+  } catch (err) {
+    console.error('Signup error:', err.message);
+    return res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
 
 // ✅ Admin Login
 router.post('/login', async (req, res) => {
