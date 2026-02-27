@@ -11,6 +11,7 @@ const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
+  const [isLogin, setIsLogin] = useState(true);
   const [formData, setFormData] = useState({
     email: '',
     password: '',
@@ -38,8 +39,10 @@ const Login: React.FC = () => {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    setErrors({});
     try {
-      const response = await api.post('/api/admin/login', {
+      const endpoint = isLogin ? '/api/admin/login' : '/api/admin/signup';
+      const response = await api.post(endpoint, {
         email: formData.email,
         password: formData.password
       });
@@ -57,8 +60,8 @@ const Login: React.FC = () => {
         navigate('/dashboard');
       });
     } catch (error: any) {
-      console.error('Login Error:', error);
-      setErrors({ submit: error.response?.data?.message || 'Invalid email or password' });
+      console.error('Auth Error:', error);
+      setErrors({ submit: error.response?.data?.message || (isLogin ? 'Invalid email or password' : 'Error creating account') });
     } finally {
       setIsLoading(false);
     }
@@ -96,7 +99,9 @@ const Login: React.FC = () => {
             {/* Header */}
             <div className="text-center mb-6 xl:mb-8">
               <h2 className="text-3xl xl:text-4xl 2xl:text-5xl font-bold text-white mb-2 xl:mb-3">Apna Book Admin</h2>
-              <p className="text-white/80 text-sm xl:text-base 2xl:text-lg">Sign in to your admin dashboard</p>
+              <p className="text-white/80 text-sm xl:text-base 2xl:text-lg">
+                {isLogin ? 'Sign in to your admin dashboard' : 'Create a new admin account'}
+              </p>
             </div>
 
             {/* Login Form */}
@@ -149,21 +154,23 @@ const Login: React.FC = () => {
                 </div>
               </div>
 
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  name="rememberMe"
-                  checked={formData.rememberMe}
-                  className="h-4 w-4 xl:h-5 xl:w-5 text-white focus:ring-white/50 border-white/30 rounded bg-white/10"
-                  onChange={(e) =>
-                    setFormData({ ...formData, rememberMe: e.target.checked })
-                  }
-                />
+              {isLogin && (
+                <div className="flex items-center">
+                  <input
+                    type="checkbox"
+                    name="rememberMe"
+                    checked={formData.rememberMe}
+                    className="h-4 w-4 xl:h-5 xl:w-5 text-white focus:ring-white/50 border-white/30 rounded bg-white/10"
+                    onChange={(e) =>
+                      setFormData({ ...formData, rememberMe: e.target.checked })
+                    }
+                  />
 
-                <label className="ml-3 text-sm xl:text-base text-white font-medium">
-                  Remember Password
-                </label>
-              </div>
+                  <label className="ml-3 text-sm xl:text-base text-white font-medium">
+                    Remember Password
+                  </label>
+                </div>
+              )}
 
               <button
                 type="submit"
@@ -178,13 +185,26 @@ const Login: React.FC = () => {
                         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                       </svg>
                     </div>
-                    Signing in...
+                    {isLogin ? 'Signing in...' : 'Signing up...'}
                   </div>
                 ) : (
-                  'Sign In'
+                  isLogin ? 'Sign In' : 'Sign Up'
                 )}
               </button>
             </form>
+
+            <div className="mt-6 text-center">
+              <button
+                type="button"
+                onClick={() => {
+                  setIsLogin(!isLogin);
+                  setErrors({});
+                }}
+                className="text-white/90 hover:text-white font-medium text-sm xl:text-base border-b border-transparent hover:border-white transition-all pb-0.5"
+              >
+                {isLogin ? "Don't have an account? Sign Up" : "Already have an account? Sign In"}
+              </button>
+            </div>
 
             {/* Demo Credentials */}
             <div className="bg-white/10 rounded-xl xl:rounded-2xl p-4 xl:p-6 text-center border border-white/20">
