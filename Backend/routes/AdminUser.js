@@ -42,7 +42,7 @@ router.get('/', async (req, res) => {
     // Ensure dates are valid
     const formattedUsers = users.map(u => ({
       ...u,
-      last_login: u.last_login ? new Date(u.last_login).toISOString() : null
+      lastLogin: u.last_login ? new Date(u.last_login).toISOString() : null
     }));
 
 
@@ -72,14 +72,14 @@ router.post('/', async (req, res) => {
         VALUES (?, ?, ?, ?, ?, ?)
       `, [name, phone, email, hashedPassword, status || 'active', now]);
 
-      res.status(201).json({ id: result.insertId, name, phone, email, status: status || 'active', last_login: now });
+      res.status(201).json({ id: result.insertId, name, phone, email, status: status || 'active', lastLogin: now });
     } else if (role === 'ca_admin') {
       const [result] = await db.query(`
         INSERT INTO tbCAEmployees (ca_id, name, email, phone, password)
         VALUES (?, ?, ?, ?, ?)
       `, [id, name, email, phone, hashedPassword]);
 
-      res.status(201).json({ id: result.insertId, name, phone, email, status: 'active', last_login: now });
+      res.status(201).json({ id: result.insertId, name, phone, email, status: 'active', lastLogin: now });
     } else {
       res.status(403).json({ error: 'Unauthorized' });
     }

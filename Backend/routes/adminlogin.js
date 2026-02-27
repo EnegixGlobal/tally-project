@@ -41,6 +41,11 @@ router.post('/login', async (req, res) => {
       }
     }
 
+    // Update last login time for CA
+    if (role === 'ca_admin') {
+      await db.query('UPDATE tbCA SET fdlast_login = NOW() WHERE fdSiNo = ?', [user.fdSiNo]);
+    }
+
     // Generate JWT
     const token = jwt.sign(
       { id: user.id || user.fdSiNo, email: user.email, role },

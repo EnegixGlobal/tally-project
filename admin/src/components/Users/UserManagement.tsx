@@ -134,7 +134,7 @@ const UserManagement: React.FC = () => {
       const res = await api.put(`/api/adminUser/${editingUser.id}`, payload);
 
       setUsers((prev) =>
-        prev.map((u) => (u.id === editingUser.id ? res.data : u))
+        prev.map((u) => (u.id === editingUser.id ? { ...u, ...res.data } : u))
       );
       resetForm();
       Swal.fire({
@@ -384,8 +384,8 @@ const UserManagement: React.FC = () => {
                         title={user.status === 'active' ? 'Suspend Account' : 'Activate Account'}
                         onClick={() => handleStatusChange(user.id, user.status === 'active' ? 'suspended' : 'active')}
                         className={`p-2 rounded-lg transition-all transform hover:scale-110 shadow-sm ${user.status === 'active'
-                            ? 'bg-amber-100 text-amber-600 hover:bg-amber-600 hover:text-white'
-                            : 'bg-green-100 text-green-600 hover:bg-green-600 hover:text-white'
+                          ? 'bg-amber-100 text-amber-600 hover:bg-amber-600 hover:text-white'
+                          : 'bg-green-100 text-green-600 hover:bg-green-600 hover:text-white'
                           }`}
                       >
                         {user.status === 'active' ? <Ban className="w-4 h-4" /> : <Play className="w-4 h-4" />}
