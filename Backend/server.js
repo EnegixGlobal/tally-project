@@ -12,6 +12,7 @@ app.use(
     origin: [
       "https://apnabook.com",
       "https://www.apnabook.com",
+      "https://admin.apnabook.com",
       "http://localhost:5173",
       "http://localhost:5174",
       "http://localhost:4173",
@@ -253,7 +254,9 @@ const purchaseinvoicematching = require("./routes/purchaseinvoicematching");
 app.use("/api/", purchaseinvoicematching);
 const authMiddleware = require("./middlewares/authMiddleware");
 const AdminUser = require("./routes/AdminUser");
+const Traders = require("./routes/traders");
 app.use("/api/adminUser", authMiddleware, AdminUser);
+app.use("/api/traders", authMiddleware, Traders);
 const caEmployee = require("./routes/caemployee");
 app.use("/api/", caEmployee);
 
