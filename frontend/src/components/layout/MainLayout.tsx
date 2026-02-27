@@ -14,7 +14,7 @@ const MainLayout: React.FC = () => {
   const { theme } = useAppContext();
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showShortcuts, setShowShortcuts] = useState(false);
-  const { isAuthenticated, isLoading: authLoading, hasCompany } = useAuth();
+  const { isAuthenticated, isLoading: authLoading, hasCompany, checkPermission } = useAuth();
   const { isLoading: companyLoading } = useCompany();
   const navigate = useNavigate();
 
@@ -34,9 +34,26 @@ const MainLayout: React.FC = () => {
     if (!isLoading && isAuthenticated && !hasCompany) {
       if (!location.pathname.startsWith('/app/company')) {
         navigate('/app/company');
+        return;
       }
     }
-  }, [isLoading, isAuthenticated, hasCompany, navigate, location]);
+
+    // Role-based route protection
+    if (!isLoading && isAuthenticated) {
+      const restrictedPaths = [
+        { path: '/app/gst', moduleId: 'gst' },
+        { path: '/app/tds', moduleId: 'tds' },
+        { path: '/app/audit', moduleId: 'audit' },
+        { path: '/app/income-tax', moduleId: 'income-tax' },
+      ];
+
+      const currentRestricted = restrictedPaths.find(p => location.pathname.startsWith(p.path));
+      if (currentRestricted && !checkPermission(currentRestricted.moduleId)) {
+        console.warn(`Access denied to ${location.pathname} for current role`);
+        navigate('/app');
+      }
+    }
+  }, [isLoading, isAuthenticated, hasCompany, navigate, location, checkPermission]);
 
   // Handle keyboard shortcuts
   useEffect(() => {

@@ -69,17 +69,17 @@ interface HorizontalMenuProps {
 
 const menuItems = [
   { title: 'Dashboard', path: '/app' },
-  { title: 'Masters', path: '/app/masters' },
-  { title: 'Vouchers', path: '/app/vouchers' },
-  { title: 'Reports', path: '/app/reports' },
+  { title: 'Masters', path: '/app/masters', permissionId: 'masters' },
+  { title: 'Vouchers', path: '/app/vouchers', permissionId: 'vouchers' },
+  { title: 'Reports', path: '/app/reports', permissionId: 'reports' },
   // { title: 'Accounting', path: '/app/accounting' },
   // { title: 'Inventory', path: '/app/inventory' },
-  { title: 'Vouchers Register', path: '/app/voucher-register' },
+  { title: 'Vouchers Register', path: '/app/voucher-register', permissionId: 'vouchers' },
   // { title: 'Sales Order', path: '/app/sales-order' },
-  { title: 'GST', path: '/app/gst' },
-  { title: 'TDS', path: '/app/tds' },
-  { title: 'Income Tax', path: '/app/income-tax' },
-  { title: 'Audit', path: '/app/audit' },
+  { title: 'GST', path: '/app/gst', permissionId: 'gst' },
+  { title: 'TDS', path: '/app/tds', permissionId: 'tds' },
+  { title: 'Income Tax', path: '/app/income-tax', permissionId: 'income-tax' },
+  { title: 'Audit', path: '/app/audit', permissionId: 'audit' },
   { title: 'Config', path: '/app/config' },
 ];
 
@@ -88,7 +88,7 @@ const HorizontalMenu: React.FC<HorizontalMenuProps> = ({ sidebarOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { hasCompany } = useAuth();
+  const { hasCompany, checkPermission } = useAuth();
 
   const allowedWhenNoCompany = ['/app', '/app/company'];
 
@@ -105,18 +105,29 @@ const HorizontalMenu: React.FC<HorizontalMenuProps> = ({ sidebarOpen }) => {
     >
       <div className="flex items-center h-full px-2 space-x-2 min-w-max">
         {menuItems.map((item, index) => {
-          const disabled = !hasCompany && !allowedWhenNoCompany.includes(item.path);
+          let hasPermission = true;
+          if ((item as any).permissionId) {
+            hasPermission = checkPermission((item as any).permissionId);
+          }
+
+          const disabled = (!hasCompany && !allowedWhenNoCompany.includes(item.path)) || !hasPermission;
           return (
             <button
               key={index}
               onClick={() => !disabled && navigate(item.path)}
               disabled={disabled}
-              title={disabled ? 'Create a company first to access this' : undefined}
+              title={
+                !hasPermission
+                  ? "You don't have permission to access this module"
+                  : disabled
+                    ? 'Create a company first to access this'
+                    : undefined
+              }
               className={`px-3 py-1 rounded text-sm transition-colors flex-shrink-0 ${isActive(item.path)
-                  ? theme === 'dark'
-                    ? 'bg-gray-700'
-                    : 'bg-blue-700'
-                  : 'hover:bg-blue-700 dark:hover:bg-gray-700'
+                ? theme === 'dark'
+                  ? 'bg-gray-700'
+                  : 'bg-blue-700'
+                : 'hover:bg-blue-700 dark:hover:bg-gray-700'
                 } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {item.title}
