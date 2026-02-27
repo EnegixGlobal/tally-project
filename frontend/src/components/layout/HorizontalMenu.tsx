@@ -78,6 +78,7 @@ const menuItems = [
   // { title: 'Sales Order', path: '/app/sales-order' },
   { title: 'GST', path: '/app/gst' },
   { title: 'TDS', path: '/app/tds' },
+  { title: 'Income Tax', path: '/app/income-tax' },
   { title: 'Audit', path: '/app/audit' },
   { title: 'Config', path: '/app/config' },
 ];
@@ -96,13 +97,11 @@ const HorizontalMenu: React.FC<HorizontalMenuProps> = ({ sidebarOpen }) => {
 
   return (
     <div
-      className={`fixed top-14 z-40 h-10 overflow-x-auto whitespace-nowrap transition-all duration-300 ${
-        sidebarOpen ? 'left-60' : 'left-16'
-      } right-0 border-b scrollbar-thin scrollbar-thumb-rounded ${
-        theme === 'dark'
+      className={`fixed top-14 z-40 h-10 overflow-x-auto whitespace-nowrap transition-all duration-300 ${sidebarOpen ? 'left-60' : 'left-16'
+        } right-0 border-b scrollbar-thin scrollbar-thumb-rounded ${theme === 'dark'
           ? 'bg-gray-900 text-gray-200 border-gray-700 scrollbar-thumb-gray-700'
           : 'bg-blue-800 text-white border-blue-700 scrollbar-thumb-blue-700'
-      }`}
+        }`}
     >
       <div className="flex items-center h-full px-2 space-x-2 min-w-max">
         {menuItems.map((item, index) => {
@@ -113,13 +112,12 @@ const HorizontalMenu: React.FC<HorizontalMenuProps> = ({ sidebarOpen }) => {
               onClick={() => !disabled && navigate(item.path)}
               disabled={disabled}
               title={disabled ? 'Create a company first to access this' : undefined}
-              className={`px-3 py-1 rounded text-sm transition-colors flex-shrink-0 ${
-                isActive(item.path)
+              className={`px-3 py-1 rounded text-sm transition-colors flex-shrink-0 ${isActive(item.path)
                   ? theme === 'dark'
                     ? 'bg-gray-700'
                     : 'bg-blue-700'
                   : 'hover:bg-blue-700 dark:hover:bg-gray-700'
-              } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${disabled ? 'opacity-50 cursor-not-allowed' : ''}`}
             >
               {item.title}
             </button>
