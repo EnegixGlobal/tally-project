@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Search, Filter, Edit, Trash2, Ban, Play, Users } from 'lucide-react';
+import { Search, Filter, Edit, Trash2, Ban, Play, Users, MoreVertical, X, ExternalLink } from 'lucide-react';
 import { useTheme } from '../../context/ThemeContext';
+import { useAdmin } from '../../hooks/useAdmin';
 import { format } from 'date-fns';
 import api from '../../services/api';
 import Swal from 'sweetalert2';
@@ -17,11 +18,20 @@ interface User {
 
 const UserManagement: React.FC = () => {
   const { theme } = useTheme();
+  const { adminData } = useAdmin();
   const [users, setUsers] = useState<User[]>([]);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState('all');
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingUser, setEditingUser] = useState<User | null>(null);
+
+  // Details Modal States
+  const [showDetailsModal, setShowDetailsModal] = useState(false);
+  const [selectedUser, setSelectedUser] = useState<User | null>(null);
+  const [loadingDetails, setLoadingDetails] = useState(false);
+  const [caEmployees, setCaEmployees] = useState<any[]>([]);
+  const [employeeCompanies, setEmployeeCompanies] = useState<any[]>([]);
+
   const [newUser, setNewUser] = useState({
     name: '',
     phone: '',
@@ -211,6 +221,28 @@ const UserManagement: React.FC = () => {
     }
   };
 
+  const handleShowDetails = async (user: User) => {
+    setSelectedUser(user);
+    setShowDetailsModal(true);
+    setLoadingDetails(true);
+    setCaEmployees([]);
+    setEmployeeCompanies([]);
+
+    try {
+      if (adminData?.role === 'super_admin') {
+        const res = await api.get(`/api/ca-employees-with-companies?ca_id=${user.id}`);
+        setCaEmployees(res.data.employees || []);
+      } else if (adminData?.role === 'ca_admin') {
+        const res = await api.get(`/api/ca-employee-companies?ca_employee_id=${user.id}`);
+        setEmployeeCompanies(res.data.companies || []);
+      }
+    } catch (err: any) {
+      console.error('Failed to fetch details:', err);
+    } finally {
+      setLoadingDetails(false);
+    }
+  };
+
   const handleEdit = (user: User) => {
     setEditingUser(user);
     setNewUser({
@@ -381,6 +413,14 @@ const UserManagement: React.FC = () => {
                       </button>
 
                       <button
+                        title="View Details"
+                        onClick={() => handleShowDetails(user)}
+                        className="p-2 bg-purple-100 text-purple-600 rounded-lg hover:bg-purple-600 hover:text-white transition-all transform hover:scale-110 shadow-sm"
+                      >
+                        <MoreVertical className="w-4 h-4" />
+                      </button>
+
+                      <button
                         title={user.status === 'active' ? 'Suspend Account' : 'Activate Account'}
                         onClick={() => handleStatusChange(user.id, user.status === 'active' ? 'suspended' : 'active')}
                         className={`p-2 rounded-lg transition-all transform hover:scale-110 shadow-sm ${user.status === 'active'
@@ -412,6 +452,114 @@ const UserManagement: React.FC = () => {
           </table>
         </div>
       </div>
+
+      {showDetailsModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-300">
+          <div className={`w-full max-w-4xl max-h-[90vh] overflow-hidden rounded-2xl shadow-2xl ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} border flex flex-col`}>
+            {/* Modal Header */}
+            <div className={`px-6 py-4 border-b flex items-center justify-between ${theme === 'dark' ? 'border-gray-700 bg-gray-800/50' : 'border-gray-100 bg-gray-50/50'}`}>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Users className="w-5 h-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className={`text-lg font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+                    {adminData?.role === 'super_admin' ? 'CA Employee Details' : 'Assigned Companies'}
+                  </h3>
+                  <p className={`text-xs ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    Viewing information for <span className="font-semibold text-primary">{selectedUser?.name}</span>
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className={`p-2 rounded-lg transition-colors ${theme === 'dark' ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'}`}
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            {/* Modal Content */}
+            <div className="flex-1 overflow-auto p-6">
+              {loadingDetails ? (
+                <div className="flex flex-col items-center justify-center py-20 space-y-4">
+                  <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
+                  <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Fetching details...</p>
+                </div>
+              ) : adminData?.role === 'super_admin' ? (
+                caEmployees.length > 0 ? (
+                  <div className={`rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <table className="w-full text-sm">
+                      <thead className={`${theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
+                        <tr>
+                          <th className="px-4 py-3 text-left font-semibold">Employee Name</th>
+                          <th className="px-4 py-3 text-left font-semibold">Username (Email)</th>
+                          <th className="px-4 py-3 text-left font-semibold">Phone</th>
+                          <th className="px-4 py-3 text-left font-semibold">Allotted Companies</th>
+                        </tr>
+                      </thead>
+                      <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                        {caEmployees.map((emp) => (
+                          <tr key={emp.employee_id} className={theme === 'dark' ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50'}>
+                            <td className={`px-4 py-4 font-medium ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{emp.name}</td>
+                            <td className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'} px-4 py-4 italic`}>{emp.email}</td>
+                            <td className={`px-4 py-4 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{emp.phone || 'N/A'}</td>
+                            <td className="px-4 py-4">
+                              <div className="flex flex-wrap gap-1">
+                                {emp.company_names ? emp.company_names.split(',').map((c: string, i: number) => (
+                                  <span key={i} className={`px-2 py-0.5 text-[10px] font-medium rounded-md ${theme === 'dark' ? 'bg-blue-900/40 text-blue-200' : 'bg-blue-50 text-blue-700'}`}>
+                                    {c.trim()}
+                                  </span>
+                                )) : (
+                                  <span className="text-gray-400 italic text-xs">No companies assigned</span>
+                                )}
+                              </div>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="text-center py-20 bg-gray-50/10 rounded-2xl border-2 border-dashed border-gray-700/20">
+                    <p className="text-gray-500 italic">No employees found for this CA admin.</p>
+                  </div>
+                )
+              ) : (
+                employeeCompanies.length > 0 ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {employeeCompanies.map((comp) => (
+                      <div key={comp.id} className={`p-4 rounded-xl border flex items-center justify-between group ${theme === 'dark' ? 'bg-gray-700/30 border-gray-600 hover:bg-gray-700/50' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'} transition-all`}>
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'}`}>
+                            <ExternalLink className={`w-4 h-4 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
+                          </div>
+                          <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{comp.name}</span>
+                        </div>
+                        <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Allotted</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-20 bg-gray-50/10 rounded-2xl border-2 border-dashed border-gray-700/20">
+                    <p className="text-gray-500 italic">No companies allotted to this employee yet.</p>
+                  </div>
+                )
+              )}
+            </div>
+
+            {/* Modal Footer */}
+            <div className={`px-6 py-4 border-t flex justify-end ${theme === 'dark' ? 'border-gray-700 bg-gray-800' : 'border-gray-100 bg-gray-50'}`}>
+              <button
+                onClick={() => setShowDetailsModal(false)}
+                className="px-6 py-2 bg-primary text-white rounded-xl font-semibold hover:bg-primaryDark transition-all active:scale-95 shadow-lg shadow-primary/20"
+              >
+                Close View
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
