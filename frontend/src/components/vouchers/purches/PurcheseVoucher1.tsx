@@ -1021,6 +1021,7 @@ const PurchaseVoucher: React.FC = () => {
     >
   ) => {
     const { name, value } = e.target;
+    if (name === "date" && !isEditMode) return;
 
     // Debug: Log form changes
 
@@ -2311,7 +2312,10 @@ const PurchaseVoucher: React.FC = () => {
                   value={formData.date}
                   onChange={handleChange}
                   required
-                  className={getInputClasses(theme, !!errors.date)}
+                  readOnly={!isEditMode}
+                  min={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
+                  max={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
+                  className={`${getInputClasses(theme, !!errors.date)} ${!isEditMode ? "opacity-70 cursor-not-allowed" : ""}`}
                 />
                 {errors.date && (
                   <p className="text-red-500 text-xs mt-1">{errors.date}</p>

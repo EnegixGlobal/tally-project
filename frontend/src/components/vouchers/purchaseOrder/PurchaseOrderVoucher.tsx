@@ -327,6 +327,7 @@ const PurchaseOrderVoucher: React.FC = () => {
     >
   ) => {
     const { name, value } = e.target;
+    if (name === "date" && !isEditMode) return;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
@@ -696,11 +697,14 @@ const PurchaseOrderVoucher: React.FC = () => {
                 value={formData.date}
                 onChange={handleChange}
                 required
+                readOnly={!isEditMode}
+                min={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
+                max={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
                 className={`w-full p-2 rounded border ${
                   theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500`}
+                } focus:border-blue-500 focus:ring-blue-500 ${!isEditMode ? "opacity-70 cursor-not-allowed" : ""}`}
               />
               {errors.date && (
                 <p className="text-red-500 text-sm mt-1">{errors.date}</p>

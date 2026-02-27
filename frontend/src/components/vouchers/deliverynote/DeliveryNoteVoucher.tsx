@@ -29,6 +29,7 @@ const DeliveryNoteVoucher: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
+    if (name === "date") return; // ALWAYS locked for new
     setFormData(prev => ({ ...prev, [name]: value }));
   };
 
@@ -137,11 +138,14 @@ const DeliveryNoteVoucher: React.FC = () => {
                 value={formData.date}
                 onChange={handleChange}
                 required
+                readOnly={true}
+                min={new Date().toLocaleDateString('en-CA')}
+                max={new Date().toLocaleDateString('en-CA')}
                 className={`w-full p-2 rounded border ${
                   theme === 'dark' 
                     ? 'bg-gray-700 border-gray-600 focus:border-blue-500' 
                     : 'bg-white border-gray-300 focus:border-blue-500'
-                } outline-none transition-colors`}
+                } outline-none transition-colors opacity-70 cursor-not-allowed`}
               />
             </div>
             
