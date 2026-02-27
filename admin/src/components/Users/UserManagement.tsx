@@ -335,7 +335,7 @@ const UserManagement: React.FC = () => {
                 </label>
                 <input
                   type={field.includes('password') ? 'password' : field === 'email' ? 'email' : 'text'}
-                  value={newUser[field as keyof typeof newUser] || ''}
+                  value={(newUser as any)[field] || ''}
                   onChange={(e) => setNewUser((prev) => ({ ...prev, [field]: e.target.value }))}
                   className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
                   placeholder={`Enter ${field.toLowerCase()}...`}
