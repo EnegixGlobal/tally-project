@@ -130,6 +130,37 @@ router.put('/:userId', async (req, res) => {
   }
 });
 
+// ✅ Change user status (Role-aware)
+router.patch('/:userId/status', async (req, res) => {
+  try {
+    const { role } = req.user;
+    const { status } = req.body;
+    const userId = req.params.userId;
+
+    if (!['active', 'suspended', 'pending'].includes(status)) {
+      return res.status(400).json({ error: 'Invalid status' });
+    }
+
+    let result;
+    if (role === 'super_admin') {
+      [result] = await db.query('UPDATE tbCA SET fdstatus = ? WHERE fdSiNo = ?', [status, userId]);
+    } else if (role === 'ca_admin') {
+      [result] = await db.query('UPDATE tbCAEmployees SET status = ? WHERE id = ? AND ca_id = ?', [status, userId, req.user.id]);
+    } else {
+      return res.status(403).json({ error: 'Unauthorized' });
+    }
+
+    if (result.affectedRows === 0) {
+      return res.status(404).json({ error: 'User not found' });
+    }
+
+    res.json({ message: 'Status updated', id: userId, status });
+  } catch (err) {
+    console.error('Error updating status:', err);
+    res.status(500).json({ error: err.message });
+  }
+});
+
 // ✅ Delete user (Role-aware)
 router.delete('/:userId', async (req, res) => {
   try {
