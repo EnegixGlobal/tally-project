@@ -100,6 +100,12 @@ app.use("/api/admin", adminloginRoute);
 const ledgerDropdown = require("./routes/ledgerDropdown");
 app.use("/api/ledger-dropdown", ledgerDropdown);
 
+const subscriptionRoutes = require("./routes/subscriptions");
+app.use("/api/subscriptions", subscriptionRoutes);
+
+const couponRoutes = require("./routes/coupons");
+app.use("/api/coupons", couponRoutes);
+
 const salesOrders = require("./routes/salesOrders");
 app.use("/api/sales-orders", salesOrders);
 

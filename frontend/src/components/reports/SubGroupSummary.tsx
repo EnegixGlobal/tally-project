@@ -33,8 +33,6 @@ interface BaseGroup {
 
 // group name
 const baseGroups = [
-  { id: -1, name: "Bank Accounts", nature: "Assets" },
-  { id: -2, name: "Bank OD A/c", nature: "Assets" },
   { id: -3, name: "Branch/Division", nature: "Assets" },
   { id: -4, name: "Capital Account", nature: "Liabilities" },
   { id: -5, name: "Current Assets", nature: "Assets" },
