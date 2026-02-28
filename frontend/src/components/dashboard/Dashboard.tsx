@@ -559,6 +559,7 @@ const Dashboard: React.FC = () => {
                     onChange={(e) => setSelectedFinYear(e.target.value)}
                     className="border border-gray-300 rounded px-2 py-0.5 text-xs bg-white text-gray-800 outline-none w-auto"
                   >
+                    <option value="">Clear</option>
                     {availableFinYears.map((fy) => (
                       <option key={fy} value={fy}>{fy}</option>
                     ))}
@@ -663,7 +664,6 @@ const Dashboard: React.FC = () => {
                 </>
               )}
             </>
-
           )}
         </div>
       ) : suppl === "ca" ? (
@@ -798,84 +798,90 @@ const Dashboard: React.FC = () => {
           </div>
         </div>
       ) : null}
-      {showAssignModal && selectedEmployeeId !== null && (
-        <AssignCompaniesModal
-          caId={caId || ""}
-          employeeId={selectedEmployeeId}
-          employeeName={selectedEmployeeName}
-          onClose={closeAssignModal}
-          onAssigned={() => {
-            fetchEmployees(); // refresh list after update
-          }}
-        />
-      )}
+      {
+        showAssignModal && selectedEmployeeId !== null && (
+          <AssignCompaniesModal
+            caId={caId || ""}
+            employeeId={selectedEmployeeId}
+            employeeName={selectedEmployeeName}
+            onClose={closeAssignModal}
+            onAssigned={() => {
+              fetchEmployees(); 
+            }}
+          />
+        )
+      }
 
-      {showPermissionsModal && selectedEmployeeId !== null && (
-        <PermissionsModal
-          employeeId={selectedEmployeeId}
-          employeeName={selectedEmployeeName}
-          onClose={closePermissionsModal}
-        />
-      )}
+      {
+        showPermissionsModal && selectedEmployeeId !== null && (
+          <PermissionsModal
+            employeeId={selectedEmployeeId}
+            employeeName={selectedEmployeeName}
+            onClose={closePermissionsModal}
+          />
+        )
+      }
 
       {/* Modal for Adding Employee */}
-      {showModal && (
-        <div className="fixed inset-0 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm z-50 p-4 transition-all duration-300">
-          <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative animate-in zoom-in-95 duration-200 overflow-hidden border border-white/20 p-8">
-            <div className="text-center mb-8">
-              <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
-                Add New Employee
-              </h3>
-              <p className="text-sm text-gray-500 mt-1">Fill in the details to add a new employee</p>
-            </div>
+      {
+        showModal && (
+          <div className="fixed inset-0 flex items-center justify-center bg-gray-900/40 backdrop-blur-sm z-50 p-4 transition-all duration-300">
+            <div className="bg-white rounded-3xl shadow-2xl w-full max-w-md relative animate-in zoom-in-95 duration-200 overflow-hidden border border-white/20 p-8">
+              <div className="text-center mb-8">
+                <h3 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent">
+                  Add New Employee
+                </h3>
+                <p className="text-sm text-gray-500 mt-1">Fill in the details to add a new employee</p>
+              </div>
 
-            <div className="space-y-4">
-              <input
-                type="text"
-                placeholder="Employee Name"
-                value={newEmployee.name}
-                onChange={(e) =>
-                  setNewEmployee({ ...newEmployee, name: e.target.value })
-                }
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400 text-gray-800 font-medium"
-              />
-              <input
-                type="text"
-                placeholder="Aadhaar Number"
-                value={newEmployee.adhar}
-                onChange={(e) =>
-                  setNewEmployee({ ...newEmployee, adhar: e.target.value })
-                }
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400 text-gray-800 font-medium"
-              />
-              <input
-                type="text"
-                placeholder="Phone Number"
-                value={newEmployee.phone}
-                onChange={(e) =>
-                  setNewEmployee({ ...newEmployee, phone: e.target.value })
-                }
-                className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400 text-gray-800 font-medium"
-              />
-            </div>
+              <div className="space-y-4">
+                <input
+                  type="text"
+                  placeholder="Employee Name"
+                  value={newEmployee.name}
+                  onChange={(e) =>
+                    setNewEmployee({ ...newEmployee, name: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400 text-gray-800 font-medium"
+                />
+                <input
+                  type="text"
+                  placeholder="Aadhaar Number"
+                  value={newEmployee.adhar}
+                  onChange={(e) =>
+                    setNewEmployee({ ...newEmployee, adhar: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400 text-gray-800 font-medium"
+                />
+                <input
+                  type="text"
+                  placeholder="Phone Number"
+                  value={newEmployee.phone}
+                  onChange={(e) =>
+                    setNewEmployee({ ...newEmployee, phone: e.target.value })
+                  }
+                  className="w-full px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 outline-none transition-all placeholder:text-gray-400 text-gray-800 font-medium"
+                />
+              </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 mt-8">
-              <button
-                onClick={() => setShowModal(false)}
-                className="flex-1 px-4 py-3 rounded-xl border border-gray-200 font-semibold text-gray-600 hover:bg-gray-50 transition-all active:scale-95"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAddEmployee}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
-              >
-                Add Employee
-              </button>
+              <div className="flex flex-col sm:flex-row gap-3 mt-8">
+                <button
+                  onClick={() => setShowModal(false)}
+                  className="flex-1 px-4 py-3 rounded-xl border border-gray-200 font-semibold text-gray-600 hover:bg-gray-50 transition-all active:scale-95"
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleAddEmployee}
+                  className="flex-1 bg-gradient-to-r from-blue-600 to-indigo-600 text-white font-bold py-3 rounded-xl shadow-lg shadow-blue-500/25 hover:shadow-blue-500/40 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                >
+                  Add Employee
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        )
+      }
     </>
   );
 };
