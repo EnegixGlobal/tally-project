@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import type { VoucherEntry, StockItem, Godown } from '../../../types';
 import { Save, Plus, Trash2, ArrowLeft } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { useFinancialYear, getFinancialYearDefaults } from '../../../hooks/useFinancialYear';
 
 const StockJournalVoucher: React.FC = () => {
   const { theme, stockItems, godowns = [], addVoucher } = useAppContext();
@@ -11,13 +12,15 @@ const StockJournalVoucher: React.FC = () => {
   const companyId = localStorage.getItem('company_id');
   const ownerType = localStorage.getItem('userType');
   const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
+  const { selectedFinYear } = useFinancialYear();
+  const { defaultDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
   const generateVoucherNumber = () => {
-  const prefix = 'STKJRNLV';
-  const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit
-  return `${prefix}${randomNumber}`;
-};
+    const prefix = 'STKJRNLV';
+    const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit
+    return `${prefix}${randomNumber}`;
+  };
   const [formData, setFormData] = useState<Omit<VoucherEntry, 'id'>>({
-    date: new Date().toISOString().split('T')[0],
+    date: defaultDate,
     type: 'stock-journal',
     number: generateVoucherNumber(),
     narration: '',
@@ -43,7 +46,6 @@ const StockJournalVoucher: React.FC = () => {
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
-    if (name === "date") return; // ALWAYS locked for new
     setFormData(prev => ({ ...prev, [name]: value }));
     setErrors(prev => ({ ...prev, [name]: '' }));
   };
@@ -51,7 +53,7 @@ const StockJournalVoucher: React.FC = () => {
   const handleEntryChange = (index: number, e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target;
     const updatedEntries = [...formData.entries];
-    const entry = updatedEntries[index];    if (name === 'itemId') {
+    const entry = updatedEntries[index]; if (name === 'itemId') {
       const selectedItem = stockItems.find(item => item.id === value);
       const gstRate = selectedItem?.gstRate ?? 0;
       updatedEntries[index] = {
@@ -141,56 +143,56 @@ const StockJournalVoucher: React.FC = () => {
   // };
 
   const handleSubmit = async (e: React.FormEvent) => {
-      e.preventDefault();
-      // if (!isBalanced) {
-      //   alert('Total debit must equal total credit');
-      //   return;
-      // }
-  
-  
-      const formattedEntries = formData.entries.map(entry => ({
-        id: entry.id,
-        ledgerId: entry.ledgerId,
-        batchNumber: entry.batchNumber || '',
-        quantity: parseFloat((entry.quantity || 0).toString()),
-        rate: parseFloat((entry.rate || 0).toString()),
-        amount: parseFloat((entry.amount || 0).toString()),
-        type: entry.type,
-      }));
-  
-      const payload = {
-        date: formData.date,
-        number: formData.number || 'Auto',
-        narration: formData.narration,
-        type: 'journal',
-        companyId,
-        ownerType,
-        ownerId,
-        entries: formattedEntries,
-      };
-  
-      try {
-        const response = await fetch(`${import.meta.env.VITE_API_URL}/api/StockJournal`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-  
-        if (!response.ok) throw new Error('Failed to save voucher');
-  
-        addVoucher(await response.json());
-       Swal.fire({
-                 icon: 'success',
-                 title: 'Success',
-                 text: "Voucher created Successfully",
-               }).then(() => {
-                 navigate('/app/vouchers'); // or your route to go back
-               });
-      } catch (err) {
-        console.error(err);
-        alert('Failed to save voucher.');
-      }
+    e.preventDefault();
+    // if (!isBalanced) {
+    //   alert('Total debit must equal total credit');
+    //   return;
+    // }
+
+
+    const formattedEntries = formData.entries.map(entry => ({
+      id: entry.id,
+      ledgerId: entry.ledgerId,
+      batchNumber: entry.batchNumber || '',
+      quantity: parseFloat((entry.quantity || 0).toString()),
+      rate: parseFloat((entry.rate || 0).toString()),
+      amount: parseFloat((entry.amount || 0).toString()),
+      type: entry.type,
+    }));
+
+    const payload = {
+      date: formData.date,
+      number: formData.number || 'Auto',
+      narration: formData.narration,
+      type: 'journal',
+      companyId,
+      ownerType,
+      ownerId,
+      entries: formattedEntries,
     };
+
+    try {
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/StockJournal`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+
+      if (!response.ok) throw new Error('Failed to save voucher');
+
+      addVoucher(await response.json());
+      Swal.fire({
+        icon: 'success',
+        title: 'Success',
+        text: "Voucher created Successfully",
+      }).then(() => {
+        navigate('/app/vouchers'); // or your route to go back
+      });
+    } catch (err) {
+      console.error(err);
+      alert('Failed to save voucher.');
+    }
+  };
 
   const sourceEntries = formData.entries.filter(e => e.type === 'source');
   const destEntries = formData.entries.filter(e => e.type === 'destination');
@@ -225,10 +227,8 @@ const StockJournalVoucher: React.FC = () => {
                 value={formData.date}
                 onChange={handleChange}
                 required
-                readOnly={true}
-                min={new Date().toLocaleDateString('en-CA')}
-                max={new Date().toLocaleDateString('en-CA')}
-                className={`w-full p-2 rounded border ${theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500' : 'bg-white border-gray-300 focus:border-blue-500'} outline-none transition-colors opacity-70 cursor-not-allowed ${errors.date ? 'border-red-500' : ''}`}
+                max={maxDate}
+                className={`w-full p-2 rounded border ${theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500' : 'bg-white border-gray-300 focus:border-blue-500'} outline-none transition-colors ${errors.date ? 'border-red-500' : ''}`}
               />
               {errors.date && <p className="text-red-500 text-xs mt-1">{errors.date}</p>}
             </div>

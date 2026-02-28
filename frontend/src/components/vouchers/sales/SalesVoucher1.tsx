@@ -2325,7 +2325,6 @@ const SalesVoucher: React.FC = () => {
                     value={formData.date}
                     onChange={handleChange}
                     required
-                    min={minDate}
                     max={maxDate}
                     className={`${FORM_STYLES.input(theme, !!errors.date)}`}
                   />

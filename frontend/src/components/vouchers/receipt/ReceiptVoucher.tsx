@@ -679,7 +679,6 @@ const ReceiptVoucher: React.FC = () => {
                 onChange={handleChange}
                 required
                 title="Receipt Date"
-                min={minDate}
                 max={maxDate}
                 className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 text-gray-100"

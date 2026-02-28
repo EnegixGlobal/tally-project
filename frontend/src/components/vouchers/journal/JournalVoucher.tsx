@@ -424,8 +424,8 @@ const JournalVoucher: React.FC = () => {
             title="Save Voucher"
             onClick={handleSubmit}
             className={`p-2 rounded-md ${theme === "dark"
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-blue-500 hover:bg-blue-600"
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-blue-500 hover:bg-blue-600"
               } text-white flex items-center`}
             disabled={!isBalanced}
           >
@@ -470,11 +470,10 @@ const JournalVoucher: React.FC = () => {
                 onChange={handleChange}
                 required
                 title="Select voucher date"
-                min={minDate}
                 max={maxDate}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500`}
               />
               {errors.date && (
@@ -496,8 +495,8 @@ const JournalVoucher: React.FC = () => {
                 readOnly={config.autoNumbering}
                 required
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500 ${config.autoNumbering ? "opacity-50" : ""
                   }`}
                 placeholder={
@@ -524,8 +523,8 @@ const JournalVoucher: React.FC = () => {
                     onChange={handleChange}
                     title="Reference number"
                     className={`w-full p-2 rounded border ${theme === "dark"
-                        ? "bg-gray-700 border-gray-600 text-gray-100"
-                        : "bg-white border-gray-300 text-gray-900"
+                      ? "bg-gray-700 border-gray-600 text-gray-100"
+                      : "bg-white border-gray-300 text-gray-900"
                       } focus:border-blue-500 focus:ring-blue-500`}
                     placeholder="Enter reference number"
                   />
@@ -544,8 +543,8 @@ const JournalVoucher: React.FC = () => {
                     onChange={handleChange}
                     title="Reference date"
                     className={`w-full p-2 rounded border ${theme === "dark"
-                        ? "bg-gray-700 border-gray-600 text-gray-100"
-                        : "bg-white border-gray-300 text-gray-900"
+                      ? "bg-gray-700 border-gray-600 text-gray-100"
+                      : "bg-white border-gray-300 text-gray-900"
                       } focus:border-blue-500 focus:ring-blue-500`}
                   />
                 </div>
@@ -563,8 +562,8 @@ const JournalVoucher: React.FC = () => {
                 type="button"
                 onClick={addEntry}
                 className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
                   }`}
               >
                 <Plus size={16} className="mr-1" /> Add Line
@@ -575,8 +574,8 @@ const JournalVoucher: React.FC = () => {
                 <thead>
                   <tr
                     className={`${theme === "dark"
-                        ? "border-b border-gray-600"
-                        : "border-b border-gray-300"
+                      ? "border-b border-gray-600"
+                      : "border-b border-gray-300"
                       }`}
                   >
                     <th className="px-4 py-2 text-left">Ledger Account</th>
@@ -596,8 +595,8 @@ const JournalVoucher: React.FC = () => {
                     <tr
                       key={index}
                       className={`${theme === "dark"
-                          ? "border-b border-gray-600"
-                          : "border-b border-gray-300"
+                        ? "border-b border-gray-600"
+                        : "border-b border-gray-300"
                         }`}
                     >
                       <td className="px-4 py-2">
@@ -608,8 +607,8 @@ const JournalVoucher: React.FC = () => {
                           required
                           title="Select ledger account"
                           className={`w-full p-2 rounded border ${theme === "dark"
-                              ? "bg-gray-700 border-gray-600 text-gray-100"
-                              : "bg-white border-gray-300 text-gray-900"
+                            ? "bg-gray-700 border-gray-600 text-gray-100"
+                            : "bg-white border-gray-300 text-gray-900"
                             } focus:border-blue-500 focus:ring-blue-500`}
                         >
                           <option value="">Select Ledger</option>
@@ -621,8 +620,8 @@ const JournalVoucher: React.FC = () => {
                           <option
                             value="add-new"
                             className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                                ? "bg-blue-600 hover:bg-green-700"
-                                : "bg-green-600 hover:bg-green-700 text-white"
+                              ? "bg-blue-600 hover:bg-green-700"
+                              : "bg-green-600 hover:bg-green-700 text-white"
                               }`}
                           >
                             + Add New Ledger
@@ -642,8 +641,8 @@ const JournalVoucher: React.FC = () => {
                           required
                           title="Select debit or credit"
                           className={`w-full p-2 rounded border ${theme === "dark"
-                              ? "bg-gray-700 border-gray-600 text-gray-100"
-                              : "bg-white border-gray-300 text-gray-900"
+                            ? "bg-gray-700 border-gray-600 text-gray-100"
+                            : "bg-white border-gray-300 text-gray-900"
                             } focus:border-blue-500 focus:ring-blue-500`}
                         >
                           <option value="debit">Dr</option>
@@ -662,8 +661,8 @@ const JournalVoucher: React.FC = () => {
                           title="Enter amount"
                           placeholder="0.00"
                           className={`w-full p-2 rounded border text-right ${theme === "dark"
-                              ? "bg-gray-700 border-gray-600 text-gray-100"
-                              : "bg-white border-gray-300 text-gray-900"
+                            ? "bg-gray-700 border-gray-600 text-gray-100"
+                            : "bg-white border-gray-300 text-gray-900"
                             } focus:border-blue-500 focus:ring-blue-500`}
                         />
                         {errors[`amount${index}`] && (
@@ -680,8 +679,8 @@ const JournalVoucher: React.FC = () => {
                             onChange={(e) => handleEntryChange(index, e)}
                             title="Select cost centre"
                             className={`w-full p-2 rounded border ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
                               } focus:border-blue-500 focus:ring-blue-500`}
                           >
                             <option value="">None</option>
@@ -701,8 +700,8 @@ const JournalVoucher: React.FC = () => {
                             value={entry.narration || ""}
                             onChange={(e) => handleEntryChange(index, e)}
                             className={`w-full p-2 rounded border ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
                               } focus:border-blue-500 focus:ring-blue-500`}
                             placeholder="Entry narration"
                           />
@@ -719,10 +718,10 @@ const JournalVoucher: React.FC = () => {
                               : "Remove entry"
                           }
                           className={`p-1 rounded ${formData.entries.length <= 2
-                              ? "opacity-50 cursor-not-allowed"
-                              : theme === "dark"
-                                ? "hover:bg-gray-600"
-                                : "hover:bg-gray-300"
+                            ? "opacity-50 cursor-not-allowed"
+                            : theme === "dark"
+                              ? "hover:bg-gray-600"
+                              : "hover:bg-gray-300"
                             }`}
                         >
                           <Trash2 size={16} />
@@ -734,8 +733,8 @@ const JournalVoucher: React.FC = () => {
                 <tfoot>
                   <tr
                     className={`font-semibold ${theme === "dark"
-                        ? "border-t border-gray-600"
-                        : "border-t border-gray-300"
+                      ? "border-t border-gray-600"
+                      : "border-t border-gray-300"
                       }`}
                   >
                     <td className="px-4 py-2 text-right" colSpan={2}>
@@ -760,8 +759,8 @@ const JournalVoucher: React.FC = () => {
                       {isBalanced ? (
                         <span
                           className={`px-2 py-1 rounded text-xs ${theme === "dark"
-                              ? "bg-green-900 text-green-200"
-                              : "bg-green-100 text-green-800"
+                            ? "bg-green-900 text-green-200"
+                            : "bg-green-100 text-green-800"
                             }`}
                         >
                           Balanced
@@ -769,8 +768,8 @@ const JournalVoucher: React.FC = () => {
                       ) : (
                         <span
                           className={`px-2 py-1 rounded text-xs ${theme === "dark"
-                              ? "bg-red-900 text-red-200"
-                              : "bg-red-100 text-red-800"
+                            ? "bg-red-900 text-red-200"
+                            : "bg-red-100 text-red-800"
                             }`}
                         >
                           Unbalanced
@@ -832,8 +831,8 @@ const JournalVoucher: React.FC = () => {
               title="Enter narration"
               placeholder="Enter voucher narration"
               className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                  : "bg-white border-gray-300 text-gray-900"
+                ? "bg-gray-700 border-gray-600 text-gray-100"
+                : "bg-white border-gray-300 text-gray-900"
                 } focus:border-blue-500 focus:ring-blue-500`}
             />
           </div>

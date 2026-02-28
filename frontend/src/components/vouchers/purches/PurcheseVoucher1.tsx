@@ -2315,7 +2315,6 @@ const PurchaseVoucher: React.FC = () => {
                   value={formData.date}
                   onChange={handleChange}
                   required
-                  min={minDate}
                   max={maxDate}
                   className={`${getInputClasses(theme, !!errors.date)}`}
                 />
