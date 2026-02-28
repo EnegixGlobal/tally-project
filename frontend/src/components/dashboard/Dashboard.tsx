@@ -17,6 +17,7 @@ import PermissionsModal from "./PermissionsModal";
 import DashboardCaEmployee from "./DashboardCaEmployee";
 import { useAuth } from "../../home/context/AuthContext";
 import { Lock, ShieldCheck } from "lucide-react";
+import { useFinancialYear, getAvailableFinYears, filterByFinancialYear } from "../../hooks/useFinancialYear";
 
 const Dashboard: React.FC = () => {
   const isSameCompany = (a: any, b: any) => {
@@ -50,6 +51,9 @@ const Dashboard: React.FC = () => {
     null
   );
   const [selectedEmployeeName, setSelectedEmployeeName] = useState<string>("");
+
+  const { selectedFinYear, setSelectedFinYear } = useFinancialYear();
+  const availableFinYears = getAvailableFinYears(companyInfo?.booksBeginningYear || companyInfo?.books_beginning_year || 2020);
 
   const openPermissionsModal = (employeeId: number, employeeName: string) => {
     setSelectedEmployeeId(employeeId);
@@ -336,6 +340,8 @@ const Dashboard: React.FC = () => {
   };
 
 
+  const filteredVouchers = filterByFinancialYear(vouchers, "date", selectedFinYear);
+
   const stats = [
     {
       title: "Ledger Accounts",
@@ -345,7 +351,7 @@ const Dashboard: React.FC = () => {
     },
     {
       title: "Total Vouchers",
-      value: vouchers.length,
+      value: filteredVouchers.length,
       icon: <ShoppingBag size={24} />,
       color: theme === "dark" ? "bg-gray-800" : "bg-green-50",
     },
@@ -546,8 +552,17 @@ const Dashboard: React.FC = () => {
                   {companyInfo.name}
                 </h2>
 
-                <p className="text-sm opacity-75 mb-1">
-                  Financial Year: {companyInfo.financial_year}
+                <p className="text-sm opacity-75 mb-1 flex items-center">
+                  <span className="mr-2">Financial Year:</span>
+                  <select
+                    value={selectedFinYear}
+                    onChange={(e) => setSelectedFinYear(e.target.value)}
+                    className="border border-gray-300 rounded px-2 py-0.5 text-xs bg-white text-gray-800 outline-none w-auto"
+                  >
+                    {availableFinYears.map((fy) => (
+                      <option key={fy} value={fy}>{fy}</option>
+                    ))}
+                  </select>
                 </p>
 
                 <p className="text-sm opacity-75 mb-1">

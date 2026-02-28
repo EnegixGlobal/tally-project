@@ -4,6 +4,7 @@ import Swal from "sweetalert2";
 import { useAppContext } from "../../../context/AppContext";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 import type { VoucherEntry, Ledger } from "../../../types";
+import { useFinancialYear, getFinancialYearDefaults } from "../../../hooks/useFinancialYear";
 interface Ledgers {
   id: number;
   name: string;
@@ -23,10 +24,13 @@ const ContraVoucher: React.FC = () => {
     ownerType === "employee" ? "employee_id" : "user_id"
   );
 
+  const { selectedFinYear } = useFinancialYear();
+  const { defaultDate, minDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
+
   console.log(companyId, ownerType, ownerId);
 
   const initialFormData: Omit<VoucherEntry, "id"> = {
-    date: new Date().toISOString().split("T")[0],
+    date: defaultDate,
     type: "contra",
     number: "",
     narration: "",
@@ -101,7 +105,6 @@ const ContraVoucher: React.FC = () => {
     >
   ) => {
     const { name, value } = e.target;
-    if (name === "date" && !isEditMode) return;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
@@ -487,13 +490,12 @@ const ContraVoucher: React.FC = () => {
                 onChange={handleChange}
                 required
                 title="Select voucher date"
-                readOnly={!isEditMode}
-                min={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
-                max={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
+                min={minDate}
+                max={maxDate}
                 className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 text-gray-100"
                   : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500 ${!isEditMode ? "opacity-70 cursor-not-allowed" : ""}`}
+                  } focus:border-blue-500 focus:ring-blue-500`}
               />
               {errors.date && (
                 <p className="text-red-500 text-sm mt-1">{errors.date}</p>

@@ -21,6 +21,7 @@ import EWayBillGeneration from "./EWayBillGeneration";
 import InvoicePrint from "./InvoicePrint";
 import PrintOptions from "./PrintOptions";
 import type { StockItem } from "../../../types";
+import { useFinancialYear, getFinancialYearDefaults } from "../../../hooks/useFinancialYear";
 
 // DRY Constants for Tailwind Classes
 const FORM_STYLES = {
@@ -75,6 +76,9 @@ const SalesVoucher: React.FC = () => {
   const [selectedSalesTypeId, setSelectedSalesTypeId] = useState<string>("");
   const [isReadyToSave, setIsReadyToSave] = useState(false);
   const DRAFT_KEY = "SALES_VOUCHER_CREATE_DRAFT";
+
+  const { selectedFinYear } = useFinancialYear();
+  const { defaultDate, minDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
 
   // Robust detection for party ledgers — backend may return different field names
 
@@ -304,7 +308,7 @@ const SalesVoucher: React.FC = () => {
       }
     }
     return {
-      date: new Date().toISOString().split("T")[0],
+      date: defaultDate,
       type: isQuotationMode ? "quotation" : "sales",
       // number: `${isQuotation ? "QT" : "XYZ"}0001`, // Will be updated by useEffect
       number: "",
@@ -420,7 +424,7 @@ const SalesVoucher: React.FC = () => {
     localStorage.removeItem(DRAFT_KEY);
 
     setFormData({
-      date: new Date().toISOString().split("T")[0],
+      date: defaultDate,
       type: isQuotationMode ? "quotation" : "sales",
       number: formData.number, // Keep the number
       narration: "",
@@ -887,7 +891,6 @@ const SalesVoucher: React.FC = () => {
     >
   ) => {
     const { name, value } = e.target;
-    if (name === "date" && !isEditMode) return;
     if (name.startsWith("dispatchDetails.")) {
       const field = name.split(".")[1];
 
@@ -2322,10 +2325,9 @@ const SalesVoucher: React.FC = () => {
                     value={formData.date}
                     onChange={handleChange}
                     required
-                    readOnly={!isEditMode}
-                    min={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
-                    max={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
-                    className={`${FORM_STYLES.input(theme, !!errors.date)} ${!isEditMode ? "opacity-70 cursor-not-allowed" : ""}`}
+                    min={minDate}
+                    max={maxDate}
+                    className={`${FORM_STYLES.input(theme, !!errors.date)}`}
                   />
                   {errors.date && <p className="text-red-500 text-xs mt-1">{errors.date}</p>}
                 </div>

@@ -9,6 +9,7 @@ import {
   Calendar,
   Eye,
 } from "lucide-react";
+import { useFinancialYear, filterByFinancialYear } from "../../hooks/useFinancialYear";
 
 interface DayBookEntry {
   id: string;
@@ -51,6 +52,7 @@ interface VoucherGroup {
 const DayBook: React.FC = () => {
   const { theme, stockItems } = useAppContext();
   const navigate = useNavigate();
+  const { selectedFinYear } = useFinancialYear();
 
   const getItemName = (itemId: string | undefined) => {
     if (!itemId) return "";
@@ -135,7 +137,8 @@ const DayBook: React.FC = () => {
       }/api/daybookTable2?company_id=${company_id}&owner_type=${fetchOwnerType}&owner_id=${fetchOwnerId}`
     )
       .then((res) => res.json())
-      .then((data) => {
+      .then((rawData) => {
+        const data = filterByFinancialYear(rawData, "date", selectedFinYear);
         const grouped: Record<string, VoucherGroup> = {};
         console.log("this is data", data);
         // 🔹 RAW entries for Detailed view
@@ -318,7 +321,7 @@ const DayBook: React.FC = () => {
         });
       })
       .catch((err) => console.error("DayBook Error:", err));
-  }, []);
+  }, [selectedFinYear]);
 
   const getLocalDate = (dateStr: string) => {
     const d = new Date(dateStr);
