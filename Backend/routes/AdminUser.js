@@ -26,13 +26,13 @@ const uploadToCloudinary = (fileBuffer, folder = 'user_terms') => {
 // Helper to ensure columns exist
 const ensureTermsColumn = async () => {
   try {
-    const [caCols] = await db.query("SHOW COLUMNS FROM tbCA LIKE 'fdterms_file'");
+    const [caCols] = await db.query("SHOW COLUMNS FROM tbca LIKE 'fdterms_file'");
     if (caCols.length === 0) {
-      await db.query("ALTER TABLE tbCA ADD COLUMN fdterms_file VARCHAR(255) DEFAULT NULL");
+      await db.query("ALTER TABLE tbca ADD COLUMN fdterms_file VARCHAR(255) DEFAULT NULL");
     }
-    const [empCols] = await db.query("SHOW COLUMNS FROM tbCAEmployees LIKE 'fdterms_file'");
+    const [empCols] = await db.query("SHOW COLUMNS FROM tbemployees LIKE 'fdterms_file'");
     if (empCols.length === 0) {
-      await db.query("ALTER TABLE tbCAEmployees ADD COLUMN fdterms_file VARCHAR(255) DEFAULT NULL");
+      await db.query("ALTER TABLE tbemployees ADD COLUMN fdterms_file VARCHAR(255) DEFAULT NULL");
     }
   } catch (err) {
     console.error('Error ensuring terms column:', err);
@@ -58,7 +58,7 @@ router.get('/', async (req, res) => {
           fdstatus AS status,
           fdlast_login AS last_login,
           fdterms_file AS terms_file
-        FROM tbCA
+        FROM tbca
       `);
     } else if (role === 'ca_admin') {
       // CA sees their own employees
@@ -71,7 +71,7 @@ router.get('/', async (req, res) => {
           'active' AS status, 
           created_at AS last_login,
           fdterms_file AS terms_file
-        FROM tbCAEmployees
+        FROM tbemployees
         WHERE ca_id = ?
       `, [id]);
     } else {
@@ -117,14 +117,14 @@ router.post('/', upload.single('terms_file'), async (req, res) => {
 
     if (role === 'super_admin') {
       const [result] = await db.query(`
-        INSERT INTO tbCA (fdname, fdphone, email, fdpassword, fdstatus, fdlast_login, fdterms_file)
+        INSERT INTO tbca (fdname, fdphone, email, fdpassword, fdstatus, fdlast_login, fdterms_file)
         VALUES (?, ?, ?, ?, ?, ?, ?)
       `, [name, phone, email, hashedPassword, status || 'active', now, terms_file]);
 
       res.status(201).json({ id: result.insertId, name, phone, email, status: status || 'active', lastLogin: now, terms_file });
     } else if (role === 'ca_admin') {
       const [result] = await db.query(`
-        INSERT INTO tbCAEmployees (ca_id, name, email, phone, password, fdterms_file)
+        INSERT INTO tbemployees (ca_id, name, email, phone, password, fdterms_file)
         VALUES (?, ?, ?, ?, ?, ?)
       `, [id, name, email, phone, hashedPassword, terms_file]);
 
@@ -160,12 +160,12 @@ router.put('/:userId', upload.single('terms_file'), async (req, res) => {
       let query, params;
       if (password) {
         const hashedPassword = await bcrypt.hash(password, 10);
-        query = 'UPDATE tbCA SET fdname = ?, fdphone = ?, email = ?, fdpassword = ?, fdstatus = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE fdSiNo = ?';
+        query = 'UPDATE tbca SET fdname = ?, fdphone = ?, email = ?, fdpassword = ?, fdstatus = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE fdSiNo = ?';
         params = [name, phone, email, hashedPassword, status];
         if (terms_file) params.push(terms_file);
         params.push(userId);
       } else {
-        query = 'UPDATE tbCA SET fdname = ?, fdphone = ?, email = ?, fdstatus = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE fdSiNo = ?';
+        query = 'UPDATE tbca SET fdname = ?, fdphone = ?, email = ?, fdstatus = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE fdSiNo = ?';
         params = [name, phone, email, status];
         if (terms_file) params.push(terms_file);
         params.push(userId);
@@ -175,12 +175,12 @@ router.put('/:userId', upload.single('terms_file'), async (req, res) => {
       let query, params;
       if (password) {
         const hashedPassword = await bcrypt.hash(password, 10);
-        query = 'UPDATE tbCAEmployees SET name = ?, phone = ?, email = ?, password = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE id = ? AND ca_id = ?';
+        query = 'UPDATE tbemployees SET name = ?, phone = ?, email = ?, password = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE id = ? AND ca_id = ?';
         params = [name, phone, email, hashedPassword];
         if (terms_file) params.push(terms_file);
         params.push(userId, req.user.id);
       } else {
-        query = 'UPDATE tbCAEmployees SET name = ?, phone = ?, email = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE id = ? AND ca_id = ?';
+        query = 'UPDATE tbemployees SET name = ?, phone = ?, email = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE id = ? AND ca_id = ?';
         params = [name, phone, email];
         if (terms_file) params.push(terms_file);
         params.push(userId, req.user.id);
@@ -210,9 +210,9 @@ router.patch('/:userId/status', async (req, res) => {
 
     let result;
     if (role === 'super_admin') {
-      [result] = await db.query('UPDATE tbCA SET fdstatus = ? WHERE fdSiNo = ?', [status, userId]);
+      [result] = await db.query('UPDATE tbca SET fdstatus = ? WHERE fdSiNo = ?', [status, userId]);
     } else if (role === 'ca_admin') {
-      [result] = await db.query('UPDATE tbCAEmployees SET status = ? WHERE id = ? AND ca_id = ?', [status, userId, req.user.id]);
+      [result] = await db.query('UPDATE tbemployees SET status = ? WHERE id = ? AND ca_id = ?', [status, userId, req.user.id]);
     } else {
       return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -236,9 +236,9 @@ router.delete('/:userId', async (req, res) => {
     let result;
 
     if (role === 'super_admin') {
-      [result] = await db.query('DELETE FROM tbCA WHERE fdSiNo = ?', [userId]);
+      [result] = await db.query('DELETE FROM tbca WHERE fdSiNo = ?', [userId]);
     } else if (role === 'ca_admin') {
-      [result] = await db.query('DELETE FROM tbCAEmployees WHERE id = ? AND ca_id = ?', [userId, id]);
+      [result] = await db.query('DELETE FROM tbemployees WHERE id = ? AND ca_id = ?', [userId, id]);
     } else {
       return res.status(403).json({ error: 'Unauthorized' });
     }
