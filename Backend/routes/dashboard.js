@@ -29,12 +29,45 @@ router.get('/dashboard-data', async (req, res) => {
     const activeCompanyId = company_id || (companyInfo ? companyInfo.id : null);
     let ledgers = [];
     let vouchers = [];
+    let stats = {
+      salesMonthly: 0,
+      purchaseMonthly: 0,
+      inputTaxMonthly: 0,
+      outputTaxMonthly: 0
+    };
 
     if (activeCompanyId) {
       const [ledgerRows] = await db.query('SELECT * FROM ledgers WHERE company_id = ?', [activeCompanyId]);
       const [voucherRows] = await db.query('SELECT * FROM voucher_main WHERE company_id = ?', [activeCompanyId]);
       ledgers = ledgerRows;
       vouchers = voucherRows;
+
+      // Calculate monthly stats from sales_vouchers and purchase_vouchers
+      const currentMonth = new Date().getMonth() + 1;
+      const currentYear = new Date().getFullYear();
+
+      const [salesStats] = await db.query(`
+        SELECT 
+          SUM(total) as totalSales,
+          SUM(cgstTotal + sgstTotal + igstTotal) as totalOutputTax
+        FROM sales_vouchers 
+        WHERE company_id = ? AND MONTH(date) = ? AND YEAR(date) = ?
+      `, [activeCompanyId, currentMonth, currentYear]);
+
+      const [purchaseStats] = await db.query(`
+        SELECT 
+          SUM(total) as totalPurchases,
+          SUM(cgstTotal + sgstTotal + igstTotal) as totalInputTax
+        FROM purchase_vouchers 
+        WHERE company_id = ? AND MONTH(date) = ? AND YEAR(date) = ?
+      `, [activeCompanyId, currentMonth, currentYear]);
+
+      stats = {
+        salesMonthly: salesStats[0]?.totalSales || 0,
+        purchaseMonthly: purchaseStats[0]?.totalPurchases || 0,
+        outputTaxMonthly: salesStats[0]?.totalOutputTax || 0,
+        inputTaxMonthly: purchaseStats[0]?.totalInputTax || 0
+      };
     }
 
     res.json({
@@ -43,7 +76,8 @@ router.get('/dashboard-data', async (req, res) => {
       companies: companies || [],
       userLimit,
       ledgers,
-      vouchers
+      vouchers,
+      stats
     });
   } catch (err) {
     console.error('Error fetching dashboard data:', err);

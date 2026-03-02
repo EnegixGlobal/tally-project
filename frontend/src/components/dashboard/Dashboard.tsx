@@ -167,6 +167,13 @@ const Dashboard: React.FC = () => {
   // }, [companyInfo]);
 
 
+  const [realStats, setRealStats] = useState<any>({
+    salesMonthly: 0,
+    purchaseMonthly: 0,
+    inputTaxMonthly: 0,
+    outputTaxMonthly: 0
+  });
+
   useEffect(() => {
     async function fetchData() {
       try {
@@ -216,6 +223,10 @@ const Dashboard: React.FC = () => {
 
           setLedgers(data.ledgers || []);
           setVouchers(data.vouchers || []);
+          
+          if (data.stats) {
+            setRealStats(data.stats);
+          }
         } else {
           console.error("Failed to load dashboard data");
         }
@@ -625,7 +636,7 @@ const Dashboard: React.FC = () => {
                         Sales Report
                       </h3>
                       <p className="text-2xl font-bold text-green-700">
-                        ₹ 1,25,000
+                        ₹ {Number(realStats.salesMonthly || 0).toLocaleString()}
                       </p>
                       <p className="text-sm text-gray-500">This Month</p>
                     </div>
@@ -635,7 +646,9 @@ const Dashboard: React.FC = () => {
                       <h3 className="text-lg font-semibold text-gray-800 mb-2">
                         Purchase Report
                       </h3>
-                      <p className="text-2xl font-bold text-blue-700">₹ 75,000</p>
+                      <p className="text-2xl font-bold text-blue-700">
+                        ₹ {Number(realStats.purchaseMonthly || 0).toLocaleString()}
+                      </p>
                       <p className="text-sm text-gray-500">This Month</p>
                     </div>
 
@@ -645,7 +658,9 @@ const Dashboard: React.FC = () => {
                         <h3 className="text-lg font-semibold text-gray-800 mb-2">
                           Input Tax
                         </h3>
-                        <p className="text-2xl font-bold text-purple-700">₹ 15,000</p>
+                        <p className="text-2xl font-bold text-purple-700">
+                          ₹ {Number(realStats.inputTaxMonthly || 0).toLocaleString()}
+                        </p>
                         <p className="text-sm text-gray-500">This Month</p>
                       </div>
                     )}
@@ -656,7 +671,9 @@ const Dashboard: React.FC = () => {
                         <h3 className="text-lg font-semibold text-gray-800 mb-2">
                           Output Tax
                         </h3>
-                        <p className="text-2xl font-bold text-orange-700">₹ 20,000</p>
+                        <p className="text-2xl font-bold text-orange-700">
+                          ₹ {Number(realStats.outputTaxMonthly || 0).toLocaleString()}
+                        </p>
                         <p className="text-sm text-gray-500">This Month</p>
                       </div>
                     )}
