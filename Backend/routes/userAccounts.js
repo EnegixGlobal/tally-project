@@ -20,6 +20,8 @@ async function getUserRolesAndPermissions(userId) {
     WHERE ur.user_id = ?
   `, [userId]);
 
+  
+
   // For each role, get privileges
   let permissionsSet = new Set();
   for (const role of roles) {
