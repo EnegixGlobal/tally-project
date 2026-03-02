@@ -403,7 +403,7 @@ router.get('/company/:companyId', async (req, res) => {
 router.get('/accountants', async (req, res) => {
   try {
     const connection = await db.getConnection();
-    const [rows] = await connection.query('SELECT fdSiNo, fdname FROM tbCA');
+    const [rows] = await connection.query('SELECT fdSiNo, fdname FROM tbca');
     connection.release();
     return res.json(rows);
   } catch (err) {
