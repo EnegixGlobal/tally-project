@@ -15,18 +15,20 @@ async function getUserRolesAndPermissions(userId) {
   // Get roles linked to this user
   const [roles] = await pool.query(`
     SELECT r.role_id, r.role_name
-    FROM tbUserRoles ur
-    JOIN tbRoles r ON ur.role_id = r.role_id
+    FROM tbuserroles ur
+    JOIN tbroles r ON ur.role_id = r.role_id
     WHERE ur.user_id = ?
   `, [userId]);
+
+  
 
   // For each role, get privileges
   let permissionsSet = new Set();
   for (const role of roles) {
     const [privs] = await pool.query(`
       SELECT p.permission_name
-      FROM tbRolePermissions rp
-      JOIN tbPermissions p ON rp.permission_id = p.permission_id 
+      FROM tbrolepermissions rp
+      JOIN tbpermissions p ON rp.permission_id = p.permission_id 
       WHERE rp.role_id = ?
     `, [role.role_id]);
     privs.forEach(p => permissionsSet.add(p.permission_name));
@@ -52,7 +54,7 @@ router.get('/users', async (req, res) => {
     let sql = `
       SELECT 
         u.id, 
-        u.username,   -- ✅ from tbUsers
+        u.username,   -- ✅ from tbusers
         u.email, 
         u.phone, 
         u.department, 
@@ -60,9 +62,9 @@ router.get('/users', async (req, res) => {
         u.last_login, 
         u.created_at,
         r.role_name
-      FROM tbUsers u
-      LEFT JOIN tbUserRoles ur ON u.id = ur.user_id
-      LEFT JOIN tbRoles r ON ur.role_id = r.role_id
+      FROM tbusers u
+      LEFT JOIN tbuserroles ur ON u.id = ur.user_id
+      LEFT JOIN tbroles r ON ur.role_id = r.role_id
       WHERE u.employee_id = ?
     `;
 
@@ -93,7 +95,7 @@ router.get('/users', async (req, res) => {
       const { roles, permissions, primaryRole } = await getUserRolesAndPermissions(row.id);
       users.push({
         id: row.id,
-        name: row.username || row.email,  // ✅ userName from tbUsers
+        name: row.username || row.email,  // ✅ userName from tbusers
         email: row.email,
         phone: row.phone,
         department: row.department,
@@ -128,7 +130,7 @@ router.post('/users', async (req, res) => {
     }
 
     // Check for existing user
-    const [[existingUser]] = await pool.query('SELECT id FROM tbUsers WHERE email = ?', [email]);
+    const [[existingUser]] = await pool.query('SELECT id FROM tbusers WHERE email = ?', [email]);
     if (existingUser) {
       return res.status(400).json({ success: false, error: 'User email already exists' });
     }
@@ -138,7 +140,7 @@ router.post('/users', async (req, res) => {
 
     // Get role_id by role name (and company, if needed)
     const [[roleRow]] = await pool.query(
-      `SELECT role_id FROM tbRoles WHERE LOWER(role_name) = LOWER(?) LIMIT 1`,
+      `SELECT role_id FROM tbroles WHERE LOWER(role_name) = LOWER(?) LIMIT 1`,
       [role.trim()]
     );
     if (!roleRow) {
@@ -147,15 +149,15 @@ router.post('/users', async (req, res) => {
 
     // Insert user, INCLUDING role_id
     const [userResult] = await pool.query(
-      `INSERT INTO tbUsers (employee_id, company_id, role_id, username, email, phone, department, password, status, created_at)
+      `INSERT INTO tbusers (employee_id, company_id, role_id, username, email, phone, department, password, status, created_at)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'active', NOW())`,
       [creatorEmployeeId, companyId, roleRow.role_id, name, email, phone || '', department || '', passwordHash]
     );
     const userId = userResult.insertId;
 
-    // (Optionally) add to tbUserRoles as well, or remove if not using
+    // (Optionally) add to tbuserroles as well, or remove if not using
     await pool.query(
-      'INSERT INTO tbUserRoles (user_id, role_id) VALUES (?, ?);',
+      'INSERT INTO tbuserroles (user_id, role_id) VALUES (?, ?);',
       [userId, roleRow.role_id]
     );
 
@@ -173,7 +175,7 @@ router.post('/users', async (req, res) => {
 //     const userId = req.params.id;
 
 //     // Change user status to suspended
-//     await pool.query(`UPDATE tbUsers SET status = 'suspended' WHERE id = ?`, [userId]);
+//     await pool.query(`UPDATE tbusers SET status = 'suspended' WHERE id = ?`, [userId]);
 
 //     res.json({ success: true, message: 'User suspended' });
 //   } catch (err) {
@@ -188,10 +190,10 @@ router.delete('/users/:id', async (req, res) => {
     const userId = req.params.id;
 
     // Remove roles assigned first
-    await pool.query('DELETE FROM tbUserRoles WHERE user_id = ?', [userId]);
+    await pool.query('DELETE FROM tbuserroles WHERE user_id = ?', [userId]);
 
     // Delete user record
-    await pool.query('DELETE FROM tbUsers WHERE id = ?', [userId]);
+    await pool.query('DELETE FROM tbusers WHERE id = ?', [userId]);
 
     res.json({ success: true, message: 'User deleted' });
   } catch (err) {
@@ -202,7 +204,7 @@ router.delete('/users/:id', async (req, res) => {
 // GET /api/roles/names - fetch all role names
 router.get('/roles/names', async (req, res) => {
   try {
-    const [roles] = await pool.query('SELECT role_name FROM tbRoles ORDER BY role_name');
+    const [roles] = await pool.query('SELECT role_name FROM tbroles ORDER BY role_name');
     res.json({ success: true, roles: roles.map(r => r.role_name) });
   } catch (err) {
     console.error('Error fetching role names:', err);

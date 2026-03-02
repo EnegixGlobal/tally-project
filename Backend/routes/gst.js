@@ -21,7 +21,7 @@ router.post("/", async (req, res) => {
 
   try {
     const [result] = await db.execute(
-      `INSERT INTO tbGstRegistrations (
+      `INSERT INTO tbgstregistrations (
         state, registrationType, assesseeOfOtherTerritory, gstNumber,
         periodicityOfGstr1, gstApplicableFrom, eWayBillApplicable,
         eWayBillThresholdLimit, eWayBillIntrastate,
