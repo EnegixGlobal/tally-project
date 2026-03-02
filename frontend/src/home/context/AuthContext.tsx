@@ -15,6 +15,7 @@ interface User {
   subscriptionPlan?: "basic" | "professional" | "enterprise";
   createdAt?: string;
   lastLoginAt?: string;
+  userType?: string;
 }
 
 interface AuthContextType {
@@ -62,6 +63,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       console.log(savedUser);
       if (savedUser) {
         const parsedUser = JSON.parse(savedUser);
+        if (!parsedUser.userType && savedUserType) {
+          parsedUser.userType = savedUserType;
+        }
         setUser(parsedUser);
       }
 
@@ -148,6 +152,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         createdAt: userFromResponse.createdAt ?? userFromResponse.created_at,
         lastLoginAt:
           userFromResponse.lastLoginAt ?? userFromResponse.last_login_at,
+        userType: data.role || userFromResponse.userType || "user",
       };
 
       setUser(newUser);
