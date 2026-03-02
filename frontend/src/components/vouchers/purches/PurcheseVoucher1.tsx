@@ -235,7 +235,7 @@ const PurchaseVoucher: React.FC = () => {
     {
       hsn: true,
       gst: true,
-      batch: true,
+      batch: false,
       godown: true,
       showReceiptDetails: true,
       tds: true,
@@ -1364,6 +1364,28 @@ const PurchaseVoucher: React.FC = () => {
       }),
     }));
   }, [supplierState, safeStockItems, companyState]);
+
+  // Auto-hide batch column if no item in entries supports batches
+  useEffect(() => {
+    if (formData.mode !== "item-invoice") return;
+
+    const hasBatchItem = formData.entries.some((entry) => {
+      if (entry.batchNumber && entry.batchNumber.trim() !== "") return true;
+      if (!entry.itemId) return false;
+      const item = stockItems.find((i) => String(i.id) === String(entry.itemId));
+      return (
+        item?.enableBatchTracking ||
+        (item?.batches && item.batches.length > 0)
+      );
+    });
+
+    if (visibleColumns.batch !== hasBatchItem) {
+      setVisibleColumns((prev) => ({
+        ...prev,
+        batch: hasBatchItem,
+      }));
+    }
+  }, [formData.entries, stockItems, formData.mode, visibleColumns.batch]);
 
 
   const addEntry = () => {
