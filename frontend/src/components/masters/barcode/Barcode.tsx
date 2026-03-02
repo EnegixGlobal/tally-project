@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Search, Printer, Check, Trash2, LayoutGrid, List as ListIcon, X } from "lucide-react";
+import { Search, Printer, Check, Trash2, LayoutGrid, List as ListIcon, X, ScanBarcode as ScanIcon, Terminal, Package, ArrowRight, Zap, Info } from "lucide-react";
 import { useAppContext } from "../../../context/AppContext";
 import Barcode from "react-barcode";
 import { useReactToPrint } from "react-to-print";
@@ -45,19 +45,18 @@ const BarcodeManagement = () => {
             );
             const json = await res.json();
             if (json.success) {
-                // Filter items that actually have barcodes
                 setStockItems(json.data.filter((item: StockItem) => item.barcode));
             }
         } catch (err) {
             console.error("Failed to fetch stock items:", err);
         } finally {
-            setLoading(false);
+            setTimeout(() => setLoading(false), 500); // Smooth loading transition
         }
     };
 
     const handlePrint = useReactToPrint({
         contentRef: componentRef,
-        documentTitle: "Barcodes",
+        documentTitle: `Barcodes_${new Date().toLocaleDateString()}`,
     });
 
     const addToPrintQueue = (item: StockItem) => {
@@ -70,13 +69,23 @@ const BarcodeManagement = () => {
             setPrintQueue([...printQueue, { ...item, copies: 1 }]);
         }
 
-        Swal.fire({
+        const Toast = Swal.mixin({
             toast: true,
-            position: 'top-end',
-            icon: 'success',
-            title: 'Added to print queue',
+            position: 'bottom-end',
             showConfirmButton: false,
-            timer: 1000
+            timer: 1500,
+            timerProgressBar: true,
+            didOpen: (toast) => {
+                toast.addEventListener('mouseenter', Swal.stopTimer)
+                toast.addEventListener('mouseleave', Swal.resumeTimer)
+            }
+        });
+
+        Toast.fire({
+            icon: 'success',
+            title: `"${item.name}" added to queue`,
+            background: theme === 'dark' ? '#1f2937' : '#ffffff',
+            color: theme === 'dark' ? '#f3f4f6' : '#111827',
         });
     };
 
@@ -96,153 +105,185 @@ const BarcodeManagement = () => {
         item.barcode.toLowerCase().includes(searchQuery.toLowerCase())
     );
 
+    const totalLabelsInQueue = printQueue.reduce((acc, item) => acc + item.copies, 0);
+
     return (
-        <div className="pt-[56px] px-4 min-h-screen">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
-                <div>
-                    <h1 className="text-2xl font-bold">Barcode Management</h1>
-                    <p className={`${theme === "dark" ? "text-gray-400" : "text-gray-500"} text-sm mt-1`}>
-                        Search items and generate/print barcodes for your stock items
+        <div className={`pt-20 px-6 min-h-screen transition-colors duration-500 ${theme === 'dark' ? 'bg-[#0f172a]' : 'bg-slate-50'}`}>
+            {/* Header Section */}
+            <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end mb-10 gap-8 animate-in fade-in slide-in-from-top-4 duration-700">
+                <div className="space-y-2">
+                    <div className="flex items-center gap-2 mb-2">
+                        <span className={`px-2 py-1 rounded-md text-[10px] font-bold uppercase tracking-widest ${theme === 'dark' ? 'bg-blue-500/10 text-blue-400' : 'bg-blue-100 text-blue-600'}`}>
+                            Inventory Tools
+                        </span>
+                        <div className={`h-1 w-1 rounded-full ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-300'}`}></div>
+                        <span className={`text-[10px] font-bold uppercase tracking-widest ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
+                            Masters
+                        </span>
+                    </div>
+                    <h1 className={`text-4xl font-extrabold tracking-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>
+                        <span className="bg-gradient-to-r from-blue-500 to-indigo-500 bg-clip-text text-transparent"> Barcode</span>
+                    </h1>
+                    <p className={`max-w-xl text-md ${theme === 'dark' ? 'text-gray-400' : 'text-slate-500'}`}>
+                        High-precision label management system. Search inventory and deploy barcodes for physical stock tracking.
                     </p>
                 </div>
 
-                <div className="flex items-center gap-3 w-full md:w-auto">
-                    <div className="relative flex-1 md:w-64">
-                        <Search className="absolute left-3 top-1/2 -transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <div className="flex flex-wrap items-center gap-4 w-full xl:w-auto">
+                    <div className="relative group flex-1 xl:w-80">
+                        <div className={`absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none transition-colors ${theme === 'dark' ? 'text-gray-500 group-focus-within:text-blue-400' : 'text-slate-400 group-focus-within:text-blue-500'}`}>
+                            <Search size={18} />
+                        </div>
                         <input
                             type="text"
-                            placeholder="Search items..."
+                            placeholder="Identify items by name or ID..."
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
-                            className={`w-full pl-9 pr-4 py-2 rounded-lg border focus:ring-2 focus:ring-blue-500 outline-none transition-all ${theme === "dark"
-                                    ? "bg-gray-800 border-gray-700 text-white"
-                                    : "bg-white border-gray-200 text-gray-900"
+                            className={`w-full pl-10 pr-4 py-3 rounded-2xl border-2 transition-all outline-none text-sm font-medium ${theme === 'dark'
+                                    ? 'bg-slate-800/50 border-slate-700/50 text-white focus:border-blue-500/50 focus:bg-slate-800'
+                                    : 'bg-white border-slate-200 text-slate-900 focus:border-blue-500 focus:shadow-xl focus:shadow-blue-500/10'
                                 }`}
                         />
                     </div>
 
-                    <div className={`flex items-center border rounded-lg p-1 ${theme === 'dark' ? 'border-gray-700 bg-gray-800' : 'border-gray-200 bg-white'}`}>
+                    <div className={`flex items-center p-1 rounded-2xl border-2 ${theme === 'dark' ? 'border-slate-800 bg-slate-900/50' : 'border-slate-200 bg-white shadow-sm'}`}>
                         <button
                             onClick={() => setViewMode("grid")}
-                            className={`p-1.5 rounded-md transition-all ${viewMode === "grid" ? (theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-blue-600') : 'text-gray-400 hover:text-gray-600'}`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === "grid" ? (theme === 'dark' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-blue-600 text-white shadow-lg shadow-blue-500/30') : 'text-gray-500 hover:text-blue-400'}`}
                         >
-                            <LayoutGrid size={18} />
+                            <LayoutGrid size={16} /> Grid
                         </button>
                         <button
                             onClick={() => setViewMode("list")}
-                            className={`p-1.5 rounded-md transition-all ${viewMode === "list" ? (theme === 'dark' ? 'bg-gray-700 text-white' : 'bg-gray-100 text-blue-600') : 'text-gray-400 hover:text-gray-600'}`}
+                            className={`flex items-center gap-2 px-4 py-2 rounded-xl text-sm font-bold transition-all duration-300 ${viewMode === "list" ? (theme === 'dark' ? 'bg-blue-600 text-white shadow-lg shadow-blue-600/20' : 'bg-blue-600 text-white shadow-lg shadow-blue-500/30') : 'text-gray-500 hover:text-blue-400'}`}
                         >
-                            <ListIcon size={18} />
+                            <ListIcon size={16} /> List
                         </button>
                     </div>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-4 gap-6">
-                {/* Item Selection Area */}
-                <div className="xl:col-span-3">
+            <div className="grid grid-cols-1 xl:grid-cols-4 gap-8">
+                {/* Main Content Area */}
+                <div className="xl:col-span-3 space-y-6">
                     {loading ? (
-                        <div className="flex items-center justify-center p-20">
-                            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+                        <div className="flex flex-col items-center justify-center p-24 space-y-4">
+                            <div className="relative w-16 h-16">
+                                <div className="absolute inset-0 rounded-full border-4 border-blue-500/20"></div>
+                                <div className="absolute inset-0 rounded-full border-4 border-t-blue-500 animate-spin"></div>
+                            </div>
+                            <p className={`text-sm font-bold tracking-widest animate-pulse ${theme === 'dark' ? 'text-gray-500' : 'text-slate-400'}`}>INITIALIZING INVENTORY</p>
                         </div>
                     ) : filteredItems.length === 0 ? (
-                        <div className={`text-center p-20 rounded-xl border-2 border-dashed ${theme === 'dark' ? 'border-gray-700 text-gray-400' : 'border-gray-200 text-gray-500'}`}>
-                            <ScanBarcode className="mx-auto w-12 h-12 mb-4 opacity-20" />
-                            <p>No items with barcodes found.</p>
-                            {searchQuery && <p className="text-sm">Try searching for something else.</p>}
+                        <div className={`group flex flex-col items-center justify-center p-24 rounded-[2.5rem] border-4 border-dashed transition-colors duration-500 ${theme === 'dark' ? 'border-slate-800 bg-slate-900/20 hover:border-slate-700' : 'border-slate-100 bg-white hover:border-slate-200'}`}>
+                            <div className={`w-24 h-24 rounded-full flex items-center justify-center mb-6 transition-transform group-hover:scale-110 duration-500 ${theme === 'dark' ? 'bg-slate-800 text-slate-600' : 'bg-slate-50 text-slate-300'}`}>
+                                <ScanIcon size={48} strokeWidth={1} />
+                            </div>
+                            <h3 className={`text-xl font-bold mb-2 ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>No Assets Found</h3>
+                            <p className={`text-sm max-w-xs text-center ${theme === 'dark' ? 'text-gray-500' : 'text-slate-400'}`}>
+                                {searchQuery ? `We couldn't locate any records matching "${searchQuery}" in our system.` : 'Start by assigning barcodes to your stock items in the editor.'}
+                            </p>
                         </div>
                     ) : viewMode === "grid" ? (
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 animate-in fade-in slide-in-from-bottom-4 duration-1000">
                             {filteredItems.map(item => (
                                 <div
                                     key={item.id}
-                                    className={`p-4 rounded-xl border transition-all hover:shadow-lg group ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'
+                                    className={`relative p-6 rounded-[2rem] border-2 transition-all duration-300 group hover:-translate-y-2 ${theme === 'dark'
+                                            ? 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800 hover:border-blue-500/30 shadow-2xl shadow-black/20'
+                                            : 'bg-white border-slate-200/60 shadow-xl shadow-slate-200/50 hover:border-blue-200 hover:shadow-2xl hover:shadow-blue-500/10'
                                         }`}
                                 >
-                                    <div className="flex justify-between items-start mb-3">
-                                        <h3 className="font-semibold text-wrap line-clamp-1 pr-2 uppercase text-xs tracking-wider">{item.name}</h3>
-                                        <div className="flex gap-1">
+                                    <div className="flex justify-between items-start mb-4">
+                                        <div className="space-y-1">
+                                            <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${theme === 'dark' ? 'text-blue-500' : 'text-blue-600'}`}>Stock Unit</span>
+                                            <h3 className={`font-bold leading-tight ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{item.name}</h3>
+                                        </div>
+                                        <div className="flex gap-2">
                                             <button
                                                 onClick={() => {
                                                     setPrintQueue([{ ...item, copies: 1 }]);
                                                     setTimeout(() => handlePrint(), 100);
                                                 }}
-                                                className={`p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all ${theme === 'dark' ? 'bg-green-600/20 text-green-400 border border-green-600/30' : 'bg-green-50 text-green-600 border border-green-100'
+                                                className={`p-2.5 rounded-xl transition-all active:scale-95 ${theme === 'dark' ? 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white' : 'bg-emerald-50 text-emerald-600 hover:bg-emerald-600 hover:text-white'
                                                     }`}
-                                                title="Print Now"
+                                                title="Immediate Print"
                                             >
                                                 <Printer size={16} />
                                             </button>
                                             <button
                                                 onClick={() => addToPrintQueue(item)}
-                                                className={`p-2 rounded-lg opacity-0 group-hover:opacity-100 transition-all ${theme === 'dark' ? 'bg-blue-600/20 text-blue-400 border border-blue-600/30' : 'bg-blue-50 text-blue-600 border border-blue-100'
+                                                className={`p-2.5 rounded-xl transition-all active:scale-95 ${theme === 'dark' ? 'bg-blue-500/10 text-blue-400 hover:bg-blue-500 hover:text-white' : 'bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white'
                                                     }`}
-                                                title="Add to Print Queue"
+                                                title="Add to Deployment Queue"
                                             >
-                                                <Plus size={16} />
+                                                <PlusIcon size={16} />
                                             </button>
                                         </div>
                                     </div>
-                                    <div className="flex justify-center bg-white p-4 rounded-lg border border-gray-100 mb-3 overflow-hidden">
+
+                                    <div className="bg-white p-5 rounded-3xl border border-slate-100 flex items-center justify-center transition-all group-hover:shadow-inner">
                                         <Barcode
                                             value={item.barcode}
-                                            width={1.2}
-                                            height={50}
+                                            width={1.4}
+                                            height={60}
                                             fontSize={12}
                                             background="#ffffff"
+                                            lineColor="#0f172a"
                                         />
                                     </div>
-                                    <div className="flex justify-between items-center text-xs opacity-60">
-                                        <span>Barcode: {item.barcode}</span>
-                                        <button
-                                            onClick={() => addToPrintQueue(item)}
-                                            className={`flex items-center gap-1 font-medium sm:hidden ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}
-                                        >
-                                            <Plus size={12} /> Add to Print
-                                        </button>
+
+                                    <div className="mt-4 flex justify-between items-center">
+                                        <div className={`flex items-center gap-2 text-[11px] font-mono font-bold ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                            <Terminal size={12} />
+                                            {item.barcode}
+                                        </div>
+                                        <div className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-widest ${theme === 'dark' ? 'bg-slate-700 text-slate-400' : 'bg-slate-100 text-slate-500'}`}>
+                                            Active
+                                        </div>
                                     </div>
                                 </div>
                             ))}
                         </div>
                     ) : (
-                        <div className={`rounded-xl overflow-hidden border ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200 shadow-sm'}`}>
+                        <div className={`rounded-[2.5rem] overflow-hidden border-2 transition-colors duration-500 ${theme === 'dark' ? 'border-slate-800 bg-slate-900/50 shadow-2xl' : 'border-slate-200 bg-white shadow-xl'}`}>
                             <table className="w-full text-left">
-                                <thead className={`${theme === 'dark' ? 'bg-gray-900/50' : 'bg-gray-50'}`}>
+                                <thead className={`${theme === 'dark' ? 'bg-slate-800/80 backdrop-blur-md text-slate-400' : 'bg-slate-50/80 backdrop-blur-md text-slate-500'}`}>
                                     <tr>
-                                        <th className="px-6 py-4 font-semibold text-sm">Item Name</th>
-                                        <th className="px-6 py-4 font-semibold text-sm">Barcode</th>
-                                        <th className="px-6 py-4 font-semibold text-sm text-center">Visual</th>
-                                        <th className="px-6 py-4 font-semibold text-sm text-right">Action</th>
+                                        <th className="px-8 py-5 font-black text-[11px] uppercase tracking-[0.2em]">Deployment Asset</th>
+                                        <th className="px-8 py-5 font-black text-[11px] uppercase tracking-[0.2em]">Protocol (ID)</th>
+                                        <th className="px-8 py-5 font-black text-[11px] uppercase tracking-[0.2em] text-center">Visual Signal</th>
+                                        <th className="px-8 py-5 font-black text-[11px] uppercase tracking-[0.2em] text-right">Operations</th>
                                     </tr>
                                 </thead>
-                                <tbody className={`${theme === 'dark' ? 'bg-gray-800' : 'bg-white'}`}>
+                                <tbody>
                                     {filteredItems.map(item => (
-                                        <tr key={item.id} className={`border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-100 hover:bg-gray-50'} transition-colors`}>
-                                            <td className="px-6 py-4 text-sm font-medium">{item.name}</td>
-                                            <td className="px-6 py-4 text-sm font-mono opacity-70">{item.barcode}</td>
-                                            <td className="px-6 py-4 flex justify-center">
-                                                <div className="bg-white p-1 rounded">
-                                                    <Barcode value={item.barcode} width={0.8} height={25} fontSize={10} />
+                                        <tr key={item.id} className={`border-t transition-colors ${theme === 'dark' ? 'border-slate-800 hover:bg-slate-800/40 text-slate-300' : 'border-slate-100 hover:bg-slate-50 text-slate-600'}`}>
+                                            <td className="px-8 py-4 font-bold text-sm tracking-tight">{item.name}</td>
+                                            <td className="px-8 py-4 text-xs font-mono opacity-60 tracking-tighter">{item.barcode}</td>
+                                            <td className="px-8 py-4">
+                                                <div className="flex justify-center">
+                                                    <div className="bg-white px-3 py-1 rounded-xl shadow-sm border border-slate-50">
+                                                        <Barcode value={item.barcode} width={0.8} height={25} fontSize={10} />
+                                                    </div>
                                                 </div>
                                             </td>
-                                            <td className="px-6 py-4 text-right">
-                                                <div className="flex justify-end gap-2">
+                                            <td className="px-8 py-4">
+                                                <div className="flex justify-end gap-3">
                                                     <button
                                                         onClick={() => {
                                                             setPrintQueue([{ ...item, copies: 1 }]);
                                                             setTimeout(() => handlePrint(), 100);
                                                         }}
-                                                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold ${theme === 'dark' ? 'bg-green-600/20 text-green-400 hover:bg-green-600/30' : 'bg-green-50 text-green-600 hover:bg-green-100'
-                                                            }`}
+                                                        className={`p-2 rounded-xl transition-all ${theme === 'dark' ? 'hover:bg-emerald-500/20 text-emerald-400' : 'hover:bg-emerald-50 text-emerald-600'}`}
                                                     >
-                                                        <Printer size={14} /> Print
+                                                        <Printer size={15} />
                                                     </button>
                                                     <button
                                                         onClick={() => addToPrintQueue(item)}
-                                                        className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold ${theme === 'dark' ? 'bg-blue-600/20 text-blue-400 hover:bg-blue-600/30' : 'bg-blue-50 text-blue-600 hover:bg-blue-100'
-                                                            }`}
+                                                        className={`p-2 rounded-xl transition-all ${theme === 'dark' ? 'hover:bg-blue-500/20 text-blue-400' : 'hover:bg-blue-50 text-blue-600'}`}
                                                     >
-                                                        <Plus size={14} /> Queue
+                                                        <PlusIcon size={15} />
                                                     </button>
                                                 </div>
                                             </td>
@@ -254,95 +295,137 @@ const BarcodeManagement = () => {
                     )}
                 </div>
 
-                {/* Print Queue Sidebar */}
+                {/* Vertical Control Panel (Sidebar) */}
                 <div className="xl:col-span-1">
-                    <div className={`sticky top-[80px] rounded-xl border overflow-hidden flex flex-col max-h-[calc(100vh-120px)] ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-lg'
+                    <div className={`sticky top-24 rounded-[2.5rem] border-2 overflow-hidden flex flex-col transition-all duration-500 max-h-[calc(100vh-140px)] ${theme === 'dark' ? 'bg-slate-900 border-slate-800 shadow-2xl shadow-blue-900/10' : 'bg-white border-slate-200/80 shadow-2xl shadow-slate-300/40'
                         }`}>
-                        <div className={`p-4 border-b flex justify-between items-center ${theme === 'dark' ? 'border-gray-700 bg-gray-900/30' : 'border-gray-100 bg-gray-50/50'}`}>
-                            <h2 className="font-bold flex items-center gap-2">
-                                <Printer size={18} /> Print Queue
-                            </h2>
-                            <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-600 text-white'}`}>
-                                {printQueue.length}
-                            </span>
+                        <div className={`p-8 border-b transition-colors ${theme === 'dark' ? 'border-slate-800 bg-slate-900/10' : 'border-slate-50 bg-slate-50/30'}`}>
+                            <div className="flex justify-between items-center mb-1">
+                                <h2 className={`font-black text-xs uppercase tracking-[0.2em] ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>Deployment Queue</h2>
+                                <Zap size={14} className="text-yellow-500 fill-yellow-500 animate-pulse" />
+                            </div>
+                            <p className={`text-[11px] font-medium leading-relaxed ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>
+                                Select item quantities for high-precision deployment.
+                            </p>
                         </div>
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-3">
+                        <div className="flex-1 overflow-y-auto p-6 space-y-4 custom-scrollbar">
                             {printQueue.length === 0 ? (
-                                <div className="text-center py-10 opacity-40">
-                                    <p className="text-sm italic">Queue is empty</p>
+                                <div className="flex flex-col items-center justify-center py-16 space-y-4 opacity-50 grayscale transition-all hover:grayscale-0">
+                                    <div className={`p-4 rounded-[1.5rem] ${theme === 'dark' ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                                        <Package size={24} className={theme === 'dark' ? 'text-slate-600' : 'text-slate-400'} />
+                                    </div>
+                                    <p className={`text-xs font-bold uppercase tracking-widest text-center ${theme === 'dark' ? 'text-slate-600' : 'text-slate-400'}`}>
+                                        Operational Queue Empty
+                                    </p>
                                 </div>
                             ) : (
                                 printQueue.map(item => (
-                                    <div key={item.id} className={`p-3 rounded-lg border flex flex-col gap-2 ${theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-gray-50 border-gray-100'}`}>
-                                        <div className="flex justify-between items-start">
-                                            <span className="text-sm font-medium line-clamp-2 leading-tight">{item.name}</span>
+                                    <div key={item.id} className={`group p-4 rounded-[1.8rem] border-2 transition-all duration-300 ${theme === 'dark'
+                                            ? 'bg-slate-800/30 border-slate-800 hover:border-slate-700'
+                                            : 'bg-slate-50/50 border-slate-100 hover:border-slate-200 shadow-sm'
+                                        }`}>
+                                        <div className="flex justify-between items-start mb-3">
+                                            <div className="flex-1 pr-4">
+                                                <h4 className={`text-xs font-black uppercase tracking-tight line-clamp-2 leading-none mb-1 ${theme === 'dark' ? 'text-slate-300' : 'text-slate-800'}`}>
+                                                    {item.name}
+                                                </h4>
+                                                <span className="text-[10px] font-mono opacity-40 font-bold">{item.barcode}</span>
+                                            </div>
                                             <button
                                                 onClick={() => removeFromPrintQueue(item.id)}
-                                                className="text-gray-400 hover:text-red-500 transition-colors"
+                                                className={`p-1.5 rounded-lg transition-colors scale-0 group-hover:scale-100 duration-300 ${theme === 'dark' ? 'text-slate-500 hover:text-rose-500 hover:bg-rose-500/10' : 'text-slate-400 hover:text-rose-600 hover:bg-rose-50'}`}
                                             >
                                                 <X size={14} />
                                             </button>
                                         </div>
-                                        <div className="flex justify-between items-center mt-1">
-                                            <div className="flex items-center gap-2">
-                                                <label className="text-[10px] uppercase font-bold text-gray-500">Copies:</label>
+                                        <div className="flex items-center justify-between">
+                                            <div className={`flex items-center p-1 rounded-xl border ${theme === 'dark' ? 'bg-slate-900/50 border-slate-700' : 'bg-white border-slate-200'}`}>
+                                                <button
+                                                    onClick={() => updateCopies(item.id, item.copies - 1)}
+                                                    className={`w-6 h-6 flex items-center justify-center rounded-lg transition-colors font-bold ${theme === 'dark' ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-50 text-slate-500'}`}
+                                                >
+                                                    -
+                                                </button>
                                                 <input
                                                     type="number"
                                                     min="1"
                                                     value={item.copies}
                                                     onChange={(e) => updateCopies(item.id, parseInt(e.target.value) || 1)}
-                                                    className={`w-12 h-6 text-center text-xs rounded border outline-none ${theme === 'dark' ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200 shadow-inner'
-                                                        }`}
+                                                    className="w-10 text-center text-xs font-black bg-transparent outline-none border-none"
                                                 />
+                                                <button
+                                                    onClick={() => updateCopies(item.id, item.copies + 1)}
+                                                    className={`w-6 h-6 flex items-center justify-center rounded-lg transition-colors font-bold ${theme === 'dark' ? 'hover:bg-slate-800 text-slate-400' : 'hover:bg-slate-50 text-slate-500'}`}
+                                                >
+                                                    +
+                                                </button>
                                             </div>
-                                            <span className="text-[10px] text-gray-500 font-mono">{item.barcode}</span>
+                                            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-[10px] font-black ${theme === 'dark' ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-slate-100 border-slate-100 text-slate-500'}`}>
+                                                <Check size={10} className="text-emerald-500" /> STAGED
+                                            </div>
                                         </div>
                                     </div>
                                 ))
                             )}
                         </div>
 
-                        <div className="p-4 border-t border-gray-700 bg-gray-900/10 mt-auto">
-                            <button
-                                onClick={() => handlePrint()}
-                                disabled={printQueue.length === 0}
-                                className={`w-full py-3 rounded-lg flex items-center justify-center gap-2 font-bold transition-all ${printQueue.length === 0
-                                        ? "bg-gray-200 text-gray-400 cursor-not-allowed"
-                                        : "bg-blue-600 hover:bg-blue-700 text-white shadow-xl shadow-blue-600/20 active:scale-[0.98]"
-                                    }`}
-                            >
-                                <Printer size={20} /> Print Labels
-                            </button>
-                            {printQueue.length > 0 && (
+                        {/* Summary & Activation */}
+                        <div className={`p-8 border-t transition-colors ${theme === 'dark' ? 'border-slate-800 bg-slate-900/50' : 'border-slate-50 bg-slate-50/20'}`}>
+                            <div className="flex justify-between items-center mb-6 px-1">
+                                <span className={`text-[10px] font-black uppercase tracking-[0.2em] ${theme === 'dark' ? 'text-slate-500' : 'text-slate-400'}`}>Cumulative Count</span>
+                                <span className={`text-xl font-black ${theme === 'dark' ? 'text-white' : 'text-slate-900'}`}>{totalLabelsInQueue} <span className="text-[10px] text-blue-500 -ml-1 uppercase">Units</span></span>
+                            </div>
+
+                            <div className="space-y-3">
                                 <button
-                                    onClick={() => setPrintQueue([])}
-                                    className="w-full mt-2 text-xs text-gray-500 hover:text-red-500 transition-colors font-medium text-center"
+                                    onClick={() => handlePrint()}
+                                    disabled={printQueue.length === 0}
+                                    className={`group w-full py-4 rounded-[1.5rem] flex items-center justify-center gap-3 font-black text-sm transition-all duration-500 active:scale-95 ${printQueue.length === 0
+                                            ? "bg-slate-200 text-slate-400 cursor-not-allowed border-none shadow-none"
+                                            : "bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/50 hover:scale-[1.02]"
+                                        }`}
                                 >
-                                    Clear All
+                                    <Printer size={18} className="group-hover:rotate-12 transition-transform" />
+                                    GENERATE LABELS
+                                    <ArrowRight size={16} className="opacity-40 group-hover:translate-x-1 transition-transform" />
                                 </button>
-                            )}
+
+                                {printQueue.length > 0 && (
+                                    <button
+                                        onClick={() => setPrintQueue([])}
+                                        className={`w-full py-2 flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest transition-all duration-300 ${theme === 'dark' ? 'text-slate-600 hover:text-rose-500' : 'text-slate-400 hover:text-rose-600'}`}
+                                    >
+                                        <Trash2 size={12} /> Purge Terminal Cache
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 </div>
             </div>
 
-            {/* Hidden Print Container */}
+            {/* Hidden High-Definition Print Matrix */}
             <div className="hidden">
-                <div ref={componentRef} className="print-labels-container p-4">
-                    <div className="grid grid-cols-3 gap-8" style={{ width: "100%", padding: "10mm" }}>
+                <div ref={componentRef} className="print-matrix bg-white p-10">
+                    <div className="grid grid-cols-3 gap-y-12 gap-x-8">
                         {printQueue.flatMap(item =>
                             Array.from({ length: item.copies }).map((_, i) => (
-                                <div key={`${item.id}-${i}`} className="flex flex-col items-center justify-center border p-4 border-gray-100 mb-8 break-inside-avoid shadow-sm rounded">
-                                    <span className="text-[10px] font-bold mb-1 truncate w-full text-center uppercase tracking-tight">{item.name}</span>
-                                    <div className="flex justify-center bg-white p-1">
+                                <div key={`${item.id}-${i}`} className="flex flex-col items-center justify-center border-2 border-slate-100 p-6 break-inside-avoid text-center">
+                                    <span className="text-[9px] font-black uppercase tracking-tight text-slate-400 mb-1 leading-none">{companyId}</span>
+                                    <span className="text-sm font-black uppercase text-slate-800 mb-2 leading-tight w-full truncate">{item.name}</span>
+                                    <div className="flex justify-center p-2 bg-white rounded border border-slate-50">
                                         <Barcode
                                             value={item.barcode}
-                                            width={1.2}
-                                            height={35}
-                                            fontSize={11}
+                                            width={1.5}
+                                            height={45}
+                                            fontSize={14}
                                             margin={0}
+                                            lineColor="#000000"
                                         />
+                                    </div>
+                                    <div className="mt-2 flex items-center gap-1 font-mono text-[8px] font-bold text-slate-300">
+                                        <Zap size={8} /> SECURE DEPLOYMENT ASSET
                                     </div>
                                 </div>
                             ))
@@ -351,48 +434,53 @@ const BarcodeManagement = () => {
                 </div>
             </div>
 
-            {/* Styles for Printing */}
+            {/* Global UI Styles */}
             <style>{`
-        @media print {
-          .print-labels-container {
-            display: block !important;
-            width: 100%;
-          }
-          @page {
-            size: A4;
-            margin: 10mm;
-          }
-          .break-inside-avoid {
-            page-break-inside: avoid;
-          }
-        }
-      `}</style>
+                .custom-scrollbar::-webkit-scrollbar {
+                    width: 4px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-track {
+                    background: transparent;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb {
+                    background: ${theme === 'dark' ? '#334155' : '#e2e8f0'};
+                    border-radius: 10px;
+                }
+                .custom-scrollbar::-webkit-scrollbar-thumb:hover {
+                    background: #3b82f6;
+                }
+                
+                @media print {
+                    .print-matrix {
+                        display: block !important;
+                        width: 100%;
+                    }
+                    @page {
+                        size: A4;
+                        margin: 15mm;
+                    }
+                    .break-inside-avoid {
+                        page-break-inside: avoid;
+                    }
+                }
+                
+                @keyframes shimmer {
+                    0% { background-position: -200% 0; }
+                    100% { background-position: 200% 0; }
+                }
+                
+                .animate-shimmer {
+                    background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
+                    background-size: 200% 100%;
+                    animation: shimmer 2s infinite;
+                }
+            `}</style>
         </div>
     );
 };
 
-const ScanBarcode = ({ className, ...props }: any) => (
-    <svg
-        xmlns="http://www.w3.org/2000/svg"
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="currentColor"
-        strokeWidth="2"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-        className={className}
-        {...props}
-    >
-        <path d="M3 7V5a2 2 0 0 1 2-2h2" />
-        <path d="M17 3h2a2 2 0 0 1 2 2v2" />
-        <path d="M21 17v2a2 2 0 0 1-2 2h-2" />
-        <path d="M7 21H5a2 2 0 0 1-2-2v-2" />
-        <polyline points="7 12 12 7 17 12" />
-        <line x1="12" y1="7" x2="12" y2="17" />
-    </svg>
-);
-
-const Plus = ({ size = 24, className }: { size?: number, className?: string }) => (
+// Icon Components for consistent look
+const PlusIcon = ({ size = 24, className }: { size?: number, className?: string }) => (
     <svg
         xmlns="http://www.w3.org/2000/svg"
         width={size}
@@ -400,7 +488,7 @@ const Plus = ({ size = 24, className }: { size?: number, className?: string }) =
         viewBox="0 0 24 24"
         fill="none"
         stroke="currentColor"
-        strokeWidth="2"
+        strokeWidth="3"
         strokeLinecap="round"
         strokeLinejoin="round"
         className={className}
