@@ -28,6 +28,7 @@ import StockItemEdit from "./components/masters/stock/StockItemEdit";
 import BulkStockItemCreate from "./components/masters/stock/BulkStockItemCreate";
 import StockPerchaseItem from "./components/masters/stock/StocPerchaseItem";
 import BatchList from "./components/masters/batch/BatchList";
+import BarcodeList from "./components/masters/barcode/Barcode";
 import BatchSelectionPage from "./components/masters/batch/BatchSelectionPage";
 import StockGroupList from "./components/masters/stock/StockGroupList";
 import StockGroupForm from "./components/masters/stock/StockGroupForm";
@@ -488,6 +489,16 @@ function App() {
                   element={
                     <RequireCompany>
                       <BatchList />
+                    </RequireCompany>
+                  }
+                />
+
+
+                <Route
+                  path="masters/stock-item/barcode"
+                  element={
+                    <RequireCompany>
+                      <BarcodeList />
                     </RequireCompany>
                   }
                 />

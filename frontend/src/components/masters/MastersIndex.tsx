@@ -92,7 +92,7 @@ const MastersIndex: React.FC = () => {
         {
           icon: <ScanBarcode size={20} />,
           name: "Barcode Managment",
-          // path: "/app/masters/stock-item/batches",
+          path: "/app/masters/stock-item/barcode",
         },
       ],
     },
