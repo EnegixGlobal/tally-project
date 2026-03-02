@@ -12,7 +12,7 @@ import ErrorBoundary from './ErrorBoundary';
 
 const MainLayout: React.FC = () => {
   const { theme } = useAppContext();
-  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [showShortcuts, setShowShortcuts] = useState(false);
   const { isAuthenticated, isLoading: authLoading, hasCompany, checkPermission } = useAuth();
   const { isLoading: companyLoading } = useCompany();

@@ -209,6 +209,7 @@ import AccessControl from "./components/config/AccessControl";
 import SetProfit from "./components/config/SetProfit";
 import SalesByFifo from "./components/config/SalesByFifo";
 import Profile from "./components/config/Profile";
+import UpdateProfile from "./components/config/UpdateProfile";
 import PurchaseDetail from "./components/reports/profit_loss/PurchaseDetail";
 import PurchaseAddDetails from "./components/reports/profit_loss/PurchaseAddDetails";
 import PurchaseItemDetail from "./components/reports/profit_loss/PurchaseItemDetail";
@@ -2005,6 +2006,14 @@ function App() {
                   element={
                     <RequireCompany>
                       <Profile />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="config/update-profile"
+                  element={
+                    <RequireCompany>
+                      <UpdateProfile />
                     </RequireCompany>
                   }
                 />
