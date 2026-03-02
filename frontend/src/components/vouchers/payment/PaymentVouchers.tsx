@@ -4,6 +4,7 @@ import { useAppContext } from "../../../context/AppContext";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 import type { VoucherEntry, Ledger } from "../../../types";
 import Swal from "sweetalert2";
+import { useFinancialYear, getFinancialYearDefaults } from "../../../hooks/useFinancialYear";
 interface Ledgers {
   id: number;
   name: string;
@@ -26,8 +27,11 @@ const PaymentVoucher: React.FC = () => {
     ownerType === "employee" ? "employee_id" : "user_id"
   );
 
+  const { selectedFinYear } = useFinancialYear();
+  const { defaultDate, minDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
+
   const initialFormData: Omit<VoucherEntry, "id"> = {
-    date: new Date().toLocaleDateString('en-CA'),
+    date: defaultDate,
     type: "payment",
     number: "",
     narration: "",
@@ -242,7 +246,6 @@ const PaymentVoucher: React.FC = () => {
     >
   ) => {
     const { name, value } = e.target;
-    if (name === "date" && !isEditMode) return; // Prevent changing date unless in edit mode
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
@@ -579,8 +582,8 @@ const PaymentVoucher: React.FC = () => {
             title="Save Voucher"
             onClick={handleSubmit}
             className={`p-2 rounded-md ${theme === "dark"
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-blue-500 hover:bg-blue-600"
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-blue-500 hover:bg-blue-600"
               } text-white flex items-center`}
           >
             <Save size={18} className="mr-2" /> Save
@@ -624,15 +627,11 @@ const PaymentVoucher: React.FC = () => {
                 onChange={handleChange}
                 required
                 title="Select voucher date"
-                readOnly={!isEditMode}
-                min={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
-                max={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
+                max={maxDate}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500 ${
-                    !isEditMode ? "opacity-70 cursor-not-allowed" : ""
-                  }`}
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
+                  } focus:border-blue-500 focus:ring-blue-500`}
               />
               {errors.date && (
                 <p className="text-red-500 text-sm mt-1">{errors.date}</p>
@@ -656,8 +655,8 @@ const PaymentVoucher: React.FC = () => {
                 readOnly={config.autoNumbering}
                 required
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500 ${config.autoNumbering ? "opacity-50" : ""
                   }`}
               />
@@ -721,8 +720,8 @@ const PaymentVoucher: React.FC = () => {
                   }));
                 }}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500`}
               >
                 <option value="double-entry">Double Entry</option>
@@ -744,8 +743,8 @@ const PaymentVoucher: React.FC = () => {
                     value={formData.referenceNo}
                     onChange={handleChange}
                     className={`w-full p-2 rounded border ${theme === "dark"
-                        ? "bg-gray-700 border-gray-600 text-gray-100"
-                        : "bg-white border-gray-300 text-gray-900"
+                      ? "bg-gray-700 border-gray-600 text-gray-100"
+                      : "bg-white border-gray-300 text-gray-900"
                       } focus:border-blue-500 focus:ring-blue-500`}
                     placeholder="Enter reference number"
                   />
@@ -765,8 +764,8 @@ const PaymentVoucher: React.FC = () => {
                     title="Select supplier invoice date"
                     placeholder="Select supplier invoice date"
                     className={`w-full p-2 rounded border ${theme === "dark"
-                        ? "bg-gray-700 border-gray-600 text-gray-100"
-                        : "bg-white border-gray-300 text-gray-900"
+                      ? "bg-gray-700 border-gray-600 text-gray-100"
+                      : "bg-white border-gray-300 text-gray-900"
                       } focus:border-blue-500 focus:ring-blue-500`}
                   />
                 </div>
@@ -795,8 +794,8 @@ const PaymentVoucher: React.FC = () => {
                     onChange={(e) => handleEntryChange(0, e)}
                     required
                     className={`w-full p-2 rounded border ${theme === "dark"
-                        ? "bg-gray-700 border-gray-600 text-gray-100"
-                        : "bg-white border-gray-300 text-gray-900"
+                      ? "bg-gray-700 border-gray-600 text-gray-100"
+                      : "bg-white border-gray-300 text-gray-900"
                       } focus:border-blue-500 focus:ring-blue-500`}
                   >
                     <option value="">Select Cash/Bank Ledger</option>
@@ -818,8 +817,8 @@ const PaymentVoucher: React.FC = () => {
                   type="button"
                   onClick={addEntry}
                   className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
-                      ? "bg-blue-600 hover:bg-blue-700"
-                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
                     }`}
                 >
                   <Plus size={16} className="mr-1" /> Add Line
@@ -831,8 +830,8 @@ const PaymentVoucher: React.FC = () => {
                   <thead>
                     <tr
                       className={`${theme === "dark"
-                          ? "border-b border-gray-600"
-                          : "border-b border-gray-300"
+                        ? "border-b border-gray-600"
+                        : "border-b border-gray-300"
                         }`}
                     >
                       <th className="px-4 py-2 text-left">
@@ -856,8 +855,8 @@ const PaymentVoucher: React.FC = () => {
                         <tr
                           key={index}
                           className={`${theme === "dark"
-                              ? "border-b border-gray-600"
-                              : "border-b border-gray-300"
+                            ? "border-b border-gray-600"
+                            : "border-b border-gray-300"
                             }`}
                         >
                           <td className="px-4 py-2">
@@ -867,8 +866,8 @@ const PaymentVoucher: React.FC = () => {
                               onChange={(e) => handleEntryChange(index, e)}
                               required
                               className={`w-full p-2 rounded border ${theme === "dark"
-                                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                                  : "bg-white border-gray-300 text-gray-900"
+                                ? "bg-gray-700 border-gray-600 text-gray-100"
+                                : "bg-white border-gray-300 text-gray-900"
                                 } focus:border-blue-500 focus:ring-blue-500`}
                             >
                               <option value="">Select Party Ledger</option>
@@ -891,8 +890,8 @@ const PaymentVoucher: React.FC = () => {
                               step="0.01"
                               placeholder="0.00"
                               className={`w-full p-2 rounded border text-right ${theme === "dark"
-                                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                                  : "bg-white border-gray-300 text-gray-900"
+                                ? "bg-gray-700 border-gray-600 text-gray-100"
+                                : "bg-white border-gray-300 text-gray-900"
                                 } focus:border-blue-500 focus:ring-blue-500`}
                             />
                           </td>
@@ -903,10 +902,10 @@ const PaymentVoucher: React.FC = () => {
                               onClick={() => removeEntry(index)}
                               disabled={formData.entries.length <= 2}
                               className={`p-1 rounded ${formData.entries.length <= 2
-                                  ? "opacity-50 cursor-not-allowed"
-                                  : theme === "dark"
-                                    ? "hover:bg-gray-600"
-                                    : "hover:bg-gray-300"
+                                ? "opacity-50 cursor-not-allowed"
+                                : theme === "dark"
+                                  ? "hover:bg-gray-600"
+                                  : "hover:bg-gray-300"
                                 }`}
                             >
                               <Trash2 size={16} />
@@ -920,8 +919,8 @@ const PaymentVoucher: React.FC = () => {
                   <tfoot>
                     <tr
                       className={`font-semibold ${theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
+                        ? "border-t border-gray-600"
+                        : "border-t border-gray-300"
                         }`}
                     >
                       <td className="px-4 py-2 text-right">Totals:</td>
@@ -933,12 +932,12 @@ const PaymentVoucher: React.FC = () => {
                       <td className="px-4 py-2 text-center">
                         <span
                           className={`px-2 py-1 rounded text-xs ${theme === "dark"
-                              ? isBalanced
-                                ? "bg-green-900 text-green-200"
-                                : "bg-red-900 text-red-200"
-                              : isBalanced
-                                ? "bg-green-100 text-green-800"
-                                : "bg-red-100 text-red-800"
+                            ? isBalanced
+                              ? "bg-green-900 text-green-200"
+                              : "bg-red-900 text-red-200"
+                            : isBalanced
+                              ? "bg-green-100 text-green-800"
+                              : "bg-red-100 text-red-800"
                             }`}
                         >
                           {isBalanced ? "Balanced" : "Unbalanced"}
@@ -962,8 +961,8 @@ const PaymentVoucher: React.FC = () => {
                   type="button"
                   onClick={addEntry}
                   className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
-                      ? "bg-blue-600 hover:bg-blue-700"
-                      : "bg-blue-600 hover:bg-blue-700 text-white"
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
                     }`}
                 >
                   <Plus size={16} className="mr-1" /> Add Line
@@ -974,8 +973,8 @@ const PaymentVoucher: React.FC = () => {
                   <thead>
                     <tr
                       className={`${theme === "dark"
-                          ? "border-b border-gray-600"
-                          : "border-b border-gray-300"
+                        ? "border-b border-gray-600"
+                        : "border-b border-gray-300"
                         }`}
                     >
                       <th className="px-4 py-2 text-left">Ledger Account</th>
@@ -995,8 +994,8 @@ const PaymentVoucher: React.FC = () => {
                       <tr
                         key={index}
                         className={`${theme === "dark"
-                            ? "border-b border-gray-600"
-                            : "border-b border-gray-300"
+                          ? "border-b border-gray-600"
+                          : "border-b border-gray-300"
                           }`}
                       >
                         <td className="px-4 py-2">
@@ -1007,8 +1006,8 @@ const PaymentVoucher: React.FC = () => {
                             required
                             title="Select ledger account"
                             className={`w-full p-2 rounded border ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
                               } focus:border-blue-500 focus:ring-blue-500`}
                           >
                             <option value="">Select Ledger</option>
@@ -1020,8 +1019,8 @@ const PaymentVoucher: React.FC = () => {
                             <option
                               value="add-new"
                               className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                                  ? "bg-blue-600 hover:bg-green-700"
-                                  : "bg-green-600 hover:bg-green-700 text-white"
+                                ? "bg-blue-600 hover:bg-green-700"
+                                : "bg-green-600 hover:bg-green-700 text-white"
                                 }`}
                             >
                               + Add New Ledger
@@ -1046,8 +1045,8 @@ const PaymentVoucher: React.FC = () => {
                                 : "Select debit or credit"
                             }
                             className={`w-full p-2 rounded border ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
                               } ${index === 0 ? "opacity-60 cursor-not-allowed" : ""
                               } focus:border-blue-500 focus:ring-blue-500`}
                           >
@@ -1067,8 +1066,8 @@ const PaymentVoucher: React.FC = () => {
                             title="Enter amount"
                             placeholder="0.00"
                             className={`w-full p-2 rounded border text-right ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
                               } focus:border-blue-500 focus:ring-blue-500`}
                           />
                           {errors[`amount${index}`] && (
@@ -1085,8 +1084,8 @@ const PaymentVoucher: React.FC = () => {
                               onChange={(e) => handleEntryChange(index, e)}
                               title="Select cost centre"
                               className={`w-full p-2 rounded border ${theme === "dark"
-                                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                                  : "bg-white border-gray-300 text-gray-900"
+                                ? "bg-gray-700 border-gray-600 text-gray-100"
+                                : "bg-white border-gray-300 text-gray-900"
                                 } focus:border-blue-500 focus:ring-blue-500`}
                             >
                               <option value="">None</option>
@@ -1106,8 +1105,8 @@ const PaymentVoucher: React.FC = () => {
                               value={entry.narration || ""}
                               onChange={(e) => handleEntryChange(index, e)}
                               className={`w-full p-2 rounded border ${theme === "dark"
-                                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                                  : "bg-white border-gray-300 text-gray-900"
+                                ? "bg-gray-700 border-gray-600 text-gray-100"
+                                : "bg-white border-gray-300 text-gray-900"
                                 } focus:border-blue-500 focus:ring-blue-500`}
                               placeholder="Entry narration"
                             />
@@ -1120,10 +1119,10 @@ const PaymentVoucher: React.FC = () => {
                             disabled={formData.entries.length <= 2}
                             title="Remove entry"
                             className={`p-1 rounded ${formData.entries.length <= 2
-                                ? "opacity-50 cursor-not-allowed"
-                                : theme === "dark"
-                                  ? "hover:bg-gray-600"
-                                  : "hover:bg-gray-300"
+                              ? "opacity-50 cursor-not-allowed"
+                              : theme === "dark"
+                                ? "hover:bg-gray-600"
+                                : "hover:bg-gray-300"
                               }`}
                           >
                             <Trash2 size={16} />
@@ -1135,8 +1134,8 @@ const PaymentVoucher: React.FC = () => {
                   <tfoot>
                     <tr
                       className={`font-semibold ${theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
+                        ? "border-t border-gray-600"
+                        : "border-t border-gray-300"
                         }`}
                     >
                       <td className="px-4 py-2 text-right" colSpan={2}>
@@ -1161,8 +1160,8 @@ const PaymentVoucher: React.FC = () => {
                         {isBalanced ? (
                           <span
                             className={`px-2 py-1 rounded text-xs ${theme === "dark"
-                                ? "bg-green-900 text-green-200"
-                                : "bg-green-100 text-green-800"
+                              ? "bg-green-900 text-green-200"
+                              : "bg-green-100 text-green-800"
                               }`}
                           >
                             Balanced
@@ -1170,8 +1169,8 @@ const PaymentVoucher: React.FC = () => {
                         ) : (
                           <span
                             className={`px-2 py-1 rounded text-xs ${theme === "dark"
-                                ? "bg-red-900 text-red-200"
-                                : "bg-red-100 text-red-800"
+                              ? "bg-red-900 text-red-200"
+                              : "bg-red-100 text-red-800"
                               }`}
                           >
                             Unbalanced
@@ -1218,8 +1217,8 @@ const PaymentVoucher: React.FC = () => {
               title="Enter narration details"
               placeholder="Enter any additional notes or description for this voucher"
               className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                  : "bg-white border-gray-300 text-gray-900"
+                ? "bg-gray-700 border-gray-600 text-gray-100"
+                : "bg-white border-gray-300 text-gray-900"
                 } focus:border-blue-500 focus:ring-blue-500`}
             />
           </div>

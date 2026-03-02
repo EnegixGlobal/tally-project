@@ -7,6 +7,7 @@ import type { LedgerWithGroup, VoucherEntry } from "../../../types";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 import Swal from "sweetalert2";
 import type { StockItem } from "../../../types";
+import { useFinancialYear, getFinancialYearDefaults } from "../../../hooks/useFinancialYear";
 
 // DRY Principle - Reusable constants and styles
 const TABLE_STYLES = {
@@ -234,7 +235,7 @@ const PurchaseVoucher: React.FC = () => {
     {
       hsn: true,
       gst: true,
-      batch: true,
+      batch: false,
       godown: true,
       showReceiptDetails: true,
       tds: true,
@@ -773,8 +774,11 @@ const PurchaseVoucher: React.FC = () => {
     panNumber: "N/A",
   };
 
+  const { selectedFinYear } = useFinancialYear();
+  const { defaultDate, minDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
+
   const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>({
-    date: new Date().toISOString().split("T")[0],
+    date: defaultDate,
     type: "purchase",
     number: "",
     narration: "",
@@ -878,7 +882,7 @@ const PurchaseVoucher: React.FC = () => {
     localStorage.removeItem(DRAFT_KEY);
 
     setFormData({
-      date: new Date().toISOString().split("T")[0],
+      date: defaultDate,
       type: "purchase",
       number: formData.number, // Preserve the number
       narration: "",
@@ -1021,7 +1025,6 @@ const PurchaseVoucher: React.FC = () => {
     >
   ) => {
     const { name, value } = e.target;
-    if (name === "date" && !isEditMode) return;
 
     // Debug: Log form changes
 
@@ -1361,6 +1364,28 @@ const PurchaseVoucher: React.FC = () => {
       }),
     }));
   }, [supplierState, safeStockItems, companyState]);
+
+  // Auto-hide batch column if no item in entries supports batches
+  useEffect(() => {
+    if (formData.mode !== "item-invoice") return;
+
+    const hasBatchItem = formData.entries.some((entry) => {
+      if (entry.batchNumber && entry.batchNumber.trim() !== "") return true;
+      if (!entry.itemId) return false;
+      const item = stockItems.find((i) => String(i.id) === String(entry.itemId));
+      return (
+        item?.enableBatchTracking ||
+        (item?.batches && item.batches.length > 0)
+      );
+    });
+
+    if (visibleColumns.batch !== hasBatchItem) {
+      setVisibleColumns((prev) => ({
+        ...prev,
+        batch: hasBatchItem,
+      }));
+    }
+  }, [formData.entries, stockItems, formData.mode, visibleColumns.batch]);
 
 
   const addEntry = () => {
@@ -2312,10 +2337,8 @@ const PurchaseVoucher: React.FC = () => {
                   value={formData.date}
                   onChange={handleChange}
                   required
-                  readOnly={!isEditMode}
-                  min={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
-                  max={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
-                  className={`${getInputClasses(theme, !!errors.date)} ${!isEditMode ? "opacity-70 cursor-not-allowed" : ""}`}
+                  max={maxDate}
+                  className={`${getInputClasses(theme, !!errors.date)}`}
                 />
                 {errors.date && (
                   <p className="text-red-500 text-xs mt-1">{errors.date}</p>

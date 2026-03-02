@@ -60,6 +60,11 @@ const ConfigModule: React.FC = () => {
           name: "Profile Settings",
           path: "/app/config/profile",
         },
+        {
+          icon: <User size={20} />,
+          name: "Update Profile",
+          path: "/app/config/update-profile",
+        },
       ],
     },
   ];

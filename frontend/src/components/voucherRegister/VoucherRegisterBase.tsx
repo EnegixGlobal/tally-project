@@ -4,6 +4,7 @@ import { ArrowLeft } from "lucide-react";
 import type { VoucherEntry } from "../../types";
 import { useAppContext } from "../../context/AppContext";
 import PrintOptions from "../vouchers/sales/PrintOptions";
+import { useFinancialYear, filterByFinancialYear } from "../../hooks/useFinancialYear";
 
 interface VoucherRegisterBaseProps {
   title: string;
@@ -87,6 +88,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     null
   );
   const [ledgerList, setLedgerList] = useState<any[]>([]);
+
+  const { selectedFinYear } = useFinancialYear();
 
   // New state for Change View functionality
   const [viewType, setViewType] = useState<
@@ -340,9 +343,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         Number(p.sub_total) ||
         Number(p.beforeTax) ||
         Number(p.totalAmount) -
-          (Number(p.cgstTotal || 0) +
-            Number(p.sgstTotal || 0) +
-            Number(p.igstTotal || 0)) ||
+        (Number(p.cgstTotal || 0) +
+          Number(p.sgstTotal || 0) +
+          Number(p.igstTotal || 0)) ||
         0;
 
       const cgst = Number(p.cgstTotal || p.cgst || 0);
@@ -407,9 +410,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         Number(p.sub_total) ||
         Number(p.beforeTax) ||
         Number(p.totalAmount) -
-          (Number(p.cgstTotal || 0) +
-            Number(p.sgstTotal || 0) +
-            Number(p.igstTotal || 0)) ||
+        (Number(p.cgstTotal || 0) +
+          Number(p.sgstTotal || 0) +
+          Number(p.igstTotal || 0)) ||
         0;
 
       const cgst = Number(p.cgstTotal || p.cgst || 0);
@@ -436,10 +439,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         dispatchDetails:
           p.dispatchDocNo || p.dispatchThrough || p.destination
             ? {
-                docNo: p.dispatchDocNo || "",
-                through: p.dispatchThrough || "",
-                destination: p.destination || "",
-              }
+              docNo: p.dispatchDocNo || "",
+              through: p.dispatchThrough || "",
+              destination: p.destination || "",
+            }
             : undefined,
 
         entries: [
@@ -553,7 +556,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       };
     }
 
-  
+
 
     // ---------------------- RECEIPT ----------------------
     if (voucherType === "receipt") {
@@ -674,8 +677,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         };
       });
 
+      // Apply Financial Year filter
+      const finYearFiltered = filterByFinancialYear(converted, "date", selectedFinYear);
+
       // Apply View Type filter
-      const viewFiltered = filterVouchersByView(converted);
+      const viewFiltered = filterVouchersByView(finYearFiltered);
 
       // Apply Search, Date, Status filters
       let finalList = viewFiltered.filter((voucher) => {
@@ -799,9 +805,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${title.replace(/\s+/g, "_")}_${
-        new Date().toISOString().split("T")[0]
-      }.csv`;
+      a.download = `${title.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]
+        }.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -826,7 +831,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
       const selectedMonthName = selectedMonth
         ? getAvailableMonths().find((m) => m.value === selectedMonth)?.label ||
-          "Unknown Month"
+        "Unknown Month"
         : "";
 
       const printContent = `
@@ -852,9 +857,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             <div class="header">
               <h1>${title}</h1>
               <p>Generated on: ${new Date().toLocaleString()}</p>
-              <p>View Type: ${viewType}${
-        selectedMonth ? ` - ${selectedMonthName}` : ""
-      }</p>
+              <p>View Type: ${viewType}${selectedMonth ? ` - ${selectedMonthName}` : ""
+        }</p>
               <p>Total Records: ${filteredVouchers.length}</p>
             </div>
             <table>
@@ -871,11 +875,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               </thead>
               <tbody>
                 ${filteredVouchers
-                  .map((voucher) => {
-                    const { debit, credit } = calculateDebitCredit(voucher);
-                    const particulars = getParticulars(voucher);
-                    if (voucherType === "sales") {
-                      return `
+          .map((voucher) => {
+            const { debit, credit } = calculateDebitCredit(voucher);
+            const particulars = getParticulars(voucher);
+            if (voucherType === "sales") {
+              return `
                     <tr>
                       <td>${formatDate(voucher.date)}</td>
                       <td>${voucher.number}</td>
@@ -885,34 +889,30 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       <td class="text-right">-</td>
                       <td class="text-center">${getVoucherStatus(voucher)}</td>
                     </tr>`;
-                    } else {
-                      return `
+            } else {
+              return `
                     <tr>
                       <td>${formatDate(voucher.date)}</td>
                       <td>${voucher.number}</td>
                       <td>${voucher.type.toUpperCase()}</td>
                       <td>${particulars}</td>
-                      <td class="text-right">${
-                        debit > 0 ? formatCurrency(debit) : "-"
-                      }</td>
-                      <td class="text-right">${
-                        credit > 0 ? formatCurrency(credit) : "-"
-                      }</td>
+                      <td class="text-right">${debit > 0 ? formatCurrency(debit) : "-"
+                }</td>
+                      <td class="text-right">${credit > 0 ? formatCurrency(credit) : "-"
+                }</td>
                       <td class="text-center">${getVoucherStatus(voucher)}</td>
                     </tr>`;
-                    }
-                  })
-                  .join("")}
+            }
+          })
+          .join("")}
               </tbody>
               <tfoot>
                 <tr class="font-bold">
-                  <td colspan="4" class="text-right">Total (${
-                    filteredVouchers.length
-                  } vouchers)</td>
+                  <td colspan="4" class="text-right">Total (${filteredVouchers.length
+        } vouchers)</td>
                   <td class="text-right">${formatCurrency(totalDebit)}</td>
-                  <td class="text-right">${
-                    voucherType === "sales" ? "-" : formatCurrency(totalCredit)
-                  }</td>
+                  <td class="text-right">${voucherType === "sales" ? "-" : formatCurrency(totalCredit)
+        }</td>
                   <td></td>
                 </tr>
               </tfoot>
@@ -946,8 +946,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     const fetchLedgers = async () => {
       try {
         const ledgerRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -986,45 +985,37 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
         // --- SALES VOUCHERS ---
         if (voucherType === "sales") {
-          url = `${
-            import.meta.env.VITE_API_URL
-          }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          url = `${import.meta.env.VITE_API_URL
+            }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         }
 
         // --- QUOTATIONS ---
         else if (voucherType === "quotation") {
-          url = `${
-            import.meta.env.VITE_API_URL
-          }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&isQuotation=1`;
+          url = `${import.meta.env.VITE_API_URL
+            }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&isQuotation=1`;
         }
 
         // --- PURCHASE VOUCHERS ---
         else if (voucherType === "purchase") {
-          url = `${
-            import.meta.env.VITE_API_URL
-          }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          url = `${import.meta.env.VITE_API_URL
+            }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         } else if (voucherType === "sales_order") {
-          url = `${
-            import.meta.env.VITE_API_URL
-          }/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
+          url = `${import.meta.env.VITE_API_URL
+            }/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
         } else if (voucherType === "purchase_order") {
-          url = `${
-            import.meta.env.VITE_API_URL
-          }/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
+          url = `${import.meta.env.VITE_API_URL
+            }/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
         } else if (voucherType === "receipt") {
-          url = `${
-            import.meta.env.VITE_API_URL
-          }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=receipt`;
+          url = `${import.meta.env.VITE_API_URL
+            }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=receipt`;
         } else if (voucherType === "contra") {
-          url = `${
-            import.meta.env.VITE_API_URL
-          }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=contra`;
+          url = `${import.meta.env.VITE_API_URL
+            }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=contra`;
         } else if (voucherType === "journal") {
-          url = `${
-            import.meta.env.VITE_API_URL
-          }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=journal`;
-        } 
-         else {
+          url = `${import.meta.env.VITE_API_URL
+            }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=journal`;
+        }
+        else {
           console.warn("Unknown voucherType:", voucherType);
           return;
         }
@@ -1068,11 +1059,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           </head>
           <body>
             <h1>Invoice</h1>
-            <div class="muted">Voucher No: ${
-              voucher.number
-            } | Date: ${formatDate(
-        voucher.date
-      )} | Type: ${voucher.type.toUpperCase()}</div>
+            <div class="muted">Voucher No: ${voucher.number
+        } | Date: ${formatDate(
+          voucher.date
+        )} | Type: ${voucher.type.toUpperCase()}</div>
             <div>Particulars: ${particulars}</div>
             <table>
               <thead>
@@ -1086,21 +1076,19 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               </thead>
               <tbody>
                 ${voucher.entries
-                  .map(
-                    (e, idx) => `
+          .map(
+            (e, idx) => `
                   <tr>
                     <td>${idx + 1}</td>
                     <td>${e.ledgerId || e.itemId || "-"}</td>
-                    <td class="right">${
-                      e.type === "debit" ? e.amount.toFixed(2) : "-"
-                    }</td>
-                    <td class="right">${
-                      e.type === "credit" ? e.amount.toFixed(2) : "-"
-                    }</td>
+                    <td class="right">${e.type === "debit" ? e.amount.toFixed(2) : "-"
+              }</td>
+                    <td class="right">${e.type === "credit" ? e.amount.toFixed(2) : "-"
+              }</td>
                     <td>${e.narration || ""}</td>
                   </tr>`
-                  )
-                  .join("")}
+          )
+          .join("")}
               </tbody>
               <tfoot>
                 <tr>
@@ -1463,12 +1451,12 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {voucherType === "debit_note"
                         ? getLedgerNameById(
-                            voucher.entries.find((e) => e.type === "credit")
-                              ?.ledgerId
-                          )
+                          voucher.entries.find((e) => e.type === "credit")
+                            ?.ledgerId
+                        )
                         : voucherType === "sales"
-                        ? getLedgerNameById(debitEntry?.ledgerId)
-                        : getLedgerNameById(creditEntry?.ledgerId)}
+                          ? getLedgerNameById(debitEntry?.ledgerId)
+                          : getLedgerNameById(creditEntry?.ledgerId)}
                     </td>
 
                     {/* Supplier Invoice Date */}
@@ -1627,11 +1615,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       <button
                         key={page}
                         onClick={() => setCurrentPage(page)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          page === currentPage
+                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === currentPage
                             ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
                             : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                        }`}
+                          }`}
                       >
                         {page}
                       </button>

@@ -28,6 +28,7 @@ import StockItemEdit from "./components/masters/stock/StockItemEdit";
 import BulkStockItemCreate from "./components/masters/stock/BulkStockItemCreate";
 import StockPerchaseItem from "./components/masters/stock/StocPerchaseItem";
 import BatchList from "./components/masters/batch/BatchList";
+import BarcodeList from "./components/masters/barcode/Barcode";
 import BatchSelectionPage from "./components/masters/batch/BatchSelectionPage";
 import StockGroupList from "./components/masters/stock/StockGroupList";
 import StockGroupForm from "./components/masters/stock/StockGroupForm";
@@ -209,6 +210,7 @@ import AccessControl from "./components/config/AccessControl";
 import SetProfit from "./components/config/SetProfit";
 import SalesByFifo from "./components/config/SalesByFifo";
 import Profile from "./components/config/Profile";
+import UpdateProfile from "./components/config/UpdateProfile";
 import PurchaseDetail from "./components/reports/profit_loss/PurchaseDetail";
 import PurchaseAddDetails from "./components/reports/profit_loss/PurchaseAddDetails";
 import PurchaseItemDetail from "./components/reports/profit_loss/PurchaseItemDetail";
@@ -487,6 +489,16 @@ function App() {
                   element={
                     <RequireCompany>
                       <BatchList />
+                    </RequireCompany>
+                  }
+                />
+
+
+                <Route
+                  path="masters/stock-item/barcode"
+                  element={
+                    <RequireCompany>
+                      <BarcodeList />
                     </RequireCompany>
                   }
                 />
@@ -2005,6 +2017,14 @@ function App() {
                   element={
                     <RequireCompany>
                       <Profile />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="config/update-profile"
+                  element={
+                    <RequireCompany>
+                      <UpdateProfile />
                     </RequireCompany>
                   }
                 />

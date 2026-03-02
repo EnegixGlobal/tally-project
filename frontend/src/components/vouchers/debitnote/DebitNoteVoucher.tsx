@@ -10,6 +10,7 @@ import type {
 import { Save, Plus, Trash2, ArrowLeft, Printer } from "lucide-react";
 import PrintOptions from "../sales/PrintOptions";
 import EWayBillGeneration from "../sales/EWayBillGeneration";
+import { useFinancialYear, getFinancialYearDefaults } from "../../../hooks/useFinancialYear";
 import InvoicePrint from "../sales/InvoicePrint";
 import Swal from "sweetalert2";
 
@@ -18,6 +19,8 @@ const DebitNoteVoucher: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = Boolean(id);
+  const { selectedFinYear } = useFinancialYear();
+  const { defaultDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
 
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
   const companyId = localStorage.getItem("company_id");
@@ -33,8 +36,7 @@ const DebitNoteVoucher: React.FC = () => {
     const fetchDebitNote = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/DebitNoteVoucher/${id}?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`
         );
 
@@ -56,15 +58,15 @@ const DebitNoteVoucher: React.FC = () => {
           entries:
             v.entries?.length > 0
               ? v.entries.map((e: any, i: number) => ({
-                  id: String(i + 1),
-                  ledgerId: e.ledgerId,
-                  amount: Number(e.amount) || 0,
-                  type: e.type,
-                }))
+                id: String(i + 1),
+                ledgerId: e.ledgerId,
+                amount: Number(e.amount) || 0,
+                type: e.type,
+              }))
               : [
-                  { id: "1", ledgerId: "", amount: 0, type: "debit" },
-                  { id: "2", ledgerId: "", amount: 0, type: "credit" },
-                ],
+                { id: "1", ledgerId: "", amount: 0, type: "debit" },
+                { id: "2", ledgerId: "", amount: 0, type: "credit" },
+              ],
         });
       } catch (err) {
         console.error(err);
@@ -79,8 +81,7 @@ const DebitNoteVoucher: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
@@ -111,7 +112,7 @@ const DebitNoteVoucher: React.FC = () => {
   };
 
   const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>({
-    date: new Date().toISOString().split("T")[0],
+    date: defaultDate,
     type: "debit-note",
     number: "",
     narration: "",
@@ -131,10 +132,10 @@ const DebitNoteVoucher: React.FC = () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/DebitNoteVoucher/next-number` +
-            `?company_id=${companyId}` +
-            `&owner_type=${ownerType}` +
-            `&owner_id=${ownerId}` +
-            `&date=${formData.date}`
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}` +
+          `&date=${formData.date}`
         );
 
         const data = await res.json();
@@ -182,7 +183,6 @@ const DebitNoteVoucher: React.FC = () => {
     >
   ) => {
     const { name, value } = e.target;
-    if (name === "date" && !isEditMode) return;
 
     if (name === "mode") {
       const newMode = value as "accounting-invoice" | "as-voucher";
@@ -194,9 +194,9 @@ const DebitNoteVoucher: React.FC = () => {
         entries: isEditMode
           ? prev.entries
           : [
-              { id: "1", ledgerId: "", amount: 0, type: "debit" },
-              { id: "2", ledgerId: "", amount: 0, type: "credit" },
-            ],
+            { id: "1", ledgerId: "", amount: 0, type: "debit" },
+            { id: "2", ledgerId: "", amount: 0, type: "credit" },
+          ],
       }));
     } else {
       setFormData((prev) => ({ ...prev, [name]: value }));
@@ -422,9 +422,8 @@ const DebitNoteVoucher: React.FC = () => {
         <button
           title="Back"
           onClick={() => navigate(-1)}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -437,9 +436,8 @@ const DebitNoteVoucher: React.FC = () => {
       </div>
 
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <form onSubmit={handleSubmit}>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
@@ -454,14 +452,11 @@ const DebitNoteVoucher: React.FC = () => {
                 value={formData.date}
                 onChange={handleChange}
                 required
-                readOnly={!isEditMode}
-                min={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
-                max={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                max={maxDate}
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                     : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors ${!isEditMode ? "opacity-70 cursor-not-allowed" : ""}`}
+                  } outline-none transition-colors`}
               />
             </div>
 
@@ -480,11 +475,10 @@ const DebitNoteVoucher: React.FC = () => {
                 readOnly
                 disabled
                 placeholder="Auto"
-                className={`w-full p-2 rounded border cursor-not-allowed opacity-70 ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border cursor-not-allowed opacity-70 ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-300"
                     : "bg-gray-100 border-gray-300 text-gray-600"
-                }`}
+                  }`}
               />
             </div>
 
@@ -498,11 +492,10 @@ const DebitNoteVoucher: React.FC = () => {
                 value={formData.mode}
                 onChange={handleChange}
                 title="Voucher Mode"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                     : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
+                  } outline-none transition-colors`}
               >
                 <option value="accounting-invoice">Accounting Invoice</option>
                 <option value="as-voucher">As Voucher</option>
@@ -511,9 +504,8 @@ const DebitNoteVoucher: React.FC = () => {
           </div>
 
           <div
-            className={`p-4 mb-6 rounded ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-            }`}
+            className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+              }`}
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold">Entries</h3>
@@ -521,11 +513,10 @@ const DebitNoteVoucher: React.FC = () => {
                 title="Add Entry"
                 type="button"
                 onClick={addEntry}
-                className={`flex items-center text-sm px-2 py-1 rounded ${
-                  theme === "dark"
+                className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
                     ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
+                  }`}
               >
                 <Plus size={16} className="mr-1" />
                 Add Line
@@ -536,11 +527,10 @@ const DebitNoteVoucher: React.FC = () => {
               <table className="w-full mb-4">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark"
+                    className={`${theme === "dark"
                         ? "border-b border-gray-600"
                         : "border-b border-gray-300"
-                    }`}
+                      }`}
                   >
                     <th className="px-4 py-2 text-left">Ledger Account</th>
 
@@ -554,11 +544,10 @@ const DebitNoteVoucher: React.FC = () => {
                     (entry: VoucherEntryLine, index: number) => (
                       <tr
                         key={index}
-                        className={`${
-                          theme === "dark"
+                        className={`${theme === "dark"
                             ? "border-b border-gray-600"
                             : "border-b border-gray-300"
-                        }`}
+                          }`}
                       >
                         <td className="px-4 py-2">
                           <select
@@ -567,11 +556,10 @@ const DebitNoteVoucher: React.FC = () => {
                             value={entry.ledgerId}
                             onChange={(e) => handleEntryChange(index, e)}
                             required
-                            className={`w-full p-2 rounded border ${
-                              theme === "dark"
+                            className={`w-full p-2 rounded border ${theme === "dark"
                                 ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                                 : "bg-white border-gray-300 focus:border-blue-500"
-                            } outline-none transition-colors`}
+                              } outline-none transition-colors`}
                           >
                             <option value="">Select Ledger</option>
                             {safeLedgers.map((ledger: Ledger) => (
@@ -581,11 +569,10 @@ const DebitNoteVoucher: React.FC = () => {
                             ))}
                             <option
                               value="add-new"
-                              className={`flex items-center px-4 py-2 rounded ${
-                                theme === "dark"
+                              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
                                   ? "bg-blue-600 hover:bg-green-700"
                                   : "bg-green-600 hover:bg-green-700 text-white"
-                              }`}
+                                }`}
                             >
                               + Add New Ledger
                             </option>
@@ -602,11 +589,10 @@ const DebitNoteVoucher: React.FC = () => {
                             required
                             min="0"
                             step="0.01"
-                            className={`w-full p-2 rounded border text-right ${
-                              theme === "dark"
+                            className={`w-full p-2 rounded border text-right ${theme === "dark"
                                 ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                                 : "bg-white border-gray-300 focus:border-blue-500"
-                            } outline-none transition-colors`}
+                              } outline-none transition-colors`}
                           />
                         </td>
 
@@ -617,11 +603,10 @@ const DebitNoteVoucher: React.FC = () => {
                             value={entry.type}
                             onChange={(e) => handleEntryChange(index, e)}
                             required
-                            className={`w-full p-2 rounded border ${
-                              theme === "dark"
+                            className={`w-full p-2 rounded border ${theme === "dark"
                                 ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                                 : "bg-white border-gray-300 focus:border-blue-500"
-                            } outline-none transition-colors`}
+                              } outline-none transition-colors`}
                           >
                             <option value="debit">Dr</option>
                             <option value="credit">Cr</option>
@@ -633,13 +618,12 @@ const DebitNoteVoucher: React.FC = () => {
                             type="button"
                             onClick={() => removeEntry(index)}
                             disabled={formData.entries.length <= 2}
-                            className={`p-1 rounded ${
-                              formData.entries.length <= 2
+                            className={`p-1 rounded ${formData.entries.length <= 2
                                 ? "opacity-50 cursor-not-allowed"
                                 : theme === "dark"
-                                ? "hover:bg-gray-600"
-                                : "hover:bg-gray-300"
-                            }`}
+                                  ? "hover:bg-gray-600"
+                                  : "hover:bg-gray-300"
+                              }`}
                           >
                             <Trash2 size={16} />
                           </button>
@@ -650,11 +634,10 @@ const DebitNoteVoucher: React.FC = () => {
                 </tbody>
                 <tfoot>
                   <tr
-                    className={`font-semibold ${
-                      theme === "dark"
+                    className={`font-semibold ${theme === "dark"
                         ? "border-t border-gray-600"
                         : "border-t border-gray-300"
-                    }`}
+                      }`}
                   >
                     <td className="px-4 py-2 text-right" colSpan={3}>
                       Totals:
@@ -668,21 +651,19 @@ const DebitNoteVoucher: React.FC = () => {
                     <td className="px-4 py-2 text-center">
                       {isBalanced ? (
                         <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            theme === "dark"
+                          className={`px-2 py-1 rounded text-xs ${theme === "dark"
                               ? "bg-green-900 text-green-200"
                               : "bg-green-100 text-green-800"
-                          }`}
+                            }`}
                         >
                           Balanced
                         </span>
                       ) : (
                         <span
-                          className={`px-2 py-1 rounded text-xs ${
-                            theme === "dark"
+                          className={`px-2 py-1 rounded text-xs ${theme === "dark"
                               ? "bg-red-900 text-red-200"
                               : "bg-red-100 text-red-800"
-                          }`}
+                            }`}
                         >
                           Unbalanced
                         </span>
@@ -707,11 +688,10 @@ const DebitNoteVoucher: React.FC = () => {
               value={formData.narration}
               onChange={handleChange}
               rows={3}
-              className={`w-full p-2 rounded border ${
-                theme === "dark"
+              className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                   : "bg-white border-gray-300 focus:border-blue-500"
-              } outline-none transition-colors`}
+                } outline-none transition-colors`}
             />
           </div>
 
@@ -719,11 +699,10 @@ const DebitNoteVoucher: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate("/app/vouchers")}
-              className={`px-4 py-2 rounded ${
-                theme === "dark"
+              className={`px-4 py-2 rounded ${theme === "dark"
                   ? "bg-gray-700 hover:bg-gray-600"
                   : "bg-gray-200 hover:bg-gray-300"
-              }`}
+                }`}
             >
               Cancel
             </button>
@@ -731,11 +710,10 @@ const DebitNoteVoucher: React.FC = () => {
               title="Print"
               type="button"
               onClick={handlePrintClick}
-              className={`flex items-center px-4 py-2 rounded ${
-                theme === "dark"
+              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
                   ? "bg-green-600 hover:bg-green-700"
                   : "bg-green-600 hover:bg-green-700 text-white"
-              }`}
+                }`}
             >
               <Printer size={18} className="mr-1" />
               Print
@@ -743,13 +721,12 @@ const DebitNoteVoucher: React.FC = () => {
             <button
               type="submit"
               disabled={!isBalanced}
-              className={`flex items-center px-4 py-2 rounded ${
-                !isBalanced
+              className={`flex items-center px-4 py-2 rounded ${!isBalanced
                   ? "opacity-50 cursor-not-allowed bg-blue-600"
                   : theme === "dark"
-                  ? "bg-blue-600 hover:bg-blue-700"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
+                    ? "bg-blue-600 hover:bg-blue-700"
+                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
             >
               <Save size={18} className="mr-1" />
               {isEditMode ? "Update" : "Save"}
@@ -759,9 +736,8 @@ const DebitNoteVoucher: React.FC = () => {
       </div>
 
       <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <p className="text-sm">
           <span className="font-semibold">Note:</span> Debit notes are issued to

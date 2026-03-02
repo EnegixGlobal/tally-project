@@ -100,6 +100,12 @@ app.use("/api/admin", adminloginRoute);
 const ledgerDropdown = require("./routes/ledgerDropdown");
 app.use("/api/ledger-dropdown", ledgerDropdown);
 
+const subscriptionRoutes = require("./routes/subscriptions");
+app.use("/api/subscriptions", subscriptionRoutes);
+
+const couponRoutes = require("./routes/coupons");
+app.use("/api/coupons", couponRoutes);
+
 const salesOrders = require("./routes/salesOrders");
 app.use("/api/sales-orders", salesOrders);
 
@@ -274,6 +280,9 @@ app.use("/api/", VoucherImport);
 
 const GstAssisment = require("./routes/GstAssisment");
 app.use("/api/gst-assessment", GstAssisment);
+
+const userProfile = require("./routes/userProfile");
+app.use("/api/profile", userProfile);
 
 const voucherDetailRouter = require("./routes/voucher-detail");
 app.use("/api/voucher-detail", voucherDetailRouter);

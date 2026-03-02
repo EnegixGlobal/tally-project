@@ -11,6 +11,7 @@ import {
   Settings,
   Calculator,
 } from "lucide-react";
+import { useFinancialYear, getFinancialYearDefaults } from "../../../hooks/useFinancialYear";
 import type { LedgerWithGroup } from "../../../types";
 import type { StockItem } from "../../../types";
 
@@ -43,11 +44,11 @@ interface SalesOrderData {
   termsOfDelivery: string;
   expectedDeliveryDate: string;
   status:
-    | "pending"
-    | "confirmed"
-    | "partially_delivered"
-    | "completed"
-    | "cancelled";
+  | "pending"
+  | "confirmed"
+  | "partially_delivered"
+  | "completed"
+  | "cancelled";
   dispatchDetails: {
     destination: string;
     through: string;
@@ -78,6 +79,8 @@ const SalesOrder: React.FC = () => {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
+  const { selectedFinYear } = useFinancialYear();
+  const { defaultDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
 
   useEffect(() => {
@@ -200,7 +203,7 @@ const SalesOrder: React.FC = () => {
   ]);
 
   const initialFormData: SalesOrderData = {
-    date: new Date().toISOString().split("T")[0],
+    date: defaultDate,
     number: "",
     partyId: "",
     salesLedgerId: "",
@@ -256,10 +259,10 @@ const SalesOrder: React.FC = () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL}/api/sales-orders/next-number` +
-            `?company_id=${companyId}` +
-            `&owner_type=${ownerType}` +
-            `&owner_id=${ownerId}` +
-            `&date=${formData.date}`
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}` +
+          `&date=${formData.date}`
         );
 
         const data = await res.json();
@@ -295,7 +298,6 @@ const SalesOrder: React.FC = () => {
     >
   ) => {
     const { name, value } = e.target;
-    if (name === "date" && !isEditMode) return;
     setFormData((prev) => ({ ...prev, [name]: value }));
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
@@ -446,8 +448,7 @@ const SalesOrder: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
@@ -545,9 +546,8 @@ const SalesOrder: React.FC = () => {
           Swal.fire({
             icon: "success",
             title: "Success",
-            text: `Sales Order ${
-              isEditMode ? "updated" : "created"
-            } successfully`,
+            text: `Sales Order ${isEditMode ? "updated" : "created"
+              } successfully`,
           }).then(() => {
             navigate("/app/vouchers");
           });
@@ -609,18 +609,15 @@ const SalesOrder: React.FC = () => {
               <div>
                 <strong>Order No:</strong> ${formData.number}<br>
                 <strong>Date:</strong> ${formData.date}<br>
-                <strong>Expected Delivery:</strong> ${
-                  formData.expectedDeliveryDate || "N/A"
-                }
+                <strong>Expected Delivery:</strong> ${formData.expectedDeliveryDate || "N/A"
+        }
               </div>
               <div>
                 <strong>Customer:</strong> ${selectedParty?.name || "N/A"}<br>
-                <strong>GST No:</strong> ${
-                  selectedParty?.gstNumber || "N/A"
-                }<br>
-                <strong>Current Balance:</strong> ₹${
-                  selectedParty?.currentBalance?.toLocaleString() || "0"
-                }
+                <strong>GST No:</strong> ${selectedParty?.gstNumber || "N/A"
+        }<br>
+                <strong>Current Balance:</strong> ₹${selectedParty?.currentBalance?.toLocaleString() || "0"
+        }
               </div>
             </div>
 
@@ -640,8 +637,8 @@ const SalesOrder: React.FC = () => {
               </thead>
               <tbody>
                 ${formData.items
-                  .map(
-                    (item, index) => `
+          .map(
+            (item, index) => `
                   <tr>
                     <td>${index + 1}</td>
                     <td>${item.itemName || "N/A"}</td>
@@ -650,45 +647,39 @@ const SalesOrder: React.FC = () => {
                     <td>${item.unit || "Nos"}</td>
                     <td class="amount">₹${item.rate.toLocaleString()}</td>
                     <td class="amount">₹${item.discount.toLocaleString()}</td>
-                    ${
-                      config.showGST
-                        ? `<td>${
-                            (item.cgstRate || 0) +
-                            (item.sgstRate || 0) +
-                            (item.igstRate || 0)
-                          }%</td>`
-                        : ""
-                    }
+                    ${config.showGST
+                ? `<td>${(item.cgstRate || 0) +
+                (item.sgstRate || 0) +
+                (item.igstRate || 0)
+                }%</td>`
+                : ""
+              }
                     <td class="amount">₹${item.amount.toLocaleString()}</td>
                   </tr>
                 `
-                  )
-                  .join("")}
+          )
+          .join("")}
                 <tr class="total-row">
-                  <td colspan="${
-                    config.showGST ? "8" : "7"
-                  }"><strong>Subtotal</strong></td>
+                  <td colspan="${config.showGST ? "8" : "7"
+        }"><strong>Subtotal</strong></td>
                   <td class="amount"><strong>₹${subtotal.toLocaleString()}</strong></td>
                 </tr>
                 <tr class="total-row">
-                  <td colspan="${
-                    config.showGST ? "8" : "7"
-                  }"><strong>Total GST</strong></td>
+                  <td colspan="${config.showGST ? "8" : "7"
+        }"><strong>Total GST</strong></td>
                   <td class="amount"><strong>₹${totalGST.toLocaleString()}</strong></td>
                 </tr>
                 <tr class="total-row">
-                  <td colspan="${
-                    config.showGST ? "8" : "7"
-                  }"><strong>Total Amount</strong></td>
+                  <td colspan="${config.showGST ? "8" : "7"
+        }"><strong>Total Amount</strong></td>
                   <td class="amount"><strong>₹${totalAmount.toLocaleString()}</strong></td>
                 </tr>
               </tbody>
             </table>
 
             <div>
-              <strong>Terms of Delivery:</strong> ${
-                formData.termsOfDelivery || "N/A"
-              }<br>
+              <strong>Terms of Delivery:</strong> ${formData.termsOfDelivery || "N/A"
+        }<br>
               <strong>Narration:</strong> ${formData.narration || "N/A"}
             </div>
 
@@ -735,25 +726,22 @@ const SalesOrder: React.FC = () => {
 
   return (
     <div
-      className={`pt-[56px] px-4 ${
-        theme === "dark" ? "bg-gray-900" : "bg-gray-50"
-      }`}
+      className={`pt-[56px] px-4 ${theme === "dark" ? "bg-gray-900" : "bg-gray-50"
+        }`}
     >
       <div className="flex items-center mb-6">
         <button
           title="Back to Vouchers"
           type="button"
           onClick={() => navigate("/app/vouchers")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
         <h1
-          className={`text-2xl font-bold ${
-            theme === "dark" ? "text-gray-100" : "text-gray-900"
-          }`}
+          className={`text-2xl font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"
+            }`}
         >
           {isEditMode ? "Edit Sales Order" : "New Sales Order"}
         </h1>
@@ -761,29 +749,26 @@ const SalesOrder: React.FC = () => {
           <button
             title="Save Sales Order"
             onClick={handleSubmit}
-            className={`p-2 rounded-md ${
-              theme === "dark"
+            className={`p-2 rounded-md ${theme === "dark"
                 ? "bg-blue-600 hover:bg-blue-700"
                 : "bg-blue-500 hover:bg-blue-600"
-            } text-white flex items-center`}
+              } text-white flex items-center`}
           >
             <Save size={18} className="mr-2" /> Save
           </button>
           <button
             title="Print Sales Order"
             onClick={handlePrint}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
           <button
             title="Configure"
             onClick={() => setShowConfigPanel(!showConfigPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Settings size={18} />
           </button>
@@ -791,18 +776,16 @@ const SalesOrder: React.FC = () => {
       </div>
 
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <form onSubmit={handleSubmit}>
           {/* Header Information */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Date <span className="text-red-500">*</span>
               </label>
@@ -813,14 +796,11 @@ const SalesOrder: React.FC = () => {
                 value={formData.date}
                 onChange={handleChange}
                 required
-                readOnly={!isEditMode}
-                min={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
-                max={!isEditMode ? new Date().toLocaleDateString('en-CA') : undefined}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                max={maxDate}
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500 ${!isEditMode ? "opacity-70 cursor-not-allowed" : ""}`}
+                  } focus:border-blue-500 focus:ring-blue-500`}
               />
               {errors.date && (
                 <p className="text-red-500 text-sm mt-1">{errors.date}</p>
@@ -829,9 +809,8 @@ const SalesOrder: React.FC = () => {
 
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Sales Order No.
               </label>
@@ -841,13 +820,11 @@ const SalesOrder: React.FC = () => {
                 value={formData.number}
                 onChange={handleChange}
                 readOnly={config.autoNumbering}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500 ${
-                  config.autoNumbering ? "opacity-50" : ""
-                }`}
+                  } focus:border-blue-500 focus:ring-blue-500 ${config.autoNumbering ? "opacity-50" : ""
+                  }`}
                 placeholder={
                   config.autoNumbering ? "Auto" : "Enter order number"
                 }
@@ -856,9 +833,8 @@ const SalesOrder: React.FC = () => {
 
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Reference No.
               </label>
@@ -867,11 +843,10 @@ const SalesOrder: React.FC = () => {
                 name="referenceNo"
                 value={formData.referenceNo}
                 onChange={handleChange}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500`}
+                  } focus:border-blue-500 focus:ring-blue-500`}
                 placeholder="Enter reference number"
               />
             </div>
@@ -879,9 +854,8 @@ const SalesOrder: React.FC = () => {
             {config.showExpectedDate && (
               <div>
                 <label
-                  className={`block text-sm font-medium mb-1 ${
-                    theme === "dark" ? "text-gray-300" : "text-gray-700"
-                  }`}
+                  className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                    }`}
                 >
                   Expected Delivery Date
                 </label>
@@ -891,11 +865,10 @@ const SalesOrder: React.FC = () => {
                   value={formData.expectedDeliveryDate}
                   onChange={handleChange}
                   title="Expected Delivery Date"
-                  className={`w-full p-2 rounded border ${
-                    theme === "dark"
+                  className={`w-full p-2 rounded border ${theme === "dark"
                       ? "bg-gray-700 border-gray-600 text-gray-100"
                       : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
+                    } focus:border-blue-500 focus:ring-blue-500`}
                 />
               </div>
             )}
@@ -905,9 +878,8 @@ const SalesOrder: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Party's A/c Name <span className="text-red-500">*</span>
               </label>
@@ -916,11 +888,10 @@ const SalesOrder: React.FC = () => {
                 name="partyId"
                 value={formData.partyId}
                 onChange={handlePartyChange}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500`}
+                  } focus:border-blue-500 focus:ring-blue-500`}
               >
                 <option value="">-- Select Party Name --</option>
 
@@ -931,11 +902,10 @@ const SalesOrder: React.FC = () => {
                 ))}
                 <option
                   value="add-new"
-                  className={`flex items-center px-4 py-2 rounded ${
-                    theme === "dark"
+                  className={`flex items-center px-4 py-2 rounded ${theme === "dark"
                       ? "bg-blue-600 hover:bg-g]reen-700"
                       : "bg-green-600 hover:bg-green-700 text-white"
-                  }`}
+                    }`}
                 >
                   + Add New Ledger
                 </option>
@@ -946,11 +916,10 @@ const SalesOrder: React.FC = () => {
 
               {selectedParty && (
                 <div
-                  className={`mt-2 p-2 rounded text-sm ${
-                    theme === "dark"
+                  className={`mt-2 p-2 rounded text-sm ${theme === "dark"
                       ? "bg-gray-700 text-gray-300"
                       : "bg-gray-100 text-gray-600"
-                  }`}
+                    }`}
                 >
                   <p>
                     <strong>Current Balance:</strong> ₹
@@ -974,9 +943,8 @@ const SalesOrder: React.FC = () => {
 
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Sales Ledger <span className="text-red-500">*</span>
               </label>
@@ -986,11 +954,10 @@ const SalesOrder: React.FC = () => {
                 onChange={handlePurchaseLedgerChange}
                 required
                 title="Select Sales Ledger"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500`}
+                  } focus:border-blue-500 focus:ring-blue-500`}
               >
                 <option value="">Select Sales Ledger</option>
 
@@ -1001,11 +968,10 @@ const SalesOrder: React.FC = () => {
                 ))}
                 <option
                   value="add-new"
-                  className={`flex items-center px-4 py-2 rounded ${
-                    theme === "dark"
+                  className={`flex items-center px-4 py-2 rounded ${theme === "dark"
                       ? "bg-blue-600 hover:bg-g]reen-700"
                       : "bg-green-600 hover:bg-green-700 text-white"
-                  }`}
+                    }`}
                 >
                   + Add New Ledger
                 </option>
@@ -1020,20 +986,18 @@ const SalesOrder: React.FC = () => {
 
           {/* Items Section */}
           <div
-            className={`p-4 mb-6 rounded ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-            }`}
+            className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+              }`}
           >
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold">Items</h3>
               <button
                 type="button"
                 onClick={addItem}
-                className={`flex items-center text-sm px-3 py-2 rounded ${
-                  theme === "dark"
+                className={`flex items-center text-sm px-3 py-2 rounded ${theme === "dark"
                     ? "bg-blue-600 hover:bg-blue-700"
                     : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
+                  }`}
               >
                 <Plus size={16} className="mr-1" /> Add Item
               </button>
@@ -1043,11 +1007,10 @@ const SalesOrder: React.FC = () => {
               <table className="w-full">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark"
+                    className={`${theme === "dark"
                         ? "border-b border-gray-600"
                         : "border-b border-gray-300"
-                    }`}
+                      }`}
                   >
                     <th className="px-2 py-2 text-left">Name of Item</th>
                     {config.showHSN && (
@@ -1072,11 +1035,10 @@ const SalesOrder: React.FC = () => {
                   {formData.items.map((item, index) => (
                     <tr
                       key={item.id}
-                      className={`${
-                        theme === "dark"
+                      className={`${theme === "dark"
                           ? "border-b border-gray-600"
                           : "border-b border-gray-300"
-                      }`}
+                        }`}
                     >
                       <td className="px-2 py-2">
                         <select
@@ -1085,11 +1047,10 @@ const SalesOrder: React.FC = () => {
                             handleItemChange(index, "itemId", e.target.value)
                           }
                           title="Select Item"
-                          className={`w-full p-1 rounded border text-sm ${
-                            theme === "dark"
+                          className={`w-full p-1 rounded border text-sm ${theme === "dark"
                               ? "bg-gray-700 border-gray-600 text-gray-100"
                               : "bg-white border-gray-300 text-gray-900"
-                          } focus:border-blue-500`}
+                            } focus:border-blue-500`}
                         >
                           <option value="">Select Item</option>
                           {stockItems.map((stockItem) => (
@@ -1113,11 +1074,10 @@ const SalesOrder: React.FC = () => {
                             onChange={(e) =>
                               handleItemChange(index, "hsnCode", e.target.value)
                             }
-                            className={`w-full p-1 rounded border text-sm ${
-                              theme === "dark"
+                            className={`w-full p-1 rounded border text-sm ${theme === "dark"
                                 ? "bg-gray-700 border-gray-600 text-gray-100"
                                 : "bg-white border-gray-300 text-gray-900"
-                            } focus:border-blue-500`}
+                              } focus:border-blue-500`}
                             placeholder="HSN"
                             title="HSN Code"
                             aria-label="HSN Code"
@@ -1135,11 +1095,10 @@ const SalesOrder: React.FC = () => {
                               e.target.value
                             )
                           }
-                          className={`w-full p-1 rounded border text-sm ${
-                            theme === "dark"
+                          className={`w-full p-1 rounded border text-sm ${theme === "dark"
                               ? "bg-gray-700 border-gray-600 text-gray-100"
                               : "bg-white border-gray-300 text-gray-900"
-                          } focus:border-blue-500`}
+                            } focus:border-blue-500`}
                         >
                           <option value="">Select Batch</option>
                           {(item as any).batches?.map((batch: any) => (
@@ -1164,11 +1123,10 @@ const SalesOrder: React.FC = () => {
                               parseFloat(e.target.value) || 0
                             )
                           }
-                          className={`w-full p-1 rounded border text-center text-sm ${
-                            theme === "dark"
+                          className={`w-full p-1 rounded border text-center text-sm ${theme === "dark"
                               ? "bg-gray-700 border-gray-600 text-gray-100"
                               : "bg-white border-gray-300 text-gray-900"
-                          } focus:border-blue-500`}
+                            } focus:border-blue-500`}
                           placeholder="0"
                           min="0"
                           step="0.01"
@@ -1191,11 +1149,10 @@ const SalesOrder: React.FC = () => {
                               parseFloat(e.target.value) || 0
                             )
                           }
-                          className={`w-full p-1 rounded border text-right text-sm ${
-                            theme === "dark"
+                          className={`w-full p-1 rounded border text-right text-sm ${theme === "dark"
                               ? "bg-gray-700 border-gray-600 text-gray-100"
                               : "bg-white border-gray-300 text-gray-900"
-                          } focus:border-blue-500`}
+                            } focus:border-blue-500`}
                           placeholder="0.00"
                           min="0"
                           step="0.01"
@@ -1219,11 +1176,10 @@ const SalesOrder: React.FC = () => {
                                 parseFloat(e.target.value) || 0
                               )
                             }
-                            className={`w-full p-1 rounded border text-right text-sm ${
-                              theme === "dark"
+                            className={`w-full p-1 rounded border text-right text-sm ${theme === "dark"
                                 ? "bg-gray-700 border-gray-600 text-gray-100"
                                 : "bg-white border-gray-300 text-gray-900"
-                            } focus:border-blue-500`}
+                              } focus:border-blue-500`}
                             placeholder="0.00"
                             min="0"
                             step="0.01"
@@ -1248,11 +1204,10 @@ const SalesOrder: React.FC = () => {
                           value={item.amount}
                           readOnly
                           title="Item Amount"
-                          className={`w-full p-1 rounded border text-right text-sm ${
-                            theme === "dark"
+                          className={`w-full p-1 rounded border text-right text-sm ${theme === "dark"
                               ? "bg-gray-600 border-gray-600 text-gray-100"
                               : "bg-gray-100 border-gray-300 text-gray-900"
-                          } opacity-60`}
+                            } opacity-60`}
                         />
                       </td>
 
@@ -1261,13 +1216,12 @@ const SalesOrder: React.FC = () => {
                           type="button"
                           onClick={() => removeItem(index)}
                           disabled={formData.items.length <= 1}
-                          className={`p-1 rounded ${
-                            formData.items.length <= 1
+                          className={`p-1 rounded ${formData.items.length <= 1
                               ? "opacity-50 cursor-not-allowed"
                               : theme === "dark"
-                              ? "hover:bg-gray-600"
-                              : "hover:bg-gray-300"
-                          }`}
+                                ? "hover:bg-gray-600"
+                                : "hover:bg-gray-300"
+                            }`}
                           title="Remove Item"
                           aria-label="Remove Item"
                         >
@@ -1279,11 +1233,10 @@ const SalesOrder: React.FC = () => {
                 </tbody>
                 <tfoot>
                   <tr
-                    className={`font-semibold ${
-                      theme === "dark"
+                    className={`font-semibold ${theme === "dark"
                         ? "border-t border-gray-600"
                         : "border-t border-gray-300"
-                    }`}
+                      }`}
                   >
                     <td className="px-2 py-2" colSpan={config.showHSN ? 2 : 1}>
                       Total
@@ -1315,9 +1268,8 @@ const SalesOrder: React.FC = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Order Reference
               </label>
@@ -1326,20 +1278,18 @@ const SalesOrder: React.FC = () => {
                 name="orderRef"
                 value={formData.orderRef}
                 onChange={handleChange}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500`}
+                  } focus:border-blue-500 focus:ring-blue-500`}
                 placeholder="Enter order reference"
               />
             </div>
 
             <div>
               <label
-                className={`block text-sm font-medium mb-1 ${
-                  theme === "dark" ? "text-gray-300" : "text-gray-700"
-                }`}
+                className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                  }`}
               >
                 Terms of Delivery
               </label>
@@ -1348,11 +1298,10 @@ const SalesOrder: React.FC = () => {
                 name="termsOfDelivery"
                 value={formData.termsOfDelivery}
                 onChange={handleChange}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-gray-100"
                     : "bg-white border-gray-300 text-gray-900"
-                } focus:border-blue-500 focus:ring-blue-500`}
+                  } focus:border-blue-500 focus:ring-blue-500`}
                 placeholder="Enter delivery terms"
               />
             </div>
@@ -1361,9 +1310,8 @@ const SalesOrder: React.FC = () => {
           {/* Narration */}
           <div className="mb-6">
             <label
-              className={`block text-sm font-medium mb-1 ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               Narration
             </label>
@@ -1372,11 +1320,10 @@ const SalesOrder: React.FC = () => {
               value={formData.narration}
               onChange={handleChange}
               rows={3}
-              className={`w-full p-2 rounded border ${
-                theme === "dark"
+              className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 text-gray-100"
                   : "bg-white border-gray-300 text-gray-900"
-              } focus:border-blue-500 focus:ring-blue-500`}
+                } focus:border-blue-500 focus:ring-blue-500`}
               placeholder="Enter narration"
             />
           </div>
@@ -1384,9 +1331,8 @@ const SalesOrder: React.FC = () => {
           {/* Configuration Panel */}
           {showConfigPanel && (
             <div
-              className={`p-4 mb-6 rounded ${
-                theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-              }`}
+              className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                }`}
             >
               <h3 className="font-semibold mb-4">Configuration (F12)</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -1400,9 +1346,8 @@ const SalesOrder: React.FC = () => {
                         autoNumbering: e.target.checked,
                       }))
                     }
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Auto Numbering
                 </label>
@@ -1416,9 +1361,8 @@ const SalesOrder: React.FC = () => {
                         showExpectedDate: e.target.checked,
                       }))
                     }
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Show Expected Date
                 </label>
@@ -1432,9 +1376,8 @@ const SalesOrder: React.FC = () => {
                         showGodown: e.target.checked,
                       }))
                     }
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Show Godown
                 </label>
@@ -1448,9 +1391,8 @@ const SalesOrder: React.FC = () => {
                         showHSN: e.target.checked,
                       }))
                     }
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Show HSN Code
                 </label>
@@ -1464,9 +1406,8 @@ const SalesOrder: React.FC = () => {
                         showDiscount: e.target.checked,
                       }))
                     }
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Show Discount
                 </label>
@@ -1480,9 +1421,8 @@ const SalesOrder: React.FC = () => {
                         showGST: e.target.checked,
                       }))
                     }
-                    className={`mr-2 ${
-                      theme === "dark" ? "bg-gray-600" : "bg-white"
-                    }`}
+                    className={`mr-2 ${theme === "dark" ? "bg-gray-600" : "bg-white"
+                      }`}
                   />
                   Show GST
                 </label>
@@ -1494,9 +1434,8 @@ const SalesOrder: React.FC = () => {
 
       {/* Summary Panel */}
       <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <div className="flex justify-between items-center">
           <div>

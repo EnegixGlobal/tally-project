@@ -3,13 +3,16 @@ import { useAppContext } from '../../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import type { VoucherEntry, Ledger } from '../../../types';
 import { Save, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { useFinancialYear, getFinancialYearDefaults } from '../../../hooks/useFinancialYear';
 
 const StockJournalVoucher: React.FC = () => {
   const { theme, ledgers, addVoucher } = useAppContext();
   const navigate = useNavigate();
+  const { selectedFinYear } = useFinancialYear();
+  const { defaultDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
 
   const [formData, setFormData] = useState<Omit<VoucherEntry, 'id'>>({
-    date: new Date().toISOString().split('T')[0],
+    date: defaultDate,
     type: 'journal',
     number: '',
     narration: '',
@@ -131,6 +134,7 @@ const StockJournalVoucher: React.FC = () => {
                 value={formData.date}
                 onChange={handleChange}
                 required
+                max={maxDate}
                 className={`w-full p-2 rounded border ${theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
               />
             </div>
