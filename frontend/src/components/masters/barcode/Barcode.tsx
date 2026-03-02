@@ -57,6 +57,49 @@ const BarcodeManagement = () => {
     const handlePrint = useReactToPrint({
         contentRef: componentRef,
         documentTitle: `Barcodes_${new Date().toLocaleDateString()}`,
+        pageStyle: `
+            @page { 
+                size: 3in 2in; 
+                margin: 0 !important; 
+            } 
+            @media print { 
+                * {
+                    -webkit-print-color-adjust: exact !important;
+                    print-color-adjust: exact !important;
+                    image-rendering: pixelated !important;
+                    font-family: 'Courier New', Courier, monospace !important;
+                }
+                html, body {
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    width: 3in !important;
+                    height: 2in !important;
+                    background: #ffffff !important;
+                }
+                .print-matrix {
+                    display: block !important;
+                    width: 3in !important;
+                }
+                .label-page {
+                    width: 3in !important;
+                    height: 2in !important;
+                    display: flex !important;
+                    flex-direction: column !important;
+                    align-items: center !important;
+                    justify-content: center !important;
+                    page-break-after: always !important;
+                    page-break-inside: avoid !important;
+                    margin: 0 !important;
+                    padding: 0 !important;
+                    overflow: hidden !important;
+                    background: white !important;
+                }
+                canvas, svg {
+                    width: 2.8in !important; /* Slightly smaller than label to prevent cutoff */
+                    height: auto !important;
+                }
+            }
+        `,
     });
 
     const addToPrintQueue = (item: StockItem) => {
@@ -407,30 +450,23 @@ const BarcodeManagement = () => {
 
             {/* Hidden High-Definition Print Matrix */}
             <div className="hidden">
-                <div ref={componentRef} className="print-matrix bg-white p-10">
-                    <div className="grid grid-cols-3 gap-y-12 gap-x-8">
-                        {printQueue.flatMap(item =>
-                            Array.from({ length: item.copies }).map((_, i) => (
-                                <div key={`${item.id}-${i}`} className="flex flex-col items-center justify-center border-2 border-slate-100 p-6 break-inside-avoid text-center">
-                                    <span className="text-[9px] font-black uppercase tracking-tight text-slate-400 mb-1 leading-none">{companyId}</span>
-                                    <span className="text-sm font-black uppercase text-slate-800 mb-2 leading-tight w-full truncate">{item.name}</span>
-                                    <div className="flex justify-center p-2 bg-white rounded border border-slate-50">
-                                        <Barcode
-                                            value={item.barcode}
-                                            width={1.5}
-                                            height={45}
-                                            fontSize={14}
-                                            margin={0}
-                                            lineColor="#000000"
-                                        />
-                                    </div>
-                                    <div className="mt-2 flex items-center gap-1 font-mono text-[8px] font-bold text-slate-300">
-                                        <Zap size={8} /> SECURE DEPLOYMENT ASSET
-                                    </div>
-                                </div>
-                            ))
-                        )}
-                    </div>
+                <div ref={componentRef} className="print-matrix">
+                    {printQueue.flatMap(item =>
+                        Array.from({ length: item.copies }).map((_, i) => (
+                            <div key={`${item.id}-${i}`} className="label-page">
+                                <Barcode
+                                    value={item.barcode}
+                                    width={2.5}  // Increased width for Zebra standard
+                                    height={120} // Taller bars for industrial scanning
+                                    fontSize={20} // Sharp, readable mono font
+                                    margin={0}
+                                    background="#ffffff"
+                                    lineColor="#000000"
+                                    displayValue={true}
+                                />
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -451,16 +487,40 @@ const BarcodeManagement = () => {
                 }
                 
                 @media print {
+                    @page {
+                        size: 3in 2in;
+                        margin: 0;
+                    }
+                    html, body {
+                        width: 3in;
+                        height: 2in;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        overflow: hidden;
+                    }
                     .print-matrix {
                         display: block !important;
-                        width: 100%;
+                        width: 3in;
+                        height: 2in;
                     }
-                    @page {
-                        size: A4;
-                        margin: 15mm;
-                    }
-                    .break-inside-avoid {
+                    .label-page {
+                        width: 3in;
+                        height: 2in;
+                        display: flex !important;
+                        flex-direction: column !important;
+                        align-items: center !important;
+                        justify-content: center !important;
+                        page-break-after: always;
                         page-break-inside: avoid;
+                        margin: 0 !important;
+                        padding: 0 !important;
+                        background: white;
+                    }
+                    .barcode-wrapper {
+                        transform: scale(1.1); /* Slightly scale up to fill space */
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
                     }
                 }
                 
