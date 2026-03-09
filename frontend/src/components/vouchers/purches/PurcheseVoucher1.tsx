@@ -283,6 +283,44 @@ const PurchaseVoucher: React.FC = () => {
       if (json.success && json.data) {
         setIsBarcodeError(false);
         const item = json.data;
+
+        // ✅ CHECK directly using formDataRef (reliable — no async batching issue)
+        const existingIndex = formDataRef.current.entries.findIndex(
+          (e: any) => String(e.itemId) === String(item.id)
+        );
+
+        if (existingIndex !== -1) {
+          // Item pehle se hai — sirf quantity +1 karo, koi naya row nahi
+          setFormData((prev) => {
+            const updatedEntries = [...prev.entries];
+            const existingEntry = updatedEntries[existingIndex];
+            const newQty = Number(existingEntry.quantity || 0) + 1;
+
+            const calculated = calculateEntryValues(
+              newQty,
+              Number(existingEntry.rate || 0),
+              Number(existingEntry.discount || 0),
+              Number(existingEntry.gstRate || 0),
+              companyState,
+              supplierState
+            );
+
+            updatedEntries[existingIndex] = {
+              ...existingEntry,
+              quantity: newQty,
+              amount: calculated.amount,
+            };
+
+            return { ...prev, entries: updatedEntries };
+          });
+
+          Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500, timerProgressBar: true })
+            .fire({ icon: 'success', title: `Qty +1: ${item.name}` });
+          setBarcodeInput("");
+          return;
+        }
+
+        // ✅ Naya item — quantity 2 se add karo
         const details = resolveStockItemDetails(item.id);
 
         setFormData((prev) => {
@@ -290,9 +328,9 @@ const PurchaseVoucher: React.FC = () => {
 
           const gst = Number(details.gstRate || 0);
 
-          // Calculate amounts using existing helper
+          // Calculate amounts using existing helper — quantity 2 default
           const calculated = calculateEntryValues(
-            1, // quantity 1 by default
+            2, // ✅ Default quantity 2 for new barcode items
             Number(details.standardPurchaseRate || 0),
             0, // discount
             gst,
@@ -351,7 +389,7 @@ const PurchaseVoucher: React.FC = () => {
             hsnCode: details.hsnCode || "",
             unitName: details.unit || "",
 
-            quantity: 1,
+            quantity: 2, // ✅ Default 2 for new barcode scan items
             rate: calculated.rate,
             amount: calculated.amount,
 
@@ -433,7 +471,8 @@ const PurchaseVoucher: React.FC = () => {
         if (e.key === "Enter") {
           if (barcodeBuffer.current.length >= 3) {
             const code = barcodeBuffer.current;
-            setBarcodeInput(code);
+            // ✅ Clear barcodeInput (empty string) — prevents debounce useEffect from firing again
+            setBarcodeInput("");
             performBarcodeLookup(code);
             barcodeBuffer.current = "";
           }
@@ -782,9 +821,9 @@ const PurchaseVoucher: React.FC = () => {
     type: "purchase",
     number: "",
     narration: "",
-    referenceNo: "", // This will be used for Supplier Invoice Number
-    supplierInvoiceDate: new Date().toISOString().split("T")[0], // New field for supplier invoice date
-    purchaseLedgerId: "", // New field for purchase ledger
+    referenceNo: "",
+    supplierInvoiceDate: new Date().toISOString().split("T")[0],
+    purchaseLedgerId: "",
     partyId: "",
     mode: "item-invoice",
     tdsLedgerId: "",
@@ -817,6 +856,10 @@ const PurchaseVoucher: React.FC = () => {
       },
     ],
   });
+
+  // ✅ Always-fresh ref to formData — prevents stale closure in async barcode lookup
+  const formDataRef = useRef<any>(null);
+  useEffect(() => { formDataRef.current = formData; }, [formData]);
 
   // Draft Persistence Logic
   const DRAFT_KEY = "PURCHASE_VOUCHER_CREATE_DRAFT";
@@ -1161,7 +1204,7 @@ const PurchaseVoucher: React.FC = () => {
           batchNumber: "",
           batchExpiryDate: "",
           batchManufacturingDate: "",
-          quantity: 0,
+          quantity: 1, // ✅ Fixed: Set to 1 instead of 0 for 'real' feel
           discount: 0,
         };
 
