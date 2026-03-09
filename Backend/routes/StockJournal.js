@@ -5,7 +5,7 @@ const db = require('../db'); // mysql2/promise connection
 // Insert Stock Journal Voucher
 router.post('/', async (req, res) => {
   const { date, number, narration, entries, companyId, ownerType, ownerId } = req.body;
-    
+
   const connection = await db.getConnection();
 
   try {

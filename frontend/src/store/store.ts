@@ -1,9 +1,11 @@
 import { configureStore } from '@reduxjs/toolkit';
 import { balanceSheetSlice } from './features/BalanceSheet/balancesheetSlice';
+import allVoucherReducer from './features/AllVoucher/allVoucher';
 
 export const store = configureStore({
   reducer: {
     balanceSheet: balanceSheetSlice.reducer,
+    allVoucher: allVoucherReducer,
   },
 });
 
