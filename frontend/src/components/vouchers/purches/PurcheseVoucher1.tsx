@@ -235,7 +235,7 @@ const PurchaseVoucher: React.FC = () => {
     {
       hsn: true,
       gst: true,
-      batch: false,
+      batch: true,   // ✅ Default ON — but column only shows when item has batches (hasAnyBatch)
       godown: true,
       showReceiptDetails: true,
       tds: true,
@@ -627,7 +627,7 @@ const PurchaseVoucher: React.FC = () => {
         );
         const data = await res.json();
 
-        console.log('this is data', data)
+        // console.log('this is data', data)
 
         // Accept multiple response shapes: array, { success, data }, or nested
         let items: any[] = [];
@@ -689,7 +689,7 @@ const PurchaseVoucher: React.FC = () => {
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
-        console.log('led', data)
+        // console.log('led', data)
         setLedgers(data);
       } catch (err) {
         console.error("Failed to fetch ledgers:", err);
@@ -1741,7 +1741,7 @@ const PurchaseVoucher: React.FC = () => {
       // Same logic as Sales Voucher (which subtracts via negative quantity)
       // Here we ADD positive quantity to existing batches on purchase
       if (formData.mode === "item-invoice") {
-        console.log("🔵 PURCHASE STOCK UPDATE — companyId:", companyId, "ownerType:", ownerType, "ownerId:", ownerId);
+        // console.log("🔵 PURCHASE STOCK UPDATE — companyId:", companyId, "ownerType:", ownerType, "ownerId:", ownerId);
         await Promise.all(
           formData.entries.map(async (entry) => {
             // Only for existing items (not new batch creations handled above)
@@ -1756,7 +1756,7 @@ const PurchaseVoucher: React.FC = () => {
               quantity: Number(entry.quantity || 0),
               mode: "add",
             };
-            console.log("🔵 PATCH purchase stock:", patchUrl, patchBody);
+            // console.log("🔵 PATCH purchase stock:", patchUrl, patchBody);
 
             try {
               const patchRes = await fetch(patchUrl, {
@@ -1765,7 +1765,7 @@ const PurchaseVoucher: React.FC = () => {
                 body: JSON.stringify(patchBody),
               });
               const patchData = await patchRes.json();
-              console.log("🟢 PATCH response:", patchRes.status, patchData);
+              // console.log("🟢 PATCH response:", patchRes.status, patchData);
             } catch (err) {
               console.error(`⚠️ Stock batch update failed for item ${entry.itemId}:`, err);
             }
@@ -2204,6 +2204,18 @@ const PurchaseVoucher: React.FC = () => {
   // 🔹 Intra / Inter State Check
   // Note: isIntraState is now defined above calculateTotals to avoid ReferenceError
 
+  // ✅ Same as SalesVoucher: auto-show Batch column only when at least one item has batches
+  const hasAnyBatch = formData.entries?.some((entry) => {
+    if (!entry.itemId) return false;
+    const item = stockItems.find((s) => String(s.id) === String(entry.itemId));
+    // Show batch column if item has enableBatchTracking OR already has batches in the entry
+    return (
+      (item as any)?.enableBatchTracking === true ||
+      (item as any)?.enableBatchTracking === 1 ||
+      (entry.batches && entry.batches.some((b: any) => b?.batchName))
+    );
+  });
+
   return (
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
@@ -2595,7 +2607,8 @@ const PurchaseVoucher: React.FC = () => {
                       <th className={TABLE_STYLES.header}>Item</th>
                       {visibleColumns.hsn && <th>HSN/SAC</th>}
 
-                      {visibleColumns.batch && (
+                      {/* Batch column — only show when items have batches (same as Sales Voucher) */}
+                      {visibleColumns.batch && hasAnyBatch && (
                         <th className={TABLE_STYLES.header}>Batch</th>
                       )}
 
@@ -2675,8 +2688,8 @@ const PurchaseVoucher: React.FC = () => {
                             </td>
                           )}
 
-                          {visibleColumns.batch && (
-                            // BATCH with Add button
+                          {/* BATCH — only show when items have batches */}
+                          {visibleColumns.batch && hasAnyBatch && (
                             <td className="px-1 py-2 min-w-[140px] flex items-center gap-2">
                               <select
                                 name="batchNumber"
