@@ -1264,26 +1264,8 @@ const PurchaseVoucher: React.FC = () => {
 
         setFormData((prev) => ({ ...prev, entries: updatedEntries }));
 
-        // 🔥 batch quantity sync (keep existing logic)
-        if (name === "quantity") {
-          const oldQty = Number(entry.quantity || 0);
-          const baseQty = Number(entry.batchBaseQuantity ?? 0);
-          const diffQty = newVal - oldQty;
-          const finalBatchQty = baseQty + newVal;
-
-          const itemId = entry.itemId;
-          const batchName = entry.batchNumber;
-          if (itemId && diffQty !== 0 && batchName) {
-            fetch(
-              `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-              {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ batchName, quantity: finalBatchQty }),
-              }
-            ).catch(console.error);
-          }
-        }
+        // NOTE: Stock batch quantity is updated only on final submit (in handleSubmit Step 3.5)
+        // Real-time PATCH removed to prevent intermediate/incorrect updates
         return;
       }
 
@@ -1752,6 +1734,42 @@ const PurchaseVoucher: React.FC = () => {
               owner_id: ownerId,
             }),
           }
+        );
+      }
+
+      // 🔥 3.5. EXISTING BATCHES — ADD quantity (purchase stock addition)
+      // Same logic as Sales Voucher (which subtracts via negative quantity)
+      // Here we ADD positive quantity to existing batches on purchase
+      if (formData.mode === "item-invoice") {
+        console.log("🔵 PURCHASE STOCK UPDATE — companyId:", companyId, "ownerType:", ownerType, "ownerId:", ownerId);
+        await Promise.all(
+          formData.entries.map(async (entry) => {
+            // Only for existing items (not new batch creations handled above)
+            if (!entry.itemId) return;
+            if (entry.batchMeta?.isNew) return; // New batches already handled by POST above
+
+            // Use batchNumber if selected, else use "" (default/no-batch item)
+            const targetBatchName = entry.batchNumber ?? "";
+            const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+            const patchBody = {
+              batchName: targetBatchName,
+              quantity: Number(entry.quantity || 0),
+              mode: "add",
+            };
+            console.log("🔵 PATCH purchase stock:", patchUrl, patchBody);
+
+            try {
+              const patchRes = await fetch(patchUrl, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(patchBody),
+              });
+              const patchData = await patchRes.json();
+              console.log("🟢 PATCH response:", patchRes.status, patchData);
+            } catch (err) {
+              console.error(`⚠️ Stock batch update failed for item ${entry.itemId}:`, err);
+            }
+          })
         );
       }
 

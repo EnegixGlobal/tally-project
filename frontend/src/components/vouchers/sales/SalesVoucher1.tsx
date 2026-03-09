@@ -1992,34 +1992,31 @@ const SalesVoucher: React.FC = () => {
       }
 
       // ================= STOCK DEDUCTION (FINAL & IMPORTANT) =================
+      console.log("🔴 SALE STOCK DEDUCTION — companyId:", companyId, "ownerType:", ownerType, "ownerId:", ownerId);
       await Promise.all(
-        formData.entries.map((entry) => {
+        formData.entries.map(async (entry) => {
           if (!entry.itemId) return;
 
-          // Logic: If batchNumber is present -> use it.
-          // If NOT present, implicitly use "" (default batch) IF we allowed it in validation.
-          // The backend should handle batchName="" to find null/empty batch.
           const targetBatchName = entry.batchNumber || "";
+          const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          const patchBody = {
+            batchName: targetBatchName,
+            quantity: -Number(entry.quantity || 0),
+            mode: "add",
+          };
+          console.log("🔴 PATCH sale stock deduct:", patchUrl, patchBody);
 
-          // Original check was: if (!entry.itemId || !entry.batchNumber) return;
-          // We modify it to proceed if itemId matches.
-
-          // But wait, if an item HAS batches and user didn't select one (validation failure), we shouldn't be here.
-          // If validation passed (because of our change above), then targetBatchName="" is correct.
-
-          return fetch(
-            `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId
-            }/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-            {
+          try {
+            const patchRes = await fetch(patchUrl, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                batchName: entry.batchNumber ?? "", // Send empty string if null/undefined
-                quantity: -Number(entry.quantity || 0), // 🔴 subtract stock
-                mode: "add", // ✅ Incremental update
-              }),
-            }
-          );
+              body: JSON.stringify(patchBody),
+            });
+            const patchData = await patchRes.json();
+            console.log("🟢 PATCH sale response:", patchRes.status, patchData);
+          } catch (err) {
+            console.error(`⚠️ Sale stock deduction failed for item ${entry.itemId}:`, err);
+          }
         })
       );
 
