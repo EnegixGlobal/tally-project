@@ -235,7 +235,7 @@ const PurchaseVoucher: React.FC = () => {
     {
       hsn: true,
       gst: true,
-      batch: false,
+      batch: true,   // ✅ Default ON — but column only shows when item has batches (hasAnyBatch)
       godown: true,
       showReceiptDetails: true,
       tds: true,
@@ -283,6 +283,44 @@ const PurchaseVoucher: React.FC = () => {
       if (json.success && json.data) {
         setIsBarcodeError(false);
         const item = json.data;
+
+        // ✅ CHECK directly using formDataRef (reliable — no async batching issue)
+        const existingIndex = formDataRef.current.entries.findIndex(
+          (e: any) => String(e.itemId) === String(item.id)
+        );
+
+        if (existingIndex !== -1) {
+          // Item pehle se hai — sirf quantity +1 karo, koi naya row nahi
+          setFormData((prev) => {
+            const updatedEntries = [...prev.entries];
+            const existingEntry = updatedEntries[existingIndex];
+            const newQty = Number(existingEntry.quantity || 0) + 1;
+
+            const calculated = calculateEntryValues(
+              newQty,
+              Number(existingEntry.rate || 0),
+              Number(existingEntry.discount || 0),
+              Number(existingEntry.gstRate || 0),
+              companyState,
+              supplierState
+            );
+
+            updatedEntries[existingIndex] = {
+              ...existingEntry,
+              quantity: newQty,
+              amount: calculated.amount,
+            };
+
+            return { ...prev, entries: updatedEntries };
+          });
+
+          Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500, timerProgressBar: true })
+            .fire({ icon: 'success', title: `Qty +1: ${item.name}` });
+          setBarcodeInput("");
+          return;
+        }
+
+        // ✅ Naya item — quantity 2 se add karo
         const details = resolveStockItemDetails(item.id);
 
         setFormData((prev) => {
@@ -290,9 +328,9 @@ const PurchaseVoucher: React.FC = () => {
 
           const gst = Number(details.gstRate || 0);
 
-          // Calculate amounts using existing helper
+          // Calculate amounts using existing helper — quantity 2 default
           const calculated = calculateEntryValues(
-            1, // quantity 1 by default
+            2, // ✅ Default quantity 2 for new barcode items
             Number(details.standardPurchaseRate || 0),
             0, // discount
             gst,
@@ -351,7 +389,7 @@ const PurchaseVoucher: React.FC = () => {
             hsnCode: details.hsnCode || "",
             unitName: details.unit || "",
 
-            quantity: 1,
+            quantity: 2, // ✅ Default 2 for new barcode scan items
             rate: calculated.rate,
             amount: calculated.amount,
 
@@ -433,7 +471,8 @@ const PurchaseVoucher: React.FC = () => {
         if (e.key === "Enter") {
           if (barcodeBuffer.current.length >= 3) {
             const code = barcodeBuffer.current;
-            setBarcodeInput(code);
+            // ✅ Clear barcodeInput (empty string) — prevents debounce useEffect from firing again
+            setBarcodeInput("");
             performBarcodeLookup(code);
             barcodeBuffer.current = "";
           }
@@ -627,7 +666,7 @@ const PurchaseVoucher: React.FC = () => {
         );
         const data = await res.json();
 
-        console.log('this is data', data)
+        // console.log('this is data', data)
 
         // Accept multiple response shapes: array, { success, data }, or nested
         let items: any[] = [];
@@ -689,7 +728,7 @@ const PurchaseVoucher: React.FC = () => {
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
-        console.log('led', data)
+        // console.log('led', data)
         setLedgers(data);
       } catch (err) {
         console.error("Failed to fetch ledgers:", err);
@@ -782,9 +821,9 @@ const PurchaseVoucher: React.FC = () => {
     type: "purchase",
     number: "",
     narration: "",
-    referenceNo: "", // This will be used for Supplier Invoice Number
-    supplierInvoiceDate: new Date().toISOString().split("T")[0], // New field for supplier invoice date
-    purchaseLedgerId: "", // New field for purchase ledger
+    referenceNo: "",
+    supplierInvoiceDate: new Date().toISOString().split("T")[0],
+    purchaseLedgerId: "",
     partyId: "",
     mode: "item-invoice",
     tdsLedgerId: "",
@@ -817,6 +856,10 @@ const PurchaseVoucher: React.FC = () => {
       },
     ],
   });
+
+  // ✅ Always-fresh ref to formData — prevents stale closure in async barcode lookup
+  const formDataRef = useRef<any>(null);
+  useEffect(() => { formDataRef.current = formData; }, [formData]);
 
   // Draft Persistence Logic
   const DRAFT_KEY = "PURCHASE_VOUCHER_CREATE_DRAFT";
@@ -1161,7 +1204,7 @@ const PurchaseVoucher: React.FC = () => {
           batchNumber: "",
           batchExpiryDate: "",
           batchManufacturingDate: "",
-          quantity: 0,
+          quantity: 1, // ✅ Fixed: Set to 1 instead of 0 for 'real' feel
           discount: 0,
         };
 
@@ -1264,26 +1307,8 @@ const PurchaseVoucher: React.FC = () => {
 
         setFormData((prev) => ({ ...prev, entries: updatedEntries }));
 
-        // 🔥 batch quantity sync (keep existing logic)
-        if (name === "quantity") {
-          const oldQty = Number(entry.quantity || 0);
-          const baseQty = Number(entry.batchBaseQuantity ?? 0);
-          const diffQty = newVal - oldQty;
-          const finalBatchQty = baseQty + newVal;
-
-          const itemId = entry.itemId;
-          const batchName = entry.batchNumber;
-          if (itemId && diffQty !== 0 && batchName) {
-            fetch(
-              `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-              {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ batchName, quantity: finalBatchQty }),
-              }
-            ).catch(console.error);
-          }
-        }
+        // NOTE: Stock batch quantity is updated only on final submit (in handleSubmit Step 3.5)
+        // Real-time PATCH removed to prevent intermediate/incorrect updates
         return;
       }
 
@@ -1755,6 +1780,42 @@ const PurchaseVoucher: React.FC = () => {
         );
       }
 
+      // 🔥 3.5. EXISTING BATCHES — ADD quantity (purchase stock addition)
+      // Same logic as Sales Voucher (which subtracts via negative quantity)
+      // Here we ADD positive quantity to existing batches on purchase
+      if (formData.mode === "item-invoice") {
+        // console.log("🔵 PURCHASE STOCK UPDATE — companyId:", companyId, "ownerType:", ownerType, "ownerId:", ownerId);
+        await Promise.all(
+          formData.entries.map(async (entry) => {
+            // Only for existing items (not new batch creations handled above)
+            if (!entry.itemId) return;
+            if (entry.batchMeta?.isNew) return; // New batches already handled by POST above
+
+            // Use batchNumber if selected, else use "" (default/no-batch item)
+            const targetBatchName = entry.batchNumber ?? "";
+            const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+            const patchBody = {
+              batchName: targetBatchName,
+              quantity: Number(entry.quantity || 0),
+              mode: "add",
+            };
+            // console.log("🔵 PATCH purchase stock:", patchUrl, patchBody);
+
+            try {
+              const patchRes = await fetch(patchUrl, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(patchBody),
+              });
+              const patchData = await patchRes.json();
+              // console.log("🟢 PATCH response:", patchRes.status, patchData);
+            } catch (err) {
+              console.error(`⚠️ Stock batch update failed for item ${entry.itemId}:`, err);
+            }
+          })
+        );
+      }
+
       // 🔥 4. Purchase history (unchanged)
       const finalVoucherNumber = data.voucherNumber || formData.number;
       if (formData.mode === "item-invoice") {
@@ -2186,6 +2247,18 @@ const PurchaseVoucher: React.FC = () => {
   // 🔹 Intra / Inter State Check
   // Note: isIntraState is now defined above calculateTotals to avoid ReferenceError
 
+  // ✅ Same as SalesVoucher: auto-show Batch column only when at least one item has batches
+  const hasAnyBatch = formData.entries?.some((entry) => {
+    if (!entry.itemId) return false;
+    const item = stockItems.find((s) => String(s.id) === String(entry.itemId));
+    // Show batch column if item has enableBatchTracking OR already has batches in the entry
+    return (
+      (item as any)?.enableBatchTracking === true ||
+      (item as any)?.enableBatchTracking === 1 ||
+      (entry.batches && entry.batches.some((b: any) => b?.batchName))
+    );
+  });
+
   return (
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
@@ -2577,7 +2650,8 @@ const PurchaseVoucher: React.FC = () => {
                       <th className={TABLE_STYLES.header}>Item</th>
                       {visibleColumns.hsn && <th>HSN/SAC</th>}
 
-                      {visibleColumns.batch && (
+                      {/* Batch column — only show when items have batches (same as Sales Voucher) */}
+                      {visibleColumns.batch && hasAnyBatch && (
                         <th className={TABLE_STYLES.header}>Batch</th>
                       )}
 
@@ -2657,8 +2731,8 @@ const PurchaseVoucher: React.FC = () => {
                             </td>
                           )}
 
-                          {visibleColumns.batch && (
-                            // BATCH with Add button
+                          {/* BATCH — only show when items have batches */}
+                          {visibleColumns.batch && hasAnyBatch && (
                             <td className="px-1 py-2 min-w-[140px] flex items-center gap-2">
                               <select
                                 name="batchNumber"

@@ -95,8 +95,21 @@ const BarcodeManagement = () => {
                     background: white !important;
                 }
                 canvas, svg {
-                    width: 2.8in !important; /* Slightly smaller than label to prevent cutoff */
+                    width: 2.8in !important;
                     height: auto !important;
+                }
+                .label-name {
+                    font-size: 13px !important;
+                    font-weight: bold !important;
+                    text-align: center !important;
+                    width: 2.8in !important;
+                    white-space: nowrap !important;
+                    overflow: hidden !important;
+                    text-overflow: ellipsis !important;
+                    margin-bottom: 4px !important;
+                    color: #000000 !important;
+                    font-family: 'Courier New', Courier, monospace !important;
+                    letter-spacing: 0.02em !important;
                 }
             }
         `,
@@ -183,8 +196,8 @@ const BarcodeManagement = () => {
                             value={searchQuery}
                             onChange={(e) => setSearchQuery(e.target.value)}
                             className={`w-full pl-10 pr-4 py-3 rounded-2xl border-2 transition-all outline-none text-sm font-medium ${theme === 'dark'
-                                    ? 'bg-slate-800/50 border-slate-700/50 text-white focus:border-blue-500/50 focus:bg-slate-800'
-                                    : 'bg-white border-slate-200 text-slate-900 focus:border-blue-500 focus:shadow-xl focus:shadow-blue-500/10'
+                                ? 'bg-slate-800/50 border-slate-700/50 text-white focus:border-blue-500/50 focus:bg-slate-800'
+                                : 'bg-white border-slate-200 text-slate-900 focus:border-blue-500 focus:shadow-xl focus:shadow-blue-500/10'
                                 }`}
                         />
                     </div>
@@ -233,8 +246,8 @@ const BarcodeManagement = () => {
                                 <div
                                     key={item.id}
                                     className={`relative p-6 rounded-[2rem] border-2 transition-all duration-300 group hover:-translate-y-2 ${theme === 'dark'
-                                            ? 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800 hover:border-blue-500/30 shadow-2xl shadow-black/20'
-                                            : 'bg-white border-slate-200/60 shadow-xl shadow-slate-200/50 hover:border-blue-200 hover:shadow-2xl hover:shadow-blue-500/10'
+                                        ? 'bg-slate-800/40 border-slate-700/50 hover:bg-slate-800 hover:border-blue-500/30 shadow-2xl shadow-black/20'
+                                        : 'bg-white border-slate-200/60 shadow-xl shadow-slate-200/50 hover:border-blue-200 hover:shadow-2xl hover:shadow-blue-500/10'
                                         }`}
                                 >
                                     <div className="flex justify-between items-start mb-4">
@@ -365,8 +378,8 @@ const BarcodeManagement = () => {
                             ) : (
                                 printQueue.map(item => (
                                     <div key={item.id} className={`group p-4 rounded-[1.8rem] border-2 transition-all duration-300 ${theme === 'dark'
-                                            ? 'bg-slate-800/30 border-slate-800 hover:border-slate-700'
-                                            : 'bg-slate-50/50 border-slate-100 hover:border-slate-200 shadow-sm'
+                                        ? 'bg-slate-800/30 border-slate-800 hover:border-slate-700'
+                                        : 'bg-slate-50/50 border-slate-100 hover:border-slate-200 shadow-sm'
                                         }`}>
                                         <div className="flex justify-between items-start mb-3">
                                             <div className="flex-1 pr-4">
@@ -425,8 +438,8 @@ const BarcodeManagement = () => {
                                     onClick={() => handlePrint()}
                                     disabled={printQueue.length === 0}
                                     className={`group w-full py-4 rounded-[1.5rem] flex items-center justify-center gap-3 font-black text-sm transition-all duration-500 active:scale-95 ${printQueue.length === 0
-                                            ? "bg-slate-200 text-slate-400 cursor-not-allowed border-none shadow-none"
-                                            : "bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/50 hover:scale-[1.02]"
+                                        ? "bg-slate-200 text-slate-400 cursor-not-allowed border-none shadow-none"
+                                        : "bg-gradient-to-br from-blue-600 to-indigo-700 text-white shadow-2xl shadow-blue-600/30 hover:shadow-blue-600/50 hover:scale-[1.02]"
                                         }`}
                                 >
                                     <Printer size={18} className="group-hover:rotate-12 transition-transform" />
@@ -454,11 +467,13 @@ const BarcodeManagement = () => {
                     {printQueue.flatMap(item =>
                         Array.from({ length: item.copies }).map((_, i) => (
                             <div key={`${item.id}-${i}`} className="label-page">
+                                {/* Item Name above barcode */}
+                                <div className="label-name">{item.name}</div>
                                 <Barcode
                                     value={item.barcode}
-                                    width={2.5}  // Increased width for Zebra standard
-                                    height={120} // Taller bars for industrial scanning
-                                    fontSize={20} // Sharp, readable mono font
+                                    width={2.5}
+                                    height={100}
+                                    fontSize={18}
                                     margin={0}
                                     background="#ffffff"
                                     lineColor="#000000"

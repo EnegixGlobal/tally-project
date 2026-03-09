@@ -1584,6 +1584,11 @@ router.patch("/:id/batches", async (req, res) => {
   const { company_id, owner_type, owner_id } = req.query;
   const { batchName, quantity, rate, mode } = req.body;
 
+  console.log("🔵 PATCH /batches called:", {
+    id, company_id, owner_type, owner_id,
+    body: { batchName, quantity, mode, rate }
+  });
+
   if (quantity === undefined) {
     return res.status(400).json({
       success: false,
@@ -1594,7 +1599,7 @@ router.patch("/:id/batches", async (req, res) => {
   const connection = await db.getConnection();
   try {
     const [rows] = await connection.execute(
-      `SELECT batches, allowNegativeStock FROM stock_items
+      `SELECT batches, allowNegativeStock, openingBalance FROM stock_items
          WHERE id=? AND company_id=? AND owner_type=? AND owner_id=?`,
       [id, company_id, owner_type, owner_id]
     );
@@ -1608,10 +1613,61 @@ router.patch("/:id/batches", async (req, res) => {
 
     const item = rows[0];
     let batches = JSON.parse(item.batches || "[]");
+    const allowNegative = item.allowNegativeStock === 1;
 
-    const index = batches.findIndex(
-      (b) => String(b.batchName ?? "") === String(batchName ?? "")
-    );
+    // ====================================================================
+    // ✅ SMART LOGIC: Handle empty/null batchName (no-batch selection)
+    //    → FIRST check if batches array has an entry with batchName="" or null
+    //      (items created with a "default" empty-named batch)
+    //    → If found: update that batch's batchQuantity
+    //    → If NOT found: update openingBalance (pure no-batch item)
+    // ====================================================================
+    const isEmptyBatchName = batchName === "" || batchName === null || batchName === undefined;
+
+    const emptyBatchIndex = isEmptyBatchName
+      ? batches.findIndex((b) => {
+        const bn = b.batchName;
+        return bn === null || bn === "" || bn === undefined;
+      })
+      : -1;
+
+    if (isEmptyBatchName && emptyBatchIndex === -1) {
+      // ─── PURE NO-BATCH ITEM → update openingBalance ───
+      let currentQty = Number(item.openingBalance || 0);
+      let newQty = mode === "add"
+        ? currentQty + Number(quantity)
+        : Number(quantity);
+
+      console.log(`📦 openingBalance update: ${currentQty} → ${newQty}`);
+
+      if (newQty < 0 && !allowNegative) {
+        return res.status(400).json({
+          success: false,
+          message: `Stock cannot be negative (Current: ${currentQty}, Change: ${quantity})`,
+        });
+      }
+
+      await connection.execute(
+        `UPDATE stock_items SET openingBalance=? WHERE id=?`,
+        [newQty, id]
+      );
+
+      return res.json({
+        success: true,
+        message: "Opening balance updated successfully",
+        newOpeningBalance: newQty,
+      });
+    }
+
+    // ====================================================================
+    // ✅ BATCH ITEM: Find exact batch by batchName and update its quantity
+    //    (also catches empty-named batches found in the array above)
+    // ====================================================================
+    const index = isEmptyBatchName
+      ? emptyBatchIndex
+      : batches.findIndex(
+        (b) => String(b.batchName ?? "") === String(batchName ?? "")
+      );
 
     if (index === -1) {
       return res.status(404).json({
@@ -1620,32 +1676,20 @@ router.patch("/:id/batches", async (req, res) => {
       });
     }
 
-    // =========================
-    // ✅ LOGIC: ADD or REPLACE
-    // =========================
     let newQty = 0;
-
     if (mode === "add") {
-      // Incremental update (add/subtract)
       newQty = Number(batches[index].batchQuantity || 0) + Number(quantity);
     } else {
-      // Default: Replace (absolute set)
       newQty = Number(quantity);
     }
 
-    if (newQty < 0) {
-      // Optional: Check allowNegativeStock if needed, 
-      // currently standardizing on preventing negative unless explicitly allowed? 
-      // But for now, let's just Block negative unless item allows it (if we had the flag).
-      // The query above fetches allowNegativeStock, let's use it.
-      const allowNegative = item.allowNegativeStock === 1;
+    console.log(`📦 batchQuantity update [${batches[index].batchName}]: ${batches[index].batchQuantity} → ${newQty}`);
 
-      if (!allowNegative) {
-        return res.status(400).json({
-          success: false,
-          message: `Stock cannot be negative (Current: ${batches[index].batchQuantity}, Requested Change: ${quantity})`,
-        });
-      }
+    if (newQty < 0 && !allowNegative) {
+      return res.status(400).json({
+        success: false,
+        message: `Stock cannot be negative (Current: ${batches[index].batchQuantity}, Change: ${quantity})`,
+      });
     }
 
     batches[index].batchQuantity = newQty;
@@ -1674,6 +1718,7 @@ router.patch("/:id/batches", async (req, res) => {
     connection.release();
   }
 });
+
 
 //delete only batch
 router.delete("/:id/batch", async (req, res) => {

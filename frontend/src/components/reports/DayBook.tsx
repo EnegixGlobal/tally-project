@@ -87,6 +87,8 @@ const DayBook: React.FC = () => {
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherGroup | null>(
     null
   );
+  const [hoveredVoucherId, setHoveredVoucherId] = useState<string | null>(null);
+  const [activeVoucherId, setActiveVoucherId] = useState<string | null>(null);
 
   const [groupedVouchers, setGroupedVouchers] = useState<VoucherGroup[]>([]);
   const [processedEntries, setProcessedEntries] = useState<DayBookEntry[]>([]);
@@ -733,10 +735,13 @@ const DayBook: React.FC = () => {
                   groupedVouchers.map((voucher) => (
                     <tr
                       key={voucher.voucherId}
-                      className={`${theme === "dark"
-                        ? "border-b border-gray-700 hover:bg-gray-700"
-                        : "border-b border-gray-200 hover:bg-gray-50"
-                        } cursor-pointer`}
+                      onMouseEnter={() => setHoveredVoucherId(voucher.voucherId)}
+                      onMouseLeave={() => setHoveredVoucherId(null)}
+                      onDoubleClick={() => setActiveVoucherId(activeVoucherId === voucher.voucherId ? null : voucher.voucherId)}
+                      className={`transition-colors duration-150 cursor-pointer ${theme === "dark"
+                        ? `border-b border-gray-700 ${hoveredVoucherId === voucher.voucherId || activeVoucherId === voucher.voucherId ? "bg-gray-700" : "hover:bg-gray-700"}`
+                        : `border-b border-gray-200 ${hoveredVoucherId === voucher.voucherId || activeVoucherId === voucher.voucherId ? "bg-blue-100" : "hover:bg-gray-50"}`
+                        }`}
                       onClick={() => handleVoucherClick(voucher)}
                     >
                       <td className="px-4 py-3">
@@ -874,20 +879,23 @@ const DayBook: React.FC = () => {
                     return (
                       <tr
                         key={`${entry.id}-${index}`}
-                        className={`${theme === "dark"
-                          ? "border-b border-gray-700"
-                          : "border-b border-gray-200"
+                        onMouseEnter={() => setHoveredVoucherId(entry.voucherId)}
+                        onMouseLeave={() => setHoveredVoucherId(null)}
+                        onDoubleClick={() => setActiveVoucherId(activeVoucherId === entry.voucherId ? null : entry.voucherId)}
+                        className={`transition-colors duration-150 ${theme === "dark"
+                          ? `border-b border-gray-700 ${hoveredVoucherId === entry.voucherId || activeVoucherId === entry.voucherId ? "bg-gray-700" : ""}`
+                          : `border-b border-gray-200 ${hoveredVoucherId === entry.voucherId || activeVoucherId === entry.voucherId ? "bg-blue-100" : ""}`
                           }`}
                       >
                         {/* DATE */}
                         {showCommon && (
-                          <td rowSpan={rowspan} className="px-4 py-3">
+                          <td rowSpan={rowspan} className="px-4 py-3 align-top">
                             {formatDate(entry.date)}
                           </td>
                         )}
 
                         {/* PARTICULARS (LEDGER / ITEM NAME) */}
-                        <td className="px-4 py-3">
+                        <td className="px-4 py-3 align-top">
                           <div className="font-medium">
                             {entry.ledgerName}
                           </div>
@@ -903,7 +911,7 @@ const DayBook: React.FC = () => {
                         {showCommon && (
                           <td
                             rowSpan={rowspan}
-                            className="px-4 py-3 capitalize"
+                            className="px-4 py-3 capitalize align-top"
                           >
                             {entry.voucherType}
                           </td>
@@ -911,18 +919,18 @@ const DayBook: React.FC = () => {
 
                         {/* VOUCHER NO */}
                         {showCommon && (
-                          <td rowSpan={rowspan} className="px-4 py-3 font-mono">
+                          <td rowSpan={rowspan} className="px-4 py-3 font-mono align-top">
                             {entry.voucherNo}
                           </td>
                         )}
 
                         {/* DEBIT */}
-                        <td className="px-4 py-3 text-right font-mono">
+                        <td className="px-4 py-3 text-right font-mono align-top">
                           {entry.debit > 0 ? formatCurrency(entry.debit) : "-"}
                         </td>
 
                         {/* CREDIT */}
-                        <td className="px-4 py-3 text-right font-mono">
+                        <td className="px-4 py-3 text-right font-mono align-top">
                           {entry.credit > 0
                             ? formatCurrency(entry.credit)
                             : "-"}

@@ -1,14 +1,18 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { useCompany } from '../../context/CompanyContext';
 import { useNavigate } from 'react-router-dom';
-import { 
-  DollarSign, ArrowRightCircle, ArrowLeftCircle, 
-  FileText, ShoppingCart, ShoppingBag, 
+import { useDispatch, useSelector } from 'react-redux';
+import { fetchAllVouchers } from '../../store/features/AllVoucher/allVoucher';
+import { useAuth } from '../../home/context/AuthContext';
+import type { RootState, AppDispatch } from '../../store/store';
+import {
+  DollarSign, ArrowRightCircle, ArrowLeftCircle,
+  FileText, ShoppingCart, ShoppingBag,
   FileMinus, FilePlus, Truck, Clipboard,
   Package, BookKey, BarChart3,
-  Printer, Download
+  Printer, Download, AlertCircle
 } from 'lucide-react';
-
 
 interface VoucherRegisterType {
   id: string;
@@ -19,7 +23,7 @@ interface VoucherRegisterType {
   iconBg: string;
   description: string;
   category: 'accounting' | 'trading' | 'inventory';
-  count?: number;
+  count: number;
 }
 
 interface VoucherRegisterSection {
@@ -30,15 +34,58 @@ interface VoucherRegisterSection {
 }
 
 const VoucherRegisterIndex: React.FC = () => {
-  const { theme, vouchers } = useAppContext();
+  const { theme } = useAppContext();
+  const { activeCompanyId } = useCompany();
+  const { companyId: authCompanyId, user } = useAuth();
   const navigate = useNavigate();
+  const dispatch = useDispatch<AppDispatch>();
 
-  // Safe fallbacks
-  const safeVouchers = vouchers || [];
+  // Use Redux state
+  const voucherState = useSelector((state: RootState) => state.allVoucher);
 
-  // Helper function to count vouchers by type
+  // Tenant Identification and Data Fetching
+  useEffect(() => {
+    const companyId = authCompanyId ?? localStorage.getItem("company_id") ?? activeCompanyId;
+
+    let ownerType = localStorage.getItem("supplier");
+    if (!ownerType) {
+      ownerType = localStorage.getItem("employee_id") ? "employee" : "user";
+    }
+
+    const ownerId =
+      localStorage.getItem(
+        ownerType === "employee" ? "employee_id" : "user_id"
+      ) ??
+      user?.id ??
+      null;
+
+    if (companyId && ownerId && ownerType) {
+      dispatch(fetchAllVouchers({
+        companyId,
+        ownerType,
+        ownerId: String(ownerId)
+      }));
+    }
+  }, [dispatch, authCompanyId, activeCompanyId, user]);
+
+  // Helper function to count vouchers by type using Redux state
   const getVoucherCount = (type: string): number => {
-    return safeVouchers.filter(v => v.type === type).length;
+    switch (type) {
+      case 'payment': return voucherState.paymentVoucher.length;
+      case 'receipt': return voucherState.receiptVoucher.length;
+      case 'contra': return voucherState.contraVoucher.length;
+      case 'journal': return voucherState.journalVoucher.length;
+      case 'sales': return voucherState.saleVoucher.length;
+      case 'purchase': return voucherState.purchaseVoucher.length;
+      case 'sales-order': return voucherState.salesOrderVoucher.length;
+      case 'purchase-order': return voucherState.purchaseOrderVoucher.length;
+      case 'quotation': return voucherState.quotationVoucher.length;
+      case 'debit-note': return voucherState.debitNoteVoucher.length;
+      case 'credit-note': return voucherState.creditNoteVoucher.length;
+      case 'stock-journal': return voucherState.stockJournalVoucher.length;
+      case 'delivery-note': return voucherState.deliveryNoteVoucher.length;
+      default: return 0;
+    }
   };
 
   // Helper function to handle register navigation
@@ -144,7 +191,7 @@ const VoucherRegisterIndex: React.FC = () => {
           path: '/app/voucher-register/purchase-order',
           color: theme === 'dark' ? 'bg-sky-900/50 hover:bg-sky-800/50' : 'bg-sky-50 hover:bg-sky-100',
           iconBg: theme === 'dark' ? 'bg-sky-800/70' : 'bg-sky-100',
-          description: 'View all sales orders',
+          description: 'View all purchase orders',
           category: 'trading',
           count: getVoucherCount('purchase-order')
         },
@@ -188,7 +235,7 @@ const VoucherRegisterIndex: React.FC = () => {
           category: 'trading',
           count: getVoucherCount('credit-note')
         },
-       
+
       ]
     },
     {
@@ -223,7 +270,21 @@ const VoucherRegisterIndex: React.FC = () => {
   ];
 
   // Calculate total vouchers
-  const totalVouchers = safeVouchers.length;
+  const totalVouchers =
+    voucherState.paymentVoucher.length +
+    voucherState.receiptVoucher.length +
+    voucherState.contraVoucher.length +
+    voucherState.journalVoucher.length +
+    voucherState.saleVoucher.length +
+    voucherState.purchaseVoucher.length +
+    voucherState.salesOrderVoucher.length +
+    voucherState.purchaseOrderVoucher.length +
+    voucherState.quotationVoucher.length +
+    voucherState.debitNoteVoucher.length +
+    voucherState.creditNoteVoucher.length +
+    voucherState.stockJournalVoucher.length +
+    voucherState.deliveryNoteVoucher.length +
+    voucherState.payrollVoucher.length;
 
   return (
     <div className="pt-[56px] px-4 min-h-screen">
@@ -239,12 +300,12 @@ const VoucherRegisterIndex: React.FC = () => {
               View, filter, and export all your vouchers by type
             </p>
           </div>
-          
+
           {/* Quick Stats */}
           <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-blue-50'}`}>
             <div className="text-center">
               <div className={`text-2xl font-bold ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`}>
-                {totalVouchers}
+                {voucherState.loading ? '...' : totalVouchers}
               </div>
               <div className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
                 Total Vouchers
@@ -254,46 +315,51 @@ const VoucherRegisterIndex: React.FC = () => {
         </div>
       </div>
 
+      {/* Error Message */}
+      {voucherState.error && (
+        <div className="mb-6 p-3 bg-red-100 text-red-700 rounded-lg flex items-center">
+          <AlertCircle className="mr-2" size={18} />
+          Some data could not be loaded. Please check your connection.
+        </div>
+      )}
+
       {/* Quick Actions */}
       <div className={`p-4 rounded-lg mb-6 ${theme === 'dark' ? 'bg-gray-800 border border-gray-700' : 'bg-white shadow-sm border border-gray-200'}`}>
         <h2 className="text-lg font-semibold mb-3">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
           <button
-            onClick={() => {/* Handle export all */}}
-            className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-              theme === 'dark' 
-                ? 'bg-blue-600 hover:bg-blue-700 text-white' 
-                : 'bg-blue-500 hover:bg-blue-600 text-white'
-            }`}
+            onClick={() => {/* Handle export all */ }}
+            className={`flex items-center px-4 py-2 rounded-lg transition-colors ${theme === 'dark'
+              ? 'bg-blue-600 hover:bg-blue-700 text-white'
+              : 'bg-blue-500 hover:bg-blue-600 text-white'
+              }`}
           >
             <Download size={16} className="mr-2" />
             Export All Registers
           </button>
           <button
-            onClick={() => {/* Handle print all */}}
-            className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-              theme === 'dark' 
-                ? 'bg-gray-600 hover:bg-gray-700 text-white' 
-                : 'bg-gray-500 hover:bg-gray-600 text-white'
-            }`}
+            onClick={() => {/* Handle print all */ }}
+            className={`flex items-center px-4 py-2 rounded-lg transition-colors ${theme === 'dark'
+              ? 'bg-gray-600 hover:bg-gray-700 text-white'
+              : 'bg-gray-500 hover:bg-gray-600 text-white'
+              }`}
           >
             <Printer size={16} className="mr-2" />
             Print Summary
           </button>
           <button
             onClick={() => navigate('/app/reports')}
-            className={`flex items-center px-4 py-2 rounded-lg transition-colors ${
-              theme === 'dark' 
-                ? 'bg-green-600 hover:bg-green-700 text-white' 
-                : 'bg-green-500 hover:bg-green-600 text-white'
-            }`}
+            className={`flex items-center px-4 py-2 rounded-lg transition-colors ${theme === 'dark'
+              ? 'bg-green-600 hover:bg-green-700 text-white'
+              : 'bg-green-500 hover:bg-green-600 text-white'
+              }`}
           >
             <BarChart3 size={16} className="mr-2" />
             Advanced Reports
           </button>
         </div>
       </div>
-      
+
       {/* Voucher Register Sections */}
       <div className="space-y-6 mb-6">
         {voucherRegisterSections.map((section, sectionIndex) => (
@@ -309,7 +375,7 @@ const VoucherRegisterIndex: React.FC = () => {
                 </p>
               </div>
             </div>
-            
+
             <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-4 xl:grid-cols-4 gap-4">
               {section.registers.map((register) => (
                 <button
@@ -326,13 +392,20 @@ const VoucherRegisterIndex: React.FC = () => {
                   <span className={`text-xs mt-1 opacity-70 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                     {register.category}
                   </span>
+
                   {/* Voucher count badge */}
                   {register.count !== undefined && register.count > 0 && (
-                    <span className={`absolute -top-2 -right-2 px-2 py-1 rounded-full text-xs font-semibold ${
-                      theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
-                    }`}>
+                    <span className={`absolute -top-2 -right-2 px-2 py-1 bg-red-500 rounded-full text-xs font-semibold ${theme === 'dark' ? 'bg-blue-600 text-white' : 'bg-blue-500 text-white'
+                      }`}>
                       {register.count}
                     </span>
+                  )}
+
+                  {/* Loading indicator for individual tag */}
+                  {voucherState.loading && (
+                    <div className="absolute top-1 right-1">
+                      <div className="w-3 h-3 border-2 border-blue-500 border-t-transparent rounded-full animate-spin"></div>
+                    </div>
                   )}
                 </button>
               ))}
@@ -340,19 +413,18 @@ const VoucherRegisterIndex: React.FC = () => {
           </div>
         ))}
       </div>
-      
+
       {/* Pro Tips Section */}
-      <div className={`mt-6 p-4 rounded-lg border-l-4 ${
-        theme === 'dark' 
-          ? 'bg-blue-900/20 border-blue-500 text-blue-200' 
-          : 'bg-blue-50 border-blue-400 text-blue-700'
-      }`}>
+      <div className={`mt-6 p-4 rounded-lg border-l-4 ${theme === 'dark'
+        ? 'bg-blue-900/20 border-blue-500 text-blue-200'
+        : 'bg-blue-50 border-blue-400 text-blue-700'
+        }`}>
         <h3 className="font-semibold text-sm mb-2">💡 Pro Tips</h3>
         <ul className="text-sm space-y-1">
           <li>• Click on any register to view detailed voucher list for that type</li>
+          <li>• Numbers on badges show count of vouchers for each type</li>
           <li>• Use date range filters in individual registers for specific periods</li>
           <li>• Export registers to Excel for further analysis and record keeping</li>
-          <li>• Numbers on badges show count of vouchers for each type</li>
         </ul>
       </div>
     </div>

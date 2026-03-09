@@ -343,6 +343,10 @@ const SalesVoucher: React.FC = () => {
     getInitialFormData()
   );
 
+  // ✅ Always-fresh ref to formData — prevents stale closure in async barcode lookup
+  const formDataRef = useRef<any>(null);
+  useEffect(() => { formDataRef.current = formData; }, [formData]);
+
   // Bill No. preview based on selected sales type (prefix + (current_no+1) + suffix)
   const selectedSalesType = useMemo(() => {
     if (!selectedSalesTypeId) return null;
@@ -1541,8 +1545,39 @@ const SalesVoucher: React.FC = () => {
       const json = await res.json();
 
       if (json.success && json.data) {
-        setIsBarcodeError(false); // Reset error state on success
+        setIsBarcodeError(false);
         const item = json.data;
+
+        // ✅ CHECK directly using formDataRef (reliable — no async batching issue)
+        const existingIndex = (formDataRef.current?.entries || []).findIndex(
+          (e: any) => String(e.itemId) === String(item.id)
+        );
+
+        if (existingIndex !== -1) {
+          // Item pehle se hai — sirf quantity +1 karo, koi naya row nahi
+          setFormData((prev) => {
+            const updatedEntries = [...prev.entries];
+            const existingEntry = updatedEntries[existingIndex];
+            const newQty = Number(existingEntry.quantity || 0) + 1;
+            const newRate = Number(existingEntry.rate || 0);
+            const newAmount = newQty * newRate;
+
+            updatedEntries[existingIndex] = {
+              ...existingEntry,
+              quantity: newQty,
+              amount: newAmount,
+            };
+
+            return { ...prev, entries: updatedEntries };
+          });
+
+          Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500, timerProgressBar: true })
+            .fire({ icon: 'success', title: `Qty +1: ${item.name}` });
+          setBarcodeInput("");
+          return;
+        }
+
+        // ✅ Naya item — add fresh entry
         const details = getItemDetails(item.id);
 
         setFormData((prev) => {
@@ -1578,19 +1613,14 @@ const SalesVoucher: React.FC = () => {
           const totalGst = statesMatch ? (extractedCgst + extractedSgst) : extractedIgst;
           const gstToMatch = Math.round(totalGst);
 
-          // Find matching Sales Ledger with robust logic
           const salesLedgers = ledgers.filter(l => String(l.name).toLowerCase().includes("sales"));
-
           const matchingSalesLedger = salesLedgers.find((l) => {
             const name = String(l.name).toLowerCase();
-
-            // Check for Inter/Intra
             if (statesMatch) {
               if (!name.includes("intra")) return false;
             } else {
               if (!name.includes("inter")) return false;
             }
-
             return (
               name.includes(`${gstToMatch}%`) ||
               name.includes(`${gstToMatch} %`) ||
@@ -1600,7 +1630,6 @@ const SalesVoucher: React.FC = () => {
             );
           });
 
-          // ⚠️ Warning if not found
           if (!matchingSalesLedger && gstToMatch > 0) {
             Swal.fire({
               title: "Sales Ledger Missing",
@@ -1618,9 +1647,9 @@ const SalesVoucher: React.FC = () => {
             unitLabel: details.unitLabel || "",
             batches: details.batches || [],
             batchNumber: "",
-            quantity: 1,
+            quantity: 2, // ✅ Set to 2 to match Purchase logic
             rate: details.rate || 0,
-            amount: details.rate || 0,
+            amount: (details.rate || 0) * 2,
             type: "debit",
             cgstRate: cgstRate,
             sgstRate: sgstRate,
@@ -1644,21 +1673,11 @@ const SalesVoucher: React.FC = () => {
           return { ...prev, entries: updatedEntries };
         });
 
-        // NOT clearing the input anymore as requested: "barcode number wahi rahe hate nii"
-        const Toast = Swal.mixin({
-          toast: true,
-          position: 'top-end',
-          showConfirmButton: false,
-          timer: 1500,
-          timerProgressBar: true,
-        });
-        Toast.fire({
-          icon: 'success',
-          title: `Item added: ${item.name}`
-        });
+        Swal.mixin({ toast: true, position: 'top-end', showConfirmButton: false, timer: 1500, timerProgressBar: true })
+          .fire({ icon: 'success', title: `Item added: ${item.name}` });
       } else {
         if (code) {
-          setIsBarcodeError(true); // Set error state to true for visual feedback
+          setIsBarcodeError(true);
         }
       }
     } catch (err) {
@@ -1687,7 +1706,8 @@ const SalesVoucher: React.FC = () => {
         if (e.key === "Enter") {
           if (barcodeBuffer.current.length >= 3) {
             const code = barcodeBuffer.current;
-            setBarcodeInput(code);
+            // ✅ Clear barcodeInput — prevents debounce useEffect from double-calling
+            setBarcodeInput("");
             performBarcodeLookup(code);
             barcodeBuffer.current = "";
           }
@@ -1992,34 +2012,31 @@ const SalesVoucher: React.FC = () => {
       }
 
       // ================= STOCK DEDUCTION (FINAL & IMPORTANT) =================
+      console.log("🔴 SALE STOCK DEDUCTION — companyId:", companyId, "ownerType:", ownerType, "ownerId:", ownerId);
       await Promise.all(
-        formData.entries.map((entry) => {
+        formData.entries.map(async (entry) => {
           if (!entry.itemId) return;
 
-          // Logic: If batchNumber is present -> use it.
-          // If NOT present, implicitly use "" (default batch) IF we allowed it in validation.
-          // The backend should handle batchName="" to find null/empty batch.
           const targetBatchName = entry.batchNumber || "";
+          const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          const patchBody = {
+            batchName: targetBatchName,
+            quantity: -Number(entry.quantity || 0),
+            mode: "add",
+          };
+          console.log("🔴 PATCH sale stock deduct:", patchUrl, patchBody);
 
-          // Original check was: if (!entry.itemId || !entry.batchNumber) return;
-          // We modify it to proceed if itemId matches.
-
-          // But wait, if an item HAS batches and user didn't select one (validation failure), we shouldn't be here.
-          // If validation passed (because of our change above), then targetBatchName="" is correct.
-
-          return fetch(
-            `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId
-            }/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
-            {
+          try {
+            const patchRes = await fetch(patchUrl, {
               method: "PATCH",
               headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                batchName: entry.batchNumber ?? "", // Send empty string if null/undefined
-                quantity: -Number(entry.quantity || 0), // 🔴 subtract stock
-                mode: "add", // ✅ Incremental update
-              }),
-            }
-          );
+              body: JSON.stringify(patchBody),
+            });
+            const patchData = await patchRes.json();
+            console.log("🟢 PATCH sale response:", patchRes.status, patchData);
+          } catch (err) {
+            console.error(`⚠️ Sale stock deduction failed for item ${entry.itemId}:`, err);
+          }
         })
       );
 
