@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from "react";
-import { Search, Printer, Check, Trash2, LayoutGrid, List as ListIcon, X, ScanBarcode as ScanIcon, Terminal, Package, ArrowRight, Zap, Info } from "lucide-react";
+import { Search, Printer, Check, Trash2, LayoutGrid, List as ListIcon, X, ScanBarcode as ScanIcon, Terminal, Package, ArrowRight, Zap, Info, Settings } from "lucide-react";
 import { useAppContext } from "../../../context/AppContext";
 import Barcode from "react-barcode";
 import { useReactToPrint } from "react-to-print";
@@ -23,6 +23,8 @@ const BarcodeManagement = () => {
     const [searchQuery, setSearchQuery] = useState("");
     const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
     const [printQueue, setPrintQueue] = useState<PrintItem[]>([]);
+    const [showSettings, setShowSettings] = useState(false);
+    const [showNameOnBarcode, setShowNameOnBarcode] = useState(false);
 
     const companyId = localStorage.getItem("company_id");
     const ownerType = localStorage.getItem("supplier");
@@ -90,12 +92,14 @@ const BarcodeManagement = () => {
                     page-break-after: always !important;
                     page-break-inside: avoid !important;
                     margin: 0 !important;
-                    padding: 0 !important;
+                    padding: 0.1in !important;
                     overflow: hidden !important;
                     background: white !important;
+                    box-sizing: border-box !important;
                 }
                 canvas, svg {
-                    width: 2.8in !important;
+                    max-width: 2.8in !important;
+                    max-height: 1.5in !important;
                     height: auto !important;
                 }
                 .label-name {
@@ -215,6 +219,43 @@ const BarcodeManagement = () => {
                         >
                             <ListIcon size={16} /> List
                         </button>
+                    </div>
+
+                    <div className="relative">
+                        <button
+                            onClick={() => setShowSettings(!showSettings)}
+                            className={`p-3 rounded-2xl border-2 transition-all ${theme === 'dark'
+                                ? 'bg-slate-800/50 border-slate-700/50 hover:bg-slate-800 text-gray-400 hover:text-blue-400'
+                                : 'bg-white border-slate-200 text-slate-500 hover:text-blue-600 hover:shadow-lg'}`}
+                        >
+                            <Settings size={20} className={showSettings ? "animate-spin-slow" : ""} />
+                        </button>
+
+                        {showSettings && (
+                            <div className={`absolute right-0 mt-3 w-64 p-5 rounded-[1.8rem] border-2 shadow-2xl z-50 animate-in fade-in slide-in-from-top-2 duration-300 ${theme === 'dark' ? 'bg-slate-900 border-slate-700 text-white' : 'bg-white border-slate-100 text-slate-900'
+                                }`}>
+                                <h4 className="font-black text-[11px] uppercase tracking-widest mb-4 opacity-50 flex items-center gap-2">
+                                    <Settings size={12} /> Label Configuration
+                                </h4>
+                                <div className="space-y-4">
+                                    <label className="flex items-center gap-3 cursor-pointer group">
+                                        <div className={`relative w-10 h-6 border-2 rounded-full transition-colors ${showNameOnBarcode ? 'bg-blue-600 border-blue-600' : theme === 'dark' ? 'bg-slate-800 border-slate-700' : 'bg-slate-100 border-slate-200'}`}>
+                                            <input
+                                                type="checkbox"
+                                                className="sr-only"
+                                                checked={showNameOnBarcode}
+                                                onChange={() => setShowNameOnBarcode(!showNameOnBarcode)}
+                                            />
+                                            <div className={`absolute top-0.5 left-0.5 w-4 h-4 bg-white rounded-full transition-transform duration-300 shadow-sm ${showNameOnBarcode ? 'translate-x-4' : ''}`}></div>
+                                        </div>
+                                        <span className="text-sm font-bold transition-colors group-hover:text-blue-500">Show Item Name</span>
+                                    </label>
+                                    <p className={`text-[10px] leading-relaxed opacity-60 font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                                        When enabled, the item name will be printed above the barcode signal.
+                                    </p>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
@@ -468,13 +509,13 @@ const BarcodeManagement = () => {
                         Array.from({ length: item.copies }).map((_, i) => (
                             <div key={`${item.id}-${i}`} className="label-page">
                                 {/* Item Name above barcode */}
-                                <div className="label-name">{item.name}</div>
+                                {showNameOnBarcode && <div className="label-name">{item.name}</div>}
                                 <Barcode
                                     value={item.barcode}
-                                    width={2.5}
-                                    height={100}
-                                    fontSize={18}
-                                    margin={0}
+                                    width={2}
+                                    height={80}
+                                    fontSize={16}
+                                    margin={10}
                                     background="#ffffff"
                                     lineColor="#000000"
                                     displayValue={true}
@@ -548,6 +589,14 @@ const BarcodeManagement = () => {
                     background: linear-gradient(90deg, transparent, rgba(255,255,255,0.1), transparent);
                     background-size: 200% 100%;
                     animation: shimmer 2s infinite;
+                }
+
+                @keyframes spin-slow {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+                .animate-spin-slow {
+                    animation: spin-slow 8s linear infinite;
                 }
             `}</style>
         </div>
