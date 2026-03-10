@@ -157,6 +157,26 @@ async function ensureDispatchColumns() {
   }
 }
 
+// ✅ Auto-create mode column if missing
+async function ensureModeColumn() {
+  try {
+    const [rows] = await db.execute(`
+      SHOW COLUMNS FROM sales_vouchers LIKE 'mode'
+    `);
+
+    if (rows.length === 0) {
+      console.log("⚠️ mode column missing in sales_vouchers → creating...");
+      await db.execute(`
+        ALTER TABLE sales_vouchers 
+        ADD COLUMN mode VARCHAR(50) DEFAULT 'item-invoice' AFTER bill_no
+      `);
+      console.log("✅ mode column created");
+    }
+  } catch (err) {
+    console.error("ensureModeColumn Error:", err);
+  }
+}
+
 // ================= SAVE SALES VOUCHER =================
 router.post("/", async (req, res) => {
   console.log("POST /sales-vouchers hit");
@@ -166,6 +186,7 @@ router.post("/", async (req, res) => {
     await ensureSalesLedgerColumn();
     await ensureDiscountLedgerColumn();
     await ensureDispatchColumns();
+    await ensureModeColumn();
 
     const {
       number,
@@ -195,6 +216,7 @@ router.post("/", async (req, res) => {
       items,
       sales_type_id,
       bill_no,
+      mode
     } = req.body;
 
     // ================= AUTH =================
@@ -279,9 +301,10 @@ router.post("/", async (req, res) => {
         owner_type,
         owner_id,
         sales_type_id,
-        bill_no
+        bill_no,
+        mode
       )
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `;
 
     const voucherValues = [
@@ -315,6 +338,7 @@ router.post("/", async (req, res) => {
 
       sales_type_id ?? null,
       bill_no ?? null,
+      mode || 'item-invoice'
     ];
 
     const [voucherResult] = await db.execute(
@@ -324,12 +348,51 @@ router.post("/", async (req, res) => {
 
     const voucherId = voucherResult.insertId;
 
-    // ================= INSERT ITEMS =================
-    const itemEntries = receivedEntries.filter((e) => e.itemId);
+    // ================= INSERT ENTRIES (BASED ON MODE) =================
+    if (mode === "accounting-invoice" || mode === "as-voucher") {
+      const ledgerEntries = receivedEntries.filter((e) => e.ledgerId);
+      if (ledgerEntries.length > 0) {
+        const ledgerValues = ledgerEntries.map((e) => [
+          voucherId,
+          Number(e.ledgerId),
+          Number(e.amount) || 0,
+          e.type || "debit",
+          e.narration || null,
+        ]);
 
-    if (itemEntries.length > 0) {
-      const itemValues = itemEntries.map((e) => {
-        if (isIntra) {
+        await db.query(
+          `INSERT INTO voucher_entries (voucher_id, ledger_id, amount, entry_type, narration) VALUES ?`,
+          [ledgerValues]
+        );
+      }
+    } else {
+      // DEFAULT: item-invoice
+      const itemEntries = receivedEntries.filter((e) => e.itemId);
+
+      if (itemEntries.length > 0) {
+        const itemValues = itemEntries.map((e) => {
+          if (isIntra) {
+            return [
+              voucherId,
+              e.itemId,
+              Number(e.quantity || 0),
+              Number(e.rate || 0),
+              Number(e.amount || 0),
+
+              Number(e.cgstLedgerId || 0),
+              Number(e.sgstLedgerId || 0),
+              0,
+
+              Number(e.discount || 0),
+              e.hsnCode ?? "",
+              e.batchNumber ?? "",
+              e.godownId ?? null,
+
+              Number(e.salesLedgerId || 0),
+              Number(e.discountLedgerId || 0),
+            ];
+          }
+
           return [
             voucherId,
             e.itemId,
@@ -337,9 +400,9 @@ router.post("/", async (req, res) => {
             Number(e.rate || 0),
             Number(e.amount || 0),
 
-            Number(e.cgstLedgerId || 0),
-            Number(e.sgstLedgerId || 0),
             0,
+            0,
+            Number(e.gstLedgerId || e.igstLedgerId || 0),
 
             Number(e.discount || 0),
             e.hsnCode ?? "",
@@ -349,31 +412,10 @@ router.post("/", async (req, res) => {
             Number(e.salesLedgerId || 0),
             Number(e.discountLedgerId || 0),
           ];
-        }
+        });
 
-        return [
-          voucherId,
-          e.itemId,
-          Number(e.quantity || 0),
-          Number(e.rate || 0),
-          Number(e.amount || 0),
-
-          0,
-          0,
-          Number(e.gstLedgerId || e.igstLedgerId || 0),
-
-          Number(e.discount || 0),
-          e.hsnCode ?? "",
-          e.batchNumber ?? "",
-          e.godownId ?? null,
-
-          Number(e.salesLedgerId || 0),
-          Number(e.discountLedgerId || 0),
-        ];
-      });
-
-      await db.query(
-        `
+        await db.query(
+          `
         INSERT INTO sales_voucher_items
         (
           voucherId,
@@ -393,8 +435,9 @@ router.post("/", async (req, res) => {
         )
         VALUES ?
         `,
-        [itemValues]
-      );
+          [itemValues]
+        );
+      }
     }
 
     // ================= DONE =================
@@ -547,7 +590,7 @@ router.get("/", async (req, res) => {
         dispatchThrough, destination, subtotal, cgstTotal, sgstTotal,
         igstTotal, discountTotal, total, createdAt, company_id, owner_type,
         owner_id, type, isQuotation, salesLedgerId, supplierInvoiceDate,
-        sales_type_id, bill_no
+        sales_type_id, bill_no, mode
       FROM sales_vouchers
       WHERE owner_type = ? AND owner_id = ?
     `;
@@ -646,67 +689,74 @@ router.get("/:id", async (req, res) => {
     const voucher = voucherRows[0];
 
     /* ======================
-       2️⃣ GET ITEMS
+       2️⃣ GET ITEMS / ENTRIES
     ====================== */
-    const [items] = await db.execute(
-      `
+    let entries = [];
+
+    if (voucher.mode === "accounting-invoice" || voucher.mode === "as-voucher") {
+      const [rows] = await db.execute(
+        `SELECT ve.*, l.name AS ledgerName 
+         FROM voucher_entries ve 
+         LEFT JOIN ledgers l ON l.id = ve.ledger_id
+         WHERE ve.voucher_id = ?`,
+        [voucherId]
+      );
+
+      entries = rows.map((r) => ({
+        id: r.id,
+        ledgerId: r.ledger_id,
+        ledgerName: r.ledgerName,
+        amount: r.amount,
+        type: r.entry_type,
+        narration: r.narration || "",
+      }));
+    } else {
+      // DEFAULT: item-invoice
+      const [items] = await db.execute(
+        `
       SELECT *
       FROM sales_voucher_items
       WHERE voucherId = ?
       `,
-      [voucherId]
-    );
+        [voucherId]
+      );
 
-    /* ======================
-       3️⃣ GET SALE HISTORY (BY VOUCHER NUMBER)
-    ====================== */
-    const [history] = await db.execute(
-      `
+      /* ======================
+         3️⃣ GET SALE HISTORY (BY VOUCHER NUMBER)
+      ====================== */
+      const [history] = await db.execute(
+        `
       SELECT *
       FROM sale_history
       WHERE voucherNumber = ?
       `,
-      [voucher.number]
-    );
-
-    /* ======================
-       4️⃣ MERGE ITEMS + HISTORY
-       (MATCH BY GODOWN)
-    ====================== */
-
-    const entries = items.map((item) => {
-
-      // 🔥 Same logic as purchase
-      const historyRow = history.find(
-        (h) =>
-          String(h.godownId) === String(item.godownId)
+        [voucher.number]
       );
 
-      return {
-        id: item.id,
+      entries = items.map((item) => {
+        const historyRow = history.find(
+          (h) => String(h.godownId) === String(item.godownId)
+        );
 
-        itemId: item.itemId,
-
-        quantity: item.quantity,
-        rate: item.rate,
-        discount: item.discount,
-        amount: item.amount,
-
-        cgstRate: item.cgstRate,
-        sgstRate: item.sgstRate,
-        igstRate: item.igstRate,
-
-        godownId: item.godownId,
-        godownId: item.godownId,
-        salesLedgerId: item.salesLedgerId,
-        discountLedgerId: item.discountLedgerId,
-
-        // 🔥 FROM HISTORY
-        batchNumber: historyRow?.batchNumber || "",
-        hsnCode: historyRow?.hsnCode || "",
-        movementDate: historyRow?.movementDate || voucher.date,
-      };
-    });
+        return {
+          id: item.id,
+          itemId: item.itemId,
+          quantity: item.quantity,
+          rate: item.rate,
+          discount: item.discount,
+          amount: item.amount,
+          cgstRate: item.cgstRate,
+          sgstRate: item.sgstRate,
+          igstRate: item.igstRate,
+          godownId: item.godownId,
+          salesLedgerId: item.salesLedgerId,
+          discountLedgerId: item.discountLedgerId,
+          batchNumber: historyRow?.batchNumber || "",
+          hsnCode: historyRow?.hsnCode || "",
+          movementDate: historyRow?.movementDate || voucher.date,
+        };
+      });
+    }
 
 
 
@@ -749,6 +799,7 @@ router.get("/:id", async (req, res) => {
 
       supplierInvoiceDate: voucher.supplierInvoiceDate,
       sales_type_id: voucher.sales_type_id,
+      mode: voucher.mode,
 
       // ⭐ MAIN DATA
       entries,
@@ -788,6 +839,7 @@ router.put("/:id", async (req, res) => {
     salesLedgerId,
     sales_type_id,
     bill_no,
+    mode
   } = req.body;
 
   try {
@@ -807,6 +859,7 @@ router.put("/:id", async (req, res) => {
          dispatchDocNo = ?, 
          dispatchThrough = ?, 
          destination = ?, 
+         approxDistance = ?,
          subtotal = ?, 
          cgstTotal = ?, 
          sgstTotal = ?, 
@@ -816,7 +869,8 @@ router.put("/:id", async (req, res) => {
          isQuotation = ?, 
          salesLedgerId = ?,
          sales_type_id = ?,
-         bill_no = ?
+         bill_no = ?,
+         mode = ?
        WHERE id = ?`,
       [
         date,
@@ -827,6 +881,7 @@ router.put("/:id", async (req, res) => {
         dispatchDetails?.docNo || null,
         dispatchDetails?.through || null,
         dispatchDetails?.destination || null,
+        dispatchDetails?.approxDistance || null,
         subtotal,
         cgstTotal,
         sgstTotal,
@@ -837,65 +892,57 @@ router.put("/:id", async (req, res) => {
         salesLedgerId,
         sales_type_id ?? null,
         bill_no ?? null,
+        mode || 'item-invoice',
         voucherId,
       ]
     );
 
-    // ---- 2) DELETE OLD ITEM ROWS ----
-    await db.execute(`DELETE FROM sales_voucher_items WHERE voucherId = ?`, [
-      voucherId,
-    ]);
+    // ---- 4) CLEAR OLD ROWS ----
+    await db.execute(`DELETE FROM sales_voucher_items WHERE voucherId = ?`, [voucherId]);
+    await db.execute(`DELETE FROM voucher_entries WHERE voucher_id = ?`, [voucherId]);
 
-    // ---- 3) INSERT NEW ITEM ROWS ----
-    const itemEntries = entries.filter((e) => e.itemId);
+    // ---- 5) INSERT NEW ROWS (BASED ON MODE) ----
+    if (mode === "accounting-invoice" || mode === "as-voucher") {
+      const ledgerEntries = entries.filter((e) => e.ledgerId);
+      if (ledgerEntries.length > 0) {
+        const ledgerValues = ledgerEntries.map((e) => [
+          voucherId,
+          Number(e.ledgerId),
+          Number(e.amount || 0),
+          e.type || "debit",
+          e.narration || null,
+        ]);
 
-    if (itemEntries.length > 0) {
-      const itemValues = itemEntries.map((e) => [
-        voucherId,
-        e.itemId,
-        Number(e.quantity || 0),
-        Number(e.rate || 0),
-        Number(e.amount || 0),
-        Number(e.cgstLedgerId || e.cgstRate || 0),
-        Number(e.sgstLedgerId || e.sgstRate || 0),
-        Number(e.igstLedgerId || e.igstRate || e.gstLedgerId || 0),
-        Number(e.discount || 0),
-        e.hsnCode || "",
-        e.batchNumber || "",
-        e.godownId || null,
-        Number(e.salesLedgerId || 0),
-        Number(e.discountLedgerId || 0),
-      ]);
+        await db.query(`INSERT INTO voucher_entries (voucher_id, ledger_id, amount, entry_type, narration) VALUES ?`, [ledgerValues]);
+      }
+    } else {
+      // DEFAULT: item-invoice
+      const itemEntries = entries.filter((e) => e.itemId);
+      if (itemEntries.length > 0) {
+        const itemValues = itemEntries.map((e) => [
+          voucherId,
+          e.itemId,
+          Number(e.quantity || 0),
+          Number(e.rate || 0),
+          Number(e.amount || 0),
+          Number(e.cgstLedgerId || e.cgstRate || 0),
+          Number(e.sgstLedgerId || e.sgstRate || 0),
+          Number(e.igstLedgerId || e.igstRate || e.gstLedgerId || 0),
+          Number(e.discount || 0),
+          e.hsnCode || "",
+          e.batchNumber || "",
+          e.godownId || null,
+          Number(e.salesLedgerId || 0),
+          Number(e.discountLedgerId || 0),
+        ]);
 
-      await db.query(
-        `INSERT INTO sales_voucher_items 
-        (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId, salesLedgerId, discountLedgerId)
-        VALUES ?`,
-        [itemValues]
-      );
-    }
-
-    // ---- 4) DELETE OLD LEDGER ENTRIES ----
-    await db.execute(`DELETE FROM voucher_entries WHERE voucher_id = ?`, [
-      voucherId,
-    ]);
-
-    // ---- 5) INSERT NEW LEDGER ENTRIES ----
-    const ledgerEntries = entries.filter((e) => e.ledgerId);
-
-    if (ledgerEntries.length > 0) {
-      const ledgerValues = ledgerEntries.map((e) => [
-        voucherId,
-        e.ledgerId,
-        Number(e.amount || 0),
-        e.type || "debit",
-      ]);
-
-      await db.query(
-        `INSERT INTO voucher_entries (voucher_id, ledger_id, amount, entry_type)
-         VALUES ?`,
-        [ledgerValues]
-      );
+        await db.query(
+          `INSERT INTO sales_voucher_items 
+          (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId, salesLedgerId, discountLedgerId)
+          VALUES ?`,
+          [itemValues]
+        );
+      }
     }
 
     // ---- 6) CLEAR OLD HISTORY (The frontend will POST new history) ----

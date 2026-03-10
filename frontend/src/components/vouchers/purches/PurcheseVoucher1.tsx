@@ -531,6 +531,7 @@ const PurchaseVoucher: React.FC = () => {
           tdsAmount: data.tdsAmount || 0,
           narration: data.narration || "",
           number: data.number || prev.number,
+          mode: data.mode || "item-invoice",
 
           dispatchDetails: {
             docNo: data.dispatchDocNo || "",
@@ -588,6 +589,7 @@ const PurchaseVoucher: React.FC = () => {
                 ledgerId: e.ledgerId || "",
                 purchaseLedgerId: e.purchaseLedgerId || data.purchaseLedgerId || "",
                 type: e.type || "debit",
+                narration: e.narration || "",
               };
             }) || [],
         }));
@@ -1485,7 +1487,7 @@ const PurchaseVoucher: React.FC = () => {
     if (!formData.number) newErrors.number = "Voucher number is required";
 
     // Only validate item-invoice specific fields when mode is item-invoice
-    if (formData.mode === "item-invoice") {
+    if (formData.mode === "item-invoice" || formData.mode === "accounting-invoice") {
       if (!formData.partyId) newErrors.partyId = "Party is required";
       if (!formData.referenceNo)
         newErrors.referenceNo = "Supplier Invoice number is required";
@@ -1519,16 +1521,18 @@ const PurchaseVoucher: React.FC = () => {
           newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
       });
 
-      const debitTotal = formData.entries
-        .filter((e) => e.type === "debit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+      if (formData.mode === "as-voucher") {
+        const debitTotal = formData.entries
+          .filter((e) => e.type === "debit")
+          .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
-      const creditTotal = formData.entries
-        .filter((e) => e.type === "credit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+        const creditTotal = formData.entries
+          .filter((e) => e.type === "credit")
+          .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
-      if (Math.abs(debitTotal - creditTotal) > 0.01) {
-        newErrors.entries = "Debit and credit amounts must balance";
+        if (Math.abs(debitTotal - creditTotal) > 0.01) {
+          newErrors.entries = "Debit and credit amounts must balance";
+        }
       }
     }
 
@@ -1641,7 +1645,19 @@ const PurchaseVoucher: React.FC = () => {
         .filter((e) => e.type === "credit")
         .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
-      return { debitTotal, creditTotal, total: debitTotal };
+      // In accounting-invoice, total is usually the sum of debits/expenses
+      // In as-voucher, it's also the balancing amount.
+      return {
+        debitTotal,
+        creditTotal,
+        total: debitTotal,
+        subtotal: debitTotal, // Added for consistency in backend
+        cgstTotal: 0,
+        sgstTotal: 0,
+        igstTotal: 0,
+        discountTotal: 0,
+        tdsTotal: 0
+      };
     }
   };
 
