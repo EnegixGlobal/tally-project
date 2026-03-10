@@ -611,7 +611,7 @@ const SalesVoucher: React.FC = () => {
 
           partyId: data.partyId?.toString() || "",
 
-          mode: "item-invoice",
+          mode: data.mode || "item-invoice",
 
           isQuotation: data.isQuotation === 1,
 
@@ -662,7 +662,9 @@ const SalesVoucher: React.FC = () => {
             // Restore Discount Ledger if saved
             discountLedgerId: e.discountLedgerId || "",
 
-            type: "debit",
+            ledgerId: e.ledgerId?.toString() || "",
+            type: e.type || "debit",
+            narration: e.narration || "",
           })),
 
           type: "sales",
@@ -1007,6 +1009,7 @@ const SalesVoucher: React.FC = () => {
               igstRate: 0,
               godownId: "",
               discount: 0,
+              narration: "",
             },
           ],
         }));
@@ -1760,7 +1763,7 @@ const SalesVoucher: React.FC = () => {
     if (!formData.number) pushError("number", "Voucher Number is required");
 
     // Only validate item-invoice specific fields when mode is item-invoice
-    if (formData.mode === "item-invoice") {
+    if (formData.mode === "item-invoice" || formData.mode === "accounting-invoice") {
       if (!formData.partyId) pushError("partyId", "Party is required");
     }
 
@@ -1825,6 +1828,13 @@ const SalesVoucher: React.FC = () => {
       }
     });
 
+    if (formData.mode === "as-voucher") {
+      const { debitTotal, creditTotal } = calculateTotals() as any;
+      if (Math.abs((debitTotal || 0) - (creditTotal || 0)) > 0.01) {
+        pushError("entries", "Debit and credit amounts must balance");
+      }
+    }
+
     setErrors(newErrors);
 
     return {
@@ -1852,39 +1862,60 @@ const SalesVoucher: React.FC = () => {
   }, [companyId, ownerType, ownerId]);
 
   const calculateTotals = () => {
-    let subtotal = 0;
-    let cgstTotal = 0;
-    let sgstTotal = 0;
-    let igstTotal = 0;
-    let discountTotal = 0;
+    if (formData.mode === "item-invoice") {
+      let subtotal = 0;
+      let cgstTotal = 0;
+      let sgstTotal = 0;
+      let igstTotal = 0;
+      let discountTotal = 0;
 
-    formData.entries.forEach((entry) => {
-      const qty = entry.quantity || 0;
-      const rate = entry.rate || 0;
-      const discount = entry.discount || 0;
+      formData.entries.forEach((entry) => {
+        const qty = entry.quantity || 0;
+        const rate = entry.rate || 0;
+        const discount = entry.discount || 0;
 
-      const baseAmount = qty * rate;
-      const gstRate =
-        (entry.cgstRate || 0) + (entry.sgstRate || 0) + (entry.igstRate || 0);
-      const gstAmount = (baseAmount * gstRate) / 100;
+        const baseAmount = qty * rate;
+        const gstRate =
+          (entry.cgstRate || 0) + (entry.sgstRate || 0) + (entry.igstRate || 0);
+        // const gstAmount = (baseAmount * gstRate) / 100;
 
-      subtotal += baseAmount;
-      discountTotal += discount;
-      cgstTotal += (baseAmount * (entry.cgstRate || 0)) / 100;
-      sgstTotal += (baseAmount * (entry.sgstRate || 0)) / 100;
-      igstTotal += (baseAmount * (entry.igstRate || 0)) / 100;
-    });
+        subtotal += baseAmount;
+        discountTotal += discount;
+        cgstTotal += (baseAmount * (entry.cgstRate || 0)) / 100;
+        sgstTotal += (baseAmount * (entry.sgstRate || 0)) / 100;
+        igstTotal += (baseAmount * (entry.igstRate || 0)) / 100;
+      });
 
-    const total = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
+      const total = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
 
-    return {
-      subtotal,
-      cgstTotal,
-      sgstTotal,
-      igstTotal,
-      discountTotal,
-      total,
-    };
+      return {
+        subtotal,
+        cgstTotal,
+        sgstTotal,
+        igstTotal,
+        discountTotal,
+        total,
+      };
+    } else {
+      const debitTotal = formData.entries
+        .filter((e) => e.type === "debit")
+        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+
+      const creditTotal = formData.entries
+        .filter((e) => e.type === "credit")
+        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+
+      return {
+        debitTotal,
+        creditTotal,
+        total: debitTotal,
+        subtotal: debitTotal, // Added for consistency
+        cgstTotal: 0,
+        sgstTotal: 0,
+        igstTotal: 0,
+        discountTotal: 0,
+      };
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -1947,6 +1978,7 @@ const SalesVoucher: React.FC = () => {
       narration: formData.narration,
       type: isQuotation ? "quotation" : "sales",
       isQuotation: isQuotation,
+      mode: formData.mode, // ✅ Added mode
 
       companyId,
       ownerType,
@@ -1966,12 +1998,12 @@ const SalesVoucher: React.FC = () => {
       bill_no: billNoPreview || null,
 
       // Ensure totals are properly formatted as numbers with 2 decimal places
-      subtotal: Number(totals.subtotal.toFixed(2)),
-      cgstTotal: Number(totals.cgstTotal.toFixed(2)),
-      sgstTotal: Number(totals.sgstTotal.toFixed(2)),
-      igstTotal: Number(totals.igstTotal.toFixed(2)),
-      discountTotal: Number(totals.discountTotal.toFixed(2)),
-      total: Number(grandTotal.toFixed(2)),
+      subtotal: Number((totals.subtotal || 0).toFixed(2)),
+      cgstTotal: Number((totals.cgstTotal || 0).toFixed(2)),
+      sgstTotal: Number((totals.sgstTotal || 0).toFixed(2)),
+      igstTotal: Number((totals.igstTotal || 0).toFixed(2)),
+      discountTotal: Number((totals.discountTotal || 0).toFixed(2)),
+      total: Number((totals.total || 0).toFixed(2)),
     };
 
     try {
@@ -3135,6 +3167,7 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-left">Ledger</th>
                         <th className="px-4 py-2 text-right">Amount</th>
                         <th className="px-4 py-2 text-left">Type</th>
+                        <th className="px-4 py-2 text-left">Narration</th>
                         <th className="px-4 py-2 text-center">Action</th>
                       </tr>
                     </thead>
@@ -3217,6 +3250,16 @@ const SalesVoucher: React.FC = () => {
                               <option value="credit">Credit</option>
                             </select>
                           </td>
+                          <td className="px-4 py-2">
+                            <input
+                              type="text"
+                              name="narration"
+                              value={entry.narration || ""}
+                              onChange={(e) => handleEntryChange(index, e)}
+                              placeholder="Entry Narration"
+                              className={FORM_STYLES.tableInput(theme)}
+                            />
+                          </td>
                           <td className="px-4 py-2 text-center">
                             <button
                               title="Remove Ledger"
@@ -3237,65 +3280,28 @@ const SalesVoucher: React.FC = () => {
                       ))}
                     </tbody>
                     <tfoot>
-                      {/* SUBTOTAL */}
-                      <tr
-                        className={`${theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
-                          } font-semibold`}
-                      >
-                        <td colSpan={7}></td>
-                        <td className="text-right py-2">Subtotal:</td>
-                        <td className="text-right py-2 font-bold">
-                          {subtotal.toLocaleString()}
-                        </td>
-                        <td></td>
-                      </tr>
-
-                      {/* GST TOTAL */}
-                      <tr
-                        className={`${theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
-                          } font-semibold`}
-                      >
-                        <td colSpan={7}></td>
-                        <td className="text-right py-2">GST Total:</td>
-                        <td className="text-right py-2 text-blue-600 font-bold">
-                          {(cgstTotal + sgstTotal + igstTotal).toLocaleString()}
-                        </td>
-                        <td></td>
-                      </tr>
-
-                      {/* DISCOUNT */}
-                      <tr
-                        className={`${theme === "dark"
-                          ? "border-t border-gray-600"
-                          : "border-t border-gray-300"
-                          } font-semibold`}
-                      >
-                        <td colSpan={7}></td>
-                        <td className="text-right py-2">Discount:</td>
-                        <td className="text-right py-2 text-red-600 font-bold">
-                          {discountTotal.toLocaleString()}
-                        </td>
-                        <td></td>
-                      </tr>
-
-                      {/* GRAND TOTAL */}
-                      <tr
-                        className={`${theme === "dark"
-                          ? "border-t-2 border-gray-500"
-                          : "border-t-2 border-black"
-                          } font-bold`}
-                      >
-                        <td colSpan={7}></td>
-                        <td className="text-right py-3 text-lg">
-                          Grand Total:
-                        </td>
-
-                        <td></td>
-                      </tr>
+                      {(() => {
+                        const { debitTotal = 0, creditTotal = 0 } = calculateTotals() as any;
+                        return (
+                          <>
+                            <tr className={`font-semibold ${theme === "dark" ? "border-t border-gray-600" : "border-t border-gray-300"}`}>
+                              <td colSpan={2} className="px-4 py-2 text-right">Debit Total:</td>
+                              <td className="px-4 py-2 text-right">₹{debitTotal.toLocaleString()}</td>
+                              <td colSpan={3}></td>
+                            </tr>
+                            <tr className={`font-semibold ${theme === "dark" ? "border-t border-gray-600" : "border-t border-gray-300"}`}>
+                              <td colSpan={2} className="px-4 py-2 text-right">Credit Total:</td>
+                              <td className="px-4 py-2 text-right">₹{creditTotal.toLocaleString()}</td>
+                              <td colSpan={3}></td>
+                            </tr>
+                            <tr className={`font-bold text-lg ${theme === "dark" ? "border-t-2 border-gray-500" : "border-t-2 border-black"}`}>
+                              <td colSpan={2} className="px-4 py-2 text-right">Grand Total:</td>
+                              <td className="px-4 py-2 text-right text-green-600">₹{debitTotal.toLocaleString()}</td>
+                              <td colSpan={3}></td>
+                            </tr>
+                          </>
+                        );
+                      })()}
                     </tfoot>
                   </table>
                 )}

@@ -290,30 +290,84 @@ ORDER BY vm.date ASC
     );
 
     /* ===============================
-   6️⃣A DEBIT / CREDIT NOTES 🔥 (NEW)
-*/
-    const [dcNotes] = await connection.execute(
+       6️⃣C PURCHASE VOUCHER ACCOUNTING ENTRIES 🔥
+    =============================== */
+    const [purAccTxns] = await connection.execute(
       `
-  SELECT id, date, number, party_id, narration
-  FROM debit_note_vouchers
-  WHERE narration IS NOT NULL
-  ORDER BY date ASC, id ASC
-  `
+      SELECT
+        ve.amount,
+        ve.entry_type,
+        ve.narration AS entry_narration,
+        pv.id AS voucher_id,
+        pv.number AS voucher_number,
+        pv.date,
+        other.ledger_id AS opposite_ledger,
+        l2.name AS opposite_ledger_name
+      FROM voucher_entries ve
+      JOIN purchase_vouchers pv ON pv.id = ve.voucher_id
+      JOIN voucher_entries other ON other.voucher_id = ve.voucher_id AND other.ledger_id != ve.ledger_id
+      LEFT JOIN ledgers l2 ON l2.id = other.ledger_id
+      WHERE ve.ledger_id = ?
+        AND pv.company_id = ?
+        AND pv.owner_type = ?
+        AND pv.owner_id = ?
+      ORDER BY pv.date ASC, pv.id ASC
+      `,
+      [ledgerId, ledger.company_id, ledger.owner_type, ledger.owner_id]
     );
 
     /* ===============================
-   6️⃣B CREDIT NOTES 🔥
-=============================== */
+       6️⃣D SALES VOUCHER ACCOUNTING ENTRIES 🔥
+    =============================== */
+    const [salAccTxns] = await connection.execute(
+      `
+      SELECT
+        ve.amount,
+        ve.entry_type,
+        ve.narration AS entry_narration,
+        sv.id AS voucher_id,
+        sv.number AS voucher_number,
+        sv.date,
+        other.ledger_id AS opposite_ledger,
+        l2.name AS opposite_ledger_name
+      FROM voucher_entries ve
+      JOIN sales_vouchers sv ON sv.id = ve.voucher_id
+      JOIN voucher_entries other ON other.voucher_id = ve.voucher_id AND other.ledger_id != ve.ledger_id
+      LEFT JOIN ledgers l2 ON l2.id = other.ledger_id
+      WHERE ve.ledger_id = ?
+        AND sv.company_id = ?
+        AND sv.owner_type = ?
+        AND sv.owner_id = ?
+      ORDER BY sv.date ASC, sv.id ASC
+      `,
+      [ledgerId, ledger.company_id, ledger.owner_type, ledger.owner_id]
+    );
+
+    /* ===============================
+       6️⃣A DEBIT / CREDIT NOTES 🔥 (NEW)
+    =============================== */
+    const [dcNotes] = await connection.execute(
+      `
+      SELECT id, date, number, party_id, narration
+      FROM debit_note_vouchers
+      WHERE narration IS NOT NULL
+      ORDER BY date ASC, id ASC
+      `
+    );
+
+    /* ===============================
+       6️⃣B CREDIT NOTES 🔥
+    =============================== */
     const [creditNotes] = await connection.execute(
       `
-  SELECT id, date, number, mode, narration
-  FROM credit_vouchers
-  WHERE narration IS NOT NULL
-    AND company_id = ?
-    AND owner_type = ?
-    AND owner_id = ?
-  ORDER BY date ASC, id ASC
-  `,
+      SELECT id, date, number, mode, narration
+      FROM credit_vouchers
+      WHERE narration IS NOT NULL
+        AND company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+      ORDER BY date ASC, id ASC
+      `,
       [ledger.company_id, ledger.owner_type, ledger.owner_id]
     );
 
@@ -592,6 +646,42 @@ ORDER BY vm.date ASC
         voucherType: "Sales",
         voucherNo: sv.number,
         particulars,
+        debit,
+        credit,
+        balance,
+      });
+    });
+
+    // Purchase Voucher Accounting Mode push
+    purAccTxns.forEach((row) => {
+      const debit = row.entry_type === "debit" ? Number(row.amount) : 0;
+      const credit = row.entry_type === "credit" ? Number(row.amount) : 0;
+      balance += debit - credit;
+
+      transactions.push({
+        id: `PUR-ACC-${row.voucher_id}-${row.opposite_ledger}`,
+        date: row.date,
+        voucherType: "Purchase",
+        voucherNo: row.voucher_number,
+        particulars: row.opposite_ledger_name || String(row.opposite_ledger),
+        debit,
+        credit,
+        balance,
+      });
+    });
+
+    // Sales Voucher Accounting Mode push
+    salAccTxns.forEach((row) => {
+      const debit = row.entry_type === "debit" ? Number(row.amount) : 0;
+      const credit = row.entry_type === "credit" ? Number(row.amount) : 0;
+      balance += debit - credit;
+
+      transactions.push({
+        id: `SAL-ACC-${row.voucher_id}-${row.opposite_ledger}`,
+        date: row.date,
+        voucherType: "Sales",
+        voucherNo: row.voucher_number,
+        particulars: row.opposite_ledger_name || String(row.opposite_ledger),
         debit,
         credit,
         balance,

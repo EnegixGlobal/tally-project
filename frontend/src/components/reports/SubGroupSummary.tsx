@@ -208,16 +208,21 @@ const SubGroupSummary: React.FC = () => {
   );
 
   // 2. Calculation Functions
-  const calculateClosingBalance = (ledger: Ledger): number => {
-    const opening = Number(ledger.openingBalance) || 0;
+  const getLedgerBalances = (ledger: Ledger) => {
+    const o = Number(ledger.openingBalance) || 0;
     const debit = debitCreditData[ledger.id]?.debit || 0;
     const credit = debitCreditData[ledger.id]?.credit || 0;
 
-    if (ledger.balanceType === "debit") {
-      return opening + debit - credit;
-    } else {
-      return opening + credit - debit;
-    }
+    // Signed value (Relative to Debit)
+    const openingSigned = ledger.balanceType === "debit" ? o : -o;
+    const closingSigned = openingSigned + debit - credit;
+
+    return { openingSigned, debit, credit, closingSigned };
+  };
+
+  const formatBalance = (amount: number) => {
+    if (Math.abs(amount) < 0.01) return "";
+    return `${Math.abs(amount).toLocaleString()} ${amount > 0 ? "Dr" : "Cr"}`;
   };
 
   const calculateGrandTotal = () => {
@@ -227,15 +232,31 @@ const SubGroupSummary: React.FC = () => {
     let closing = 0;
 
     directLedgers.forEach((ledger) => {
-      const o = Number(ledger.openingBalance) || 0;
-      const d = debitCreditData[ledger.id]?.debit || 0;
-      const c = debitCreditData[ledger.id]?.credit || 0;
-      const cl = calculateClosingBalance(ledger);
+      const b = getLedgerBalances(ledger);
+      opening += b.openingSigned;
+      debit += b.debit;
+      credit += b.credit;
+      closing += b.closingSigned;
+    });
 
-      opening += o;
-      debit += d;
-      credit += c;
-      closing += cl;
+    return { opening, debit, credit, closing };
+  };
+
+  const calculateSubGroupGrandTotal = () => {
+    let opening = 0;
+    let debit = 0;
+    let credit = 0;
+    let closing = 0;
+
+    subGroups.forEach((group) => {
+      const groupLedgers = ledgersByGroup[group.id] || [];
+      groupLedgers.forEach((ledger) => {
+        const b = getLedgerBalances(ledger);
+        opening += b.openingSigned;
+        debit += b.debit;
+        credit += b.credit;
+        closing += b.closingSigned;
+      });
     });
 
     return { opening, debit, credit, closing };
@@ -244,24 +265,20 @@ const SubGroupSummary: React.FC = () => {
   const getGroupTotals = (groupId: number) => {
     const groupLedgers = ledgersByGroup[groupId] || [];
 
-    let totalOpDr = 0;
-    let totalOpCr = 0;
-    let totalTransDr = 0;
-    let totalTransCr = 0;
+    let opening = 0;
+    let debit = 0;
+    let credit = 0;
+    let closing = 0;
 
     groupLedgers.forEach((ledger) => {
-      const op = Number(ledger.openingBalance) || 0;
-      if (ledger.balanceType === 'debit') totalOpDr += op;
-      else totalOpCr += op;
-
-      totalTransDr += (debitCreditData[ledger.id]?.debit || 0);
-      totalTransCr += (debitCreditData[ledger.id]?.credit || 0);
+      const b = getLedgerBalances(ledger);
+      opening += b.openingSigned;
+      debit += b.debit;
+      credit += b.credit;
+      closing += b.closingSigned;
     });
 
-    const opening = totalOpDr - totalOpCr;
-    const closing = (totalOpDr + totalTransDr) - (totalOpCr + totalTransCr);
-
-    return { opening, debit: totalTransDr, credit: totalTransCr, closing };
+    return { opening, debit, credit, closing };
   };
 
   // 3. Handlers
@@ -425,9 +442,7 @@ const SubGroupSummary: React.FC = () => {
                       .map(([grpId, groupLedgers], idx, arr) => (
                         <React.Fragment key={grpId}>
                           {groupLedgers.map((ledger) => {
-                            const closing = calculateClosingBalance(ledger);
-                            const debit = debitCreditData[ledger.id]?.debit || 0;
-                            const credit = debitCreditData[ledger.id]?.credit || 0;
+                            const b = getLedgerBalances(ledger);
 
                             return (
                               <tr
@@ -444,16 +459,16 @@ const SubGroupSummary: React.FC = () => {
                                   {ledger.name}
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono text-sm">
-                                  {ledger.openingBalance.toLocaleString()}
+                                  {formatBalance(b.openingSigned)}
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono text-sm">
-                                  {debit.toLocaleString()}
+                                  {b.debit > 0 ? b.debit.toLocaleString() : ""}
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono text-sm">
-                                  {credit.toLocaleString()}
+                                  {b.credit > 0 ? b.credit.toLocaleString() : ""}
                                 </td>
                                 <td className="py-3 px-4 text-right font-mono text-sm font-semibold">
-                                  {closing.toLocaleString()}
+                                  {formatBalance(b.closingSigned)}
                                 </td>
                               </tr>
                             );
@@ -480,16 +495,16 @@ const SubGroupSummary: React.FC = () => {
                       >
                         <td className="py-3 px-4 text-right">Grand Total</td>
                         <td className="py-3 px-4 text-right font-mono">
-                          {total.opening.toLocaleString()}
+                          {formatBalance(total.opening)}
                         </td>
                         <td className="py-3 px-4 text-right font-mono">
-                          {total.debit.toLocaleString()}
+                          {total.debit > 0 ? total.debit.toLocaleString() : ""}
                         </td>
                         <td className="py-3 px-4 text-right font-mono">
-                          {total.credit.toLocaleString()}
+                          {total.credit > 0 ? total.credit.toLocaleString() : ""}
                         </td>
                         <td className="py-3 px-4 text-right font-mono">
-                          {total.closing.toLocaleString()}
+                          {formatBalance(total.closing)}
                         </td>
                       </tr>
                     );
@@ -558,7 +573,7 @@ const SubGroupSummary: React.FC = () => {
                             )}
                           </td>
                           <td className="py-3 px-4 text-right font-mono font-semibold text-sm">
-                            {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : ""}
+                            {formatBalance(totals.opening)}
                           </td>
                           <td className="py-3 px-4 text-right font-mono font-semibold">
                             {totals.debit > 0 ? totals.debit.toLocaleString() : ""}
@@ -567,13 +582,39 @@ const SubGroupSummary: React.FC = () => {
                             {totals.credit > 0 ? totals.credit.toLocaleString() : ""}
                           </td>
                           <td className="py-3 px-4 text-right font-mono font-semibold text-sm">
-                            {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : ""}
+                            {formatBalance(totals.closing)}
                           </td>
                         </tr>
                       );
                     })}
                   </tbody>
-                  {/* Grand Total Row */}
+                  <tfoot>
+                    {(() => {
+                      const total = calculateSubGroupGrandTotal();
+                      return (
+                        <tr
+                          className={`font-bold border-t-2 ${theme === "dark"
+                            ? "border-gray-600 bg-gray-700"
+                            : "border-gray-300 bg-gray-100"
+                            }`}
+                        >
+                          <td className="py-3 px-4 text-right">Grand Total</td>
+                          <td className="py-3 px-4 text-right font-mono">
+                            {formatBalance(total.opening)}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono">
+                            {total.debit > 0 ? total.debit.toLocaleString() : ""}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono">
+                            {total.credit > 0 ? total.credit.toLocaleString() : ""}
+                          </td>
+                          <td className="py-3 px-4 text-right font-mono">
+                            {formatBalance(total.closing)}
+                          </td>
+                        </tr>
+                      );
+                    })()}
+                  </tfoot>
                 </table>
               </div>
             </div>

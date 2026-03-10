@@ -78,7 +78,7 @@ const LedgerVouchers: React.FC = () => {
 
   const handleVoucherClick = (voucher: LedgerVoucherEntry) => {
     navigate(`/app/vouchers/view/${voucher.vchType.toLowerCase()}/${voucher.vchNo}`, {
-      state: { 
+      state: {
         voucherData: voucher,
         ledgerName: ledgerName,
         period: period
@@ -97,9 +97,8 @@ const LedgerVouchers: React.FC = () => {
           type="button"
           title='Back to Group Cash Flow'
           onClick={() => navigate(-1)}
-          className={`mr-4 p-2 rounded-full ${
-            theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -121,18 +120,16 @@ const LedgerVouchers: React.FC = () => {
           <button
             title='Print Report'
             type='button'
-            className={`p-2 rounded-md ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-            }`}
+            className={`p-2 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+              }`}
           >
             <Printer size={18} />
           </button>
           <button
             title='Download Report'
             type='button'
-            className={`p-2 rounded-md ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-            }`}
+            className={`p-2 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+              }`}
           >
             <Download size={18} />
           </button>
@@ -140,61 +137,51 @@ const LedgerVouchers: React.FC = () => {
       </div>
 
       {/* Vouchers Table */}
-      <div className={`rounded-xl border ${
-        theme === 'dark'
+      <div className={`rounded-xl border ${theme === 'dark'
           ? 'bg-gray-800 border-gray-700'
           : 'bg-white border-gray-200'
-      }`}>
+        }`}>
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className={`${
-              theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-            }`}>
+            <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
+              }`}>
               <tr>
-                <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
+                <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
                   Date
                 </th>
-                <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
+                <th className={`px-4 py-3 text-left text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
                   Particulars
                 </th>
-                <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
+                <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
                   Vch Type
                 </th>
-                <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
+                <th className={`px-4 py-3 text-center text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
                   Vch No
                 </th>
-                <th className={`px-4 py-3 text-right text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
+                <th className={`px-4 py-3 text-right text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
                   Debit
                 </th>
-                <th className={`px-4 py-3 text-right text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
+                <th className={`px-4 py-3 text-right text-xs font-medium uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
                   Credit
                 </th>
               </tr>
             </thead>
-            <tbody className={`divide-y ${
-              theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200'
-            }`}>
+            <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200'
+              }`}>
               {voucherData.map((voucher) => (
-                <tr 
-                  key={voucher.id} 
+                <tr
+                  key={voucher.id}
                   onClick={() => handleVoucherClick(voucher)}
-                  className={`cursor-pointer transition-colors ${
-                    theme === 'dark' 
-                      ? 'hover:bg-gray-700 text-gray-200' 
+                  className={`cursor-pointer transition-colors ${theme === 'dark'
+                      ? 'hover:bg-gray-700 text-gray-200'
                       : 'hover:bg-gray-50 text-gray-900'
-                  }`}
+                    }`}
                 >
                   <td className="px-4 py-3 whitespace-nowrap text-sm">
                     {formatDate(voucher.date)}
@@ -224,13 +211,12 @@ const LedgerVouchers: React.FC = () => {
                   </td>
                 </tr>
               ))}
-              
+
               {/* Total Row */}
-              <tr className={`font-bold border-t-2 ${
-                theme === 'dark' 
-                  ? 'border-gray-600 bg-gray-700 text-white' 
+              <tr className={`font-bold border-t-2 ${theme === 'dark'
+                  ? 'border-gray-600 bg-gray-700 text-white'
                   : 'border-gray-300 bg-gray-50 text-gray-900'
-              }`}>
+                }`}>
                 <td className="px-4 py-3 text-sm" colSpan={4}>
                   Total
                 </td>

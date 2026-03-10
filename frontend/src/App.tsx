@@ -493,7 +493,6 @@ function App() {
                   }
                 />
 
-
                 <Route
                   path="masters/stock-item/barcode"
                   element={

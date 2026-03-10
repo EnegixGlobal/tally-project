@@ -194,8 +194,12 @@ const DayBook: React.FC = () => {
               credit: isCredit ? amount : 0,
 
               voucherId: id,
-              narration: entry.entry_narration,
+              narration: entry.entry_narration || entry.narration,
               itemId: entry.item_id,
+
+              isParty: !!entry.isParty,
+              isChild: !!entry.isChild,
+              amount: amount,
             };
 
             allDetailedEntriesRaw.push(rawEntry);
@@ -1082,7 +1086,7 @@ const DayBook: React.FC = () => {
                           <>
                             {/* PARTY ROW */}
                             {partyEntry && (
-                              <tr className="font-semibold bg-gray-100 dark:bg-gray-700">
+                              <tr className="border-t border-gray-200 dark:border-gray-600">
                                 <td className="px-3 py-2">
                                   {partyEntry.ledgerName}
                                 </td>
@@ -1096,11 +1100,15 @@ const DayBook: React.FC = () => {
                                 </td>
 
                                 <td className="px-3 py-2 text-right font-mono">
-                                  -
+                                  {partyEntry.debit > 0
+                                    ? formatCurrency(partyEntry.debit)
+                                    : "-"}
                                 </td>
 
                                 <td className="px-3 py-2 text-right font-mono">
-                                  {formatCurrency(partyEntry.amount ?? 0)}
+                                  {partyEntry.credit > 0
+                                    ? formatCurrency(partyEntry.credit)
+                                    : "-"}
                                 </td>
                               </tr>
                             )}

@@ -92,14 +92,12 @@ const BarcodeManagement = () => {
                     page-break-after: always !important;
                     page-break-inside: avoid !important;
                     margin: 0 !important;
-                    padding: 0.1in !important;
+                    padding: 0 !important;
                     overflow: hidden !important;
                     background: white !important;
-                    box-sizing: border-box !important;
                 }
                 canvas, svg {
-                    max-width: 2.8in !important;
-                    max-height: 1.5in !important;
+                    width: 2.8in !important;
                     height: auto !important;
                 }
                 .label-name {
@@ -512,10 +510,10 @@ const BarcodeManagement = () => {
                                 {showNameOnBarcode && <div className="label-name">{item.name}</div>}
                                 <Barcode
                                     value={item.barcode}
-                                    width={2}
-                                    height={80}
-                                    fontSize={16}
-                                    margin={10}
+                                    width={2.5}
+                                    height={100}
+                                    fontSize={18}
+                                    margin={0}
                                     background="#ffffff"
                                     lineColor="#000000"
                                     displayValue={true}

@@ -236,6 +236,22 @@ ADD COLUMN purchaseLedgerId INT NULL
   isPurchaseLedgerChecked = true;
 };
 
+// ✅ AUTO CREATE MODE COLUMN
+let isModeChecked = false;
+const ensureModeColumn = async () => {
+  if (isModeChecked) return;
+  const [rows] = await db.execute(`
+    SHOW COLUMNS FROM purchase_vouchers LIKE 'mode'
+  `);
+  if (rows.length === 0) {
+    await db.execute(`
+      ALTER TABLE purchase_vouchers ADD COLUMN mode VARCHAR(50) DEFAULT 'item-invoice'
+    `);
+    console.log("✅ mode column created in purchase_vouchers");
+  }
+  isModeChecked = true;
+};
+
 // ✅ AUTO CREATE TDS COLUMNS
 let isTDSChecked = false;
 const ensureTDSColumns = async () => {
@@ -338,6 +354,7 @@ router.post("/", async (req, res) => {
     // ================= FETCH STATES =================
     await ensurePurchaseLedgerColumn();
     await ensureTDSColumns();
+    await ensureModeColumn();
     await ensureDiscountLedgerColumn();
 
     let companyState = "";
@@ -420,17 +437,11 @@ router.post("/", async (req, res) => {
 
     // ================= VALIDATION =================
 
-    if (mode !== "item-invoice") {
-      return res.status(400).json({
-        success: false,
-        message: "Invalid mode",
-      });
-    }
-
+    // Removed strict item-invoice check to support other modes
     if (!entries.length) {
       return res.status(400).json({
         success: false,
-        message: "No items found",
+        message: "No entries found",
       });
     }
 
@@ -457,8 +468,9 @@ router.post("/", async (req, res) => {
         total,
         company_id,
         owner_type,
-        owner_id
-      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+        owner_id,
+        mode
+      ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `;
 
     const insertVoucherValues = [
@@ -486,6 +498,7 @@ router.post("/", async (req, res) => {
       finalCompanyId,
       finalOwnerType,
       finalOwnerId,
+      mode || "item-invoice"
     ];
 
     const [voucherResult] = await db.execute(
@@ -495,88 +508,91 @@ router.post("/", async (req, res) => {
 
     const voucherId = voucherResult.insertId;
 
-    // ================= INSERT ITEMS =================
+    // ================= INSERT ITEMS / ENTRIES =================
 
-    const validItems = entries.filter((e) => e.itemId);
+    if (mode === "item-invoice") {
+      const validItems = entries.filter((e) => e.itemId);
 
-    if (!validItems.length) {
-      return res.status(400).json({
-        success: false,
-        message: "No valid items",
-      });
-    }
+      if (validItems.length > 0) {
+        const insertItemSql = `
+          INSERT INTO purchase_voucher_items (
+            voucherId,
+            itemId,
+            quantity,
+            rate,
+            discount,
+            cgstRate,
+            sgstRate,
+            igstRate,
+            amount,
+            tdsRate,
+            godownId,
+            purchaseLedgerId,
+            discountLedgerId
+          ) VALUES ?
+        `;
 
-    const insertItemSql = `
-      INSERT INTO purchase_voucher_items (
-        voucherId,
-        itemId,
-        quantity,
-        rate,
-        discount,
-        cgstRate,
-        sgstRate,
-        igstRate,
-        amount,
-        tdsRate,
-        godownId,
-        purchaseLedgerId,
-        discountLedgerId
-      ) VALUES ?
-    `;
+        const itemValues = validItems.map((e) => {
+          if (isIntra) {
+            return [
+              voucherId,
+              e.itemId,
+              Number(e.quantity || 0),
+              Number(e.rate || 0),
+              Number(e.discount || 0),
+              Number(e.cgstLedgerId || 0),
+              Number(e.sgstLedgerId || 0),
+              0,
+              Number(e.amount || 0),
+              Number(e.tdsRate || 0),
+              e.godownId || null,
+              e.purchaseLedgerId || purchaseLedgerId || null,
+              Number(e.discountLedgerId || 0),
+            ];
+          }
 
-    // 🔥 MAIN FIX: LEDGER ID SAVE IN GST COLUMNS
+          return [
+            voucherId,
+            e.itemId,
+            Number(e.quantity || 0),
+            Number(e.rate || 0),
+            Number(e.discount || 0),
+            0,
+            0,
+            Number(e.gstLedgerId || 0),
+            Number(e.amount || 0),
+            Number(e.tdsRate || 0),
+            e.godownId || null,
+            e.purchaseLedgerId || purchaseLedgerId || null,
+            Number(e.discountLedgerId || 0),
+          ];
+        });
 
-    const itemValues = validItems.map((e) => {
-
-      // ================= INTRA =================
-      if (isIntra) {
-        return [
-          voucherId,
-
-          e.itemId,
-          Number(e.quantity || 0),
-          Number(e.rate || 0),
-          Number(e.discount || 0),
-
-          // ✅ LEDGER ID
-          Number(e.cgstLedgerId || 0),
-          Number(e.sgstLedgerId || 0),
-          0,
-
-          Number(e.amount || 0),
-          Number(e.tdsRate || 0),
-          e.godownId || null,
-
-          e.purchaseLedgerId || purchaseLedgerId || null,
-          Number(e.discountLedgerId || 0),
-        ];
+        await db.query(insertItemSql, [itemValues]);
       }
-
-      // ================= INTER =================
-      return [
-        voucherId,
-
-        e.itemId,
-        Number(e.quantity || 0),
-        Number(e.rate || 0),
-        Number(e.discount || 0),
-
-        0,
-        0,
-
-        // ✅ IGST LEDGER ID
-        Number(e.gstLedgerId || 0),
-
-        Number(e.amount || 0),
-        Number(e.tdsRate || 0),
-        e.godownId || null,
-
-        e.purchaseLedgerId || purchaseLedgerId || null,
-        Number(e.discountLedgerId || 0),
-      ];
-    });
-
-    await db.query(insertItemSql, [itemValues]);
+    } else {
+      // accounting-invoice or as-voucher
+      const ledgerEntries = entries.filter(e => e.ledgerId);
+      if (ledgerEntries.length > 0) {
+        const insertEntrySql = `
+          INSERT INTO voucher_entries (
+            voucher_id,
+            ledger_id,
+            amount,
+            entry_type,
+            narration
+          ) VALUES ?
+        `;
+        const entryValues = ledgerEntries.map(e => [
+          voucherId,
+          e.ledgerId,
+          Number(e.amount || 0),
+          e.type || "debit",
+          e.narration || null
+        ]);
+        await db.query(insertEntrySql, [entryValues]);
+      }
+    }
 
     // ================= SUCCESS =================
 
@@ -805,87 +821,102 @@ router.get("/:id", async (req, res) => {
     const voucher = voucherRows[0];
 
     /* ======================
-       2️⃣ GET ITEMS
+       2️⃣ GET ITEMS / ENTRIES
     ====================== */
 
-    const [items] = await db.execute(
-      `
-      SELECT *
-      FROM purchase_voucher_items
-      WHERE voucherId = ?
-      `,
-      [voucherId]
-    );
+    let entries = [];
+    if (voucher.mode === "item-invoice" || !voucher.mode) {
+      const [items] = await db.execute(
+        `
+        SELECT *
+        FROM purchase_voucher_items
+        WHERE voucherId = ?
+        `,
+        [voucherId]
+      );
+
+      /* ======================
+         3️⃣ GET HISTORY (BY VOUCHER NUMBER)
+      ====================== */
+
+      const [history] = await db.execute(
+        `
+        SELECT *
+        FROM purchase_history
+        WHERE voucherNumber = ?
+        `,
+        [voucher.number]
+      );
+
+      /* ======================
+         4️⃣ MAP HISTORY BY ITEM NAME
+      ====================== */
+
+      const historyMap = {};
+
+      history.forEach((h) => {
+        if (h.itemName) {
+          historyMap[h.itemName.trim().toLowerCase()] = h;
+        }
+      });
+
+      /* ======================
+         5️⃣ MERGE ITEMS + HISTORY
+      ====================== */
+
+      entries = items.map((item) => {
+
+        // ⚠️ match via itemName (only way in current DB)
+        const historyRow = history.find(
+          (h) =>
+            String(h.godownId) === String(item.godownId)
+        );
+
+        return {
+          id: item.id,
+
+          itemId: item.itemId,
+
+          quantity: item.quantity,
+          rate: item.rate,
+          discount: item.discount,
+          amount: item.amount,
+
+          cgstRate: item.cgstRate,
+          sgstRate: item.sgstRate,
+          igstRate: item.igstRate,
+
+          godownId: item.godownId,
+          purchaseLedgerId: item.purchaseLedgerId,
+          tdsRate: item.tdsRate, // ✅ Added
+          discountLedgerId: item.discountLedgerId,
+
+          // 🔥 FROM HISTORY
+          batchNumber: historyRow?.batchNumber || "",
+          hsnCode: historyRow?.hsnCode || "",
+          purchaseDate: historyRow?.purchaseDate || voucher.date,
+        };
+      });
+    } else {
+      // accounting-invoice or as-voucher
+      const [ledgerRows] = await db.execute(
+        `SELECT id, ledger_id as ledgerId, amount, entry_type as type, narration 
+         FROM voucher_entries 
+         WHERE voucher_id = ?`,
+        [voucherId]
+      );
+      entries = ledgerRows;
+    }
 
     // 🔍 Fallback: If tdsLedgerId is missing in main row, try to get it from first item
     // ⚠️ tdsRate column might be DECIMAL(10,2), so we must parse it to INT to match matches frontend ID
-    let fallbackTdsId = items.find(i => Number(i.tdsRate) > 0)?.tdsRate;
-    if (fallbackTdsId) fallbackTdsId = Math.round(Number(fallbackTdsId));
+    let fallbackTdsId = 0;
+    if (voucher.mode === "item-invoice") {
+      const itemWithTds = entries.find(i => Number(i.tdsRate) > 0);
+      if (itemWithTds) fallbackTdsId = Math.round(Number(itemWithTds.tdsRate));
+    }
 
-    const tdsLedgerId = voucher.tdsLedgerId || fallbackTdsId || null;
-
-    /* ======================
-       3️⃣ GET HISTORY (BY VOUCHER NUMBER)
-    ====================== */
-
-    const [history] = await db.execute(
-      `
-      SELECT *
-      FROM purchase_history
-      WHERE voucherNumber = ?
-      `,
-      [voucher.number]
-    );
-
-    /* ======================
-       4️⃣ MAP HISTORY BY ITEM NAME
-    ====================== */
-
-    const historyMap = {};
-
-    history.forEach((h) => {
-      if (h.itemName) {
-        historyMap[h.itemName.trim().toLowerCase()] = h;
-      }
-    });
-
-    /* ======================
-       5️⃣ MERGE ITEMS + HISTORY
-    ====================== */
-
-    const entries = items.map((item) => {
-
-      // ⚠️ match via itemName (only way in current DB)
-      const historyRow = history.find(
-        (h) =>
-          String(h.godownId) === String(item.godownId)
-      );
-
-      return {
-        id: item.id,
-
-        itemId: item.itemId,
-
-        quantity: item.quantity,
-        rate: item.rate,
-        discount: item.discount,
-        amount: item.amount,
-
-        cgstRate: item.cgstRate,
-        sgstRate: item.sgstRate,
-        igstRate: item.igstRate,
-
-        godownId: item.godownId,
-        purchaseLedgerId: item.purchaseLedgerId,
-        tdsRate: item.tdsRate, // ✅ Added
-        discountLedgerId: item.discountLedgerId,
-
-        // 🔥 FROM HISTORY
-        batchNumber: historyRow?.batchNumber || "",
-        hsnCode: historyRow?.hsnCode || "",
-        purchaseDate: historyRow?.purchaseDate || voucher.date,
-      };
-    });
+    const tdsLedgerId = voucher.tdsLedgerId || (fallbackTdsId > 0 ? fallbackTdsId : null);
 
     console.log('subtotal: voucher.subtotal', voucher.subtotal,
       voucher.cgstTotal,
@@ -921,6 +952,7 @@ router.get("/:id", async (req, res) => {
       tdsTotal: voucher.tdsTotal, // ✅ Added
       tdsLedgerId: tdsLedgerId, // ✅ Use the calculated variable with fallback
       total: voucher.total,
+      mode: voucher.mode, // ✅ Added mode
 
       // ⭐ MAIN
       entries,
@@ -1015,6 +1047,7 @@ router.put("/:id", async (req, res) => {
     // ================= STATES & GST LOGIC (COPIED FROM POST) =================
     await ensurePurchaseLedgerColumn();
     await ensureTDSColumns();
+    await ensureModeColumn();
     await ensureDiscountLedgerColumn();
 
     let companyState = "";
@@ -1097,7 +1130,8 @@ router.put("/:id", async (req, res) => {
         total = ?,
         company_id = ?,
         owner_type = ?,
-        owner_id = ?
+        owner_id = ?,
+        mode = ?
       WHERE id = ?
     `;
 
@@ -1122,78 +1156,103 @@ router.put("/:id", async (req, res) => {
       finalCompanyId,
       finalOwnerType,
       finalOwnerId,
+      mode || "item-invoice",
       voucherId,
     ]);
 
-    // ================= UPDATE ITEMS (DELETE OLD + INSERT NEW) =================
+    // ================= UPDATE ITEMS / ENTRIES (DELETE OLD + INSERT NEW) =================
 
-    // 1️⃣ Delete old items
+    // 1️⃣ Delete old entries (both from items and voucher_entries)
     await db.execute("DELETE FROM purchase_voucher_items WHERE voucherId = ?", [
       voucherId,
     ]);
+    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [
+      voucherId,
+    ]);
 
-    // 2️⃣ Insert new items (if any)
-    const validItems = entries.filter((e) => e.itemId);
+    // 2️⃣ Insert new entries based on mode
+    if (mode === "item-invoice") {
+      const validItems = entries.filter((e) => e.itemId);
 
-    if (validItems.length > 0) {
-      const insertItemSql = `
-        INSERT INTO purchase_voucher_items (
-          voucherId,
-          itemId,
-          quantity,
-          rate,
-          discount,
-          cgstRate,
-          sgstRate,
-          igstRate,
-          amount,
-          tdsRate,
-          godownId,
-          purchaseLedgerId,
-          discountLedgerId
-        ) VALUES ?
-      `;
+      if (validItems.length > 0) {
+        const insertItemSql = `
+          INSERT INTO purchase_voucher_items (
+            voucherId,
+            itemId,
+            quantity,
+            rate,
+            discount,
+            cgstRate,
+            sgstRate,
+            igstRate,
+            amount,
+            tdsRate,
+            godownId,
+            purchaseLedgerId,
+            discountLedgerId
+          ) VALUES ?
+        `;
 
-      const itemValues = validItems.map((e) => {
-        if (isIntra) {
+        const itemValues = validItems.map((e) => {
+          if (isIntra) {
+            return [
+              voucherId,
+              e.itemId,
+              Number(e.quantity || 0),
+              Number(e.rate || 0),
+              Number(e.discount || 0),
+              Number(e.cgstLedgerId || 0),
+              Number(e.sgstLedgerId || 0),
+              0,
+              Number(e.amount || 0),
+              Number(e.tdsRate || 0),
+              e.godownId || null,
+              e.purchaseLedgerId || purchaseLedgerId || null,
+              Number(e.discountLedgerId || 0),
+            ];
+          }
+
           return [
             voucherId,
             e.itemId,
             Number(e.quantity || 0),
             Number(e.rate || 0),
             Number(e.discount || 0),
-            // ✅ LEDGER ID (Saved in rate columns as per POST logic)
-            Number(e.cgstLedgerId || 0),
-            Number(e.sgstLedgerId || 0),
             0,
+            0,
+            Number(e.gstLedgerId || 0),
             Number(e.amount || 0),
             Number(e.tdsRate || 0),
             e.godownId || null,
             e.purchaseLedgerId || purchaseLedgerId || null,
             Number(e.discountLedgerId || 0),
           ];
-        }
+        });
 
-        // INTER
-        return [
+        await db.query(insertItemSql, [itemValues]);
+      }
+    } else {
+      // accounting-invoice or as-voucher
+      const ledgerEntries = entries.filter((e) => e.ledgerId);
+      if (ledgerEntries.length > 0) {
+        const insertEntrySql = `
+          INSERT INTO voucher_entries (
+            voucher_id,
+            ledger_id,
+            amount,
+            entry_type,
+            narration
+          ) VALUES ?
+        `;
+        const entryValues = ledgerEntries.map((e) => [
           voucherId,
-          e.itemId,
-          Number(e.quantity || 0),
-          Number(e.rate || 0),
-          Number(e.discount || 0),
-          0,
-          0,
-          // ✅ LEDGER ID
-          Number(e.gstLedgerId || 0),
+          e.ledgerId,
           Number(e.amount || 0),
-          Number(e.tdsRate || 0),
-          e.godownId || null,
-          e.purchaseLedgerId || purchaseLedgerId || null,
-          Number(e.discountLedgerId || 0),
-        ];
-      });
-
-      await db.query(insertItemSql, [itemValues]);
+          e.type || "debit",
+          e.narration || null,
+        ]);
+        await db.query(insertEntrySql, [entryValues]);
+      }
     }
 
     return res.json({

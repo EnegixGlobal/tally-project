@@ -28,7 +28,8 @@ const GroupSummary: React.FC = () => {
   const { groupType } = useParams<{ groupType: string }>();
   const groupIdFromUrl = Number(groupType);
 
-  const [ledgers, setLedgers] = useState<Ledger[]>([]);
+  const [ledgers, setLedgers] = useState<any[]>([]);
+  const [allLedgers, setAllLedgers] = useState<any[]>([]);
   const [taxData, setTaxData] = useState<Record<number, { debit: number; credit: number }>>({});
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [, setLoading] = useState(false);
@@ -124,45 +125,37 @@ const GroupSummary: React.FC = () => {
         }
 
         const data = await res.json();
-        // console.log('this is ledger', data)
+        const allLedgersData = data || [];
+        setAllLedgers(allLedgersData);
 
         const groupIdFromUrl = Number(groupType);
-
         let resolvedName = "Unknown Group";
 
-        /* ===============================
-         BASE GROUPS (Negative ID)
-      ================================ */
         if (groupIdFromUrl < 0) {
-          const matchedBaseGroup = baseGroups.find(
-            (g) => g.id === groupIdFromUrl
-          );
-
-          if (matchedBaseGroup) {
-            resolvedName = matchedBaseGroup.name;
-          }
+          const matchedBaseGroup = baseGroups.find((g) => g.id === groupIdFromUrl);
+          if (matchedBaseGroup) resolvedName = matchedBaseGroup.name;
         }
 
-        /* ===============================
-         LEDGER GROUPS (Positive ID)
-      ================================ */
         if (groupIdFromUrl > 0) {
-          const matchedLedgerGroup = groups.find(
-            (g) => Number(g.id) === groupIdFromUrl
-          );
-
-          if (matchedLedgerGroup) {
-            resolvedName = matchedLedgerGroup.name;
-          }
+          const matchedLedgerGroup = groups.find((g) => Number(g.id) === groupIdFromUrl);
+          if (matchedLedgerGroup) resolvedName = matchedLedgerGroup.name;
         }
 
         setResolvedGroupName(resolvedName);
 
-        const filteredLedgers = (data || []).filter(
-          (item: any) => Number(item.groupId) === groupIdFromUrl
-        );
+        // Child groups
+        const childGroups = groups.filter((g) => Number(g.parent) === groupIdFromUrl);
+        // Direct ledgers
+        const directLedgers = allLedgersData.filter((item: any) => Number(item.groupId) === groupIdFromUrl);
 
-        setLedgers(filteredLedgers);
+        // We'll calculate balances later after taxData is loaded
+        // For now, let's just combine them as placeholders
+        const combined = [
+          ...childGroups.map(g => ({ ...g, isGroup: true })),
+          ...directLedgers.map(l => ({ ...l, isGroup: false }))
+        ];
+
+        setLedgers(combined);
       } catch (err: any) {
         console.error(err);
         setError(err.message || "Unexpected error");
@@ -181,14 +174,12 @@ const GroupSummary: React.FC = () => {
 
     const fetchTaxData = async () => {
 
-      if (!companyId || !ownerType || !ownerId || !ledgers.length) {
+      if (!companyId || !ownerType || !ownerId || !allLedgers.length) {
         return;
       }
 
       try {
-
-        // Ledger IDs
-        const ledgerIds = ledgers.map(item => item.id).join(",");
+        const ledgerIds = allLedgers.map(item => item.id).join(",");
 
         const url =
           `${import.meta.env.VITE_API_URL}/api/group` +
@@ -228,7 +219,7 @@ const GroupSummary: React.FC = () => {
 
     fetchTaxData();
 
-  }, [companyId, ownerType, ownerId, ledgers]);
+  }, [companyId, ownerType, ownerId, allLedgers]);
 
   // Resolve `groupType` param to a numeric group id.
   const resolveGroupId = (param?: string | null): number | null => {
@@ -335,34 +326,77 @@ const GroupSummary: React.FC = () => {
     });
   };
 
-  const totals = ledgers.reduce(
-    (acc, ledger) => {
-      const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
-      const tData = taxData[Number(ledger.id)] || { debit: 0, credit: 0 };
-      const debit = Number(tData.debit) || 0;
-      const credit = Number(tData.credit) || 0;
-      const type = (ledger.balanceType || "debit").toLowerCase();
+  // Recursive Balance Calculation
+  const calculateRecursiveBalance = (groupId: number) => {
+    const getGroupLedgers = (gid: number): any[] => {
+      const direct = allLedgers.filter((l) => Number(l.groupId) === Number(gid));
+      const children = groups.filter((g) => Number(g.parent) === Number(gid));
+      let total = [...direct];
+      children.forEach((c) => {
+        total = [...total, ...getGroupLedgers(c.id)];
+      });
+      return total;
+    };
 
-      let closing = 0;
+    const targetLedgers = getGroupLedgers(groupId);
+    let opening = 0;
+    let debit = 0;
+    let credit = 0;
+    let netBalance = 0;
+
+    targetLedgers.forEach((l) => {
+      const op = Number(l.openingBalance || l.opening_balance) || 0;
+      const td = taxData[Number(l.id)] || { debit: 0, credit: 0 };
+      const type = (l.balanceType || l.balance_type || "debit").toLowerCase();
+
+      opening += op;
+      debit += td.debit;
+      credit += td.credit;
+
       if (type === "debit" || type === "dr") {
-        closing = (opening + debit) - credit;
+        netBalance += (op + td.debit - td.credit);
       } else {
-        closing = (opening + credit) - debit;
+        netBalance -= (op + td.credit - td.debit);
+      }
+    });
+
+    return { opening, debit, credit, netBalance };
+  };
+
+  const totals = ledgers.reduce(
+    (acc, item) => {
+      let b;
+      if (item.isGroup) {
+        b = calculateRecursiveBalance(item.id);
+      } else {
+        const op = Number(item.openingBalance || item.opening_balance) || 0;
+        const td = taxData[Number(item.id)] || { debit: 0, credit: 0 };
+        const type = (item.balanceType || item.balance_type || "debit").toLowerCase();
+        let net = 0;
+        if (type === "debit" || type === "dr") {
+          net = (op + td.debit - td.credit);
+        } else {
+          net = -(op + td.credit - td.debit);
+        }
+        b = { opening: op, debit: td.debit, credit: td.credit, netBalance: net };
       }
 
-      acc.opening += opening;
-      acc.debit += debit;
-      acc.credit += credit;
-      acc.closing += Math.abs(closing);
+      acc.opening += b.opening;
+      acc.debit += b.debit;
+      acc.credit += b.credit;
+      acc.netBalance += b.netBalance;
       return acc;
     },
-    { opening: 0, debit: 0, credit: 0, closing: 0 }
+    { opening: 0, debit: 0, credit: 0, netBalance: 0 }
   );
 
   const totalOpening = totals.opening;
   const totalDebit = totals.debit;
   const totalCredit = totals.credit;
-  const totalClosing = totals.closing;
+  const totalClosingStr = totals.netBalance >= 0
+    ? `₹ ${Math.abs(totals.netBalance).toLocaleString()} Dr`
+    : `₹ ${Math.abs(totals.netBalance).toLocaleString()} Cr`;
+  const totalClosing = Math.abs(totals.netBalance);
 
   // You can replace this with your actual theme logic or context
   const [theme] = useState<"light" | "dark">("light");
@@ -380,8 +414,8 @@ const GroupSummary: React.FC = () => {
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-2xl font-bold">
-          {" "}
-          {resolvedGroupName || `Group ${groupType}`} - Group Summary
+          {resolvedGroupName || `Group ${groupType}`}
+          <span className="ml-3 text-blue-600">({totalClosingStr})</span>
         </h1>
         <div className="ml-auto flex space-x-2">
           <button
@@ -599,65 +633,77 @@ const GroupSummary: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {ledgers.map((ledger) => (
-                  <tr
-                    key={ledger.id}
-                    onClick={() =>
-                      navigate(`/app/reports/ledger/${ledger.id}`)
+                {ledgers.map((item) => {
+                  const isGroup = item.isGroup;
+                  const balance = isGroup
+                    ? calculateRecursiveBalance(item.id)
+                    : {
+                      opening: Number(item.openingBalance || item.opening_balance) || 0,
+                      debit: taxData[Number(item.id)]?.debit || 0,
+                      credit: taxData[Number(item.id)]?.credit || 0,
+                      type: (item.balanceType || item.balance_type || 'debit').toLowerCase()
+                    };
+
+                  let netClosing = 0;
+                  if (!isGroup) {
+                    if (balance.type === 'debit' || balance.type === 'dr') {
+                      netClosing = (balance.opening + balance.debit) - balance.credit;
+                    } else {
+                      netClosing = (balance.opening + balance.credit) - balance.debit;
                     }
-                    className="border-b border-gray-200 cursor-pointer hover:bg-gray-100"
-                  >
-                    {/* Ledger Name */}
-                    <td className="px-4 py-3 font-medium">{ledger.name}</td>
+                  } else {
+                    netClosing = balance.netBalance;
+                  }
 
-                    {/* Group */}
-                    <td className="px-4 py-3 font-medium">
-                      {resolvedGroupName || `Group ${groupType}`}
-                    </td>
+                  const navigateTo = isGroup
+                    ? `/app/reports/group-summary/${item.id}`
+                    : `/app/reports/ledger/${item.id}`;
 
-                    {/* Opening */}
-                    {columnVisibility.opening && (
-                      <td className="px-4 py-3 text-right font-mono">
-                        ₹ {(Number(ledger.openingBalance || ledger.opening_balance) || 0).toLocaleString()} {ledger.balanceType === 'debit' ? 'Dr' : 'Cr'}
+                  return (
+                    <tr
+                      key={isGroup ? `group-${item.id}` : `ledger-${item.id}`}
+                      onClick={() => navigate(navigateTo)}
+                      className="border-b border-gray-200 cursor-pointer hover:bg-gray-100"
+                    >
+                      {/* Name */}
+                      <td className="px-4 py-3 font-medium flex items-center">
+                        {isGroup && <span className="mr-2 text-blue-500">📁</span>}
+                        {item.name}
                       </td>
-                    )}
 
-                    {columnVisibility.debit && (
-                      <td className="px-4 py-3 text-right font-mono text-green-600">
-                        ₹ {(taxData[Number(ledger.id)]?.debit || 0).toLocaleString()}
+                      {/* Group */}
+                      <td className="px-4 py-3 font-medium">
+                        {resolvedGroupName || `Group ${groupType}`}
                       </td>
-                    )}
 
-                    {columnVisibility.credit && (
-                      <td className="px-4 py-3 text-right font-mono text-red-600">
-                        ₹ {(taxData[Number(ledger.id)]?.credit || 0).toLocaleString()}
-                      </td>
-                    )}
+                      {/* Opening */}
+                      {columnVisibility.opening && (
+                        <td className="px-4 py-3 text-right font-mono">
+                          ₹ {Math.abs(balance.opening).toLocaleString()} {(!isGroup ? balance.type : (balance.opening >= 0 ? 'Dr' : 'Cr')) === 'debit' ? 'Dr' : 'Cr'}
+                        </td>
+                      )}
 
-                    {/* Closing */}
-                    {columnVisibility.closing && (
-                      <td className="px-4 py-3 text-right font-mono font-semibold">
-                        {(() => {
-                          const opening = Number(ledger.openingBalance || ledger.opening_balance) || 0;
-                          const debit = taxData[Number(ledger.id)]?.debit || 0;
-                          const credit = taxData[Number(ledger.id)]?.credit || 0;
-                          const type = ledger.balanceType || 'debit';
-                          let closing = 0;
-                          if (type === 'debit') {
-                            closing = (opening + debit) - credit;
-                          } else {
-                            closing = (opening + credit) - debit;
-                          }
-                          return (
-                            <>
-                              ₹ {Math.abs(closing).toLocaleString()} {closing >= 0 ? (type === 'debit' ? 'Dr' : 'Cr') : (type === 'debit' ? 'Cr' : 'Dr')}
-                            </>
-                          );
-                        })()}
-                      </td>
-                    )}
-                  </tr>
-                ))}
+                      {columnVisibility.debit && (
+                        <td className="px-4 py-3 text-right font-mono text-green-600">
+                          ₹ {balance.debit.toLocaleString()}
+                        </td>
+                      )}
+
+                      {columnVisibility.credit && (
+                        <td className="px-4 py-3 text-right font-mono text-red-600">
+                          ₹ {balance.credit.toLocaleString()}
+                        </td>
+                      )}
+
+                      {/* Closing */}
+                      {columnVisibility.closing && (
+                        <td className="px-4 py-3 text-right font-mono font-semibold">
+                          ₹ {Math.abs(netClosing).toLocaleString()} {netClosing >= 0 ? (isGroup ? 'Dr' : (balance.type === 'debit' ? 'Dr' : 'Cr')) : (isGroup ? 'Cr' : (balance.type === 'debit' ? 'Cr' : 'Dr'))}
+                        </td>
+                      )}
+                    </tr>
+                  );
+                })}
               </tbody>
 
               <tfoot>
@@ -685,7 +731,7 @@ const GroupSummary: React.FC = () => {
                   )}
                   {columnVisibility.closing && (
                     <td className="px-4 py-3 text-right font-mono font-bold">
-                      ₹ {totalClosing.toLocaleString()}
+                      {totalClosingStr}
                     </td>
                   )}
                 </tr>
@@ -764,7 +810,7 @@ const GroupSummary: React.FC = () => {
                       {columnVisibility.opening && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalOpening.toLocaleString()}</td>}
                       {columnVisibility.debit && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalDebit.toLocaleString()}</td>}
                       {columnVisibility.credit && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalCredit.toLocaleString()}</td>}
-                      {columnVisibility.closing && <td className="px-3 py-2 text-right font-mono font-bold">₹ {totalClosing.toLocaleString()}</td>}
+                      {columnVisibility.closing && <td className="px-3 py-2 text-right font-mono font-bold">{totalClosingStr}</td>}
                     </tr>
                   </tfoot>
                 </table>

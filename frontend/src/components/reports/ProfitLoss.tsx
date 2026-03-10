@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { useNavigate, Link } from "react-router-dom";
 import { ArrowLeft, Printer, Download, Filter, Settings } from "lucide-react";
@@ -259,24 +259,113 @@ const ProfitLoss: React.FC = () => {
     }, 0);
   };
 
-  // Helper to calculate total opening stock from items (without filtering)
-  const getOpeningStockItemSum = () => {
-    return stockItems.reduce((totalSum, item) => {
-      const itemSum = (item.batches || [])
-        .filter((b: any) => b.openingRate)
-        .reduce((batchSum: number, b: any) => {
-          const qty = Number(b.batchQuantity || 0);
-          const rate = Number(b.openingRate || 0);
-          return batchSum + (qty * rate);
-        }, 0);
-      return totalSum + itemSum;
-    }, 0);
-  };
+  // Unified Inventory Calculations (Item-wise)
+  const inventoryCalculations = useMemo(() => {
+    const itemMap: Record<string, any> = {};
+
+    // 1. Initialize with Stock Items (Opening)
+    stockItems.forEach((item: any) => {
+      const itemName = item.name;
+      if (!itemMap[itemName]) {
+        itemMap[itemName] = {
+          id: item.id,
+          name: itemName,
+          openingQty: 0,
+          openingValue: 0,
+          inwardQty: 0,
+          inwardValue: 0,
+          outwardQty: 0,
+          outwardValue: 0,
+          closingQty: 0,
+          closingValue: 0,
+          avgRate: 0,
+          batches: item.batches || []
+        };
+      }
+
+      let batchesProcessed = false;
+      if (item.batches && item.batches.length > 0) {
+        item.batches.forEach((b: any) => {
+          const q = Number(b.batchQuantity || 0);
+          const r = Number(b.openingRate || 0);
+          itemMap[itemName].openingQty += q;
+          itemMap[itemName].openingValue += q * r;
+          batchesProcessed = true;
+        });
+      }
+
+      if (!batchesProcessed && (Number(item.openingBalance || 0) > 0 || Number(item.quantity || 0) > 0)) {
+        const q = Number(item.openingBalance || item.quantity || 0);
+        const r = Number(item.openingRate || item.rate || 0);
+        itemMap[itemName].openingQty += q;
+        itemMap[itemName].openingValue += q * r;
+      }
+    });
+
+    // 2. Add Inwards (Purchases)
+    purchaseData.forEach((p: any) => {
+      const itemName = p.itemName;
+      if (!itemMap[itemName]) {
+        itemMap[itemName] = {
+          id: itemName,
+          name: itemName,
+          openingQty: 0,
+          openingValue: 0,
+          inwardQty: 0,
+          inwardValue: 0,
+          outwardQty: 0,
+          outwardValue: 0,
+          closingQty: 0,
+          closingValue: 0,
+          avgRate: 0,
+          batches: []
+        };
+      }
+      const q = Number(p.purchaseQuantity || 0);
+      const v = q * Number(p.rate || p.purchaseRate || 0);
+      itemMap[itemName].inwardQty += q;
+      itemMap[itemName].inwardValue += v;
+    });
+
+    // 3. Add Outwards (Sales)
+    salesData.forEach((s: any) => {
+      const itemName = s.itemName;
+      if (!itemMap[itemName]) return;
+      const q = Math.abs(Number(s.qtyChange || 0));
+      itemMap[itemName].outwardQty += q;
+    });
+
+    // 4. Final Calculations (Weighted Average Cost)
+    let totalOpeningValue = 0;
+    let totalClosingValue = 0;
+
+    Object.values(itemMap).forEach((item: any) => {
+      const totalInQty = item.openingQty + item.inwardQty;
+      const totalInValue = item.openingValue + item.inwardValue;
+      item.avgRate = totalInQty > 0 ? totalInValue / totalInQty : 0;
+
+      item.closingQty = totalInQty - item.outwardQty;
+      item.closingValue = item.closingQty * item.avgRate;
+
+      // Precision fix
+      if (Math.abs(item.closingQty) < 0.001) item.closingQty = 0;
+      if (Math.abs(item.closingValue) < 0.01) item.closingValue = 0;
+
+      totalOpeningValue += item.openingValue;
+      totalClosingValue += Math.max(0, item.closingValue);
+    });
+
+    return {
+      items: Object.values(itemMap),
+      totalOpeningValue,
+      totalClosingValue
+    };
+  }, [stockItems, purchaseData, salesData]);
 
   // Unified Opening Stock Value Accessor
   const calculateOpeningStockValue = () => {
     if (showItemWise && stockItems.length > 0) {
-      return getOpeningStockItemSum();
+      return inventoryCalculations.totalOpeningValue;
     }
     return getOpeningStock();
   };
@@ -376,208 +465,68 @@ const ProfitLoss: React.FC = () => {
     return getProfitLossCreditTotal() - getProfitLossDebitTotal();
   };
 
-  // Helper functions for inventory breakup
+  // Unified Inventory Breakup Accessors
   const getOpeningStockByItems = () => {
-    return stockItems
-      .filter((item: any) => item.batches && item.batches.length > 0)
-      .map((item: any) => ({
+    return inventoryCalculations.items
+      .filter(item => item.openingValue > 0)
+      .map(item => ({
         id: item.id,
         name: item.name,
-        batches: item.batches.filter((b: any) => b.openingRate),
-        totalValue: item.batches
-          .filter((b: any) => b.openingRate)
-          .reduce((sum: number, b: any) => {
-            const qty = Number(b.batchQuantity || 0);
-            const rate = Number(b.openingRate || 0);
-            return sum + qty * rate;
-          }, 0),
-      }))
-      .filter((item) => item.totalValue > 0);
+        batches: item.batches,
+        totalValue: item.openingValue
+      }));
   };
 
   const getPurchaseByItems = () => {
-    // Create a map to store item IDs by name
-    const itemIdMap = new Map<string, string | number>();
-    stockItems.forEach((item: any) => {
-      itemIdMap.set(item.name, item.id);
-    });
-
-    const itemMap = new Map<string, { id: string | number; name: string; qty: number; rate: number; value: number }>();
-
-    purchaseData.forEach((p: any) => {
-      const itemName = p.itemName || "Unknown Item";
-      const qty = Number(p.purchaseQuantity || 0);
-      const rate = Number(p.rate || 0);
-      const value = qty * rate;
-
-      if (itemMap.has(itemName)) {
-        const existing = itemMap.get(itemName)!;
-        existing.qty += qty;
-        existing.value += value;
-        existing.rate = existing.value / existing.qty || 0;
-      } else {
-        itemMap.set(itemName, {
-          id: itemIdMap.get(itemName) || itemName,
-          name: itemName,
-          qty,
-          rate,
-          value
-        });
-      }
-    });
-
-    return Array.from(itemMap.values()).filter((item) => item.value > 0);
+    return inventoryCalculations.items
+      .filter(item => item.inwardValue > 0)
+      .map(item => ({
+        id: item.id,
+        name: item.name,
+        qty: item.inwardQty,
+        rate: item.inwardQty > 0 ? item.inwardValue / item.inwardQty : 0,
+        value: item.inwardValue
+      }));
   };
 
   const getSalesByItems = () => {
-    // Create a map to store item IDs by name
-    const itemIdMap = new Map<string, string | number>();
-    stockItems.forEach((item: any) => {
-      itemIdMap.set(item.name, item.id);
-    });
-
-    const itemMap = new Map<string, { id: string | number; name: string; qty: number; rate: number; value: number }>();
-
-    salesData.forEach((s: any) => {
-      const itemName = s.itemName || "Unknown Item";
-      const qty = Math.abs(Number(s.qtyChange || 0));
-      const rate = Number(s.rate || 0);
-      const value = qty * rate;
-
-      if (itemMap.has(itemName)) {
-        const existing = itemMap.get(itemName)!;
-        existing.qty += qty;
-        existing.value += value;
-        existing.rate = existing.value / existing.qty || 0;
-      } else {
-        itemMap.set(itemName, {
-          id: itemIdMap.get(itemName) || itemName,
-          name: itemName,
-          qty,
-          rate,
-          value
-        });
+    const revenueMap: Record<string, any> = {};
+    salesData.forEach(s => {
+      const q = Math.abs(Number(s.qtyChange || 0));
+      const v = q * Number(s.rate || 0);
+      const name = s.itemName || "Unknown Item";
+      if (!revenueMap[name]) {
+        revenueMap[name] = { id: name, name: name, qty: 0, value: 0 };
       }
+      revenueMap[name].qty += q;
+      revenueMap[name].value += v;
     });
 
-    return Array.from(itemMap.values()).filter((item) => item.value > 0);
-  };
-
-  // Helper to calculate total closing stock from items (without filtering)
-  const getClosingStockItemSum = () => {
-    const openingItems = getOpeningStockByItems();
-    const purchaseItems = getPurchaseByItems();
-    const salesItems = getSalesByItems();
-
-    // Create a map to store item IDs by name
-    const itemIdMap = new Map<string, string | number>();
-    openingItems.forEach((item) => itemIdMap.set(item.name, item.id));
-    stockItems.forEach((item: any) => {
-      if (!itemIdMap.has(item.name)) itemIdMap.set(item.name, item.id);
-    });
-
-    const itemMap = new Map<string, number>();
-
-    // Add opening
-    openingItems.forEach(item => itemMap.set(item.name, item.totalValue));
-
-    // Add purchase
-    purchaseItems.forEach(item => {
-      const current = itemMap.get(item.name) || 0;
-      itemMap.set(item.name, current + item.value);
-    });
-
-    // Subtract sales
-    salesItems.forEach(item => {
-      const current = itemMap.get(item.name) || 0;
-      itemMap.set(item.name, current - item.value);
-    });
-
-    // Sum up non-negative closing values
-    return Array.from(itemMap.values()).reduce((sum, val) => sum + Math.max(0, val), 0);
+    return Object.values(revenueMap).map(item => ({
+      ...item,
+      rate: item.qty > 0 ? item.value / item.qty : 0
+    })).filter(item => item.value > 0);
   };
 
   // Unified Closing Stock Value Accessor
   const calculateClosingStockValue = () => {
     if (showItemWise && stockItems.length > 0) {
-      return getClosingStockItemSum();
+      return inventoryCalculations.totalClosingValue;
     }
     return getClosingStock();
   };
 
   const getClosingStockByItems = () => {
-    const openingItems = getOpeningStockByItems();
-    const purchaseItems = getPurchaseByItems();
-    const salesItems = getSalesByItems();
-
-    // Create a map to store item IDs by name
-    const itemIdMap = new Map<string, string | number>();
-    openingItems.forEach((item) => {
-      itemIdMap.set(item.name, item.id);
-    });
-    // Also check stockItems for items that might not be in opening stock
-    stockItems.forEach((item: any) => {
-      if (!itemIdMap.has(item.name)) {
-        itemIdMap.set(item.name, item.id);
-      }
-    });
-
-    const itemMap = new Map<string, { id: string | number; name: string; opening: number; purchase: number; sales: number; closing: number }>();
-
-    // Add opening stock
-    openingItems.forEach((item) => {
-      itemMap.set(item.name, {
+    return inventoryCalculations.items
+      .filter(item => item.closingValue > 0)
+      .map(item => ({
         id: item.id,
         name: item.name,
-        opening: item.totalValue,
-        purchase: 0,
-        sales: 0,
-        closing: item.totalValue,
-      });
-    });
-
-    // Add purchases
-    purchaseItems.forEach((item) => {
-      if (itemMap.has(item.name)) {
-        const existing = itemMap.get(item.name)!;
-        existing.purchase = item.value;
-        existing.closing = existing.opening + existing.purchase - existing.sales;
-      } else {
-        itemMap.set(item.name, {
-          id: itemIdMap.get(item.name) || item.name,
-          name: item.name,
-          opening: 0,
-          purchase: item.value,
-          sales: 0,
-          closing: item.value,
-        });
-      }
-    });
-
-    // Subtract sales
-    salesItems.forEach((item) => {
-      if (itemMap.has(item.name)) {
-        const existing = itemMap.get(item.name)!;
-        existing.sales = item.value;
-        existing.closing = existing.opening + existing.purchase - existing.sales;
-      } else {
-        itemMap.set(item.name, {
-          id: itemIdMap.get(item.name) || item.name,
-          name: item.name,
-          opening: 0,
-          purchase: 0,
-          sales: item.value,
-          closing: -item.value,
-        });
-      }
-    });
-
-    return Array.from(itemMap.values())
-      .map((item) => ({
-        ...item,
-        closing: Math.max(0, item.closing),
-      }))
-      .filter((item) => item.closing > 0);
+        opening: item.openingValue,
+        purchase: item.inwardValue,
+        sales: item.outwardQty * item.avgRate, // This is COGS
+        closing: item.closingValue
+      }));
   };
 
   const getIndirectIncomeLedgers = () => {

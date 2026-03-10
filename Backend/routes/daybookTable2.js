@@ -104,6 +104,7 @@ router.get("/", async (req, res) => {
     pv.tdsTotal,
     pv.discountTotal,
     pv.total,
+    pv.mode,
 
     pi.purchaseLedgerId,
     l.name AS purchase_ledger_name,
@@ -151,19 +152,24 @@ router.get("/", async (req, res) => {
           total: row.total,
           partyId: row.partyId,
           partyName: row.party_name,
+          mode: row.mode || "item-invoice",
           entries: [],
         };
 
-        /* 🔴 PARTY -> CREDIT */
-        vouchers[key].entries.push({
-          id: `PUR-P-${row.voucher_id}`,
-          ledger_id: row.partyId,
-          ledger_name: row.party_name,
-          amount: Number(row.total),
-          entry_type: "credit",
-          narration: "Purchase Party",
-          isParty: true,
-        });
+        /* 🔴 PARTY -> CREDIT (ONLY FOR ITEM INVOICE) */
+        // In As Voucher / Accounting mode, party is usually in voucher_entries
+        if (!row.mode || row.mode === "item-invoice") {
+          vouchers[key].entries.push({
+            id: `PUR-P-${row.voucher_id}`,
+            ledger_id: row.partyId,
+            ledger_name: row.party_name,
+            amount: Number(row.total),
+            entry_type: "credit",
+            narration: "Purchase Party",
+            isParty: true,
+            isChild: false,
+          });
+        }
       }
 
       /* ================================
@@ -269,9 +275,43 @@ router.get("/", async (req, res) => {
     });
 
     /* =====================================================
+       2.2 PURCHASE VOUCHER LEDGER ENTRIES (ACCOUNTING MODE)
+    ===================================================== */
+    const purchaseVoucherIds = purchaseRows.map(r => r.voucher_id).filter(id => id);
+    if (purchaseVoucherIds.length > 0) {
+      const [entryRows] = await db.query(
+        `SELECT ve.*, l.name AS ledger_name 
+         FROM voucher_entries ve
+         LEFT JOIN ledgers l ON l.id = ve.ledger_id
+         WHERE ve.voucher_id IN (?)`,
+        [purchaseVoucherIds]
+      );
+
+      entryRows.forEach(entry => {
+        const key = `PUR-${entry.voucher_id}`;
+        if (vouchers[key]) {
+          const amount = Number(entry.amount);
+          const isMainParty = entry.ledger_id === vouchers[key].partyId;
+
+          // Avoid duplicates if we already added the synthetic party row
+          // and this entry happens to be the party (though in item-invoice it shouldn't be in voucher_entries)
+          vouchers[key].entries.push({
+            id: `PUR-VE-${entry.id}`,
+            ledger_id: entry.ledger_id,
+            ledger_name: entry.ledger_name,
+            amount: amount,
+            entry_type: entry.entry_type,
+            narration: entry.narration,
+            isParty: isMainParty,
+            isChild: !isMainParty,
+          });
+        }
+      });
+    }
+
+    /* =====================================================
        3️⃣ SALES VOUCHERS → CREDIT
     ===================================================== */
-
 
     const [salesRows] = await db.query(
       `
@@ -290,6 +330,7 @@ router.get("/", async (req, res) => {
     sv.igstTotal,
     sv.discountTotal,
     sv.total,
+    sv.mode,
 
     si.salesLedgerId,
     si.discountLedgerId,
@@ -343,21 +384,25 @@ router.get("/", async (req, res) => {
           total: row.total,
           partyId: row.partyId,
           partyName: row.party_name,
+          mode: row.mode || "item-invoice",
           discountLedgerId: row.discountLedgerId,
           discountLedgerName: row.discount_ledger_name,
           entries: [],
         };
 
-        /* 🔴 PARTY → DEBIT */
-        vouchers[key].entries.push({
-          id: `SAL-P-${row.voucher_id}`,
-          ledger_id: row.partyId,
-          ledger_name: row.party_name,
-          amount: Number(row.total),
-          entry_type: "debit",
-          narration: "Sales Party",
-          isParty: true,
-        });
+        /* 🔴 PARTY → DEBIT (ONLY FOR ITEM INVOICE) */
+        if (!row.mode || row.mode === "item-invoice") {
+          vouchers[key].entries.push({
+            id: `SAL-P-${row.voucher_id}`,
+            ledger_id: row.partyId,
+            ledger_name: row.party_name,
+            amount: Number(row.total),
+            entry_type: "debit",
+            narration: "Sales Party",
+            isParty: true,
+            isChild: false,
+          });
+        }
       }
 
       // Capture discount info if not already captured
@@ -455,8 +500,40 @@ router.get("/", async (req, res) => {
     });
 
     /* =====================================================
-   4️⃣ DEBIT NOTE VOUCHERS (Debit Note Register)
-===================================================== */
+       3.2 SALES VOUCHER LEDGER ENTRIES (ACCOUNTING MODE)
+    ===================================================== */
+    const salesVoucherIds = salesRows.map(r => r.voucher_id).filter(id => id);
+    if (salesVoucherIds.length > 0) {
+      const [entryRows] = await db.query(
+        `SELECT ve.*, l.name AS ledger_name 
+         FROM voucher_entries ve
+         LEFT JOIN ledgers l ON l.id = ve.ledger_id
+         WHERE ve.voucher_id IN (?)`,
+        [salesVoucherIds]
+      );
+
+      entryRows.forEach(entry => {
+        const key = `SAL-${entry.voucher_id}`;
+        if (vouchers[key]) {
+          const isMainParty = entry.ledger_id === vouchers[key].partyId;
+          vouchers[key].entries.push({
+            id: `SAL-VE-${entry.id}`,
+            ledger_id: entry.ledger_id,
+            ledger_name: entry.ledger_name,
+            amount: Number(entry.amount),
+            entry_type: entry.entry_type,
+            narration: entry.narration,
+            isParty: isMainParty,
+            isChild: !isMainParty,
+          });
+        }
+      });
+    }
+
+
+    /* =====================================================
+       4️⃣ DEBIT NOTE VOUCHERS (Debit Note Register)
+    ===================================================== */
     const [debitNoteRows] = await db.query(
       `
   SELECT
@@ -507,6 +584,8 @@ router.get("/", async (req, res) => {
               entry_type: e.type, // debit / credit
               narration: parsed.note || "",
               item_id: null,
+              isParty: idx === 0,
+              isChild: idx !== 0,
             }));
           }
         } catch (err) {
@@ -586,6 +665,8 @@ router.get("/", async (req, res) => {
               entry_type: e.type, // debit / credit
               narration: narrationText,
               item_id: null,
+              isParty: index === 0,
+              isChild: index !== 0,
             }));
           }
         } catch (err) {
