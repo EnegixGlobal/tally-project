@@ -116,6 +116,20 @@ const BalanceSheet: React.FC = () => {
     const CurrentAssets = calculateGroupTotal(-5);
     const tdsPayable = calculateGroupTotal(-19);
 
+    // Liabilities are typically Credit (Negative in our Dr-based signed math)
+    // Assets are typically Debit (Positive)
+    const liabSum =
+      Math.abs(capitalTotal < 0 ? capitalTotal : 0) +
+      Math.abs(loanLability < 0 ? loanLability : 0) +
+      Math.abs(currentLiability < 0 ? currentLiability : 0) +
+      Math.abs(tdsPayable < 0 ? tdsPayable : 0);
+
+    const assetSum =
+      Math.abs(fixedAssets > 0 ? fixedAssets : 0) +
+      Math.abs(CurrentAssets > 0 ? CurrentAssets : 0);
+
+    const pnlSigned = -(netProfit - netLoss - transferredProfit + transferredLoss); // Profit is Credit (-)
+
     setCalculatedTotal({
       CapitalAccount: capitalTotal,
       Loans: loanLability,
@@ -123,8 +137,8 @@ const BalanceSheet: React.FC = () => {
       FixedAssets: fixedAssets,
       CurrentAssets: CurrentAssets,
       TDSPayable: tdsPayable,
-      LaiblityTotal: capitalTotal + loanLability + currentLiability + tdsPayable + (netProfit - netLoss - transferredProfit + transferredLoss),
-      AssetTotal: fixedAssets + CurrentAssets,
+      LaiblityTotal: liabSum + (pnlSigned < 0 ? Math.abs(pnlSigned) : 0),
+      AssetTotal: assetSum + (pnlSigned > 0 ? Math.abs(pnlSigned) : 0),
     });
   }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss, transferredProfit, transferredLoss]);
 
@@ -146,24 +160,43 @@ const BalanceSheet: React.FC = () => {
     fetchDebitCreditData();
   }, [ledgers, companyId, ownerType, ownerId]);
 
-  const calculateClosingBalance = (ledger: Ledger): number => {
-    const opening = Number(ledger.openingBalance) || 0;
+  const getLedgerBalances = (ledger: Ledger) => {
+    const o = Number(ledger.openingBalance) || 0;
     const debit = debitCreditData[ledger.id]?.debit || 0;
     const credit = debitCreditData[ledger.id]?.credit || 0;
-    return ledger.balanceType === "debit" ? (opening + debit - credit) : (opening + credit - debit);
+
+    // Signed value (Relative to Debit)
+    const openingSigned = ledger.balanceType === "debit" ? o : -o;
+    const closingSigned = openingSigned + debit - credit;
+
+    return { openingSigned, debit, credit, closingSigned };
+  };
+
+  const formatBalance = (amount: number) => {
+    if (Math.abs(amount) < 0.01) return "0";
+    return `${Math.abs(amount).toLocaleString()} ${amount > 0 ? "Dr" : "Cr"}`;
   };
 
   const calculateGroupTotal = (groupId: number): number => {
     const findSubGroups = (id: number): number[] => {
       let results = [id];
-      ledgerGroups.filter(g => g.parent === id).forEach(c => {
-        results = [...results, ...findSubGroups(c.id)];
-      });
+      ledgerGroups
+        .filter((g) => g.parent === id)
+        .forEach((c) => {
+          results = [...results, ...findSubGroups(c.id)];
+        });
       return results;
     };
     const allGroupIds = findSubGroups(groupId);
-    const recursiveLedgers = ledgers.filter(l => allGroupIds.includes(Number(l.groupId)));
-    return recursiveLedgers.reduce((sum, ledger) => sum + Math.abs(calculateClosingBalance(ledger)), 0);
+    const recursiveLedgers = ledgers.filter((l) =>
+      allGroupIds.includes(Number(l.groupId))
+    );
+
+    // Sum signed closing balances
+    return recursiveLedgers.reduce((sum, ledger) => {
+      const b = getLedgerBalances(ledger);
+      return sum + b.closingSigned;
+    }, 0);
   };
 
   const handleGroupClick = (groupId: number, additionalGroupId?: number) => {
@@ -184,30 +217,33 @@ const BalanceSheet: React.FC = () => {
               <div
                 className={`grid grid-cols-2 gap-2 py-1 text-sm cursor-pointer hover:bg-gray-200 dark:hover:bg-gray-200 rounded px-2  `}
                 style={{ paddingLeft: `${level * 1.5}rem` }}
-                onClick={() => navigate(`/app/reports/sub-group-summary/${group.id}`)}
+                onClick={() =>
+                  navigate(`/app/reports/sub-group-summary/${group.id}`)
+                }
               >
-                <span className="italic font-semibold text-blue-500">{group.name}</span>
-                <span className="text-right font-mono text-xs">{total.toLocaleString()}</span>
+                <span className="italic font-semibold text-blue-500">
+                  {group.name}
+                </span>
+                <span className="text-right font-mono text-xs">
+                  {formatBalance(total)}
+                </span>
               </div>
               {renderDetailedGroupItems(group.id, level + 1)}
             </div>
           );
         })}
 
-        {directLedgers.map(ledger => {
-          const closing = calculateClosingBalance(ledger);
-          return (
-            <div
-              key={ledger.id}
-              className="grid grid-cols-2 gap-2 py-1 text-xs text-gray-500 font-semibold dark:text-gray-600 cursor-pointer hover:text-blue-600 px-2"
-              style={{ paddingLeft: `${level * 1.5}rem` }}
-              onClick={() => navigate(`/app/reports/ledger/${ledger.id}`)}
-            >
-              <span>{ledger.name}</span>
-              <span className="text-right font-mono">{closing.toLocaleString()}</span>
-            </div>
-          );
-        })}
+        <div
+          key={ledger.id}
+          className="grid grid-cols-2 gap-2 py-1 text-xs text-gray-500 font-semibold dark:text-gray-600 cursor-pointer hover:text-blue-600 px-2"
+          style={{ paddingLeft: `${level * 1.5}rem` }}
+          onClick={() => navigate(`/app/reports/ledger/${ledger.id}`)}
+        >
+          <span>{ledger.name}</span>
+          <span className="text-right font-mono">
+            {formatBalance(b.closingSigned)}
+          </span>
+        </div>
       </div>
     );
   };
@@ -256,41 +292,71 @@ const BalanceSheet: React.FC = () => {
               <div className="space-y-2 mt-3">
                 {/* Capital Account */}
                 <div>
-                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-4, -18)}>
-                    <span className="text-blue-600 font-semibold ">Capital Account</span>
-                    <span className="text-right font-mono font-bold">{calculatedTotal.CapitalAccount.toLocaleString()}</span>
+                  <div
+                    className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer"
+                    onClick={() => handleGroupClick(-4, -18)}
+                  >
+                    <span className="text-blue-600 font-semibold ">
+                      Capital Account
+                    </span>
+                    <span className="text-right font-mono font-bold">
+                      {formatBalance(calculatedTotal.CapitalAccount)}
+                    </span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-4)}
                 </div>
 
                 {/* Loans */}
                 <div>
-                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-13)}>
-                    <span className="text-blue-600 font-semibold ">Loans (Liability)</span>
-                    <span className="text-right font-mono font-bold">{calculatedTotal.Loans.toLocaleString()}</span>
+                  <div
+                    className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer"
+                    onClick={() => handleGroupClick(-13)}
+                  >
+                    <span className="text-blue-600 font-semibold ">
+                      Loans (Liability)
+                    </span>
+                    <span className="text-right font-mono font-bold">
+                      {formatBalance(calculatedTotal.Loans)}
+                    </span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-13)}
                 </div>
 
                 {/* Current Liabilities */}
                 <div>
-                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-6)}>
-                    <span className="text-blue-600 font-semibold ">Current Liabilities</span>
-                    <span className="text-right font-mono font-bold">{calculatedTotal.CurrentLiabilities.toLocaleString()}</span>
+                  <div
+                    className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer"
+                    onClick={() => handleGroupClick(-6)}
+                  >
+                    <span className="text-blue-600 font-semibold ">
+                      Current Liabilities
+                    </span>
+                    <span className="text-right font-mono font-bold">
+                      {formatBalance(calculatedTotal.CurrentLiabilities)}
+                    </span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-6)}
                 </div>
 
                 {/* TDS Payable */}
                 <div>
-                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-19)}>
-                    <span className="text-blue-600 font-semibold ">TDS Payable</span>
-                    <span className="text-right font-mono font-bold">{calculatedTotal.TDSPayable.toLocaleString()}</span>
+                  <div
+                    className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer"
+                    onClick={() => handleGroupClick(-19)}
+                  >
+                    <span className="text-blue-600 font-semibold ">
+                      TDS Payable
+                    </span>
+                    <span className="text-right font-mono font-bold">
+                      {formatBalance(calculatedTotal.TDSPayable)}
+                    </span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-19)}
                 </div>
 
-                {/* Profit & Loss A/c (Restored to standalone row) */}
+
+
+                  {/* Profit & Loss A/c (Restored to standalone row) */}
                 <div className="border-b border-gray-300 pb-2">
                   {/* Header */}
                   <div
@@ -343,9 +409,16 @@ const BalanceSheet: React.FC = () => {
               <div className="space-y-2 mt-3">
                 {/* Fixed Assets */}
                 <div>
-                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-9)}>
-                    <span className="text-blue-600 font-semibold ">Fixed Assets</span>
-                    <span className="text-right font-mono font-bold">{calculatedTotal.FixedAssets.toLocaleString()}</span>
+                  <div
+                    className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer"
+                    onClick={() => handleGroupClick(-9)}
+                  >
+                    <span className="text-blue-600 font-semibold ">
+                      Fixed Assets
+                    </span>
+                    <span className="text-right font-mono font-bold">
+                      {formatBalance(calculatedTotal.FixedAssets)}
+                    </span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-9)}
                 </div>
@@ -354,9 +427,16 @@ const BalanceSheet: React.FC = () => {
 
                 {/* Current Assets */}
                 <div>
-                  <div className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer" onClick={() => handleGroupClick(-5)}>
-                    <span className="text-blue-600 font-semibold ">Current Assets</span>
-                    <span className="text-right font-mono font-bold">{calculatedTotal.CurrentAssets.toLocaleString()}</span>
+                  <div
+                    className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer"
+                    onClick={() => handleGroupClick(-5)}
+                  >
+                    <span className="text-blue-600 font-semibold ">
+                      Current Assets
+                    </span>
+                    <span className="text-right font-mono font-bold">
+                      {formatBalance(calculatedTotal.CurrentAssets)}
+                    </span>
                   </div>
                   {isDetailedView && renderDetailedGroupItems(-5)}
                 </div>
