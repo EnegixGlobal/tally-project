@@ -66,7 +66,7 @@ const LedgerReport: React.FC = () => {
 
   // Get selected ledger details
   const selectedLedgerData = ledgers.find(l => l.id === selectedLedger);
-  const selectedLedgerGroup = selectedLedgerData ? 
+  const selectedLedgerGroup = selectedLedgerData ?
     ledgerGroups.find(g => g.id === selectedLedgerData.groupId) : null;
 
   // Generate comprehensive transactions for the selected ledger
@@ -191,13 +191,13 @@ const LedgerReport: React.FC = () => {
   const groupTransactionsByMonth = (transactions: LedgerTransaction[]) => {
     const grouped: { [key: string]: LedgerTransaction[] } = {};
     const monthlyBalances: { [key: string]: MonthlyBalance } = {};
-    
+
     transactions.forEach(txn => {
       if (txn.isOpening || txn.isClosing) return;
-      
+
       const monthKey = txn.date.substring(0, 7); // YYYY-MM
       const monthName = new Date(txn.date).toLocaleDateString('en-US', { year: 'numeric', month: 'long' });
-      
+
       if (!grouped[monthKey]) {
         grouped[monthKey] = [];
         monthlyBalances[monthKey] = {
@@ -209,7 +209,7 @@ const LedgerReport: React.FC = () => {
           transactionCount: 0
         };
       }
-      
+
       grouped[monthKey].push(txn);
       monthlyBalances[monthKey].totalDebit += txn.debit;
       monthlyBalances[monthKey].totalCredit += txn.credit;
@@ -226,7 +226,7 @@ const LedgerReport: React.FC = () => {
   const summaryTotals = useMemo(() => {
     const openingTxn = ledgerTransactions.find((t: LedgerTransaction) => t.isOpening);
     const regularTxns = ledgerTransactions.filter((t: LedgerTransaction) => !t.isOpening && !t.isClosing);
-    
+
     return {
       openingBalance: openingTxn ? openingTxn.balance : 0,
       totalDebit: regularTxns.reduce((sum: number, t: LedgerTransaction) => sum + t.debit, 0),
@@ -256,7 +256,7 @@ const LedgerReport: React.FC = () => {
 
   const handleVoucherClick = (transaction: LedgerTransaction) => {
     if (transaction.isOpening || transaction.isClosing) return;
-    
+
     const voucherDetail: VoucherDetail = {
       id: transaction.id,
       voucherNo: transaction.voucherNo,
@@ -290,7 +290,7 @@ const LedgerReport: React.FC = () => {
     setSelectedDateRange(range);
     const today = new Date();
     const currentYear = today.getFullYear();
-    
+
     switch (range) {
       case 'current-month': {
         setFromDate(`${currentYear}-${String(today.getMonth() + 1).padStart(2, '0')}-01`);
@@ -327,9 +327,8 @@ const LedgerReport: React.FC = () => {
           type="button"
           title="Back to Reports"
           onClick={() => navigate('/app/reports')}
-          className={`mr-4 p-2 rounded-full ${
-            theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -339,9 +338,8 @@ const LedgerReport: React.FC = () => {
             title='Toggle Filters'
             type='button'
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-            } ${showFilterPanel ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
+            className={`p-2 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+              } ${showFilterPanel ? 'bg-blue-100 dark:bg-blue-900' : ''}`}
           >
             <Filter size={18} />
           </button>
@@ -349,9 +347,8 @@ const LedgerReport: React.FC = () => {
             title="Print Report"
             type="button"
             onClick={handlePrint}
-            className={`p-2 rounded-md ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-            }`}
+            className={`p-2 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+              }`}
           >
             <Printer size={18} />
           </button>
@@ -359,19 +356,17 @@ const LedgerReport: React.FC = () => {
             type='button'
             title='Download Report'
             onClick={handleDownload}
-            className={`p-2 rounded-md ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-            }`}
+            className={`p-2 rounded-md ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+              }`}
           >
             <Download size={18} />
           </button>
         </div>
       </div>
-      
+
       {showFilterPanel && (
-        <div className={`p-4 mb-6 rounded-lg ${
-          theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-        }`}>
+        <div className={`p-4 mb-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+          }`}>
           <h3 className="font-semibold mb-4">Filters & Options</h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
             <div>
@@ -382,11 +377,10 @@ const LedgerReport: React.FC = () => {
                 title="Select Ledger"
                 value={selectedLedger}
                 onChange={(e) => setSelectedLedger(e.target.value)}
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600' 
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                    ? 'bg-gray-700 border-gray-600'
                     : 'bg-white border-gray-300'
-                }`}
+                  }`}
               >
                 <option value="">Select Ledger</option>
                 {ledgers.map(ledger => (
@@ -404,11 +398,10 @@ const LedgerReport: React.FC = () => {
                 title="Select View Mode"
                 value={viewMode}
                 onChange={(e) => setViewMode(e.target.value as 'detailed' | 'summary' | 'monthly')}
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600' 
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                    ? 'bg-gray-700 border-gray-600'
                     : 'bg-white border-gray-300'
-                }`}
+                  }`}
               >
                 <option value="detailed">Detailed View</option>
                 <option value="summary">Summary View</option>
@@ -423,11 +416,10 @@ const LedgerReport: React.FC = () => {
                 title='Select Date Range'
                 value={selectedDateRange}
                 onChange={(e) => handleDateRangeChange(e.target.value)}
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600' 
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                    ? 'bg-gray-700 border-gray-600'
                     : 'bg-white border-gray-300'
-                }`}
+                  }`}
               >
                 <option value="current-month">Current Month</option>
                 <option value="previous-month">Previous Month</option>
@@ -448,7 +440,7 @@ const LedgerReport: React.FC = () => {
               </label>
             </div>
           </div>
-          
+
           {selectedDateRange === 'custom' && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
@@ -460,11 +452,10 @@ const LedgerReport: React.FC = () => {
                   type="date"
                   value={fromDate}
                   onChange={(e) => setFromDate(e.target.value)}
-                  className={`w-full p-2 rounded border ${
-                    theme === 'dark' 
-                      ? 'bg-gray-700 border-gray-600' 
+                  className={`w-full p-2 rounded border ${theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600'
                       : 'bg-white border-gray-300'
-                  }`}
+                    }`}
                 />
               </div>
               <div>
@@ -476,11 +467,10 @@ const LedgerReport: React.FC = () => {
                   type="date"
                   value={toDate}
                   onChange={(e) => setToDate(e.target.value)}
-                  className={`w-full p-2 rounded border ${
-                    theme === 'dark' 
-                      ? 'bg-gray-700 border-gray-600' 
+                  className={`w-full p-2 rounded border ${theme === 'dark'
+                      ? 'bg-gray-700 border-gray-600'
                       : 'bg-white border-gray-300'
-                  }`}
+                    }`}
                 />
               </div>
             </div>
@@ -489,9 +479,8 @@ const LedgerReport: React.FC = () => {
       )}
 
       {!selectedLedger ? (
-        <div className={`p-8 text-center rounded-lg ${
-          theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-        }`}>
+        <div className={`p-8 text-center rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+          }`}>
           <Calendar size={48} className="mx-auto mb-4 text-gray-400" />
           <h3 className="text-lg font-medium mb-2">Select a Ledger</h3>
           <p className="text-gray-500">Choose a ledger from the filter panel to view its report</p>
@@ -499,23 +488,21 @@ const LedgerReport: React.FC = () => {
       ) : (
         <>
           {/* Ledger Header */}
-          <div className={`p-4 mb-4 rounded-lg ${
-            theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-          }`}>
+          <div className={`p-4 mb-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+            }`}>
             <div className="flex justify-between items-start">
               <div>
                 <h2 className="text-xl font-bold mb-1">{selectedLedgerData?.name}</h2>
                 <p className="text-sm text-gray-500">
-                  Group: {selectedLedgerGroup?.name} | 
+                  Group: {selectedLedgerGroup?.name} |
                   Period: {formatDate(fromDate)} to {formatDate(toDate)}
                 </p>
               </div>
               <div className="text-right">
                 <div className="text-sm text-gray-500">Opening Balance</div>
-                <div className={`text-lg font-bold ${
-                  summaryTotals.openingBalance >= 0 ? 'text-green-600' : 'text-red-600'
-                }`}>
-                  {formatCurrency(Math.abs(summaryTotals.openingBalance))} 
+                <div className={`text-lg font-bold ${summaryTotals.openingBalance >= 0 ? 'text-green-600' : 'text-red-600'
+                  }`}>
+                  {formatCurrency(Math.abs(summaryTotals.openingBalance))}
                   {summaryTotals.openingBalance >= 0 ? ' Dr' : ' Cr'}
                 </div>
               </div>
@@ -524,36 +511,31 @@ const LedgerReport: React.FC = () => {
 
           {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <div className={`p-4 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
+            <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+              }`}>
               <div className="text-sm text-gray-500">Total Debit</div>
               <div className="text-xl font-bold text-blue-600">
                 {formatCurrency(summaryTotals.totalDebit)}
               </div>
             </div>
-            <div className={`p-4 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
+            <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+              }`}>
               <div className="text-sm text-gray-500">Total Credit</div>
               <div className="text-xl font-bold text-purple-600">
                 {formatCurrency(summaryTotals.totalCredit)}
               </div>
             </div>
-            <div className={`p-4 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
-              <div className="text-sm text-gray-500">Net Balance</div>
-              <div className={`text-xl font-bold ${
-                summaryTotals.closingBalance >= 0 ? 'text-green-600' : 'text-red-600'
+            <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
               }`}>
+              <div className="text-sm text-gray-500">Net Balance</div>
+              <div className={`text-xl font-bold ${summaryTotals.closingBalance >= 0 ? 'text-green-600' : 'text-red-600'
+                }`}>
                 {formatCurrency(Math.abs(summaryTotals.closingBalance))}
                 {summaryTotals.closingBalance >= 0 ? ' Dr' : ' Cr'}
               </div>
             </div>
-            <div className={`p-4 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
+            <div className={`p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+              }`}>
               <div className="text-sm text-gray-500">Transactions</div>
               <div className="text-xl font-bold text-gray-600">
                 {summaryTotals.transactionCount}
@@ -567,15 +549,14 @@ const LedgerReport: React.FC = () => {
               <button
                 key={mode}
                 onClick={() => setViewMode(mode as 'detailed' | 'summary' | 'monthly')}
-                className={`px-4 py-2 rounded-t-lg text-sm font-medium ${
-                  viewMode === mode
+                className={`px-4 py-2 rounded-t-lg text-sm font-medium ${viewMode === mode
                     ? theme === 'dark'
                       ? 'bg-gray-800 text-white'
                       : 'bg-white text-blue-600 shadow'
                     : theme === 'dark'
                       ? 'bg-gray-700 text-gray-300 hover:bg-gray-600'
                       : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                }`}
+                  }`}
               >
                 {mode.charAt(0).toUpperCase() + mode.slice(1)} View
               </button>
@@ -583,15 +564,13 @@ const LedgerReport: React.FC = () => {
           </div>
 
           {/* Transaction Table */}
-          <div className={`rounded-lg overflow-hidden ${
-            theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-          }`}>
+          <div className={`rounded-lg overflow-hidden ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+            }`}>
             {viewMode === 'detailed' && (
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className={`${
-                    theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                  }`}>
+                  <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
+                    }`}>
                     <tr>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Date</th>
                       <th className="px-4 py-3 text-left text-xs font-medium uppercase tracking-wider">Particulars</th>
@@ -604,15 +583,13 @@ const LedgerReport: React.FC = () => {
                   </thead>
                   <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
                     {ledgerTransactions.map((transaction: LedgerTransaction) => (
-                      <tr 
-                        key={transaction.id} 
-                        className={`${
-                          theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
-                        } ${
-                          transaction.isOpening || transaction.isClosing
+                      <tr
+                        key={transaction.id}
+                        className={`${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                          } ${transaction.isOpening || transaction.isClosing
                             ? 'font-medium bg-yellow-50 dark:bg-yellow-900/20'
                             : 'cursor-pointer'
-                        }`}
+                          }`}
                         onClick={() => !transaction.isOpening && !transaction.isClosing && handleVoucherClick(transaction)}
                       >
                         <td className="px-4 py-3 text-sm">{formatDate(transaction.date)}</td>
@@ -623,15 +600,14 @@ const LedgerReport: React.FC = () => {
                           )}
                         </td>
                         <td className="px-4 py-3 text-sm">
-                          <span className={`px-2 py-1 rounded-full text-xs ${
-                            transaction.voucherType === 'Opening' ? 'bg-yellow-100 text-yellow-800' :
-                            transaction.voucherType === 'Closing' ? 'bg-gray-100 text-gray-800' :
-                            transaction.voucherType === 'Sales' ? 'bg-green-100 text-green-800' :
-                            transaction.voucherType === 'Purchase' ? 'bg-blue-100 text-blue-800' :
-                            transaction.voucherType === 'Receipt' ? 'bg-purple-100 text-purple-800' :
-                            transaction.voucherType === 'Payment' ? 'bg-red-100 text-red-800' :
-                            'bg-gray-100 text-gray-800'
-                          }`}>
+                          <span className={`px-2 py-1 rounded-full text-xs ${transaction.voucherType === 'Opening' ? 'bg-yellow-100 text-yellow-800' :
+                              transaction.voucherType === 'Closing' ? 'bg-gray-100 text-gray-800' :
+                                transaction.voucherType === 'Sales' ? 'bg-green-100 text-green-800' :
+                                  transaction.voucherType === 'Purchase' ? 'bg-blue-100 text-blue-800' :
+                                    transaction.voucherType === 'Receipt' ? 'bg-purple-100 text-purple-800' :
+                                      transaction.voucherType === 'Payment' ? 'bg-red-100 text-red-800' :
+                                        'bg-gray-100 text-gray-800'
+                            }`}>
                             {transaction.voucherType}
                           </span>
                         </td>
@@ -642,9 +618,8 @@ const LedgerReport: React.FC = () => {
                         <td className="px-4 py-3 text-sm text-right font-mono">
                           {transaction.credit > 0 ? formatCurrency(transaction.credit) : '-'}
                         </td>
-                        <td className={`px-4 py-3 text-sm text-right font-mono font-medium ${
-                          transaction.balance >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
+                        <td className={`px-4 py-3 text-sm text-right font-mono font-medium ${transaction.balance >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
                           {formatCurrency(Math.abs(transaction.balance))} {transaction.balance >= 0 ? 'Dr' : 'Cr'}
                         </td>
                       </tr>
@@ -662,10 +637,9 @@ const LedgerReport: React.FC = () => {
                     <div className="space-y-3">
                       <div className="flex justify-between py-2 border-b border-gray-200 dark:border-gray-700">
                         <span>Opening Balance:</span>
-                        <span className={`font-medium ${
-                          summaryTotals.openingBalance >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          {formatCurrency(Math.abs(summaryTotals.openingBalance))} 
+                        <span className={`font-medium ${summaryTotals.openingBalance >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                          {formatCurrency(Math.abs(summaryTotals.openingBalance))}
                           {summaryTotals.openingBalance >= 0 ? ' Dr' : ' Cr'}
                         </span>
                       </div>
@@ -690,16 +664,15 @@ const LedgerReport: React.FC = () => {
                       </div>
                       <div className="flex justify-between py-2 font-bold text-lg">
                         <span>Closing Balance:</span>
-                        <span className={`${
-                          summaryTotals.closingBalance >= 0 ? 'text-green-600' : 'text-red-600'
-                        }`}>
-                          {formatCurrency(Math.abs(summaryTotals.closingBalance))} 
+                        <span className={`${summaryTotals.closingBalance >= 0 ? 'text-green-600' : 'text-red-600'
+                          }`}>
+                          {formatCurrency(Math.abs(summaryTotals.closingBalance))}
                           {summaryTotals.closingBalance >= 0 ? ' Dr' : ' Cr'}
                         </span>
                       </div>
                     </div>
                   </div>
-                  
+
                   <div>
                     <h3 className="text-lg font-semibold mb-4">Transaction Analysis</h3>
                     <div className="space-y-3">
@@ -733,21 +706,19 @@ const LedgerReport: React.FC = () => {
                 ) : (
                   <div className="space-y-4">
                     {Object.entries(monthlyBalances).map(([monthKey, monthData]) => (
-                      <div 
-                        key={monthKey} 
-                        className={`border rounded-lg ${
-                          theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
-                        }`}
-                      >
-                        <div 
-                          className={`p-4 cursor-pointer flex items-center justify-between ${
-                            theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                      <div
+                        key={monthKey}
+                        className={`border rounded-lg ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'
                           }`}
+                      >
+                        <div
+                          className={`p-4 cursor-pointer flex items-center justify-between ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                            }`}
                           onClick={() => toggleMonth(monthKey)}
                         >
                           <div className="flex items-center">
-                            {expandedMonths.has(monthKey) ? 
-                              <ChevronDown size={16} className="mr-2" /> : 
+                            {expandedMonths.has(monthKey) ?
+                              <ChevronDown size={16} className="mr-2" /> :
                               <ChevronRight size={16} className="mr-2" />
                             }
                             <span className="font-medium">{monthData.month}</span>
@@ -757,19 +728,17 @@ const LedgerReport: React.FC = () => {
                           </div>
                           <div className="text-right">
                             <div className="text-sm text-gray-500">Net Effect</div>
-                            <div className={`font-medium ${
-                              (monthData.totalDebit - monthData.totalCredit) >= 0 ? 'text-green-600' : 'text-red-600'
-                            }`}>
+                            <div className={`font-medium ${(monthData.totalDebit - monthData.totalCredit) >= 0 ? 'text-green-600' : 'text-red-600'
+                              }`}>
                               {formatCurrency(Math.abs(monthData.totalDebit - monthData.totalCredit))}
                               {(monthData.totalDebit - monthData.totalCredit) >= 0 ? ' Dr' : ' Cr'}
                             </div>
                           </div>
                         </div>
-                        
+
                         {expandedMonths.has(monthKey) && (
-                          <div className={`px-4 pb-4 ${
-                            theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
-                          }`}>
+                          <div className={`px-4 pb-4 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+                            }`}>
                             <div className="grid grid-cols-3 gap-4 mb-4">
                               <div className="text-center">
                                 <div className="text-sm text-gray-500">Total Debit</div>
@@ -788,13 +757,12 @@ const LedgerReport: React.FC = () => {
                                 <div className="font-medium">{monthData.transactionCount}</div>
                               </div>
                             </div>
-                            
+
                             <div className="max-h-60 overflow-y-auto">
                               <table className="w-full text-sm">
                                 <thead>
-                                  <tr className={`${
-                                    theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
-                                  }`}>
+                                  <tr className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'
+                                    }`}>
                                     <th className="px-3 py-2 text-left">Date</th>
                                     <th className="px-3 py-2 text-left">Particulars</th>
                                     <th className="px-3 py-2 text-right">Debit</th>
@@ -803,11 +771,10 @@ const LedgerReport: React.FC = () => {
                                 </thead>
                                 <tbody>
                                   {monthlyGrouped[monthKey]?.map((txn) => (
-                                    <tr 
+                                    <tr
                                       key={txn.id}
-                                      className={`border-t ${
-                                        theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-white'
-                                      } cursor-pointer`}
+                                      className={`border-t ${theme === 'dark' ? 'border-gray-600 hover:bg-gray-700' : 'border-gray-200 hover:bg-white'
+                                        } cursor-pointer`}
                                       onClick={() => handleVoucherClick(txn)}
                                     >
                                       <td className="px-3 py-2">{formatDate(txn.date)}</td>
@@ -838,22 +805,20 @@ const LedgerReport: React.FC = () => {
       {/* Voucher Detail Modal */}
       {selectedVoucher && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-          <div className={`w-full max-w-2xl mx-4 rounded-lg ${
-            theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-          }`}>
+          <div className={`w-full max-w-2xl mx-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white'
+            }`}>
             <div className="p-6">
               <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">Voucher Details</h3>
                 <button
                   onClick={() => setSelectedVoucher(null)}
-                  className={`p-2 rounded-full ${
-                    theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-                  }`}
+                  className={`p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
+                    }`}
                 >
                   ×
                 </button>
               </div>
-              
+
               <div className="grid grid-cols-2 gap-4 mb-4">
                 <div>
                   <label className="block text-sm font-medium mb-1">Voucher No</label>
@@ -872,32 +837,31 @@ const LedgerReport: React.FC = () => {
                   <div className="font-medium">{formatCurrency(selectedVoucher.amount)}</div>
                 </div>
               </div>
-              
+
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-1">Particulars</label>
                 <div>{selectedVoucher.particulars}</div>
               </div>
-              
+
               <div className="mb-4">
                 <label className="block text-sm font-medium mb-1">Narration</label>
                 <div className="text-gray-600 dark:text-gray-400">{selectedVoucher.narration}</div>
               </div>
-              
+
               {selectedVoucher.reference && (
                 <div className="mb-4">
                   <label className="block text-sm font-medium mb-1">Reference</label>
                   <div>{selectedVoucher.reference}</div>
                 </div>
               )}
-              
+
               <div className="flex justify-end space-x-3">
                 <button
                   onClick={() => setSelectedVoucher(null)}
-                  className={`px-4 py-2 rounded ${
-                    theme === 'dark' 
-                      ? 'bg-gray-700 hover:bg-gray-600' 
+                  className={`px-4 py-2 rounded ${theme === 'dark'
+                      ? 'bg-gray-700 hover:bg-gray-600'
                       : 'bg-gray-100 hover:bg-gray-200'
-                  }`}
+                    }`}
                 >
                   Close
                 </button>
@@ -915,10 +879,9 @@ const LedgerReport: React.FC = () => {
           </div>
         </div>
       )}
-      
-      <div className={`mt-6 p-4 rounded ${
-        theme === 'dark' ? 'bg-gray-800' : 'bg-blue-50'
-      }`}>
+
+      <div className={`mt-6 p-4 rounded ${theme === 'dark' ? 'bg-gray-800' : 'bg-blue-50'
+        }`}>
         <p className="text-sm">
           <span className="font-semibold">Pro Tip:</span> Click on any transaction to view voucher details. Use F7 to quickly open ledger, F5 to refresh.
         </p>
