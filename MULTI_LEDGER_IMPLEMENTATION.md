@@ -1,7 +1,7 @@
 # Multi Ledger Creation Feature - Implementation Summary
 
 ## Overview
-This implementation provides a bulk ledger creation feature similar to Tally Prime's multi-ledger creation interface. Users can create multiple ledgers in a single operation with a tabular interface.
+This implementation provides a bulk ledger creation feature similar to ApnaBook's multi-ledger creation interface. Users can create multiple ledgers in a single operation with a tabular interface.
 
 ## Features Implemented
 
@@ -10,7 +10,7 @@ This implementation provides a bulk ledger creation feature similar to Tally Pri
 - **Route**: `/app/masters/ledger/bulk-create`
 
 #### Key Features:
-- **Tabular Interface**: Similar to Tally Prime with columns for:
+- **Tabular Interface**: Similar to ApnaBook with columns for:
   - S.No (Auto-generated row numbers)
   - Under Group (Dropdown with ledger groups)
   - Ledger Name (Text input)

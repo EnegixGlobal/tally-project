@@ -52,7 +52,7 @@ const Settings: React.FC = () => {
                   <input
                   title='Contact Email'
                     type="email"
-                    value="admin@tallyprimeaas.com"
+                    value="admin@apnabooksaas.com"
                     className={`w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
                       theme === 'dark' 
                         ? 'border-gray-600 bg-gray-700 text-white' 
