@@ -947,7 +947,7 @@ const CompanyForm: React.FC = () => {
                     <div className="flex items-start">
                       <AlertTriangle size={16} className="text-orange-500 mr-2 mt-0.5" />
                       <div className="text-sm">
-                        <strong>Warning:</strong> If you forget your Tally Vault password, you will permanently lose access to this company.
+                        <strong>Warning:</strong> If you forget your Apno Vault password, you will permanently lose access to this company.
                       </div>
                     </div>
                   </div>

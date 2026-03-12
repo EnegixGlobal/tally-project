@@ -1544,7 +1544,7 @@ CREATE TABLE `tbadmin` (
 --
 
 INSERT INTO `tbadmin` (`id`, `email`, `password`, `created_at`) VALUES
-(12, 'admin@tallyprime.com', 'admin123', '2025-07-10 06:55:34');
+(12, 'admin@apnabook.com', 'admin123', '2025-07-10 06:55:34');
 
 -- --------------------------------------------------------
 
