@@ -72,11 +72,11 @@ async function generateVoucherNumber({
     // 2️⃣ Resolve prefix (fallback safe)
     const prefix = PREFIX_MAP[voucherType] || voucherType.toUpperCase();
 
-    // 3️⃣ Financial year + month
+    // 3️⃣ Financial year
     const fy = getFinancialYear(date); // e.g. 25-26
-    const month = new Date(date).getMonth() + 1; // 1–12
 
     // 4️⃣ Lock sequence row (race-condition safe)
+    // Using month=0 for yearly sequence
     const [rows] = await conn.execute(
       `
       SELECT id, current_no
@@ -86,24 +86,24 @@ async function generateVoucherNumber({
         AND owner_id = ?
         AND voucher_type = ?
         AND financial_year = ?
-        AND month = ?
+        AND month = 0
       FOR UPDATE
       `,
-      [companyId, ownerType, ownerId, voucherType, fy, month]
+      [companyId, ownerType, ownerId, voucherType, fy]
     );
 
     let nextNo = 1;
 
     if (rows.length === 0) {
-      // 5️⃣ First voucher for this month/FY/type
+      // 5️⃣ First voucher for this FY/type
       await conn.execute(
         `
         INSERT INTO voucher_sequences
         (company_id, owner_type, owner_id,
          voucher_type, financial_year, month, current_no)
-        VALUES (?, ?, ?, ?, ?, ?, 1)
+        VALUES (?, ?, ?, ?, ?, 0, 1)
         `,
-        [companyId, ownerType, ownerId, voucherType, fy, month]
+        [companyId, ownerType, ownerId, voucherType, fy]
       );
     } else {
       // 6️⃣ Increment counter
@@ -115,10 +115,7 @@ async function generateVoucherNumber({
     }
 
     // 7️⃣ Final voucher number
-    const voucherNumber = `${prefix}/${fy}/${String(month).padStart(
-      2,
-      "0"
-    )}/${String(nextNo).padStart(6, "0")}`;
+    const voucherNumber = `${prefix}/${fy}/${String(nextNo).padStart(6, "0")}`;
 
     await conn.commit();
     return voucherNumber;

@@ -161,11 +161,8 @@ router.get("/next-number", async (req, res) => {
     }
 
     const fy = getFinancialYear(date);
-    const month = String(new Date(date).getMonth() + 1).padStart(2, "0");
-
     const prefix = "SO";
 
-    // 🔒 last sales order of same FY + month
     const [rows] = await db.query(
       `
       SELECT number
@@ -177,7 +174,7 @@ router.get("/next-number", async (req, res) => {
       ORDER BY id DESC
       LIMIT 1
       `,
-      [company_id, owner_type, owner_id, `${prefix}/${fy}/${month}/%`]
+      [company_id, owner_type, owner_id, `${prefix}/${fy}/%`]
     );
 
     let nextNo = 1;
@@ -185,13 +182,10 @@ router.get("/next-number", async (req, res) => {
     if (rows.length > 0) {
       const lastNumber = rows[0].number;
       const lastSeq = Number(lastNumber.split("/").pop());
-      nextNo = lastSeq + 1;
+      nextNo = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
     }
 
-    const voucherNumber = `${prefix}/${fy}/${month}/${String(nextNo).padStart(
-      6,
-      "0"
-    )}`;
+    const voucherNumber = `${prefix}/${fy}/${String(nextNo).padStart(6, "0")}`;
 
     return res.json({
       success: true,

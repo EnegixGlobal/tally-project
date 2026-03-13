@@ -151,7 +151,6 @@ router.get("/next-number", async (req, res) => {
     }
 
     const fy = getFinancialYear(date);
-    const month = String(new Date(date).getMonth() + 1).padStart(2, "0");
 
     // 🔥 LAST VOUCHER FETCH
     const [rows] = await db.execute(
@@ -164,20 +163,20 @@ router.get("/next-number", async (req, res) => {
         company_id,
         owner_type,
         owner_id,
-        `${voucherType}/${fy}/${month}/%`
+        `${voucherType}/${fy}/%`
       ]
     );
 
     let nextNo = 1;
 
     if (rows.length > 0) {
-      const lastNumber = rows[0].number; // PRV/25-26/01/000001
+      const lastNumber = rows[0].number; // PRV/25-26/000001
       const lastSeq = Number(lastNumber.split("/").pop());
-      nextNo = lastSeq + 1;
+      nextNo = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
     }
 
     const voucherNumber =
-      `${voucherType}/${fy}/${month}/${String(nextNo).padStart(6, "0")}`;
+      `${voucherType}/${fy}/${String(nextNo).padStart(6, "0")}`;
 
     console.log("voucherNumber:", voucherNumber);
 
