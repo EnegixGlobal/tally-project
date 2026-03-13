@@ -196,6 +196,31 @@ router.get("/next-number", async (req, res) => {
 });
 
 
+// Check duplicate voucher number
+router.get("/check-duplicate/:number", async (req, res) => {
+  try {
+    const { number } = req.params;
+    const { company_id } = req.query;
+
+    if (!company_id || !number) {
+      return res.status(400).json({ success: false, message: "Missing params" });
+    }
+
+    const [rows] = await db.execute(
+      "SELECT id FROM purchase_vouchers WHERE number = ? AND company_id = ? LIMIT 1",
+      [number, company_id]
+    );
+
+    return res.json({
+      success: true,
+      exists: rows.length > 0
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+});
+
 // POST Purchase Voucher
 // Helper
 // ================= UTILS =================
@@ -419,10 +444,22 @@ router.post("/", async (req, res) => {
     const dispatchThrough = dispatchDetails?.through || null;
     const destination = dispatchDetails?.destination || null;
 
-    // ================= GENERATE NUMBER =================
+    // ================= DUPLICATE CHECK =================
+    if (number) {
+      const [existingVoucher] = await db.execute(
+        "SELECT id FROM purchase_vouchers WHERE number = ? AND company_id = ? LIMIT 1",
+        [number, finalCompanyId]
+      );
+
+      if (existingVoucher.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Voucher number "${number}" already exists. Duplicate voucher numbers are not allowed.`,
+        });
+      }
+    }
 
     // ================= GENERATE NUMBER =================
-
     let voucherNumber = number; // ✅ Use frontend number if exists
 
     if (!voucherNumber) {
@@ -1023,6 +1060,21 @@ router.put("/:id", async (req, res) => {
     }
 
     const existing = voucherRows[0];
+
+    // ================= DUPLICATE CHECK =================
+    if (number && number !== existing.number) {
+      const [duplicateRows] = await db.execute(
+        "SELECT id FROM purchase_vouchers WHERE number = ? AND company_id = ? AND id != ? LIMIT 1",
+        [number, finalCompanyId, voucherId]
+      );
+
+      if (duplicateRows.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Voucher number "${number}" already exists in another voucher. Duplicate voucher numbers are not allowed.`,
+        });
+      }
+    }
 
     // ⭐ AUTO FIX OLD VOUCHERS (null company fields)
     if (!existing.company_id || !existing.owner_type || !existing.owner_id) {
