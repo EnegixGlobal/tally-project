@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer, Download, Settings } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
+import { useProfitLossSync } from "../../hooks/useProfitLossSync";
 
 interface Ledger {
   id: number;
@@ -24,6 +25,9 @@ interface LedgerGroup {
 const TrialBalance: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
+
+  // Sync Profit & Loss Data headlessly in background
+  useProfitLossSync();
 
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);

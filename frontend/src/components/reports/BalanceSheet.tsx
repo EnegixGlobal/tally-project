@@ -2,6 +2,7 @@ import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { ArrowLeft, Printer, Download, Settings } from "lucide-react";
+import { useProfitLossSync } from "../../hooks/useProfitLossSync";
 
 // Interfaces copied from your structure
 interface Ledger {
@@ -96,6 +97,21 @@ const BalanceSheet: React.FC = () => {
       setNetLoss(loss);
     }
   }, [companyId]);
+
+  // Sync Profit & Loss Data headlessly
+  const { netProfit: syncedNetProfit } = useProfitLossSync();
+
+  useEffect(() => {
+    if (syncedNetProfit !== undefined) {
+      if (syncedNetProfit > 0) {
+        setNetProfit(syncedNetProfit);
+        setNetLoss(0);
+      } else {
+        setNetProfit(0);
+        setNetLoss(Math.abs(syncedNetProfit));
+      }
+    }
+  }, [syncedNetProfit]);
 
   const [calculatedTotal, setCalculatedTotal] = useState({
     CapitalAccount: 0,
@@ -404,6 +420,13 @@ const BalanceSheet: React.FC = () => {
                       <span className="opacity-75">Less Transferred</span>
                       <span className="text-right font-mono ">
                         {`${-(transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup).toLocaleString()}`}
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 border-t border-gray-300 mt-1 pt-1 font-semibold">
+                      <span className="">Diff</span>
+                      <span className="text-right font-mono">
+                        {(netProfit - netLoss - (transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup)).toLocaleString()}
                       </span>
                     </div>
                   </div>
