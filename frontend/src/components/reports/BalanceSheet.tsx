@@ -104,6 +104,7 @@ const BalanceSheet: React.FC = () => {
     FixedAssets: 0,
     CurrentAssets: 0,
     TDSPayable: 0,
+    ProfitAndLossGroup: 0,
     LaiblityTotal: 0,
     AssetTotal: 0,
   });
@@ -115,6 +116,7 @@ const BalanceSheet: React.FC = () => {
     const fixedAssets = calculateGroupTotal(-9);
     const CurrentAssets = calculateGroupTotal(-5);
     const tdsPayable = calculateGroupTotal(-19);
+    const pnlGroupTotal = calculateGroupTotal(-18);
 
     // Liabilities are typically Credit (Negative in our Dr-based signed math)
     // Assets are typically Debit (Positive)
@@ -122,13 +124,15 @@ const BalanceSheet: React.FC = () => {
       Math.abs(capitalTotal < 0 ? capitalTotal : 0) +
       Math.abs(loanLability < 0 ? loanLability : 0) +
       Math.abs(currentLiability < 0 ? currentLiability : 0) +
-      Math.abs(tdsPayable < 0 ? tdsPayable : 0);
+      Math.abs(tdsPayable < 0 ? tdsPayable : 0) +
+      Math.abs(pnlGroupTotal < 0 ? pnlGroupTotal : 0);
 
     const assetSum =
       Math.abs(fixedAssets > 0 ? fixedAssets : 0) +
-      Math.abs(CurrentAssets > 0 ? CurrentAssets : 0);
+      Math.abs(CurrentAssets > 0 ? CurrentAssets : 0) +
+      Math.abs(pnlGroupTotal > 0 ? pnlGroupTotal : 0);
 
-    const pnlSigned = -(netProfit - netLoss - transferredProfit + transferredLoss); // Profit is Credit (-)
+    const pnlSigned = -(netProfit - netLoss - (transferredProfit - transferredLoss) - pnlGroupTotal); // Profit is Credit (-)
 
     setCalculatedTotal({
       CapitalAccount: capitalTotal,
@@ -137,6 +141,7 @@ const BalanceSheet: React.FC = () => {
       FixedAssets: fixedAssets,
       CurrentAssets: CurrentAssets,
       TDSPayable: tdsPayable,
+      ProfitAndLossGroup: pnlGroupTotal,
       LaiblityTotal: liabSum + (pnlSigned < 0 ? Math.abs(pnlSigned) : 0),
       AssetTotal: assetSum + (pnlSigned > 0 ? Math.abs(pnlSigned) : 0),
     });
@@ -294,7 +299,7 @@ const BalanceSheet: React.FC = () => {
                 <div>
                   <div
                     className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer"
-                    onClick={() => handleGroupClick(-4, -18)}
+                    onClick={() => handleGroupClick(-4)}
                   >
                     <span className="text-blue-600 font-semibold ">
                       Capital Account
@@ -356,19 +361,33 @@ const BalanceSheet: React.FC = () => {
 
 
 
-                  {/* Profit & Loss A/c (Restored to standalone row) */}
-                <div className="border-b border-gray-300 pb-2">
-                  {/* Header */}
+                {/* Profit & Loss A/c (Clickable Link) */}
+                <div>
                   <div
-                    className="grid grid-cols-2 gap-2 py-2 cursor-pointer"
-                    onClick={() => navigate("/app/reports/profit-loss")}
+                    className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer"
+                    onClick={() => navigate("/app/reports/sub-group-summary/-18")}
                   >
                     <span className="text-blue-600 font-semibold ">
                       Profit & Loss A/c
                     </span>
                     <span className="text-right font-mono font-bold">
-                      {/* {(netProfit - netLoss - transferredProfit + transferredLoss).toLocaleString()} */}
-                      0
+                      {formatBalance(calculatedTotal.ProfitAndLossGroup)}
+                    </span>
+                  </div>
+                  {isDetailedView && renderDetailedGroupItems(-18)}
+                </div>
+
+                {/* Profit & Loss A/c (Existing with breakdown) */}
+                <div className="border-b border-gray-300 pb-2">
+                  <div
+                    className="grid grid-cols-2 gap-2 py-2 cursor-pointer"
+                    onClick={() => navigate("/app/reports/profit-loss")}
+                  >
+                    <span className="text-blue-600 font-semibold ">
+                      Profit & Loss
+                    </span>
+                    <span className="text-right font-mono font-bold text-red-600">
+                      {/* {(netProfit - netLoss - (transferredProfit - transferredLoss) - calculatedTotal.ProfitAndLossGroup).toLocaleString()} */}
                     </span>
                   </div>
 
@@ -383,8 +402,8 @@ const BalanceSheet: React.FC = () => {
 
                     <div className="grid grid-cols-2">
                       <span className="opacity-75">Less Transferred</span>
-                      <span className="text-right font-mono">
-                        {(transferredProfit > 0 || transferredLoss > 0) ? 0 : (netProfit - netLoss).toLocaleString()}
+                      <span className="text-right font-mono ">
+                        {`${-(transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup).toLocaleString()}`}
                       </span>
                     </div>
                   </div>
