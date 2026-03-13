@@ -128,6 +128,7 @@ const ProfitLoss: React.FC = () => {
   const [purchaseLedgers, setPurchaseLedgers] = useState<SimpleLedger[]>([]);
   const [salesLedgers, setSalesLedgers] = useState<SimpleLedger[]>([]);
   const [directexpense, setDirectexpense] = useState<SimpleLedger[]>([]);
+  const [directincome, setDirectincome] = useState<SimpleLedger[]>([]);
   const [indirectExpenses, setIndirectExpenses] = useState<SimpleLedger[]>([]);
   const [indirectIncome, setIndirectIncome] = useState<SimpleLedger[]>([]);
   const [stockLedgers, setStockLedgers] = useState<any[]>([]);
@@ -187,6 +188,20 @@ const ProfitLoss: React.FC = () => {
             opening_balance: l.opening_balance,
           }));
 
+        // direct-income
+        const dirIncome: SimpleLedger[] = ledgers
+          .filter((l: any) => {
+            const gid = String(l.group_id);
+            if (gid === "-8") return true;
+            const group = (ledgerGroups || []).find(g => String(g.id) === gid);
+            return group?.type === "direct-income";
+          })
+          .map((l: any) => ({
+            id: Number(l.id),
+            name: l.name,
+            opening_balance: l.opening_balance,
+          }));
+
         // indirect-income
         const indIncome: SimpleLedger[] = ledgers
           .filter((l: any) => {
@@ -225,6 +240,7 @@ const ProfitLoss: React.FC = () => {
         setPurchaseLedgers(purchases);
         setSalesLedgers(sales);
         setDirectexpense(directExpense);
+        setDirectincome(dirIncome);
         setIndirectExpenses(indExpenses);
         setIndirectIncome(indIncome);
         setStockLedgers(stockItems);
@@ -389,7 +405,14 @@ const ProfitLoss: React.FC = () => {
 
   const getIndirectIncomeTotal = () => {
     return indirectIncome.reduce(
-      (sum, item) => sum + (ledgerBalances[item.id]?.credit || 0),
+      (sum, item) => sum + ((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)),
+      0
+    );
+  };
+
+  const getDirectIncomeTotal = () => {
+    return directincome.reduce(
+      (sum, item) => sum + ((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)),
       0
     );
   };
@@ -408,14 +431,14 @@ const ProfitLoss: React.FC = () => {
 
   const getDirectExpensesTotal = () => {
     return directexpense.reduce(
-      (sum, item) => sum + (ledgerBalances[item.id]?.debit || 0),
+      (sum, item) => sum + ((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)),
       0
     );
   };
 
   const getIndirectExpensesTotal = () => {
     return indirectExpenses.reduce(
-      (sum, item) => sum + (ledgerBalances[item.id]?.debit || 0),
+      (sum, item) => sum + ((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)),
       0
     );
   };
@@ -442,7 +465,7 @@ const ProfitLoss: React.FC = () => {
   };
 
   const getTradingCreditTotal = () => {
-    return getSalesTotal() + calculateClosingStockValue();
+    return getSalesTotal() + getDirectIncomeTotal() + calculateClosingStockValue();
   };
 
 
@@ -605,6 +628,14 @@ const ProfitLoss: React.FC = () => {
   const handleIndirectIncomeClick = (ledgerName: string, ledgerId: number) => {
     navigate(
       `/app/reports/profit-loss/indirect-income/alldetails?ledger=${encodeURIComponent(
+        ledgerName
+      )}&groupId=${ledgerId}`
+    );
+  };
+
+  const handleDirectIncomeClick = (ledgerName: string, ledgerId: number) => {
+    navigate(
+      `/app/reports/profit-loss/direct-income/alldetails?ledger=${encodeURIComponent(
         ledgerName
       )}&groupId=${ledgerId}`
     );
@@ -838,7 +869,7 @@ const ProfitLoss: React.FC = () => {
                   </Link>
                   <span className="font-mono">
                     {showDetailed
-                      ? purchaseLedgers.reduce((sum, item) => sum + (ledgerBalances[item.id]?.debit || 0), 0).toLocaleString()
+                      ? purchaseLedgers.reduce((sum, item) => sum + ((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)), 0).toLocaleString()
                       : getPurchaseTotal().toLocaleString()
                     }
                   </span>
@@ -941,7 +972,7 @@ const ProfitLoss: React.FC = () => {
                           {item.name}
                         </span>
                         <span className="font-mono">
-                          {(ledgerBalances[item.id]?.debit || 0).toLocaleString()}
+                          {((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)).toLocaleString()}
                         </span>
                       </div>
                     ))}
@@ -1006,7 +1037,7 @@ const ProfitLoss: React.FC = () => {
                   </Link>
                   <span className="font-mono">
                     {showDetailed
-                      ? salesLedgers.reduce((sum, item) => sum + (ledgerBalances[item.id]?.credit || 0), 0).toLocaleString()
+                      ? salesLedgers.reduce((sum, item) => sum + ((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)), 0).toLocaleString()
                       : getFinalSalesTotal().toLocaleString()
                     }
                   </span>
@@ -1078,6 +1109,41 @@ const ProfitLoss: React.FC = () => {
                       <div className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-500"
                         }`}>No sales items</div>
                     )}
+                  </div>
+                )}
+              </div>
+
+              {/* Direct Income */}
+              <div className="py-2 border-b border-gray-300 dark:border-gray-600">
+                <div className="flex justify-between font-semibold cursor-pointer">
+                  <Link to="/app/reports/group-summary/-8">
+                    <span className="text-blue-600 dark:text-blue-400 underline font-semibold">
+                      By Direct Income
+                    </span>
+                  </Link>
+                  <span className="font-mono">
+                    {getDirectIncomeTotal().toLocaleString()}
+                  </span>
+                </div>
+
+                {/* Detailed Breakup - Direct Income */}
+                {showDetailed && directincome.length > 0 && (
+                  <div className="mt-2 space-y-1 pl-4 text-sm">
+                    {directincome.map((item, index) => (
+                      <div
+                        key={index}
+                        onClick={() => handleDirectIncomeClick(item.name, item.id)}
+                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                          }`}
+                      >
+                        <span className="text-blue-600 underline">
+                          {item.name}
+                        </span>
+                        <span className="font-mono">
+                          {((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)).toLocaleString()}
+                        </span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -1282,7 +1348,7 @@ const ProfitLoss: React.FC = () => {
                       >
                         <span className="text-blue-600 underline">{ledger.name}</span>
                         <span className="font-mono">
-                          {(ledgerBalances[Number(ledger.id)]?.credit || 0).toLocaleString()}
+                          {((ledgerBalances[Number(ledger.id)]?.credit || 0) - (ledgerBalances[Number(ledger.id)]?.debit || 0)).toLocaleString()}
                         </span>
                       </div>
                     ))}
