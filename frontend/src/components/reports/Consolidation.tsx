@@ -126,9 +126,37 @@ const ConsolidatedFinancialReport: React.FC = () => {
     return companies.reduce((sum, c) => sum + calculateGroupTotalByCompany(groupId, c.id), 0);
   };
 
-  const getTotalSales = () => companies.reduce((sum, c) => sum + (salesData[c.id] || 0), 0);
-  const getTotalPurchase = () => companies.reduce((sum, c) => sum + (purchaseData[c.id] || 0), 0);
+  const getSalesForCompany = (companyId: number) => {
+    return salesData[companyId] || 0;
+  };
+
+  const getPurchaseForCompany = (companyId: number) => {
+    return purchaseData[companyId] || 0;
+  };
+
+  const getTotalSales = () => companies.reduce((sum, c) => sum + getSalesForCompany(c.id), 0);
+  const getTotalPurchase = () => companies.reduce((sum, c) => sum + getPurchaseForCompany(c.id), 0);
   const getTotalPL = () => companies.reduce((sum, c) => sum + getCompanyProfitLoss(c.id), 0);
+
+  const getDirectExpenseForCompany = (companyId: number) => calculateGroupTotalByCompany(-7, companyId);
+  const getDirectIncomeForCompany = (companyId: number) => calculateGroupTotalByCompany(-8, companyId);
+  const getIndirectIncomeForCompany = (companyId: number) => calculateGroupTotalByCompany(-11, companyId);
+
+  const getTotalDirectExpense = () => companies.reduce((sum, c) => sum + getDirectExpenseForCompany(c.id), 0);
+  const getTotalDirectIncome = () => companies.reduce((sum, c) => sum + getDirectIncomeForCompany(c.id), 0);
+  const getTotalIndirectIncome = () => companies.reduce((sum, c) => sum + getIndirectIncomeForCompany(c.id), 0);
+
+  const getCompanyGrossProfit = (companyId: number) => {
+    const sale = getSalesForCompany(companyId);
+    const purchase = getPurchaseForCompany(companyId);
+    const directExp = getDirectExpenseForCompany(companyId);
+    const directInc = getDirectIncomeForCompany(companyId);
+    return (sale + directInc) - (purchase + directExp);
+  };
+
+  const getTotalGrossProfit = () => {
+    return companies.reduce((sum, c) => sum + getCompanyGrossProfit(c.id), 0);
+  };
 
   // Get ledgers for a group by company
   const getLedgersForGroup = (groupId: number, companyId: number) => {
@@ -214,7 +242,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
             Trading Account
           </h2>
           <span className="text-sm font-bold text-indigo-600">
-            {formatINR(getTotalSales() - getTotalPurchase())}
+            {formatINR(getTotalGrossProfit())}
           </span>
         </div>
 
@@ -231,26 +259,104 @@ const ConsolidatedFinancialReport: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                  <td className={tdClass}>Sales</td>
-                  {companies.map(c => (
-                    <td key={c.id} className={tdRightClass}>{formatINR(salesData[c.id] || 0)}</td>
-                  ))}
-                  <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalSales())}</td>
-                </tr>
-                <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                  <td className={tdClass}>Purchase</td>
-                  {companies.map(c => (
-                    <td key={c.id} className={tdRightClass}>{formatINR(purchaseData[c.id] || 0)}</td>
-                  ))}
-                  <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalPurchase())}</td>
-                </tr>
+                <React.Fragment>
+                  <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                    <td className={tdClass}>Purchase</td>
+                    {companies.map(c => (
+                      <td key={c.id} className={tdRightClass}>{formatINR(getPurchaseForCompany(c.id))}</td>
+                    ))}
+                    <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalPurchase())}</td>
+                  </tr>
+                  {isDetailedView && companies.map(c => {
+                    const groupLedgers = getLedgersForGroup(-15, c.id);
+                    return groupLedgers.map(ledger => (
+                      <tr key={`${c.id}-${ledger.id}`} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                        <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name} ({c.name})</td>
+                        {companies.map(cc => (
+                          <td key={cc.id} className={`${tdRightClass} text-gray-500`}>
+                            {cc.id === c.id ? formatINR(calculateClosingBalance(ledger)) : '-'}
+                          </td>
+                        ))}
+                        <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                      </tr>
+                    ));
+                  })}
+                </React.Fragment>
+                <React.Fragment>
+                  <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                    <td className={tdClass}>To Direct Expense</td>
+                    {companies.map(c => (
+                      <td key={c.id} className={tdRightClass}>{formatINR(getDirectExpenseForCompany(c.id))}</td>
+                    ))}
+                    <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalDirectExpense())}</td>
+                  </tr>
+                  {isDetailedView && companies.map(c => {
+                    const groupLedgers = getLedgersForGroup(-7, c.id);
+                    return groupLedgers.map(ledger => (
+                      <tr key={`${c.id}-${ledger.id}`} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                        <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name} ({c.name})</td>
+                        {companies.map(cc => (
+                          <td key={cc.id} className={`${tdRightClass} text-gray-500`}>
+                            {cc.id === c.id ? formatINR(calculateClosingBalance(ledger)) : '-'}
+                          </td>
+                        ))}
+                        <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                      </tr>
+                    ));
+                  })}
+                </React.Fragment>
+                <React.Fragment>
+                  <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                    <td className={tdClass}>By Sale</td>
+                    {companies.map(c => (
+                      <td key={c.id} className={tdRightClass}>{formatINR(getSalesForCompany(c.id))}</td>
+                    ))}
+                    <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalSales())}</td>
+                  </tr>
+                  {isDetailedView && companies.map(c => {
+                    const groupLedgers = getLedgersForGroup(-16, c.id);
+                    return groupLedgers.map(ledger => (
+                      <tr key={`${c.id}-${ledger.id}`} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                        <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name} ({c.name})</td>
+                        {companies.map(cc => (
+                          <td key={cc.id} className={`${tdRightClass} text-gray-500`}>
+                            {cc.id === c.id ? formatINR(calculateClosingBalance(ledger)) : '-'}
+                          </td>
+                        ))}
+                        <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                      </tr>
+                    ));
+                  })}
+                </React.Fragment>
+                <React.Fragment>
+                  <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                    <td className={tdClass}>By Direct Income</td>
+                    {companies.map(c => (
+                      <td key={c.id} className={tdRightClass}>{formatINR(getDirectIncomeForCompany(c.id))}</td>
+                    ))}
+                    <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalDirectIncome())}</td>
+                  </tr>
+                  {isDetailedView && companies.map(c => {
+                    const groupLedgers = getLedgersForGroup(-8, c.id);
+                    return groupLedgers.map(ledger => (
+                      <tr key={`${c.id}-${ledger.id}`} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                        <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name} ({c.name})</td>
+                        {companies.map(cc => (
+                          <td key={cc.id} className={`${tdRightClass} text-gray-500`}>
+                            {cc.id === c.id ? formatINR(calculateClosingBalance(ledger)) : '-'}
+                          </td>
+                        ))}
+                        <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                      </tr>
+                    ));
+                  })}
+                </React.Fragment>
                 <tr className={totalRowClass}>
                   <td className={tdClass}>Gross Profit/Loss</td>
                   {companies.map(c => (
-                    <td key={c.id} className={tdRightClass}>{formatINR((salesData[c.id] || 0) - (purchaseData[c.id] || 0))}</td>
+                    <td key={c.id} className={tdRightClass}>{formatINR(getCompanyGrossProfit(c.id))}</td>
                   ))}
-                  <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalSales() - getTotalPurchase())}</td>
+                  <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalGrossProfit())}</td>
                 </tr>
               </tbody>
             </table>
@@ -473,9 +579,9 @@ const ConsolidatedFinancialReport: React.FC = () => {
             </thead>
             <tbody>
               {companies.map(c => {
-                const sales = salesData[c.id] || 0;
-                const purchase = purchaseData[c.id] || 0;
-                const grossPL = sales - purchase;
+                const sales = getSalesForCompany(c.id);
+                const purchase = getPurchaseForCompany(c.id);
+                const grossPL = getCompanyGrossProfit(c.id);
                 const netPL = getCompanyProfitLoss(c.id);
                 const totalLiab = liabilityGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0) + netPL;
                 const totalAssets = assetGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0);
@@ -498,7 +604,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
                 <td className={tdClass}>Total</td>
                 <td className={tdRightClass}>{formatINR(getTotalSales())}</td>
                 <td className={tdRightClass}>{formatINR(getTotalPurchase())}</td>
-                <td className={tdRightClass}>{formatINR(getTotalSales() - getTotalPurchase())}</td>
+                <td className={tdRightClass}>{formatINR(getTotalGrossProfit())}</td>
                 <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalPL())}</td>
                 <td className={`${tdRightClass} font-bold`}>{formatINR(liabilityGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0) + getTotalPL())}</td>
                 <td className={`${tdRightClass} font-bold`}>{formatINR(assetGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0))}</td>
@@ -510,7 +616,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
           </table>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

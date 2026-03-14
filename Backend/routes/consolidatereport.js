@@ -46,11 +46,11 @@ router.get('/employee-financial-report', async (req, res) => {
     // --- Trading Account ---
     for (const company of companies) {
       const [sales] = await connection.query(
-        `SELECT SUM(total) AS total FROM sales_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
         [company.id]
       );
       const [purchases] = await connection.query(
-        `SELECT SUM(total) AS total FROM purchase_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
         [company.id]
       );
       tradingRowsMap[company.id] = {
@@ -356,13 +356,13 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
         }
       });
 
-      // Calculate net profit/loss from sales and purchases
+      // Calculate net profit/loss from sales and purchases (Base amounts without tax)
       const [[salesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
         [company.id]
       );
       const [[purchasesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
         [company.id]
       );
 
@@ -397,11 +397,11 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
     const purchaseData = {};
     for (const company of companies) {
       const [[salesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
         [company.id]
       );
       const [[purchasesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
         [company.id]
       );
       salesData[company.id] = Number(salesResult?.total) || 0;
