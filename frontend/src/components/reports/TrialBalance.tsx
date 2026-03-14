@@ -33,6 +33,9 @@ const TrialBalance: React.FC = () => {
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [isDetailedView, setIsDetailedView] = useState(false);
+  const [showOpening, setShowOpening] = useState(false);
+  const [showDebit, setShowDebit] = useState(false);
+  const [showCredit, setShowCredit] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const [debitCreditData, setDebitCreditData] = useState<
@@ -186,11 +189,17 @@ const TrialBalance: React.FC = () => {
                 <td className="py-2 px-4" style={{ paddingLeft: `${(level + 1) * 1.5}rem` }}>
                   <span className="italic font-semibold text-blue-500">{group.name}</span>
                 </td>
-                <td className="py-2 px-4 text-right font-mono text-xs">
-                  {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : ""}
-                </td>
-                <td className="py-2 px-4 text-right font-mono text-xs">{totals.debit > 0 ? totals.debit.toLocaleString() : ""}</td>
-                <td className="py-2 px-4 text-right font-mono text-xs">{totals.credit > 0 ? totals.credit.toLocaleString() : ""}</td>
+                {showOpening && (
+                  <td className="py-2 px-4 text-right font-mono text-xs">
+                    {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : ""}
+                  </td>
+                )}
+                {showDebit && (
+                  <td className="py-2 px-4 text-right font-mono text-xs">{totals.debit > 0 ? totals.debit.toLocaleString() : ""}</td>
+                )}
+                {showCredit && (
+                  <td className="py-2 px-4 text-right font-mono text-xs">{totals.credit > 0 ? totals.credit.toLocaleString() : ""}</td>
+                )}
                 <td className="py-2 px-4 text-right font-mono text-xs">
                   {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : ""}
                 </td>
@@ -225,11 +234,17 @@ const TrialBalance: React.FC = () => {
               <td className="py-1 px-4" style={{ paddingLeft: `${(level + 1) * 1.5}rem` }}>
                 {ledger.name}
               </td>
-              <td className="py-1 px-4 text-right font-mono">
-                {netOp !== 0 ? `${Math.abs(netOp).toLocaleString()} ${netOp > 0 ? "Dr" : "Cr"}` : ""}
-              </td>
-              <td className="py-1 px-4 text-right font-mono">{d > 0 ? d.toLocaleString() : ""}</td>
-              <td className="py-1 px-4 text-right font-mono">{c > 0 ? c.toLocaleString() : ""}</td>
+              {showOpening && (
+                <td className="py-1 px-4 text-right font-mono">
+                  {netOp !== 0 ? `${Math.abs(netOp).toLocaleString()} ${netOp > 0 ? "Dr" : "Cr"}` : ""}
+                </td>
+              )}
+              {showDebit && (
+                <td className="py-1 px-4 text-right font-mono">{d > 0 ? d.toLocaleString() : ""}</td>
+              )}
+              {showCredit && (
+                <td className="py-1 px-4 text-right font-mono">{c > 0 ? c.toLocaleString() : ""}</td>
+              )}
               <td className="py-1 px-4 text-right font-mono">
                 {netClose !== 0 ? `${Math.abs(netClose).toLocaleString()} ${netClose > 0 ? "Dr" : "Cr"}` : ""}
               </td>
@@ -268,15 +283,40 @@ const TrialBalance: React.FC = () => {
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-2xl font-bold">Trial Balance</h1>
-        <div className="ml-auto flex space-x-2">
-          <button
-            onClick={() => setIsDetailedView(!isDetailedView)}
-            className={`p-2 rounded-md transition-all ${isDetailedView ? "bg-indigo-600 text-white shadow-lg" : theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
-          >
-            <Settings size={18} className={isDetailedView ? "animate-spin-slow" : ""} />
-          </button>
-          <button className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-200" : "hover:bg-gray-200"}`}><Printer size={18} /></button>
-          <button className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-200" : "hover:bg-gray-200"}`}><Download size={18} /></button>
+        <div className="ml-auto relative">
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setIsDetailedView(!isDetailedView)}
+              className={`p-2 rounded-md transition-all ${isDetailedView ? "bg-indigo-600 text-white shadow-lg" : theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
+            >
+              <Settings size={18} className={isDetailedView ? "animate-spin-slow" : ""} />
+            </button>
+            <button className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-200" : "hover:bg-gray-200"}`}><Printer size={18} /></button>
+            <button className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-200" : "hover:bg-gray-200"}`}><Download size={18} /></button>
+          </div>
+
+          {isDetailedView && (
+            <div className={`absolute right-0 mt-2 w-48 p-3 rounded bg-white shadow-lg ${theme === 'dark' ? 'bg-gray-800 text-white' : ''}`}>
+              <div className="text-sm font-semibold mb-2">Show Columns</div>
+              <label className="flex items-center justify-between mb-2">
+                <span>Opening</span>
+                <input type="checkbox" checked={showOpening} onChange={(e) => setShowOpening(e.target.checked)} />
+              </label>
+              <label className="flex items-center justify-between mb-2">
+                <span>Debit</span>
+                <input type="checkbox" checked={showDebit} onChange={(e) => setShowDebit(e.target.checked)} />
+              </label>
+              <label className="flex items-center justify-between mb-2">
+                <span>Credit</span>
+                <input type="checkbox" checked={showCredit} onChange={(e) => setShowCredit(e.target.checked)} />
+              </label>
+              <hr className="my-2 border-t" />
+              <label className="flex items-center justify-between">
+                <span>Show Details</span>
+                <input type="checkbox" checked={isDetailedView} onChange={(e) => setIsDetailedView(e.target.checked)} />
+              </label>
+            </div>
+          )}
         </div>
       </div>
 
@@ -289,9 +329,9 @@ const TrialBalance: React.FC = () => {
             <thead>
               <tr className="border-b-2 border-gray-400 font-bold text-sm">
                 <th className="py-3 px-4">Particulars</th>
-                <th className="py-3 px-4 text-right">Opening Balance</th>
-                <th className="py-3 px-4 text-right">Debit</th>
-                <th className="py-3 px-4 text-right">Credit</th>
+                {showOpening && <th className="py-3 px-4 text-right">Opening Balance</th>}
+                {showDebit && <th className="py-3 px-4 text-right">Debit</th>}
+                {showCredit && <th className="py-3 px-4 text-right">Credit</th>}
                 <th className="py-3 px-4 text-right">Closing Balance</th>
               </tr>
             </thead>
@@ -307,11 +347,17 @@ const TrialBalance: React.FC = () => {
                       onClick={() => navigate(`/app/reports/sub-group-summary/${tg.id}`)}
                     >
                       <td className="py-3 px-4 text-blue-600">{tg.name}</td>
-                      <td className="py-3 px-4 text-right font-mono">
-                        {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : ""}
-                      </td>
-                      <td className="py-3 px-4 text-right font-mono">{totals.debit > 0 ? totals.debit.toLocaleString() : ""}</td>
-                      <td className="py-3 px-4 text-right font-mono">{totals.credit > 0 ? totals.credit.toLocaleString() : ""}</td>
+                      {showOpening && (
+                        <td className="py-3 px-4 text-right font-mono">
+                          {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : ""}
+                        </td>
+                      )}
+                      {showDebit && (
+                        <td className="py-3 px-4 text-right font-mono">{totals.debit > 0 ? totals.debit.toLocaleString() : ""}</td>
+                      )}
+                      {showCredit && (
+                        <td className="py-3 px-4 text-right font-mono">{totals.credit > 0 ? totals.credit.toLocaleString() : ""}</td>
+                      )}
                       <td className="py-3 px-4 text-right font-mono">
                         {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : ""}
                       </td>
@@ -322,28 +368,34 @@ const TrialBalance: React.FC = () => {
               })}
             </tbody>
             <tfoot>
-              <tr className="font-bold text-lg border-t-2 border-gray-400">
+              <tr className="font-bold text-lg border-t-2 border-gray-400 cursor-pointer" onClick={() => setIsDetailedView(true)}>
                 <td className="py-3 px-4 font-bold">Grand Total</td>
-                <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
-                  {grandTotals.openingDr > 0 || grandTotals.openingCr > 0 ? (
-                    <>
-                      {grandTotals.openingDr > grandTotals.openingCr
-                        ? `${(grandTotals.openingDr - grandTotals.openingCr).toLocaleString()} Dr`
-                        : `${(grandTotals.openingCr - grandTotals.openingDr).toLocaleString()} Cr`}
-                    </>
-                  ) : "-"}
-                </td>
-                <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.debit.toLocaleString()}</td>
-                <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.credit.toLocaleString()}</td>
-                <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
-                  {grandTotals.closingDr > 0 || grandTotals.closingCr > 0 ? (
-                    <>
-                      {grandTotals.closingDr > grandTotals.closingCr
-                        ? `${(grandTotals.closingDr - grandTotals.closingCr).toLocaleString()} Dr`
-                        : `${(grandTotals.closingCr - grandTotals.closingDr).toLocaleString()} Cr`}
-                    </>
-                  ) : "-"}
-                </td>
+                  {showOpening && (
+                    <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
+                      {grandTotals.openingDr > 0 || grandTotals.openingCr > 0 ? (
+                        <>
+                          {grandTotals.openingDr > grandTotals.openingCr
+                            ? `${(grandTotals.openingDr - grandTotals.openingCr).toLocaleString()} Dr`
+                            : `${(grandTotals.openingCr - grandTotals.openingDr).toLocaleString()} Cr`}
+                        </>
+                      ) : "-"}
+                    </td>
+                  )}
+                  {showDebit && (
+                    <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.debit.toLocaleString()}</td>
+                  )}
+                  {showCredit && (
+                    <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.credit.toLocaleString()}</td>
+                  )}
+                  <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
+                    {grandTotals.closingDr > 0 || grandTotals.closingCr > 0 ? (
+                      <>
+                        {grandTotals.closingDr > grandTotals.closingCr
+                          ? `${(grandTotals.closingDr - grandTotals.closingCr).toLocaleString()} Dr`
+                          : `${(grandTotals.closingCr - grandTotals.closingDr).toLocaleString()} Cr`}
+                      </>
+                    ) : "-"}
+                  </td>
               </tr>
             </tfoot>
           </table>
