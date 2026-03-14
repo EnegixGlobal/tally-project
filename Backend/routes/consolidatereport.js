@@ -316,9 +316,38 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
           WHERE pvi.tdsLedgerId IN (${ledgerPlaceholders})
             AND pv.company_id IN (${placeholders})
           GROUP BY pvi.tdsLedgerId
+
+          UNION ALL
+
+          SELECT 
+            pvi.purchaseLedgerId AS ledgerId,
+            SUM(pvi.amount) AS debit,
+            0 AS credit
+          FROM purchase_voucher_items pvi
+          JOIN purchase_vouchers pv ON pv.id = pvi.voucherId
+          WHERE pvi.purchaseLedgerId IN (${ledgerPlaceholders})
+            AND pv.company_id IN (${placeholders})
+          GROUP BY pvi.purchaseLedgerId
+
+          UNION ALL
+
+          SELECT 
+            svi.salesLedgerId AS ledgerId,
+            0 AS debit,
+            SUM(svi.amount) AS credit
+          FROM sales_voucher_items svi
+          JOIN sales_vouchers sv ON sv.id = svi.voucherId
+          WHERE svi.salesLedgerId IN (${ledgerPlaceholders})
+            AND sv.company_id IN (${placeholders})
+          GROUP BY svi.salesLedgerId
         ) AS combined_data
         GROUP BY ledgerId`,
-        [...ledgerIds, ...ledgerIds, ...companyIds]
+        [
+          ...ledgerIds, // 1st query ledger_id IN
+          ...ledgerIds, ...companyIds, // 2nd query pvi.tdsLedgerId IN, pv.company_id IN
+          ...ledgerIds, ...companyIds, // 3rd query pvi.purchaseLedgerId IN, pv.company_id IN
+          ...ledgerIds, ...companyIds  // 4th query svi.salesLedgerId IN, sv.company_id IN
+        ]
       );
 
       // Map debitCreditData with companyId_ledgerId as key
