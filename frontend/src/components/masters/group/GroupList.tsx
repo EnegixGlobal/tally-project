@@ -42,7 +42,7 @@ const GroupList: React.FC = () => {
     { id: -15, name: "Purchase Accounts", nature: "Expenses", isSystem: true },
     { id: -16, name: "Sales Accounts", nature: "Income", isSystem: true },
     { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },
-    { id: -18, name: "Profit/Loss", nature: "Liabilities", isSystem: true },
+    { id: -18, name: "Profit & Loss A/c", nature: "Liabilities", isSystem: true },
     { id: -19, name: "TDS Payables", nature: "Liabilities", isSystem: true },
   ];
 

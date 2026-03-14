@@ -126,9 +126,37 @@ const ConsolidatedFinancialReport: React.FC = () => {
     return companies.reduce((sum, c) => sum + calculateGroupTotalByCompany(groupId, c.id), 0);
   };
 
-  const getTotalSales = () => companies.reduce((sum, c) => sum + (salesData[c.id] || 0), 0);
-  const getTotalPurchase = () => companies.reduce((sum, c) => sum + (purchaseData[c.id] || 0), 0);
+  const getSalesForCompany = (companyId: number) => {
+    return salesData[companyId] || 0;
+  };
+
+  const getPurchaseForCompany = (companyId: number) => {
+    return purchaseData[companyId] || 0;
+  };
+
+  const getTotalSales = () => companies.reduce((sum, c) => sum + getSalesForCompany(c.id), 0);
+  const getTotalPurchase = () => companies.reduce((sum, c) => sum + getPurchaseForCompany(c.id), 0);
   const getTotalPL = () => companies.reduce((sum, c) => sum + getCompanyProfitLoss(c.id), 0);
+
+  const getDirectExpenseForCompany = (companyId: number) => calculateGroupTotalByCompany(-7, companyId);
+  const getDirectIncomeForCompany = (companyId: number) => calculateGroupTotalByCompany(-8, companyId);
+  const getIndirectIncomeForCompany = (companyId: number) => calculateGroupTotalByCompany(-11, companyId);
+
+  const getTotalDirectExpense = () => companies.reduce((sum, c) => sum + getDirectExpenseForCompany(c.id), 0);
+  const getTotalDirectIncome = () => companies.reduce((sum, c) => sum + getDirectIncomeForCompany(c.id), 0);
+  const getTotalIndirectIncome = () => companies.reduce((sum, c) => sum + getIndirectIncomeForCompany(c.id), 0);
+
+  const getCompanyGrossProfit = (companyId: number) => {
+    const sale = getSalesForCompany(companyId);
+    const purchase = getPurchaseForCompany(companyId);
+    const directExp = getDirectExpenseForCompany(companyId);
+    const directInc = getDirectIncomeForCompany(companyId);
+    return (sale + directInc) - (purchase + directExp);
+  };
+
+  const getTotalGrossProfit = () => {
+    return companies.reduce((sum, c) => sum + getCompanyGrossProfit(c.id), 0);
+  };
 
   // Get ledgers for a group by company
   const getLedgersForGroup = (groupId: number, companyId: number) => {
@@ -203,258 +231,196 @@ const ConsolidatedFinancialReport: React.FC = () => {
         </div>
       )}
 
-      {/* TRADING ACCOUNT */}
-      <div className={`mb-4 rounded border overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
-        <div
-          className={`px-3 py-2 flex items-center justify-between cursor-pointer ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}
-          onClick={() => toggleSection('trading')}
-        >
-          <h2 className="text-sm font-bold flex items-center gap-2">
-            {expandedSections.trading ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            Trading Account
-          </h2>
-          <span className="text-sm font-bold text-indigo-600">
-            {formatINR(getTotalSales() - getTotalPurchase())}
-          </span>
-        </div>
+      {/* Individual Company Reports in Grid */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
+        {companies.map(c => {
+          const companySales = getSalesForCompany(c.id);
+          const companyPurchase = getPurchaseForCompany(c.id);
+          const companyDirectExp = getDirectExpenseForCompany(c.id);
+          const companyDirectInc = getDirectIncomeForCompany(c.id);
+          const companyGrossPL = getCompanyGrossProfit(c.id);
 
-        {expandedSections.trading && (
-          <div className="overflow-x-auto p-2">
-            <table className={tableClass}>
-              <thead>
-                <tr>
-                  <th className={thClass} style={{ minWidth: '150px' }}>Particulars</th>
-                  {companies.map(c => (
-                    <th key={c.id} className={thRightClass} style={{ minWidth: '120px' }}>{c.name}</th>
-                  ))}
-                  <th className={thRightClass} style={{ minWidth: '120px' }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                  <td className={tdClass}>Sales</td>
-                  {companies.map(c => (
-                    <td key={c.id} className={tdRightClass}>{formatINR(salesData[c.id] || 0)}</td>
-                  ))}
-                  <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalSales())}</td>
-                </tr>
-                <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                  <td className={tdClass}>Purchase</td>
-                  {companies.map(c => (
-                    <td key={c.id} className={tdRightClass}>{formatINR(purchaseData[c.id] || 0)}</td>
-                  ))}
-                  <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalPurchase())}</td>
-                </tr>
-                <tr className={totalRowClass}>
-                  <td className={tdClass}>Gross Profit/Loss</td>
-                  {companies.map(c => (
-                    <td key={c.id} className={tdRightClass}>{formatINR((salesData[c.id] || 0) - (purchaseData[c.id] || 0))}</td>
-                  ))}
-                  <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalSales() - getTotalPurchase())}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          const pl = profitLossData[c.id] || { netProfit: 0, netLoss: 0, transferredProfit: 0, transferredLoss: 0 };
+          const companyNetPL = getCompanyProfitLoss(c.id);
 
-      {/* PROFIT & LOSS */}
-      <div className={`mb-4 rounded border overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
-        <div
-          className={`px-3 py-2 flex items-center justify-between cursor-pointer ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}
-          onClick={() => toggleSection('profitLoss')}
-        >
-          <h2 className="text-sm font-bold flex items-center gap-2">
-            {expandedSections.profitLoss ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            Profit & Loss
-          </h2>
-          <span className="text-sm font-bold text-indigo-600">
-            {formatINR(getTotalPL())}
-          </span>
-        </div>
+          const totalAsset = assetGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0);
+          const totalLiab = liabilityGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0) + companyNetPL;
 
-        {expandedSections.profitLoss && (
-          <div className="overflow-x-auto p-2">
-            <table className={tableClass}>
-              <thead>
-                <tr>
-                  <th className={thClass}>Company</th>
-                  <th className={thRightClass}>Net Profit</th>
-                  <th className={thRightClass}>Net Loss</th>
-                  <th className={thRightClass}>Transferred</th>
-                  <th className={thRightClass}>Net P&L</th>
-                </tr>
-              </thead>
-              <tbody>
-                {companies.map(c => {
-                  const pl = profitLossData[c.id] || { netProfit: 0, netLoss: 0, transferredProfit: 0, transferredLoss: 0 };
-                  const netPL = getCompanyProfitLoss(c.id);
-                  return (
-                    <tr key={c.id} className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                      <td className={tdClass}>{c.name}</td>
-                      <td className={tdRightClass}>{formatINR(pl.netProfit)}</td>
-                      <td className={tdRightClass}>{formatINR(pl.netLoss)}</td>
-                      <td className={tdRightClass}>{formatINR(pl.transferredProfit - pl.transferredLoss)}</td>
-                      <td className={`${tdRightClass} font-bold`}>{formatINR(netPL)}</td>
-                    </tr>
-                  );
-                })}
-                <tr className={totalRowClass}>
-                  <td className={tdClass}>Total</td>
-                  <td className={tdRightClass}>{formatINR(companies.reduce((sum, c) => sum + (profitLossData[c.id]?.netProfit || 0), 0))}</td>
-                  <td className={tdRightClass}>{formatINR(companies.reduce((sum, c) => sum + (profitLossData[c.id]?.netLoss || 0), 0))}</td>
-                  <td className={tdRightClass}>{formatINR(companies.reduce((sum, c) => sum + ((profitLossData[c.id]?.transferredProfit || 0) - (profitLossData[c.id]?.transferredLoss || 0)), 0))}</td>
-                  <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalPL())}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+          return (
+            <div key={c.id} className={`rounded border overflow-hidden shadow-sm ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
+              <div className={`px-4 py-3 border-b pb-2 flex items-center justify-between ${isDark ? 'border-gray-700 bg-gray-750' : 'bg-gray-50 border-gray-200'}`}>
+                <h2 className="text-lg font-bold truncate pr-4 text-indigo-600">{c.name}</h2>
+                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-indigo-100 text-indigo-800 shrink-0">
+                  {formatINR(companyNetPL)} N/P
+                </span>
+              </div>
 
-      {/* LIABILITIES */}
-      <div className={`mb-4 rounded border overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
-        <div
-          className={`px-3 py-2 flex items-center justify-between cursor-pointer ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}
-          onClick={() => toggleSection('liabilities')}
-        >
-          <h2 className="text-sm font-bold flex items-center gap-2">
-            {expandedSections.liabilities ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            Liabilities
-          </h2>
-          <span className="text-sm font-bold">{formatINR(liabilityGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0) + getTotalPL())}</span>
-        </div>
-
-        {expandedSections.liabilities && (
-          <div className="overflow-x-auto p-2">
-            <table className={tableClass}>
-              <thead>
-                <tr>
-                  <th className={thClass} style={{ minWidth: '180px' }}>Particulars</th>
-                  {companies.map(c => (
-                    <th key={c.id} className={thRightClass} style={{ minWidth: '120px' }}>{c.name}</th>
-                  ))}
-                  <th className={thRightClass} style={{ minWidth: '120px' }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {liabilityGroups.map(group => (
-                  <React.Fragment key={group.id}>
-                    <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                      <td className={`${tdClass} font-medium`}>{group.name}</td>
-                      {companies.map(c => (
-                        <td key={c.id} className={tdRightClass}>{formatINR(calculateGroupTotalByCompany(group.id, c.id))}</td>
-                      ))}
-                      <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalForGroup(group.id))}</td>
-                    </tr>
-                    {/* Detailed View - Show ledgers */}
-                    {isDetailedView && companies.map(c => {
-                      const groupLedgers = getLedgersForGroup(group.id, c.id);
-                      return groupLedgers.map(ledger => (
-                        <tr key={`${c.id}-${ledger.id}`} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                          <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name} ({c.name})</td>
-                          {companies.map(cc => (
-                            <td key={cc.id} className={`${tdRightClass} text-gray-500`}>
-                              {cc.id === c.id ? formatINR(calculateClosingBalance(ledger)) : '-'}
-                            </td>
-                          ))}
-                          <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+              <div className="p-3">
+                {/* Trading Account Segment */}
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Trading Account</h3>
+                <div className="mb-4">
+                  <table className={tableClass}>
+                    <tbody>
+                      <React.Fragment>
+                        <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                          <td className={tdClass}>Purchase</td>
+                          <td className={`${tdRightClass}`}>{formatINR(companyPurchase)}</td>
                         </tr>
-                      ));
-                    })}
-                  </React.Fragment>
-                ))}
-                <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                  <td className={`${tdClass} font-medium`}>Profit & Loss A/c</td>
-                  {companies.map(c => (
-                    <td key={c.id} className={tdRightClass}>{formatINR(getCompanyProfitLoss(c.id))}</td>
-                  ))}
-                  <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalPL())}</td>
-                </tr>
-                <tr className={totalRowClass}>
-                  <td className={tdClass}>Total Liabilities</td>
-                  {companies.map(c => {
-                    const total = liabilityGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0) + getCompanyProfitLoss(c.id);
-                    return <td key={c.id} className={`${tdRightClass} font-bold`}>{formatINR(total)}</td>;
-                  })}
-                  <td className={`${tdRightClass} font-bold`}>{formatINR(liabilityGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0) + getTotalPL())}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+                        {isDetailedView && getLedgersForGroup(-15, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
+                          <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                            <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
+                            <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
 
-      {/* ASSETS */}
-      <div className={`mb-4 rounded border overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
-        <div
-          className={`px-3 py-2 flex items-center justify-between cursor-pointer ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}
-          onClick={() => toggleSection('assets')}
-        >
-          <h2 className="text-sm font-bold flex items-center gap-2">
-            {expandedSections.assets ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-            Assets
-          </h2>
-          <span className="text-sm font-bold">{formatINR(assetGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0))}</span>
-        </div>
-
-        {expandedSections.assets && (
-          <div className="overflow-x-auto p-2">
-            <table className={tableClass}>
-              <thead>
-                <tr>
-                  <th className={thClass} style={{ minWidth: '180px' }}>Particulars</th>
-                  {companies.map(c => (
-                    <th key={c.id} className={thRightClass} style={{ minWidth: '120px' }}>{c.name}</th>
-                  ))}
-                  <th className={thRightClass} style={{ minWidth: '120px' }}>Total</th>
-                </tr>
-              </thead>
-              <tbody>
-                {assetGroups.map(group => (
-                  <React.Fragment key={group.id}>
-                    <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                      <td className={`${tdClass} font-medium`}>{group.name}</td>
-                      {companies.map(c => (
-                        <td key={c.id} className={tdRightClass}>{formatINR(calculateGroupTotalByCompany(group.id, c.id))}</td>
-                      ))}
-                      <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalForGroup(group.id))}</td>
-                    </tr>
-                    {/* Detailed View - Show ledgers */}
-                    {isDetailedView && companies.map(c => {
-                      const groupLedgers = getLedgersForGroup(group.id, c.id);
-                      return groupLedgers.map(ledger => (
-                        <tr key={`${c.id}-${ledger.id}`} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                          <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name} ({c.name})</td>
-                          {companies.map(cc => (
-                            <td key={cc.id} className={`${tdRightClass} text-gray-500`}>
-                              {cc.id === c.id ? formatINR(calculateClosingBalance(ledger)) : '-'}
-                            </td>
-                          ))}
-                          <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                      <React.Fragment>
+                        <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                          <td className={tdClass}>To Direct Expense</td>
+                          <td className={`${tdRightClass}`}>{formatINR(companyDirectExp)}</td>
                         </tr>
-                      ));
-                    })}
-                  </React.Fragment>
-                ))}
-                <tr className={totalRowClass}>
-                  <td className={tdClass}>Total Assets</td>
-                  {companies.map(c => {
-                    const total = assetGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0);
-                    return <td key={c.id} className={`${tdRightClass} font-bold`}>{formatINR(total)}</td>;
-                  })}
-                  <td className={`${tdRightClass} font-bold`}>{formatINR(assetGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0))}</td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-        )}
+                        {isDetailedView && getLedgersForGroup(-7, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
+                          <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                            <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
+                            <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+
+                      <React.Fragment>
+                        <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                          <td className={tdClass}>By Sale</td>
+                          <td className={`${tdRightClass}`}>{formatINR(companySales)}</td>
+                        </tr>
+                        {isDetailedView && getLedgersForGroup(-16, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
+                          <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                            <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
+                            <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+
+                      <React.Fragment>
+                        <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                          <td className={tdClass}>By Direct Income</td>
+                          <td className={`${tdRightClass}`}>{formatINR(companyDirectInc)}</td>
+                        </tr>
+                        {isDetailedView && getLedgersForGroup(-8, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
+                          <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                            <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
+                            <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                          </tr>
+                        ))}
+                      </React.Fragment>
+                      <tr className={totalRowClass}>
+                        <td className={tdClass}>Gross Profit/Loss</td>
+                        <td className={`${tdRightClass} font-bold`}>{formatINR(companyGrossPL)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* P&L Segment */}
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Profit & Loss</h3>
+                <div className="mb-4">
+                  <table className={tableClass}>
+                    <tbody>
+                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={tdClass}>Net Profit</td>
+                        <td className={tdRightClass}>{formatINR(pl.netProfit)}</td>
+                      </tr>
+                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={tdClass}>Net Loss</td>
+                        <td className={tdRightClass}>{formatINR(pl.netLoss)}</td>
+                      </tr>
+                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={tdClass}>Transferred</td>
+                        <td className={tdRightClass}>{formatINR(pl.transferredProfit - pl.transferredLoss)}</td>
+                      </tr>
+                      <tr className={totalRowClass}>
+                        <td className={tdClass}>Net P&L</td>
+                        <td className={`${tdRightClass} font-bold`}>{formatINR(companyNetPL)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Liabilities Segment */}
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Liabilities</h3>
+                <div className="mb-4">
+                  <table className={tableClass}>
+                    <tbody>
+                      {liabilityGroups.map(group => (
+                        <React.Fragment key={group.id}>
+                          <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                            <td className={`${tdClass} font-medium`}>{group.name}</td>
+                            <td className={`${tdRightClass}`}>{formatINR(calculateGroupTotalByCompany(group.id, c.id))}</td>
+                          </tr>
+                          {isDetailedView && getLedgersForGroup(group.id, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
+                            <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                              <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
+                              <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={`${tdClass} font-medium`}>Profit & Loss A/c</td>
+                        <td className={`${tdRightClass}`}>{formatINR(companyNetPL)}</td>
+                      </tr>
+                      <tr className={totalRowClass}>
+                        <td className={tdClass}>Total Liabilities</td>
+                        <td className={`${tdRightClass} font-bold`}>{formatINR(totalLiab)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Assets Segment */}
+                <h3 className="text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Assets</h3>
+                <div className="mb-2">
+                  <table className={tableClass}>
+                    <tbody>
+                      {assetGroups.map(group => (
+                        <React.Fragment key={group.id}>
+                          <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                            <td className={`${tdClass} font-medium`}>{group.name}</td>
+                            <td className={`${tdRightClass}`}>{formatINR(calculateGroupTotalByCompany(group.id, c.id))}</td>
+                          </tr>
+                          {isDetailedView && getLedgersForGroup(group.id, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
+                            <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
+                              <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
+                              <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
+                            </tr>
+                          ))}
+                        </React.Fragment>
+                      ))}
+                      <tr className={totalRowClass}>
+                        <td className={tdClass}>Total Assets</td>
+                        <td className={`${tdRightClass} font-bold`}>{formatINR(totalAsset)}</td>
+                      </tr>
+                    </tbody>
+                  </table>
+                </div>
+
+                {/* Diff Segment */}
+                {totalAsset - totalLiab !== 0 && (
+                  <div className={`mt-2 p-2 rounded text-xm text-center ${isDark ? 'bg-red-900/40 text-red-200' : 'bg-red-50 text-red-600'}`}>
+                    Difference: {formatINR(totalAsset - totalLiab)}
+                  </div>
+                )}
+
+              </div>
+            </div>
+          );
+        })}
       </div>
 
-      {/* COMPANY SUMMARY */}
+      {/* OVERALL SUMMARY TABLE */}
       <div className={`rounded border overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
-        <div className={`px-3 py-2 ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
-          <h2 className="text-sm font-bold">Company-wise Summary</h2>
+        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
+          <h2 className="text-md font-bold">Consolidated Summary {companies.length > 0 && `(All ${companies.length} Companies)`}</h2>
+          <span className="text-sm font-bold text-indigo-600">Total Net P/L: {formatINR(getTotalPL())}</span>
         </div>
 
         <div className="overflow-x-auto p-2">
@@ -473,9 +439,9 @@ const ConsolidatedFinancialReport: React.FC = () => {
             </thead>
             <tbody>
               {companies.map(c => {
-                const sales = salesData[c.id] || 0;
-                const purchase = purchaseData[c.id] || 0;
-                const grossPL = sales - purchase;
+                const sales = getSalesForCompany(c.id);
+                const purchase = getPurchaseForCompany(c.id);
+                const grossPL = getCompanyGrossProfit(c.id);
                 const netPL = getCompanyProfitLoss(c.id);
                 const totalLiab = liabilityGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0) + netPL;
                 const totalAssets = assetGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0);
@@ -498,7 +464,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
                 <td className={tdClass}>Total</td>
                 <td className={tdRightClass}>{formatINR(getTotalSales())}</td>
                 <td className={tdRightClass}>{formatINR(getTotalPurchase())}</td>
-                <td className={tdRightClass}>{formatINR(getTotalSales() - getTotalPurchase())}</td>
+                <td className={tdRightClass}>{formatINR(getTotalGrossProfit())}</td>
                 <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalPL())}</td>
                 <td className={`${tdRightClass} font-bold`}>{formatINR(liabilityGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0) + getTotalPL())}</td>
                 <td className={`${tdRightClass} font-bold`}>{formatINR(assetGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0))}</td>
@@ -510,7 +476,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
           </table>
         </div>
       </div>
-    </div>
+    </div >
   );
 };
 

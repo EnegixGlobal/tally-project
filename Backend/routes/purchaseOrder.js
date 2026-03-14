@@ -259,8 +259,6 @@ router.get("/next-number", async (req, res) => {
     }
 
     const fy = getFinancialYear(date);
-    const month = String(new Date(date).getMonth() + 1).padStart(2, "0");
-
     const prefix = "PO";
 
     const [rows] = await db.query(
@@ -278,7 +276,7 @@ router.get("/next-number", async (req, res) => {
         company_id,
         owner_type,
         owner_id,
-        `${prefix}/${fy}/${month}/%`,
+        `${prefix}/${fy}/%`,
       ]
     );
 
@@ -287,13 +285,10 @@ router.get("/next-number", async (req, res) => {
     if (rows.length > 0) {
       const lastNumber = rows[0].number;
       const lastSeq = Number(lastNumber.split("/").pop());
-      nextNo = lastSeq + 1;
+      nextNo = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
     }
 
-    const voucherNumber = `${prefix}/${fy}/${month}/${String(nextNo).padStart(
-      6,
-      "0"
-    )}`;
+    const voucherNumber = `${prefix}/${fy}/${String(nextNo).padStart(6, "0")}`;
 
     res.json({
       success: true,

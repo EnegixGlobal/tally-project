@@ -2,7 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { ArrowLeft } from "lucide-react";
-import Swal from "sweetalert2";
+
 
 
 interface Ledger {
@@ -48,7 +48,7 @@ const baseGroups = [
   { id: -15, name: "Purchase Accounts", nature: "Expenses" },
   { id: -16, name: "Sales Accounts", nature: "Income" },
   { id: -17, name: "Suspense A/C", nature: "Assets" },
-  { id: -18, name: "Profit/Loss", nature: "Liabilities" },
+  { id: -18, name: "Profit & Loss A/c", nature: "Liabilities" },
   { id: -19, name: "TDS Payables", nature: "Liabilities" },
 ];
 
@@ -282,103 +282,6 @@ const SubGroupSummary: React.FC = () => {
   };
 
   // 3. Handlers
-  const [transferLoading, setTransferLoading] = useState(false);
-
-  const handleTransferNow = async () => {
-    if (Number(groupId) !== -4) return;
-    if (transferLoading) return;
-
-    setTransferLoading(true);
-
-    try {
-      const confirm = await Swal.fire({
-        icon: "question",
-        title: "Confirm Transfer",
-        text: "Do you want to transfer/update Profit / Loss to Capital Account?",
-        showCancelButton: true,
-        confirmButtonText: "Yes, Transfer",
-        cancelButtonText: "Cancel",
-      });
-
-      if (!confirm.isConfirmed) {
-        setTransferLoading(false);
-        return;
-      }
-
-      const profit = Number(localStorage.getItem(`NET_PROFIT_${companyId}`) || 0);
-      const loss = Number(localStorage.getItem(`NET_LOSS_${companyId}`) || 0);
-
-      if (profit === 0 && loss === 0) {
-        Swal.fire({
-          icon: "warning",
-          title: "Nothing to Transfer",
-          text: "Profit / Loss amount is zero.",
-        });
-        setTransferLoading(false);
-        return;
-      }
-
-      const capitalAccountLedger = directLedgers.find(
-        (l) => l.name.toLowerCase().includes("capital") || l.group_id === -4
-      );
-      const profitLedger = directLedgers.find((l) => l.name.toLowerCase().includes("profit"));
-      const lossLedger = directLedgers.find((l) => l.name.toLowerCase().includes("loss"));
-
-      if (!capitalAccountLedger && loss > 0) {
-        Swal.fire({
-          icon: "warning",
-          title: "Capital Ledger Missing",
-          text: "Capital Account ledger not found. Please create one for loss distribution.",
-        });
-        setTransferLoading(false);
-        return;
-      }
-
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/profit`, {
-        method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          profit,
-          loss,
-          company_id: companyId,
-          owner_type: ownerType,
-          owner_id: ownerId,
-          capitalAccountId: capitalAccountLedger?.id || null,
-          profitId: profitLedger?.id || null,
-          lossId: lossLedger?.id || null,
-        }),
-      });
-
-      const data = await response.json();
-
-      if (data.success) {
-        Swal.fire({
-          icon: "success",
-          title: "Transfer Successful",
-          text: "Profit / Loss has been updated in Capital Account",
-          timer: 2000,
-          showConfirmButton: false,
-        });
-
-        if (ledgers.length > 0) {
-          const ledgerIds = ledgers.map((l) => l.id).join(",");
-          const url = `${import.meta.env.VITE_API_URL}/api/group?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&ledgerIds=${ledgerIds}`;
-          const res = await fetch(url);
-          if (res.ok) {
-            const d = await res.json();
-            if (d.success && d.data) setDebitCreditData(d.data);
-          }
-        }
-      } else {
-        Swal.fire({ icon: "warning", title: "Transfer Failed", text: data.error || "Unable to complete transfer" });
-      }
-    } catch (error) {
-      console.error("Error during transfer:", error);
-      Swal.fire({ icon: "error", title: "Something went wrong", text: "An unexpected error occurred during transfer" });
-    } finally {
-      setTransferLoading(false);
-    }
-  };
 
   return (
     <div className="pt-[56px] px-4">
@@ -398,15 +301,7 @@ const SubGroupSummary: React.FC = () => {
           <h1 className="text-2xl font-bold">{groupName}</h1>
         </div>
 
-        {Number(groupId) === -4 && (
-          <button
-            onClick={handleTransferNow}
-            disabled={transferLoading}
-            className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700 disabled:opacity-60"
-          >
-            {transferLoading ? "Transferring..." : "Transfer now"}
-          </button>
-        )}
+
 
       </div>
 

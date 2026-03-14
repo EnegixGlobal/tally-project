@@ -2,6 +2,7 @@ import React, { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer, Download, Settings } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
+import { useProfitLossSync } from "../../hooks/useProfitLossSync";
 
 interface Ledger {
   id: number;
@@ -25,15 +26,14 @@ const TrialBalance: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
 
+  // Sync Profit & Loss Data headlessly in background
+  useProfitLossSync();
+
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);
   const [loading, setLoading] = useState(false);
   const [isDetailedView, setIsDetailedView] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [netProfit, setNetProfit] = useState<number>(0);
-  const [netLoss, setNetLoss] = useState<number>(0);
-  const [transferredProfit, setTransferredProfit] = useState<number>(0);
-  const [transferredLoss, setTransferredLoss] = useState<number>(0);
 
   const [debitCreditData, setDebitCreditData] = useState<
     Record<number, { debit: number; credit: number }>
@@ -74,8 +74,6 @@ const TrialBalance: React.FC = () => {
           parent: g.parent ? Number(g.parent) : null
         }));
         setLedgerGroups(normalizedGroups);
-        setTransferredProfit(data.transferredProfit || 0);
-        setTransferredLoss(data.transferredLoss || 0);
       } catch (err: any) {
         setError(err.message || "Unknown error occurred");
       } finally {
@@ -85,18 +83,7 @@ const TrialBalance: React.FC = () => {
     fetchData();
   }, [companyId, ownerType, ownerId]);
 
-  useEffect(() => {
-    if (companyId) {
-      const profit = Number(
-        localStorage.getItem(`NET_PROFIT_${companyId}`) || 0
-      );
-      const loss = Number(
-        localStorage.getItem(`NET_LOSS_${companyId}`) || 0
-      );
-      setNetProfit(profit);
-      setNetLoss(loss);
-    }
-  }, [companyId]);
+
 
   useEffect(() => {
     const fetchDebitCreditData = async () => {
@@ -116,12 +103,7 @@ const TrialBalance: React.FC = () => {
     fetchDebitCreditData();
   }, [ledgers, companyId, ownerType, ownerId]);
 
-  const calculateClosingBalance = (ledger: Ledger): number => {
-    const opening = Number(ledger.openingBalance) || 0;
-    const debit = debitCreditData[ledger.id]?.debit || 0;
-    const credit = debitCreditData[ledger.id]?.credit || 0;
-    return ledger.balanceType === "debit" ? (opening + debit - credit) : (opening + credit - debit);
-  };
+
 
   const calculateGroupTotals = (groupId: number) => {
     const findSubGroups = (id: number): number[] => {
@@ -261,18 +243,20 @@ const TrialBalance: React.FC = () => {
   const grandTotals = useMemo(() => {
     let d = 0;
     let c = 0;
-    trialGroups.forEach(tg => {
-      if (tg.id === -18) {
-        const plVal = netProfit - netLoss - transferredProfit + transferredLoss;
-        if (plVal > 0) c += plVal; else d += Math.abs(plVal);
-      } else {
-        const totals = calculateGroupTotals(tg.id);
-        d += totals.debit;
-        c += totals.credit;
-      }
+    let opDr = 0;
+    let opCr = 0;
+    let clDr = 0;
+    let clCr = 0;
+
+    trialGroups.forEach((tg) => {
+      const totals = calculateGroupTotals(tg.id);
+      d += totals.debit;
+      c += totals.credit;
+      if (totals.opening > 0) opDr += totals.opening; else opCr += Math.abs(totals.opening);
+      if (totals.closing > 0) clDr += totals.closing; else clCr += Math.abs(totals.closing);
     });
-    return { debit: d, credit: c };
-  }, [ledgers, debitCreditData, netProfit, netLoss, transferredProfit, transferredLoss]);
+    return { debit: d, credit: c, openingDr: opDr, openingCr: opCr, closingDr: clDr, closingCr: clCr };
+  }, [ledgers, debitCreditData, trialGroups]);
 
   return (
     <div className="pt-[56px] px-4">
@@ -314,48 +298,12 @@ const TrialBalance: React.FC = () => {
             <tbody>
               {trialGroups.map(tg => {
                 const totals = calculateGroupTotals(tg.id);
-
-                // Special handling for Profit & Loss (id -18)
-                if (tg.id === -18) {
-                  // Logic for P&L presentation in TB can be complex. 
-                  // To keep it simple and consistent with user request:
-                  // We will just show the calculated totals if they exist, 
-                  // or the net profit/loss if handled externally.
-                  // Previous code calculated it from netProfit/netLoss states.
-
-                  const plVal = netProfit - netLoss - transferredProfit + transferredLoss;
-                  let closingDr = 0, closingCr = 0;
-                  if (plVal > 0) closingCr = plVal; else closingDr = Math.abs(plVal);
-
-                  // P&L usually accumulated in closing, opening implies retained earnings? 
-                  // For now, mirroring previous logic but fitting columns.
-                  if (plVal === 0 && !isDetailedView) return null;
-
-                  return (
-                    <React.Fragment key={tg.id}>
-                      <tr
-                        className="border-b border-gray-300 font-semibold cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-200"
-                        onClick={() => navigate("/app/reports/profit-loss")}
-                      >
-                        <td className="py-3 px-4 text-blue-600">{tg.name}</td>
-                        <td className="py-3 px-4 text-right font-mono text-gray-400">-</td>
-                        <td className="py-3 px-4 text-right font-mono text-gray-400">-</td>
-                        <td className="py-3 px-4 text-right font-mono text-gray-400">-</td>
-                        <td className="py-3 px-4 text-right font-mono">
-                          {closingDr > 0 ? `${closingDr.toLocaleString()} Dr` : ""}
-                          {closingCr > 0 ? `${closingCr.toLocaleString()} Cr` : ""}
-                        </td>
-                      </tr>
-                    </React.Fragment>
-                  );
-                }
-
                 if (totals.opening === 0 && totals.debit === 0 && totals.credit === 0 && totals.closing === 0 && !isDetailedView) return null;
 
                 return (
                   <React.Fragment key={tg.id}>
                     <tr
-                      className="border-b border-gray-300 font-semibold cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800"
+                      className="border-b border-gray-300 font-semibold cursor-pointer hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors"
                       onClick={() => navigate(`/app/reports/sub-group-summary/${tg.id}`)}
                     >
                       <td className="py-3 px-4 text-blue-600">{tg.name}</td>
@@ -375,14 +323,26 @@ const TrialBalance: React.FC = () => {
             </tbody>
             <tfoot>
               <tr className="font-bold text-lg border-t-2 border-gray-400">
-                <td className="py-3 px-4">Grand Total</td>
-                <td className="py-3 px-4 text-right text-indigo-600 font-mono">
-                  {/* Grand Total Opening is usually balanced to 0 in double entry, but might filter specific groups */}
+                <td className="py-3 px-4 font-bold">Grand Total</td>
+                <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
+                  {grandTotals.openingDr > 0 || grandTotals.openingCr > 0 ? (
+                    <>
+                      {grandTotals.openingDr > grandTotals.openingCr
+                        ? `${(grandTotals.openingDr - grandTotals.openingCr).toLocaleString()} Dr`
+                        : `${(grandTotals.openingCr - grandTotals.openingDr).toLocaleString()} Cr`}
+                    </>
+                  ) : "-"}
                 </td>
                 <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.debit.toLocaleString()}</td>
                 <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.credit.toLocaleString()}</td>
-                <td className="py-3 px-4 text-right text-indigo-600 font-mono">
-                  {/* Grand Total Closing is usually balanced */}
+                <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
+                  {grandTotals.closingDr > 0 || grandTotals.closingCr > 0 ? (
+                    <>
+                      {grandTotals.closingDr > grandTotals.closingCr
+                        ? `${(grandTotals.closingDr - grandTotals.closingCr).toLocaleString()} Dr`
+                        : `${(grandTotals.closingCr - grandTotals.closingDr).toLocaleString()} Cr`}
+                    </>
+                  ) : "-"}
                 </td>
               </tr>
             </tfoot>

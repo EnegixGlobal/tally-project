@@ -244,7 +244,7 @@ const PurchaseVoucher: React.FC = () => {
   );
 
   const [isReadyToSave, setIsReadyToSave] = useState(false);
-  const [voucherMode, setVoucherMode] = useState<"auto" | "custom">("custom");
+  const [voucherMode, setVoucherMode] = useState<"auto" | "custom">("auto");
 
   // Barcode State
   const [barcodeInput, setBarcodeInput] = useState("");
@@ -862,6 +862,62 @@ const PurchaseVoucher: React.FC = () => {
   // ✅ Always-fresh ref to formData — prevents stale closure in async barcode lookup
   const formDataRef = useRef<any>(null);
   useEffect(() => { formDataRef.current = formData; }, [formData]);
+
+  const [isDuplicateVoucher, setIsDuplicateVoucher] = useState(false);
+
+  // Check duplicate voucher number
+  useEffect(() => {
+    if (voucherMode === "custom" && formData.number && !isEditMode) {
+      const checkDuplicate = async () => {
+        try {
+          const res = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/purchase-vouchers/check-duplicate/${formData.number}?company_id=${companyId}`
+          );
+          const data = await res.json();
+          if (data.exists) {
+            setIsDuplicateVoucher(true);
+            Swal.fire({
+              icon: "warning",
+              title: "Duplicate Voucher Number",
+              text: `Voucher number "${formData.number}" already exists. Please use a unique number.`,
+              toast: true,
+              position: "top-end",
+              timer: 3000,
+              showConfirmButton: false,
+            });
+          } else {
+            setIsDuplicateVoucher(false);
+          }
+        } catch (err) {
+          console.error("Duplicate check error:", err);
+        }
+      };
+      const timer = setTimeout(checkDuplicate, 500);
+      return () => clearTimeout(timer);
+    } else {
+      setIsDuplicateVoucher(false);
+    }
+  }, [formData.number, voucherMode, companyId, isEditMode]);
+
+  // Auto-fetch voucher number when mode is "auto"
+  useEffect(() => {
+    if (voucherMode === "auto" && !isEditMode && formData.date) {
+      const fetchNextNumber = async () => {
+        try {
+          const res = await fetch(
+            `${import.meta.env.VITE_API_URL}/api/purchase-vouchers/next-number?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=PRV&date=${formData.date}`
+          );
+          const data = await res.json();
+          if (data.success) {
+            setFormData((prev) => ({ ...prev, number: data.voucherNumber }));
+          }
+        } catch (err) {
+          console.error("Next number fetch error:", err);
+        }
+      };
+      fetchNextNumber();
+    }
+  }, [voucherMode, formData.date, companyId, ownerType, ownerId, isEditMode]);
 
   // Draft Persistence Logic
   const DRAFT_KEY = "PURCHASE_VOUCHER_CREATE_DRAFT";
@@ -1696,6 +1752,15 @@ const PurchaseVoucher: React.FC = () => {
     e.preventDefault();
     setIsReadyToSave(false); // Stop draft saving immediately when starting submission
 
+    if (isDuplicateVoucher) {
+      Swal.fire({
+        icon: "error",
+        title: "Duplicate Voucher Number",
+        text: "Please use a unique voucher number before saving.",
+      });
+      return;
+    }
+
     if (!validateForm()) {
       Swal.fire({
         icon: "warning",
@@ -2446,9 +2511,15 @@ const PurchaseVoucher: React.FC = () => {
                   onChange={handleChange}
                   readOnly={voucherMode === "auto"}
                   placeholder={voucherMode === "auto" ? "Auto-Generated" : "Enter Number"}
-                  className={`${getInputClasses(theme, !!errors.number)} ${voucherMode === "auto" ? "opacity-70 cursor-not-allowed" : ""} font-mono font-bold`}
+                  className={`${getInputClasses(theme, !!errors.number || isDuplicateVoucher)} ${voucherMode === "auto" ? "opacity-70 cursor-not-allowed" : ""
+                    } ${isDuplicateVoucher ? "border-red-500 text-red-500" : ""} font-mono font-bold`}
                 />
-                {errors.number && (
+                {isDuplicateVoucher && (
+                  <p className="text-red-500 text-[10px] font-bold mt-1 animate-pulse">
+                    ⚠️ DUPLICATE VOUCHER NUMBER
+                  </p>
+                )}
+                {errors.number && !isDuplicateVoucher && (
                   <p className="text-red-500 text-xs mt-1">{errors.number}</p>
                 )}
               </div>

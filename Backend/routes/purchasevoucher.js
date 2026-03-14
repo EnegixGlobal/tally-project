@@ -151,7 +151,6 @@ router.get("/next-number", async (req, res) => {
     }
 
     const fy = getFinancialYear(date);
-    const month = String(new Date(date).getMonth() + 1).padStart(2, "0");
 
     // 🔥 LAST VOUCHER FETCH
     const [rows] = await db.execute(
@@ -164,20 +163,20 @@ router.get("/next-number", async (req, res) => {
         company_id,
         owner_type,
         owner_id,
-        `${voucherType}/${fy}/${month}/%`
+        `${voucherType}/${fy}/%`
       ]
     );
 
     let nextNo = 1;
 
     if (rows.length > 0) {
-      const lastNumber = rows[0].number; // PRV/25-26/01/000001
+      const lastNumber = rows[0].number; // PRV/25-26/000001
       const lastSeq = Number(lastNumber.split("/").pop());
-      nextNo = lastSeq + 1;
+      nextNo = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
     }
 
     const voucherNumber =
-      `${voucherType}/${fy}/${month}/${String(nextNo).padStart(6, "0")}`;
+      `${voucherType}/${fy}/${String(nextNo).padStart(6, "0")}`;
 
     console.log("voucherNumber:", voucherNumber);
 
@@ -195,6 +194,31 @@ router.get("/next-number", async (req, res) => {
   }
 });
 
+
+// Check duplicate voucher number
+router.get("/check-duplicate/:number", async (req, res) => {
+  try {
+    const { number } = req.params;
+    const { company_id } = req.query;
+
+    if (!company_id || !number) {
+      return res.status(400).json({ success: false, message: "Missing params" });
+    }
+
+    const [rows] = await db.execute(
+      "SELECT id FROM purchase_vouchers WHERE number = ? AND company_id = ? LIMIT 1",
+      [number, company_id]
+    );
+
+    return res.json({
+      success: true,
+      exists: rows.length > 0
+    });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ success: false });
+  }
+});
 
 // POST Purchase Voucher
 // Helper
@@ -419,10 +443,22 @@ router.post("/", async (req, res) => {
     const dispatchThrough = dispatchDetails?.through || null;
     const destination = dispatchDetails?.destination || null;
 
-    // ================= GENERATE NUMBER =================
+    // ================= DUPLICATE CHECK =================
+    if (number) {
+      const [existingVoucher] = await db.execute(
+        "SELECT id FROM purchase_vouchers WHERE number = ? AND company_id = ? LIMIT 1",
+        [number, finalCompanyId]
+      );
+
+      if (existingVoucher.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Voucher number "${number}" already exists. Duplicate voucher numbers are not allowed.`,
+        });
+      }
+    }
 
     // ================= GENERATE NUMBER =================
-
     let voucherNumber = number; // ✅ Use frontend number if exists
 
     if (!voucherNumber) {
@@ -1023,6 +1059,21 @@ router.put("/:id", async (req, res) => {
     }
 
     const existing = voucherRows[0];
+
+    // ================= DUPLICATE CHECK =================
+    if (number && number !== existing.number) {
+      const [duplicateRows] = await db.execute(
+        "SELECT id FROM purchase_vouchers WHERE number = ? AND company_id = ? AND id != ? LIMIT 1",
+        [number, finalCompanyId, voucherId]
+      );
+
+      if (duplicateRows.length > 0) {
+        return res.status(400).json({
+          success: false,
+          message: `Voucher number "${number}" already exists in another voucher. Duplicate voucher numbers are not allowed.`,
+        });
+      }
+    }
 
     // ⭐ AUTO FIX OLD VOUCHERS (null company fields)
     if (!existing.company_id || !existing.owner_type || !existing.owner_id) {

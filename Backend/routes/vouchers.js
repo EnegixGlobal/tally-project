@@ -147,7 +147,6 @@ router.get("/next-number", async (req, res) => {
     if (!prefix) return res.status(400).json({ success: false });
 
     const fy = getFinancialYear(date);
-    const month = String(new Date(date).getMonth() + 1).padStart(2, "0");
 
     const [rows] = await db.execute(
       `
@@ -166,25 +165,20 @@ router.get("/next-number", async (req, res) => {
         owner_type,
         owner_id,
         voucherType,
-        `${prefix}/${fy}/${month}/%`,
+        `${prefix}/${fy}/%`,
       ]
     );
 
     let nextNo = 1;
     if (rows.length > 0) {
-      nextNo = Number(rows[0].voucher_number.split("/").pop()) + 1;
+      const lastNumber = rows[0].voucher_number;
+      const lastSeq = Number(lastNumber.split("/").pop());
+      nextNo = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
     }
 
-    // console.log(
-    //   "Next Voucher Number:",
-    //   `${prefix}/${fy}/${month}/${String(nextNo).padStart(6, "0")}`
-    // );
     return res.json({
       success: true,
-      voucherNumber: `${prefix}/${fy}/${month}/${String(nextNo).padStart(
-        6,
-        "0"
-      )}`,
+      voucherNumber: `${prefix}/${fy}/${String(nextNo).padStart(6, "0")}`,
     });
   } catch (e) {
     console.error(e);

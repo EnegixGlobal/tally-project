@@ -46,11 +46,11 @@ router.get('/employee-financial-report', async (req, res) => {
     // --- Trading Account ---
     for (const company of companies) {
       const [sales] = await connection.query(
-        `SELECT SUM(total) AS total FROM sales_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
         [company.id]
       );
       const [purchases] = await connection.query(
-        `SELECT SUM(total) AS total FROM purchase_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
         [company.id]
       );
       tradingRowsMap[company.id] = {
@@ -316,9 +316,38 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
           WHERE pvi.tdsLedgerId IN (${ledgerPlaceholders})
             AND pv.company_id IN (${placeholders})
           GROUP BY pvi.tdsLedgerId
+
+          UNION ALL
+
+          SELECT 
+            pvi.purchaseLedgerId AS ledgerId,
+            SUM(pvi.amount) AS debit,
+            0 AS credit
+          FROM purchase_voucher_items pvi
+          JOIN purchase_vouchers pv ON pv.id = pvi.voucherId
+          WHERE pvi.purchaseLedgerId IN (${ledgerPlaceholders})
+            AND pv.company_id IN (${placeholders})
+          GROUP BY pvi.purchaseLedgerId
+
+          UNION ALL
+
+          SELECT 
+            svi.salesLedgerId AS ledgerId,
+            0 AS debit,
+            SUM(svi.amount) AS credit
+          FROM sales_voucher_items svi
+          JOIN sales_vouchers sv ON sv.id = svi.voucherId
+          WHERE svi.salesLedgerId IN (${ledgerPlaceholders})
+            AND sv.company_id IN (${placeholders})
+          GROUP BY svi.salesLedgerId
         ) AS combined_data
         GROUP BY ledgerId`,
-        [...ledgerIds, ...ledgerIds, ...companyIds]
+        [
+          ...ledgerIds, // 1st query ledger_id IN
+          ...ledgerIds, ...companyIds, // 2nd query pvi.tdsLedgerId IN, pv.company_id IN
+          ...ledgerIds, ...companyIds, // 3rd query pvi.purchaseLedgerId IN, pv.company_id IN
+          ...ledgerIds, ...companyIds  // 4th query svi.salesLedgerId IN, sv.company_id IN
+        ]
       );
 
       // Map debitCreditData with companyId_ledgerId as key
@@ -356,13 +385,13 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
         }
       });
 
-      // Calculate net profit/loss from sales and purchases
+      // Calculate net profit/loss from sales and purchases (Base amounts without tax)
       const [[salesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
         [company.id]
       );
       const [[purchasesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
         [company.id]
       );
 
@@ -397,11 +426,11 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
     const purchaseData = {};
     for (const company of companies) {
       const [[salesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
         [company.id]
       );
       const [[purchasesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
         [company.id]
       );
       salesData[company.id] = Number(salesResult?.total) || 0;
