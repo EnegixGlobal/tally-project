@@ -248,9 +248,9 @@ const ConsolidatedFinancialReport: React.FC = () => {
 
           return (
             <div key={c.id} className={`rounded border overflow-hidden shadow-sm ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
-              <div className={`px-4 py-3 border-b pb-2 flex items-center justify-between ${isDark ? 'border-gray-700 bg-gray-750' : 'bg-gray-50 border-gray-200'}`}>
-                <h2 className="text-lg font-bold truncate pr-4 text-indigo-600">{c.name}</h2>
-                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-indigo-100 text-indigo-800 shrink-0">
+              <div className={`px-4 py-3 border-b flex flex-col items-end ${isDark ? 'border-gray-700 bg-gray-750' : 'bg-gray-50 border-gray-200'}`}>
+                <h2 className="text-lg font-bold text-indigo-600 mb-1">{c.name}</h2>
+                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-indigo-100 text-indigo-800">
                   {formatINR(companyNetPL)} N/P
                 </span>
               </div>
