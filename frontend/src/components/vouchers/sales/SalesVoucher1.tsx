@@ -75,6 +75,7 @@ const SalesVoucher: React.FC = () => {
   const [salesTypes, setSalesTypes] = useState<SalesType[]>([]);
   const [selectedSalesTypeId, setSelectedSalesTypeId] = useState<string>("");
   const [isReadyToSave, setIsReadyToSave] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
   const DRAFT_KEY = "SALES_VOUCHER_CREATE_DRAFT";
 
   const { selectedFinYear } = useFinancialYear();
@@ -1938,6 +1939,9 @@ const SalesVoucher: React.FC = () => {
       return;
     }
 
+    // Prevent double submit by disabling save button
+    setIsSaving(true);
+
     const totals = calculateTotals();
 
     // Extract partyId from first ledger entry when in accounting mode
@@ -2040,6 +2044,7 @@ const SalesVoucher: React.FC = () => {
       // ❌ Stop if voucher not saved
       if (!voucherSaved) {
         Swal.fire("Error", "Save failed", "error");
+        setIsSaving(false);
         return;
       }
 
@@ -2110,6 +2115,7 @@ const SalesVoucher: React.FC = () => {
     } catch (err) {
       console.error("Save error:", err);
       Swal.fire("Error", "Server or network error", "error");
+      setIsSaving(false);
     }
   };
 
@@ -3355,13 +3361,14 @@ const SalesVoucher: React.FC = () => {
               <button
                 title="Save Voucher (F9)"
                 type="submit"
-                className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                disabled={isSaving}
+                className={`flex items-center px-4 py-2 rounded disabled:opacity-50 disabled:cursor-not-allowed ${theme === "dark"
                   ? "bg-blue-600 hover:bg-blue-700"
                   : "bg-blue-600 hover:bg-blue-700 text-white"
                   }`}
               >
                 <Save size={18} className="mr-1" />
-                Save
+                {isSaving ? "Saving..." : "Save"}
               </button>
             </div>
           </form>
