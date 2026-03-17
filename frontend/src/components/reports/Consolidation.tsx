@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
-import { ArrowLeft, Printer, Download, Settings, ChevronDown, ChevronRight, User } from "lucide-react";
+import { ArrowLeft, Printer, Download, Settings, ChevronDown, ChevronRight, User, Calendar } from "lucide-react";
 import { useAuth } from "../../home/context/AuthContext";
+import { useFinancialYear, getFinancialYearRange, getAvailableFinYears } from "../../hooks/useFinancialYear";
 
 interface Company {
   id: number;
@@ -37,6 +38,7 @@ const formatINR = (value: number) => {
 const ConsolidatedFinancialReport: React.FC = () => {
   const { theme } = useAppContext();
   const { user } = useAuth();
+  const { selectedFinYear, setSelectedFinYear } = useFinancialYear();
   const navigate = useNavigate();
 
   const employeeId = localStorage.getItem("employee_id") || "";
@@ -81,7 +83,11 @@ const ConsolidatedFinancialReport: React.FC = () => {
       setLoading(true);
       setError(null);
       try {
-        const url = `${import.meta.env.VITE_API_URL}/api/consolidated-balance-sheet?employee_id=${employeeId}`;
+        const { startDate, endDate } = getFinancialYearRange(selectedFinYear);
+        const startStr = startDate.toISOString().split('T')[0];
+        const endStr = endDate.toISOString().split('T')[0];
+
+        const url = `${import.meta.env.VITE_API_URL}/api/consolidated-balance-sheet?employee_id=${employeeId}&startDate=${startStr}&endDate=${endStr}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load consolidated data");
         const data = await res.json();
@@ -132,7 +138,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
       }
     };
     fetchData();
-  }, [employeeId]);
+  }, [employeeId, selectedFinYear]);
 
   const calculateClosingBalance = (ledger: Ledger): number => {
     const opening = Number(ledger.openingBalance) || 0;
@@ -369,7 +375,20 @@ const ConsolidatedFinancialReport: React.FC = () => {
           <h1 className="text-xl font-bold">Consolidated Financial Report</h1>
           <p className="text-xs text-gray-500">{companies.length} {companies.length === 1 ? 'Company' : 'Companies'}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 print:hidden">
+          <div className="flex items-center gap-2 mr-2">
+            <Calendar size={16} className="text-indigo-500" />
+            <select
+              value={selectedFinYear}
+              onChange={(e) => setSelectedFinYear(e.target.value)}
+              className={`text-xs p-2 rounded border focus:outline-none focus:ring-1 focus:ring-indigo-500 transition-all ${isDark ? 'bg-gray-800 border-gray-700 text-gray-200' : 'bg-white border-gray-300 text-gray-700'
+                }`}
+            >
+              {getAvailableFinYears().map(year => (
+                <option key={year} value={year}>{year}</option>
+              ))}
+            </select>
+          </div>
           <button
             title="Toggle Item-wise Mode"
             onClick={() => {
@@ -408,7 +427,8 @@ const ConsolidatedFinancialReport: React.FC = () => {
         <div className="flex justify-between items-start">
           <div>
             <h1 className="text-2xl font-bold text-gray-900 uppercase">Consolidated Financial Report</h1>
-            <p className="text-sm text-gray-600 mt-1">Generated on: {new Date().toLocaleDateString('en-IN')} at {new Date().toLocaleTimeString('en-IN')}</p>
+            <p className="text-sm text-indigo-600 font-bold mt-1">FY: {selectedFinYear}</p>
+            <p className="text-xs text-gray-500 mt-1">Generated on: {new Date().toLocaleDateString('en-IN')} at {new Date().toLocaleTimeString('en-IN')}</p>
           </div>
           <div className="text-right">
             <h2 className="text-xl font-bold text-indigo-700">{user?.firstName} {user?.lastName}</h2>
