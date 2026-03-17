@@ -116,20 +116,38 @@ const ContraVoucher: React.FC = () => {
     >
   ) => {
     const { name, value, type } = e.target;
-    const updatedEntries = [...formData.entries];
+    let updatedEntries = [...formData.entries];
+
+    const newValue = type === "number" ? parseFloat(value) || 0 : value;
+
     updatedEntries[index] = {
       ...updatedEntries[index],
-      [name]: type === "number" ? parseFloat(value) || 0 : value,
+      [name]: newValue,
     };
 
-    // Handle single-entry mode type/amount syncing
+    // Handle single-entry mode type/amount syncing (existing logic)
     if (formData.mode === "single-entry") {
       if (index === 0) updatedEntries[0].type = "debit";
       if (index === 1) updatedEntries[1].type = "credit";
       if (name === "amount" && index === 0)
-        updatedEntries[1].amount = updatedEntries[0].amount;
+        updatedEntries[1].amount = newValue as number;
       if (name === "amount" && index === 1)
-        updatedEntries[0].amount = updatedEntries[1].amount;
+        updatedEntries[0].amount = newValue as number;
+    }
+
+    // Auto-fill logic for double-entry mode with 2-field entry
+    if (formData.mode === "double-entry" && index === 0 && updatedEntries.length === 2) {
+      if (name === "amount") {
+        updatedEntries[1] = {
+          ...updatedEntries[1],
+          amount: newValue as number,
+        };
+      } else if (name === "type") {
+        updatedEntries[1] = {
+          ...updatedEntries[1],
+          type: newValue === "debit" ? "credit" : "debit",
+        };
+      }
     }
 
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
@@ -137,8 +155,6 @@ const ContraVoucher: React.FC = () => {
 
     if (e.target.value === "add-new") {
       navigate("/app/masters/ledger/create"); // Redirect to ledger creation page
-    } else {
-      handleChange(e); // normal update
     }
   };
 

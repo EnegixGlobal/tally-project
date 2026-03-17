@@ -255,12 +255,13 @@ const PaymentVoucher: React.FC = () => {
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
     const { name, value, type } = e.target;
-    const updatedEntries = [...formData.entries];
+    let updatedEntries = [...formData.entries];
+
+    const newValue = type === "number" ? (value === "" ? 0 : parseFloat(value)) : value;
 
     updatedEntries[index] = {
       ...updatedEntries[index],
-      [name]:
-        type === "number" ? (value === "" ? "" : parseFloat(value)) : value,
+      [name]: newValue,
     };
 
     // SINGLE ENTRY FIXED LOGIC
@@ -284,6 +285,21 @@ const PaymentVoucher: React.FC = () => {
 
       // Auto balance
       updatedEntries[0].amount = Number(updatedEntries[1].amount) || 0;
+    }
+
+    // Auto-fill logic for double-entry mode with 2-field entry
+    if (formData.mode === "double-entry" && index === 0 && updatedEntries.length === 2) {
+      if (name === "amount") {
+        updatedEntries[1] = {
+          ...updatedEntries[1],
+          amount: newValue as number,
+        };
+      } else if (name === "type") {
+        updatedEntries[1] = {
+          ...updatedEntries[1],
+          type: newValue === "debit" ? "credit" : "debit",
+        };
+      }
     }
 
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
