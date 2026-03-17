@@ -24,22 +24,6 @@ const db = mysql.createPool({
   }
 })();
 
-// Function to ensure address column exists in user tables
-db.ensureAddressColumn = async () => {
-  const tables = ["tbemployees", "tbca", "tbcaemployees"];
-  for (const table of tables) {
-    try {
-      const [columns] = await db.query(`SHOW COLUMNS FROM ${table} LIKE 'address'`);
-      if (columns.length === 0) {
-        console.log(`Adding 'address' column to ${table}...`);
-        await db.query(`ALTER TABLE ${table} ADD COLUMN address TEXT AFTER pan`);
-      }
-    } catch (err) {
-      console.error(`Error ensuring 'address' column in ${table}:`, err.message);
-    }
-  }
-};
-
 module.exports = db;
 
 

@@ -34,6 +34,28 @@ router.get('/my-profile', authMiddleware, async (req, res) => {
 router.post('/update-profile', authMiddleware, async (req, res) => {
     try {
         const { id, role } = req.user;
+
+        // ✅ Ensure 'address' column exists in the active user's table when route is hit
+        let targetTable = 'tbemployees';
+        let afterColumn = 'pan';
+
+        if (role === 'ca') {
+            targetTable = 'tbca';
+            afterColumn = 'fdpan';
+        } else if (role === 'ca_employee') {
+            targetTable = 'tbcaemployees';
+            afterColumn = 'adhar';
+        }
+
+        try {
+            const [cols] = await db.query(`SHOW COLUMNS FROM ${targetTable} LIKE 'address'`);
+            if (cols.length === 0) {
+                await db.query(`ALTER TABLE ${targetTable} ADD COLUMN address TEXT AFTER ${afterColumn}`);
+            }
+        } catch (err) {
+            console.error(`Error ensuring address column in ${targetTable}:`, err.message);
+        }
+
         const { firstName, lastName, phoneNumber, pan, address } = req.body;
 
         let sql = '';
