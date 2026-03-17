@@ -14,6 +14,7 @@ const Register: React.FC = () => {
     confirmPassword: '',
     phoneNumber: '',
     pan: '',
+    address: '',
     agreeToTerms: false
   });
   const [errors, setErrors] = useState<Record<string, string>>({});
@@ -112,8 +113,8 @@ const Register: React.FC = () => {
           password: formData.password,
           phoneNumber: formData.phoneNumber,
           pan: formData.pan,
-          userLimit: userLimit    // <--- Add this line
-
+          userLimit: userLimit,
+          address: formData.address
         })
       });
 
@@ -300,6 +301,23 @@ const Register: React.FC = () => {
                 />
                 {errors.phoneNumber && (
                   <p className="mt-1 text-sm text-red-600">{errors.phoneNumber}</p>
+                )}
+              </div>
+
+              {/* Address */}
+              <div>
+                <textarea
+                  id="address"
+                  name="address"
+                  required
+                  value={formData.address}
+                  onChange={(e: any) => handleInputChange(e)}
+                  className={`w-full px-4 py-3 border-2 ${errors.address ? 'border-red-300' : 'border-white/30'
+                    } rounded-xl placeholder-white/70 text-white focus:outline-none focus:ring-2 focus:ring-white/50 focus:border-white/50 bg-white/10 backdrop-blur-sm transition-all duration-200 min-h-[100px]`}
+                  placeholder="Permanent Address"
+                />
+                {errors.address && (
+                  <p className="mt-1 text-sm text-red-600">{errors.address}</p>
                 )}
               </div>
 

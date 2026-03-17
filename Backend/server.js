@@ -293,7 +293,10 @@ app.use("/api/purchase-report", purchaseVouchersRouter);
 // ✅ Start Server
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () =>
-  console.log(`Server running on port ${PORT}`)
-);
+app.listen(PORT, async () => {
+  console.log(`Server running on port ${PORT}`);
+  // Run schema update for address column
+  const db = require("./db");
+  await db.ensureAddressColumn();
+});
 

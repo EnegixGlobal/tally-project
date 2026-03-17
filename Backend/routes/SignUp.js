@@ -10,7 +10,7 @@ const JWT_SECRET = process.env.JWT_SECRET || "8fbd@hG35kd93JK!hG2c90MZ";
 router.post("/register", async (req, res) => {
   // console.log("/register hit");
 
-  const { firstName, lastName, email, phoneNumber, pan, password, userLimit } =
+  const { firstName, lastName, email, phoneNumber, pan, password, userLimit, address } =
     req.body;
 
   if (
@@ -25,7 +25,7 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ message: "All fields are required" });
   }
 
-  console.log(firstName, !lastName, email, password, phoneNumber, pan, userLimit);
+  console.log(firstName, !lastName, email, password, phoneNumber, pan, userLimit, address);
 
   try {
     // 🔍 Check if email already exists
@@ -45,8 +45,8 @@ router.post("/register", async (req, res) => {
 
     // 📥 Insert into DB
     const sql = `
-      INSERT INTO tbemployees (firstName, lastName, email, phoneNumber, pan, password, userLimit, token)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tbemployees (firstName, lastName, email, phoneNumber, pan, password, userLimit, token, address)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const [result] = await db.query(sql, [
@@ -58,6 +58,7 @@ router.post("/register", async (req, res) => {
       hashedPassword,
       userLimit,
       token,
+      address || null,
     ]);
 
     console.log("✅ User inserted:", result.insertId);
