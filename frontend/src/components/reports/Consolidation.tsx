@@ -116,10 +116,42 @@ const ConsolidatedFinancialReport: React.FC = () => {
     return companyLedgers.reduce((sum, ledger) => sum + Math.abs(calculateClosingBalance(ledger)), 0);
   };
 
+  const getIndirectExpenseForCompany = (companyId: number) => calculateGroupTotalByCompany(-10, companyId);
+  const getIndirectIncomeForCompany = (companyId: number) => calculateGroupTotalByCompany(-11, companyId);
+
+  const getCompanyOpeningStock = (companyId: number) => {
+    const stockLedgers = ledgers.filter(l => {
+      const gname = (l.groupName || "").toLowerCase();
+      const gtype = (l.groupType || "").toLowerCase();
+      return (gname.includes("stock") || gtype.includes("stock")) && l.companyId === companyId;
+    });
+    return stockLedgers.reduce((sum, l) => sum + (Number(l.openingBalance) || 0), 0);
+  };
+
+  const getCompanyClosingStock = (companyId: number) => {
+    const stockLedgers = ledgers.filter(l => {
+      const gname = (l.groupName || "").toLowerCase();
+      const gtype = (l.groupType || "").toLowerCase();
+      return (gname.includes("stock") || gtype.includes("stock")) && l.companyId === companyId;
+    });
+    return stockLedgers.reduce((sum, l) => sum + Math.abs(calculateClosingBalance(l)), 0);
+  };
+
+  const getCompanyGrossProfit = (companyId: number) => {
+    const sale = getSalesForCompany(companyId);
+    const directInc = getDirectIncomeForCompany(companyId);
+    const closingStock = getCompanyClosingStock(companyId);
+    const purchase = getPurchaseForCompany(companyId);
+    const openingStock = getCompanyOpeningStock(companyId);
+    const directExp = getDirectExpenseForCompany(companyId);
+    return (sale + directInc + closingStock) - (purchase + openingStock + directExp);
+  };
+
   const getCompanyProfitLoss = (companyId: number) => {
-    const data = profitLossData[companyId];
-    if (!data) return 0;
-    return data.netProfit - data.netLoss - data.transferredProfit + data.transferredLoss;
+    const grossProfit = getCompanyGrossProfit(companyId);
+    const indirectInc = getIndirectIncomeForCompany(companyId);
+    const indirectExp = getIndirectExpenseForCompany(companyId);
+    return (grossProfit + indirectInc) - indirectExp;
   };
 
   const getTotalForGroup = (groupId: number) => {
@@ -140,19 +172,10 @@ const ConsolidatedFinancialReport: React.FC = () => {
 
   const getDirectExpenseForCompany = (companyId: number) => calculateGroupTotalByCompany(-7, companyId);
   const getDirectIncomeForCompany = (companyId: number) => calculateGroupTotalByCompany(-8, companyId);
-  const getIndirectIncomeForCompany = (companyId: number) => calculateGroupTotalByCompany(-11, companyId);
 
   const getTotalDirectExpense = () => companies.reduce((sum, c) => sum + getDirectExpenseForCompany(c.id), 0);
   const getTotalDirectIncome = () => companies.reduce((sum, c) => sum + getDirectIncomeForCompany(c.id), 0);
   const getTotalIndirectIncome = () => companies.reduce((sum, c) => sum + getIndirectIncomeForCompany(c.id), 0);
-
-  const getCompanyGrossProfit = (companyId: number) => {
-    const sale = getSalesForCompany(companyId);
-    const purchase = getPurchaseForCompany(companyId);
-    const directExp = getDirectExpenseForCompany(companyId);
-    const directInc = getDirectIncomeForCompany(companyId);
-    return (sale + directInc) - (purchase + directExp);
-  };
 
   const getTotalGrossProfit = () => {
     return companies.reduce((sum, c) => sum + getCompanyGrossProfit(c.id), 0);
@@ -261,60 +284,43 @@ const ConsolidatedFinancialReport: React.FC = () => {
                 <div className="mb-4">
                   <table className={tableClass}>
                     <tbody>
-                      <React.Fragment>
-                        <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                          <td className={tdClass}>Purchase</td>
-                          <td className={`${tdRightClass}`}>{formatINR(companyPurchase)}</td>
-                        </tr>
-                        {isDetailedView && getLedgersForGroup(-15, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
-                          <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                            <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
-                            <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
-                          </tr>
-                        ))}
-                      </React.Fragment>
+                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={tdClass}>Sales</td>
+                        <td className={tdRightClass}>{formatINR(companySales)}</td>
+                      </tr>
+                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={tdClass}>Direct Income</td>
+                        <td className={tdRightClass}>{formatINR(companyDirectInc)}</td>
+                      </tr>
+                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={tdClass}>Closing Stock</td>
+                        <td className={tdRightClass}>{formatINR(getCompanyClosingStock(c.id))}</td>
+                      </tr>
+                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={tdClass}>Purchase</td>
+                        <td className={tdRightClass}>{formatINR(companyPurchase)}</td>
+                      </tr>
+                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={tdClass}>Opening Stock</td>
+                        <td className={tdRightClass}>{formatINR(getCompanyOpeningStock(c.id))}</td>
+                      </tr>
+                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
+                        <td className={tdClass}>Direct Expense</td>
+                        <td className={tdRightClass}>{formatINR(companyDirectExp)}</td>
+                      </tr>
 
-                      <React.Fragment>
-                        <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                          <td className={tdClass}>To Direct Expense</td>
-                          <td className={`${tdRightClass}`}>{formatINR(companyDirectExp)}</td>
-                        </tr>
-                        {isDetailedView && getLedgersForGroup(-7, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
-                          <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                            <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
-                            <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
-                          </tr>
-                        ))}
-                      </React.Fragment>
+                      <tr className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-blue-50'}`}>
+                        <td className={tdClass}>Total of Credit side</td>
+                        <td className={tdRightClass}>{formatINR(companySales + companyDirectInc + getCompanyClosingStock(c.id))}</td>
+                      </tr>
+                      <tr className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-red-50'}`}>
+                        <td className={tdClass}>Total of Debit side</td>
+                        <td className={tdRightClass}>{formatINR(companyPurchase + getCompanyOpeningStock(c.id) + companyDirectExp)}</td>
+                      </tr>
 
-                      <React.Fragment>
-                        <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                          <td className={tdClass}>By Sale</td>
-                          <td className={`${tdRightClass}`}>{formatINR(companySales)}</td>
-                        </tr>
-                        {isDetailedView && getLedgersForGroup(-16, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
-                          <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                            <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
-                            <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
-                          </tr>
-                        ))}
-                      </React.Fragment>
-
-                      <React.Fragment>
-                        <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                          <td className={tdClass}>By Direct Income</td>
-                          <td className={`${tdRightClass}`}>{formatINR(companyDirectInc)}</td>
-                        </tr>
-                        {isDetailedView && getLedgersForGroup(-8, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
-                          <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                            <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
-                            <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
-                          </tr>
-                        ))}
-                      </React.Fragment>
                       <tr className={totalRowClass}>
-                        <td className={tdClass}>Gross Profit/Loss</td>
-                        <td className={`${tdRightClass} font-bold`}>{formatINR(companyGrossPL)}</td>
+                        <td className={tdClass}>{companyGrossPL >= 0 ? 'Gross Profit' : 'Gross Loss'}</td>
+                        <td className={`${tdRightClass} font-bold ${companyGrossPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatINR(companyGrossPL)}</td>
                       </tr>
                     </tbody>
                   </table>
@@ -326,20 +332,20 @@ const ConsolidatedFinancialReport: React.FC = () => {
                   <table className={tableClass}>
                     <tbody>
                       <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Net Profit</td>
-                        <td className={tdRightClass}>{formatINR(pl.netProfit)}</td>
+                        <td className={tdClass}>Indirect Income</td>
+                        <td className={tdRightClass}>{formatINR(getIndirectIncomeForCompany(c.id))}</td>
                       </tr>
                       <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Net Loss</td>
-                        <td className={tdRightClass}>{formatINR(pl.netLoss)}</td>
+                        <td className={tdClass}>Indirect Expense</td>
+                        <td className={tdRightClass}>{formatINR(getIndirectExpenseForCompany(c.id))}</td>
                       </tr>
                       <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Transferred</td>
-                        <td className={tdRightClass}>{formatINR(pl.transferredProfit - pl.transferredLoss)}</td>
+                        <td className={tdClass}>Gross Profit (b/f)</td>
+                        <td className={`${tdRightClass} ${companyGrossPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatINR(companyGrossPL)}</td>
                       </tr>
                       <tr className={totalRowClass}>
-                        <td className={tdClass}>Net P&L</td>
-                        <td className={`${tdRightClass} font-bold`}>{formatINR(companyNetPL)}</td>
+                        <td className={tdClass}>{companyNetPL >= 0 ? 'Net Profit' : 'Net Loss'}</td>
+                        <td className={`${tdRightClass} font-bold ${companyNetPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatINR(companyNetPL)}</td>
                       </tr>
                     </tbody>
                   </table>
