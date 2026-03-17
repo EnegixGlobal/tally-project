@@ -8,7 +8,9 @@ const ProfitLoss: React.FC = () => {
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [showFullData, setShowFullData] = useState(false);
-  const [showInventoryBreakup, setShowInventoryBreakup] = useState(false);
+  const [showInventoryBreakup, setShowInventoryBreakup] = useState(
+    localStorage.getItem("PL_SHOW_INVENTORY") === "true"
+  );
   const [showDetailed, setShowDetailed] = useState(
     localStorage.getItem("PL_SHOW_DETAILED") === "true"
   );
@@ -25,6 +27,10 @@ const ProfitLoss: React.FC = () => {
   useEffect(() => {
     localStorage.setItem("PL_SHOW_ITEM_WISE", String(showItemWise));
   }, [showItemWise]);
+
+  useEffect(() => {
+    localStorage.setItem("PL_SHOW_INVENTORY", String(showInventoryBreakup));
+  }, [showInventoryBreakup]);
 
 
 
@@ -721,24 +727,12 @@ const ProfitLoss: React.FC = () => {
                     type="checkbox"
                     id="itemWise"
                     checked={showItemWise}
-                    onChange={(e) => setShowItemWise(e.target.checked)}
+                    onChange={(e) => {
+                      setShowItemWise(e.target.checked);
+                      setShowInventoryBreakup(e.target.checked);
+                    }}
                   />
                   Item wise
-                </label>
-
-                {/* Inventory */}
-                <label
-                  htmlFor="inventoryBreakup"
-                  className="flex items-center gap-2 px-3 py-2 text-sm cursor-pointer hover:bg-gray-100 border-t border-gray-200"
-                >
-                  <input
-                    type="checkbox"
-                    id="inventoryBreakup"
-                    checked={showInventoryBreakup}
-                    onChange={(e) => setShowInventoryBreakup(e.target.checked)}
-                    disabled={!showDetailed}
-                  />
-                  Inventory
                 </label>
               </div>
             )}
@@ -878,23 +872,25 @@ const ProfitLoss: React.FC = () => {
                 {/* GST Breakup - Ledgers */}
                 {showDetailed && (
                   <div className="mt-2 space-y-1 pl-4 text-sm">
-                    {purchaseLedgers.map((item, index) => (
-                      <div
-                        key={index}
-                        onClick={() =>
-                          handlePurchaseLedgerClick(item.name, item.id)
-                        }
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-                          }`}
-                      >
-                        <span className="text-blue-600 underline">
-                          {item.name}
-                        </span>
-                        <span className="font-mono">
-                          {(ledgerBalances[item.id]?.debit || 0).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                    {purchaseLedgers
+                      .filter(item => Math.abs((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)) > 0)
+                      .map((item, index) => (
+                        <div
+                          key={index}
+                          onClick={() =>
+                            handlePurchaseLedgerClick(item.name, item.id)
+                          }
+                          className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                            }`}
+                        >
+                          <span className="text-blue-600 underline">
+                            {item.name}
+                          </span>
+                          <span className="font-mono">
+                            {(ledgerBalances[item.id]?.debit || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
 
                     {/* Inventory Breakup - Purchase Items */}
                     {showInventoryBreakup && (
@@ -961,42 +957,46 @@ const ProfitLoss: React.FC = () => {
                 {/* Detailed Breakup - Direct Expenses */}
                 {showDetailed && directexpense.length > 0 && (
                   <div className="mt-2 space-y-1 pl-4 text-sm">
-                    {directexpense.map((item, index) => (
-                      <div
-                        key={index}
-                        onClick={() => handleDirectExpenseClick(item.name, item.id)}
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                          }`}
-                      >
-                        <span className="text-blue-600 underline">
-                          {item.name}
-                        </span>
-                        <span className="font-mono">
-                          {((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                    {directexpense
+                      .filter(item => Math.abs((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)) > 0)
+                      .map((item, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handleDirectExpenseClick(item.name, item.id)}
+                          className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                            }`}
+                        >
+                          <span className="text-blue-600 underline">
+                            {item.name}
+                          </span>
+                          <span className="font-mono">
+                            {((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
                   </div>
                 )}
 
                 {/* Inventory Breakup - Direct Expenses Fallback */}
                 {!showDetailed && showInventoryBreakup && (
                   <div className="mt-2 space-y-1 pl-4 text-sm">
-                    {directexpense.map((item, index) => (
-                      <div
-                        key={index}
-                        onClick={() => handleDirectExpenseClick(item.name, item.id)}
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                          }`}
-                      >
-                        <span className="text-blue-600 underline">
-                          {item.name}
-                        </span>
-                        <span className="font-mono">
-                          {(ledgerBalances[item.id]?.debit || 0).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                    {directexpense
+                      .filter(item => Math.abs((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)) > 0)
+                      .map((item, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handleDirectExpenseClick(item.name, item.id)}
+                          className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                            }`}
+                        >
+                          <span className="text-blue-600 underline">
+                            {item.name}
+                          </span>
+                          <span className="font-mono">
+                            {(ledgerBalances[item.id]?.debit || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
                   </div>
                 )}
               </div>
@@ -1046,23 +1046,25 @@ const ProfitLoss: React.FC = () => {
                 {/* GST Breakup - Ledgers */}
                 {showDetailed && (
                   <div className="mt-2 space-y-1 pl-4 text-sm">
-                    {salesLedgers.map((item, index) => (
-                      <div
-                        key={index}
-                        onClick={() =>
-                          handleSalesLedgerClick(item.name, item.id)
-                        }
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-                          }`}
-                      >
-                        <span className="text-blue-600 underline">
-                          {item.name}
-                        </span>
-                        <span className="font-mono">
-                          {(ledgerBalances[item.id]?.credit || 0).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                    {salesLedgers
+                      .filter(item => Math.abs((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)) > 0)
+                      .map((item, index) => (
+                        <div
+                          key={index}
+                          onClick={() =>
+                            handleSalesLedgerClick(item.name, item.id)
+                          }
+                          className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                            }`}
+                        >
+                          <span className="text-blue-600 underline">
+                            {item.name}
+                          </span>
+                          <span className="font-mono">
+                            {(ledgerBalances[item.id]?.credit || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
 
                     {/* Inventory Breakup - Sales Items */}
                     {showInventoryBreakup && (
@@ -1129,21 +1131,23 @@ const ProfitLoss: React.FC = () => {
                 {/* Detailed Breakup - Direct Income */}
                 {showDetailed && directincome.length > 0 && (
                   <div className="mt-2 space-y-1 pl-4 text-sm">
-                    {directincome.map((item, index) => (
-                      <div
-                        key={index}
-                        onClick={() => handleDirectIncomeClick(item.name, item.id)}
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                          }`}
-                      >
-                        <span className="text-blue-600 underline">
-                          {item.name}
-                        </span>
-                        <span className="font-mono">
-                          {((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                    {directincome
+                      .filter(item => Math.abs((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)) > 0)
+                      .map((item, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handleDirectIncomeClick(item.name, item.id)}
+                          className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                            }`}
+                        >
+                          <span className="text-blue-600 underline">
+                            {item.name}
+                          </span>
+                          <span className="font-mono">
+                            {((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
                   </div>
                 )}
               </div>
@@ -1252,19 +1256,21 @@ const ProfitLoss: React.FC = () => {
                 {/* Detailed Breakup - Indirect Expenses */}
                 {showDetailed && indirectExpenses.length > 0 && (
                   <div className="mt-2 space-y-1 pl-4 text-sm">
-                    {indirectExpenses.map((ledger, index) => (
-                      <div
-                        key={index}
-                        onClick={() => handleIndirectExpenseClick(ledger.name, ledger.id)}
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                          }`}
-                      >
-                        <span className="text-blue-600 underline">{ledger.name}</span>
-                        <span className="font-mono">
-                          {(ledgerBalances[Number(ledger.id)]?.debit || 0).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                    {indirectExpenses
+                      .filter(ledger => Math.abs((ledgerBalances[ledger.id]?.debit || 0) - (ledgerBalances[ledger.id]?.credit || 0)) > 0)
+                      .map((ledger, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handleIndirectExpenseClick(ledger.name, ledger.id)}
+                          className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                            }`}
+                        >
+                          <span className="text-blue-600 underline">{ledger.name}</span>
+                          <span className="font-mono">
+                            {(ledgerBalances[Number(ledger.id)]?.debit || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
                     {indirectExpenses.length === 0 && (
                       <div className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-500"
                         }`}>No indirect expenses</div>
@@ -1275,18 +1281,20 @@ const ProfitLoss: React.FC = () => {
                 {/* Inventory Breakup - Indirect Expenses (Fallback or additional if needed) */}
                 {!showDetailed && showInventoryBreakup && (
                   <div className="mt-2 space-y-1 pl-4 text-sm">
-                    {getIndirectExpensesLedgers().map((ledger, index) => (
-                      <div
-                        key={index}
-                        className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-                          }`}
-                      >
-                        <span>{ledger.name}</span>
-                        <span className="font-mono">
-                          {(ledgerBalances[Number(ledger.id)]?.debit || 0).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                    {getIndirectExpensesLedgers()
+                      .filter(ledger => Math.abs((ledgerBalances[ledger.id]?.debit || 0) - (ledgerBalances[ledger.id]?.credit || 0)) > 0)
+                      .map((ledger, index) => (
+                        <div
+                          key={index}
+                          className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                            }`}
+                        >
+                          <span>{ledger.name}</span>
+                          <span className="font-mono">
+                            {(ledgerBalances[Number(ledger.id)]?.debit || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
                   </div>
                 )}
               </div>
@@ -1339,19 +1347,21 @@ const ProfitLoss: React.FC = () => {
                 {/* Detailed Breakup - Indirect Income */}
                 {showDetailed && indirectIncome.length > 0 && (
                   <div className="mt-2 space-y-1 pl-4 text-sm">
-                    {indirectIncome.map((ledger, index) => (
-                      <div
-                        key={index}
-                        onClick={() => handleIndirectIncomeClick(ledger.name, ledger.id)}
-                        className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
-                          }`}
-                      >
-                        <span className="text-blue-600 underline">{ledger.name}</span>
-                        <span className="font-mono">
-                          {((ledgerBalances[Number(ledger.id)]?.credit || 0) - (ledgerBalances[Number(ledger.id)]?.debit || 0)).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                    {indirectIncome
+                      .filter(ledger => Math.abs((ledgerBalances[ledger.id]?.credit || 0) - (ledgerBalances[ledger.id]?.debit || 0)) > 0)
+                      .map((ledger, index) => (
+                        <div
+                          key={index}
+                          onClick={() => handleIndirectIncomeClick(ledger.name, ledger.id)}
+                          className={`flex justify-between cursor-pointer hover:bg-gray-100 ${theme === "dark" ? "text-gray-300 hover:bg-gray-700" : "text-gray-700"
+                            }`}
+                        >
+                          <span className="text-blue-600 underline">{ledger.name}</span>
+                          <span className="font-mono">
+                            {((ledgerBalances[Number(ledger.id)]?.credit || 0) - (ledgerBalances[Number(ledger.id)]?.debit || 0)).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
                     {indirectIncome.length === 0 && (
                       <div className={`text-xs italic ${theme === "dark" ? "text-gray-500" : "text-gray-500"
                         }`}>No indirect income</div>
@@ -1362,18 +1372,20 @@ const ProfitLoss: React.FC = () => {
                 {/* Inventory Breakup - Indirect Income (Fallback or additional if needed) */}
                 {!showDetailed && showInventoryBreakup && (
                   <div className="mt-2 space-y-1 pl-4 text-sm">
-                    {getIndirectIncomeLedgers().map((ledger, index) => (
-                      <div
-                        key={index}
-                        className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
-                          }`}
-                      >
-                        <span>{ledger.name}</span>
-                        <span className="font-mono">
-                          {(ledgerBalances[Number(ledger.id)]?.credit || 0).toLocaleString()}
-                        </span>
-                      </div>
-                    ))}
+                    {getIndirectIncomeLedgers()
+                      .filter(ledger => Math.abs((ledgerBalances[ledger.id]?.credit || 0) - (ledgerBalances[ledger.id]?.debit || 0)) > 0)
+                      .map((ledger, index) => (
+                        <div
+                          key={index}
+                          className={`flex justify-between ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                            }`}
+                        >
+                          <span>{ledger.name}</span>
+                          <span className="font-mono">
+                            {(ledgerBalances[Number(ledger.id)]?.credit || 0).toLocaleString()}
+                          </span>
+                        </div>
+                      ))}
                   </div>
                 )}
               </div>
