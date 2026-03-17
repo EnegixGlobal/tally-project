@@ -240,9 +240,11 @@ const SalesVoucher: React.FC = () => {
         const json = await res.json();
         if (json?.success) {
           setSalesTypes(json?.data || []);
-          // Auto-select default Sales type (id=1) if not in edit mode
-          if (!isEditMode) {
-            setSelectedSalesTypeId((prev) => prev || "custom");
+          // Auto-select first Sales type if not in edit mode
+          if (!isEditMode && json?.data?.length > 0) {
+            setSelectedSalesTypeId(String(json.data[0].id));
+          } else if (!isEditMode) {
+            setSelectedSalesTypeId("custom"); // Fallback if no types exist
           }
         } else {
           setSalesTypes([]);
