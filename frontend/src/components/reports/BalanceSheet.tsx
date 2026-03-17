@@ -377,23 +377,7 @@ const BalanceSheet: React.FC = () => {
 
 
 
-                {/* Profit & Loss A/c (Clickable Link) */}
-                <div>
-                  <div
-                    className="grid grid-cols-2 gap-2 py-2 border-b border-gray-300 cursor-pointer"
-                    onClick={() => navigate("/app/reports/sub-group-summary/-18")}
-                  >
-                    <span className="text-blue-600 font-semibold ">
-                      Profit & Loss A/c
-                    </span>
-                    <span className="text-right font-mono font-bold">
-                      {formatBalance(calculatedTotal.ProfitAndLossGroup)}
-                    </span>
-                  </div>
-                  {isDetailedView && renderDetailedGroupItems(-18)}
-                </div>
-
-                {/* Profit & Loss A/c (Existing with breakdown) */}
+                {/* Profit & Loss */}
                 <div className="border-b border-gray-300 pb-2">
                   <div
                     className="grid grid-cols-2 gap-2 py-2 cursor-pointer"
@@ -402,8 +386,8 @@ const BalanceSheet: React.FC = () => {
                     <span className="text-blue-600 font-semibold ">
                       Profit & Loss
                     </span>
-                    <span className="text-right font-mono font-bold text-red-600">
-                      {/* {(netProfit - netLoss - (transferredProfit - transferredLoss) - calculatedTotal.ProfitAndLossGroup).toLocaleString()} */}
+                    <span className="text-right font-mono font-bold">
+                      {(netProfit - netLoss - (transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup)).toLocaleString()}
                     </span>
                   </div>
 
@@ -419,14 +403,7 @@ const BalanceSheet: React.FC = () => {
                     <div className="grid grid-cols-2">
                       <span className="opacity-75">Less Transferred</span>
                       <span className="text-right font-mono ">
-                        {`${-(transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup).toLocaleString()}`}
-                      </span>
-                    </div>
-
-                    <div className="grid grid-cols-2 border-t border-gray-300 mt-1 pt-1 font-semibold">
-                      <span className="">Diff</span>
-                      <span className="text-right font-mono">
-                        {(netProfit - netLoss - (transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup)).toLocaleString()}
+                        -{(transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup).toLocaleString()}
                       </span>
                     </div>
                   </div>
