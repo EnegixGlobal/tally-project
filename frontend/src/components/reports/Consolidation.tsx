@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
-import { ArrowLeft, Printer, Download, Settings, ChevronDown, ChevronRight } from "lucide-react";
+import { ArrowLeft, Printer, Download, Settings, ChevronDown, ChevronRight, User } from "lucide-react";
+import { useAuth } from "../../home/context/AuthContext";
 
 interface Company {
   id: number;
@@ -35,6 +36,7 @@ const formatINR = (value: number) => {
 
 const ConsolidatedFinancialReport: React.FC = () => {
   const { theme } = useAppContext();
+  const { user } = useAuth();
   const navigate = useNavigate();
 
   const employeeId = localStorage.getItem("employee_id") || "";
@@ -350,6 +352,9 @@ const ConsolidatedFinancialReport: React.FC = () => {
 
   return (
     <div className={`pt-[56px] px-4 pb-8 min-h-screen ${isDark ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
+      {/* Print Header - Visible only when printing */}
+
+
       {/* Header */}
       <div className="flex items-center mb-6 flex-wrap gap-2">
         <button
@@ -373,8 +378,8 @@ const ConsolidatedFinancialReport: React.FC = () => {
               localStorage.setItem("PL_SHOW_ITEM_WISE", String(newVal));
             }}
             className={`flex items-center gap-2 px-3 py-2 rounded-md transition-all text-xs font-medium border ${showItemWise
-                ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
-                : isDark ? 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
+              ? 'bg-indigo-600 text-white border-indigo-500 shadow-sm'
+              : isDark ? 'bg-gray-800 text-gray-300 border-gray-700 hover:bg-gray-700' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'
               }`}
           >
             <div className={`w-3 h-3 rounded-full ${showItemWise ? 'bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]' : 'bg-gray-400'}`}></div>
@@ -398,6 +403,22 @@ const ConsolidatedFinancialReport: React.FC = () => {
         </div>
       )}
 
+
+      <div className="hidden print:block mb-8 border-b-2 border-gray-800 pb-4">
+        <div className="flex justify-between items-start">
+          <div>
+            <h1 className="text-2xl font-bold text-gray-900 uppercase">Consolidated Financial Report</h1>
+            <p className="text-sm text-gray-600 mt-1">Generated on: {new Date().toLocaleDateString('en-IN')} at {new Date().toLocaleTimeString('en-IN')}</p>
+          </div>
+          <div className="text-right">
+            <h2 className="text-xl font-bold text-indigo-700">{user?.firstName} {user?.lastName}</h2>
+            <p className="text-sm text-gray-700">{user?.address}</p>
+            <p className="text-sm text-gray-700">Phone: {user?.phoneNumber} | Email: {user?.email}</p>
+            {user?.pan && <p className="text-sm font-semibold text-gray-800">PAN: {user.pan}</p>}
+          </div>
+        </div>
+      </div>
+
       {/* Individual Company Reports in Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
         {companies.map(c => {
@@ -415,13 +436,9 @@ const ConsolidatedFinancialReport: React.FC = () => {
 
           return (
             <div key={c.id} className={`rounded border overflow-hidden shadow-sm ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
-              <div className={`px-4 py-3 border-b flex flex-col items-end ${isDark ? 'border-gray-700 bg-gray-750' : 'bg-gray-50 border-gray-200'}`}>
+              <div className={`px-4 py-3 border-b flex flex-col items-center ${isDark ? 'border-gray-700 bg-gray-750' : 'bg-gray-50 border-gray-200'}`}>
                 <h2 className="text-lg font-bold text-indigo-600 mb-1">{c.name}</h2>
-                <span className="text-xs font-semibold px-2 py-1 rounded-full bg-indigo-100 text-indigo-800">
-                  {formatINR(companyNetPL)} N/P
-                </span>
               </div>
-
               <div className="p-3">
                 {/* Trading Account Segment */}
                 <h3 className="text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Trading Account</h3>
