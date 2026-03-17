@@ -16,6 +16,7 @@ interface User {
   createdAt?: string;
   lastLoginAt?: string;
   userType?: string;
+  address?: string;
 }
 
 interface AuthContextType {
@@ -153,6 +154,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         lastLoginAt:
           userFromResponse.lastLoginAt ?? userFromResponse.last_login_at,
         userType: data.role || userFromResponse.userType || "user",
+        address: userFromResponse.address ?? "",
       };
 
       setUser(newUser);
@@ -241,6 +243,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         hasSubscription: false,
         createdAt: new Date().toISOString(),
         lastLoginAt: new Date().toISOString(),
+        address: (userData as any).address || "",
       };
 
       setUser(newUser);

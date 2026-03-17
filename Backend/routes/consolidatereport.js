@@ -233,11 +233,24 @@ router.get('/employee-financial-report-consolidated', async (req, res) => {
 
 // GET /api/consolidated-balance-sheet - For consolidated balance sheet view (all employee's companies)
 router.get('/consolidated-balance-sheet', async (req, res) => {
-  const employee_id = req.query.employee_id;
+  const { employee_id, startDate, endDate } = req.query;
   if (!employee_id) return res.status(400).json({ message: "Missing employee_id" });
 
   const connection = await db.getConnection();
   try {
+    // Determine if date filtering is needed
+    const dateFilter = startDate && endDate ? ` AND v.date BETWEEN ? AND ?` : '';
+    const dateParams = startDate && endDate ? [startDate, endDate] : [];
+
+    const voucherDateFilter = startDate && endDate ? ` AND vm.date BETWEEN ? AND ?` : '';
+    const voucherDateParams = startDate && endDate ? [startDate, endDate] : [];
+
+    const pvDateFilter = startDate && endDate ? ` AND pv.date BETWEEN ? AND ?` : '';
+    const pvDateParams = startDate && endDate ? [startDate, endDate] : [];
+
+    const svDateFilter = startDate && endDate ? ` AND sv.date BETWEEN ? AND ?` : '';
+    const svDateParams = startDate && endDate ? [startDate, endDate] : [];
+
     // Get all companies assigned to this employee
     const [companies] = await connection.query(
       `SELECT id, name FROM tbcompanies WHERE employee_id = ?`,
@@ -293,12 +306,13 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
           SUM(credit) AS credit
         FROM (
           SELECT 
-            ledger_id AS ledgerId,
-            SUM(CASE WHEN entry_type = 'debit' THEN amount ELSE 0 END) AS debit,
-            SUM(CASE WHEN entry_type = 'credit' THEN amount ELSE 0 END) AS credit
-          FROM voucher_entries
-          WHERE ledger_id IN (${ledgerPlaceholders})
-          GROUP BY ledger_id
+            ve.ledger_id AS ledgerId,
+            SUM(CASE WHEN ve.entry_type = 'debit' THEN ve.amount ELSE 0 END) AS debit,
+            SUM(CASE WHEN ve.entry_type = 'credit' THEN ve.amount ELSE 0 END) AS credit
+          FROM voucher_entries ve
+          JOIN voucher_main vm ON ve.voucher_id = vm.id
+          WHERE ve.ledger_id IN (${ledgerPlaceholders}) ${voucherDateFilter}
+          GROUP BY ve.ledger_id
 
           UNION ALL
 
@@ -314,7 +328,7 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
           ) pvi
           JOIN purchase_vouchers pv ON pv.id = pvi.voucherId
           WHERE pvi.tdsLedgerId IN (${ledgerPlaceholders})
-            AND pv.company_id IN (${placeholders})
+            AND pv.company_id IN (${placeholders}) ${pvDateFilter}
           GROUP BY pvi.tdsLedgerId
 
           UNION ALL
@@ -326,7 +340,7 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
           FROM purchase_voucher_items pvi
           JOIN purchase_vouchers pv ON pv.id = pvi.voucherId
           WHERE pvi.purchaseLedgerId IN (${ledgerPlaceholders})
-            AND pv.company_id IN (${placeholders})
+            AND pv.company_id IN (${placeholders}) ${pvDateFilter}
           GROUP BY pvi.purchaseLedgerId
 
           UNION ALL
@@ -338,15 +352,15 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
           FROM sales_voucher_items svi
           JOIN sales_vouchers sv ON sv.id = svi.voucherId
           WHERE svi.salesLedgerId IN (${ledgerPlaceholders})
-            AND sv.company_id IN (${placeholders})
+            AND sv.company_id IN (${placeholders}) ${svDateFilter}
           GROUP BY svi.salesLedgerId
         ) AS combined_data
         GROUP BY ledgerId`,
         [
-          ...ledgerIds, // 1st query ledger_id IN
-          ...ledgerIds, ...companyIds, // 2nd query pvi.tdsLedgerId IN, pv.company_id IN
-          ...ledgerIds, ...companyIds, // 3rd query pvi.purchaseLedgerId IN, pv.company_id IN
-          ...ledgerIds, ...companyIds  // 4th query svi.salesLedgerId IN, sv.company_id IN
+          ...ledgerIds, ...voucherDateParams, // 1st query
+          ...ledgerIds, ...companyIds, ...pvDateParams, // 2nd query
+          ...ledgerIds, ...companyIds, ...pvDateParams, // 3rd query
+          ...ledgerIds, ...companyIds, ...svDateParams  // 4th query
         ]
       );
 
@@ -369,10 +383,11 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
     for (const company of companies) {
       // Get net profit/loss from localStorage values (stored in voucher_entries narration)
       const [transferredEntries] = await connection.query(
-        `SELECT narration FROM voucher_entries 
-         WHERE (narration LIKE 'PROFIT_TR:%' OR narration LIKE 'LOSS_TR:%')
-         AND voucher_id IN (SELECT id FROM voucher_main WHERE company_id = ?)`,
-        [company.id]
+        `SELECT ve.narration FROM voucher_entries ve
+         JOIN voucher_main vm ON ve.voucher_id = vm.id
+         WHERE (ve.narration LIKE 'PROFIT_TR:%' OR ve.narration LIKE 'LOSS_TR:%')
+         AND vm.company_id = ? ${voucherDateFilter}`,
+        [company.id, ...voucherDateParams]
       );
 
       let transferredProfit = 0;
@@ -387,24 +402,25 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
 
       // Calculate net profit/loss from sales and purchases (Base amounts without tax)
       const [[salesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
-        [company.id]
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM sales_vouchers sv WHERE sv.company_id = ? ${svDateFilter}`,
+        [company.id, ...svDateParams]
       );
       const [[purchasesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
-        [company.id]
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM purchase_vouchers pv WHERE pv.company_id = ? ${pvDateFilter}`,
+        [company.id, ...pvDateParams]
       );
 
       // Get expenses from indirect expenses group
       const [[expensesResult]] = await connection.query(
         `SELECT COALESCE(SUM(ve.amount), 0) AS total
          FROM voucher_entries ve
+         JOIN voucher_main vm ON ve.voucher_id = vm.id
          JOIN ledgers l ON ve.ledger_id = l.id
          JOIN ledger_groups g ON l.group_id = g.id
          WHERE l.company_id = ? 
          AND (g.id = -11 OR g.parent = -11 OR g.name LIKE '%Indirect Expenses%')
-         AND ve.entry_type = 'debit'`,
-        [company.id]
+         AND ve.entry_type = 'debit' ${voucherDateFilter}`,
+        [company.id, ...voucherDateParams]
       );
 
       const sales = Number(salesResult?.total) || 0;
@@ -426,12 +442,12 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
     const purchaseData = {};
     for (const company of companies) {
       const [[salesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM sales_vouchers WHERE company_id = ?`,
-        [company.id]
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM sales_vouchers sv WHERE sv.company_id = ? ${svDateFilter}`,
+        [company.id, ...svDateParams]
       );
       const [[purchasesResult]] = await connection.query(
-        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM purchase_vouchers WHERE company_id = ?`,
-        [company.id]
+        `SELECT COALESCE(SUM(subtotal), SUM(total), 0) AS total FROM purchase_vouchers pv WHERE pv.company_id = ? ${pvDateFilter}`,
+        [company.id, ...pvDateParams]
       );
       salesData[company.id] = Number(salesResult?.total) || 0;
       purchaseData[company.id] = Number(purchasesResult?.total) || 0;

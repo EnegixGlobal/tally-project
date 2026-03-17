@@ -8,9 +8,25 @@ const bcrypt = require("bcryptjs");
 const JWT_SECRET = process.env.JWT_SECRET || "8fbd@hG35kd93JK!hG2c90MZ";
 
 router.post("/register", async (req, res) => {
-  // console.log("/register hit");
+  // ✅ Ensure 'address' column exists in all relevant user tables when route is hit
+  const userTables = [
+    { name: "tbemployees", after: "pan" },
+    { name: "tbca", after: "fdpan" },
+    { name: "tbcaemployees", after: "adhar" }
+  ];
 
-  const { firstName, lastName, email, phoneNumber, pan, password, userLimit } =
+  for (const table of userTables) {
+    try {
+      const [cols] = await db.query(`SHOW COLUMNS FROM ${table.name} LIKE 'address'`);
+      if (cols.length === 0) {
+        await db.query(`ALTER TABLE ${table.name} ADD COLUMN address TEXT AFTER ${table.after}`);
+      }
+    } catch (err) {
+      console.error(`Error ensuring address column in ${table.name}:`, err.message);
+    }
+  }
+
+  const { firstName, lastName, email, phoneNumber, pan, password, userLimit, address } =
     req.body;
 
   if (
@@ -25,7 +41,7 @@ router.post("/register", async (req, res) => {
     return res.status(400).json({ message: "All fields are required" });
   }
 
-  console.log(firstName, !lastName, email, password, phoneNumber, pan, userLimit);
+  console.log(firstName, !lastName, email, password, phoneNumber, pan, userLimit, address);
 
   try {
     // 🔍 Check if email already exists
@@ -45,8 +61,8 @@ router.post("/register", async (req, res) => {
 
     // 📥 Insert into DB
     const sql = `
-      INSERT INTO tbemployees (firstName, lastName, email, phoneNumber, pan, password, userLimit, token)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+      INSERT INTO tbemployees (firstName, lastName, email, phoneNumber, pan, password, userLimit, token, address)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const [result] = await db.query(sql, [
@@ -58,6 +74,7 @@ router.post("/register", async (req, res) => {
       hashedPassword,
       userLimit,
       token,
+      address || null,
     ]);
 
     console.log("✅ User inserted:", result.insertId);

@@ -179,6 +179,8 @@ const ReceiptVoucher: React.FC = () => {
 
     const updatedEntries = [...formData.entries];
 
+    const newValue = type === "number" ? parseFloat(value) || 0 : value;
+
     // 🟢 If ledgerId changed → ledgerName bhi set karo
     if (name === "ledgerId") {
       // Ledger find from both cashBankLedgers + allLedgers
@@ -190,8 +192,7 @@ const ReceiptVoucher: React.FC = () => {
       updatedEntries[index].ledgerName = ledger?.name || "";
     } else {
       // Normal update (amount, type, narration, costCentre, etc.)
-      updatedEntries[index][name] =
-        type === "number" ? parseFloat(value) || 0 : value;
+      updatedEntries[index][name] = newValue;
     }
 
     // 🟡 FIRST ENTRY ALWAYS CREDIT — Both modes
@@ -201,6 +202,21 @@ const ReceiptVoucher: React.FC = () => {
     if (formData.mode === "single-entry") {
       updatedEntries.length = 1; // only 1 row allowed
       updatedEntries[0].type = "credit";
+    }
+
+    // Auto-fill logic for double-entry mode with 2-field entry
+    if (formData.mode === "double-entry" && index === 0 && updatedEntries.length === 2) {
+      if (name === "amount") {
+        updatedEntries[1] = {
+          ...updatedEntries[1],
+          amount: newValue as number,
+        };
+      } else if (name === "type") {
+        updatedEntries[1] = {
+          ...updatedEntries[1],
+          type: newValue === "debit" ? "credit" : "debit",
+        };
+      }
     }
 
     // Update State

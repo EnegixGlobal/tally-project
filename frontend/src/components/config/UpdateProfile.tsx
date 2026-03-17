@@ -27,6 +27,7 @@ interface ProfileData {
     email: string;
     phoneNumber: string;
     pan: string;
+    address?: string;
     userLimit?: number;
     created_at?: string;
 }
@@ -43,6 +44,7 @@ const UpdateProfile: React.FC = () => {
         email: "",
         phoneNumber: "",
         pan: "",
+        address: "",
     });
 
     useEffect(() => {
@@ -90,6 +92,7 @@ const UpdateProfile: React.FC = () => {
                     firstName: profile.firstName,
                     lastName: profile.lastName,
                     phoneNumber: profile.phoneNumber,
+                    address: profile.address,
                 }),
             });
 
@@ -112,6 +115,7 @@ const UpdateProfile: React.FC = () => {
                     firstName: profile.firstName,
                     lastName: profile.lastName,
                     phoneNumber: profile.phoneNumber,
+                    address: profile.address,
                 }));
             } else {
                 throw new Error(data.message || "Update failed");
@@ -238,6 +242,18 @@ const UpdateProfile: React.FC = () => {
                                             <p className={`text-sm font-bold truncate ${theme === "dark" ? "text-gray-200" : "text-slate-700"}`}>{profile.id}</p>
                                         </div>
                                     </div>
+
+                                    {profile.address && (
+                                        <div className={`group/item flex items-center gap-4 p-4 rounded-3xl transition-all ${theme === "dark" ? "hover:bg-gray-800/60" : "hover:bg-slate-50"}`}>
+                                            <div className={`p-3 rounded-2xl ${theme === "dark" ? "bg-gray-800 text-blue-400" : "bg-blue-50 text-blue-600"} shadow-sm transition-transform group-hover/item:scale-110`}>
+                                                <ExternalLink size={20} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <p className={`text-[10px] font-black uppercase tracking-widest ${theme === 'dark' ? 'text-gray-500' : 'text-slate-400'}`}>Current Address</p>
+                                                <p className={`text-sm font-bold break-words ${theme === "dark" ? "text-gray-200" : "text-slate-700"}`}>{profile.address}</p>
+                                            </div>
+                                        </div>
+                                    )}
 
                                     {profile.created_at && (
                                         <div className={`group/item flex items-center gap-4 p-4 rounded-3xl transition-all ${theme === "dark" ? "hover:bg-gray-800/60" : "hover:bg-slate-50"}`}>
@@ -381,6 +397,24 @@ const UpdateProfile: React.FC = () => {
                                                     : "bg-slate-100 border-slate-200 text-slate-400"
                                                     }`}
                                                 placeholder="PAN locked"
+                                            />
+                                        </div>
+                                    </div>
+
+                                    <div className="md:col-span-2 space-y-2">
+                                        <label className={`flex items-center gap-2 text-[11px] font-black uppercase tracking-widest ${theme === "dark" ? "text-gray-400" : "text-slate-500"}`}>
+                                            Permanent Address
+                                        </label>
+                                        <div className="relative group/field">
+                                            <textarea
+                                                name="address"
+                                                value={profile.address}
+                                                onChange={(e: any) => handleChange(e)}
+                                                className={`block w-full px-4 py-4 rounded-2xl border-2 outline-none transition-all duration-300 font-bold min-h-[100px] ${theme === "dark"
+                                                    ? "bg-gray-800/40 border-gray-700/50 text-white focus:border-blue-500/50 focus:bg-gray-800"
+                                                    : "bg-slate-50 border-slate-100 text-slate-900 focus:border-blue-500/30 focus:bg-white"
+                                                    }`}
+                                                placeholder="Enter full address"
                                             />
                                         </div>
                                     </div>

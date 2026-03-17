@@ -140,17 +140,35 @@ const JournalVoucher: React.FC = () => {
     >
   ) => {
     const { name, value, type } = e.target;
-    const updatedEntries = [...formData.entries];
+    let updatedEntries = [...formData.entries];
+
+    const newValue = type === "number" ? parseFloat(value) || 0 : value;
+
     updatedEntries[index] = {
       ...updatedEntries[index],
-      [name]: type === "number" ? parseFloat(value) || 0 : value,
+      [name]: newValue,
     };
+
+    // Auto-fill logic for 2-field entry
+    if (index === 0 && updatedEntries.length === 2) {
+      if (name === "amount") {
+        updatedEntries[1] = {
+          ...updatedEntries[1],
+          amount: newValue as number,
+        };
+      } else if (name === "type") {
+        updatedEntries[1] = {
+          ...updatedEntries[1],
+          type: newValue === "debit" ? "credit" : "debit",
+        };
+      }
+    }
+
     setFormData((prev) => ({ ...prev, entries: updatedEntries }));
     setErrors((prev) => ({ ...prev, [`${name}${index}`]: "" }));
+
     if (e.target.value === "add-new") {
       navigate("/app/masters/ledger/create"); // Redirect to ledger creation page
-    } else {
-      handleChange(e); // normal update
     }
   };
 

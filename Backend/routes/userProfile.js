@@ -12,12 +12,12 @@ router.get('/my-profile', authMiddleware, async (req, res) => {
         let params = [id];
 
         if (role === 'ca') {
-            sql = 'SELECT fdSiNo as id, fdname as firstName, email, fdphoneNumber as phoneNumber, fdpan as pan, created_at FROM tbca WHERE fdSiNo = ?';
+            sql = 'SELECT fdSiNo as id, fdname as firstName, email, fdphoneNumber as phoneNumber, fdpan as pan, address, created_at FROM tbca WHERE fdSiNo = ?';
         } else if (role === 'ca_employee') {
-            sql = 'SELECT id, name as firstName, email, phone as phoneNumber, adhar, created_at FROM tbcaemployees WHERE id = ?';
+            sql = 'SELECT id, name as firstName, email, phone as phoneNumber, adhar, address, created_at FROM tbcaemployees WHERE id = ?';
         } else {
             // Default to tbemployees (trader/employee)
-            sql = 'SELECT id, firstName, lastName, email, phoneNumber, pan, userLimit, created_at FROM tbemployees WHERE id = ?';
+            sql = 'SELECT id, firstName, lastName, email, phoneNumber, pan, address, userLimit, created_at FROM tbemployees WHERE id = ?';
         }
 
         const [rows] = await db.query(sql, params);
@@ -34,20 +34,42 @@ router.get('/my-profile', authMiddleware, async (req, res) => {
 router.post('/update-profile', authMiddleware, async (req, res) => {
     try {
         const { id, role } = req.user;
-        const { firstName, lastName, phoneNumber, pan } = req.body;
+
+        // ✅ Ensure 'address' column exists in the active user's table when route is hit
+        let targetTable = 'tbemployees';
+        let afterColumn = 'pan';
+
+        if (role === 'ca') {
+            targetTable = 'tbca';
+            afterColumn = 'fdpan';
+        } else if (role === 'ca_employee') {
+            targetTable = 'tbcaemployees';
+            afterColumn = 'adhar';
+        }
+
+        try {
+            const [cols] = await db.query(`SHOW COLUMNS FROM ${targetTable} LIKE 'address'`);
+            if (cols.length === 0) {
+                await db.query(`ALTER TABLE ${targetTable} ADD COLUMN address TEXT AFTER ${afterColumn}`);
+            }
+        } catch (err) {
+            console.error(`Error ensuring address column in ${targetTable}:`, err.message);
+        }
+
+        const { firstName, lastName, phoneNumber, pan, address } = req.body;
 
         let sql = '';
         let params = [];
 
         if (role === 'ca') {
-            sql = 'UPDATE tbca SET fdname = ?, fdphoneNumber = ? WHERE fdSiNo = ?';
-            params = [firstName, phoneNumber, id];
+            sql = 'UPDATE tbca SET fdname = ?, fdphoneNumber = ?, address = ? WHERE fdSiNo = ?';
+            params = [firstName, phoneNumber, address, id];
         } else if (role === 'ca_employee') {
-            sql = 'UPDATE tbcaemployees SET name = ?, phone = ? WHERE id = ?';
-            params = [firstName, phoneNumber, id];
+            sql = 'UPDATE tbcaemployees SET name = ?, phone = ?, address = ? WHERE id = ?';
+            params = [firstName, phoneNumber, address, id];
         } else {
-            sql = 'UPDATE tbemployees SET firstName = ?, lastName = ?, phoneNumber = ? WHERE id = ?';
-            params = [firstName, lastName, phoneNumber, id];
+            sql = 'UPDATE tbemployees SET firstName = ?, lastName = ?, phoneNumber = ?, address = ? WHERE id = ?';
+            params = [firstName, lastName, phoneNumber, address, id];
         }
 
         await db.query(sql, params);

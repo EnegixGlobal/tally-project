@@ -134,6 +134,7 @@ router.post('/', async (req, res) => {
           pan: user.pan,
           phoneNumber: user.phoneNumber,
           userLimit: user.userLimit,
+          address: user.address, // Added address
           companyName: companyRow ? companyRow.name : "",
           userType: role, // Add userType here too
         }
@@ -182,6 +183,7 @@ router.post('/', async (req, res) => {
               lastName: '',
               pan: '',
               phoneNumber: '',
+              address: userRow.address, // Added address
               userLimit: 1,
               companyName: companyRow.name,
               userType: 'company_user', // Added here too
