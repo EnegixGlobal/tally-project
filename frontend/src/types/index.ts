@@ -157,7 +157,6 @@ export type VoucherEntry = {
   mode?:
   | "item-invoice"
   | "accounting-invoice"
-  | "as-voucher"
   | "transfer"
   | "adjustment"
   | "double-entry"

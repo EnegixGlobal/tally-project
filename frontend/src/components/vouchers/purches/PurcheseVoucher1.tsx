@@ -236,8 +236,8 @@ const PurchaseVoucher: React.FC = () => {
       hsn: true,
       gst: true,
       batch: true,   // ✅ Default ON — but column only shows when item has batches (hasAnyBatch)
-      godown: true,
-      showReceiptDetails: true,
+      godown: false,
+      showReceiptDetails: false,
       tds: true,
       enableTdsCredit: false,
     }
@@ -1154,7 +1154,7 @@ const PurchaseVoucher: React.FC = () => {
               quantity: 0,
               rate: 0,
               amount: 0,
-              type: value === "item-invoice" ? "debit" : "debit",
+              type: value === "accounting-invoice" ? "credit" : "debit",
               cgstRate: 0,
               sgstRate: 0,
               igstRate: 0,
@@ -1381,7 +1381,7 @@ const PurchaseVoucher: React.FC = () => {
     }
 
 
-    // ⭐ ACCOUNTING / AS-VOUCHER MODES
+    // ⭐ ACCOUNTING MODE
     if (name === "ledgerId") {
       updatedEntries[index] = {
         ...entry,
@@ -1472,32 +1472,39 @@ const PurchaseVoucher: React.FC = () => {
 
 
   const addEntry = () => {
-    setFormData((prev) => ({
-      ...prev,
-      entries: [
-        ...prev.entries,
-        {
-          id: `e${prev.entries.length + 1}`,
-          itemId: "",
-          ledgerId: "",
-          quantity: 0,
-          rate: 0,
-          amount: 0,
-          type: "debit",
-          cgstRate: 0,
-          sgstRate: 0,
-          igstRate: 0,
-          godownId: "",
-          discount: 0,
-          discountLedgerId: "",
-          batchNumber: "",
-          batchExpiryDate: "",
-          batchManufacturingDate: "",
-          batches: [],
-          purchaseLedgerId: "",
-        },
-      ],
-    }));
+    setFormData((prev) => {
+      const newEntry = {
+        id: `e${prev.entries.length + 1}`,
+        itemId: "",
+        ledgerId: "",
+        quantity: 0,
+        rate: 0,
+        amount: 0,
+        type: "debit",
+        cgstRate: 0,
+        sgstRate: 0,
+        igstRate: 0,
+        godownId: "",
+        discount: 0,
+        discountLedgerId: "",
+        batchNumber: "",
+        batchExpiryDate: "",
+        batchManufacturingDate: "",
+        batches: [],
+        purchaseLedgerId: "",
+      } as any;
+
+      // In accounting mode, insert the new ledger entry just below the first entry
+      if (prev.mode === "accounting-invoice") {
+        const entries = [...prev.entries];
+        // ensure there's at least one entry (first should be credit)
+        if (entries.length === 0) entries.push({ ...newEntry, type: "credit", id: "e1" });
+        entries.splice(1, 0, newEntry);
+        return { ...prev, entries };
+      }
+
+      return { ...prev, entries: [...prev.entries, newEntry] };
+    });
   };
 
   useEffect(() => {
@@ -1543,7 +1550,7 @@ const PurchaseVoucher: React.FC = () => {
     if (!formData.number) newErrors.number = "Voucher number is required";
 
     // Only validate item-invoice specific fields when mode is item-invoice
-    if (formData.mode === "item-invoice" || formData.mode === "accounting-invoice") {
+    if (formData.mode === "item-invoice") {
       if (!formData.partyId) newErrors.partyId = "Party is required";
       if (!formData.referenceNo)
         newErrors.referenceNo = "Supplier Invoice number is required";
@@ -1551,7 +1558,7 @@ const PurchaseVoucher: React.FC = () => {
         newErrors.supplierInvoiceDate = "Supplier Invoice date is required";
     }
 
-    if (formData.mode === "item-invoice") {
+      if (formData.mode === "item-invoice") {
       formData.entries.forEach((entry, index) => {
         if (!entry.itemId)
           newErrors[`entry${index}.itemId`] = "Item is required";
@@ -1569,7 +1576,7 @@ const PurchaseVoucher: React.FC = () => {
           }
         }
       });
-    } else {
+      } else {
       formData.entries.forEach((entry, index) => {
         if (!entry.ledgerId)
           newErrors[`entry${index}.ledgerId`] = "Ledger is required";
@@ -1577,7 +1584,7 @@ const PurchaseVoucher: React.FC = () => {
           newErrors[`entry${index}.amount`] = "Amount must be greater than 0";
       });
 
-      if (formData.mode === "as-voucher") {
+      if (formData.mode === "accounting-invoice") {
         const debitTotal = formData.entries
           .filter((e) => e.type === "debit")
           .reduce((sum, e) => sum + (e.amount ?? 0), 0);
@@ -1702,7 +1709,7 @@ const PurchaseVoucher: React.FC = () => {
         .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
       // In accounting-invoice, total is usually the sum of debits/expenses
-      // In as-voucher, it's also the balancing amount.
+      // In accounting-invoice, it's also the balancing amount.
       return {
         debitTotal,
         creditTotal,
@@ -1775,11 +1782,7 @@ const PurchaseVoucher: React.FC = () => {
 
       // Extract partyId from first ledger entry when in accounting mode
       let finalPartyId = formData.partyId;
-      if (
-        (formData.mode === "accounting-invoice" ||
-          formData.mode === "as-voucher") &&
-        formData.entries.length > 0
-      ) {
+      if (formData.mode === "accounting-invoice" && formData.entries.length > 0) {
         // Use first debit entry's ledgerId as partyId, or first entry if no debit found
         const firstDebitEntry = formData.entries.find(
           (e) => e.type === "debit" && e.ledgerId
@@ -2564,34 +2567,36 @@ const PurchaseVoucher: React.FC = () => {
 
             {/* Row 2: Party & Selection */}
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
-              <div className="md:col-span-2">
-                <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="partyId">
-                  Party / Supplier Name
-                </label>
-                <select
-                  id="partyId"
-                  name="partyId"
-                  value={formData.partyId}
-                  onChange={handlePartyChange}
-                  className={`${getSelectClasses(theme, !!errors.partyId)} font-semibold`}
-                >
-                  <option value="">-- Select Party --</option>
-                  {partyLedgers.map((ledger) => (
-                    <option key={ledger.id} value={ledger.id}>{ledger.name}</option>
-                  ))}
-                  <option value="add-new" className="text-blue-600 font-bold">+ Create New Ledger</option>
-                </select>
-                {selectedPartyLedger && (() => {
-                  const partyState = selectedPartyLedger.state || selectedPartyLedger.state_name || selectedPartyLedger.State || "N/A";
-                  return (
-                    <div className={`mt-1.5 text-[10px] font-bold flex items-center gap-1.5 px-2 py-0.5 rounded-full w-fit ${isRegularCharge ? "bg-green-100 text-green-700 dark:bg-green-900/30" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30"}`}>
-                      <span className={`w-1.5 h-1.5 rounded-full ${isRegularCharge ? "bg-green-600" : "bg-orange-600 animate-pulse"}`}></span>
-                      {isRegularCharge ? `REGULAR | GSTIN: ${selectedPartyLedger.gstNumber || "N/A"} | ${partyState}` : `REVERSE CHARGE | ${partyState}`}
-                    </div>
-                  );
-                })()}
-                {errors.partyId && <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>}
-              </div>
+              {formData.mode !== "accounting-invoice" && (
+                <div className="md:col-span-2">
+                  <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60" htmlFor="partyId">
+                    Party / Supplier Name
+                  </label>
+                  <select
+                    id="partyId"
+                    name="partyId"
+                    value={formData.partyId}
+                    onChange={handlePartyChange}
+                    className={`${getSelectClasses(theme, !!errors.partyId)} font-semibold`}
+                  >
+                    <option value="">-- Select Party --</option>
+                    {partyLedgers.map((ledger) => (
+                      <option key={ledger.id} value={ledger.id}>{ledger.name}</option>
+                    ))}
+                    <option value="add-new" className="text-blue-600 font-bold">+ Create New Ledger</option>
+                  </select>
+                  {selectedPartyLedger && (() => {
+                    const partyState = selectedPartyLedger.state || selectedPartyLedger.state_name || selectedPartyLedger.State || "N/A";
+                    return (
+                      <div className={`mt-1.5 text-[10px] font-bold flex items-center gap-1.5 px-2 py-0.5 rounded-full w-fit ${isRegularCharge ? "bg-green-100 text-green-700 dark:bg-green-900/30" : "bg-orange-100 text-orange-700 dark:bg-orange-900/30"}`}>
+                        <span className={`w-1.5 h-1.5 rounded-full ${isRegularCharge ? "bg-green-600" : "bg-orange-600 animate-pulse"}`}></span>
+                        {isRegularCharge ? `REGULAR | GSTIN: ${selectedPartyLedger.gstNumber || "N/A"} | ${partyState}` : `REVERSE CHARGE | ${partyState}`}
+                      </div>
+                    );
+                  })()}
+                  {errors.partyId && <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>}
+                </div>
+              )}
 
               <div>
                 <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
@@ -2604,8 +2609,7 @@ const PurchaseVoucher: React.FC = () => {
                   className={getSelectClasses(theme)}
                 >
                   <option value="item-invoice">Item Invoice</option>
-                  <option value="accounting-invoice">Accounting Invoice</option>
-                  <option value="as-voucher">As Voucher</option>
+                    <option value="accounting-invoice">Accounting Invoice</option>
                 </select>
               </div>
 

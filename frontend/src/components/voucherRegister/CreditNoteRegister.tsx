@@ -297,8 +297,6 @@ const CreditNoteRegister: React.FC = () => {
     switch (mode) {
       case "accounting-invoice":
         return "Accounting Invoice";
-      case "as-voucher":
-        return "As Voucher";
       case "cash":
         return "Cash";
       case "bank":

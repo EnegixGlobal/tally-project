@@ -167,7 +167,7 @@ CREATE TABLE `credit_vouchers` (
   `id` int(11) NOT NULL,
   `date` date DEFAULT NULL,
   `number` varchar(50) DEFAULT NULL,
-  `mode` enum('item-invoice','accounting-invoice','as-voucher') DEFAULT NULL,
+  `mode` enum('item-invoice','accounting-invoice') DEFAULT NULL,
   `partyId` int(11) DEFAULT NULL,
   `narration` text DEFAULT NULL,
   `employee_id` int(11) DEFAULT NULL,

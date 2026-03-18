@@ -185,7 +185,7 @@ const CreditNoteVoucher: React.FC = () => {
     const { name, value } = e.target;
 
     if (name === "mode") {
-      const newMode = value as "accounting-invoice" | "as-voucher";
+      const newMode = value as "accounting-invoice";
 
       setFormData((prev) => ({
         ...prev,
@@ -484,22 +484,21 @@ const CreditNoteVoucher: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium mb-1" htmlFor="mode">
-                Voucher Mode
-              </label>
-              <select
-                id="mode"
-                name="mode"
-                value={formData.mode}
-                onChange={handleChange}
-                title="Voucher Mode"
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-                  } outline-none transition-colors`}
-              >
-                <option value="accounting-invoice">Accounting Invoice</option>
-                <option value="as-voucher">As Voucher</option>
-              </select>
+                    Voucher Mode
+                  </label>
+                  <select
+                    id="mode"
+                    name="mode"
+                    value={formData.mode}
+                    onChange={handleChange}
+                    title="Voucher Mode"
+                    className={`w-full p-2 rounded border ${theme === "dark"
+                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                      : "bg-white border-gray-300 focus:border-blue-500"
+                      } outline-none transition-colors`}
+                  >
+                    <option value="accounting-invoice">Accounting Invoice</option>
+                  </select>
             </div>
           </div>
 

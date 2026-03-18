@@ -349,7 +349,7 @@ router.post("/", async (req, res) => {
     const voucherId = voucherResult.insertId;
 
     // ================= INSERT ENTRIES (BASED ON MODE) =================
-    if (mode === "accounting-invoice" || mode === "as-voucher") {
+    if (mode === "accounting-invoice") {
       const ledgerEntries = receivedEntries.filter((e) => e.ledgerId);
       if (ledgerEntries.length > 0) {
         const ledgerValues = ledgerEntries.map((e) => [
@@ -693,7 +693,7 @@ router.get("/:id", async (req, res) => {
     ====================== */
     let entries = [];
 
-    if (voucher.mode === "accounting-invoice" || voucher.mode === "as-voucher") {
+    if (voucher.mode === "accounting-invoice") {
       const [rows] = await db.execute(
         `SELECT ve.*, l.name AS ledgerName 
          FROM voucher_entries ve 
@@ -902,7 +902,7 @@ router.put("/:id", async (req, res) => {
     await db.execute(`DELETE FROM voucher_entries WHERE voucher_id = ?`, [voucherId]);
 
     // ---- 5) INSERT NEW ROWS (BASED ON MODE) ----
-    if (mode === "accounting-invoice" || mode === "as-voucher") {
+    if (mode === "accounting-invoice") {
       const ledgerEntries = entries.filter((e) => e.ledgerId);
       if (ledgerEntries.length > 0) {
         const ledgerValues = ledgerEntries.map((e) => [

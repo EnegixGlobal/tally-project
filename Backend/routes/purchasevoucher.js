@@ -607,7 +607,7 @@ router.post("/", async (req, res) => {
         await db.query(insertItemSql, [itemValues]);
       }
     } else {
-      // accounting-invoice or as-voucher
+      // accounting-invoice
       const ledgerEntries = entries.filter(e => e.ledgerId);
       if (ledgerEntries.length > 0) {
         const insertEntrySql = `
@@ -934,7 +934,7 @@ router.get("/:id", async (req, res) => {
         };
       });
     } else {
-      // accounting-invoice or as-voucher
+      // accounting-invoice
       const [ledgerRows] = await db.execute(
         `SELECT id, ledger_id as ledgerId, amount, entry_type as type, narration 
          FROM voucher_entries 
@@ -1283,7 +1283,7 @@ router.put("/:id", async (req, res) => {
         await db.query(insertItemSql, [itemValues]);
       }
     } else {
-      // accounting-invoice or as-voucher
+      // accounting-invoice
       const ledgerEntries = entries.filter((e) => e.ledgerId);
       if (ledgerEntries.length > 0) {
         const insertEntrySql = `
