@@ -70,6 +70,14 @@ export const fetchAllVouchers = createAsyncThunk<AllVoucherPayload, FetchVoucher
 
         const params = { companyId, ownerType, ownerId };
         const paramsUnderScore = { company_id: companyId, owner_type: ownerType, owner_id: ownerId };
+        const commonParams = {
+            companyId,
+            company_id: companyId,
+            ownerType,
+            owner_type: ownerType,
+            ownerId,
+            owner_id: ownerId,
+        };
 
         const getData = (res: any) => {
             if (!res || !res.data) return [];
@@ -108,20 +116,20 @@ export const fetchAllVouchers = createAsyncThunk<AllVoucherPayload, FetchVoucher
                 payrollVoucher,
                 deliveryNoteVoucher,
             ] = await Promise.all([
-                fetchSafe("/api/sale-vouchers", paramsUnderScore),
-                fetchSafe("/api/purchase-vouchers", paramsUnderScore),
-                fetchSafe("/api/vouchers", { ...params, voucherType: 'payment' }),
-                fetchSafe("/api/vouchers", { ...params, voucherType: 'receipt' }),
-                fetchSafe("/api/vouchers", { ...params, voucherType: 'contra' }),
-                fetchSafe("/api/vouchers", { ...params, voucherType: 'journal' }),
-                fetchSafe("/api/sales-orders", params),
-                fetchSafe("/api/purchase-orders", params),
-                fetchSafe("/api/vouchers", { ...params, voucherType: 'quotation' }),
-                fetchSafe("/api/DebitNoteVoucher", paramsUnderScore),
-                fetchSafe("/api/CreditNotevoucher", paramsUnderScore),
-                fetchSafe("/api/StockJournal", paramsUnderScore),
-                fetchSafe("/api/vouchers", { ...params, voucherType: 'payroll' }),
-                fetchSafe("/api/vouchers", { ...params, voucherType: 'delivery-note' }),
+                fetchSafe("/api/sale-vouchers", commonParams),
+                fetchSafe("/api/purchase-vouchers", commonParams),
+                fetchSafe("/api/vouchers", { ...commonParams, voucherType: 'payment' }),
+                fetchSafe("/api/vouchers", { ...commonParams, voucherType: 'receipt' }),
+                fetchSafe("/api/vouchers", { ...commonParams, voucherType: 'contra' }),
+                fetchSafe("/api/vouchers", { ...commonParams, voucherType: 'journal' }),
+                fetchSafe("/api/sales-orders", commonParams),
+                fetchSafe("/api/purchase-orders", commonParams),
+                fetchSafe("/api/vouchers", { ...commonParams, voucherType: 'quotation' }),
+                fetchSafe("/api/DebitNoteVoucher", commonParams),
+                fetchSafe("/api/CreditNotevoucher", commonParams),
+                fetchSafe("/api/StockJournal", commonParams),
+                fetchSafe("/api/vouchers", { ...commonParams, voucherType: 'payroll' }),
+                fetchSafe("/api/vouchers", { ...commonParams, voucherType: 'delivery-note' }),
             ]);
 
             return {

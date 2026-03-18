@@ -102,6 +102,48 @@ router.post('/', async (req, res) => {
       const hasCompany = !!companyRow;
       const userid = "employee";
 
+      // --- Fetch subscription / trial info for this company (if any) ---
+      let subscriptionInfo = null;
+      if (companyId) {
+        const [subsRows] = await db.query(
+          `
+            SELECT 
+              id,
+              plan,
+              is_trial,
+              status,
+              start_date,
+              end_date
+            FROM company_subscriptions
+            WHERE company_id = ?
+            ORDER BY end_date DESC
+            LIMIT 1
+          `,
+          [companyId]
+        ).catch(() => [ [] ]);
+
+        if (subsRows && subsRows.length > 0) {
+          const s = subsRows[0];
+          const now = new Date();
+          const end = new Date(s.end_date);
+          const msDiff = end.getTime() - now.getTime();
+          const daysRemaining = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+
+          const isExpired = msDiff < 0 || s.status === 'expired' || s.status === 'cancelled';
+
+          subscriptionInfo = {
+            id: s.id,
+            plan: s.plan,
+            isTrial: !!s.is_trial,
+            status: isExpired ? 'expired' : s.status,
+            startDate: s.start_date,
+            endDate: s.end_date,
+            daysRemaining: isExpired ? 0 : Math.max(daysRemaining, 0),
+            isExpired,
+          };
+        }
+      }
+
       const token = jwt.sign(
         { id: user[idField], role },
         JWT_SECRET,
@@ -123,6 +165,7 @@ router.post('/', async (req, res) => {
         companyId,
         hasCompany,
         companyInfo: companyRow || null,
+        subscription: subscriptionInfo,
         companies: user.assignedCompanies || (companyRow ? [companyRow] : []),
         employee_id: employeeId,
         user: {

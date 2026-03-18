@@ -45,7 +45,7 @@ const VoucherRegisterIndex: React.FC = () => {
 
   // Tenant Identification and Data Fetching
   useEffect(() => {
-    const companyId = authCompanyId ?? localStorage.getItem("company_id") ?? activeCompanyId;
+    const companyId = activeCompanyId ?? localStorage.getItem("company_id") ?? authCompanyId;
 
     let ownerType = localStorage.getItem("supplier");
     if (!ownerType) {

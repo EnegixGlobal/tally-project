@@ -34,6 +34,7 @@ interface ProfileData {
 
 const UpdateProfile: React.FC = () => {
     const { theme } = useAppContext();
+    const { user } = useAuth();
     const navigate = useNavigate();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -161,7 +162,7 @@ const UpdateProfile: React.FC = () => {
 
             <div className="max-w-6xl mx-auto relative z-10">
                 {/* Header Area */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-10 gap-6">
+                <div className="flex flex-col md:flex-row md:items-center justify-between mb-6 gap-6">
                     <div>
                         <button
                             onClick={() => navigate(-1)}
@@ -180,7 +181,7 @@ const UpdateProfile: React.FC = () => {
                         </p>
                     </div>
 
-                    <div className="flex items-center gap-3">
+                    <div className="flex flex-col gap-3 items-stretch md:items-end">
                         <div className={`flex flex-col items-end px-4 py-2 rounded-2xl border ${theme === 'dark' ? 'bg-gray-800/40 border-gray-700/50' : 'bg-white border-slate-200'} shadow-sm`}>
                             <span className={`text-[10px] font-bold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-500' : 'text-slate-400'}`}>Account Status</span>
                             <div className="flex items-center gap-1.5 mt-0.5">
@@ -188,6 +189,32 @@ const UpdateProfile: React.FC = () => {
                                 <span className={`text-sm font-bold ${theme === 'dark' ? 'text-gray-200' : 'text-slate-700'}`}>Active Verified</span>
                             </div>
                         </div>
+                        
+                            {user?.isTrial && user.trialDaysRemaining !== undefined && (() => {
+                                const isActive = user.trialDaysRemaining > 0;
+                                const baseClass = theme === 'dark' ? 'border-amber-700/60 shadow-sm' : 'border-200 shadow-sm';
+                                return (
+                                    <div className={`w-full md:w-auto px-4 py-2 rounded-2xl border flex items-center gap-3 ${isActive ? (theme === 'dark' ? 'bg-green-900/20 border-green-700/60 text-green-200' : 'bg-green-50 border-green-200 text-green-800') : (theme === 'dark' ? 'bg-red-900/20 border-red-700/60 text-red-200' : 'bg-red-50 border-red-200 text-red-800')}`}>
+                                        <div className="flex-shrink-0">
+                                            <Calendar size={18} className={isActive ? 'text-green-600' : 'text-red-600'} />
+                                        </div>
+                                        <div className="text-xs">
+                                            <div className={`font-semibold ${isActive ? 'text-green-800' : 'text-red-800'}`}>
+                                                Free Trial {isActive ? 'Active' : 'Ended'}
+                                            </div>
+                                            {isActive ? (
+                                                <div className={isActive ? 'text-green-700' : ''}>
+                                                    Your trial has <span className="font-bold">{user.trialDaysRemaining} days</span> remaining.
+                                                </div>
+                                            ) : (
+                                                <div className="text-red-700">
+                                                    Your 14-day free trial has ended.
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                     </div>
                 </div>
 

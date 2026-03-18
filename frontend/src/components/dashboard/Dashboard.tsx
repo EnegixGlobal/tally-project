@@ -10,6 +10,7 @@ import {
   PlusCircle,
   Lock as LucideLock,
   Building,
+  Calendar,
 } from "lucide-react";
 import AddCaEmployeeForm from "./caemployee"; // adjust path as needed
 import AssignCompaniesModal from "./AssignCompaniesModal"; // Adjust path accordingly
@@ -27,7 +28,7 @@ const Dashboard: React.FC = () => {
 
   const { theme, setCompanyInfo } = useAppContext();
   const { switchCompany, activeCompanyId, setCompanies: setContextCompanies } = useCompany();
-  const { checkPermission } = useAuth();
+  const { checkPermission, user } = useAuth();
   const navigate = useNavigate();
   const [companyInfo, setCompanyInfoState] = useState<any>(null);
   const [ledgers, setLedgers] = useState<any[]>([]);
@@ -417,7 +418,7 @@ const Dashboard: React.FC = () => {
         <div className="pt-[40px] px-4 ">
           {/* <h1 className="text-2xl font-bold mb-6">Dashboard</h1> */}
 
-          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-6">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4 mb-4">
             <div>
               <h1 className="text-3xl font-bold text-gray-800 tracking-tight mb-1">
                 My Companies
@@ -462,6 +463,41 @@ const Dashboard: React.FC = () => {
               )}
             </div>
           </div>
+
+          {/* Trial / subscription banner */}
+          {user?.isTrial && user.trialDaysRemaining !== undefined && (() => {
+            const isActive = user.trialDaysRemaining > 0;
+            return (
+              <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${isActive ? 'border-green-300 bg-green-50 text-green-900' : 'border-red-300 bg-red-50 text-red-800'}`}>
+                <div className="flex items-start gap-3">
+                  <div className={`mt-0.5 h-8 w-8 rounded-full flex items-center justify-center ${isActive ? 'bg-green-100' : 'bg-red-100'}`}>
+                    <Calendar className={`h-4 w-4 ${isActive ? 'text-green-700' : 'text-red-700'}`} />
+                  </div>
+                  <div>
+                    <div className={`font-semibold ${isActive ? 'text-green-800' : 'text-red-800'}`}>
+                      {isActive ? 'Free Trial — Active' : 'Free Trial — Ended'}
+                    </div>
+                    {isActive ? (
+                      <div>
+                        Your 14-day free trial is active —
+                        <span className="font-bold"> {user.trialDaysRemaining} days</span> remaining. After the trial ends, a subscription is required to continue using the service.
+                      </div>
+                    ) : (
+                      <div>
+                        Your 14-day free trial has ended. To continue using the service, please renew your subscription.
+                      </div>
+                    )}
+                  </div>
+                </div>
+                <button
+                  onClick={() => navigate('/pricing')}
+                  className="self-stretch md:self-auto rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-blue-700"
+                >
+                  View Plans / Renew
+                </button>
+              </div>
+            );
+          })()}
 
           {/* Company Cards */}
           {companyCount === 0 ? (
