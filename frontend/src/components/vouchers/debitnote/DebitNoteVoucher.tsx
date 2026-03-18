@@ -185,7 +185,7 @@ const DebitNoteVoucher: React.FC = () => {
     const { name, value } = e.target;
 
     if (name === "mode") {
-      const newMode = value as "accounting-invoice" | "as-voucher";
+      const newMode = value as "accounting-invoice";
 
       setFormData((prev) => ({
         ...prev,
@@ -498,7 +498,6 @@ const DebitNoteVoucher: React.FC = () => {
                   } outline-none transition-colors`}
               >
                 <option value="accounting-invoice">Accounting Invoice</option>
-                <option value="as-voucher">As Voucher</option>
               </select>
             </div>
           </div>

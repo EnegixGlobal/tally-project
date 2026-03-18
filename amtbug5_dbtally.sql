@@ -215,7 +215,7 @@ CREATE TABLE `credit_vouchers` (
   `id` int(11) NOT NULL,
   `date` date DEFAULT NULL,
   `number` varchar(50) DEFAULT NULL,
-  `mode` enum('item-invoice','accounting-invoice','as-voucher') DEFAULT NULL,
+  `mode` enum('item-invoice','accounting-invoice') DEFAULT NULL,
   `partyId` int(11) DEFAULT NULL,
   `narration` text DEFAULT NULL,
   `employee_id` int(11) DEFAULT NULL,
@@ -239,7 +239,7 @@ INSERT INTO `credit_vouchers` (`id`, `date`, `number`, `mode`, `partyId`, `narra
 (8, '2025-07-19', 'CN-1007', 'item-invoice', 2, 'Credit note for returned items', NULL, 0, 'employee', 0),
 (9, '2025-07-19', 'SO0001', 'item-invoice', 13, '', NULL, 0, 'employee', 0),
 (10, '2025-07-19', 'RV249201', 'accounting-invoice', 15, '', NULL, 0, 'employee', 0),
-(11, '2025-07-19', '', 'as-voucher', 0, '', NULL, 0, 'employee', 0),
+(11, '2025-07-19', '', 'accounting-invoice', 0, '', NULL, 0, 'employee', 0),
 (12, '2025-07-20', '12345', 'item-invoice', 13, '', NULL, 0, 'employee', 0),
 (13, '2025-07-20', '123456789', 'item-invoice', 13, '', 7, 0, 'employee', 0),
 (14, '2025-08-29', 'XYZ0001', 'item-invoice', 40, '', NULL, 38, 'employee', 10);

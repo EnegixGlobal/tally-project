@@ -33,10 +33,7 @@ router.post("/", async (req, res) => {
     ========================= */
     let finalNarration = narration || "";
 
-    if (
-      (mode === "accounting-invoice" || mode === "as-voucher") &&
-      Array.isArray(entries)
-    ) {
+    if (mode === "accounting-invoice" && Array.isArray(entries)) {
       const cleanAccountingEntries = entries
         .filter(
           (e) =>
@@ -140,10 +137,7 @@ router.get("/", async (req, res) => {
       let entries = [];
       let narrationText = "";
 
-      if (
-        (r.mode === "accounting-invoice" || r.mode === "as-voucher") &&
-        r.narration
-      ) {
+      if (r.mode === "accounting-invoice" && r.narration) {
         try {
           const parsed = JSON.parse(r.narration);
           entries = parsed.accountingEntries || [];
@@ -313,10 +307,7 @@ router.put("/:id", async (req, res) => {
 
     let finalNarration = narration || "";
 
-    if (
-      (mode === "accounting-invoice" || mode === "as-voucher") &&
-      Array.isArray(entries)
-    ) {
+    if (mode === "accounting-invoice" && Array.isArray(entries)) {
       const cleanAccountingEntries = entries
         .filter(
           (e) =>

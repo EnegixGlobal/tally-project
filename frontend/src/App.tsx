@@ -4,6 +4,7 @@ import { AppProvider } from "./context/AppContext";
 import { CompanyProvider } from "./context/CompanyContext";
 import MainLayout from "./components/layout/MainLayout";
 import RequireCompany from "./components/layout/RequireCompany";
+import RequireSubscription from "./components/layout/RequireSubscription";
 import Dashboard from "./components/dashboard/Dashboard";
 import CompanyForm from "./components/company/CompanyForm";
 
@@ -280,7 +281,9 @@ function App() {
                   path="masters"
                   element={
                     <RequireCompany>
-                      <MastersIndex />
+                      <RequireSubscription>
+                        <MastersIndex />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -288,7 +291,9 @@ function App() {
                   path="masters/ledger"
                   element={
                     <RequireCompany>
-                      <LedgerList />
+                      <RequireSubscription>
+                        <LedgerList />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -637,7 +642,9 @@ function App() {
                   path="vouchers"
                   element={
                     <RequireCompany>
-                      <VouchersIndex />
+                      <RequireSubscription>
+                        <VouchersIndex />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -1023,7 +1030,9 @@ function App() {
                   path="reports"
                   element={
                     <RequireCompany>
-                      <ReportsIndex />
+                      <RequireSubscription>
+                        <ReportsIndex />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />

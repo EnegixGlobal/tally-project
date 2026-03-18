@@ -240,11 +240,9 @@ const SalesVoucher: React.FC = () => {
         const json = await res.json();
         if (json?.success) {
           setSalesTypes(json?.data || []);
-          // Auto-select first Sales type if not in edit mode
-          if (!isEditMode && json?.data?.length > 0) {
-            setSelectedSalesTypeId(String(json.data[0].id));
-          } else if (!isEditMode) {
-            setSelectedSalesTypeId("custom"); // Fallback if no types exist
+          // Auto-select default Sales type (id=1) if not in edit mode
+          if (!isEditMode) {
+            setSelectedSalesTypeId((prev) => prev || "custom");
           }
         } else {
           setSalesTypes([]);
@@ -495,7 +493,7 @@ const SalesVoucher: React.FC = () => {
     showDestination: true,
     showDispatchThrough: true,
     showDispatchDocNo: true,
-    showDispatchDetails: true,
+    showDispatchDetails: false,
   });
 
   //wholsell or retailer
@@ -1006,7 +1004,7 @@ const SalesVoucher: React.FC = () => {
               quantity: 0,
               rate: 0,
               amount: 0,
-              type: value === "item-invoice" ? "debit" : "debit",
+              type: value === "accounting-invoice" ? "credit" : "debit",
               cgstRate: 0,
               sgstRate: 0,
               igstRate: 0,
@@ -1510,29 +1508,34 @@ const SalesVoucher: React.FC = () => {
   };
 
   const addEntry = () => {
-    setFormData((prev) => ({
-      ...prev,
-      entries: [
-        ...prev.entries,
-        {
-          id: `e${prev.entries.length + 1}`,
-          itemId: "",
-          ledgerId: "",
-          quantity: 0,
-          rate: 0,
-          amount: 0,
-          type: formData.mode === "item-invoice" ? "debit" : "debit",
-          cgstRate: 0,
-          sgstRate: 0,
-          igstRate: 0,
-          godownId: "",
-          salesLedgerId: "",
-          discount: 0,
-          discountLedgerId: "", // Init
-          hsnCode: "", // Add HSN code for manual editing
-        },
-      ],
-    }));
+    setFormData((prev) => {
+      const newEntry = {
+        id: `e${prev.entries.length + 1}`,
+        itemId: "",
+        ledgerId: "",
+        quantity: 0,
+        rate: 0,
+        amount: 0,
+        type: "debit",
+        cgstRate: 0,
+        sgstRate: 0,
+        igstRate: 0,
+        godownId: "",
+        salesLedgerId: "",
+        discount: 0,
+        discountLedgerId: "",
+        hsnCode: "",
+      } as any;
+
+      if (prev.mode === "accounting-invoice") {
+        const entries = [...prev.entries];
+        if (entries.length === 0) entries.push({ ...newEntry, type: "credit", id: "e1" });
+        entries.splice(1, 0, newEntry);
+        return { ...prev, entries };
+      }
+
+      return { ...prev, entries: [...prev.entries, newEntry] };
+    });
   };
 
   const removeEntry = (index: number) => {
@@ -1766,7 +1769,7 @@ const SalesVoucher: React.FC = () => {
     if (!formData.number) pushError("number", "Voucher Number is required");
 
     // Only validate item-invoice specific fields when mode is item-invoice
-    if (formData.mode === "item-invoice" || formData.mode === "accounting-invoice") {
+    if (formData.mode === "item-invoice") {
       if (!formData.partyId) pushError("partyId", "Party is required");
     }
 
@@ -1831,7 +1834,7 @@ const SalesVoucher: React.FC = () => {
       }
     });
 
-    if (formData.mode === "as-voucher") {
+    if (formData.mode === "accounting-invoice") {
       const { debitTotal, creditTotal } = calculateTotals() as any;
       if (Math.abs((debitTotal || 0) - (creditTotal || 0)) > 0.01) {
         pushError("entries", "Debit and credit amounts must balance");
@@ -1948,11 +1951,7 @@ const SalesVoucher: React.FC = () => {
 
     // Extract partyId from first ledger entry when in accounting mode
     let finalPartyId = formData.partyId;
-    if (
-      (formData.mode === "accounting-invoice" ||
-        formData.mode === "as-voucher") &&
-      formData.entries.length > 0
-    ) {
+    if (formData.mode === "accounting-invoice" && formData.entries.length > 0) {
       // Use first debit entry's ledgerId as partyId, or first entry if no debit found
       const firstDebitEntry = formData.entries.find(
         (e) => e.type === "debit" && e.ledgerId
@@ -2408,31 +2407,33 @@ const SalesVoucher: React.FC = () => {
                   {errors.number && <p className="text-red-500 text-xs mt-1">{errors.number}</p>}
                 </div>
 
-                <div className="md:col-span-1">
-                  <label className="block text-sm font-semibold mb-1.5 opacity-80" htmlFor="partyId">
-                    Party Name
-                  </label>
-                  <select
-                    name="partyId"
-                    value={formData.partyId}
-                    onChange={handleChange}
-                    required
-                    className={`${FORM_STYLES.select(theme, !!errors.partyId)} font-medium`}
-                  >
-                    <option value="" disabled>-- Select Party --</option>
-                    {partyLedgers.map((ledger) => (
-                      <option key={ledger.id} value={ledger.id}>{ledger.name}</option>
-                    ))}
-                    <option value="add-new" className="text-blue-600 font-bold">+ Add New Ledger</option>
-                  </select>
-                  {selectedPartyState && (
-                    <p className="mt-1 text-[10px] uppercase tracking-wider text-blue-600 font-bold flex items-center gap-1">
-                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-600"></span>
-                      State: {selectedPartyState}  | Gst: {selectedPartyGst || "N/A"}
-                    </p>
-                  )}
-                  {errors.partyId && <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>}
-                </div>
+                {formData.mode !== "accounting-invoice" && (
+                  <div className="md:col-span-1">
+                    <label className="block text-sm font-semibold mb-1.5 opacity-80" htmlFor="partyId">
+                      Party Name
+                    </label>
+                    <select
+                      name="partyId"
+                      value={formData.partyId}
+                      onChange={handleChange}
+                      required
+                      className={`${FORM_STYLES.select(theme, !!errors.partyId)} font-medium`}
+                    >
+                      <option value="" disabled>-- Select Party --</option>
+                      {partyLedgers.map((ledger) => (
+                        <option key={ledger.id} value={ledger.id}>{ledger.name}</option>
+                      ))}
+                      <option value="add-new" className="text-blue-600 font-bold">+ Add New Ledger</option>
+                    </select>
+                    {selectedPartyState && (
+                      <p className="mt-1 text-[10px] uppercase tracking-wider text-blue-600 font-bold flex items-center gap-1">
+                        <span className="inline-block w-1.5 h-1.5 rounded-full bg-blue-600"></span>
+                        State: {selectedPartyState}  | Gst: {selectedPartyGst || "N/A"}
+                      </p>
+                    )}
+                    {errors.partyId && <p className="text-red-500 text-xs mt-1">{errors.partyId}</p>}
+                  </div>
+                )}
 
                 <div>
                   <label className="block text-sm font-semibold mb-1.5 opacity-80" htmlFor="referenceNo">
@@ -2526,13 +2527,12 @@ const SalesVoucher: React.FC = () => {
                   >
                     <option value="item-invoice">Item Invoice</option>
                     <option value="accounting-invoice">Accounting Invoice</option>
-                    <option value="as-voucher">As Voucher</option>
                   </select>
                 </div>
 
 
 
-                {(formData.mode !== "accounting-invoice" && formData.mode !== "as-voucher") && (
+                {formData.mode !== "accounting-invoice" && (
                   <div className="md:col-span-2">
                     <label className="block text-sm font-semibold mb-2 opacity-80">Pricing Rule / Customer Type</label>
                     <div className="flex items-center gap-6 p-2 rounded-lg border border-dashed border-gray-400/50">

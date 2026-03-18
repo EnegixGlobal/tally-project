@@ -245,13 +245,25 @@ export const CompanyProvider: React.FC<{ children: ReactNode }> = ({ children })
   const switchCompany = useCallback(async (companyId: string | number): Promise<void> => {
     const companyIdStr = String(companyId);
 
-    // Validate company exists if we have companies list
+    // If we have a local companies list but the target company isn't present,
+    // attempt to fetch it from the API and add it to the list. Do not throw;
+    // allow switching even when the companies array is stale.
     if (companies.length > 0) {
       const company = findCompanyById(companies, companyId);
       if (!company) {
-        const errorMsg = `Company with ID ${companyIdStr} not found in companies list`;
-        setError(errorMsg);
-        throw new Error(errorMsg);
+        // Try fetching from API
+        const fetched = await fetchCompanyFromAPI(companyId);
+        if (fetched) {
+          // Add to companies array so future lookups succeed
+          setCompaniesState(prev => {
+            const updated = [...prev, { id: fetched.id || companyIdStr, name: fetched.name || String(fetched.id) }];
+            safeSetItem(STORAGE_KEYS.COMPANIES, JSON.stringify(updated));
+            return updated;
+          });
+        } else {
+          // If we couldn't fetch, set a non-blocking error for visibility
+          setError(`Company with ID ${companyIdStr} not found in companies list`);
+        }
       }
     }
 

@@ -10,6 +10,11 @@ interface User {
   pan: string;
   userLimit: number;
   hasSubscription: boolean;
+  // Subscription / trial info
+  subscriptionStatus?: "active" | "expired" | "cancelled";
+  isTrial?: boolean;
+  trialEndsAt?: string | null;
+  trialDaysRemaining?: number;
   hasCompany?: boolean;
   companyId?: string | null;
   subscriptionPlan?: "basic" | "professional" | "enterprise";
@@ -104,6 +109,43 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     setIsLoading(false);
   }, []);
 
+  // Keep subscription / trial info in sync with backend for current company
+  useEffect(() => {
+    const fetchSubscriptionStatus = async () => {
+      if (!user || !companyId) return;
+
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/company-subscription/status/${companyId}`
+        );
+        if (!res.ok) return;
+
+        const json = await res.json();
+        const status = json?.data;
+        if (!status) return;
+
+        const updatedUser: User = {
+          ...user,
+          subscriptionStatus: status.status,
+          isTrial: !!status.isTrial,
+          trialEndsAt: status.endDate ?? null,
+          trialDaysRemaining: status.daysRemaining,
+          hasSubscription: !!status.hasSubscription,
+        };
+        setUser(updatedUser);
+        try {
+          localStorage.setItem("user", JSON.stringify(updatedUser));
+        } catch {
+          // ignore localStorage write failures
+        }
+      } catch (err) {
+        console.error("Error refreshing subscription status:", err);
+      }
+    };
+
+    fetchSubscriptionStatus();
+  }, [companyId]);
+
   const login = async (email: string, password: string): Promise<boolean> => {
     setIsLoading(true);
     try {
@@ -128,6 +170,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
       const userFromResponse = data.user ?? data;
 
       // Normalize a minimal user object if backend returns different shape
+      const subscription = (data as any).subscription || null;
+
       const newUser: User = {
         id:
           userFromResponse.id?.toString() ??
@@ -147,6 +191,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           userFromResponse.userLimit ?? 1,
         hasSubscription:
           !!userFromResponse.hasSubscription || !!data.hasCompany || false,
+        subscriptionStatus: subscription?.status,
+        isTrial: subscription?.isTrial ?? false,
+        trialEndsAt: subscription?.endDate ?? null,
+        trialDaysRemaining: subscription?.daysRemaining ?? undefined,
         hasCompany: data.hasCompany ?? false,
         companyId: data.companyId?.toString() ?? null,
         subscriptionPlan: userFromResponse.subscriptionPlan,

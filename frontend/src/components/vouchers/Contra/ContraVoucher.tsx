@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useMemo } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import Swal from "sweetalert2";
 import { useAppContext } from "../../../context/AppContext";
+import { useCompany } from "../../../context/CompanyContext";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 import type { VoucherEntry, Ledger } from "../../../types";
 import { useFinancialYear, getFinancialYearDefaults } from "../../../hooks/useFinancialYear";
@@ -18,7 +19,8 @@ const ContraVoucher: React.FC = () => {
   console.log("id", id);
   const [ledgers] = useState<Ledger[]>([]);
   const [cashBankLedgers, setCashBankLedgers] = useState<Ledgers[]>([]);
-  const companyId = localStorage.getItem("company_id");
+  const { activeCompanyId } = useCompany();
+  const companyId = activeCompanyId ?? localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");
   const ownerId = localStorage.getItem(
     ownerType === "employee" ? "employee_id" : "user_id"
@@ -88,7 +90,7 @@ const ContraVoucher: React.FC = () => {
     };
 
     fetchNextNumber();
-  }, [formData.date]);
+  }, [formData.date, companyId, ownerType, ownerId]);
 
   // Mock cost centres
   const costCentres = useMemo(
@@ -163,9 +165,9 @@ const ContraVoucher: React.FC = () => {
 
     const fetchVoucher = async () => {
       try {
-        const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`
-        );
+        let url = `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`;
+        if (companyId) url += `?company_id=${companyId}`;
+        const res = await fetch(url);
         const json = await res.json();
 
         if (!json.data) return;

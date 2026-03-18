@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAppContext } from '../../../context/AppContext';
+import { useCompany } from '../../../context/CompanyContext';
 import { useNavigate } from 'react-router-dom';
 import type { VoucherEntry, StockItem, Godown } from '../../../types';
 import { Save, Plus, Trash2, ArrowLeft } from 'lucide-react';
@@ -9,7 +10,8 @@ import { useFinancialYear, getFinancialYearDefaults } from '../../../hooks/useFi
 const StockJournalVoucher: React.FC = () => {
   const { theme, stockItems, godowns = [], addVoucher } = useAppContext();
   const navigate = useNavigate();
-  const companyId = localStorage.getItem('company_id');
+  const { activeCompanyId } = useCompany();
+  const companyId = activeCompanyId ?? localStorage.getItem('company_id');
   const ownerType = localStorage.getItem('userType');
   const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
   const { selectedFinYear } = useFinancialYear();

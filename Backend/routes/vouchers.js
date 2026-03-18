@@ -187,12 +187,15 @@ router.get("/next-number", async (req, res) => {
 });
 
 router.get("/", async (req, res) => {
-  const { ownerType, ownerId, voucherType } = req.query;
+  // Accept both camelCase and underscore query names for compatibility
+  const ownerType = req.query.ownerType || req.query.owner_type;
+  const ownerId = req.query.ownerId || req.query.owner_id;
+  const voucherType = req.query.voucherType || req.query.voucher_type;
+  // Accept both company_id and companyId for flexibility
+  const company_id = req.query.company_id || req.query.companyId;
 
-  if (!ownerType || !ownerId || !voucherType) {
-    return res
-      .status(400)
-      .json({ message: "ownerType, ownerId, voucherType required" });
+  if (!ownerType || !ownerId || !voucherType || !company_id) {
+    return res.status(400).json({ message: "ownerType, ownerId, voucherType and company_id required" });
   }
 
   try {
@@ -224,8 +227,9 @@ router.get("/", async (req, res) => {
    WHERE v.owner_type = ? 
      AND v.owner_id = ? 
      AND v.voucher_type = ?
+     AND v.company_id = ?
    ORDER BY v.date DESC, v.id DESC`,
-      [ownerType, ownerId, voucherType]
+      [ownerType, ownerId, voucherType, company_id]
     );
 
     const voucherIds = vouchers.map((v) => v.id);
@@ -447,6 +451,10 @@ router.get("/:id", async (req, res) => {
     // ---------------------------------------
     // 1️⃣ Get voucher_main record
     // ---------------------------------------
+    // optional: require company_id to ensure company-scoped access
+    // Accept both query names for company id
+    const company_id = req.query.company_id || req.query.companyId;
+
     const [voucherRows] = await db.execute(
       `
       SELECT 
@@ -458,11 +466,13 @@ router.get("/:id", async (req, res) => {
         v.reference_no,
         v.supplier_invoice_date,
         v.owner_type,
-        v.owner_id
+        v.owner_id,
+        v.company_id
       FROM voucher_main v 
       WHERE v.id = ?
+      ${company_id ? ' AND v.company_id = ?' : ''}
       `,
-      [id]
+      company_id ? [id, company_id] : [id]
     );
 
     if (voucherRows.length === 0) {

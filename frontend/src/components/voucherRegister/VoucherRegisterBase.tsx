@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
+import { useCompany } from "../../context/CompanyContext";
 import { ArrowLeft } from "lucide-react";
 import type { VoucherEntry } from "../../types";
 import { useAppContext } from "../../context/AppContext";
@@ -97,7 +98,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   >("Daily");
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [showMonthList, setShowMonthList] = useState(false);
-  const companyId = localStorage.getItem("company_id") || "";
+  const { activeCompanyId } = useCompany();
+  const companyId = activeCompanyId ?? localStorage.getItem("company_id") ?? "";
   const ownerType = localStorage.getItem("supplier") || "";
   const ownerId =
     localStorage.getItem(
@@ -1006,14 +1008,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           url = `${import.meta.env.VITE_API_URL
             }/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
         } else if (voucherType === "receipt") {
-          url = `${import.meta.env.VITE_API_URL
-            }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=receipt`;
+          url = `${import.meta.env.VITE_API_URL}/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=receipt`;
         } else if (voucherType === "contra") {
-          url = `${import.meta.env.VITE_API_URL
-            }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=contra`;
+          url = `${import.meta.env.VITE_API_URL}/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=contra`;
         } else if (voucherType === "journal") {
-          url = `${import.meta.env.VITE_API_URL
-            }/api/vouchers?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=journal`;
+          url = `${import.meta.env.VITE_API_URL}/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=journal`;
         }
         else {
           console.warn("Unknown voucherType:", voucherType);
@@ -1037,7 +1036,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     };
 
     loadVouchers();
-  }, [voucherType]);
+  }, [voucherType, companyId, ownerType, ownerId]);
 
   const printSingleVoucher = (voucher: VoucherEntry) => {
     try {

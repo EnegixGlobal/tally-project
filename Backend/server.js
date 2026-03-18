@@ -19,7 +19,7 @@ app.use(
     ],
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-    credentials: false,
+    credentials: true,
   })
 );
 
@@ -29,6 +29,9 @@ app.use("/uploads", express.static("uploads"));
 // const loadPermissions = require('./middlewares/loadPermissions');
 const loginRoute = require("./routes/login");
 app.use("/api/login", loginRoute);
+const checkSubscription = require('./middlewares/checkSubscription');
+// Install subscription check AFTER login route so status endpoint and login remain accessible
+app.use(checkSubscription);
 // const checkPermission = require('./middlewares/checkPermission');
 
 // 1. JWT Authentication parses token and sets req.user
@@ -102,6 +105,9 @@ app.use("/api/ledger-dropdown", ledgerDropdown);
 
 const subscriptionRoutes = require("./routes/subscriptions");
 app.use("/api/subscriptions", subscriptionRoutes);
+
+const companySubscriptionRoutes = require("./routes/companySubscription");
+app.use("/api/company-subscription", companySubscriptionRoutes);
 
 const couponRoutes = require("./routes/coupons");
 app.use("/api/coupons", couponRoutes);

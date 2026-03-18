@@ -118,6 +118,48 @@ router.post('/company', async (req, res) => {
 
     const companyId = companyResult.insertId;
 
+    // --- Ensure company_subscriptions table exists (for trials/subscriptions) ---
+    const [subscriptionTable] = await connection.query(
+      "SHOW TABLES LIKE 'company_subscriptions'"
+    );
+
+    if (subscriptionTable.length === 0) {
+      await connection.query(`
+        CREATE TABLE company_subscriptions (
+          id INT AUTO_INCREMENT PRIMARY KEY,
+          company_id INT NOT NULL,
+          plan VARCHAR(50) NOT NULL DEFAULT 'trial',
+          is_trial TINYINT(1) NOT NULL DEFAULT 1,
+          status ENUM('active','expired','cancelled') NOT NULL DEFAULT 'active',
+          start_date DATETIME NOT NULL,
+          end_date DATETIME NOT NULL,
+          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+          updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+          INDEX idx_company_id (company_id),
+          CONSTRAINT fk_company_subscriptions_company
+            FOREIGN KEY (company_id) REFERENCES tbcompanies(id)
+            ON DELETE CASCADE
+        )
+      `);
+      console.log("✅ company_subscriptions table created");
+    }
+
+    // --- Create default 14-day free trial for this company ---
+    await connection.query(
+      `
+        INSERT INTO company_subscriptions (
+          company_id,
+          plan,
+          is_trial,
+          status,
+          start_date,
+          end_date
+        )
+        VALUES (?, 'trial', 1, 'active', NOW(), DATE_ADD(NOW(), INTERVAL 14 DAY))
+      `,
+      [companyId]
+    );
+
     if (accessControlEnabled && username && password) {
       const hashedPassword = await bcrypt.hash(password, 10);
 

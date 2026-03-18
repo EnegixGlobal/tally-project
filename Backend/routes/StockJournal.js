@@ -48,4 +48,28 @@ router.post('/', async (req, res) => {
   }
 });
 
+// Fetch stock journal vouchers (list) for a company/owner
+router.get('/', async (req, res) => {
+  const { company_id, owner_type, owner_id } = req.query;
+
+  if (!company_id || !owner_type || !owner_id) {
+    return res.status(400).json({ success: false, message: 'company_id, owner_type and owner_id required' });
+  }
+
+  try {
+    const [rows] = await db.query(
+      `SELECT id, date, number, narration, company_id AS companyId, owner_type AS ownerType, owner_id AS ownerId
+       FROM stock_journal_vouchers
+       WHERE company_id = ? AND owner_type = ? AND owner_id = ?
+       ORDER BY date DESC, id DESC`,
+      [company_id, owner_type, owner_id]
+    );
+
+    return res.json({ success: true, vouchers: rows });
+  } catch (err) {
+    console.error('Error fetching stock journal vouchers:', err);
+    return res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
 module.exports = router;
