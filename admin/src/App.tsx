@@ -15,6 +15,7 @@ import PaymentHistory from './components/Payments/PaymentHistory';
 import Settings from './components/Settings/Settings';
 import ProtectedRoute from './routes/ProtectedRoute';
 import Traders from './components/Trader/Traders'
+import TraderDetail from './components/Trader/TraderDetail';
 
 const PageContent: React.FC = () => {
   const contentRef = useRef<HTMLDivElement>(null);
@@ -38,6 +39,7 @@ const PageContent: React.FC = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/trader" element={< Traders />} />
+            <Route path="/trader/:id" element={<TraderDetail />} />
             <Route path="/subscriptions" element={<SubscriptionManagement />} />
             <Route path="/payments" element={<PaymentHistory />} />
             <Route path="/settings" element={<Settings />} />
