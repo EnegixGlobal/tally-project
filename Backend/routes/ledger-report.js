@@ -73,6 +73,7 @@ SELECT
   pv.id,
   pv.number,
   pv.date,
+  MAX(pv.mode) AS mode,
   pv.partyId,
 
   pv.subtotal,
@@ -291,30 +292,41 @@ ORDER BY vm.date ASC
 
     /* ===============================
        6️⃣C PURCHASE VOUCHER ACCOUNTING ENTRIES 🔥
+       For vouchers saved in accounting mode we need to return ALL voucher_entries
+       for vouchers that include the selected ledger. This ensures both the selected
+       ledger's line and the opposite ledger lines (debits/credits) are shown.
     =============================== */
-    const [purAccTxns] = await connection.execute(
-      `
-      SELECT
-        ve.amount,
-        ve.entry_type,
-        ve.narration AS entry_narration,
-        pv.id AS voucher_id,
-        pv.number AS voucher_number,
-        pv.date,
-        other.ledger_id AS opposite_ledger,
-        l2.name AS opposite_ledger_name
-      FROM voucher_entries ve
-      JOIN purchase_vouchers pv ON pv.id = ve.voucher_id
-      JOIN voucher_entries other ON other.voucher_id = ve.voucher_id AND other.ledger_id != ve.ledger_id
-      LEFT JOIN ledgers l2 ON l2.id = other.ledger_id
-      WHERE ve.ledger_id = ?
-        AND pv.company_id = ?
-        AND pv.owner_type = ?
-        AND pv.owner_id = ?
-      ORDER BY pv.date ASC, pv.id ASC
-      `,
+
+    // 1) Find purchase voucher IDs (company/owner scoped) that include this ledger
+    const [pvIdRows] = await connection.execute(
+      `SELECT DISTINCT pv.id AS voucher_id
+       FROM purchase_vouchers pv
+       JOIN voucher_entries ve ON ve.voucher_id = pv.id
+       WHERE ve.ledger_id = ?
+         AND pv.company_id = ?
+         AND pv.owner_type = ?
+         AND pv.owner_id = ?`,
       [ledgerId, ledger.company_id, ledger.owner_type, ledger.owner_id]
     );
+
+    let purchaseAccountingEntries = [];
+    if (pvIdRows && pvIdRows.length > 0) {
+      const ids = pvIdRows.map((r) => r.voucher_id);
+      const placeholders = ids.map(() => '?').join(',');
+
+      const [accRows] = await connection.execute(
+        `SELECT ve.id AS entry_id, ve.voucher_id, ve.ledger_id, COALESCE(l.name, ve.ledger_name) AS ledger_name,
+                ve.amount, ve.entry_type, pv.number AS voucher_number, pv.date
+         FROM voucher_entries ve
+         LEFT JOIN ledgers l ON l.id = ve.ledger_id
+         LEFT JOIN purchase_vouchers pv ON pv.id = ve.voucher_id
+         WHERE ve.voucher_id IN (${placeholders})
+         ORDER BY pv.date ASC, ve.voucher_id ASC, ve.id ASC`,
+        ids
+      );
+
+      purchaseAccountingEntries = accRows;
+    }
 
     /* ===============================
        6️⃣D SALES VOUCHER ACCOUNTING ENTRIES 🔥
@@ -489,6 +501,9 @@ ORDER BY vm.date ASC
     // Purchase Voucher → Debit
     // Purchase Voucher → Proper Accounting
     purchaseVouchers.forEach((pv) => {
+      // Skip aggregated purchase_vouchers when voucher was saved in accounting mode.
+      // Accounting-mode vouchers are handled by `purAccTxns` (detailed voucher_entries).
+      if (pv.mode && String(pv.mode).toLowerCase() === "accounting-invoice") return;
       let debit = 0;
       let credit = 0;
       let particulars = "";
@@ -652,23 +667,43 @@ ORDER BY vm.date ASC
       });
     });
 
-    // Purchase Voucher Accounting Mode push
-    purAccTxns.forEach((row) => {
-      const debit = row.entry_type === "debit" ? Number(row.amount) : 0;
-      const credit = row.entry_type === "credit" ? Number(row.amount) : 0;
-      balance += debit - credit;
-
-      transactions.push({
-        id: `PUR-ACC-${row.voucher_id}-${row.opposite_ledger}`,
-        date: row.date,
-        voucherType: "Purchase",
-        voucherNo: row.voucher_number,
-        particulars: row.opposite_ledger_name || String(row.opposite_ledger),
-        debit,
-        credit,
-        balance,
+    // Purchase Voucher Accounting Mode push (show counterpart entries for the selected ledger)
+    // For each purchase voucher that includes the selected ledger, emit rows for the OTHER
+    // ledger entries (counterparties). This makes the ledger view show Mohan/Mukesh when
+    // Aman is selected, and ensures amounts appear in their correct Debit/Credit columns.
+    {
+      const pvMap = {};
+      purchaseAccountingEntries.forEach((e) => {
+        if (!pvMap[e.voucher_id]) pvMap[e.voucher_id] = [];
+        pvMap[e.voucher_id].push(e);
       });
-    });
+
+      Object.values(pvMap).forEach((entries) => {
+        // Find the selected ledger's entry in this voucher
+        const sel = entries.find((x) => String(x.ledger_id) === String(ledgerId));
+        if (!sel) return; // should not happen but be safe
+
+        // For every other entry, push a row with that entry's amount/type
+        entries.forEach((other) => {
+          if (String(other.ledger_id) === String(ledgerId)) return; // skip selected ledger itself
+
+          const debit = other.entry_type === "debit" ? Number(other.amount) : 0;
+          const credit = other.entry_type === "credit" ? Number(other.amount) : 0;
+          balance += debit - credit;
+
+          transactions.push({
+            id: `PUR-ACC-${other.voucher_id}-${other.entry_id}`,
+            date: other.date || sel.date,
+            voucherType: "Purchase",
+            voucherNo: other.voucher_number || sel.voucher_number,
+            particulars: other.ledger_name || String(other.ledger_id),
+            debit,
+            credit,
+            balance,
+          });
+        });
+      });
+    }
 
     // Sales Voucher Accounting Mode push
     salAccTxns.forEach((row) => {
