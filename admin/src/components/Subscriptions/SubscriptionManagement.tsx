@@ -13,6 +13,8 @@ const SubscriptionManagement: React.FC = () => {
   const [showAddForm, setShowAddForm] = useState(false);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
+  const [trialDays, setTrialDays] = useState<number>(14);
+  const [savingTrial, setSavingTrial] = useState(false);
 
   const [newPlan, setNewPlan] = useState({
     name: '',
@@ -36,7 +38,34 @@ const SubscriptionManagement: React.FC = () => {
   useEffect(() => {
     fetchPlans();
     fetchCoupons();
+    fetchTrialPeriod();
   }, []);
+
+  const fetchTrialPeriod = async () => {
+    try {
+      const response = await api.get('/api/subscriptions/trial-period');
+      if (response.data.success) {
+        setTrialDays(response.data.trialDays);
+      }
+    } catch (error) {
+      console.error('Error fetching trial period:', error);
+    }
+  };
+
+  const handleUpdateTrialDays = async () => {
+    try {
+      setSavingTrial(true);
+      const response = await api.post('/api/subscriptions/trial-period', { trialDays });
+      if (response.data.success) {
+        Swal.fire('Success', 'Trial period updated successfully', 'success');
+      }
+    } catch (error) {
+      console.error('Error updating trial period:', error);
+      Swal.fire('Error', 'Failed to update trial period', 'error');
+    } finally {
+      setSavingTrial(false);
+    }
+  };
 
   const fetchPlans = async () => {
     try {
@@ -601,6 +630,48 @@ const SubscriptionManagement: React.FC = () => {
             )}
           </tbody>
         </table>
+      </div>
+
+      {/* Trial Period Settings Section */}
+      <div className={`mt-10 rounded-xl border p-6 ${theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200 shadow-sm'}`}>
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className={`text-2xl font-bold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>Trial Period Settings</h2>
+            <p className={`${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Configure the default free trial duration for new companies</p>
+          </div>
+        </div>
+
+        <div className="max-w-md space-y-4">
+          <div>
+            <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+              Default Trial Period (Days)
+            </label>
+            <div className="flex gap-4">
+              <input
+                type="number"
+                min="1"
+                max="365"
+                value={trialDays}
+                onChange={(e) => setTrialDays(parseInt(e.target.value) || 0)}
+                className={`flex-1 px-4 py-2 border rounded-lg focus:ring-2 focus:ring-primary focus:border-primary outline-none transition-all ${theme === 'dark'
+                  ? 'border-gray-600 bg-gray-700 text-white'
+                  : 'border-gray-300 bg-white text-gray-900'
+                  }`}
+              />
+              <button
+                onClick={handleUpdateTrialDays}
+                disabled={savingTrial}
+                className="px-6 py-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors flex items-center gap-2 disabled:opacity-50"
+              >
+                {savingTrial ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
+                Save Settings
+              </button>
+            </div>
+            <p className="mt-2 text-xs text-gray-500 italic">
+              New companies will receive a {trialDays}-day free trial upon registration.
+            </p>
+          </div>
+        </div>
       </div>
 
       {/* Add Coupon Modal */}

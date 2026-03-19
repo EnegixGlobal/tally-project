@@ -89,4 +89,54 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+// GET trial period setting
+router.get("/trial-period", async (req, res) => {
+  try {
+    // Ensure table exists
+    await db.query(`
+      CREATE TABLE IF NOT EXISTS admin_settings (
+        setting_key VARCHAR(50) PRIMARY KEY,
+        setting_value VARCHAR(255) NOT NULL,
+        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+      )
+    `);
+
+    // Ensure default value exists
+    await db.query(`
+      INSERT IGNORE INTO admin_settings (setting_key, setting_value) 
+      VALUES ('trial_period_days', '14')
+    `);
+
+    const [rows] = await db.query(
+      "SELECT setting_value FROM admin_settings WHERE setting_key = 'trial_period_days'"
+    );
+
+    res.json({ success: true, trialDays: parseInt(rows[0].setting_value) || 14 });
+  } catch (err) {
+    console.error("Error fetching trial period:", err);
+    res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+});
+
+// POST update trial period setting
+router.post("/trial-period", async (req, res) => {
+  const { trialDays } = req.body;
+
+  if (trialDays === undefined || isNaN(trialDays)) {
+    return res.status(400).json({ success: false, error: "Invalid trial days" });
+  }
+
+  try {
+    await db.query(
+      "UPDATE admin_settings SET setting_value = ? WHERE setting_key = 'trial_period_days'",
+      [trialDays.toString()]
+    );
+
+    res.json({ success: true, message: "Trial period updated successfully" });
+  } catch (err) {
+    console.error("Error updating trial period:", err);
+    res.status(500).json({ success: false, error: "Internal Server Error" });
+  }
+});
+
 module.exports = router;

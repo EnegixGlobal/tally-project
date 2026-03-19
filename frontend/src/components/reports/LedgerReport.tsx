@@ -329,10 +329,27 @@ const LedgerReport: React.FC = () => {
     let balance = ledgerData.summary.openingBalance || 0;
     const isDebitLedger = ledgerData.ledger?.balance_type === "debit";
 
-    return ledgerData.transactions.map((txn) => {
-      // Logic:
-      // If Debit Ledger: (Balance + Debit) - Credit
-      // If Credit Ledger: (Balance + Credit) - Debit
+    // Normalize transactions: some backends return `amount` + `entry_type` instead of explicit debit/credit.
+    const normalized = (ledgerData.transactions || []).map((txn) => {
+      let d = Number(txn.debit ?? 0);
+      let c = Number(txn.credit ?? 0);
+
+      // Fallback: use amount + entry_type
+      const amt = Number(txn.amount ?? 0);
+      const entryType = (txn.entry_type || txn.entryType || "").toString().toLowerCase();
+      if ((d === 0 && c === 0) && amt && entryType) {
+        if (entryType === "debit") d = amt;
+        else if (entryType === "credit") c = amt;
+      }
+
+      return {
+        ...txn,
+        debit: d,
+        credit: c,
+      } as any;
+    });
+
+    return normalized.map((txn) => {
       if (isDebitLedger) {
         balance += (txn.debit - txn.credit);
       } else {
@@ -951,31 +968,18 @@ const LedgerReport: React.FC = () => {
                                 } transition`}
                             >
                               {/* Date */}
-                              <td className="px-4 py-3 text-sm">
-                                {i === 0 ? formatDate(first.date) : ""}
-                              </td>
+                              <td className="px-4 py-3 text-sm">{formatDate(txn.date)}</td>
 
                               {/* Particulars */}
                               <td className="px-4 py-3 text-sm">
-                                {i === 0
-                                  ? ledgerIdNameMap[first.particulars] ||
-                                  first.particulars
-                                  : ""}
+                                {ledgerIdNameMap[String(txn.particulars)] || txn.particulars}
                               </td>
 
                               {/* Voucher Type */}
-                              <td className="px-4 py-3 text-sm">
-                                {i === 0
-                                  ? first.isQuotation
-                                    ? "Quotation"
-                                    : first.voucherType
-                                  : ""}
-                              </td>
+                              <td className="px-4 py-3 text-sm">{txn.isQuotation ? "Quotation" : txn.voucherType}</td>
 
                               {/* Voucher No */}
-                              <td className="px-4 py-3 text-sm font-mono">
-                                {i === 0 ? first.voucherNo : ""}
-                              </td>
+                              <td className="px-4 py-3 text-sm font-mono">{txn.voucherNo}</td>
 
                               {/* Debit */}
                               <td className="px-4 py-3 text-sm text-right font-mono">

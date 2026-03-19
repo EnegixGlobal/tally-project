@@ -144,7 +144,13 @@ router.post('/company', async (req, res) => {
       console.log("✅ company_subscriptions table created");
     }
 
-    // --- Create default 14-day free trial for this company ---
+    // --- Fetch trial period from admin_settings ---
+    const [settingRows] = await connection.query(
+      "SELECT setting_value FROM admin_settings WHERE setting_key = 'trial_period_days'"
+    );
+    const trialDays = settingRows.length > 0 ? parseInt(settingRows[0].setting_value) : 14;
+
+    // --- Create default free trial for this company ---
     await connection.query(
       `
         INSERT INTO company_subscriptions (
@@ -155,7 +161,7 @@ router.post('/company', async (req, res) => {
           start_date,
           end_date
         )
-        VALUES (?, 'trial', 1, 'active', NOW(), DATE_ADD(NOW(), INTERVAL 14 DAY))
+        VALUES (?, 'trial', 1, 'active', NOW(), DATE_ADD(NOW(), INTERVAL ${trialDays} DAY))
       `,
       [companyId]
     );

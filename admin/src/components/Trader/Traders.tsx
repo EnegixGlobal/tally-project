@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
 import {
     Search, Edit, Trash2, Building2, ShieldCheck,
     UserCheck, Mail, Map, Smartphone, Hash,
@@ -23,6 +24,7 @@ interface Trader {
 
 const Traders: React.FC = () => {
     const { theme } = useTheme();
+    const navigate = useNavigate();
     const [traders, setTraders] = useState<Trader[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [loading, setLoading] = useState(true);
@@ -130,19 +132,8 @@ const Traders: React.FC = () => {
             (t.phone || '').toLowerCase().includes(searchTerm.toLowerCase())
     );
 
-    const [details, setDetails] = useState<{ info: any, companies: any[] } | null>(null);
-    const [viewingDetails, setViewingDetails] = useState(false);
-
-    const handleViewDetails = async (id: number) => {
-        try {
-            setViewingDetails(true);
-            const res = await api.get(`/api/traders/${id}`);
-            setDetails(res.data);
-        } catch (err: any) {
-            Swal.fire({ icon: 'error', title: 'Oops...', text: 'Could not load details' });
-        } finally {
-            setViewingDetails(false);
-        }
+    const handleViewDetails = (id: number) => {
+        navigate(`/trader/${id}`);
     };
 
     return (
@@ -275,9 +266,8 @@ const Traders: React.FC = () => {
                                             </button>
                                             <button
                                                 onClick={() => handleViewDetails(trader.id)}
-                                                disabled={viewingDetails}
                                                 className={`p-3 rounded-xl hover:bg-indigo-500 hover:text-white transition-all ${theme === 'dark' ? 'bg-gray-800 text-gray-500' : 'bg-gray-100 text-gray-500'}`}>
-                                                <MoreVertical className={`w-4 h-4 ${viewingDetails ? 'animate-spin' : ''}`} />
+                                                <MoreVertical className="w-4 h-4" />
                                             </button>
                                         </div>
                                     </td>
@@ -312,103 +302,6 @@ const Traders: React.FC = () => {
                 </div>
             </div>
 
-            {/* Clean Detail Mode Overlay */}
-            {details && (
-                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-                    <div className={`w-full max-w-5xl h-[95vh] overflow-hidden rounded-2xl border shadow-2xl flex flex-col ${theme === 'dark' ? 'bg-gray-950 border-gray-800 text-white' : 'bg-white border-gray-200 text-gray-900'
-                        }`}>
-                        {/* Integrated Minimalist Header */}
-                        <div className={`px-10 py-10 border-b flex flex-col sm:flex-row sm:items-center justify-between gap-6 ${theme === 'dark' ? 'bg-gray-900/50' : 'bg-gray-50/50'
-                            }`}>
-                            <div className="flex items-center gap-8">
-                                <div className={`w-20 h-20 rounded-2xl flex items-center justify-center text-3xl font-black ${theme === 'dark' ? 'bg-gray-800 text-gray-400' : 'bg-gray-100 text-gray-400'
-                                    }`}>
-                                    {details.info.firstName[0]}
-                                </div>
-                                <div>
-                                    <h2 className="text-3xl font-black tracking-tight">{details.info.firstName} {details.info.lastName}</h2>
-                                    <div className="flex flex-wrap items-center gap-x-6 gap-y-1 mt-2 text-sm font-bold text-gray-500">
-                                        <span className="flex items-center gap-1.5">{details.info.email}</span>
-                                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-                                        <span>{details.info.phoneNumber}</span>
-                                        <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
-                                        <span className="uppercase tracking-widest font-black">PAN: {details.info.pan}</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <button
-                                onClick={() => setDetails(null)}
-                                className="self-start sm:self-center p-3 hover:bg-red-500 hover:text-white rounded-xl transition-all duration-200 text-gray-400">
-                                <Hash className="w-7 h-7 rotate-45" />
-                            </button>
-                        </div>
-
-                        {/* Modal Body - Just the Table */}
-                        <div className="flex-1 overflow-y-auto p-10 space-y-8 custom-scrollbar">
-                            <section>
-                                <div className="flex items-center justify-between mb-8 px-2">
-                                    <h3 className="text-xs font-black text-gray-400 uppercase tracking-[0.3em]">
-                                        Associated Company Records ({details.companies.length})
-                                    </h3>
-                                </div>
-
-                                <div className={`border rounded-[2rem] overflow-hidden ${theme === 'dark' ? 'border-gray-800 bg-black/20' : 'border-gray-100 bg-white shadow-sm'}`}>
-                                    <table className="w-full text-sm">
-                                        <thead className={theme === 'dark' ? 'bg-gray-800/50' : 'bg-gray-50'}>
-                                            <tr className="border-b dark:border-gray-700">
-                                                <th className="px-8 py-6 text-left font-black text-gray-400 uppercase tracking-widest text-[10px]">Company / GST</th>
-                                                <th className="px-8 py-6 text-left font-black text-gray-400 uppercase tracking-widest text-[10px]">Access ID</th>
-                                                <th className="px-8 py-6 text-left font-black text-gray-400 uppercase tracking-widest text-[10px]">Security Lock</th>
-                                                <th className="px-8 py-6 text-center font-black text-gray-400 uppercase tracking-widest text-[10px]">Financial Year</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y dark:divide-gray-800">
-                                            {details.companies.length > 0 ? details.companies.map((company: any) => (
-                                                <tr key={company.id} className="group hover:bg-gray-500/[0.03] transition-colors">
-                                                    <td className="px-8 py-7">
-                                                        <div className="font-black text-lg group-hover:text-indigo-600 transition-colors uppercase">{company.name}</div>
-                                                        <div className="text-[10px] text-gray-400 mt-1 font-bold tracking-widest">GST: {company.gst_number || 'NOT-REGISTERED'}</div>
-                                                    </td>
-                                                    <td className="px-8 py-7">
-                                                        <span className="font-bold text-gray-600 dark:text-gray-400 tracking-tight">
-                                                            {company.username || 'NO ACCESS'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-8 py-7">
-                                                        <span className={`text-[10px] px-3 py-1.5 rounded-lg font-black uppercase tracking-widest ${company.hasPassword ? 'bg-gray-900 text-white dark:bg-gray-100 dark:text-gray-900 shadow-lg shadow-black/10' : 'bg-gray-100 text-gray-400'
-                                                            }`}>
-                                                            {company.hasPassword ? '● Secured' : '○ Unlocked'}
-                                                        </span>
-                                                    </td>
-                                                    <td className="px-8 py-7 text-center font-black text-gray-500">
-                                                        FY {company.financial_year}
-                                                    </td>
-                                                </tr>
-                                            )) : (
-                                                <tr>
-                                                    <td colSpan={4} className="px-8 py-16 text-center text-gray-400 font-black uppercase tracking-[0.2em] text-xs">
-                                                        No associated operational nodes found.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </section>
-                        </div>
-
-                        {/* Minimal Footer */}
-                        <div className={`px-10 py-6 border-t flex items-center justify-between ${theme === 'dark' ? 'bg-gray-800/10' : 'bg-gray-50/10'}`}>
-                            <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest italic opacity-50">System Detail Mode Activated</p>
-                            <button
-                                onClick={() => setDetails(null)}
-                                className="px-12 py-3.5 border border-gray-200 dark:border-gray-700 hover:bg-gray-900 hover:text-white dark:hover:bg-white dark:hover:text-black rounded-xl font-black text-xs uppercase tracking-[0.2em] transition-all duration-300">
-                                Close Overlay
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </div>
     );
 };

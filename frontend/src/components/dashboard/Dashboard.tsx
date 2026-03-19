@@ -135,6 +135,8 @@ const Dashboard: React.FC = () => {
     if (suppl === "employee") {
       await switchCompany(id);
       setSelectedCompany(id);
+       localStorage.setItem("company_id", id);
+       window.location.reload();
     } else {
       localStorage.setItem("company_id", id);
       setSelectedCaCompany(id);
