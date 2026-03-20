@@ -203,9 +203,17 @@ export const useProfitLossSync = () => {
             localStorage.setItem(`NET_PROFIT_${companyId}`, "0");
             localStorage.setItem(`NET_LOSS_${companyId}`, "0");
         }
+        // Persist Closing Stock
+        localStorage.setItem(`CLOSING_STOCK_${companyId}`, closingStockValue.toString());
+        localStorage.setItem(`OPENING_STOCK_${companyId}`, openingStockValue.toString());
+
         // Dispatch custom event to notify other components that localStorage changed
         window.dispatchEvent(new Event("storage_sync"));
-    }, [netProfitValue, companyId]);
+    }, [netProfitValue, closingStockValue, openingStockValue, companyId]);
 
-    return { netProfit: netProfitValue };
+    return {
+        netProfit: netProfitValue,
+        closingStock: closingStockValue,
+        openingStock: openingStockValue
+    };
 }

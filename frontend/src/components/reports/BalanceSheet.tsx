@@ -32,6 +32,7 @@ const BalanceSheet: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isDetailedView, setIsDetailedView] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { closingStock } = useProfitLossSync();
   const [netProfit, setNetProfit] = useState<number>(0);
   const [netLoss, setNetLoss] = useState<number>(0);
   const [transferredProfit, setTransferredProfit] = useState<number>(0);
@@ -193,8 +194,17 @@ const BalanceSheet: React.FC = () => {
 
     let closingSigned;
     if (ledger.groupName?.toLowerCase() === "stock-in-hand") {
-      // Use database closing_balance for stock-in-hand
-      closingSigned = Number(ledger.closingBalance) || 0;
+      // Use synced closing stock for stock-in-hand
+      const stockLedgers = ledgers.filter(l => l.groupName?.toLowerCase() === "stock-in-hand");
+      const dbTotal = stockLedgers.reduce((sum, l) => sum + (Number(l.closingBalance) || 0), 0);
+
+      if (dbTotal !== 0) {
+        closingSigned = (Number(ledger.closingBalance) / dbTotal) * closingStock;
+      } else {
+        // If DB is 0, we can't distribute by proportion.
+        // Assign total to first ledger only to avoid duplication.
+        closingSigned = stockLedgers[0]?.id === ledger.id ? closingStock : 0;
+      }
     } else {
       closingSigned = openingSigned + debit - credit;
     }

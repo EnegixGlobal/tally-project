@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { ArrowLeft } from "lucide-react";
+import { useProfitLossSync } from "../../hooks/useProfitLossSync";
 
 
 
@@ -62,6 +63,7 @@ const SubGroupSummary: React.FC = () => {
   console.log('groupid', groupId)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { closingStock } = useProfitLossSync();
   const [subGroups, setSubGroups] = useState<Group[]>([]);
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [debitCreditData, setDebitCreditData] = useState<DebitCreditData>({});
@@ -222,9 +224,17 @@ const SubGroupSummary: React.FC = () => {
 
     let closingSigned;
     if (ledger.groupName?.toLowerCase() === "stock-in-hand") {
-      // Use database closing_balance for stock-in-hand
-      // Note: We assume the database value is correct and doesn't need calculation from vouchers
-      closingSigned = Number(ledger.closingBalance) || 0;
+      // Use synced closing stock for stock-in-hand
+      const stockLedgers = ledgers.filter(l => l.groupName?.toLowerCase() === "stock-in-hand");
+      const dbTotal = stockLedgers.reduce((sum, l) => sum + (Number(l.closingBalance) || 0), 0);
+
+      if (dbTotal !== 0) {
+        closingSigned = (Number(ledger.closingBalance) / dbTotal) * closingStock;
+      } else {
+        // If DB is 0, we can't distribute by proportion.
+        // Assign total to first ledger only to avoid duplication.
+        closingSigned = stockLedgers[0]?.id === ledger.id ? closingStock : 0;
+      }
     } else {
       closingSigned = openingSigned + debit - credit;
     }
