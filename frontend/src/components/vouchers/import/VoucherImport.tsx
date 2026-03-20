@@ -201,7 +201,7 @@ const VoucherImport: React.FC = () => {
       name: "Receipt Voucher Template",
       type: "receipt",
       description: "Import receipt vouchers",
-       fields: [
+      fields: [
         "Date",
         "Mode",
         "Reference No",
@@ -210,7 +210,7 @@ const VoucherImport: React.FC = () => {
         "Amount",
 
       ],
-     sampleData: [
+      sampleData: [
         {
           Date: "2024-01-15",
           Mode: "single-entry",
@@ -218,6 +218,29 @@ const VoucherImport: React.FC = () => {
           "Paid To": "Office Rent",
           "Payment Mode": "HDFC Bank",
           Amount: 25000,
+        },
+      ],
+    },
+    {
+      name: "Bank Voucher Template",
+      type: "bank",
+      description: "Import bank vouchers (Receipt mode)",
+      fields: [
+        "Date",
+        "Mode",
+        "Reference No",
+        "Paid To",
+        "Payment Mode",
+        "Amount",
+      ],
+      sampleData: [
+        {
+          Date: "2024-01-15",
+          Mode: "single-entry",
+          "Reference No": "BNK001",
+          "Paid To": "Customer Payment",
+          "Payment Mode": "HDFC Bank",
+          Amount: 50000,
         },
       ],
     },
@@ -363,6 +386,9 @@ const VoucherImport: React.FC = () => {
         case "receipt":
           endpoint = `${import.meta.env.VITE_API_URL}/api/receipt_import`;
           break;
+        case "bank":
+          endpoint = `${import.meta.env.VITE_API_URL}/api/bank_import`;
+          break;
         default:
           alert("Invalid template selected");
           setIsProcessing(false);
@@ -489,6 +515,7 @@ const VoucherImport: React.FC = () => {
               <option value="purchase">Purchase Voucher</option>
               <option value="payment">Payment Voucher</option>
               <option value="receipt">Receipt Voucher</option>
+              <option value="bank">Bank Voucher</option>
             </select>
           </div>
 

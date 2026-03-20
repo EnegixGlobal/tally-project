@@ -46,6 +46,7 @@ const PREFIX_MAP = {
   receipt: "RV",
   contra: "CV",
   journal: "JV",
+  bank: "BV",
 };
 
 /**
