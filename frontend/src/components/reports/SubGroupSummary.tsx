@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from "react";
 import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { ArrowLeft } from "lucide-react";
+import { useProfitLossSync } from "../../hooks/useProfitLossSync";
 
 
 
@@ -11,6 +12,8 @@ interface Ledger {
   group_id: number;
   openingBalance: number;
   balanceType: "debit" | "credit";
+  closingBalance: number;
+  groupName?: string;
 }
 
 interface Group {
@@ -60,6 +63,7 @@ const SubGroupSummary: React.FC = () => {
   console.log('groupid', groupId)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const { closingStock } = useProfitLossSync();
   const [subGroups, setSubGroups] = useState<Group[]>([]);
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [debitCreditData, setDebitCreditData] = useState<DebitCreditData>({});
@@ -118,6 +122,8 @@ const SubGroupSummary: React.FC = () => {
               group_id: l.group_id,
               openingBalance: parseFloat(l.opening_balance) || 0,
               balanceType: l.balance_type,
+              closingBalance: parseFloat(l.closing_balance) || 0,
+              groupName: l.group_name,
             }));
             allLedgers = [...allLedgers, ...normalizedLedgers];
           }
@@ -215,7 +221,23 @@ const SubGroupSummary: React.FC = () => {
 
     // Signed value (Relative to Debit)
     const openingSigned = ledger.balanceType === "debit" ? o : -o;
-    const closingSigned = openingSigned + debit - credit;
+
+    let closingSigned;
+    if (ledger.groupName?.toLowerCase() === "stock-in-hand") {
+      // Use synced closing stock for stock-in-hand
+      const stockLedgers = ledgers.filter(l => l.groupName?.toLowerCase() === "stock-in-hand");
+      const dbTotal = stockLedgers.reduce((sum, l) => sum + (Number(l.closingBalance) || 0), 0);
+
+      if (dbTotal !== 0) {
+        closingSigned = (Number(ledger.closingBalance) / dbTotal) * closingStock;
+      } else {
+        // If DB is 0, we can't distribute by proportion.
+        // Assign total to first ledger only to avoid duplication.
+        closingSigned = stockLedgers[0]?.id === ledger.id ? closingStock : 0;
+      }
+    } else {
+      closingSigned = openingSigned + debit - credit;
+    }
 
     return { openingSigned, debit, credit, closingSigned };
   };

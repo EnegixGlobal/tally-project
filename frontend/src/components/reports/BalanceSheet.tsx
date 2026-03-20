@@ -11,6 +11,7 @@ interface Ledger {
   groupId: number;
   openingBalance: number;
   balanceType: "debit" | "credit";
+  closingBalance: number;
   groupName: string;
   groupType: string | null;
 }
@@ -31,6 +32,7 @@ const BalanceSheet: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isDetailedView, setIsDetailedView] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { netProfit: syncedNetProfit, closingStock, openingStock } = useProfitLossSync();
   const [netProfit, setNetProfit] = useState<number>(0);
   const [netLoss, setNetLoss] = useState<number>(0);
   const [transferredProfit, setTransferredProfit] = useState<number>(0);
@@ -64,6 +66,7 @@ const BalanceSheet: React.FC = () => {
           groupId: l.group_id,
           openingBalance: parseFloat(l.opening_balance) || 0,
           balanceType: l.balance_type,
+          closingBalance: parseFloat(l.closing_balance) || 0,
           groupName: l.group_name,
           groupType: l.group_type,
         }));
@@ -99,7 +102,6 @@ const BalanceSheet: React.FC = () => {
   }, [companyId]);
 
   // Sync Profit & Loss Data headlessly
-  const { netProfit: syncedNetProfit } = useProfitLossSync();
 
   useEffect(() => {
     if (syncedNetProfit !== undefined) {
@@ -161,7 +163,7 @@ const BalanceSheet: React.FC = () => {
       LaiblityTotal: liabSum + (pnlSigned < 0 ? Math.abs(pnlSigned) : 0),
       AssetTotal: assetSum + (pnlSigned > 0 ? Math.abs(pnlSigned) : 0),
     });
-  }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss, transferredProfit, transferredLoss]);
+  }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss, transferredProfit, transferredLoss, closingStock]);
 
   useEffect(() => {
     const fetchDebitCreditData = async () => {
@@ -188,7 +190,23 @@ const BalanceSheet: React.FC = () => {
 
     // Signed value (Relative to Debit)
     const openingSigned = ledger.balanceType === "debit" ? o : -o;
-    const closingSigned = openingSigned + debit - credit;
+
+    let closingSigned;
+    if (ledger.groupName?.toLowerCase() === "stock-in-hand") {
+      // Use synced closing stock for stock-in-hand
+      const stockLedgers = ledgers.filter(l => l.groupName?.toLowerCase() === "stock-in-hand");
+      const dbTotal = stockLedgers.reduce((sum, l) => sum + (Number(l.closingBalance) || 0), 0);
+
+      if (dbTotal !== 0) {
+        closingSigned = (Number(ledger.closingBalance) / dbTotal) * closingStock;
+      } else {
+        // If DB is 0, we can't distribute by proportion.
+        // Assign total to first ledger only to avoid duplication.
+        closingSigned = stockLedgers[0]?.id === ledger.id ? closingStock : 0;
+      }
+    } else {
+      closingSigned = openingSigned + debit - credit;
+    }
 
     return { openingSigned, debit, credit, closingSigned };
   };
@@ -254,17 +272,22 @@ const BalanceSheet: React.FC = () => {
           );
         })}
 
-        <div
-          key={ledger.id}
-          className="grid grid-cols-2 gap-2 py-1 text-xs text-gray-500 font-semibold dark:text-gray-600 cursor-pointer hover:text-blue-600 px-2"
-          style={{ paddingLeft: `${level * 1.5}rem` }}
-          onClick={() => navigate(`/app/reports/ledger/${ledger.id}`)}
-        >
-          <span>{ledger.name}</span>
-          <span className="text-right font-mono">
-            {formatBalance(b.closingSigned)}
-          </span>
-        </div>
+        {directLedgers.map(ledger => {
+          const b = getLedgerBalances(ledger);
+          return (
+            <div
+              key={ledger.id}
+              className="grid grid-cols-2 gap-2 py-1 text-xs text-gray-500 font-semibold dark:text-gray-600 cursor-pointer hover:text-blue-600 px-2"
+              style={{ paddingLeft: `${level * 1.5}rem` }}
+              onClick={() => navigate(`/app/reports/ledger/${ledger.id}`)}
+            >
+              <span>{ledger.name}</span>
+              <span className="text-right font-mono">
+                {formatBalance(b.closingSigned)}
+              </span>
+            </div>
+          );
+        })}
       </div>
     );
   };

@@ -281,6 +281,7 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
         l.group_id AS groupId,
         CAST(l.opening_balance AS DECIMAL(15,2)) AS openingBalance,
         l.balance_type AS balanceType,
+        l.closing_balance,
         g.name AS groupName,
         g.type AS groupType,
         l.company_id AS companyId,

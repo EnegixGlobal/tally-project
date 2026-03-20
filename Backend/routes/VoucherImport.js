@@ -1120,4 +1120,133 @@ router.post("/receipt_import", async (req, res) => {
 });
 
 
+// =========================================
+// BANK EXCEL IMPORT (Exact Receipt Mode)
+// =========================================
+
+router.post("/bank_import", async (req, res) => {
+    try {
+        const { rows, companyId, ownerType, ownerId } = req.body;
+        console.log("Bank Rows:", rows?.length);
+
+        if (!rows || !rows.length) {
+            return res.status(400).json({
+                success: false,
+                message: "No data received",
+            });
+        }
+
+        if (!companyId || !ownerType || !ownerId) {
+            return res.status(401).json({
+                success: false,
+                message: "Unauthorized",
+            });
+        }
+
+        const [ledgers] = await db.execute(
+            "SELECT id, name FROM ledgers WHERE company_id=?",
+            [companyId]
+        );
+
+        const ledgerMap = {};
+        ledgers.forEach((l) => {
+            ledgerMap[l.name.toLowerCase().trim()] = l.id;
+        });
+
+        const errors = [];
+        const saved = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            const date = row.Date;
+            const referenceNo = row["Reference No"] || row["Voucher No"] || null;
+            const partyName = row["Paid To"] ? String(row["Paid To"]).toLowerCase().trim() : "";
+            const modeName = row["Payment Mode"] ? String(row["Payment Mode"]).toLowerCase().trim() : "";
+            const amount = Number(row.Amount || 0);
+
+            if (!date || !partyName || !modeName || !amount) {
+                errors.push(`Row ${i + 2}: Date, Paid To, Payment Mode, Amount are required`);
+                continue;
+            }
+
+            // Bank Voucher (Receipt Mode): Credit = Party | Debit = Bank
+            const creditLedgerId = ledgerMap[partyName];
+            const debitLedgerId = ledgerMap[modeName];
+
+            if (!creditLedgerId) {
+                errors.push(`Row ${i + 2}: Party ledger not found (${row["Paid To"]})`);
+                continue;
+            }
+            if (!debitLedgerId) {
+                errors.push(`Row ${i + 2}: Payment Mode ledger not found (${row["Payment Mode"]})`);
+                continue;
+            }
+
+            const voucherNumber = await generateVoucherNumber({
+                companyId,
+                ownerType,
+                ownerId,
+                voucherType: "bank",
+                date,
+            });
+
+            const [mainResult] = await db.execute(
+                `
+                INSERT INTO voucher_main
+                (voucher_type, voucher_number, date, narration, reference_no,
+                 supplier_invoice_date, owner_type, owner_id, company_id)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+                `,
+                [
+                    "bank",
+                    voucherNumber,
+                    date,
+                    null,
+                    referenceNo,
+                    date,
+                    ownerType,
+                    ownerId,
+                    companyId,
+                ]
+            );
+
+            const voucherId = mainResult.insertId;
+
+            const entryValues = [
+                // Credit (Party)
+                [voucherId, creditLedgerId, row["Paid To"], amount, "credit", null, null, null, null],
+                // Debit (Bank)
+                [voucherId, debitLedgerId, row["Payment Mode"], amount, "debit", null, null, null, null],
+            ];
+
+            await db.query(
+                `
+                INSERT INTO voucher_entries
+                (voucher_id, ledger_id, ledger_name, amount, entry_type,
+                 narration, bank_name, cheque_number, cost_centre_id)
+                VALUES ?
+                `,
+                [entryValues]
+            );
+
+            saved.push(voucherNumber);
+        }
+
+        return res.json({
+            success: errors.length === 0,
+            imported: saved.length,
+            vouchers: saved,
+            errors,
+        });
+    } catch (error) {
+        console.error("❌ Bank Import Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Import failed",
+            error: error.message,
+        });
+    }
+});
+
+
 module.exports = router;

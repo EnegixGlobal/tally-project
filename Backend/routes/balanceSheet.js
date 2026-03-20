@@ -28,6 +28,7 @@ router.get("/api/balance-sheet", async (req, res) => {
         l.group_id,
         CAST(l.opening_balance AS DECIMAL(15,2)) AS opening_balance,
         l.balance_type,
+        l.closing_balance,
         g.name AS group_name,
         g.type AS group_type
       FROM ledgers l
@@ -96,8 +97,11 @@ router.get("/api/balance-sheet/group", async (req, res) => {
         l.name,
         l.group_id,
         l.opening_balance,
-        l.balance_type
+        l.balance_type,
+        l.closing_balance,
+        g.name AS group_name
       FROM ledgers l
+      LEFT JOIN ledger_groups g ON l.group_id = g.id
       WHERE 
         l.group_id = ?
         AND l.company_id = ?
@@ -122,8 +126,11 @@ router.get("/api/balance-sheet/group", async (req, res) => {
           l.name,
           l.group_id,
           l.opening_balance,
-          l.balance_type
+          l.balance_type,
+          l.closing_balance,
+          g.name AS group_name
         FROM ledgers l
+        LEFT JOIN ledger_groups g ON l.group_id = g.id
         WHERE 
           l.group_id IN (${placeholders})
           AND l.company_id = ?

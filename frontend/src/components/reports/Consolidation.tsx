@@ -20,6 +20,7 @@ interface Ledger {
   groupType: string | null;
   companyId: number;
   companyName: string;
+  closing_balance?: number;
 }
 
 interface LedgerGroup {
@@ -145,6 +146,12 @@ const ConsolidatedFinancialReport: React.FC = () => {
     const key = `${ledger.companyId}_${ledger.id}`;
     const debit = debitCreditData[key]?.debit || 0;
     const credit = debitCreditData[key]?.credit || 0;
+
+    if (ledger.groupName?.toLowerCase() === "stock-in-hand") {
+      // Use database closing_balance for stock-in-hand
+      return Number(ledger.closing_balance) || 0;
+    }
+
     return ledger.balanceType === "debit" ? (opening + debit - credit) : (opening + credit - debit);
   };
 
@@ -255,6 +262,13 @@ const ConsolidatedFinancialReport: React.FC = () => {
   };
 
   const getCompanyClosingStock = (companyId: number) => {
+    // If both sales and purchase are 0, return 0 for Trading Account purposes
+    const sales = getSalesForCompany(companyId);
+    const purchase = getPurchaseForCompany(companyId);
+    if (sales === 0 && purchase === 0) {
+      return 0;
+    }
+
     if (showItemWise) {
       return getInventoryCalculations(companyId).totalClosingValue;
     }
@@ -329,6 +343,253 @@ const ConsolidatedFinancialReport: React.FC = () => {
     };
     const allGroupIds = findSubGroups(groupId);
     return ledgers.filter(l => allGroupIds.includes(Number(l.groupId)) && l.companyId === companyId);
+  };
+
+  const findSubGroups = (id: number): number[] => {
+    let results = [id];
+    ledgerGroups.filter((g) => g.parent === id).forEach((child) => {
+      results = [...results, ...findSubGroups(child.id)];
+    });
+    return results;
+  };
+
+  const renderRowWithLedgers = (
+    label: string,
+    groupId: number | string,
+    getValue: (cid: number) => number,
+    totalVal: number
+  ) => {
+    const isGroup = typeof groupId === "number";
+    const isOpeningStock = label === "Opening Stock";
+    const isClosingStock = label === "Closing Stock";
+
+    return (
+      <React.Fragment key={label}>
+        <tr className={isDark ? "hover:bg-gray-700" : "hover:bg-gray-50"}>
+          <td className={tdClass}>{label}</td>
+          {companies.map((c) => (
+            <td key={c.id} className={tdRightClass}>
+              {formatINR(getValue(c.id))}
+            </td>
+          ))}
+          <td className={`${tdRightClass} font-bold text-indigo-600`}>
+            {formatINR(totalVal)}
+          </td>
+        </tr>
+
+        {isDetailedView && (
+          <>
+            {isGroup &&
+              /* Find unique ledger names across all companies for this group */
+              Array.from(
+                new Set(
+                  ledgers
+                    .filter((l) =>
+                      findSubGroups(groupId as number).includes(Number(l.groupId))
+                    )
+                    .map((l) => l.name)
+                )
+              ).map((ledgerName) => (
+                <tr
+                  key={ledgerName}
+                  className={`text-xs ${isDark ? "bg-gray-750" : "bg-gray-50"}`}
+                >
+                  <td className={`${tdClass} pl-6 italic text-gray-500`}>
+                    ↳ {ledgerName}
+                  </td>
+                  {companies.map((c) => {
+                    const ledger = ledgers.find(
+                      (l) => l.name === ledgerName && l.companyId === c.id
+                    );
+                    const value = ledger
+                      ? isOpeningStock
+                        ? Number(ledger.openingBalance) || 0
+                        : calculateClosingBalance(ledger)
+                      : 0;
+                    return (
+                      <td key={c.id} className={`${tdRightClass} text-gray-400`}>
+                        {value !== 0 ? formatINR(Math.abs(value)) : "—"}
+                      </td>
+                    );
+                  })}
+                  <td className={`${tdRightClass} text-indigo-400 font-medium`}>
+                    {formatINR(
+                      companies.reduce((sum, c) => {
+                        const ledger = ledgers.find(
+                          (l) => l.name === ledgerName && l.companyId === c.id
+                        );
+                        return (
+                          sum +
+                          (ledger
+                            ? isOpeningStock
+                              ? Math.abs(Number(ledger.openingBalance) || 0)
+                              : Math.abs(calculateClosingBalance(ledger))
+                            : 0)
+                        );
+                      }, 0)
+                    )}
+                  </td>
+                </tr>
+              ))}
+
+            {(isClosingStock || isOpeningStock) &&
+              companies.some((c) => (stockItemsMap[c.id] || []).length > 0) &&
+              Array.from(
+                new Set(
+                  companies.flatMap((c) =>
+                    (stockItemsMap[c.id] || []).map((item) => item.name)
+                  )
+                )
+              ).map((itemName) => (
+                <tr
+                  key={itemName + (isClosingStock ? "_cl" : "_op")}
+                  className={`text-xs ${isDark ? "bg-gray-750" : "bg-gray-50"}`}
+                >
+                  <td className={`${tdClass} pl-6 italic text-gray-500`}>
+                    ↳ {itemName} (Item)
+                  </td>
+                  {companies.map((c) => {
+                    const stockItems = stockItemsMap[c.id] || [];
+                    const pHistory = purchaseHistoryMap[c.id] || [];
+                    const sHistory = salesHistoryMap[c.id] || [];
+                    const itemCalcs = stockItems.find((i) => i.name === itemName);
+                    let itemVal = 0;
+                    if (itemCalcs) {
+                      let openingQty = 0;
+                      let openingVal = 0;
+                      const batches =
+                        typeof itemCalcs.batches === "string"
+                          ? JSON.parse(itemCalcs.batches)
+                          : itemCalcs.batches || [];
+                      if (batches.length > 0) {
+                        batches.forEach((b: any) => {
+                          openingQty += Number(b.batchQuantity || 0);
+                          openingVal +=
+                            Number(b.batchQuantity || 0) *
+                            Number(b.openingRate || 0);
+                        });
+                      } else if (Number(itemCalcs.openingBalance || 0) > 0) {
+                        openingQty = Number(itemCalcs.openingBalance);
+                        openingVal =
+                          openingQty *
+                          Number(itemCalcs.openingRate || itemCalcs.rate || 0);
+                      }
+
+                      if (isOpeningStock) {
+                        itemVal = openingVal;
+                      } else {
+                        const itemInwardQty = pHistory
+                          .filter((p) => p.itemName === itemName)
+                          .reduce(
+                            (s, p) => s + (Number(p.purchaseQuantity) || 0),
+                            0
+                          );
+                        const itemInwardVal = pHistory
+                          .filter((p) => p.itemName === itemName)
+                          .reduce(
+                            (s, p) =>
+                              s +
+                              Number(p.purchaseQuantity) *
+                                Number(p.rate || p.purchaseRate || 0),
+                            0
+                          );
+                        const itemOutwardQty = sHistory
+                          .filter((s) => s.itemName === itemName)
+                          .reduce(
+                            (s, s_item) =>
+                              s +
+                              Math.abs(
+                                Number(s_item.qtyChange || s_item.quantity || 0)
+                              ),
+                            0
+                          );
+                        const totalInQty = openingQty + itemInwardQty;
+                        const totalInVal = openingVal + itemInwardVal;
+                        const avgRate =
+                          totalInQty > 0 ? totalInVal / totalInQty : 0;
+                        itemVal = Math.max(0, (totalInQty - itemOutwardQty) * avgRate);
+                      }
+                    }
+                    return (
+                      <td key={c.id} className={`${tdRightClass} text-gray-400`}>
+                        {itemVal > 0 ? formatINR(itemVal) : "—"}
+                      </td>
+                    );
+                  })}
+                  <td className={`${tdRightClass} text-indigo-400 font-medium`}>
+                    {formatINR(
+                      companies.reduce((sum, c) => {
+                        const stockItems = stockItemsMap[c.id] || [];
+                        const itemCalcs = stockItems.find(
+                          (i) => i.name === itemName
+                        );
+                        if (!itemCalcs) return sum;
+                        let openingQty = 0;
+                        let openingVal = 0;
+                        const batches =
+                          typeof itemCalcs.batches === "string"
+                            ? JSON.parse(itemCalcs.batches)
+                            : itemCalcs.batches || [];
+                        if (batches.length > 0) {
+                          batches.forEach((b: any) => {
+                            openingQty += Number(b.batchQuantity || 0);
+                            openingVal +=
+                              Number(b.batchQuantity || 0) *
+                              Number(b.openingRate || 0);
+                          });
+                        } else if (Number(itemCalcs.openingBalance || 0) > 0) {
+                          openingQty = Number(itemCalcs.openingBalance);
+                          openingVal =
+                            openingQty *
+                            Number(itemCalcs.openingRate || itemCalcs.rate || 0);
+                        }
+                        if (isOpeningStock) return sum + openingVal;
+                        const pHistory = purchaseHistoryMap[c.id] || [];
+                        const sHistory = salesHistoryMap[c.id] || [];
+                        const itemInwardQty = pHistory
+                          .filter((p) => p.itemName === itemName)
+                          .reduce(
+                            (s, p) => s + (Number(p.purchaseQuantity) || 0),
+                            0
+                          );
+                        const itemInwardVal = pHistory
+                          .filter((p) => p.itemName === itemName)
+                          .reduce(
+                            (s, p) =>
+                              s +
+                              Number(p.purchaseQuantity) *
+                                Number(p.rate || p.purchaseRate || 0),
+                            0
+                          );
+                        const itemOutwardQty = sHistory
+                          .filter((s) => s.itemName === itemName)
+                          .reduce(
+                            (s, s_item) =>
+                              s +
+                              Math.abs(
+                                Number(s_item.qtyChange || s_item.quantity || 0)
+                              ),
+                            0
+                          );
+                        const totalInQty = openingQty + itemInwardQty;
+                        const totalInVal = openingVal + itemInwardVal;
+                        return (
+                          sum +
+                          Math.max(
+                            0,
+                            (totalInQty - itemOutwardQty) *
+                              (totalInQty > 0 ? totalInVal / totalInQty : 0)
+                          )
+                        );
+                      }, 0)
+                    )}
+                  </td>
+                </tr>
+              ))}
+          </>
+        )}
+      </React.Fragment>
+    );
   };
 
   const liabilityGroups = [
@@ -439,278 +700,124 @@ const ConsolidatedFinancialReport: React.FC = () => {
         </div>
       </div>
 
-      {/* Individual Company Reports in Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-6">
-        {companies.map(c => {
-          const companySales = getSalesForCompany(c.id);
-          const companyPurchase = getPurchaseForCompany(c.id);
-          const companyDirectExp = getDirectExpenseForCompany(c.id);
-          const companyDirectInc = getDirectIncomeForCompany(c.id);
-          const companyGrossPL = getCompanyGrossProfit(c.id);
-
-          const pl = profitLossData[c.id] || { netProfit: 0, netLoss: 0, transferredProfit: 0, transferredLoss: 0 };
-          const companyNetPL = getCompanyProfitLoss(c.id);
-
-          const totalAsset = assetGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0);
-          const totalLiab = liabilityGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0) + companyNetPL;
-
-          return (
-            <div key={c.id} className={`rounded border overflow-hidden shadow-sm ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
-              <div className={`px-4 py-3 border-b flex flex-col items-center ${isDark ? 'border-gray-700 bg-gray-750' : 'bg-gray-50 border-gray-200'}`}>
-                <h2 className="text-lg font-bold text-indigo-600 mb-1">{c.name}</h2>
-              </div>
-              <div className="p-3">
-                {/* Trading Account Segment */}
-                <h3 className="text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Trading Account</h3>
-                <div className="mb-4">
-                  <table className={tableClass}>
-                    <tbody>
-                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Sales</td>
-                        <td className={tdRightClass}>{formatINR(companySales)}</td>
-                      </tr>
-                      {isDetailedView && getLedgersForGroup(-16, c.id).filter(l => calculateClosingBalance(l) !== 0).map(l => (
-                        <tr key={l.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                          <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {l.name}</td>
-                          <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(l))}</td>
-                        </tr>
-                      ))}
-                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Direct Income</td>
-                        <td className={tdRightClass}>{formatINR(companyDirectInc)}</td>
-                      </tr>
-                      {isDetailedView && getLedgersForGroup(-8, c.id).filter(l => calculateClosingBalance(l) !== 0).map(l => (
-                        <tr key={l.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                          <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {l.name}</td>
-                          <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(l))}</td>
-                        </tr>
-                      ))}
-                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Closing Stock</td>
-                        <td className={tdRightClass}>{formatINR(getCompanyClosingStock(c.id))}</td>
-                      </tr>
-                      {isDetailedView && getStockLedgersForCompany(c.id).filter(l => calculateClosingBalance(l) !== 0).map(l => (
-                        <tr key={l.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                          <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {l.name}</td>
-                          <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(l))}</td>
-                        </tr>
-                      ))}
-                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Purchase</td>
-                        <td className={tdRightClass}>{formatINR(companyPurchase)}</td>
-                      </tr>
-                      {isDetailedView && getLedgersForGroup(-15, c.id).filter(l => calculateClosingBalance(l) !== 0).map(l => (
-                        <tr key={l.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                          <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {l.name}</td>
-                          <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(l))}</td>
-                        </tr>
-                      ))}
-                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Opening Stock</td>
-                        <td className={tdRightClass}>{formatINR(getCompanyOpeningStock(c.id))}</td>
-                      </tr>
-                      {isDetailedView && getStockLedgersForCompany(c.id).filter(l => (Number(l.openingBalance) || 0) !== 0).map(l => (
-                        <tr key={l.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                          <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {l.name}</td>
-                          <td className={`${tdRightClass} text-gray-500`}>{formatINR(Number(l.openingBalance) || 0)}</td>
-                        </tr>
-                      ))}
-                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Direct Expense</td>
-                        <td className={tdRightClass}>{formatINR(companyDirectExp)}</td>
-                      </tr>
-                      {isDetailedView && getLedgersForGroup(-7, c.id).filter(l => calculateClosingBalance(l) !== 0).map(l => (
-                        <tr key={l.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                          <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {l.name}</td>
-                          <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(l))}</td>
-                        </tr>
-                      ))}
-
-                      <tr className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-blue-50'}`}>
-                        <td className={tdClass}>Total of Credit side</td>
-                        <td className={tdRightClass}>{formatINR(companySales + companyDirectInc + getCompanyClosingStock(c.id))}</td>
-                      </tr>
-                      <tr className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-red-50'}`}>
-                        <td className={tdClass}>Total of Debit side</td>
-                        <td className={tdRightClass}>{formatINR(companyPurchase + getCompanyOpeningStock(c.id) + companyDirectExp)}</td>
-                      </tr>
-
-                      <tr className={totalRowClass}>
-                        <td className={tdClass}>{companyGrossPL >= 0 ? 'Gross Profit' : 'Gross Loss'}</td>
-                        <td className={`${tdRightClass} font-bold ${companyGrossPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatINR(companyGrossPL)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* P&L Segment */}
-                <h3 className="text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Profit & Loss</h3>
-                <div className="mb-4">
-                  <table className={tableClass}>
-                    <tbody>
-                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Indirect Income</td>
-                        <td className={tdRightClass}>{formatINR(getIndirectIncomeForCompany(c.id))}</td>
-                      </tr>
-                      {isDetailedView && getLedgersForGroup(-11, c.id).filter(l => calculateClosingBalance(l) !== 0).map(l => (
-                        <tr key={l.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                          <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {l.name}</td>
-                          <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(l))}</td>
-                        </tr>
-                      ))}
-                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Indirect Expense</td>
-                        <td className={tdRightClass}>{formatINR(getIndirectExpenseForCompany(c.id))}</td>
-                      </tr>
-                      {isDetailedView && getLedgersForGroup(-10, c.id).filter(l => calculateClosingBalance(l) !== 0).map(l => (
-                        <tr key={l.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                          <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {l.name}</td>
-                          <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(l))}</td>
-                        </tr>
-                      ))}
-                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={tdClass}>Gross Profit (b/f)</td>
-                        <td className={`${tdRightClass} ${companyGrossPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatINR(companyGrossPL)}</td>
-                      </tr>
-                      <tr className={totalRowClass}>
-                        <td className={tdClass}>{companyNetPL >= 0 ? 'Net Profit' : 'Net Loss'}</td>
-                        <td className={`${tdRightClass} font-bold ${companyNetPL >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatINR(companyNetPL)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Liabilities Segment */}
-                <h3 className="text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Liabilities</h3>
-                <div className="mb-4">
-                  <table className={tableClass}>
-                    <tbody>
-                      {liabilityGroups.map(group => (
-                        <React.Fragment key={group.id}>
-                          <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                            <td className={`${tdClass} font-medium`}>{group.name}</td>
-                            <td className={`${tdRightClass}`}>{formatINR(calculateGroupTotalByCompany(group.id, c.id))}</td>
-                          </tr>
-                          {isDetailedView && getLedgersForGroup(group.id, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
-                            <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                              <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
-                              <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
-                            </tr>
-                          ))}
-                        </React.Fragment>
-                      ))}
-                      <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                        <td className={`${tdClass} font-medium`}>Profit & Loss A/c</td>
-                        <td className={`${tdRightClass}`}>{formatINR(companyNetPL)}</td>
-                      </tr>
-                      <tr className={totalRowClass}>
-                        <td className={tdClass}>Total Liabilities</td>
-                        <td className={`${tdRightClass} font-bold`}>{formatINR(totalLiab)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Assets Segment */}
-                <h3 className="text-xs font-bold uppercase tracking-wider mb-2 text-gray-500">Assets</h3>
-                <div className="mb-2">
-                  <table className={tableClass}>
-                    <tbody>
-                      {assetGroups.map(group => (
-                        <React.Fragment key={group.id}>
-                          <tr className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                            <td className={`${tdClass} font-medium`}>{group.name}</td>
-                            <td className={`${tdRightClass}`}>{formatINR(calculateGroupTotalByCompany(group.id, c.id))}</td>
-                          </tr>
-                          {isDetailedView && getLedgersForGroup(group.id, c.id).filter(ledger => calculateClosingBalance(ledger) !== 0).map(ledger => (
-                            <tr key={ledger.id} className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-gray-50'}`}>
-                              <td className={`${tdClass} pl-6 italic text-gray-500`}>↳ {ledger.name}</td>
-                              <td className={`${tdRightClass} text-gray-500`}>{formatINR(calculateClosingBalance(ledger))}</td>
-                            </tr>
-                          ))}
-                        </React.Fragment>
-                      ))}
-                      <tr className={totalRowClass}>
-                        <td className={tdClass}>Total Assets</td>
-                        <td className={`${tdRightClass} font-bold`}>{formatINR(totalAsset)}</td>
-                      </tr>
-                    </tbody>
-                  </table>
-                </div>
-
-                {/* Diff Segment */}
-                {totalAsset - totalLiab !== 0 && (
-                  <div className={`mt-2 p-2 rounded text-xm text-center ${isDark ? 'bg-red-900/40 text-red-200' : 'bg-red-50 text-red-600'}`}>
-                    Difference: {formatINR(totalAsset - totalLiab)}
-                  </div>
-                )}
-
-              </div>
-            </div>
-          );
-        })}
-      </div>
-
-      {/* OVERALL SUMMARY TABLE */}
-      <div className={`rounded border overflow-hidden ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
-        <div className={`px-4 py-3 flex items-center justify-between ${isDark ? 'bg-gray-700' : 'bg-gray-100'}`}>
-          <h2 className="text-md font-bold">Consolidated Summary {companies.length > 0 && `(All ${companies.length} Companies)`}</h2>
-          <span className="text-sm font-bold text-indigo-600">Total Net P/L: {formatINR(getTotalPL())}</span>
-        </div>
-
-        <div className="overflow-x-auto p-2">
+      {/* CONSOLIDATED COLUMNAR TABLE */}
+      <div className={`rounded border overflow-hidden shadow-sm ${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-300'}`}>
+        <div className="overflow-x-auto">
           <table className={tableClass}>
             <thead>
-              <tr>
-                <th className={thClass}>Company</th>
-                <th className={thRightClass}>Sales</th>
-                <th className={thRightClass}>Purchase</th>
-                <th className={thRightClass}>Gross P/L</th>
-                <th className={thRightClass}>Net P/L</th>
-                <th className={thRightClass}>Liabilities</th>
-                <th className={thRightClass}>Assets</th>
-                <th className={thRightClass}>Diff</th>
+              <tr className={isDark ? 'bg-gray-700' : 'bg-gray-100'}>
+                <th className={thClass} style={{ minWidth: '250px' }}>Particulars</th>
+                {companies.map(c => (
+                  <th key={c.id} className={thRightClass}>{c.name}</th>
+                ))}
+                <th className={`${thRightClass} text-indigo-600`}>Consolidated Total</th>
               </tr>
             </thead>
             <tbody>
-              {companies.map(c => {
-                const sales = getSalesForCompany(c.id);
-                const purchase = getPurchaseForCompany(c.id);
-                const grossPL = getCompanyGrossProfit(c.id);
-                const netPL = getCompanyProfitLoss(c.id);
-                const totalLiab = liabilityGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0) + netPL;
-                const totalAssets = assetGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0);
-                const diff = totalAssets - totalLiab;
-
-                return (
-                  <tr key={c.id} className={isDark ? 'hover:bg-gray-700' : 'hover:bg-gray-50'}>
-                    <td className={`${tdClass} font-medium`}>{c.name}</td>
-                    <td className={tdRightClass}>{formatINR(sales)}</td>
-                    <td className={tdRightClass}>{formatINR(purchase)}</td>
-                    <td className={tdRightClass}>{formatINR(grossPL)}</td>
-                    <td className={`${tdRightClass} font-semibold`}>{formatINR(netPL)}</td>
-                    <td className={tdRightClass}>{formatINR(totalLiab)}</td>
-                    <td className={tdRightClass}>{formatINR(totalAssets)}</td>
-                    <td className={`${tdRightClass} font-semibold`}>{formatINR(diff)}</td>
-                  </tr>
-                );
-              })}
-              <tr className={totalRowClass}>
-                <td className={tdClass}>Total</td>
-                <td className={tdRightClass}>{formatINR(getTotalSales())}</td>
-                <td className={tdRightClass}>{formatINR(getTotalPurchase())}</td>
-                <td className={tdRightClass}>{formatINR(getTotalGrossProfit())}</td>
-                <td className={`${tdRightClass} font-bold`}>{formatINR(getTotalPL())}</td>
-                <td className={`${tdRightClass} font-bold`}>{formatINR(liabilityGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0) + getTotalPL())}</td>
-                <td className={`${tdRightClass} font-bold`}>{formatINR(assetGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0))}</td>
-                <td className={`${tdRightClass} font-bold`}>
-                  {formatINR(assetGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0) - (liabilityGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0) + getTotalPL()))}
-                </td>
+              {/* TRADING ACCOUNT SECTION */}
+              <tr className={`${isDark ? 'bg-gray-700/50' : 'bg-gray-100/50'} font-bold`}>
+                <td colSpan={companies.length + 2} className={tdClass}>Trading Account</td>
               </tr>
+
+              {renderRowWithLedgers('Sales', -16, getSalesForCompany, getTotalSales())}
+              {renderRowWithLedgers('Direct Income', -8, getDirectIncomeForCompany, getTotalDirectIncome())}
+              {renderRowWithLedgers('Closing Stock', 'closing_stock', getCompanyClosingStock, companies.reduce((sum, c) => sum + getCompanyClosingStock(c.id), 0))}
+              {renderRowWithLedgers('Purchase', -15, getPurchaseForCompany, getTotalPurchase())}
+              {renderRowWithLedgers('Opening Stock', 'opening_stock', getCompanyOpeningStock, companies.reduce((sum, c) => sum + getCompanyOpeningStock(c.id), 0))}
+              {renderRowWithLedgers('Direct Expense', -7, getDirectExpenseForCompany, getTotalDirectExpense())}
+
+              {/* Totals for Trading Account */}
+              <tr className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-blue-50/50'} font-semibold`}>
+                <td className={tdClass}>Total of Credit side</td>
+                {companies.map(c => (
+                  <td key={c.id} className={tdRightClass}>{formatINR(getSalesForCompany(c.id) + getDirectIncomeForCompany(c.id) + getCompanyClosingStock(c.id))}</td>
+                ))}
+                <td className={`${tdRightClass} text-indigo-600 font-bold`}>{formatINR(getTotalSales() + getTotalDirectIncome() + companies.reduce((sum, c) => sum + getCompanyClosingStock(c.id), 0))}</td>
+              </tr>
+              <tr className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-red-50/50'} font-semibold`}>
+                <td className={tdClass}>Total of Debit side</td>
+                {companies.map(c => (
+                  <td key={c.id} className={tdRightClass}>{formatINR(getPurchaseForCompany(c.id) + getCompanyOpeningStock(c.id) + getDirectExpenseForCompany(c.id))}</td>
+                ))}
+                <td className={`${tdRightClass} text-indigo-600 font-bold`}>{formatINR(getTotalPurchase() + companies.reduce((sum, c) => sum + getCompanyOpeningStock(c.id), 0) + getTotalDirectExpense())}</td>
+              </tr>
+              <tr className={`${totalRowClass} border-t-2`}>
+                <td className={tdClass}>Gross Profit</td>
+                {companies.map(c => {
+                  const gp = getCompanyGrossProfit(c.id);
+                  return <td key={c.id} className={`${tdRightClass} ${gp >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatINR(gp)}</td>;
+                })}
+                <td className={`${tdRightClass} font-bold text-indigo-600`}>{formatINR(getTotalGrossProfit())}</td>
+              </tr>
+
+              {/* P&L ACCOUNT SECTION */}
+              <tr className={`${isDark ? 'bg-gray-700/50' : 'bg-gray-100/50'} font-bold`}>
+                <td colSpan={companies.length + 2} className={tdClass}>Profit & Loss Account</td>
+              </tr>
+
+              {renderRowWithLedgers('Indirect Income', -11, getIndirectIncomeForCompany, getTotalIndirectIncome())}
+              {renderRowWithLedgers('Indirect Expense', -10, getIndirectExpenseForCompany, companies.reduce((sum, c) => sum + getIndirectExpenseForCompany(c.id), 0))}
+              {renderRowWithLedgers('Gross Profit (b/f)', 'gp_bf', getCompanyGrossProfit, getTotalGrossProfit())}
+
+              <tr className={`${totalRowClass} border-t-2`}>
+                <td className={tdClass}>Net Profit</td>
+                {companies.map(c => {
+                  const np = getCompanyProfitLoss(c.id);
+                  return <td key={c.id} className={`${tdRightClass} ${np >= 0 ? 'text-green-600' : 'text-red-600'}`}>{formatINR(np)}</td>;
+                })}
+                <td className={`${tdRightClass} font-bold text-indigo-600`}>{formatINR(getTotalPL())}</td>
+              </tr>
+
+              {/* LIABILITIES SECTION */}
+              <tr className={`${isDark ? 'bg-gray-700/50' : 'bg-gray-100/50'} font-bold`}>
+                <td colSpan={companies.length + 2} className={tdClass}>Liabilities</td>
+              </tr>
+              {liabilityGroups.map(group => renderRowWithLedgers(group.name, group.id, (cid) => calculateGroupTotalByCompany(group.id, cid), getTotalForGroup(group.id)))}
+              
+              {renderRowWithLedgers('Profit & Loss A/c', 'pl_ac', getCompanyProfitLoss, getTotalPL())}
+
+              <tr className={`${totalRowClass} border-t-2`}>
+                <td className={tdClass}>Total Liabilities</td>
+                {companies.map(c => {
+                  const np = getCompanyProfitLoss(c.id);
+                  const liabTotal = liabilityGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0) + np;
+                  return <td key={c.id} className={tdRightClass}>{formatINR(liabTotal)}</td>;
+                })}
+                <td className={`${tdRightClass} font-bold text-indigo-600`}>{formatINR(liabilityGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0) + getTotalPL())}</td>
+              </tr>
+
+              {/* ASSETS SECTION */}
+              <tr className={`${isDark ? 'bg-gray-700/50' : 'bg-gray-100/50'} font-bold`}>
+                <td colSpan={companies.length + 2} className={tdClass}>Assets</td>
+              </tr>
+              {assetGroups.map(group => renderRowWithLedgers(group.name, group.id, (cid) => calculateGroupTotalByCompany(group.id, cid), getTotalForGroup(group.id)))}
+
+              <tr className={`${totalRowClass} border-t-2`}>
+                <td className={tdClass}>Total Assets</td>
+                {companies.map(c => (
+                  <td key={c.id} className={tdRightClass}>{formatINR(assetGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0))}</td>
+                ))}
+                <td className={`${tdRightClass} font-bold text-indigo-600`}>{formatINR(assetGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0))}</td>
+              </tr>
+
+              {/* Difference Row (if any) */}
+              {companies.some(c => (assetGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0) - (liabilityGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0) + getCompanyProfitLoss(c.id))) !== 0) && (
+                <tr className="bg-red-50 text-red-600 text-xs italic">
+                  <td className={tdClass}>Difference</td>
+                  {companies.map(c => {
+                    const liab = liabilityGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0) + getCompanyProfitLoss(c.id);
+                    const asst = assetGroups.reduce((sum, g) => sum + calculateGroupTotalByCompany(g.id, c.id), 0);
+                    return <td key={c.id} className={tdRightClass}>{formatINR(asst - liab)}</td>;
+                  })}
+                  <td className={tdRightClass}>{formatINR(assetGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0) - (liabilityGroups.reduce((sum, g) => sum + getTotalForGroup(g.id), 0) + getTotalPL()))}</td>
+                </tr>
+              )}
             </tbody>
+
           </table>
         </div>
       </div>
+
     </div >
   );
 };
