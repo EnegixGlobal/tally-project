@@ -32,7 +32,7 @@ const BalanceSheet: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [isDetailedView, setIsDetailedView] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const { closingStock } = useProfitLossSync();
+  const { netProfit: syncedNetProfit, closingStock, openingStock } = useProfitLossSync();
   const [netProfit, setNetProfit] = useState<number>(0);
   const [netLoss, setNetLoss] = useState<number>(0);
   const [transferredProfit, setTransferredProfit] = useState<number>(0);
@@ -102,7 +102,6 @@ const BalanceSheet: React.FC = () => {
   }, [companyId]);
 
   // Sync Profit & Loss Data headlessly
-  const { netProfit: syncedNetProfit } = useProfitLossSync();
 
   useEffect(() => {
     if (syncedNetProfit !== undefined) {
@@ -164,7 +163,7 @@ const BalanceSheet: React.FC = () => {
       LaiblityTotal: liabSum + (pnlSigned < 0 ? Math.abs(pnlSigned) : 0),
       AssetTotal: assetSum + (pnlSigned > 0 ? Math.abs(pnlSigned) : 0),
     });
-  }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss, transferredProfit, transferredLoss]);
+  }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss, transferredProfit, transferredLoss, closingStock]);
 
   useEffect(() => {
     const fetchDebitCreditData = async () => {
@@ -273,17 +272,22 @@ const BalanceSheet: React.FC = () => {
           );
         })}
 
-        <div
-          key={ledger.id}
-          className="grid grid-cols-2 gap-2 py-1 text-xs text-gray-500 font-semibold dark:text-gray-600 cursor-pointer hover:text-blue-600 px-2"
-          style={{ paddingLeft: `${level * 1.5}rem` }}
-          onClick={() => navigate(`/app/reports/ledger/${ledger.id}`)}
-        >
-          <span>{ledger.name}</span>
-          <span className="text-right font-mono">
-            {formatBalance(b.closingSigned)}
-          </span>
-        </div>
+        {directLedgers.map(ledger => {
+          const b = getLedgerBalances(ledger);
+          return (
+            <div
+              key={ledger.id}
+              className="grid grid-cols-2 gap-2 py-1 text-xs text-gray-500 font-semibold dark:text-gray-600 cursor-pointer hover:text-blue-600 px-2"
+              style={{ paddingLeft: `${level * 1.5}rem` }}
+              onClick={() => navigate(`/app/reports/ledger/${ledger.id}`)}
+            >
+              <span>{ledger.name}</span>
+              <span className="text-right font-mono">
+                {formatBalance(b.closingSigned)}
+              </span>
+            </div>
+          );
+        })}
       </div>
     );
   };

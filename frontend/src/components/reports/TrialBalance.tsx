@@ -27,7 +27,7 @@ const TrialBalance: React.FC = () => {
   const navigate = useNavigate();
 
   // Sync Profit & Loss Data headlessly in background
-  useProfitLossSync();
+  const { closingStock } = useProfitLossSync();
 
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>([]);
@@ -136,7 +136,12 @@ const TrialBalance: React.FC = () => {
     });
 
     const netOpening = totalOpDr - totalOpCr;
-    const netClosing = (totalOpDr + totalTransDr) - (totalOpCr + totalTransCr);
+    let netClosing = (totalOpDr + totalTransDr) - (totalOpCr + totalTransCr);
+
+    // Sync stock-in-hand
+    if (ledgerGroups.find(g => g.id === groupId)?.name?.toLowerCase() === "stock-in-hand") {
+      netClosing = closingStock; // +ve is Dr
+    }
 
     return {
       opening: netOpening, // +ve is Dr
@@ -271,7 +276,7 @@ const TrialBalance: React.FC = () => {
       if (totals.closing > 0) clDr += totals.closing; else clCr += Math.abs(totals.closing);
     });
     return { debit: d, credit: c, openingDr: opDr, openingCr: opCr, closingDr: clDr, closingCr: clCr };
-  }, [ledgers, debitCreditData, trialGroups]);
+  }, [ledgers, debitCreditData, trialGroups, closingStock]);
 
   return (
     <div className="pt-[56px] px-4">
@@ -370,32 +375,32 @@ const TrialBalance: React.FC = () => {
             <tfoot>
               <tr className="font-bold text-lg border-t-2 border-gray-400 cursor-pointer" onClick={() => setIsDetailedView(true)}>
                 <td className="py-3 px-4 font-bold">Grand Total</td>
-                  {showOpening && (
-                    <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
-                      {grandTotals.openingDr > 0 || grandTotals.openingCr > 0 ? (
-                        <>
-                          {grandTotals.openingDr > grandTotals.openingCr
-                            ? `${(grandTotals.openingDr - grandTotals.openingCr).toLocaleString()} Dr`
-                            : `${(grandTotals.openingCr - grandTotals.openingDr).toLocaleString()} Cr`}
-                        </>
-                      ) : "-"}
-                    </td>
-                  )}
-                  {showDebit && (
-                    <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.debit.toLocaleString()}</td>
-                  )}
-                  {showCredit && (
-                    <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.credit.toLocaleString()}</td>
-                  )}
+                {showOpening && (
                   <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
-                    {grandTotals.closingDr > 0 || grandTotals.closingCr > 0 ? (
+                    {grandTotals.openingDr > 0 || grandTotals.openingCr > 0 ? (
                       <>
-                        {grandTotals.closingDr > grandTotals.closingCr
-                          ? `${(grandTotals.closingDr - grandTotals.closingCr).toLocaleString()} Dr`
-                          : `${(grandTotals.closingCr - grandTotals.closingDr).toLocaleString()} Cr`}
+                        {grandTotals.openingDr > grandTotals.openingCr
+                          ? `${(grandTotals.openingDr - grandTotals.openingCr).toLocaleString()} Dr`
+                          : `${(grandTotals.openingCr - grandTotals.openingDr).toLocaleString()} Cr`}
                       </>
                     ) : "-"}
                   </td>
+                )}
+                {showDebit && (
+                  <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.debit.toLocaleString()}</td>
+                )}
+                {showCredit && (
+                  <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.credit.toLocaleString()}</td>
+                )}
+                <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
+                  {grandTotals.closingDr > 0 || grandTotals.closingCr > 0 ? (
+                    <>
+                      {grandTotals.closingDr > grandTotals.closingCr
+                        ? `${(grandTotals.closingDr - grandTotals.closingCr).toLocaleString()} Dr`
+                        : `${(grandTotals.closingCr - grandTotals.closingDr).toLocaleString()} Cr`}
+                    </>
+                  ) : "-"}
+                </td>
               </tr>
             </tfoot>
           </table>
