@@ -11,6 +11,7 @@ interface Ledger {
   groupId: number;
   openingBalance: number;
   balanceType: "debit" | "credit";
+  closingBalance: number;
   groupName: string;
   groupType: string | null;
 }
@@ -64,6 +65,7 @@ const BalanceSheet: React.FC = () => {
           groupId: l.group_id,
           openingBalance: parseFloat(l.opening_balance) || 0,
           balanceType: l.balance_type,
+          closingBalance: parseFloat(l.closing_balance) || 0,
           groupName: l.group_name,
           groupType: l.group_type,
         }));
@@ -188,7 +190,14 @@ const BalanceSheet: React.FC = () => {
 
     // Signed value (Relative to Debit)
     const openingSigned = ledger.balanceType === "debit" ? o : -o;
-    const closingSigned = openingSigned + debit - credit;
+
+    let closingSigned;
+    if (ledger.groupName?.toLowerCase() === "stock-in-hand") {
+      // Use database closing_balance for stock-in-hand
+      closingSigned = Number(ledger.closingBalance) || 0;
+    } else {
+      closingSigned = openingSigned + debit - credit;
+    }
 
     return { openingSigned, debit, credit, closingSigned };
   };

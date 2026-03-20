@@ -11,6 +11,8 @@ interface Ledger {
   group_id: number;
   openingBalance: number;
   balanceType: "debit" | "credit";
+  closingBalance: number;
+  groupName?: string;
 }
 
 interface Group {
@@ -118,6 +120,8 @@ const SubGroupSummary: React.FC = () => {
               group_id: l.group_id,
               openingBalance: parseFloat(l.opening_balance) || 0,
               balanceType: l.balance_type,
+              closingBalance: parseFloat(l.closing_balance) || 0,
+              groupName: l.group_name,
             }));
             allLedgers = [...allLedgers, ...normalizedLedgers];
           }
@@ -215,7 +219,15 @@ const SubGroupSummary: React.FC = () => {
 
     // Signed value (Relative to Debit)
     const openingSigned = ledger.balanceType === "debit" ? o : -o;
-    const closingSigned = openingSigned + debit - credit;
+
+    let closingSigned;
+    if (ledger.groupName?.toLowerCase() === "stock-in-hand") {
+      // Use database closing_balance for stock-in-hand
+      // Note: We assume the database value is correct and doesn't need calculation from vouchers
+      closingSigned = Number(ledger.closingBalance) || 0;
+    } else {
+      closingSigned = openingSigned + debit - credit;
+    }
 
     return { openingSigned, debit, credit, closingSigned };
   };
