@@ -20,6 +20,7 @@ interface Ledger {
   groupType: string | null;
   companyId: number;
   companyName: string;
+  closing_balance?: number;
 }
 
 interface LedgerGroup {
@@ -145,6 +146,12 @@ const ConsolidatedFinancialReport: React.FC = () => {
     const key = `${ledger.companyId}_${ledger.id}`;
     const debit = debitCreditData[key]?.debit || 0;
     const credit = debitCreditData[key]?.credit || 0;
+
+    if (ledger.groupName?.toLowerCase() === "stock-in-hand") {
+      // Use database closing_balance for stock-in-hand
+      return Number(ledger.closing_balance) || 0;
+    }
+
     return ledger.balanceType === "debit" ? (opening + debit - credit) : (opening + credit - debit);
   };
 
@@ -255,6 +262,13 @@ const ConsolidatedFinancialReport: React.FC = () => {
   };
 
   const getCompanyClosingStock = (companyId: number) => {
+    // If both sales and purchase are 0, return 0 for Trading Account purposes
+    const sales = getSalesForCompany(companyId);
+    const purchase = getPurchaseForCompany(companyId);
+    if (sales === 0 && purchase === 0) {
+      return 0;
+    }
+
     if (showItemWise) {
       return getInventoryCalculations(companyId).totalClosingValue;
     }
