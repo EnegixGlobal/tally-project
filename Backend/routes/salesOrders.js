@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // Your DB connection file
-const { genrateVoucherNumber } = require("../utils/generateVoucherNumber");
+const { generateVoucherNumber } = require("../utils/generateVoucherNumber");
 const { getFinancialYear } = require("../utils/financialYear");
 
 router.post("/", async (req, res) => {
@@ -43,15 +43,27 @@ router.post("/", async (req, res) => {
   await connection.beginTransaction();
 
   try {
+    // ================= GENERATE NUMBER =================
+    let finalNumber = number;
+    if (!finalNumber) {
+      finalNumber = await generateVoucherNumber({
+        companyId,
+        ownerType,
+        ownerId,
+        voucherType: "sales_order",
+        date,
+      });
+    }
+
     // Insert main order, including multi-tenant columns
     const [orderResult] = await connection.query(
-      `INSERT INTO sales_orders 
+      `INSERT INTO sales_orders
       (date, number, referenceNo, partyId, salesLedgerId, orderRef, termsOfDelivery, destination, dispatchThrough, dispatchDocNo,
-        narration, expectedDeliveryDate, status, company_id, owner_type, owner_id)
+        narration, expected_delivery_date, status, company_id, owner_type, owner_id)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         date,
-        number,
+        finalNumber,
         referenceNo,
         partyId,
         salesLedgerId,
@@ -148,7 +160,7 @@ router.get("/", async (req, res) => {
   }
 });
 
-//get voucher number
+// get voucher number
 router.get("/next-number", async (req, res) => {
   try {
     const { company_id, owner_type, owner_id, date } = req.query;
@@ -160,32 +172,13 @@ router.get("/next-number", async (req, res) => {
       });
     }
 
-    const fy = getFinancialYear(date);
-    const prefix = "SO";
-
-    const [rows] = await db.query(
-      `
-      SELECT number
-      FROM sales_orders
-      WHERE company_id = ?
-        AND owner_type = ?
-        AND owner_id = ?
-        AND number LIKE ?
-      ORDER BY id DESC
-      LIMIT 1
-      `,
-      [company_id, owner_type, owner_id, `${prefix}/${fy}/%`]
-    );
-
-    let nextNo = 1;
-
-    if (rows.length > 0) {
-      const lastNumber = rows[0].number;
-      const lastSeq = Number(lastNumber.split("/").pop());
-      nextNo = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
-    }
-
-    const voucherNumber = `${prefix}/${fy}/${String(nextNo).padStart(6, "0")}`;
+    const voucherNumber = await generateVoucherNumber({
+      companyId: company_id,
+      ownerType: owner_type,
+      ownerId: owner_id,
+      voucherType: 'sales_order',
+      date
+    });
 
     return res.json({
       success: true,
@@ -349,20 +342,71 @@ router.delete("/:id", async (req, res) => {
   const { id } = req.params;
 
   const conn = await db.getConnection();
-  await conn.beginTransaction();
-
   try {
-    await conn.query(`DELETE FROM sales_order_items WHERE salesOrderId=?`, [
-      id,
-    ]);
+    await conn.beginTransaction();
+
+    // 1️⃣ Get order details before deletion
+    const [orderRows] = await conn.execute(
+      "SELECT number, company_id, owner_type, owner_id FROM sales_orders WHERE id = ?",
+      [id]
+    );
+
+    if (orderRows.length === 0) {
+      await conn.rollback();
+      return res.status(404).json({ success: false, message: "Order not found" });
+    }
+
+    const { number: deletedNumber, company_id, owner_type, owner_id } = orderRows[0];
+
+    // Extract prefix, FY, and sequence: SO/25-26/000002 -> ["SO", "25-26", "000002"]
+    const parts = deletedNumber.split("/");
+    if (parts.length < 3) {
+      // Normal delete if format is unexpected
+      await conn.query(`DELETE FROM sales_order_items WHERE salesOrderId=?`, [id]);
+      await conn.query(`DELETE FROM sales_orders WHERE id=?`, [id]);
+      await conn.commit();
+      return res.json({ success: true, message: "Order deleted" });
+    }
+
+    const prefix = parts[0];
+    const fy = parts[1];
+    const deletedSeq = parseInt(parts[2]);
+
+    // 2️⃣ Delete current order and items
+    await conn.query(`DELETE FROM sales_order_items WHERE salesOrderId=?`, [id]);
     await conn.query(`DELETE FROM sales_orders WHERE id=?`, [id]);
 
+    // 3️⃣ Renumber subsequent orders of the same FY
+    const [subsequentOrders] = await conn.execute(
+      `SELECT id, number FROM sales_orders 
+       WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
+       AND number LIKE ? 
+       ORDER BY id ASC`,
+      [company_id, owner_type, owner_id, `${prefix}/${fy}/%`]
+    );
+
+    for (const order of subsequentOrders) {
+      const oParts = order.number.split("/");
+      if (oParts.length === 3) {
+        const oSeq = parseInt(oParts[2]);
+        if (oSeq > deletedSeq) {
+          const newSeq = oSeq - 1;
+          const newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
+
+          await conn.execute(
+            "UPDATE sales_orders SET number = ? WHERE id = ?",
+            [newNumber, order.id]
+          );
+        }
+      }
+    }
+
     await conn.commit();
-    res.json({ success: true, message: "Order deleted" });
+    res.json({ success: true, message: "Order deleted and subsequent orders renumbered successfully" });
   } catch (err) {
     await conn.rollback();
     console.error("Delete error:", err);
-    res.status(500).json({ success: false, message: "Delete failed" });
+    res.status(500).json({ success: false, message: "Delete and renumber failed" });
   } finally {
     conn.release();
   }

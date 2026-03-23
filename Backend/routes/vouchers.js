@@ -136,49 +136,21 @@ router.get("/next-number", async (req, res) => {
   try {
     const { company_id, owner_type, owner_id, voucherType, date } = req.query;
 
-    const prefixMap = {
-      payment: "PV",
-      receipt: "RV",
-      contra: "CV",
-      journal: "JV",
-    };
-
-    const prefix = prefixMap[voucherType];
-    if (!prefix) return res.status(400).json({ success: false });
-
-    const fy = getFinancialYear(date);
-
-    const [rows] = await db.execute(
-      `
-      SELECT voucher_number
-      FROM voucher_main
-      WHERE company_id = ?
-        AND owner_type = ?
-        AND owner_id = ?
-        AND voucher_type = ?
-        AND voucher_number LIKE ?
-      ORDER BY id DESC
-      LIMIT 1
-      `,
-      [
-        company_id,
-        owner_type,
-        owner_id,
-        voucherType,
-        `${prefix}/${fy}/%`,
-      ]
-    );
-
-    let nextNo = 1;
-    if (rows.length > 0) {
-      const lastNumber = rows[0].voucher_number;
-      const lastSeq = Number(lastNumber.split("/").pop());
-      nextNo = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
+    if (!company_id || !owner_type || !owner_id || !voucherType || !date) {
+      return res.status(400).json({ success: false, message: "Missing required params" });
     }
+
+    const voucherNumber = await generateVoucherNumber({
+      companyId: Number(company_id),
+      ownerType: String(owner_type),
+      ownerId: Number(owner_id),
+      voucherType: voucherType,
+      date
+    });
 
     return res.json({
       success: true,
-      voucherNumber: `${prefix}/${fy}/${String(nextNo).padStart(6, "0")}`,
+      voucherNumber,
     });
   } catch (e) {
     console.error(e);
@@ -281,34 +253,91 @@ router.get("/", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   const { id } = req.params;
+  const conn = await db.getConnection();
 
   try {
     if (!id) {
       return res.status(400).json({ message: "id is required" });
     }
 
-    // delete child entries first
-    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
+    await conn.beginTransaction();
 
-    // delete main
-    const [result] = await db.execute("DELETE FROM voucher_main WHERE id = ?", [
-      id,
-    ]);
+    // 1️⃣ Get voucher details before deletion
+    const [rows] = await conn.execute(
+      "SELECT voucher_number, voucher_type, company_id, owner_type, owner_id FROM voucher_main WHERE id = ?",
+      [id]
+    );
 
-    if (result.affectedRows === 0) {
+    if (rows.length === 0) {
+      await conn.rollback();
       return res.status(404).json({ message: "Voucher not found" });
     }
 
+    const {
+      voucher_number: deletedNumber,
+      voucher_type,
+      company_id,
+      owner_type,
+      owner_id
+    } = rows[0];
+
+    // Extract prefix, FY, and sequence: PV/25-26/000002 -> ["PV", "25-26", "000002"]
+    const parts = deletedNumber.split("/");
+    if (parts.length < 3) {
+      // Normal delete if format is unexpected
+      await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
+      await conn.execute("DELETE FROM voucher_main WHERE id = ?", [id]);
+      await conn.commit();
+      return res.json({ success: true, message: "Voucher deleted successfully" });
+    }
+
+    const prefix = parts[0];
+    const fy = parts[1];
+    const deletedSeq = parseInt(parts[2]);
+
+    // 2️⃣ Delete current voucher and entries
+    await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
+    await conn.execute("DELETE FROM voucher_main WHERE id = ?", [id]);
+
+    // 3️⃣ Renumber subsequent vouchers of the SAME TYPE and FY
+    const [subsequentVouchers] = await conn.execute(
+      `SELECT id, voucher_number FROM voucher_main 
+       WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
+       AND voucher_type = ? AND voucher_number LIKE ? 
+       ORDER BY id ASC`,
+      [company_id, owner_type, owner_id, voucher_type, `${prefix}/${fy}/%`]
+    );
+
+    for (const voucher of subsequentVouchers) {
+      const vParts = voucher.voucher_number.split("/");
+      if (vParts.length === 3) {
+        const vSeq = parseInt(vParts[2]);
+        if (vSeq > deletedSeq) {
+          const newSeq = vSeq - 1;
+          const newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
+
+          await conn.execute(
+            "UPDATE voucher_main SET voucher_number = ? WHERE id = ?",
+            [newNumber, voucher.id]
+          );
+        }
+      }
+    }
+
+    await conn.commit();
     res.status(200).json({
       success: true,
-      message: "Voucher deleted successfully",
+      message: "Voucher deleted and subsequent vouchers renumbered successfully",
     });
   } catch (error) {
+    await conn.rollback();
     console.error("Error deleting voucher:", error);
     res.status(500).json({
       success: false,
-      message: "Failed to delete voucher",
+      message: "Failed to delete and renumber vouchers",
     });
+  } finally {
+    conn.release();
   }
 });
 

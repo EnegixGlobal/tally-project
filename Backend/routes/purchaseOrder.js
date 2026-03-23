@@ -43,6 +43,18 @@ router.post("/", async (req, res) => {
   await conn.beginTransaction();
 
   try {
+    // ================= GENERATE NUMBER =================
+    let finalNumber = number;
+    if (!finalNumber) {
+      finalNumber = await generateVoucherNumber({
+        companyId,
+        ownerType,
+        ownerId,
+        voucherType: "purchase_order",
+        date,
+      });
+    }
+
     // Insert into purchase_orders table
     const [orderResult] = await conn.execute(
       `INSERT INTO purchase_orders (
@@ -53,7 +65,7 @@ router.post("/", async (req, res) => {
       ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         date,
-        number || null,
+        finalNumber,
         partyId,
         purchaseLedgerId,
         referenceNo || null,
@@ -258,37 +270,13 @@ router.get("/next-number", async (req, res) => {
       });
     }
 
-    const fy = getFinancialYear(date);
-    const prefix = "PO";
-
-    const [rows] = await db.query(
-      `
-      SELECT number
-      FROM purchase_orders
-      WHERE company_id = ?
-        AND owner_type = ?
-        AND owner_id = ?
-        AND number LIKE ?
-      ORDER BY id DESC
-      LIMIT 1
-      `,
-      [
-        company_id,
-        owner_type,
-        owner_id,
-        `${prefix}/${fy}/%`,
-      ]
-    );
-
-    let nextNo = 1;
-
-    if (rows.length > 0) {
-      const lastNumber = rows[0].number;
-      const lastSeq = Number(lastNumber.split("/").pop());
-      nextNo = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
-    }
-
-    const voucherNumber = `${prefix}/${fy}/${String(nextNo).padStart(6, "0")}`;
+    const voucherNumber = await generateVoucherNumber({
+      companyId: company_id,
+      ownerType: owner_type,
+      ownerId: owner_id,
+      voucherType: 'purchase_order',
+      date
+    });
 
     res.json({
       success: true,
@@ -541,9 +529,9 @@ router.delete("/:id", async (req, res) => {
   try {
     await conn.beginTransaction();
 
-    // 🔎 Check PO
+    // 🔎 Get PO details before deletion
     const [orderRows] = await conn.execute(
-      "SELECT status FROM purchase_orders WHERE id = ?",
+      "SELECT number, status, company_id, owner_type, owner_id FROM purchase_orders WHERE id = ?",
       [Number(id)]
     );
 
@@ -552,15 +540,29 @@ router.delete("/:id", async (req, res) => {
       return res.status(404).json({ message: "Purchase Order not found" });
     }
 
-    const status = String(orderRows[0].status || "").toLowerCase();
+    const { number: deletedNumber, status, company_id, owner_type, owner_id } = orderRows[0];
+    const normalizedStatus = String(status || "").toLowerCase();
 
-    if (["completed", "partially_received"].includes(status)) {
+    if (["completed", "partially_received"].includes(normalizedStatus)) {
       await conn.rollback();
       return res.status(400).json({
-        message:
-          "Cannot delete Purchase Order that is completed or partially received",
+        message: "Cannot delete Purchase Order that is completed or partially received",
       });
     }
+
+    // Extract prefix, FY, and sequence: PO/25-26/000002 -> ["PO", "25-26", "000002"]
+    const parts = deletedNumber.split("/");
+    if (parts.length < 3) {
+      // Normal delete if format is unexpected
+      await conn.execute("DELETE FROM purchase_order_items WHERE purchase_order_id = ?", [Number(id)]);
+      await conn.execute("DELETE FROM purchase_orders WHERE id = ?", [Number(id)]);
+      await conn.commit();
+      return res.json({ success: true, message: "Purchase Order deleted successfully" });
+    }
+
+    const prefix = parts[0];
+    const fy = parts[1];
+    const deletedSeq = parseInt(parts[2]);
 
     // 🔥 DELETE CHILD FIRST
     await conn.execute(
@@ -574,11 +576,36 @@ router.delete("/:id", async (req, res) => {
       [Number(id)]
     );
 
+    // 3️⃣ Renumber subsequent orders of the same FY
+    const [subsequentOrders] = await conn.execute(
+      `SELECT id, number FROM purchase_orders 
+       WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
+       AND number LIKE ? 
+       ORDER BY id ASC`,
+      [company_id, owner_type, owner_id, `${prefix}/${fy}/%`]
+    );
+
+    for (const order of subsequentOrders) {
+      const oParts = order.number.split("/");
+      if (oParts.length === 3) {
+        const oSeq = parseInt(oParts[2]);
+        if (oSeq > deletedSeq) {
+          const newSeq = oSeq - 1;
+          const newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
+
+          await conn.execute(
+            "UPDATE purchase_orders SET number = ? WHERE id = ?",
+            [newNumber, order.id]
+          );
+        }
+      }
+    }
+
     await conn.commit();
 
     res.json({
       success: true,
-      message: "Purchase Order deleted successfully",
+      message: "Purchase Order deleted and subsequent orders renumbered successfully",
       id: Number(id),
     });
   } catch (err) {
@@ -587,7 +614,7 @@ router.delete("/:id", async (req, res) => {
 
     res.status(500).json({
       success: false,
-      message: "Failed to delete Purchase Order",
+      message: "Failed to delete and renumber Purchase Orders",
       error: err.message,
     });
   } finally {
