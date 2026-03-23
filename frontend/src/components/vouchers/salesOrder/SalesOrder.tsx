@@ -82,6 +82,7 @@ const SalesOrder: React.FC = () => {
   const { selectedFinYear } = useFinancialYear();
   const { defaultDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (!isEditMode || !id) return;
@@ -511,6 +512,8 @@ const SalesOrder: React.FC = () => {
     async (e: React.FormEvent) => {
       e.preventDefault();
 
+      if (isSubmitting) return;
+
       if (!validateForm()) {
         Swal.fire(
           "Validation Error",
@@ -519,6 +522,8 @@ const SalesOrder: React.FC = () => {
         );
         return;
       }
+
+      setIsSubmitting(true);
 
       try {
         const payload = {
@@ -557,6 +562,8 @@ const SalesOrder: React.FC = () => {
       } catch (error) {
         console.error("Error:", error);
         Swal.fire("Network Error", "Failed to connect to the server.", "error");
+      } finally {
+        setIsSubmitting(false);
       }
     },
     [formData, navigate, isEditMode, validateForm]
@@ -749,12 +756,13 @@ const SalesOrder: React.FC = () => {
           <button
             title="Save Sales Order"
             onClick={handleSubmit}
+            disabled={isSubmitting}
             className={`p-2 rounded-md ${theme === "dark"
-                ? "bg-blue-600 hover:bg-blue-700"
-                : "bg-blue-500 hover:bg-blue-600"
-              } text-white flex items-center`}
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-blue-500 hover:bg-blue-600"
+              } text-white flex items-center ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            <Save size={18} className="mr-2" /> Save
+            <Save size={18} className="mr-2" /> {isSubmitting ? "Saving..." : "Save"}
           </button>
           <button
             title="Print Sales Order"
@@ -798,8 +806,8 @@ const SalesOrder: React.FC = () => {
                 required
                 max={maxDate}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500`}
               />
               {errors.date && (
@@ -821,8 +829,8 @@ const SalesOrder: React.FC = () => {
                 onChange={handleChange}
                 readOnly={config.autoNumbering}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500 ${config.autoNumbering ? "opacity-50" : ""
                   }`}
                 placeholder={
@@ -844,8 +852,8 @@ const SalesOrder: React.FC = () => {
                 value={formData.referenceNo}
                 onChange={handleChange}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500`}
                 placeholder="Enter reference number"
               />
@@ -866,8 +874,8 @@ const SalesOrder: React.FC = () => {
                   onChange={handleChange}
                   title="Expected Delivery Date"
                   className={`w-full p-2 rounded border ${theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-gray-100"
-                      : "bg-white border-gray-300 text-gray-900"
+                    ? "bg-gray-700 border-gray-600 text-gray-100"
+                    : "bg-white border-gray-300 text-gray-900"
                     } focus:border-blue-500 focus:ring-blue-500`}
                 />
               </div>
@@ -889,8 +897,8 @@ const SalesOrder: React.FC = () => {
                 value={formData.partyId}
                 onChange={handlePartyChange}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500`}
               >
                 <option value="">-- Select Party Name --</option>
@@ -903,8 +911,8 @@ const SalesOrder: React.FC = () => {
                 <option
                   value="add-new"
                   className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                      ? "bg-blue-600 hover:bg-g]reen-700"
-                      : "bg-green-600 hover:bg-green-700 text-white"
+                    ? "bg-blue-600 hover:bg-g]reen-700"
+                    : "bg-green-600 hover:bg-green-700 text-white"
                     }`}
                 >
                   + Add New Ledger
@@ -917,8 +925,8 @@ const SalesOrder: React.FC = () => {
               {selectedParty && (
                 <div
                   className={`mt-2 p-2 rounded text-sm ${theme === "dark"
-                      ? "bg-gray-700 text-gray-300"
-                      : "bg-gray-100 text-gray-600"
+                    ? "bg-gray-700 text-gray-300"
+                    : "bg-gray-100 text-gray-600"
                     }`}
                 >
                   <p>
@@ -955,8 +963,8 @@ const SalesOrder: React.FC = () => {
                 required
                 title="Select Sales Ledger"
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500`}
               >
                 <option value="">Select Sales Ledger</option>
@@ -969,8 +977,8 @@ const SalesOrder: React.FC = () => {
                 <option
                   value="add-new"
                   className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                      ? "bg-blue-600 hover:bg-g]reen-700"
-                      : "bg-green-600 hover:bg-green-700 text-white"
+                    ? "bg-blue-600 hover:bg-g]reen-700"
+                    : "bg-green-600 hover:bg-green-700 text-white"
                     }`}
                 >
                   + Add New Ledger
@@ -995,8 +1003,8 @@ const SalesOrder: React.FC = () => {
                 type="button"
                 onClick={addItem}
                 className={`flex items-center text-sm px-3 py-2 rounded ${theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
                   }`}
               >
                 <Plus size={16} className="mr-1" /> Add Item
@@ -1008,8 +1016,8 @@ const SalesOrder: React.FC = () => {
                 <thead>
                   <tr
                     className={`${theme === "dark"
-                        ? "border-b border-gray-600"
-                        : "border-b border-gray-300"
+                      ? "border-b border-gray-600"
+                      : "border-b border-gray-300"
                       }`}
                   >
                     <th className="px-2 py-2 text-left">Name of Item</th>
@@ -1036,8 +1044,8 @@ const SalesOrder: React.FC = () => {
                     <tr
                       key={item.id}
                       className={`${theme === "dark"
-                          ? "border-b border-gray-600"
-                          : "border-b border-gray-300"
+                        ? "border-b border-gray-600"
+                        : "border-b border-gray-300"
                         }`}
                     >
                       <td className="px-2 py-2">
@@ -1048,8 +1056,8 @@ const SalesOrder: React.FC = () => {
                           }
                           title="Select Item"
                           className={`w-full p-1 rounded border text-sm ${theme === "dark"
-                              ? "bg-gray-700 border-gray-600 text-gray-100"
-                              : "bg-white border-gray-300 text-gray-900"
+                            ? "bg-gray-700 border-gray-600 text-gray-100"
+                            : "bg-white border-gray-300 text-gray-900"
                             } focus:border-blue-500`}
                         >
                           <option value="">Select Item</option>
@@ -1075,8 +1083,8 @@ const SalesOrder: React.FC = () => {
                               handleItemChange(index, "hsnCode", e.target.value)
                             }
                             className={`w-full p-1 rounded border text-sm ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
                               } focus:border-blue-500`}
                             placeholder="HSN"
                             title="HSN Code"
@@ -1096,8 +1104,8 @@ const SalesOrder: React.FC = () => {
                             )
                           }
                           className={`w-full p-1 rounded border text-sm ${theme === "dark"
-                              ? "bg-gray-700 border-gray-600 text-gray-100"
-                              : "bg-white border-gray-300 text-gray-900"
+                            ? "bg-gray-700 border-gray-600 text-gray-100"
+                            : "bg-white border-gray-300 text-gray-900"
                             } focus:border-blue-500`}
                         >
                           <option value="">Select Batch</option>
@@ -1124,8 +1132,8 @@ const SalesOrder: React.FC = () => {
                             )
                           }
                           className={`w-full p-1 rounded border text-center text-sm ${theme === "dark"
-                              ? "bg-gray-700 border-gray-600 text-gray-100"
-                              : "bg-white border-gray-300 text-gray-900"
+                            ? "bg-gray-700 border-gray-600 text-gray-100"
+                            : "bg-white border-gray-300 text-gray-900"
                             } focus:border-blue-500`}
                           placeholder="0"
                           min="0"
@@ -1150,8 +1158,8 @@ const SalesOrder: React.FC = () => {
                             )
                           }
                           className={`w-full p-1 rounded border text-right text-sm ${theme === "dark"
-                              ? "bg-gray-700 border-gray-600 text-gray-100"
-                              : "bg-white border-gray-300 text-gray-900"
+                            ? "bg-gray-700 border-gray-600 text-gray-100"
+                            : "bg-white border-gray-300 text-gray-900"
                             } focus:border-blue-500`}
                           placeholder="0.00"
                           min="0"
@@ -1177,8 +1185,8 @@ const SalesOrder: React.FC = () => {
                               )
                             }
                             className={`w-full p-1 rounded border text-right text-sm ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 text-gray-100"
-                                : "bg-white border-gray-300 text-gray-900"
+                              ? "bg-gray-700 border-gray-600 text-gray-100"
+                              : "bg-white border-gray-300 text-gray-900"
                               } focus:border-blue-500`}
                             placeholder="0.00"
                             min="0"
@@ -1205,8 +1213,8 @@ const SalesOrder: React.FC = () => {
                           readOnly
                           title="Item Amount"
                           className={`w-full p-1 rounded border text-right text-sm ${theme === "dark"
-                              ? "bg-gray-600 border-gray-600 text-gray-100"
-                              : "bg-gray-100 border-gray-300 text-gray-900"
+                            ? "bg-gray-600 border-gray-600 text-gray-100"
+                            : "bg-gray-100 border-gray-300 text-gray-900"
                             } opacity-60`}
                         />
                       </td>
@@ -1217,10 +1225,10 @@ const SalesOrder: React.FC = () => {
                           onClick={() => removeItem(index)}
                           disabled={formData.items.length <= 1}
                           className={`p-1 rounded ${formData.items.length <= 1
-                              ? "opacity-50 cursor-not-allowed"
-                              : theme === "dark"
-                                ? "hover:bg-gray-600"
-                                : "hover:bg-gray-300"
+                            ? "opacity-50 cursor-not-allowed"
+                            : theme === "dark"
+                              ? "hover:bg-gray-600"
+                              : "hover:bg-gray-300"
                             }`}
                           title="Remove Item"
                           aria-label="Remove Item"
@@ -1234,8 +1242,8 @@ const SalesOrder: React.FC = () => {
                 <tfoot>
                   <tr
                     className={`font-semibold ${theme === "dark"
-                        ? "border-t border-gray-600"
-                        : "border-t border-gray-300"
+                      ? "border-t border-gray-600"
+                      : "border-t border-gray-300"
                       }`}
                   >
                     <td className="px-2 py-2" colSpan={config.showHSN ? 2 : 1}>
@@ -1279,8 +1287,8 @@ const SalesOrder: React.FC = () => {
                 value={formData.orderRef}
                 onChange={handleChange}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500`}
                 placeholder="Enter order reference"
               />
@@ -1299,8 +1307,8 @@ const SalesOrder: React.FC = () => {
                 value={formData.termsOfDelivery}
                 onChange={handleChange}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-100"
-                    : "bg-white border-gray-300 text-gray-900"
+                  ? "bg-gray-700 border-gray-600 text-gray-100"
+                  : "bg-white border-gray-300 text-gray-900"
                   } focus:border-blue-500 focus:ring-blue-500`}
                 placeholder="Enter delivery terms"
               />
@@ -1321,8 +1329,8 @@ const SalesOrder: React.FC = () => {
               onChange={handleChange}
               rows={3}
               className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-gray-100"
-                  : "bg-white border-gray-300 text-gray-900"
+                ? "bg-gray-700 border-gray-600 text-gray-100"
+                : "bg-white border-gray-300 text-gray-900"
                 } focus:border-blue-500 focus:ring-blue-500`}
               placeholder="Enter narration"
             />

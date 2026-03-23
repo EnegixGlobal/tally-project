@@ -12,6 +12,7 @@ const JournalVoucher: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const isEditMode = !!id;
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const companyId = localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");
@@ -262,33 +263,43 @@ const JournalVoucher: React.FC = () => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const payload = {
-      ...formData,
-      companyId: companyId,
-      owner_type: ownerType,
-      owner_id: ownerId,
-    };
+    if (isSubmitting) return;
 
-    const url = isEditMode
-      ? `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`
-      : `${import.meta.env.VITE_API_URL}/api/vouchers`;
+    try {
+      setIsSubmitting(true);
+      const payload = {
+        ...formData,
+        companyId: companyId,
+        owner_type: ownerType,
+        owner_id: ownerId,
+      };
 
-    const method = isEditMode ? "PUT" : "POST";
+      const url = isEditMode
+        ? `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`
+        : `${import.meta.env.VITE_API_URL}/api/vouchers`;
 
-    const res = await fetch(url, {
-      method,
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
+      const method = isEditMode ? "PUT" : "POST";
 
-    const data = await res.json();
-
-    if (res.ok) {
-      Swal.fire("Success", data.message, "success").then(() => {
-        navigate("/app/vouchers");
+      const res = await fetch(url, {
+        method,
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
       });
-    } else {
-      Swal.fire("Error", data.message, "error");
+
+      const data = await res.json();
+
+      if (res.ok) {
+        Swal.fire("Success", data.message, "success").then(() => {
+          navigate("/app/vouchers");
+        });
+      } else {
+        Swal.fire("Error", data.message, "error");
+      }
+    } catch (error) {
+      console.error("Submission error:", error);
+      Swal.fire("Error", "Something went wrong", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -441,13 +452,13 @@ const JournalVoucher: React.FC = () => {
           <button
             title="Save Voucher"
             onClick={handleSubmit}
+            disabled={isSubmitting || !isBalanced}
             className={`p-2 rounded-md ${theme === "dark"
               ? "bg-blue-600 hover:bg-blue-700"
               : "bg-blue-500 hover:bg-blue-600"
-              } text-white flex items-center`}
-            disabled={!isBalanced}
+              } text-white flex items-center ${isSubmitting || !isBalanced ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            <Save size={18} className="mr-2" /> Save
+            <Save size={18} className="mr-2" /> {isSubmitting ? "Saving..." : "Save"}
           </button>
           <button
             title="Print Voucher"

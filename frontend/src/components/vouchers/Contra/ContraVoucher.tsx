@@ -19,6 +19,7 @@ const ContraVoucher: React.FC = () => {
   console.log("id", id);
   const [ledgers] = useState<Ledger[]>([]);
   const [cashBankLedgers, setCashBankLedgers] = useState<Ledgers[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const { activeCompanyId } = useCompany();
   const companyId = activeCompanyId ?? localStorage.getItem("company_id");
   const ownerType = localStorage.getItem("supplier");
@@ -252,12 +253,10 @@ const ContraVoucher: React.FC = () => {
     async (e: React.FormEvent) => {
       if (e && e.preventDefault) e.preventDefault();
 
-      // if (!validateForm()) {
-      //   Swal.fire('Validation Error', 'Please fix the errors before submitting.', 'warning');
-      //   return;
-      // }
+      if (isSubmitting) return;
 
       try {
+        setIsSubmitting(true);
         const payload = {
           ...formData,
           companyId: companyId,
@@ -295,9 +294,11 @@ const ContraVoucher: React.FC = () => {
       } catch (error) {
         console.error("Error:", error);
         Swal.fire("Network Error", "Failed to connect to the server.", "error");
+      } finally {
+        setIsSubmitting(false);
       }
     },
-    [formData, navigate, isEditMode, id, companyId, ownerType, ownerId]
+    [formData, navigate, isEditMode, id, companyId, ownerType, ownerId, isSubmitting]
   );
 
   const handlePrint = useCallback(() => {
@@ -461,13 +462,13 @@ const ContraVoucher: React.FC = () => {
           <button
             title="Save Voucher"
             onClick={handleSubmit}
+            disabled={isSubmitting || !isBalanced}
             className={`p-2 rounded-md ${theme === "dark"
               ? "bg-blue-600 hover:bg-blue-700"
               : "bg-blue-500 hover:bg-blue-600"
-              } text-white flex items-center`}
-            disabled={!isBalanced}
+              } text-white flex items-center ${isSubmitting || !isBalanced ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            <Save size={18} className="mr-2" /> Save
+            <Save size={18} className="mr-2" /> {isSubmitting ? "Saving..." : "Save"}
           </button>
           <button
             title="Print Voucher"
