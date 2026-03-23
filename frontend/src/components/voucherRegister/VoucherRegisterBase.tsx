@@ -57,6 +57,19 @@ const getVoucherStatus = (voucher: VoucherEntry): string => {
   return "pending";
 };
 
+const getStatusColor = (status: string): string => {
+  switch (status) {
+    case "approved":
+      return "bg-green-100 text-green-800";
+    case "pending":
+      return "bg-yellow-100 text-yellow-800";
+    case "draft":
+      return "bg-gray-100 text-gray-800";
+    default:
+      return "bg-gray-100 text-gray-800";
+  }
+};
+
 const formatCurrency = (amount: number): string => {
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
@@ -121,13 +134,19 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   const getLedgerName = (ledgerId?: number | string) => {
     if (!ledgerId) return "Unknown Ledger (-)";
 
-    const ledger = ledgers?.find((l: any) => String(l.id) === String(ledgerId));
+    // Try finding in locally fetched ledgerList first (most up-to-date)
+    let ledger = ledgerList?.find((l: any) => String(l.id) === String(ledgerId));
+
+    // Fallback to context ledgers
+    if (!ledger) {
+      ledger = ledgers?.find((l: any) => String(l.id) === String(ledgerId));
+    }
 
     return ledger ? ledger.name : `Unknown Ledger (${ledgerId})`;
   };
   const getParticulars = (voucher: VoucherEntry): string => {
     return voucher.entries
-      .map((entry) => getLedgerName(entry.ledgerId ?? entry.ledgerId))
+      .map((entry: any) => getLedgerName(entry.ledgerId ?? entry.ledger_id))
       .join(", ");
   };
 
@@ -1388,24 +1407,49 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Voucher No
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Party
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Supplier Invoice Date
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Reference No
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Subtotal
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  GST Total
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Total
-                </th>
+                {["receipt", "contra", "journal"].includes(voucherType) ? (
+                  <>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Voucher Type
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Voucher Supplier Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Particulars
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Debit Amount
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Credit Amount
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                  </>
+                ) : (
+                  <>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Party
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Supplier Invoice Date
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Reference No
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Subtotal
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      GST Total
+                    </th>
+                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total
+                    </th>
+                  </>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Actions
                 </th>
@@ -1446,44 +1490,87 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       {voucher.number ?? "-"}
                     </td>
 
-                    {/* Party */}
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {voucherType === "debit_note"
-                        ? getLedgerNameById(
-                          voucher.entries.find((e) => e.type === "credit")
-                            ?.ledgerId
-                        )
-                        : voucherType === "sales"
-                          ? getLedgerNameById(debitEntry?.ledgerId)
-                          : getLedgerNameById(creditEntry?.ledgerId)}
-                    </td>
+                    {["receipt", "contra", "journal"].includes(voucherType) ? (
+                      <>
+                        {/* Voucher Type */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {voucher.type?.toUpperCase() ?? "-"}
+                        </td>
+                        {/* Voucher Supplier Date */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {voucher.supplierInvoiceDate
+                            ? formatDate(voucher.supplierInvoiceDate)
+                            : "-"}
+                        </td>
+                        {/* Particulars */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {getParticulars(voucher)}
+                        </td>
+                        {/* Debit Amount */}
+                        <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                          {calculateDebitCredit(voucher).debit > 0
+                            ? calculateDebitCredit(voucher).debit.toLocaleString()
+                            : "-"}
+                        </td>
+                        {/* Credit Amount */}
+                        <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                          {calculateDebitCredit(voucher).credit > 0
+                            ? calculateDebitCredit(voucher).credit.toLocaleString()
+                            : "-"}
+                        </td>
+                        {/* Status */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusColor(
+                              getVoucherStatus(voucher)
+                            )}`}
+                          >
+                            {getVoucherStatus(voucher)}
+                          </span>
+                        </td>
+                      </>
+                    ) : (
+                      <>
+                        {/* Party */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {voucherType === "debit_note"
+                            ? getLedgerNameById(
+                                voucher.entries.find((e) => e.type === "credit")
+                                  ?.ledgerId
+                              )
+                            : voucherType === "sales"
+                            ? getLedgerNameById(debitEntry?.ledgerId)
+                            : getLedgerNameById(creditEntry?.ledgerId)}
+                        </td>
 
-                    {/* Supplier Invoice Date */}
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {voucher.supplierInvoiceDate
-                        ? formatDate(voucher.supplierInvoiceDate)
-                        : "-"}
-                    </td>
+                        {/* Supplier Invoice Date */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {voucher.supplierInvoiceDate
+                            ? formatDate(voucher.supplierInvoiceDate)
+                            : "-"}
+                        </td>
 
-                    {/* Reference No */}
-                    <td className="px-6 py-4 text-sm text-gray-500">
-                      {voucher.referenceNo ?? "-"}
-                    </td>
+                        {/* Reference No */}
+                        <td className="px-6 py-4 text-sm text-gray-500">
+                          {voucher.referenceNo ?? "-"}
+                        </td>
 
-                    {/* Subtotal */}
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {subtotal.toLocaleString()}
-                    </td>
+                        {/* Subtotal */}
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {subtotal.toLocaleString()}
+                        </td>
 
-                    {/* GST Total */}
-                    <td className="px-6 py-4 text-sm text-gray-900">
-                      {(cgst + sgst + igst).toLocaleString()}
-                    </td>
+                        {/* GST Total */}
+                        <td className="px-6 py-4 text-sm text-gray-900">
+                          {(cgst + sgst + igst).toLocaleString()}
+                        </td>
 
-                    {/* Total */}
-                    <td className="px-6 py-4 text-sm text-gray-900 font-bold">
-                      {total.toLocaleString()}
-                    </td>
+                        {/* Total */}
+                        <td className="px-6 py-4 text-sm text-gray-900 font-bold">
+                          {total.toLocaleString()}
+                        </td>
+                      </>
+                    )}
 
                     <td className="px-6 py-4 text-sm font-medium space-x-3">
                       {onView && (
@@ -1522,7 +1609,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             <tfoot className="bg-gray-100">
               <tr>
                 <td
-                  colSpan={4}
+                  colSpan={["receipt", "contra", "journal"].includes(voucherType) ? 5 : 4}
                   className="px-6 py-4 text-sm font-semibold text-gray-900"
                 >
                   Total ({filteredVouchers.length} vouchers)
