@@ -1926,6 +1926,7 @@ const SalesVoucher: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
     setIsReadyToSave(false); // Stop draft saving immediately when starting submission
 
     const { isValid, messages } = validateForm();
@@ -2108,14 +2109,24 @@ const SalesVoucher: React.FC = () => {
         }
       );
 
+      // ✅ CLEAR DRAFT ON SUCCESS
       if (!isEditMode) {
         localStorage.removeItem(DRAFT_KEY);
       }
-      Swal.fire("Success", "Voucher saved successfully!", "success");
-      navigate("/app/vouchers");
+
+      // ✅ SUCCESS ALERT
+      Swal.fire({
+        icon: "success",
+        title: "Success",
+        text: isEditMode ? "Voucher updated successfully" : "Voucher saved successfully",
+      }).then(() => {
+        navigate("/app/vouchers");
+      });
+
     } catch (err) {
-      console.error("Save error:", err);
-      Swal.fire("Error", "Server or network error", "error");
+      console.error("Submit error:", err);
+      Swal.fire("Error", "Network or server issue", "error");
+    } finally {
       setIsSaving(false);
     }
   };

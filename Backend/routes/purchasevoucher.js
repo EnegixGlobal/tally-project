@@ -143,53 +143,26 @@ router.get("/items", async (req, res) => {
 // next voucher count
 router.get("/next-number", async (req, res) => {
   try {
-    const { company_id, owner_type, owner_id, voucherType, date } = req.query;
-    console.log("hit hua baba");
+    const { company_id, owner_type, owner_id, date } = req.query;
 
-    if (!company_id || !owner_type || !owner_id) {
-      return res.status(400).json({ success: false });
+    if (!company_id || !owner_type || !owner_id || !date) {
+      return res.status(400).json({ success: false, message: "Missing required params" });
     }
 
-    const fy = getFinancialYear(date);
-
-    // 🔥 LAST VOUCHER FETCH
-    const [rows] = await db.execute(
-      `SELECT number FROM purchase_vouchers
-       WHERE company_id=? AND owner_type=? AND owner_id=?
-         AND number LIKE ?
-       ORDER BY id DESC
-       LIMIT 1`,
-      [
-        company_id,
-        owner_type,
-        owner_id,
-        `${voucherType}/${fy}/%`
-      ]
-    );
-
-    let nextNo = 1;
-
-    if (rows.length > 0) {
-      const lastNumber = rows[0].number; // PRV/25-26/000001
-      const lastSeq = Number(lastNumber.split("/").pop());
-      nextNo = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
-    }
-
-    const voucherNumber =
-      `${voucherType}/${fy}/${String(nextNo).padStart(6, "0")}`;
-
-    console.log("voucherNumber:", voucherNumber);
-
-    // ✅ Create TDS columns if they don't exist
-    await ensureTDSColumns();
-    await ensureDiscountLedgerColumn();
+    const voucherNumber = await generateVoucherNumber({
+      companyId: company_id,
+      ownerType: owner_type,
+      ownerId: owner_id,
+      voucherType: 'purchase',
+      date
+    });
 
     return res.json({
       success: true,
       voucherNumber
     });
-  } catch (err) {
-    console.error(err);
+  } catch (e) {
+    console.error(e);
     res.status(500).json({ success: false });
   }
 });
@@ -483,46 +456,26 @@ router.post("/", async (req, res) => {
 
     // ================= INSERT VOUCHER =================
 
-    const insertVoucherSql = `
+    const insertSql = `
       INSERT INTO purchase_vouchers (
-        number,
-        date,
-        supplierInvoiceDate,
-        narration,
-        partyId,
-        referenceNo,
-        dispatchDocNo,
-        dispatchThrough,
-        destination,
-        purchaseLedgerId,
-        subtotal,
-        cgstTotal,
-        sgstTotal,
-        igstTotal,
-        discountTotal,
-        tdsTotal,
-        total,
-        company_id,
-        owner_type,
-        owner_id,
-        mode
+        number, date, supplierInvoiceDate, narration, partyId, referenceNo, 
+        dispatchDocNo, dispatchThrough, destination, purchaseLedgerId, 
+        subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, tdsTotal, 
+        total, company_id, owner_type, owner_id, mode
       ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `;
 
-    const insertVoucherValues = [
+    const [voucherResult] = await db.execute(insertSql, [
       voucherNumber,
       date || null,
       supplierInvoiceDate || null,
       narration || null,
       partyId || null,
       referenceNo || null,
-
       dispatchDocNo || null,
       dispatchThrough || null,
       destination || null,
-
       purchaseLedgerId || null,
-
       subtotal || 0,
       finalCgst,
       finalSgst,
@@ -530,17 +483,11 @@ router.post("/", async (req, res) => {
       discountTotal || 0,
       tdsTotal || 0,
       finalTotal,
-
       finalCompanyId,
       finalOwnerType,
       finalOwnerId,
-      mode || "item-invoice"
-    ];
-
-    const [voucherResult] = await db.execute(
-      insertVoucherSql,
-      insertVoucherValues
-    );
+      mode || "item-invoice",
+    ]);
 
     const voucherId = voucherResult.insertId;
 
@@ -784,48 +731,96 @@ router.get("/month-wise", async (req, res) => {
 
 router.delete("/:id", async (req, res) => {
   const id = parseInt(req.params.id);
-  console.log('this is id', id)
+  const conn = await db.getConnection();
+
   try {
-    // 1️⃣ voucher number nikaalo
-    const [rows] = await db.execute(
-      "SELECT number FROM purchase_vouchers WHERE id = ?",
+    await conn.beginTransaction();
+
+    // 1️⃣ Get voucher details before deletion
+    const [rows] = await conn.execute(
+      "SELECT number, company_id, owner_type, owner_id FROM purchase_vouchers WHERE id = ?",
       [id]
     );
 
     if (rows.length === 0) {
+      await conn.rollback();
       return res.status(404).json({
         success: false,
         message: "Voucher not found",
       });
     }
 
-    const voucherNumber = rows[0].number;
+    const { number: deletedNumber, company_id, owner_type, owner_id } = rows[0];
 
-    // 2️⃣ child tables delete
-    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
-    await db.execute("DELETE FROM purchase_voucher_items WHERE voucherId = ?", [
-      id,
-    ]);
+    // Extract prefix, FY, and sequence: PRV/25-26/000002 -> ["PRV", "25-26", "000002"]
+    const parts = deletedNumber.split("/");
+    if (parts.length < 3) {
+      // If number format is unexpected, just do a normal delete
+      await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
+      await conn.execute("DELETE FROM purchase_voucher_items WHERE voucherId = ?", [id]);
+      await conn.execute("DELETE FROM purchase_history WHERE voucherNumber = ?", [deletedNumber]);
+      await conn.execute("DELETE FROM purchase_vouchers WHERE id = ?", [id]);
+      await conn.commit();
+      return res.json({ success: true, message: "Voucher deleted (no renumbering due to format)" });
+    }
 
-    // 3️⃣ purchase history delete
-    await db.execute("DELETE FROM purchase_history WHERE voucherNumber = ?", [
-      voucherNumber,
-    ]);
+    const prefix = parts[0];
+    const fy = parts[1];
+    const deletedSeq = parseInt(parts[2]);
 
-    // 4️⃣ main voucher delete
-    await db.execute("DELETE FROM purchase_vouchers WHERE id = ?", [id]);
+    // 2️⃣ Delete voucher and related entries
+    await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
+    await conn.execute("DELETE FROM purchase_voucher_items WHERE voucherId = ?", [id]);
+    await conn.execute("DELETE FROM purchase_history WHERE voucherNumber = ?", [deletedNumber]);
+    await conn.execute("DELETE FROM purchase_vouchers WHERE id = ?", [id]);
 
-    // ✅ IMPORTANT RESPONSE
+    // 3️⃣ Find subsequent vouchers to renumber
+    // We look for numbers like "PRV/25-26/%"
+    const [subsequentVouchers] = await conn.execute(
+      `SELECT id, number FROM purchase_vouchers 
+       WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
+       AND number LIKE ? 
+       ORDER BY id ASC`,
+      [company_id, owner_type, owner_id, `${prefix}/${fy}/%`]
+    );
+
+    for (const voucher of subsequentVouchers) {
+      const vParts = voucher.number.split("/");
+      if (vParts.length === 3) {
+        const vSeq = parseInt(vParts[2]);
+        if (vSeq > deletedSeq) {
+          const newSeq = vSeq - 1;
+          const newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
+
+          // Update main table
+          await conn.execute(
+            "UPDATE purchase_vouchers SET number = ? WHERE id = ?",
+            [newNumber, voucher.id]
+          );
+
+          // Update history table
+          await conn.execute(
+            "UPDATE purchase_history SET voucherNumber = ? WHERE voucherNumber = ? AND companyId = ?",
+            [newNumber, voucher.number, company_id]
+          );
+        }
+      }
+    }
+
+    await conn.commit();
     return res.json({
       success: true,
-      message: "Purchase voucher deleted successfully",
+      message: "Purchase voucher deleted and subsequent vouchers renumbered successfully",
     });
   } catch (err) {
+    await conn.rollback();
     console.error("Delete error:", err);
     return res.status(500).json({
       success: false,
-      message: "Failed to delete voucher",
+      message: "Failed to delete and renumber vouchers",
     });
+  } finally {
+    conn.release();
   }
 });
 

@@ -249,6 +249,7 @@ const PurchaseVoucher: React.FC = () => {
   // Barcode State
   const [barcodeInput, setBarcodeInput] = useState("");
   const [isBarcodeError, setIsBarcodeError] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Helper to find stock item details
   const resolveStockItemDetails = (itemId: string) => {
@@ -1558,7 +1559,7 @@ const PurchaseVoucher: React.FC = () => {
         newErrors.supplierInvoiceDate = "Supplier Invoice date is required";
     }
 
-      if (formData.mode === "item-invoice") {
+    if (formData.mode === "item-invoice") {
       formData.entries.forEach((entry, index) => {
         if (!entry.itemId)
           newErrors[`entry${index}.itemId`] = "Item is required";
@@ -1576,7 +1577,7 @@ const PurchaseVoucher: React.FC = () => {
           }
         }
       });
-      } else {
+    } else {
       formData.entries.forEach((entry, index) => {
         if (!entry.ledgerId)
           newErrors[`entry${index}.ledgerId`] = "Ledger is required";
@@ -1757,6 +1758,8 @@ const PurchaseVoucher: React.FC = () => {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     setIsReadyToSave(false); // Stop draft saving immediately when starting submission
 
     if (isDuplicateVoucher) {
@@ -1778,6 +1781,7 @@ const PurchaseVoucher: React.FC = () => {
     }
 
     try {
+      setIsSubmitting(true);
       const totals = calculateTotals();
 
       // Extract partyId from first ledger entry when in accounting mode
@@ -1933,7 +1937,6 @@ const PurchaseVoucher: React.FC = () => {
           }
         );
       }
-
       if (!isEditMode) {
         localStorage.removeItem(DRAFT_KEY);
       }
@@ -1950,6 +1953,8 @@ const PurchaseVoucher: React.FC = () => {
     } catch (err) {
       console.error("Submit error:", err);
       Swal.fire("Error", "Network or server issue", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -2609,7 +2614,7 @@ const PurchaseVoucher: React.FC = () => {
                   className={getSelectClasses(theme)}
                 >
                   <option value="item-invoice">Item Invoice</option>
-                    <option value="accounting-invoice">Accounting Invoice</option>
+                  <option value="accounting-invoice">Accounting Invoice</option>
                 </select>
               </div>
 
@@ -3637,13 +3642,14 @@ const PurchaseVoucher: React.FC = () => {
             <button
               title="Save Voucher (F9)"
               type="submit"
+              disabled={isSubmitting}
               className={`flex items-center px-4 py-2 rounded ${theme === "dark"
                 ? "bg-blue-600 hover:bg-blue-700"
                 : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
+                } ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
             >
               <Save size={18} className="mr-1" />
-              Save
+              {isSubmitting ? "Saving..." : "Save"}
             </button>
           </div>
         </form>

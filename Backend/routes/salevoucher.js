@@ -1,6 +1,8 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // Make sure db is using mysql2.promise()
+const { generateVoucherNumber } = require("../utils/generateVoucherNumber");
+const { getFinancialYear } = require("../utils/financialYear");
 
 // GET Ledgers
 router.get("/ledgers", async (req, res) => {
@@ -341,9 +343,24 @@ router.post("/", async (req, res) => {
       mode || 'item-invoice'
     ];
 
+    // ================= GENERATE NUMBER =================
+    let finalNumber = number;
+    if (!finalNumber) {
+      finalNumber = await generateVoucherNumber({
+        companyId,
+        ownerType,
+        ownerId,
+        voucherType: "sales",
+        date,
+      });
+    }
+
     const [voucherResult] = await db.execute(
       insertVoucherSQL,
-      voucherValues
+      [
+        finalNumber,
+        ...voucherValues.slice(1)
+      ]
     );
 
     const voucherId = voucherResult.insertId;
@@ -573,6 +590,33 @@ router.get("/sale-history", async (req, res) => {
 
 
 
+// get next number
+router.get("/next-number", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id, date } = req.query;
+
+    if (!company_id || !owner_type || !owner_id || !date) {
+      return res.status(400).json({ success: false, message: "Missing required params" });
+    }
+
+    const voucherNumber = await generateVoucherNumber({
+      companyId: company_id,
+      ownerType: owner_type,
+      ownerId: owner_id,
+      voucherType: 'sales',
+      date
+    });
+
+    return res.json({
+      success: true,
+      voucherNumber
+    });
+  } catch (e) {
+    console.error(e);
+    res.status(500).json({ success: false });
+  }
+});
+
 // get sales vouchers
 router.get("/", async (req, res) => {
   const { owner_type, owner_id, company_id, isQuotation } = req.query;
@@ -623,43 +667,88 @@ router.get("/", async (req, res) => {
 //delete
 router.delete("/:id", async (req, res) => {
   const voucherId = req.params.id;
+  const conn = await db.getConnection();
 
   try {
-    // 1️⃣ voucher number nikaalo
-    const [[row]] = await db.execute(
-      "SELECT number FROM sales_vouchers WHERE id = ?",
+    await conn.beginTransaction();
+
+    // 1️⃣ Get voucher details before deletion
+    const [rows] = await conn.execute(
+      "SELECT number, company_id, owner_type, owner_id FROM sales_vouchers WHERE id = ?",
       [voucherId]
     );
 
-    if (!row) {
+    if (rows.length === 0) {
+      await conn.rollback();
       return res.status(404).json({ message: "Voucher not found" });
     }
 
-    const voucherNumber = row.number;
+    const { number: deletedNumber, company_id, owner_type, owner_id } = rows[0];
 
-    // 2️⃣ sales_history se delete (✨ यही extra line है)
-    await db.execute("DELETE FROM sale_history WHERE voucherNumber = ?", [
-      voucherNumber,
-    ]);
+    // Extract prefix, FY, and sequence: SRV/25-26/000002 -> ["SRV", "25-26", "000002"]
+    const parts = deletedNumber.split("/");
+    if (parts.length < 3) {
+      // Normal delete if format is unexpected
+      await conn.execute("DELETE FROM sale_history WHERE voucherNumber = ?", [deletedNumber]);
+      await conn.execute("DELETE FROM sales_voucher_items WHERE voucherId = ?", [voucherId]);
+      await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [voucherId]);
+      await conn.execute("DELETE FROM sales_vouchers WHERE id = ?", [voucherId]);
+      await conn.commit();
+      return res.json({ message: "Sales voucher deleted successfully" });
+    }
 
-    // 3️⃣ voucher related tables
-    await db.execute("DELETE FROM sales_voucher_items WHERE voucherId = ?", [
-      voucherId,
-    ]);
+    const prefix = parts[0];
+    const fy = parts[1];
+    const deletedSeq = parseInt(parts[2]);
 
-    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [
-      voucherId,
-    ]);
+    // 2️⃣ Delete current voucher and related data
+    await conn.execute("DELETE FROM sale_history WHERE voucherNumber = ?", [deletedNumber]);
+    await conn.execute("DELETE FROM sales_voucher_items WHERE voucherId = ?", [voucherId]);
+    await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [voucherId]);
+    await conn.execute("DELETE FROM sales_vouchers WHERE id = ?", [voucherId]);
 
-    // 4️⃣ main voucher delete
-    await db.execute("DELETE FROM sales_vouchers WHERE id = ?", [voucherId]);
+    // 3️⃣ Renumber subsequent vouchers
+    const [subsequentVouchers] = await conn.execute(
+      `SELECT id, number FROM sales_vouchers 
+       WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
+       AND number LIKE ? 
+       ORDER BY id ASC`,
+      [company_id, owner_type, owner_id, `${prefix}/${fy}/%`]
+    );
 
+    for (const voucher of subsequentVouchers) {
+      const vParts = voucher.number.split("/");
+      if (vParts.length === 3) {
+        const vSeq = parseInt(vParts[2]);
+        if (vSeq > deletedSeq) {
+          const newSeq = vSeq - 1;
+          const newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
+
+          // Update main voucher
+          await conn.execute(
+            "UPDATE sales_vouchers SET number = ? WHERE id = ?",
+            [newNumber, voucher.id]
+          );
+
+          // Update history table
+          await conn.execute(
+            "UPDATE sale_history SET voucherNumber = ? WHERE voucherNumber = ? AND companyId = ?",
+            [newNumber, voucher.number, company_id]
+          );
+        }
+      }
+    }
+
+    await conn.commit();
     return res.json({
-      message: "Sales voucher deleted successfully",
+      message: "Sales voucher deleted and subsequent vouchers renumbered successfully",
     });
   } catch (err) {
+    await conn.rollback();
     console.error("Delete failed:", err);
     return res.status(500).json({ message: err.message });
+  } finally {
+    conn.release();
   }
 });
 

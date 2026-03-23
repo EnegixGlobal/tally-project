@@ -2,129 +2,76 @@ const db = require("../db");
 const { getFinancialYear } = require("./financialYear");
 
 /**
- * 🔹 Ensure voucher_sequences table exists (runtime safe)
+ * 🔹 Voucher type → { Prefix, Table, Column } mapping
  */
-async function ensureVoucherSequenceTable(conn) {
-  await conn.execute(`
-    CREATE TABLE IF NOT EXISTS voucher_sequences (
-      id BIGINT AUTO_INCREMENT PRIMARY KEY,
-
-      company_id BIGINT NOT NULL,
-      owner_type VARCHAR(50) NOT NULL,
-      owner_id BIGINT NOT NULL,
-
-      voucher_type VARCHAR(50) NOT NULL,
-      financial_year VARCHAR(9) NOT NULL,
-      month TINYINT NOT NULL,
-
-      current_no INT NOT NULL DEFAULT 0,
-
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-      updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-        ON UPDATE CURRENT_TIMESTAMP,
-
-      UNIQUE KEY uq_voucher_seq (
-        company_id,
-        owner_type,
-        owner_id,
-        voucher_type,
-        financial_year,
-        month
-      )
-    )
-  `);
-}
-
-/**
- * 🔹 Voucher type → Prefix mapping
- * 👉 Add new voucher types HERE only
- */
-const PREFIX_MAP = {
-  payment: "PV",
-  purchase: "PRV",
-  sales: "SLV",
-  receipt: "RV",
-  contra: "CV",
-  journal: "JV",
-  bank: "BV",
+const CONFIG_MAP = {
+  payment: { prefix: "PV", table: "voucher_main", column: "voucher_number", typeCol: "voucher_type" },
+  receipt: { prefix: "RV", table: "voucher_main", column: "voucher_number", typeCol: "voucher_type" },
+  contra: { prefix: "CV", table: "voucher_main", column: "voucher_number", typeCol: "voucher_type" },
+  journal: { prefix: "JV", table: "voucher_main", column: "voucher_number", typeCol: "voucher_type" },
+  purchase: { prefix: "PRV", table: "purchase_vouchers", column: "number" },
+  sales: { prefix: "SLV", table: "sales_vouchers", column: "number" },
+  purchase_order: { prefix: "PO", table: "purchase_orders", column: "number" },
+  sales_order: { prefix: "SO", table: "sales_orders", column: "number" },
+  bank: { prefix: "BV", table: "voucher_main", column: "voucher_number", typeCol: "voucher_type" },
 };
 
 /**
  * 🔹 Generate voucher number (Tally-style)
- *
- * Format:
- *   PV/25-26/01/000001
+ * Always picks the next available number based on existing data.
  */
 async function generateVoucherNumber({
   companyId,
   ownerType,
   ownerId,
-  voucherType, // logical type: payment / purchase / sales
+  voucherType, // e.g. payment, purchase, sales_order
   date,
 }) {
-  const conn = await db.getConnection();
+  const config = CONFIG_MAP[voucherType];
+  if (!config) {
+    throw new Error(`Unsupported voucher type: ${voucherType}`);
+  }
+
+  const { prefix, table, column, typeCol } = config;
+  const fy = getFinancialYear(date);
+
+  // We look for numbers starting with "PREFIX/FY/"
+  const searchPattern = `${prefix}/${fy}/%`;
+
+  let sql = `
+    SELECT ${column} as lastNumber
+    FROM ${table}
+    WHERE company_id = ? AND owner_type = ? AND owner_id = ?
+    AND ${column} LIKE ?
+  `;
+
+  const params = [companyId, ownerType, ownerId, searchPattern];
+
+  // For voucher_main, we must also filter by voucher_type
+  if (typeCol) {
+    sql += ` AND ${typeCol} = ?`;
+    params.push(voucherType);
+  }
+
+  sql += ` ORDER BY id DESC LIMIT 1`;
 
   try {
-    await conn.beginTransaction();
-
-    // 1️⃣ Ensure table exists
-    await ensureVoucherSequenceTable(conn);
-
-    // 2️⃣ Resolve prefix (fallback safe)
-    const prefix = PREFIX_MAP[voucherType] || voucherType.toUpperCase();
-
-    // 3️⃣ Financial year
-    const fy = getFinancialYear(date); // e.g. 25-26
-
-    // 4️⃣ Lock sequence row (race-condition safe)
-    // Using month=0 for yearly sequence
-    const [rows] = await conn.execute(
-      `
-      SELECT id, current_no
-      FROM voucher_sequences
-      WHERE company_id = ?
-        AND owner_type = ?
-        AND owner_id = ?
-        AND voucher_type = ?
-        AND financial_year = ?
-        AND month = 0
-      FOR UPDATE
-      `,
-      [companyId, ownerType, ownerId, voucherType, fy]
-    );
+    const [rows] = await db.execute(sql, params);
 
     let nextNo = 1;
-
-    if (rows.length === 0) {
-      // 5️⃣ First voucher for this FY/type
-      await conn.execute(
-        `
-        INSERT INTO voucher_sequences
-        (company_id, owner_type, owner_id,
-         voucher_type, financial_year, month, current_no)
-        VALUES (?, ?, ?, ?, ?, 0, 1)
-        `,
-        [companyId, ownerType, ownerId, voucherType, fy]
-      );
-    } else {
-      // 6️⃣ Increment counter
-      nextNo = rows[0].current_no + 1;
-      await conn.execute(
-        `UPDATE voucher_sequences SET current_no = ? WHERE id = ?`,
-        [nextNo, rows[0].id]
-      );
+    if (rows.length > 0) {
+      const lastNumber = rows[0].lastNumber;
+      if (lastNumber) {
+        const parts = lastNumber.split("/");
+        const lastSeq = parseInt(parts[parts.length - 1]);
+        nextNo = (isNaN(lastSeq) ? 0 : lastSeq) + 1;
+      }
     }
 
-    // 7️⃣ Final voucher number
-    const voucherNumber = `${prefix}/${fy}/${String(nextNo).padStart(6, "0")}`;
-
-    await conn.commit();
-    return voucherNumber;
+    return `${prefix}/${fy}/${String(nextNo).padStart(6, "0")}`;
   } catch (err) {
-    await conn.rollback();
+    console.error("Error generating voucher number:", err);
     throw err;
-  } finally {
-    conn.release();
   }
 }
 

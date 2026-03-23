@@ -6,16 +6,16 @@ const ContactPage: React.FC = () => {
   return (
     <div className="min-h-screen bg-white">
       <Navigation />
-      
+
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-12">
           <h1 className="text-4xl font-bold text-gray-900 mb-4">Contact Sales</h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Ready to transform your business with ApnaBook? Get in touch with our sales team 
+            Ready to transform your business with ApnaBook? Get in touch with our sales team
             to discuss your needs and find the perfect solution.
           </p>
         </div>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Contact Form */}
           <div className="bg-white rounded-lg shadow-lg p-8">
@@ -45,7 +45,7 @@ const ContactPage: React.FC = () => {
                   />
                 </div>
               </div>
-              
+
               <div>
                 <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                   Email Address *
@@ -57,7 +57,7 @@ const ContactPage: React.FC = () => {
                   required
                 />
               </div>
-              
+
               <div>
                 <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
                   Phone Number
@@ -68,7 +68,7 @@ const ContactPage: React.FC = () => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-[#6D30D4] focus:border-transparent"
                 />
               </div>
-              
+
               <div>
                 <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-2">
                   Company Name *
@@ -80,7 +80,7 @@ const ContactPage: React.FC = () => {
                   required
                 />
               </div>
-              
+
               <div>
                 <label htmlFor="employees" className="block text-sm font-medium text-gray-700 mb-2">
                   Number of Employees
@@ -97,7 +97,7 @@ const ContactPage: React.FC = () => {
                   <option value="1000+">1000+</option>
                 </select>
               </div>
-              
+
               <div>
                 <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
                   Tell us about your needs
@@ -109,7 +109,7 @@ const ContactPage: React.FC = () => {
                   placeholder="Describe your current accounting challenges and what you're looking for..."
                 ></textarea>
               </div>
-              
+
               <button
                 type="submit"
                 className="w-full bg-[#6922DF] text-white py-3 px-6 rounded-lg font-semibold hover:bg-[#5a1cbf] transition duration-150 ease-in-out"
@@ -118,7 +118,7 @@ const ContactPage: React.FC = () => {
               </button>
             </form>
           </div>
-          
+
           {/* Contact Information */}
           <div className="space-y-8">
             <div className="bg-gradient-to-br from-[#6D30D4] to-[#9D78DB] rounded-lg p-8 text-white">
@@ -146,31 +146,39 @@ const ContactPage: React.FC = () => {
                 </li>
               </ul>
             </div>
-            
+
             <div className="bg-gray-50 rounded-lg p-8">
-              <h3 className="text-2xl font-bold text-gray-900 mb-6">Get in Touch</h3>
-              <div className="space-y-4">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">
+                Contact Details
+              </h3>
+
+              <div className="space-y-5">
+
                 <div>
-                  <h4 className="font-semibold text-gray-900">Sales Team</h4>
-                  <p className="text-gray-600">sales@apnabook.com</p>
-                  <p className="text-gray-600">+91-80-1234-5678</p>
+                  <h4 className="font-semibold text-gray-900">Name</h4>
+                  <p className="text-gray-600">Komal Dhaka</p>
                 </div>
+
+              
                 <div>
-                  <h4 className="font-semibold text-gray-900">Support Team</h4>
-                  <p className="text-gray-600">support@apnabook.com</p>
-                  <p className="text-gray-600">+91-80-1234-5679</p>
+                  <h4 className="font-semibold text-gray-900">Phone</h4>
+                  <p className="text-gray-600">+91 7678438320</p>
                 </div>
+
+          
                 <div>
-                  <h4 className="font-semibold text-gray-900">Office</h4>
+                  <h4 className="font-semibold text-gray-900">Address</h4>
                   <p className="text-gray-600">
-                    ApnaBook Technologies Pvt. Ltd.<br />
-                    123 Business Park<br />
-                    Bangalore, Karnataka 560001
+                    Allen Institute, 9th Cross,<br />
+                    Near S2 Homes, Sompura Gate B,<br />
+                    Hoshali, Bengaluru,<br />
+                    Karnataka - 562125
                   </p>
                 </div>
+
               </div>
             </div>
-            
+
             <div className="bg-[#385192] rounded-lg p-8 text-white">
               <h3 className="text-xl font-bold mb-4">Ready to Get Started?</h3>
               <p className="mb-6">
@@ -183,7 +191,7 @@ const ContactPage: React.FC = () => {
           </div>
         </div>
       </div>
-      
+
       <Footer />
     </div>
   );

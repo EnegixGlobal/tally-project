@@ -19,6 +19,7 @@ const PaymentVoucher: React.FC = () => {
   const isEditMode = !!id;
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [_originalEntries, setOriginalEntries] = useState<any[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const [cashBankLedgers, setCashBankLedgers] = useState<Ledgers[]>([]);
   const companyId = localStorage.getItem("company_id");
@@ -415,7 +416,10 @@ const PaymentVoucher: React.FC = () => {
       companyId: companyId,
     };
 
+    if (isSubmitting) return;
+
     try {
+      setIsSubmitting(true);
       const url = isEditMode
         ? `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`
         : `${import.meta.env.VITE_API_URL}/api/vouchers`;
@@ -442,6 +446,8 @@ const PaymentVoucher: React.FC = () => {
     } catch (error: any) {
       console.error("Error submitting voucher:", error);
       Swal.fire("Error", error.message || "Failed to save voucher.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -597,12 +603,13 @@ const PaymentVoucher: React.FC = () => {
           <button
             title="Save Voucher"
             onClick={handleSubmit}
+            disabled={isSubmitting}
             className={`p-2 rounded-md ${theme === "dark"
               ? "bg-blue-600 hover:bg-blue-700"
               : "bg-blue-500 hover:bg-blue-600"
-              } text-white flex items-center`}
+              } text-white flex items-center ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            <Save size={18} className="mr-2" /> Save
+            <Save size={18} className="mr-2" /> {isSubmitting ? "Saving..." : "Save"}
           </button>
           <button
             title="Print Voucher"

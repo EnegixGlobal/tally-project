@@ -20,6 +20,7 @@ const ReceiptVoucher: React.FC = () => {
 
   const [cashBankLedgers, setCashBankLedgers] = useState<Ledger[]>([]);
   const [allLedgers, setAllLedgers] = useState<Ledger[]>([]);
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { selectedFinYear } = useFinancialYear();
   const { defaultDate, minDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
@@ -437,7 +438,10 @@ const ReceiptVoucher: React.FC = () => {
       return;
     }
 
+    if (isSubmitting) return;
+
     try {
+      setIsSubmitting(true);
       const payload = {
         ...formData,
         companyId: companyId,
@@ -472,6 +476,8 @@ const ReceiptVoucher: React.FC = () => {
     } catch (error) {
       console.error("Error:", error);
       Swal.fire("Network Error", "Failed to connect to the server.", "error");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -648,13 +654,13 @@ const ReceiptVoucher: React.FC = () => {
           <button
             title="Save Voucher"
             onClick={handleSubmit}
+            disabled={isSubmitting || !isBalanced}
             className={`p-2 rounded-md ${theme === "dark"
               ? "bg-blue-600 hover:bg-blue-700"
               : "bg-blue-500 hover:bg-blue-600"
-              } text-white flex items-center`}
-            disabled={!isBalanced}
+              } text-white flex items-center ${isSubmitting || !isBalanced ? "opacity-50 cursor-not-allowed" : ""}`}
           >
-            <Save size={18} className="mr-2" /> Save
+            <Save size={18} className="mr-2" /> {isSubmitting ? "Saving..." : "Save"}
           </button>
           <button
             title="Print Voucher"

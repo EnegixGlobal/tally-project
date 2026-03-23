@@ -163,8 +163,7 @@ const PaymentRegister: React.FC = () => {
     const fetchLedgers = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
@@ -280,14 +279,13 @@ const PaymentRegister: React.FC = () => {
     }
 
     fetch(
-      `${
-        import.meta.env.VITE_API_URL
+      `${import.meta.env.VITE_API_URL
       }/api/vouchers?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`
     )
       .then((res) => res.json())
       .then((data) => {
         if (data.data) {
-         
+
           setVouchers(data.data);
         } else {
           setError("Invalid response from server");
@@ -375,8 +373,7 @@ const PaymentRegister: React.FC = () => {
     try {
       // DELETE API call
       const response = await fetch(
-        `${
-          import.meta.env.VITE_API_URL
+        `${import.meta.env.VITE_API_URL
         }/api/vouchers/${id}?ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`,
         {
           method: "DELETE",
@@ -461,9 +458,8 @@ const PaymentRegister: React.FC = () => {
     const url = window.URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = `Payment_Register_${
-      new Date().toISOString().split("T")[0]
-    }.csv`;
+    a.download = `Payment_Register_${new Date().toISOString().split("T")[0]
+      }.csv`;
     a.click();
     window.URL.revokeObjectURL(url);
   };
@@ -492,14 +488,12 @@ const PaymentRegister: React.FC = () => {
           <div class="header">
             <h1>Payment Register</h1>
             <p>Generated on: ${new Date().toLocaleString()}</p>
-            <p>View Type: ${viewType}${
-      selectedMonth
-        ? ` - ${
-            getAvailableMonths().find((m) => m.value === selectedMonth)
-              ?.label || "Unknown Month"
-          }`
+            <p>View Type: ${viewType}${selectedMonth
+        ? ` - ${getAvailableMonths().find((m) => m.value === selectedMonth)
+          ?.label || "Unknown Month"
+        }`
         : ""
-    }</p>
+      }</p>
           </div>
           <table>
             <thead>
@@ -515,25 +509,23 @@ const PaymentRegister: React.FC = () => {
             </thead>
             <tbody>
               ${filteredVouchers
-                .map((voucher) => {
-                  const { debit, credit } = calculateDebitCredit(voucher);
-                  const particulars = getParticulars(voucher);
-                  return `
+        .map((voucher) => {
+          const { debit, credit } = calculateDebitCredit(voucher);
+          const particulars = getParticulars(voucher);
+          return `
                 <tr>
                   <td>${formatDate(voucher.date)}</td>
                   <td>${voucher.number}</td>
                   <td>${voucher.type.toUpperCase()}</td>
                   <td>${particulars}</td>
-                  <td class="text-right">${
-                    debit > 0 ? formatCurrency(debit) : "-"
-                  }</td>
-                  <td class="text-right">${
-                    credit > 0 ? formatCurrency(credit) : "-"
-                  }</td>
+                  <td class="text-right">${debit > 0 ? formatCurrency(debit) : "-"
+            }</td>
+                  <td class="text-right">${credit > 0 ? formatCurrency(credit) : "-"
+            }</td>
                   <td>${getVoucherStatus(voucher)}</td>
                 </tr>`;
-                })
-                .join("")}
+        })
+        .join("")}
             </tbody>
             <tfoot>
               <tr class="font-bold">
@@ -951,11 +943,10 @@ const PaymentRegister: React.FC = () => {
                       <button
                         key={page}
                         onClick={() => setCurrentPage(page)}
-                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${
-                          page === currentPage
+                        className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === currentPage
                             ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
                             : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
-                        }`}
+                          }`}
                       >
                         {page}
                       </button>
