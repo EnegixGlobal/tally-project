@@ -139,16 +139,14 @@ const BalanceSheet: React.FC = () => {
     // Liabilities are typically Credit (Negative in our Dr-based signed math)
     // Assets are typically Debit (Positive)
     const liabSum =
-      Math.abs(capitalTotal < 0 ? capitalTotal : 0) +
-      Math.abs(loanLability < 0 ? loanLability : 0) +
-      Math.abs(currentLiability < 0 ? currentLiability : 0) +
-      Math.abs(tdsPayable < 0 ? tdsPayable : 0) +
-      Math.abs(pnlGroupTotal < 0 ? pnlGroupTotal : 0);
+      (-capitalTotal) +
+      (-loanLability) +
+      (-currentLiability) +
+      (-tdsPayable);
 
     const assetSum =
-      Math.abs(fixedAssets > 0 ? fixedAssets : 0) +
-      Math.abs(CurrentAssets > 0 ? CurrentAssets : 0) +
-      Math.abs(pnlGroupTotal > 0 ? pnlGroupTotal : 0);
+      (fixedAssets) +
+      (CurrentAssets);
 
     const pnlSigned = -(netProfit - netLoss - (transferredProfit - transferredLoss) - pnlGroupTotal); // Profit is Credit (-)
 
