@@ -1528,10 +1528,7 @@ const SalesVoucher: React.FC = () => {
       } as any;
 
       if (prev.mode === "accounting-invoice") {
-        const entries = [...prev.entries];
-        if (entries.length === 0) entries.push({ ...newEntry, type: "credit", id: "e1" });
-        entries.splice(1, 0, newEntry);
-        return { ...prev, entries };
+        return { ...prev, entries: [...prev.entries, { ...newEntry, type: "debit" }] };
       }
 
       return { ...prev, entries: [...prev.entries, newEntry] };
