@@ -1,6 +1,6 @@
-import React from 'react';
-import Navigation from '../components/Navigation';
-import Footer from '../components/Footer';
+import React from "react";
+import Navigation from "../components/Navigation";
+import Footer from "../components/Footer";
 
 const ContactPage: React.FC = () => {
   return (
@@ -9,21 +9,28 @@ const ContactPage: React.FC = () => {
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-16">
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-gray-900 mb-4">Contact Sales</h1>
+          <h1 className="text-4xl font-bold text-gray-900 mb-4">
+            Contact Sales
+          </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-            Ready to transform your business with ApnaBook? Get in touch with our sales team
-            to discuss your needs and find the perfect solution.
+            Ready to transform your business with ApnaBook? Get in touch with
+            our sales team to discuss your needs and find the perfect solution.
           </p>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
           {/* Contact Form */}
           <div className="bg-white rounded-lg shadow-lg p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Get in Touch</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-6">
+              Get in Touch
+            </h2>
             <form className="space-y-6">
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div>
-                  <label htmlFor="firstName" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="firstName"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     First Name *
                   </label>
                   <input
@@ -34,7 +41,10 @@ const ContactPage: React.FC = () => {
                   />
                 </div>
                 <div>
-                  <label htmlFor="lastName" className="block text-sm font-medium text-gray-700 mb-2">
+                  <label
+                    htmlFor="lastName"
+                    className="block text-sm font-medium text-gray-700 mb-2"
+                  >
                     Last Name *
                   </label>
                   <input
@@ -47,7 +57,10 @@ const ContactPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="email"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Email Address *
                 </label>
                 <input
@@ -59,7 +72,10 @@ const ContactPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="phone" className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="phone"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Phone Number
                 </label>
                 <input
@@ -70,7 +86,10 @@ const ContactPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="company"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Company Name *
                 </label>
                 <input
@@ -82,7 +101,10 @@ const ContactPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="employees" className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="employees"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Number of Employees
                 </label>
                 <select
@@ -99,7 +121,10 @@ const ContactPage: React.FC = () => {
               </div>
 
               <div>
-                <label htmlFor="message" className="block text-sm font-medium text-gray-700 mb-2">
+                <label
+                  htmlFor="message"
+                  className="block text-sm font-medium text-gray-700 mb-2"
+                >
                   Tell us about your needs
                 </label>
                 <textarea
@@ -153,29 +178,35 @@ const ContactPage: React.FC = () => {
               </h3>
 
               <div className="space-y-5">
-
                 <div>
                   <h4 className="font-semibold text-gray-900">Name</h4>
                   <p className="text-gray-600">Komal Dhaka</p>
                 </div>
 
-              
                 <div>
-                  <h4 className="font-semibold text-gray-900">Phone</h4>
-                  <p className="text-gray-600">+91 7678438320</p>
-                </div>
-
-          
-                <div>
-                  <h4 className="font-semibold text-gray-900">Address</h4>
+                  <h4 className="font-semibold text-gray-900">Email</h4>
                   <p className="text-gray-600">
-                    Allen Institute, 9th Cross,<br />
-                    Near S2 Homes, Sompura Gate B,<br />
-                    Hoshali, Bengaluru,<br />
-                    Karnataka - 562125
+                    apnasoftwaresolution@gmail.com
                   </p>
                 </div>
 
+                <div>
+                  <h4 className="font-semibold text-gray-900">Phone</h4>
+                  <p className="text-gray-600">+91 91539 92348</p>
+                </div>
+
+                <div>
+                  <h4 className="font-semibold text-gray-900">Address</h4>
+                  <p className="text-gray-600">
+                    Allen Institute, 9th Cross,
+                    <br />
+                    Near S2 Homes, Sompura Gate B,
+                    <br />
+                    Hoshali, Bengaluru,
+                    <br />
+                    Karnataka - 562125
+                  </p>
+                </div>
               </div>
             </div>
 
