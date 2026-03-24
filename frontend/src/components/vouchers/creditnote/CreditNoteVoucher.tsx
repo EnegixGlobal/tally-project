@@ -60,7 +60,7 @@ const CreditNoteVoucher: React.FC = () => {
               ? v.entries.map((e: any, i: number) => ({
                 id: String(i + 1),
                 ledgerId: e.ledgerId,
-                amount: Number(e.amount) || 0,
+                amount: Math.round(Number(e.amount) || 0),
                 type: e.type,
               }))
               : [
@@ -484,21 +484,21 @@ const CreditNoteVoucher: React.FC = () => {
 
             <div>
               <label className="block text-sm font-medium mb-1" htmlFor="mode">
-                    Voucher Mode
-                  </label>
-                  <select
-                    id="mode"
-                    name="mode"
-                    value={formData.mode}
-                    onChange={handleChange}
-                    title="Voucher Mode"
-                    className={`w-full p-2 rounded border ${theme === "dark"
-                      ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                      : "bg-white border-gray-300 focus:border-blue-500"
-                      } outline-none transition-colors`}
-                  >
-                    <option value="accounting-invoice">Accounting Invoice</option>
-                  </select>
+                Voucher Mode
+              </label>
+              <select
+                id="mode"
+                name="mode"
+                value={formData.mode}
+                onChange={handleChange}
+                title="Voucher Mode"
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
+                  } outline-none transition-colors`}
+              >
+                <option value="accounting-invoice">Accounting Invoice</option>
+              </select>
             </div>
           </div>
 
@@ -583,7 +583,7 @@ const CreditNoteVoucher: React.FC = () => {
                             title="Amount"
                             type="number"
                             name="amount"
-                            value={entry.amount}
+                            value={Math.round(entry.amount || 0) || ""}
                             onChange={(e) => handleEntryChange(index, e)}
                             required
                             min="0"
@@ -643,8 +643,8 @@ const CreditNoteVoucher: React.FC = () => {
                     </td>
                     <td className="px-4 py-2 text-right">
                       <div className="flex flex-col">
-                        <span>Dr: ₹{(totalDebit || 0).toLocaleString()}</span>
-                        <span>Cr: ₹{(totalCredit || 0).toLocaleString()}</span>
+                        <span>Dr: ₹{Math.round(totalDebit || 0).toLocaleString()}</span>
+                        <span>Cr: ₹{Math.round(totalCredit || 0).toLocaleString()}</span>
                       </div>
                     </td>
                     <td className="px-4 py-2 text-center">
