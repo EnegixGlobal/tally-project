@@ -8,7 +8,8 @@ import {
   FileMinus, FilePlus, Truck, Clipboard,
   Package,
   ImportIcon,
-  Lock
+  Lock,
+  FileSpreadsheet
 } from 'lucide-react';
 
 interface VoucherType {
@@ -258,6 +259,16 @@ const VouchersIndex: React.FC = () => {
           iconBg: theme === 'dark' ? 'bg-teal-800/70' : 'bg-teal-100',
           description: 'Import from Excel/CSV files',
           category: 'import'
+        },
+        {
+          id: 'bank-statement-import',
+          icon: <FileSpreadsheet size={20} />,
+          name: 'Bank Statement',
+          path: '/app/vouchers/bank-statement-import',
+          color: theme === 'dark' ? 'bg-emerald-900/50 hover:bg-emerald-800/50' : 'bg-emerald-50 hover:bg-emerald-100',
+          iconBg: theme === 'dark' ? 'bg-emerald-800/70' : 'bg-emerald-100',
+          description: 'Import Bank Statements',
+          category: 'import'
         }
       ]
     },
@@ -300,8 +311,8 @@ const VouchersIndex: React.FC = () => {
                     onClick={() => isAllowed && handleVoucherClick(voucher)}
                     disabled={!isAllowed}
                     className={`p-4 rounded-lg flex flex-col items-center text-center transition-all duration-200 transform ${isAllowed
-                        ? 'hover:scale-105 hover:shadow-lg translate-y-0 active:scale-95 cursor-pointer'
-                        : 'opacity-50 grayscale cursor-not-allowed scale-100'
+                      ? 'hover:scale-105 hover:shadow-lg translate-y-0 active:scale-95 cursor-pointer'
+                      : 'opacity-50 grayscale cursor-not-allowed scale-100'
                       } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${voucher.color} group relative`}
                     aria-label={`Create ${voucher.name} voucher - ${voucher.description}`}
                     title={isAllowed ? voucher.description : "You don't have permission to access this module"}
