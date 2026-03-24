@@ -607,11 +607,12 @@ const BankStatementImport: React.FC = () => {
                                         <thead className="bg-gray-50">
                                             <tr>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Route To</th>
+
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vch No.</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Particulars</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Narration</th>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Voucher</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-right">Debit</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-right">Credit</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-right">Balance</th>
@@ -633,9 +634,7 @@ const BankStatementImport: React.FC = () => {
                                                         )}
                                                         {row.errorMessage && <div className="text-xs text-red-600 mt-1">{row.errorMessage}</div>}
                                                     </td>
-                                                    <td className="px-4 py-3 text-sm font-semibold capitalize text-blue-700">
-                                                        {row.VoucherTargetType}
-                                                    </td>
+
                                                     <td className="px-4 py-3 text-sm text-gray-800 font-mono font-medium">
                                                         {row.SimulatedVoucherNumber || "-"}
                                                     </td>
@@ -653,6 +652,9 @@ const BankStatementImport: React.FC = () => {
                                                         </div>
                                                     </td>
                                                     <td className="px-4 py-3 text-sm text-gray-600 truncate max-w-xs">{row.Narration}</td>
+                                                    <td className="px-4 py-3 text-sm font-semibold capitalize text-blue-700">
+                                                        {row.VoucherTargetType}
+                                                    </td>
                                                     <td className="px-4 py-3 text-sm text-right text-red-600 font-medium">{row.Debit > 0 ? row.Debit : "-"}</td>
                                                     <td className="px-4 py-3 text-sm text-right text-green-600 font-medium">{row.Credit > 0 ? row.Credit : "-"}</td>
                                                     <td className="px-4 py-3 text-sm text-right text-gray-800 font-medium">{row.Balance ? row.Balance : "-"}</td>
