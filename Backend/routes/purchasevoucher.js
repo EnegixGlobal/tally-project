@@ -439,7 +439,7 @@ router.post("/", async (req, res) => {
         companyId: finalCompanyId,
         ownerType: finalOwnerType,
         ownerId: finalOwnerId,
-        voucherType: "PRV",
+        voucherType: "purchase",
         date,
       });
     }

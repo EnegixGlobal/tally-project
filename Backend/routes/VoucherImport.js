@@ -1403,6 +1403,13 @@ router.post("/purchase_summary_import", async (req, res) => {
     try {
         const { rows, companyId, ownerType, ownerId } = req.body;
 
+        console.log("Received Purchase Import Request:", {
+            rowsCount: rows?.length,
+            companyId,
+            ownerType,
+            ownerId
+        });
+
         if (!rows || !rows.length) {
             return res.status(400).json({ success: false, message: "No data received" });
         }
@@ -1410,9 +1417,14 @@ router.post("/purchase_summary_import", async (req, res) => {
             return res.status(401).json({ success: false, message: "Unauthorized" });
         }
 
-        // LOAD LEDGERS
+        // LOAD LEDGERS & ITEMS
         const [ledgers] = await db.execute(
             "SELECT id, name, gst_number, state, group_id FROM ledgers WHERE company_id=?",
+            [companyId]
+        );
+
+        const [items] = await db.execute(
+            "SELECT id, name FROM stock_items WHERE company_id=?",
             [companyId]
         );
 
@@ -1432,7 +1444,7 @@ router.post("/purchase_summary_import", async (req, res) => {
             let purchaseLedgerId = defaultPurchaseLedgerId;
             const rowPurchaseLedgerName = row["Purchase Ledger"] ? String(row["Purchase Ledger"]).toLowerCase().trim() : null;
             if (rowPurchaseLedgerName) {
-                const pLedger = ledgers.find(l => l.name.toLowerCase().trim() === rowPurchaseLedgerName);
+                const pLedger = ledgers.find(l => l.name.toLowerCase().includes(rowPurchaseLedgerName));
                 if (pLedger) purchaseLedgerId = pLedger.id;
             }
 
@@ -1481,7 +1493,7 @@ router.post("/purchase_summary_import", async (req, res) => {
                 const gstMatch = lGst === pGst;
                 
                 // Specific fix for state matching to avoid false positive substrings
-                const cleanExcelState = excelPlaceOfSupply.replace(/^[0-9]+[\-\s]*/, '').trim();
+                const cleanExcelState = excelPlaceOfSupply.replace(/\(.*?\)/g, '').replace(/^[0-9]+[\-\s]*/, '').trim();
                 const stateMatch = lState === cleanExcelState || lState === excelPlaceOfSupply;
 
                 if (gstMatch && stateMatch) {
@@ -1502,12 +1514,33 @@ router.post("/purchase_summary_import", async (req, res) => {
                 continue;
             }
 
+            // ITEM MATCH (Optional but validated if provided)
+            let finalItemId = 0;
+            let finalItemName = "";
+            const rowItemName = row["Item Name"] ? String(row["Item Name"]).trim() : null;
+            
+            if (rowItemName) {
+                const matchedItem = items.find(it => it.name.toLowerCase().trim() === rowItemName.toLowerCase());
+                if (matchedItem) {
+                    finalItemId = matchedItem.id;
+                    finalItemName = matchedItem.name;
+                } else {
+                    errors.push(`Row ${i + 2}: Item Name not found in your stock items ('${rowItemName}')`);
+                    continue;
+                }
+            }
+
+            const itemQty = parseFloat(row["Quantity"]) || 1;
+            const itemRate = parseFloat(row["Item Rate (₹)"]) || taxableValue;
+            const hsnCode = row["HSN Code"] ? String(row["HSN Code"] || "").trim() : "";
+            const batchNo = row["Batch No"] ? String(row["Batch No"]).trim() : "";
+
             // GENERATE VOUCHER NUMBER
             const voucherNumber = await generateVoucherNumber({
                 companyId,
                 ownerType,
                 ownerId,
-                voucherType: "PRV",
+                voucherType: "purchase",
                 date,
             });
 
@@ -1548,9 +1581,9 @@ router.post("/purchase_summary_import", async (req, res) => {
                 ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                 [
                     voucherId,
-                    0,
-                    1,
-                    taxableValue,
+                    finalItemId,
+                    itemQty,
+                    itemRate,
                     taxableValue,
                     cgst > 0 ? (rate / 2) : 0,
                     sgst > 0 ? (rate / 2) : 0,
@@ -1558,6 +1591,31 @@ router.post("/purchase_summary_import", async (req, res) => {
                     purchaseLedgerId
                 ]
             );
+
+            // INSERT INTO purchase_history for Batch Tracking (if Item & Batch provided)
+            if (batchNo && finalItemId) {
+                const historyValues = [[
+                    finalItemName,
+                    hsnCode,
+                    batchNo,
+                    itemQty,
+                    date,
+                    companyId,
+                    ownerType,
+                    ownerId,
+                    "purchase",
+                    itemRate,
+                    voucherNumber,
+                    null // godownId
+                ]];
+
+                await db.query(
+                    `INSERT INTO purchase_history 
+                      (itemName, hsnCode, batchNumber, purchaseQuantity, purchaseDate, companyId, ownerType, ownerId, type, rate, voucherNumber, godownId)
+                      VALUES ?`,
+                    [historyValues]
+                );
+            }
 
             saved.push(voucherNumber);
         }
