@@ -554,9 +554,9 @@ const PurchaseVoucher: React.FC = () => {
                 id: "e" + (idx + 1),
 
                 itemId: e.itemId || "",
-                quantity: e.quantity || 0,
-                rate: e.rate || 0,
-                amount: e.amount || 0,
+                quantity: Math.round(e.quantity || 0),
+                rate: Math.round(e.rate || 0),
+                amount: Math.round(e.amount || 0),
 
                 // AUTO FILL: Prioritize saved data, fallback to Item Master if missing
                 hsnCode: e.hsnCode || stockItem?.hsnCode || "",
@@ -583,7 +583,7 @@ const PurchaseVoucher: React.FC = () => {
                 godownId: e.godownId || "",
 
                 // Discount
-                discount: e.discount || 0,
+                discount: Math.round(e.discount || 0),
                 discountLedgerId: e.discountLedgerId || "",
 
                 // Ledger Mode Support
@@ -1497,11 +1497,7 @@ const PurchaseVoucher: React.FC = () => {
 
       // In accounting mode, insert the new ledger entry just below the first entry
       if (prev.mode === "accounting-invoice") {
-        const entries = [...prev.entries];
-        // ensure there's at least one entry (first should be credit)
-        if (entries.length === 0) entries.push({ ...newEntry, type: "credit", id: "e1" });
-        entries.splice(1, 0, newEntry);
-        return { ...prev, entries };
+        return { ...prev, entries: [...prev.entries, { ...newEntry, type: "debit" }] };
       }
 
       return { ...prev, entries: [...prev.entries, newEntry] };
@@ -3492,7 +3488,7 @@ const PurchaseVoucher: React.FC = () => {
                             title="Enter Amount"
                             type="number"
                             name="amount"
-                            value={entry.amount ?? ""}
+                            value={Math.round(entry.amount ?? 0) || ""}
                             onChange={(e) =>
                               handleEntryChange(
                                 formData.entries.indexOf(entry),
@@ -3571,7 +3567,7 @@ const PurchaseVoucher: React.FC = () => {
                     >
                       <td className="px-4 py-2 text-right">Debit Total:</td>
                       <td className="px-4 py-2 text-right">
-                        {debitTotal.toLocaleString()}
+                        {Math.round(debitTotal).toLocaleString()}
                       </td>
                       <td className="px-4 py-2"></td>
                       <td className="px-4 py-2"></td>
@@ -3584,7 +3580,7 @@ const PurchaseVoucher: React.FC = () => {
                     >
                       <td className="px-4 py-2 text-right">Credit Total:</td>
                       <td className="px-4 py-2 text-right">
-                        {creditTotal.toLocaleString()}
+                        {Math.round(creditTotal).toLocaleString()}
                       </td>
                       <td className="px-4 py-2"></td>
                       <td className="px-4 py-2"></td>

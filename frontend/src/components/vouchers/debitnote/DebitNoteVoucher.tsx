@@ -60,7 +60,7 @@ const DebitNoteVoucher: React.FC = () => {
               ? v.entries.map((e: any, i: number) => ({
                 id: String(i + 1),
                 ledgerId: e.ledgerId,
-                amount: Number(e.amount) || 0,
+                amount: Math.round(Number(e.amount) || 0),
                 type: e.type,
               }))
               : [
@@ -454,8 +454,8 @@ const DebitNoteVoucher: React.FC = () => {
                 required
                 max={maxDate}
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none transition-colors`}
               />
             </div>
@@ -476,8 +476,8 @@ const DebitNoteVoucher: React.FC = () => {
                 disabled
                 placeholder="Auto"
                 className={`w-full p-2 rounded border cursor-not-allowed opacity-70 ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-gray-300"
-                    : "bg-gray-100 border-gray-300 text-gray-600"
+                  ? "bg-gray-700 border-gray-600 text-gray-300"
+                  : "bg-gray-100 border-gray-300 text-gray-600"
                   }`}
               />
             </div>
@@ -493,8 +493,8 @@ const DebitNoteVoucher: React.FC = () => {
                 onChange={handleChange}
                 title="Voucher Mode"
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                    : "bg-white border-gray-300 focus:border-blue-500"
+                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                  : "bg-white border-gray-300 focus:border-blue-500"
                   } outline-none transition-colors`}
               >
                 <option value="accounting-invoice">Accounting Invoice</option>
@@ -513,8 +513,8 @@ const DebitNoteVoucher: React.FC = () => {
                 type="button"
                 onClick={addEntry}
                 className={`flex items-center text-sm px-2 py-1 rounded ${theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
                   }`}
               >
                 <Plus size={16} className="mr-1" />
@@ -527,8 +527,8 @@ const DebitNoteVoucher: React.FC = () => {
                 <thead>
                   <tr
                     className={`${theme === "dark"
-                        ? "border-b border-gray-600"
-                        : "border-b border-gray-300"
+                      ? "border-b border-gray-600"
+                      : "border-b border-gray-300"
                       }`}
                   >
                     <th className="px-4 py-2 text-left">Ledger Account</th>
@@ -544,8 +544,8 @@ const DebitNoteVoucher: React.FC = () => {
                       <tr
                         key={index}
                         className={`${theme === "dark"
-                            ? "border-b border-gray-600"
-                            : "border-b border-gray-300"
+                          ? "border-b border-gray-600"
+                          : "border-b border-gray-300"
                           }`}
                       >
                         <td className="px-4 py-2">
@@ -556,8 +556,8 @@ const DebitNoteVoucher: React.FC = () => {
                             onChange={(e) => handleEntryChange(index, e)}
                             required
                             className={`w-full p-2 rounded border ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                                : "bg-white border-gray-300 focus:border-blue-500"
+                              ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                              : "bg-white border-gray-300 focus:border-blue-500"
                               } outline-none transition-colors`}
                           >
                             <option value="">Select Ledger</option>
@@ -569,8 +569,8 @@ const DebitNoteVoucher: React.FC = () => {
                             <option
                               value="add-new"
                               className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                                  ? "bg-blue-600 hover:bg-green-700"
-                                  : "bg-green-600 hover:bg-green-700 text-white"
+                                ? "bg-blue-600 hover:bg-green-700"
+                                : "bg-green-600 hover:bg-green-700 text-white"
                                 }`}
                             >
                               + Add New Ledger
@@ -583,14 +583,14 @@ const DebitNoteVoucher: React.FC = () => {
                             title="Amount"
                             type="number"
                             name="amount"
-                            value={entry.amount}
+                            value={Math.round(entry.amount || 0) || ""}
                             onChange={(e) => handleEntryChange(index, e)}
                             required
                             min="0"
                             step="0.01"
                             className={`w-full p-2 rounded border text-right ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                                : "bg-white border-gray-300 focus:border-blue-500"
+                              ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                              : "bg-white border-gray-300 focus:border-blue-500"
                               } outline-none transition-colors`}
                           />
                         </td>
@@ -603,8 +603,8 @@ const DebitNoteVoucher: React.FC = () => {
                             onChange={(e) => handleEntryChange(index, e)}
                             required
                             className={`w-full p-2 rounded border ${theme === "dark"
-                                ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                                : "bg-white border-gray-300 focus:border-blue-500"
+                              ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                              : "bg-white border-gray-300 focus:border-blue-500"
                               } outline-none transition-colors`}
                           >
                             <option value="debit">Dr</option>
@@ -618,10 +618,10 @@ const DebitNoteVoucher: React.FC = () => {
                             onClick={() => removeEntry(index)}
                             disabled={formData.entries.length <= 2}
                             className={`p-1 rounded ${formData.entries.length <= 2
-                                ? "opacity-50 cursor-not-allowed"
-                                : theme === "dark"
-                                  ? "hover:bg-gray-600"
-                                  : "hover:bg-gray-300"
+                              ? "opacity-50 cursor-not-allowed"
+                              : theme === "dark"
+                                ? "hover:bg-gray-600"
+                                : "hover:bg-gray-300"
                               }`}
                           >
                             <Trash2 size={16} />
@@ -634,8 +634,8 @@ const DebitNoteVoucher: React.FC = () => {
                 <tfoot>
                   <tr
                     className={`font-semibold ${theme === "dark"
-                        ? "border-t border-gray-600"
-                        : "border-t border-gray-300"
+                      ? "border-t border-gray-600"
+                      : "border-t border-gray-300"
                       }`}
                   >
                     <td className="px-4 py-2 text-right" colSpan={3}>
@@ -643,16 +643,16 @@ const DebitNoteVoucher: React.FC = () => {
                     </td>
                     <td className="px-4 py-2 text-right">
                       <div className="flex flex-col">
-                        <span>Dr: ₹{(totalDebit || 0).toLocaleString()}</span>
-                        <span>Cr: ₹{(totalCredit || 0).toLocaleString()}</span>
+                        <span>Dr: ₹{Math.round(totalDebit || 0).toLocaleString()}</span>
+                        <span>Cr: ₹{Math.round(totalCredit || 0).toLocaleString()}</span>
                       </div>
                     </td>
                     <td className="px-4 py-2 text-center">
                       {isBalanced ? (
                         <span
                           className={`px-2 py-1 rounded text-xs ${theme === "dark"
-                              ? "bg-green-900 text-green-200"
-                              : "bg-green-100 text-green-800"
+                            ? "bg-green-900 text-green-200"
+                            : "bg-green-100 text-green-800"
                             }`}
                         >
                           Balanced
@@ -660,8 +660,8 @@ const DebitNoteVoucher: React.FC = () => {
                       ) : (
                         <span
                           className={`px-2 py-1 rounded text-xs ${theme === "dark"
-                              ? "bg-red-900 text-red-200"
-                              : "bg-red-100 text-red-800"
+                            ? "bg-red-900 text-red-200"
+                            : "bg-red-100 text-red-800"
                             }`}
                         >
                           Unbalanced
@@ -688,8 +688,8 @@ const DebitNoteVoucher: React.FC = () => {
               onChange={handleChange}
               rows={3}
               className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
+                ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                : "bg-white border-gray-300 focus:border-blue-500"
                 } outline-none transition-colors`}
             />
           </div>
@@ -699,8 +699,8 @@ const DebitNoteVoucher: React.FC = () => {
               type="button"
               onClick={() => navigate("/app/vouchers")}
               className={`px-4 py-2 rounded ${theme === "dark"
-                  ? "bg-gray-700 hover:bg-gray-600"
-                  : "bg-gray-200 hover:bg-gray-300"
+                ? "bg-gray-700 hover:bg-gray-600"
+                : "bg-gray-200 hover:bg-gray-300"
                 }`}
             >
               Cancel
@@ -710,8 +710,8 @@ const DebitNoteVoucher: React.FC = () => {
               type="button"
               onClick={handlePrintClick}
               className={`flex items-center px-4 py-2 rounded ${theme === "dark"
-                  ? "bg-green-600 hover:bg-green-700"
-                  : "bg-green-600 hover:bg-green-700 text-white"
+                ? "bg-green-600 hover:bg-green-700"
+                : "bg-green-600 hover:bg-green-700 text-white"
                 }`}
             >
               <Printer size={18} className="mr-1" />
@@ -721,10 +721,10 @@ const DebitNoteVoucher: React.FC = () => {
               type="submit"
               disabled={!isBalanced}
               className={`flex items-center px-4 py-2 rounded ${!isBalanced
-                  ? "opacity-50 cursor-not-allowed bg-blue-600"
-                  : theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                ? "opacity-50 cursor-not-allowed bg-blue-600"
+                : theme === "dark"
+                  ? "bg-blue-600 hover:bg-blue-700"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
                 }`}
             >
               <Save size={18} className="mr-1" />
