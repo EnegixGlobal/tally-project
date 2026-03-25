@@ -269,6 +269,16 @@ const VouchersIndex: React.FC = () => {
           iconBg: theme === 'dark' ? 'bg-emerald-800/70' : 'bg-emerald-100',
           description: 'Import Bank Statements',
           category: 'import'
+        },
+        {
+          id: 'purchase-import',
+          icon: <ShoppingCart size={20} />,
+          name: 'Purchase Import',
+          path: '/app/vouchers/purchase-import',
+          color: theme === 'dark' ? 'bg-blue-900/50 hover:bg-blue-800/50' : 'bg-blue-50 hover:bg-blue-100',
+          iconBg: theme === 'dark' ? 'bg-blue-800/70' : 'bg-blue-100',
+          description: 'Import Purchase GST Summary',
+          category: 'import'
         }
       ]
     },
@@ -335,98 +345,6 @@ const VouchersIndex: React.FC = () => {
             </div>
           </div>
         ))}
-      </div>
-
-      {/* Recent Vouchers Section */}
-      <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800 border border-gray-700' : 'bg-white shadow-sm border border-gray-200'}`}>
-        <h2 className="text-lg font-semibold mb-4 flex items-center">
-          <FileText className="mr-2" size={20} />
-          Recent Vouchers
-        </h2>
-
-        {safeVouchers && safeVouchers.length > 0 ? (
-          <div className="space-y-3">
-            {safeVouchers.slice(-5).reverse().map((voucher, index) => (
-              <div
-                key={voucher.id || `voucher-${index}`}
-                className={`p-4 rounded-lg border transition-all duration-200 cursor-pointer hover:shadow-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${theme === 'dark'
-                  ? 'bg-gray-700/50 border-gray-600 hover:bg-gray-700 hover:border-gray-500'
-                  : 'bg-gray-50 border-gray-200 hover:bg-gray-100 hover:border-gray-300'
-                  }`}
-                onClick={() => {
-                  console.log('Voucher details:', voucher);
-                  // In a real app, this would navigate to voucher details
-                  alert(`Voucher Details:\nNumber: ${voucher.number}\nType: ${voucher.type}\nDate: ${formatDate(voucher.date)}\nParty: ${getPartyName(voucher.partyId)}`);
-                }}
-                role="button"
-                tabIndex={0}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    e.preventDefault();
-                    alert(`Voucher Details:\nNumber: ${voucher.number}\nType: ${voucher.type}\nDate: ${formatDate(voucher.date)}\nParty: ${getPartyName(voucher.partyId)}`);
-                  }
-                }}
-                aria-label={`View voucher ${voucher.number} - ${voucher.type}`}
-              >
-                <div className="flex justify-between items-start">
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <span className="font-semibold text-sm truncate">
-                        {voucher.number}
-                      </span>
-                      <span className={`px-2 py-1 rounded-full text-xs font-medium uppercase tracking-wide ${voucher.type === 'quotation' || voucher.isQuotation === true
-                        ? theme === 'dark' ? 'bg-violet-900/50 text-violet-300' : 'bg-violet-100 text-violet-700'
-                        : theme === 'dark' ? 'bg-blue-900/50 text-blue-300' : 'bg-blue-100 text-blue-700'
-                        }`}>
-                        {voucher.type === 'quotation' || voucher.isQuotation === true ? 'Quotation' : voucher.type}
-                      </span>
-                    </div>
-
-                    <div className={`text-xs space-y-1 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                      <div className="flex items-center">
-                        <span className="font-medium mr-2">Date:</span>
-                        <span>{formatDate(voucher.date)}</span>
-                      </div>
-                      <div className="flex items-center">
-                        <span className="font-medium mr-2">Party:</span>
-                        <span className="truncate">{getPartyName(voucher.partyId)}</span>
-                      </div>
-                    </div>
-                  </div>
-
-                  <div className="text-right ml-4 flex-shrink-0">
-                    <div className={`text-sm font-semibold ${theme === 'dark' ? 'text-gray-200' : 'text-gray-700'}`}>
-                      {voucher.entries?.length || 0} items
-                    </div>
-                    <div className={`text-xs mt-1 px-2 py-1 rounded ${theme === 'dark' ? 'bg-gray-600 text-gray-300' : 'bg-gray-200 text-gray-600'
-                      }`}>
-                      {voucher.mode || 'item-invoice'}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          <div className={`text-center py-8 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-            <FileText size={48} className="mx-auto mb-4 opacity-50" />
-            <p className="text-lg font-medium mb-2">No vouchers found</p>
-            <p className="text-sm">Create your first voucher to get started!</p>
-          </div>
-        )}
-      </div>
-
-      {/* Pro Tips Section */}
-      <div className={`mt-6 p-4 rounded-lg border-l-4 ${theme === 'dark'
-        ? 'bg-blue-900/20 border-blue-500 text-blue-200'
-        : 'bg-blue-50 border-blue-400 text-blue-700'
-        }`}>
-        <h3 className="font-semibold text-sm mb-2">💡 Pro Tips</h3>
-        <ul className="text-sm space-y-1">
-          <li>• Press <kbd className={`px-1 py-0.5 rounded text-xs ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border'}`}>Alt+F5</kbd> to quickly access Vouchers</li>
-          <li>• Use <kbd className={`px-1 py-0.5 rounded text-xs ${theme === 'dark' ? 'bg-gray-700' : 'bg-white border'}`}>Ctrl+N</kbd> to create a new Voucher</li>
-          <li>• Click on recent vouchers to view details</li>
-        </ul>
       </div>
     </div>
   );

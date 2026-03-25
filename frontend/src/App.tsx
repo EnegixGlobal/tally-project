@@ -58,6 +58,7 @@ import StockJournalVoucher1 from "./components/vouchers/stockjournal/StockJourna
 import ReceiptVoucher from "./components/vouchers/receipt/ReceiptVoucher";
 import VoucherImport from "./components/vouchers/import/VoucherImport";
 import BankStatementImport from "./components/vouchers/import/BankStatementImport";
+import PurchaseImport from "./components/vouchers/import/PurchaseImport";
 import QuotationList from "./components/vouchers/quotation/QuotationList";
 import QuotationCreate from "./components/vouchers/quotation/QuotationCreate";
 
@@ -886,6 +887,14 @@ function App() {
                   element={
                     <RequireCompany>
                       <BankStatementImport />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="vouchers/purchase-import"
+                  element={
+                    <RequireCompany>
+                      <PurchaseImport />
                     </RequireCompany>
                   }
                 />

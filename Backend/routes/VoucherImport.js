@@ -1249,7 +1249,8 @@ router.post("/bank_import", async (req, res) => {
 });
 
 
-module.exports = router;
+
+
 
 // =========================================
 // CONTRA EXCEL IMPORT
@@ -1392,3 +1393,190 @@ router.post("/journal_import", async (req, res) => {
         return res.status(500).json({ success: false, message: "Import failed", error: error.message });
     }
 });
+
+
+// =========================================
+// PURCHASE SUMMARY IMPORT (GST TEMPLATE)
+// =========================================
+
+router.post("/purchase_summary_import", async (req, res) => {
+    try {
+        const { rows, companyId, ownerType, ownerId } = req.body;
+
+        if (!rows || !rows.length) {
+            return res.status(400).json({ success: false, message: "No data received" });
+        }
+        if (!companyId || !ownerType || !ownerId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        // LOAD LEDGERS
+        const [ledgers] = await db.execute(
+            "SELECT id, name, gst_number, state, group_id FROM ledgers WHERE company_id=?",
+            [companyId]
+        );
+
+        const ledgerMap = {};
+        const gstinMap = {};
+        // 🔍 Default Purchase Ledger
+        const defaultPLedger = ledgers.find(l => l.name.toLowerCase().includes("purchase"));
+        const defaultPurchaseLedgerId = defaultPLedger ? defaultPLedger.id : null;
+
+        const errors = [];
+        const saved = [];
+
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            
+            // 🔍 Per-row Purchase Ledger Match
+            let purchaseLedgerId = defaultPurchaseLedgerId;
+            const rowPurchaseLedgerName = row["Purchase Ledger"] ? String(row["Purchase Ledger"]).toLowerCase().trim() : null;
+            if (rowPurchaseLedgerName) {
+                const pLedger = ledgers.find(l => l.name.toLowerCase().trim() === rowPurchaseLedgerName);
+                if (pLedger) purchaseLedgerId = pLedger.id;
+            }
+
+            // Column Mapping
+            const gstin = row["GSTIN of supplier"] ? String(row["GSTIN of supplier"]).toUpperCase().trim() : null;
+            const partyName = row["Trade/Legal name of the Supplier"] ? String(row["Trade/Legal name of the Supplier"]).toLowerCase().trim() : "";
+            const invoiceNo = row["Invoice number"] || null;
+            const invoiceDateStr = row["Invoice Date"];
+            const totalValue = Number(row["Invoice Value (₹)"] || 0);
+            const taxableValue = Number(row["Taxable Value (₹)"] || 0);
+            const igst = Number(row["Integrated Tax (₹)"] || 0);
+            const cgst = Number(row["Central Tax (₹)"] || 0);
+            const sgst = Number(row["State/UT tax (₹)"] || 0);
+            const rate = Number(row["Rate (%)"] || 0);
+
+            if (!invoiceDateStr || !partyName || !totalValue) {
+                errors.push(`Row ${i + 2}: Date, Supplier Name, and Invoice Value are required`);
+                continue;
+            }
+
+            // DATE FORMATTING
+            let date = invoiceDateStr;
+            if (typeof invoiceDateStr === 'string' && invoiceDateStr.includes('-')) {
+                const parts = invoiceDateStr.split('-');
+                if (parts[0].length === 2) {
+                    date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
+            }
+
+            // LEDGER MATCH (Strict: Sequence Name -> GSTIN -> State)
+            let partyId = null;
+            const rawPlaceOfSupply = row["Place of supply"] ? String(row["Place of supply"]) : "";
+            const excelPlaceOfSupply = rawPlaceOfSupply.toLowerCase().replace(/\s+/g, " ").trim();
+            const pName = partyName ? String(partyName).toLowerCase().replace(/\s+/g, " ").trim() : "";
+            const pGst = gstin ? String(gstin).toUpperCase().replace(/\s+/g, "").trim() : "";
+
+            const matchedLedgerByName = ledgers.find(l => {
+                const lName = l.name ? String(l.name).toLowerCase().replace(/\s+/g, " ").trim() : "";
+                return lName === pName;
+            });
+
+            if (matchedLedgerByName) {
+                const lGst = matchedLedgerByName.gst_number ? String(matchedLedgerByName.gst_number).toUpperCase().replace(/\s+/g, "").trim() : "";
+                const lState = matchedLedgerByName.state ? String(matchedLedgerByName.state).toLowerCase().replace(/\s+/g, " ").trim() : "";
+                
+                const gstMatch = lGst === pGst;
+                
+                // Specific fix for state matching to avoid false positive substrings
+                const cleanExcelState = excelPlaceOfSupply.replace(/^[0-9]+[\-\s]*/, '').trim();
+                const stateMatch = lState === cleanExcelState || lState === excelPlaceOfSupply;
+
+                if (gstMatch && stateMatch) {
+                    partyId = matchedLedgerByName.id;
+                } else if (!gstMatch && !stateMatch) {
+                    errors.push(`Row ${i + 2}: GSTIN and State mismatch for Supplier '${partyName}'. Expected GSTIN: '${lGst}', State: '${lState}'`);
+                } else if (!gstMatch) {
+                    errors.push(`Row ${i + 2}: GSTIN mismatch for Supplier '${partyName}'. Expected: '${lGst}', Got: '${pGst}'`);
+                } else if (!stateMatch) {
+                    errors.push(`Row ${i + 2}: State mismatch for Supplier '${partyName}'. Expected: '${lState}', Got: '${excelPlaceOfSupply}'`);
+                }
+            } else {
+                errors.push(`Row ${i + 2}: Supplier Name not found in ledgers ('${partyName}')`);
+            }
+
+            if (!partyId) {
+                errors.push(`Row ${i + 2}: Supplier match failed! Name, GSTIN, and State must all match exactly (Supplier: ${row["Trade/Legal name of the Supplier"]})`);
+                continue;
+            }
+
+            // GENERATE VOUCHER NUMBER
+            const voucherNumber = await generateVoucherNumber({
+                companyId,
+                ownerType,
+                ownerId,
+                voucherType: "PRV",
+                date,
+            });
+
+            // INSERT INTO purchase_vouchers
+            const [mainResult] = await db.execute(
+                `INSERT INTO purchase_vouchers (
+                    number, date, supplierInvoiceDate, narration, partyId, referenceNo, 
+                    subtotal, cgstTotal, sgstTotal, igstTotal, total, 
+                    company_id, owner_type, owner_id, mode, purchaseLedgerId
+                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                [
+                    voucherNumber,
+                    date,
+                    date,
+                    "Imported from GST Summary",
+                    partyId,
+                    invoiceNo,
+                    taxableValue,
+                    cgst,
+                    sgst,
+                    igst,
+                    totalValue,
+                    companyId,
+                    ownerType,
+                    ownerId,
+                    'item-invoice',
+                    purchaseLedgerId
+                ]
+            );
+
+            const voucherId = mainResult.insertId;
+
+            // INSERT INTO purchase_voucher_items
+            await db.execute(
+                `INSERT INTO purchase_voucher_items (
+                    voucherId, itemId, quantity, rate, amount, 
+                    cgstRate, sgstRate, igstRate, purchaseLedgerId
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    voucherId,
+                    0,
+                    1,
+                    taxableValue,
+                    taxableValue,
+                    cgst > 0 ? (rate / 2) : 0,
+                    sgst > 0 ? (rate / 2) : 0,
+                    igst > 0 ? rate : 0,
+                    purchaseLedgerId
+                ]
+            );
+
+            saved.push(voucherNumber);
+        }
+
+        return res.json({
+            success: errors.length === 0,
+            imported: saved.length,
+            vouchers: saved,
+            errors,
+        });
+    } catch (error) {
+        console.error("❌ Purchase Summary Import Error:", error);
+        return res.status(500).json({
+            success: false,
+            message: "Import failed: " + error.message,
+        });
+    }
+});
+
+
+module.exports = router;
+
