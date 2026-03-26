@@ -63,7 +63,7 @@ const OutstandingPayables: React.FC = () => {
 
           const normalizedName = g.name.toLowerCase().replace(/\s+/g, ""); // remove spaces
 
-          return normalizedName === "sundrycreditors";
+          return normalizedName.includes("sundrycreditor");
         });
 
         // ✅ ONLY Sundry creditors saved
@@ -125,6 +125,39 @@ const OutstandingPayables: React.FC = () => {
 
         const data: LedgerOutstanding[] = await response.json();
 
+        // Fetch precise closing balances using the /api/group endpoint
+        if (data.length > 0) {
+          const ledgerIds = data.map((l) => l.ledger_id).join(",");
+          const groupUrl = `${import.meta.env.VITE_API_URL}/api/group?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}&ledgerIds=${ledgerIds}`;
+          
+          try {
+            const groupRes = await fetch(groupUrl);
+            if (groupRes.ok) {
+              const groupData = await groupRes.json();
+              if (groupData.success && groupData.data) {
+                data.forEach((ledger) => {
+                  const txns = groupData.data[ledger.ledger_id];
+                  const totalDebit = txns ? txns.debit : 0;
+                  const totalCredit = txns ? txns.credit : 0;
+                  
+                  let opening = Number(ledger.opening_balance) || 0;
+                  let closing = opening;
+                  
+                  if (ledger.balance_type === "debit") {
+                    closing += (totalDebit - totalCredit);
+                  } else {
+                    closing += (totalCredit - totalDebit);
+                  }
+                  
+                  (ledger as any).calculated_closing_balance = closing;
+                });
+              }
+            }
+          } catch (err) {
+            console.error("Failed to fetch group closing balances", err);
+          }
+        }
+
         setCustomersData(data);
       } catch (e: any) {
         setError(e.message || "Failed to load data");
@@ -140,6 +173,13 @@ const OutstandingPayables: React.FC = () => {
   // Filter & sort data client-side
   const filteredData = useMemo(() => {
     let filtered = customersData;
+
+    // Strict filter to ensure only Sundry Creditors are shown
+    filtered = filtered.filter((c) => {
+      if (!c.ledger_group_name) return false;
+      const normalizedName = c.ledger_group_name.toLowerCase().replace(/\s+/g, "");
+      return normalizedName.includes("sundrycreditor");
+    });
 
     if (searchTerm) {
       const lc = searchTerm.toLowerCase();
@@ -159,30 +199,20 @@ const OutstandingPayables: React.FC = () => {
     }).format(amount);
 
   const calculateTotals = (ledger: LedgerOutstanding) => {
-    const vouchers = Array.isArray(ledger.vouchers) ? ledger.vouchers : [];
+    // Return dynamically calculated closing balance if available
+    if (typeof (ledger as any).calculated_closing_balance === "number") {
+      return { closingBalance: (ledger as any).calculated_closing_balance };
+    }
 
+    const vouchers = Array.isArray(ledger.vouchers) ? ledger.vouchers : [];
     const totalVoucherAmount = vouchers.reduce((sum, v) => sum + Number(v.total), 0);
 
-    // For Sundry Creditors (Payables):
-    // Normally Credit Balance.
-    // Purchases increase the balance (Credit).
-
-    // Assuming 'vouchers' here are credits (Purchases).
-    // If the API allows, we should ensure we are adding credits.
-
-    // Closing Balance logic:
     let closingBalance = 0;
 
     if (ledger.balance_type === "credit") {
-      // Normal case for creditors: Opening Credit + New Purchase Credit
       closingBalance = Number(ledger.opening_balance) + totalVoucherAmount;
     } else {
-      // Rare case: Debit opening (advance) -> Purchase reduces the debit or flips to credit?
-      // Let's stick to the arithmetic: Opening(Dr) is treated as negative in credit world? 
-      // Simpler: Just standard subtraction if it's debit balance.
       closingBalance = Number(ledger.opening_balance) - totalVoucherAmount;
-      // Note: This logic depends heavily on how 'opening_balance' is stored (unsigned vs signed).
-      // Assuming unsigned + 'balance_type'.
     }
 
     return { closingBalance };
@@ -341,7 +371,14 @@ const OutstandingPayables: React.FC = () => {
                     {/* CLOSING BALANCE */}
                     <td className="px-4 py-4 text-right">
                       <div className="font-semibold">
-                        {formatCurrency(closingBalance)}
+                        {formatCurrency(Math.abs(closingBalance))}
+                        <span className="text-xs ml-1 font-normal text-gray-500">
+                          {closingBalance > 0
+                            ? ledger.balance_type === "debit" ? "Dr" : "Cr"
+                            : closingBalance < 0
+                              ? ledger.balance_type === "debit" ? "Cr" : "Dr"
+                              : ""}
+                        </span>
                       </div>
                     </td>
                   </tr>

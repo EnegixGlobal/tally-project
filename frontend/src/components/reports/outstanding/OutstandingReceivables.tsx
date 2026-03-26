@@ -63,7 +63,7 @@ const OutstandingReceivables: React.FC = () => {
 
           const normalizedName = g.name.toLowerCase().replace(/\s+/g, "");
 
-          return normalizedName === "sundrydebtors";
+          return normalizedName.includes("sundrydebtor");
         });
 
         // ✅ ONLY Sundry Debtors saved
@@ -125,6 +125,39 @@ const OutstandingReceivables: React.FC = () => {
 
         const data: LedgerOutstanding[] = await response.json();
 
+        // Fetch precise closing balances using the /api/group endpoint
+        if (data.length > 0) {
+          const ledgerIds = data.map((l) => l.ledger_id).join(",");
+          const groupUrl = `${import.meta.env.VITE_API_URL}/api/group?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}&ledgerIds=${ledgerIds}`;
+          
+          try {
+            const groupRes = await fetch(groupUrl);
+            if (groupRes.ok) {
+              const groupData = await groupRes.json();
+              if (groupData.success && groupData.data) {
+                data.forEach((ledger) => {
+                  const txns = groupData.data[ledger.ledger_id];
+                  const totalDebit = txns ? txns.debit : 0;
+                  const totalCredit = txns ? txns.credit : 0;
+                  
+                  let opening = Number(ledger.opening_balance) || 0;
+                  let closing = opening;
+                  
+                  if (ledger.balance_type === "debit") {
+                    closing += (totalDebit - totalCredit);
+                  } else {
+                    closing += (totalCredit - totalDebit);
+                  }
+                  
+                  (ledger as any).calculated_closing_balance = closing;
+                });
+              }
+            }
+          } catch (err) {
+            console.error("Failed to fetch group closing balances", err);
+          }
+        }
+
         setCustomersData(data);
       } catch (e: any) {
         setError(e.message || "Failed to load data");
@@ -141,6 +174,13 @@ const OutstandingReceivables: React.FC = () => {
   // Filter & sort data client-side
   const filteredData = useMemo(() => {
     let filtered = customersData;
+
+    // Strict filter to ensure only Sundry Debtors are shown
+    filtered = filtered.filter((c) => {
+      if (!c.ledger_group_name) return false;
+      const normalizedName = c.ledger_group_name.toLowerCase().replace(/\s+/g, "");
+      return normalizedName.includes("sundrydebtor");
+    });
 
     if (searchTerm) {
       const lc = searchTerm.toLowerCase();
@@ -160,23 +200,18 @@ const OutstandingReceivables: React.FC = () => {
     }).format(amount);
 
   const calculateTotals = (ledger: LedgerOutstanding) => {
+    // Return dynamically calculated closing balance if available
+    if (typeof (ledger as any).calculated_closing_balance === "number") {
+      return { closingBalance: (ledger as any).calculated_closing_balance };
+    }
+
     const vouchers = Array.isArray(ledger.vouchers) ? ledger.vouchers : [];
-
     const totalVoucherAmount = vouchers.reduce((sum, v) => sum + Number(v.total), 0);
-
-    // For Sundry Debtors (Receivables):
-    // Normally Debit Balance.
-    // Sales increase the balance (Debit).
-
-    // Assuming 'vouchers' here only contains the "sales" (debit) side or outstanding bills.
-    // If the API only returns outstanding bills, then:
-    // Closing Balance = Opening Balance + Total New Outstanding
 
     let closingBalance = 0;
     if (ledger.balance_type === "debit") {
       closingBalance = Number(ledger.opening_balance) + totalVoucherAmount;
     } else {
-      // If credit balance (e.g. advance), and we add debits (sales)
       closingBalance = Number(ledger.opening_balance) - totalVoucherAmount;
     }
 
@@ -355,7 +390,14 @@ const OutstandingReceivables: React.FC = () => {
                     {/* CLOSING BALANCE */}
                     <td className="px-4 py-4 text-right">
                       <div className="font-semibold">
-                        {formatCurrency(closingBalance)}
+                        {formatCurrency(Math.abs(closingBalance))}
+                        <span className="text-xs ml-1 font-normal text-gray-500">
+                          {closingBalance > 0
+                            ? ledger.balance_type === "debit" ? "Dr" : "Cr"
+                            : closingBalance < 0
+                              ? ledger.balance_type === "debit" ? "Cr" : "Dr"
+                              : ""}
+                        </span>
                       </div>
                     </td>
                   </tr>
