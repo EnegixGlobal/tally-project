@@ -1409,7 +1409,7 @@ router.post("/purchase_summary_import", async (req, res) => {
             companyId
         });
 
-        if (!voucher || !voucher.items || !voucher.items.length) {
+        if (!voucher) {
             return res.status(400).json({ success: false, message: "No voucher data received" });
         }
         if (!companyId || !ownerType || !ownerId) {
@@ -1423,7 +1423,7 @@ router.post("/purchase_summary_import", async (req, res) => {
         );
 
         const [stockItems] = await db.execute(
-            "SELECT id, name FROM stock_items WHERE company_id=?",
+            "SELECT id, name, batches, openingBalance FROM stock_items WHERE company_id=?",
             [companyId]
         );
 
@@ -1431,7 +1431,6 @@ router.post("/purchase_summary_import", async (req, res) => {
         const defaultPurchaseLedgerId = defaultPLedger ? defaultPLedger.id : null;
 
         // Header Fields
-        const gstin = voucher["GSTIN of supplier"] ? String(voucher["GSTIN of supplier"]).toUpperCase().trim() : null;
         const partyName = voucher["Trade/Legal name of the Supplier"] ? String(voucher["Trade/Legal name of the Supplier"]).toLowerCase().trim() : "";
         const invoiceNo = voucher["Invoice number"] || null;
         const invoiceDateStr = voucher["Invoice Date"];
@@ -1454,16 +1453,30 @@ router.post("/purchase_summary_import", async (req, res) => {
         }
 
         // PARTY MATCH
+        const importMode = voucher.importMode || 'item';
+        let partyId = null;
+
         const matchedLedgerByName = ledgers.find(l => {
             const lName = l.name ? String(l.name).toLowerCase().replace(/\s+/g, " ").trim() : "";
             const pName = partyName.replace(/\s+/g, " ").trim();
-            return lName === pName;
+            return partyName && lName === pName;
         });
 
-        if (!matchedLedgerByName) {
-            return res.json({ success: false, errors: [`Supplier '${partyName}' not found in ledgers`] });
+        if (matchedLedgerByName) {
+            partyId = matchedLedgerByName.id;
+        } else if (importMode === 'accounting') {
+            // Try to find supplier from accounting entries (the one with type 'credit')
+            const creditEntry = (voucher.accountingEntries || []).find(ae => String(ae.Type || ae.type).toLowerCase().trim() === 'credit');
+            if (creditEntry) {
+                const sName = String(creditEntry["Particulars (Ledger Name)"] || creditEntry.ledgerName || "").toLowerCase().trim();
+                const sLedger = ledgers.find(l => (l.name || "").toLowerCase().trim() === sName);
+                if (sLedger) partyId = sLedger.id;
+            }
         }
-        const partyId = matchedLedgerByName.id;
+
+        if (!partyId) {
+            return res.json({ success: false, errors: [`Supplier '${partyName || 'in entries'}' not found in ledgers`] });
+        }
 
         // AGGREGATE TOTALS
         let subtotal = 0;
@@ -1472,38 +1485,74 @@ router.post("/purchase_summary_import", async (req, res) => {
         let igstTotal = 0;
 
         const processedItems = [];
+        const processedAccountingEntries = [];
 
-        for (const item of voucher.items) {
-            const taxable = Number(item["Taxable Value (₹)"] || 0);
-            const cgst = Number(item["Central Tax (₹)"] || 0);
-            const sgst = Number(item["State/UT tax (₹)"] || 0);
-            const igst = Number(item["Integrated Tax (₹)"] || 0);
-            const rate = Number(item["Rate (%)"] || 0);
+        if (importMode === 'item') {
+            for (const item of (voucher.items || [])) {
+                const taxable = Number(item["Taxable Value (₹)"] || 0);
+                const cgst = Number(item["Central Tax (₹)"] || 0);
+                const sgst = Number(item["State/UT tax (₹)"] || 0);
+                const igst = Number(item["Integrated Tax (₹)"] || 0);
+                const rate = Number(item["Rate (%)"] || 0);
 
-            subtotal += taxable;
-            cgstTotal += cgst;
-            sgstTotal += sgst;
-            igstTotal += igst;
-            
-            let finalItemId = 0;
-            const itemName = item["Item Name"];
-            if (itemName) {
-                const si = stockItems.find(it => it.name.toLowerCase().trim() === itemName.toLowerCase().trim());
-                if (si) finalItemId = si.id;
+                subtotal += taxable;
+                cgstTotal += cgst;
+                sgstTotal += sgst;
+                igstTotal += igst;
+
+                let finalItemId = 0;
+                const itemName = item["Item Name"];
+                if (itemName) {
+                    const si = stockItems.find(it => it.name.toLowerCase().trim() === itemName.toLowerCase().trim());
+                    if (si) finalItemId = si.id;
+                }
+
+                processedItems.push({
+                    itemId: finalItemId,
+                    itemName: itemName,
+                    quantity: parseFloat(item["Quantity"]) || 1,
+                    rate: parseFloat(item["Item Rate (₹)"]) || taxable,
+                    amount: taxable,
+                    cgstRate: cgst > 0 ? (rate / 2) : 0,
+                    sgstRate: sgst > 0 ? (rate / 2) : 0,
+                    igstRate: igst > 0 ? rate : 0,
+                    hsnCode: item["HSN Code"] || "",
+                    batchNo: item["Batch No"] || ""
+                });
             }
+        } else {
+            // accounting-mode
+            for (const ae of (voucher.accountingEntries || [])) {
+                const amount = Number(ae["Amount (₹)"] || 0);
+                const cgst = Number(ae["Central Tax (₹)"] || 0);
+                const sgst = Number(ae["State/UT tax (₹)"] || 0);
+                const igst = Number(ae["Integrated Tax (₹)"] || 0);
+                const particulars = ae["Particulars (Ledger Name)"];
+                const type = ae["Type"] || "debit";
 
-            processedItems.push({
-                itemId: finalItemId,
-                itemName: itemName,
-                quantity: parseFloat(item["Quantity"]) || 1,
-                rate: parseFloat(item["Item Rate (₹)"]) || taxable,
-                amount: taxable,
-                cgstRate: cgst > 0 ? (rate / 2) : 0,
-                sgstRate: sgst > 0 ? (rate / 2) : 0,
-                igstRate: igst > 0 ? rate : 0,
-                hsnCode: item["HSN Code"] || "",
-                batchNo: item["Batch No"] || ""
-            });
+                if (type === 'debit') {
+                    subtotal += amount;
+                    cgstTotal += cgst;
+                    sgstTotal += sgst;
+                    igstTotal += igst;
+                }
+
+                let finalLedgerId = 0;
+                if (particulars) {
+                    const l = ledgers.find(ld => ld.name.toLowerCase().trim() === particulars.toLowerCase().trim());
+                    if (l) finalLedgerId = l.id;
+                }
+
+                processedAccountingEntries.push({
+                    ledgerId: finalLedgerId,
+                    ledgerName: particulars,
+                    amount: amount,
+                    type: type,
+                    cgst: cgst,
+                    sgst: sgst,
+                    igst: igst
+                });
+            }
         }
 
         const totalVal = subtotal + cgstTotal + sgstTotal + igstTotal;
@@ -1525,74 +1574,81 @@ router.post("/purchase_summary_import", async (req, res) => {
                 company_id, owner_type, owner_id, mode, purchaseLedgerId
             ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [
-                voucherNumber, date, date, "Imported Multi-item", partyId, invoiceNo,
+                voucherNumber, date, date, `Imported ${importMode === 'item' ? 'Multi-item' : 'Accounting'}`, partyId, invoiceNo,
                 subtotal, cgstTotal, sgstTotal, igstTotal, totalVal,
-                companyId, ownerType, ownerId, 'item-invoice', purchaseLedgerId
+                companyId, ownerType, ownerId, importMode === 'item' ? 'item-invoice' : 'accounting-invoice', purchaseLedgerId
             ]
         );
 
         const voucherId = mainResult.insertId;
 
-        // INSERT ITEMS
-        for (const pi of processedItems) {
-            await db.execute(
-                `INSERT INTO purchase_voucher_items (
-                    voucherId, itemId, quantity, rate, amount, 
-                    cgstRate, sgstRate, igstRate, purchaseLedgerId
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    voucherId, pi.itemId, pi.quantity, pi.rate, pi.amount,
-                    pi.cgstRate, pi.sgstRate, pi.igstRate, purchaseLedgerId
-                ]
-            );
+        if (importMode === 'item') {
+            // INSERT ITEMS
+            for (const pi of processedItems) {
+                await db.execute(
+                    `INSERT INTO purchase_voucher_items (
+                        voucherId, itemId, quantity, rate, amount, 
+                        cgstRate, sgstRate, igstRate, purchaseLedgerId
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        voucherId, pi.itemId, pi.quantity, pi.rate, pi.amount,
+                        pi.cgstRate, pi.sgstRate, pi.igstRate, purchaseLedgerId
+                    ]
+                );
 
-            if (pi.itemId) {
-                // 1. Update Stock Item Balches & Total Balance
-                const [itemData] = await db.execute("SELECT batches, openingBalance FROM stock_items WHERE id = ?", [pi.itemId]);
-                if (itemData && itemData.length > 0) {
-                    let dbBatches = [];
-                    try {
-                        dbBatches = itemData[0].batches ? (typeof itemData[0].batches === 'string' ? JSON.parse(itemData[0].batches) : itemData[0].batches) : [];
-                        if (!Array.isArray(dbBatches)) dbBatches = [];
-                    } catch (e) { dbBatches = []; }
+                if (pi.itemId) {
+                    // Update Stock Balance and Batches
+                    const stockItem = stockItems.find(si => si.id === pi.itemId);
+                    if (stockItem) {
+                        let dbBatches = [];
+                        try {
+                            dbBatches = stockItem.batches ? (typeof stockItem.batches === 'string' ? JSON.parse(stockItem.batches) : stockItem.batches) : [];
+                            if (!Array.isArray(dbBatches)) dbBatches = [];
+                        } catch (e) { dbBatches = []; }
 
-                    console.log(`[Import] Processing stock item ID ${pi.itemId}: Found ${dbBatches.length} batches, current balance ${itemData[0].openingBalance || 0}`);
-
-                    // SEARCH FOR BATCH (Treat missing/empty as null match check)
-                    const batchNameLower = pi.batchNo ? String(pi.batchNo).trim().toLowerCase() : "";
-                    const existingBatchIndex = dbBatches.findIndex(b => {
-                        const dbName = b.batchName ? String(b.batchName).trim().toLowerCase() : "";
-                        return dbName === batchNameLower;
-                    });
-
-                    if (existingBatchIndex > -1) {
-                        dbBatches[existingBatchIndex].batchQuantity = (Number(dbBatches[existingBatchIndex].batchQuantity) || 0) + pi.quantity;
-                        console.log(`[Import] Updated existing batch '${batchNameLower}', new qty: ${dbBatches[existingBatchIndex].batchQuantity}`);
-                    } else if (pi.batchNo) {
-                        // Create new batch only if batchNo was actually specified
-                        dbBatches.push({
-                            batchName: pi.batchNo,
-                            batchQuantity: pi.quantity,
-                            openingRate: pi.rate,
-                            openingValue: pi.quantity * pi.rate,
-                            mode: "purchase"
+                        const batchNameLower = pi.batchNo ? String(pi.batchNo).trim().toLowerCase() : "";
+                        const existingBatchIndex = dbBatches.findIndex(b => {
+                            const dbName = b.batchName ? String(b.batchName).trim().toLowerCase() : "";
+                            return dbName === batchNameLower;
                         });
-                        console.log(`[Import] Created new batch '${pi.batchNo}' with qty ${pi.quantity}`);
-                    }
 
-                    const newTotalBalance = (Number(itemData[0].openingBalance) || 0) + pi.quantity;
-                    await db.execute("UPDATE stock_items SET batches = ?, openingBalance = ? WHERE id = ?", [JSON.stringify(dbBatches), newTotalBalance, pi.itemId]);
-                    console.log(`[Import] Updated stock_item balance to ${newTotalBalance}`);
+                        if (existingBatchIndex > -1) {
+                            dbBatches[existingBatchIndex].batchQuantity = (Number(dbBatches[existingBatchIndex].batchQuantity) || 0) + pi.quantity;
+                        } else if (pi.batchNo) {
+                            dbBatches.push({
+                                batchName: pi.batchNo,
+                                batchQuantity: pi.quantity,
+                                openingRate: pi.rate,
+                                openingValue: pi.quantity * pi.rate,
+                                mode: "purchase"
+                            });
+                        }
+
+                        const newTotalBalance = (Number(stockItem.openingBalance) || 0) + pi.quantity;
+                        await db.execute("UPDATE stock_items SET batches = ?, openingBalance = ? WHERE id = ?", [JSON.stringify(dbBatches), newTotalBalance, pi.itemId]);
+                    }
+                }
+
+                if (pi.batchNo && pi.itemId) {
+                    // 2. Insert into purchase_history
+                    const historyValues = [[
+                        pi.itemName, pi.hsnCode, pi.batchNo, pi.quantity, date,
+                        companyId, ownerType, ownerId, "purchase", pi.rate, voucherNumber, null
+                    ]];
+                    await db.query(`INSERT INTO purchase_history (itemName, hsnCode, batchNumber, purchaseQuantity, purchaseDate, companyId, ownerType, ownerId, type, rate, voucherNumber, godownId) VALUES ?`, [historyValues]);
                 }
             }
+        } else {
+            // accounting-mode
+            const entryValues = processedAccountingEntries.map(ae => [
+                voucherId, ae.ledgerId, ae.ledgerName, ae.amount, ae.type, null, null, null, null
+            ]);
 
-            if (pi.batchNo && pi.itemId) {
-                // 2. Insert into purchase_history
-                const historyValues = [[
-                    pi.itemName, pi.hsnCode, pi.batchNo, pi.quantity, date, 
-                    companyId, ownerType, ownerId, "purchase", pi.rate, voucherNumber, null
-                ]];
-                await db.query(`INSERT INTO purchase_history (itemName, hsnCode, batchNumber, purchaseQuantity, purchaseDate, companyId, ownerType, ownerId, type, rate, voucherNumber, godownId) VALUES ?`, [historyValues]);
+            if (entryValues.length > 0) {
+                await db.query(
+                    `INSERT INTO voucher_entries (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id) VALUES ?`,
+                    [entryValues]
+                );
             }
         }
 
@@ -1607,6 +1663,7 @@ router.post("/purchase_summary_import", async (req, res) => {
         return res.status(500).json({ success: false, message: "Import failed: " + error.message });
     }
 });
+
 
 
 
