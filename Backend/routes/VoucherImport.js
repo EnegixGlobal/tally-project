@@ -1401,17 +1401,16 @@ router.post("/journal_import", async (req, res) => {
 
 router.post("/purchase_summary_import", async (req, res) => {
     try {
-        const { rows, companyId, ownerType, ownerId } = req.body;
+        const { voucher, companyId, ownerType, ownerId } = req.body;
 
-        console.log("Received Purchase Import Request:", {
-            rowsCount: rows?.length,
-            companyId,
-            ownerType,
-            ownerId
+        console.log("Received Grouped Purchase Import Request:", {
+            invoiceNo: voucher?.["Invoice number"],
+            itemsCount: voucher?.items?.length,
+            companyId
         });
 
-        if (!rows || !rows.length) {
-            return res.status(400).json({ success: false, message: "No data received" });
+        if (!voucher) {
+            return res.status(400).json({ success: false, message: "No voucher data received" });
         }
         if (!companyId || !ownerType || !ownerId) {
             return res.status(401).json({ success: false, message: "Unauthorized" });
@@ -1423,217 +1422,249 @@ router.post("/purchase_summary_import", async (req, res) => {
             [companyId]
         );
 
-        const [items] = await db.execute(
-            "SELECT id, name FROM stock_items WHERE company_id=?",
+        const [stockItems] = await db.execute(
+            "SELECT id, name, batches, openingBalance FROM stock_items WHERE company_id=?",
             [companyId]
         );
 
-        const ledgerMap = {};
-        const gstinMap = {};
-        // 🔍 Default Purchase Ledger
         const defaultPLedger = ledgers.find(l => l.name.toLowerCase().includes("purchase"));
         const defaultPurchaseLedgerId = defaultPLedger ? defaultPLedger.id : null;
 
-        const errors = [];
-        const saved = [];
+        // Header Fields
+        const partyName = voucher["Trade/Legal name of the Supplier"] ? String(voucher["Trade/Legal name of the Supplier"]).toLowerCase().trim() : "";
+        const invoiceNo = voucher["Invoice number"] || null;
+        const invoiceDateStr = voucher["Invoice Date"];
 
-        for (let i = 0; i < rows.length; i++) {
-            const row = rows[i];
-            
-            // 🔍 Per-row Purchase Ledger Match
-            let purchaseLedgerId = defaultPurchaseLedgerId;
-            const rowPurchaseLedgerName = row["Purchase Ledger"] ? String(row["Purchase Ledger"]).toLowerCase().trim() : null;
-            if (rowPurchaseLedgerName) {
-                const pLedger = ledgers.find(l => l.name.toLowerCase().includes(rowPurchaseLedgerName));
-                if (pLedger) purchaseLedgerId = pLedger.id;
+        // Determine Purchase Ledger for the whole voucher
+        let purchaseLedgerId = defaultPurchaseLedgerId;
+        const firstRowPurchaseLedgerName = voucher["Purchase Ledger"] ? String(voucher["Purchase Ledger"]).toLowerCase().trim() : null;
+        if (firstRowPurchaseLedgerName) {
+            const pLedger = ledgers.find(l => l.name.toLowerCase().includes(firstRowPurchaseLedgerName));
+            if (pLedger) purchaseLedgerId = pLedger.id;
+        }
+
+        // DATE FORMATTING
+        let date = invoiceDateStr;
+        if (typeof invoiceDateStr === 'string' && invoiceDateStr.includes('-')) {
+            const parts = invoiceDateStr.split('-');
+            if (parts[0].length === 2) {
+                date = `${parts[2]}-${parts[1]}-${parts[0]}`;
             }
+        }
 
-            // Column Mapping
-            const gstin = row["GSTIN of supplier"] ? String(row["GSTIN of supplier"]).toUpperCase().trim() : null;
-            const partyName = row["Trade/Legal name of the Supplier"] ? String(row["Trade/Legal name of the Supplier"]).toLowerCase().trim() : "";
-            const invoiceNo = row["Invoice number"] || null;
-            const invoiceDateStr = row["Invoice Date"];
-            const totalValue = Number(row["Invoice Value (₹)"] || 0);
-            const taxableValue = Number(row["Taxable Value (₹)"] || 0);
-            const igst = Number(row["Integrated Tax (₹)"] || 0);
-            const cgst = Number(row["Central Tax (₹)"] || 0);
-            const sgst = Number(row["State/UT tax (₹)"] || 0);
-            const rate = Number(row["Rate (%)"] || 0);
+        // PARTY MATCH
+        const importMode = voucher.importMode || 'item';
+        let partyId = null;
 
-            if (!invoiceDateStr || !partyName || !totalValue) {
-                errors.push(`Row ${i + 2}: Date, Supplier Name, and Invoice Value are required`);
-                continue;
+        const matchedLedgerByName = ledgers.find(l => {
+            const lName = l.name ? String(l.name).toLowerCase().replace(/\s+/g, " ").trim() : "";
+            const pName = partyName.replace(/\s+/g, " ").trim();
+            return partyName && lName === pName;
+        });
+
+        if (matchedLedgerByName) {
+            partyId = matchedLedgerByName.id;
+        } else if (importMode === 'accounting') {
+            // Try to find supplier from accounting entries (the one with type 'credit')
+            const creditEntry = (voucher.accountingEntries || []).find(ae => String(ae.Type || ae.type).toLowerCase().trim() === 'credit');
+            if (creditEntry) {
+                const sName = String(creditEntry["Particulars (Ledger Name)"] || creditEntry.ledgerName || "").toLowerCase().trim();
+                const sLedger = ledgers.find(l => (l.name || "").toLowerCase().trim() === sName);
+                if (sLedger) partyId = sLedger.id;
             }
+        }
 
-            // DATE FORMATTING
-            let date = invoiceDateStr;
-            if (typeof invoiceDateStr === 'string' && invoiceDateStr.includes('-')) {
-                const parts = invoiceDateStr.split('-');
-                if (parts[0].length === 2) {
-                    date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        if (!partyId) {
+            return res.json({ success: false, errors: [`Supplier '${partyName || 'in entries'}' not found in ledgers`] });
+        }
+
+        // AGGREGATE TOTALS
+        let subtotal = 0;
+        let cgstTotal = 0;
+        let sgstTotal = 0;
+        let igstTotal = 0;
+
+        const processedItems = [];
+        const processedAccountingEntries = [];
+
+        if (importMode === 'item') {
+            for (const item of (voucher.items || [])) {
+                const taxable = Number(item["Taxable Value (₹)"] || 0);
+                const cgst = Number(item["Central Tax (₹)"] || 0);
+                const sgst = Number(item["State/UT tax (₹)"] || 0);
+                const igst = Number(item["Integrated Tax (₹)"] || 0);
+                const rate = Number(item["Rate (%)"] || 0);
+
+                subtotal += taxable;
+                cgstTotal += cgst;
+                sgstTotal += sgst;
+                igstTotal += igst;
+
+                let finalItemId = 0;
+                const itemName = item["Item Name"];
+                if (itemName) {
+                    const si = stockItems.find(it => it.name.toLowerCase().trim() === itemName.toLowerCase().trim());
+                    if (si) finalItemId = si.id;
+                }
+
+                processedItems.push({
+                    itemId: finalItemId,
+                    itemName: itemName,
+                    quantity: parseFloat(item["Quantity"]) || 1,
+                    rate: parseFloat(item["Item Rate (₹)"]) || taxable,
+                    amount: taxable,
+                    cgstRate: cgst > 0 ? (rate / 2) : 0,
+                    sgstRate: sgst > 0 ? (rate / 2) : 0,
+                    igstRate: igst > 0 ? rate : 0,
+                    hsnCode: item["HSN Code"] || "",
+                    batchNo: item["Batch No"] || ""
+                });
+            }
+        } else {
+            // accounting-mode
+            for (const ae of (voucher.accountingEntries || [])) {
+                const amount = Number(ae["Amount (₹)"] || 0);
+                const cgst = Number(ae["Central Tax (₹)"] || 0);
+                const sgst = Number(ae["State/UT tax (₹)"] || 0);
+                const igst = Number(ae["Integrated Tax (₹)"] || 0);
+                const particulars = ae["Particulars (Ledger Name)"];
+                const type = ae["Type"] || "debit";
+
+                if (type === 'debit') {
+                    subtotal += amount;
+                    cgstTotal += cgst;
+                    sgstTotal += sgst;
+                    igstTotal += igst;
+                }
+
+                let finalLedgerId = 0;
+                if (particulars) {
+                    const l = ledgers.find(ld => ld.name.toLowerCase().trim() === particulars.toLowerCase().trim());
+                    if (l) finalLedgerId = l.id;
+                }
+
+                processedAccountingEntries.push({
+                    ledgerId: finalLedgerId,
+                    ledgerName: particulars,
+                    amount: amount,
+                    type: type,
+                    cgst: cgst,
+                    sgst: sgst,
+                    igst: igst
+                });
+            }
+        }
+
+        const totalVal = subtotal + cgstTotal + sgstTotal + igstTotal;
+
+        // GENERATE VOUCHER NUMBER
+        const voucherNumber = await generateVoucherNumber({
+            companyId,
+            ownerType,
+            ownerId,
+            voucherType: "purchase",
+            date,
+        });
+
+        // INSERT MAIN
+        const [mainResult] = await db.execute(
+            `INSERT INTO purchase_vouchers (
+                number, date, supplierInvoiceDate, narration, partyId, referenceNo, 
+                subtotal, cgstTotal, sgstTotal, igstTotal, total, 
+                company_id, owner_type, owner_id, mode, purchaseLedgerId
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [
+                voucherNumber, date, date, `Imported ${importMode === 'item' ? 'Multi-item' : 'Accounting'}`, partyId, invoiceNo,
+                subtotal, cgstTotal, sgstTotal, igstTotal, totalVal,
+                companyId, ownerType, ownerId, importMode === 'item' ? 'item-invoice' : 'accounting-invoice', purchaseLedgerId
+            ]
+        );
+
+        const voucherId = mainResult.insertId;
+
+        if (importMode === 'item') {
+            // INSERT ITEMS
+            for (const pi of processedItems) {
+                await db.execute(
+                    `INSERT INTO purchase_voucher_items (
+                        voucherId, itemId, quantity, rate, amount, 
+                        cgstRate, sgstRate, igstRate, purchaseLedgerId
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        voucherId, pi.itemId, pi.quantity, pi.rate, pi.amount,
+                        pi.cgstRate, pi.sgstRate, pi.igstRate, purchaseLedgerId
+                    ]
+                );
+
+                if (pi.itemId) {
+                    // Update Stock Balance and Batches
+                    const stockItem = stockItems.find(si => si.id === pi.itemId);
+                    if (stockItem) {
+                        let dbBatches = [];
+                        try {
+                            dbBatches = stockItem.batches ? (typeof stockItem.batches === 'string' ? JSON.parse(stockItem.batches) : stockItem.batches) : [];
+                            if (!Array.isArray(dbBatches)) dbBatches = [];
+                        } catch (e) { dbBatches = []; }
+
+                        const batchNameLower = pi.batchNo ? String(pi.batchNo).trim().toLowerCase() : "";
+                        const existingBatchIndex = dbBatches.findIndex(b => {
+                            const dbName = b.batchName ? String(b.batchName).trim().toLowerCase() : "";
+                            return dbName === batchNameLower;
+                        });
+
+                        if (existingBatchIndex > -1) {
+                            dbBatches[existingBatchIndex].batchQuantity = (Number(dbBatches[existingBatchIndex].batchQuantity) || 0) + pi.quantity;
+                        } else if (pi.batchNo) {
+                            dbBatches.push({
+                                batchName: pi.batchNo,
+                                batchQuantity: pi.quantity,
+                                openingRate: pi.rate,
+                                openingValue: pi.quantity * pi.rate,
+                                mode: "purchase"
+                            });
+                        }
+
+                        const newTotalBalance = (Number(stockItem.openingBalance) || 0) + pi.quantity;
+                        await db.execute("UPDATE stock_items SET batches = ?, openingBalance = ? WHERE id = ?", [JSON.stringify(dbBatches), newTotalBalance, pi.itemId]);
+                    }
+                }
+
+                if (pi.batchNo && pi.itemId) {
+                    // 2. Insert into purchase_history
+                    const historyValues = [[
+                        pi.itemName, pi.hsnCode, pi.batchNo, pi.quantity, date,
+                        companyId, ownerType, ownerId, "purchase", pi.rate, voucherNumber, null
+                    ]];
+                    await db.query(`INSERT INTO purchase_history (itemName, hsnCode, batchNumber, purchaseQuantity, purchaseDate, companyId, ownerType, ownerId, type, rate, voucherNumber, godownId) VALUES ?`, [historyValues]);
                 }
             }
+        } else {
+            // accounting-mode
+            const entryValues = processedAccountingEntries.map(ae => [
+                voucherId, ae.ledgerId, ae.ledgerName, ae.amount, ae.type, null, null, null, null
+            ]);
 
-            // LEDGER MATCH (Strict: Sequence Name -> GSTIN -> State)
-            let partyId = null;
-            const rawPlaceOfSupply = row["Place of supply"] ? String(row["Place of supply"]) : "";
-            const excelPlaceOfSupply = rawPlaceOfSupply.toLowerCase().replace(/\s+/g, " ").trim();
-            const pName = partyName ? String(partyName).toLowerCase().replace(/\s+/g, " ").trim() : "";
-            const pGst = gstin ? String(gstin).toUpperCase().replace(/\s+/g, "").trim() : "";
-
-            const matchedLedgerByName = ledgers.find(l => {
-                const lName = l.name ? String(l.name).toLowerCase().replace(/\s+/g, " ").trim() : "";
-                return lName === pName;
-            });
-
-            if (matchedLedgerByName) {
-                const lGst = matchedLedgerByName.gst_number ? String(matchedLedgerByName.gst_number).toUpperCase().replace(/\s+/g, "").trim() : "";
-                const lState = matchedLedgerByName.state ? String(matchedLedgerByName.state).toLowerCase().replace(/\s+/g, " ").trim() : "";
-                
-                const gstMatch = lGst === pGst;
-                
-                // Specific fix for state matching to avoid false positive substrings
-                const cleanExcelState = excelPlaceOfSupply.replace(/\(.*?\)/g, '').replace(/^[0-9]+[\-\s]*/, '').trim();
-                const stateMatch = lState === cleanExcelState || lState === excelPlaceOfSupply;
-
-                if (gstMatch && stateMatch) {
-                    partyId = matchedLedgerByName.id;
-                } else if (!gstMatch && !stateMatch) {
-                    errors.push(`Row ${i + 2}: GSTIN and State mismatch for Supplier '${partyName}'. Expected GSTIN: '${lGst}', State: '${lState}'`);
-                } else if (!gstMatch) {
-                    errors.push(`Row ${i + 2}: GSTIN mismatch for Supplier '${partyName}'. Expected: '${lGst}', Got: '${pGst}'`);
-                } else if (!stateMatch) {
-                    errors.push(`Row ${i + 2}: State mismatch for Supplier '${partyName}'. Expected: '${lState}', Got: '${excelPlaceOfSupply}'`);
-                }
-            } else {
-                errors.push(`Row ${i + 2}: Supplier Name not found in ledgers ('${partyName}')`);
-            }
-
-            if (!partyId) {
-                errors.push(`Row ${i + 2}: Supplier match failed! Name, GSTIN, and State must all match exactly (Supplier: ${row["Trade/Legal name of the Supplier"]})`);
-                continue;
-            }
-
-            // ITEM MATCH (Optional but validated if provided)
-            let finalItemId = 0;
-            let finalItemName = "";
-            const rowItemName = row["Item Name"] ? String(row["Item Name"]).trim() : null;
-            
-            if (rowItemName) {
-                const matchedItem = items.find(it => it.name.toLowerCase().trim() === rowItemName.toLowerCase());
-                if (matchedItem) {
-                    finalItemId = matchedItem.id;
-                    finalItemName = matchedItem.name;
-                } else {
-                    errors.push(`Row ${i + 2}: Item Name not found in your stock items ('${rowItemName}')`);
-                    continue;
-                }
-            }
-
-            const itemQty = parseFloat(row["Quantity"]) || 1;
-            const itemRate = parseFloat(row["Item Rate (₹)"]) || taxableValue;
-            const hsnCode = row["HSN Code"] ? String(row["HSN Code"] || "").trim() : "";
-            const batchNo = row["Batch No"] ? String(row["Batch No"]).trim() : "";
-
-            // GENERATE VOUCHER NUMBER
-            const voucherNumber = await generateVoucherNumber({
-                companyId,
-                ownerType,
-                ownerId,
-                voucherType: "purchase",
-                date,
-            });
-
-            // INSERT INTO purchase_vouchers
-            const [mainResult] = await db.execute(
-                `INSERT INTO purchase_vouchers (
-                    number, date, supplierInvoiceDate, narration, partyId, referenceNo, 
-                    subtotal, cgstTotal, sgstTotal, igstTotal, total, 
-                    company_id, owner_type, owner_id, mode, purchaseLedgerId
-                ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
-                [
-                    voucherNumber,
-                    date,
-                    date,
-                    "Imported from GST Summary",
-                    partyId,
-                    invoiceNo,
-                    taxableValue,
-                    cgst,
-                    sgst,
-                    igst,
-                    totalValue,
-                    companyId,
-                    ownerType,
-                    ownerId,
-                    'item-invoice',
-                    purchaseLedgerId
-                ]
-            );
-
-            const voucherId = mainResult.insertId;
-
-            // INSERT INTO purchase_voucher_items
-            await db.execute(
-                `INSERT INTO purchase_voucher_items (
-                    voucherId, itemId, quantity, rate, amount, 
-                    cgstRate, sgstRate, igstRate, purchaseLedgerId
-                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-                [
-                    voucherId,
-                    finalItemId,
-                    itemQty,
-                    itemRate,
-                    taxableValue,
-                    cgst > 0 ? (rate / 2) : 0,
-                    sgst > 0 ? (rate / 2) : 0,
-                    igst > 0 ? rate : 0,
-                    purchaseLedgerId
-                ]
-            );
-
-            // INSERT INTO purchase_history for Batch Tracking (if Item & Batch provided)
-            if (batchNo && finalItemId) {
-                const historyValues = [[
-                    finalItemName,
-                    hsnCode,
-                    batchNo,
-                    itemQty,
-                    date,
-                    companyId,
-                    ownerType,
-                    ownerId,
-                    "purchase",
-                    itemRate,
-                    voucherNumber,
-                    null // godownId
-                ]];
-
+            if (entryValues.length > 0) {
                 await db.query(
-                    `INSERT INTO purchase_history 
-                      (itemName, hsnCode, batchNumber, purchaseQuantity, purchaseDate, companyId, ownerType, ownerId, type, rate, voucherNumber, godownId)
-                      VALUES ?`,
-                    [historyValues]
+                    `INSERT INTO voucher_entries (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id) VALUES ?`,
+                    [entryValues]
                 );
             }
-
-            saved.push(voucherNumber);
         }
 
         return res.json({
-            success: errors.length === 0,
-            imported: saved.length,
-            vouchers: saved,
-            errors,
+            success: true,
+            imported: 1,
+            vouchers: [voucherNumber]
         });
+
     } catch (error) {
         console.error("❌ Purchase Summary Import Error:", error);
-        return res.status(500).json({
-            success: false,
-            message: "Import failed: " + error.message,
-        });
+        return res.status(500).json({ success: false, message: "Import failed: " + error.message });
     }
 });
+
+
 
 
 module.exports = router;

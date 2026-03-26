@@ -78,10 +78,8 @@ const DayBook: React.FC = () => {
     supplier_invoice_date: 0,
   });
   const [showFilterPanel, setShowFilterPanel] = useState(false);
-  const [selectedDate, setSelectedDate] = useState(
-    new Date().toISOString().split("T")[0]
-  );
-  const [selectedDateRange, setSelectedDateRange] = useState("today");
+  const [selectedDate, setSelectedDate] = useState("");
+  const [selectedDateRange, setSelectedDateRange] = useState("financial-year");
   const [selectedVoucherType, setSelectedVoucherType] = useState("");
   const [viewMode, setViewMode] = useState<"detailed" | "grouped">("grouped");
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherGroup | null>(
@@ -255,8 +253,8 @@ const DayBook: React.FC = () => {
         const groupedArray = Object.values(grouped).sort((a, b) => {
           const dateA = new Date(a.date).getTime();
           const dateB = new Date(b.date).getTime();
-          if (dateB !== dateA) return dateB - dateA;
-          return b.voucherNo.localeCompare(a.voucherNo);
+          if (dateA !== dateB) return dateA - dateB;
+          return a.voucherNo.localeCompare(b.voucherNo);
         });
         setGroupedVouchers(groupedArray);
         setAllGroupedVouchers(groupedArray);
@@ -267,12 +265,12 @@ const DayBook: React.FC = () => {
         const entryGroups: DayBookEntry[][] = [];
         const groupMap = new Map<string, number>();
 
-        // Sort RAW entries by date descending before grouping
+        // Sort RAW entries by date ascending before grouping
         allDetailedEntriesRaw.sort((a, b) => {
           const dateA = new Date(a.date).getTime();
           const dateB = new Date(b.date).getTime();
-          if (dateB !== dateA) return dateB - dateA;
-          return b.voucherNo.localeCompare(a.voucherNo);
+          if (dateA !== dateB) return dateA - dateB;
+          return a.voucherNo.localeCompare(b.voucherNo);
         });
 
         allDetailedEntriesRaw.forEach((entry) => {
@@ -525,6 +523,7 @@ const DayBook: React.FC = () => {
                   : "bg-white border-gray-300"
                   }`}
               >
+                <option value="financial-year">Financial Year</option>
                 <option value="today">Today</option>
                 <option value="yesterday">Yesterday</option>
                 <option value="this-week">This Week</option>
@@ -694,7 +693,7 @@ const DayBook: React.FC = () => {
               <button
                 onClick={() => {
                   setSelectedDate("");
-                  setSelectedDateRange("today");
+                  setSelectedDateRange("financial-year");
                 }}
                 className="text-xs px-2 py-1 rounded bg-red-100 text-red-600 hover:bg-red-200"
               >
