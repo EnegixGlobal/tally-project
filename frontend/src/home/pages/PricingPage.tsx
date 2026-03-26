@@ -1,73 +1,58 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { CheckCircle } from 'lucide-react';
 import Navigation from '../components/Navigation';
 import PricingCard from '../components/PricingCard';
 import Footer from '../components/Footer';
 
+interface Plan {
+  id: string;
+  name: string;
+  price: number;
+  duration: string;
+  features: string[];
+  isActive: boolean;
+  popular?: boolean;
+  description?: string;
+}
+
+const API_BASE = import.meta.env.VITE_API_URL
+
 const PricingPage: React.FC = () => {
-  const pricingPlans = [
-    {
-      id: 'starter',
-      name: "Starter",
-      price: "₹999",
-      period: "/month",
-      description: "Perfect for small businesses and startups",
-      features: [
-        "Up to 100 transactions/month",
-        "Basic GST reports",
-        "Single user access",
-        "Email support",
-        "Basic inventory tracking",
-        "Standard templates"
-      ],
-      popular: false,
-      buttonText: "Start Starter Plan"
-    },
-    {
-      id: 'professional',
-      name: "Professional",
-      price: "₹2,999",
-      period: "/month",
-      description: "Ideal for growing businesses",
-      features: [
-        "Unlimited transactions",
-        "Advanced GST compliance",
-        "Up to 5 users",
-        "Priority support",
-        "Advanced reporting",
-        "Multi-location support",
-        "API access",
-        "Custom workflows",
-        "Audit trails",
-        "Data export/import"
-      ],
-      popular: true,
-      buttonText: "Start Professional Plan"
-    },
-    {
-      id: 'enterprise',
-      name: "Enterprise",
-      price: "₹9,999",
-      period: "/month",
-      description: "For large enterprises with complex needs",
-      features: [
-        "Everything in Professional",
-        "Unlimited users",
-        "Custom integrations",
-        "Dedicated account manager",
-        "Advanced audit trails",
-        "Custom workflows",
-        "24/7 phone support",
-        "White-label options",
-        "Advanced security",
-        "Custom training",
-        "SLA guarantees"
-      ],
-      popular: false,
-      buttonText: "Contact Sales"
-    }
-  ];
+  const [plans, setPlans] = useState<Plan[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchPlans = async () => {
+      try {
+        const res = await fetch(`${API_BASE}/api/subscriptions`);
+        const data = await res.json();
+        if (data.success) {
+          // Only show active plans, sorted by price ascending
+          const activePlans: Plan[] = data.data
+            .filter((p: Plan) => p.isActive)
+            .sort((a: Plan, b: Plan) => a.price - b.price);
+
+          // Mark the middle plan as "popular" if there are 3+
+          if (activePlans.length >= 3) {
+            const midIndex = Math.floor(activePlans.length / 2);
+            activePlans[midIndex].popular = true;
+          }
+
+          setPlans(activePlans);
+        } else {
+          setError('Could not load plans.');
+        }
+      } catch {
+        setError('Failed to connect to server.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchPlans();
+  }, []);
 
   const faqs = [
     {
@@ -96,6 +81,18 @@ const PricingPage: React.FC = () => {
     }
   ];
 
+  // Map backend plan to PricingCard-compatible shape
+  const mapPlanToCard = (plan: Plan) => ({
+    id: plan.id,
+    name: plan.name,
+    price: `₹${Number(plan.price).toLocaleString('en-IN')}`,
+    period: plan.duration ? `/${plan.duration}` : '/month',
+    description: plan.description || `${plan.name} plan`,
+    features: plan.features,
+    popular: plan.popular || false,
+    buttonText: 'Get Started',
+  });
+
   return (
     <div className="min-h-screen bg-white">
       <Navigation centered />
@@ -107,7 +104,7 @@ const PricingPage: React.FC = () => {
             Choose Your Perfect Plan
           </h1>
           <p className="text-xl text-gray-600 max-w-3xl mx-auto mb-8">
-            Start with a 14-day free trial. No credit card required. 
+            Start with a 14-day free trial. No credit card required.{' '}
             Scale as your business grows with our flexible pricing options.
           </p>
           <div className="flex items-center justify-center space-x-4 text-sm text-gray-500">
@@ -130,11 +127,35 @@ const PricingPage: React.FC = () => {
       {/* Pricing Cards */}
       <section className="py-16 bg-white">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
-            {pricingPlans.map((plan) => (
-              <PricingCard key={plan.id} plan={plan} />
-            ))}
-          </div>
+          {loading && (
+            <div className="flex justify-center items-center py-16">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+            </div>
+          )}
+
+          {error && !loading && (
+            <div className="text-center py-16 text-red-500 text-lg">{error}</div>
+          )}
+
+          {!loading && !error && plans.length === 0 && (
+            <div className="text-center py-16 text-gray-500 text-lg">
+              No pricing plans available at the moment. Please check back soon.
+            </div>
+          )}
+
+          {!loading && plans.length > 0 && (
+            <div className={`grid grid-cols-1 gap-8 ${
+              plans.length === 1
+                ? 'md:grid-cols-1 max-w-md mx-auto'
+                : plans.length === 2
+                ? 'md:grid-cols-2 max-w-3xl mx-auto'
+                : 'md:grid-cols-3'
+            }`}>
+              {plans.map((plan) => (
+                <PricingCard key={plan.id} plan={mapPlanToCard(plan)} />
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
@@ -172,7 +193,7 @@ const PricingPage: React.FC = () => {
             Ready to Get Started?
           </h2>
           <p className="text-xl text-indigo-100 mb-8 max-w-3xl mx-auto">
-            Join thousands of businesses that trust ApnaBook for their accounting needs. 
+            Join thousands of businesses that trust ApnaBook for their accounting needs.{' '}
             Start your free trial today - no credit card required.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
