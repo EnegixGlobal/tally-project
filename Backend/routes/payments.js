@@ -16,7 +16,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || process.env.PAYU_SURL;
 const BACKEND_URL = process.env.BACKEND_URL || process.env.PAYU_SERVER_ORIGIN;
 
 if (!FRONTEND_URL || !BACKEND_URL) {
-  // console.error('❌ Critical Error: FRONTEND_URL or BACKEND_URL not defined in .env');
+  console.error('❌ Critical Error: FRONTEND_URL or BACKEND_URL not defined in .env');
 }
 
 function sha512(str) {
@@ -87,16 +87,25 @@ router.post('/create-order', async (req, res) => {
 
     // Ensure surl/furl point to the backend confirm endpoint
     const mapToBackendConfirm = (url) => {
+      const confirmPath = '/api/payments/confirm';
+      
+      // If we are in production (apnabook.com) and the URL is the base domain,
+      // we MUST append the /api path, otherwise Nginx throws 405 on POST.
+      if (url === 'https://apnabook.com' || url === 'https://www.apnabook.com' || url === FRONTEND_URL) {
+        return `${BACKEND_URL || 'https://apnabook.com'}${confirmPath}`;
+      }
+
       if (!url) return `${BACKEND_URL}/api/payments/confirm`;
+      
       try {
         const u = new URL(url);
         // If url hostname looks like a frontend dev server, map to backend
-        if (u.port === '5173' || u.port === '5174' || u.port === '4173') {
-          return `${BACKEND_URL}/api/payments/confirm`;
+        if (u.port === '5173' || u.port === '5174' || u.port === '4173' || u.hostname === 'localhost') {
+          return `${BACKEND_URL || 'http://localhost:5000'}${confirmPath}`;
         }
         return url;
       } catch (e) {
-        return `${BACKEND_URL}/api/payments/confirm`;
+        return `${BACKEND_URL}${confirmPath}`;
       }
     };
 
