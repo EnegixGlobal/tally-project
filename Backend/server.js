@@ -24,6 +24,7 @@ app.use(
 );
 
 app.use(bodyParser.json());
+app.use(express.urlencoded({ extended: true }));
 app.use("/uploads", express.static("uploads"));
 // const authMiddleware = require('./middlewares/authMiddleware');
 // const loadPermissions = require('./middlewares/loadPermissions');
@@ -111,6 +112,8 @@ app.use("/api/company-subscription", companySubscriptionRoutes);
 
 const couponRoutes = require("./routes/coupons");
 app.use("/api/coupons", couponRoutes);
+const paymentsRoutes = require("./routes/payments");
+app.use("/api/payments", paymentsRoutes);
 
 const salesOrders = require("./routes/salesOrders");
 app.use("/api/sales-orders", salesOrders);

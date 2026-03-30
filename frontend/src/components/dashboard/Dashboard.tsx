@@ -492,7 +492,7 @@ const Dashboard: React.FC = () => {
                   </div>
                 </div>
                 <button
-                  onClick={() => navigate('/pricing')}
+                  onClick={() => navigate('/app/pricing')}
                   className="self-stretch md:self-auto rounded-xl bg-blue-600 px-4 py-2 text-xs font-semibold text-white shadow hover:bg-blue-700"
                 >
                   View Plans / Renew
