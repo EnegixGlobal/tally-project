@@ -191,6 +191,9 @@ import IncomeTaxReports from "./components/incometax/IncomeTaxReports";
 // Home Pages
 import HomePage from "./home/pages/HomePage";
 import PricingPage from "./home/pages/PricingPage";
+import AppPricing from "./components/payments/Pricing";
+import PaymentSuccess from "./components/payments/Success";
+import PaymentFailure from "./components/payments/Failure";
 import PurchasePage from "./home/pages/PurchasePage";
 import AboutUsPage from "./home/pages/AboutUsPage";
 import CareersPage from "./home/pages/CareersPage";
@@ -278,6 +281,22 @@ function App() {
               <Route path="/app" element={<MainLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="company" element={<CompanyForm />} />
+                <Route
+                  path="pricing"
+                  element={
+                    <RequireCompany>
+                      <AppPricing />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="payments/success"
+                  element={<PaymentSuccess />}
+                />
+                <Route
+                  path="payments/failure"
+                  element={<PaymentFailure />}
+                />
                 {/* Masters Routes */}
                 <Route
                   path="masters"

@@ -44,6 +44,18 @@ interface AccountingEntry {
     _matchedLedgerId?: string | number;
 }
 
+interface AccSummaryRow {
+    taxableValue: number;
+    igst: number;
+    cgst: number;
+    sgst: number;
+    gstRate: number;
+    purchaseLedger: string;
+    discount: number;
+    rowTotal: number;
+    calculationWarning?: string;
+}
+
 interface GroupedVoucher {
     id: string;
     "GSTIN of supplier": string;
@@ -64,6 +76,7 @@ interface GroupedVoucher {
     items: ImportedItem[];
     accountingEntries?: AccountingEntry[];
     importMode: "item" | "accounting";
+    accSummaryRows?: AccSummaryRow[];
 }
 
 const PurchaseImport: React.FC = () => {
@@ -198,7 +211,8 @@ const PurchaseImport: React.FC = () => {
             const firstRow = jsonData[0];
             const isItemImport = firstRow.hasOwnProperty("Item Name");
             const isAccountingImport = firstRow.hasOwnProperty("Particulars (Ledger Name)") || firstRow.hasOwnProperty("Particulars");
-            const currentImportMode: "item" | "accounting" = isItemImport ? "item" : (isAccountingImport ? "accounting" : "item");
+            const isAccSummaryImport = !isItemImport && !isAccountingImport && firstRow.hasOwnProperty("GST Rate (%)");
+            const currentImportMode: "item" | "accounting" = isItemImport ? "item" : (isAccountingImport || isAccSummaryImport ? "accounting" : "item");
             setImportMode(currentImportMode);
 
             jsonData.forEach((row, index) => {
@@ -385,67 +399,170 @@ const PurchaseImport: React.FC = () => {
                         }
                     }
                 } else if (currentImportMode === "accounting") {
-                    const particulars = String(row["Particulars (Ledger Name)"] || row["Particulars"] || "").trim();
-                    if (!particulars) return; // Skip if no particulars for accounting entry
+                    if (isAccSummaryImport) {
+                        // ── NEW ACCOUNTING SUMMARY FORMAT (Multi-Row Support) ──
+                        const taxableVal     = Number(row["Taxable Value (₹)"]  || 0);
+                        const igst           = Number(row["Integrated Tax (₹)"] || 0);
+                        const cgst           = Number(row["Central Tax (₹)"]     || 0);
+                        const sgst           = Number(row["State/UT tax (₹)"]    || 0);
+                        const gstRate        = Number(row["GST Rate (%)"]         || 0);
+                        const purchaseLedger = String(row["Purchase Ledger"]   || "").trim();
+                        const discount       = Number(row["Discount (₹)"]         || 0);
+                        const totalTax       = igst + cgst + sgst;
+                        const rowTotal       = taxableVal + totalTax - discount;
 
-                    const amount = Number(row["Amount (₹)"] || row["Debit Amount (₹)"] || 0);
-                    const type = String(row["Type"] || "debit").toLowerCase().trim() as "credit" | "debit";
-                    const gstRate = Number(row["Rate (%)"] || 0);
-                    let igst = Number(row["Integrated Tax (₹)"] || 0);
-                    let cgst = Number(row["Central Tax (₹)"] || 0);
-                    let sgst = Number(row["State/UT tax (₹)"] || 0);
-
-                    let calculationWarning = "";
-
-                    // Auto-calculate taxes if they are zero or missing, or if rate is provided
-                    if (gstRate > 0 && igst === 0 && cgst === 0 && sgst === 0) {
-                        const excelPos = placeOfSupply.toLowerCase().trim();
-                        const excelPosCode = excelPos.match(/^[0-9]+/)?.[0] || excelPos.match(/\(([0-9]+)\)/)?.[1] || "";
-
-                        const supplierGstin = String(row["GSTIN of supplier"] || "").trim();
-                        const supplierGstinCode = supplierGstin.slice(0, 2);
-
-                        const isIntra = (supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode);
-
-                        if (isIntra) {
-                            cgst = (amount * (gstRate / 2)) / 100;
-                            sgst = (amount * (gstRate / 2)) / 100;
-                            igst = 0;
-                        } else {
-                            igst = (amount * gstRate) / 100;
-                            cgst = 0;
-                            sgst = 0;
+                        // Initialize if first row for this voucher group
+                        if (!voucherGroups[groupKey].accSummaryRows) {
+                            voucherGroups[groupKey].accSummaryRows = [];
+                            voucherGroups[groupKey]["Invoice Value (₹)"] = 0;
+                            voucherGroups[groupKey].accountingEntries = [];
                         }
-                    } else if (gstRate > 0) {
-                        // Check for discrepancy if tax IS provided
-                        const expectedTax = (amount * gstRate) / 100;
-                        const foundTax = igst + cgst + sgst;
-                        if (Math.abs(expectedTax - foundTax) > 0.5) {
-                            calculationWarning += (calculationWarning ? " | " : "") + `Tax Discrepancy: Expected total tax ${expectedTax}, found ${foundTax}.`;
+
+                        // Accumulate overall invoice value
+                        voucherGroups[groupKey]["Invoice Value (₹)"] += rowTotal;
+                        
+                        // --- Calculation Validation ---
+                        let calculationWarning = "";
+                        const totalTaxRow = igst + cgst + sgst;
+                        const expectedTotalTax = (taxableVal * gstRate) / 100;
+                        if (Math.abs(totalTaxRow - expectedTotalTax) > 1) {
+                            calculationWarning = "Tax Discrepancy (Calculated " + expectedTotalTax.toFixed(2) + ")";
                         }
-                    }
 
-                    const matchedLedger = ledgers.find(l => l.name.toLowerCase().trim() === particulars.toLowerCase().trim());
+                        // Track summary rows for preview
+                        voucherGroups[groupKey].accSummaryRows.push({
+                            taxableValue: taxableVal,
+                            igst, cgst, sgst, gstRate,
+                            purchaseLedger,
+                            discount,
+                            rowTotal,
+                            calculationWarning
+                        });
 
-                    voucherGroups[groupKey].accountingEntries!.push({
-                        "Particulars (Ledger Name)": particulars,
-                        "Amount (₹)": amount,
-                        "Type": type,
-                        "Rate (%)": gstRate,
-                        "Integrated Tax (₹)": igst,
-                        "Central Tax (₹)": cgst,
-                        "State/UT tax (₹)": sgst,
-                        calculationWarning,
-                        _matchedLedgerId: matchedLedger?.id || undefined
-                    });
+                        // 1. --- Debit: Purchase Ledger ---
+                        const matchedPL = purchaseLedger
+                            ? ledgers.find(l => String(l.name).toLowerCase().trim() === purchaseLedger.toLowerCase().trim())
+                            : null;
+                        
+                        voucherGroups[groupKey].accountingEntries!.push({
+                            "Particulars (Ledger Name)": purchaseLedger || "Purchase Account",
+                            "Amount (₹)": taxableVal - discount,
+                            "Type": "debit",
+                            "Rate (%)": gstRate,
+                            "Integrated Tax (₹)": 0,
+                            "Central Tax (₹)": 0,
+                            "State/UT tax (₹)": 0,
+                            calculationWarning: "",
+                            _matchedLedgerId: matchedPL?.id
+                        });
 
-                    // For accounting mode, Invoice Value is often the total credit to the party
-                    const totalCredit = voucherGroups[groupKey].accountingEntries!.reduce((sum, ae) => ae.Type === 'credit' ? sum + ae["Amount (₹)"] : sum, 0);
-                    const totalDebit = voucherGroups[groupKey].accountingEntries!.reduce((sum, ae) => ae.Type === 'debit' ? sum + ae["Amount (₹)"] + ae["Integrated Tax (₹)"] + ae["Central Tax (₹)"] + ae["State/UT tax (₹)"] : sum, 0);
+                        // 2. --- Debit: Tax Ledgers ---
+                        if (igst > 0) {
+                            const igstLedger = ledgers.find(l => /igst/i.test(String(l.name)));
+                            voucherGroups[groupKey].accountingEntries!.push({
+                                "Particulars (Ledger Name)": igstLedger?.name || "IGST",
+                                "Amount (₹)": igst,
+                                "Type": "debit",
+                                "Rate (%)": 0,
+                                "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0,
+                                calculationWarning: "",
+                                _matchedLedgerId: igstLedger?.id
+                            });
+                        }
+                        if (cgst > 0) {
+                            const cgstLedger = ledgers.find(l => /cgst/i.test(String(l.name)));
+                            voucherGroups[groupKey].accountingEntries!.push({
+                                "Particulars (Ledger Name)": cgstLedger?.name || "CGST",
+                                "Amount (₹)": cgst,
+                                "Type": "debit",
+                                "Rate (%)": 0,
+                                "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0,
+                                calculationWarning: "",
+                                _matchedLedgerId: cgstLedger?.id
+                            });
+                        }
+                        if (sgst > 0) {
+                            const sgstLedger = ledgers.find(l => /sgst|utgst/i.test(String(l.name)));
+                            voucherGroups[groupKey].accountingEntries!.push({
+                                "Particulars (Ledger Name)": sgstLedger?.name || "SGST/UTGST",
+                                "Amount (₹)": sgst,
+                                "Type": "debit",
+                                "Rate (%)": 0,
+                                "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0,
+                                calculationWarning: "",
+                                _matchedLedgerId: sgstLedger?.id
+                            });
+                        }
 
-                    // If the invoice value was not provided, or if it's significantly different, try to infer it
-                    if (voucherGroups[groupKey]["Invoice Value (₹)"] === 0 || Math.abs(voucherGroups[groupKey]["Invoice Value (₹)"] - totalCredit) > 1) {
-                        voucherGroups[groupKey]["Invoice Value (₹)"] = totalCredit;
+                        // 3. --- Credit: Supplier (Party) ---
+                        // Find or create the Credit entry for the party (only one per invoice)
+                        let creditEntry = voucherGroups[groupKey].accountingEntries!.find(ae => ae.Type === 'credit');
+                        if (!creditEntry) {
+                            const creditLedger = ledgers.find(l => String(l.name).toLowerCase().trim() === partyName.toLowerCase().trim());
+                            creditEntry = {
+                                "Particulars (Ledger Name)": partyName || "Supplier",
+                                "Amount (₹)": 0,
+                                "Type": "credit",
+                                "Rate (%)": 0,
+                                "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0,
+                                calculationWarning: "",
+                                _matchedLedgerId: creditLedger?.id
+                            };
+                            voucherGroups[groupKey].accountingEntries!.push(creditEntry);
+                        }
+                        // Update credit amount to match total accumulated invoice value
+                        creditEntry["Amount (₹)"] = voucherGroups[groupKey]["Invoice Value (₹)"];
+
+                    } else {
+                        // ── LEGACY MULTI-ROW ACCOUNTING FORMAT ──
+                        const particulars = String(row["Particulars (Ledger Name)"] || row["Particulars"] || "").trim();
+                        if (!particulars) return;
+
+                        const amount = Number(row["Amount (₹)"] || row["Debit Amount (₹)"] || 0);
+                        const type = String(row["Type"] || "debit").toLowerCase().trim() as "credit" | "debit";
+                        const gstRate = Number(row["Rate (%)"] || 0);
+                        let igst = Number(row["Integrated Tax (₹)"] || 0);
+                        let cgst = Number(row["Central Tax (₹)"] || 0);
+                        let sgst = Number(row["State/UT tax (₹)"] || 0);
+
+                        let calculationWarning = "";
+
+                        if (gstRate > 0 && igst === 0 && cgst === 0 && sgst === 0) {
+                            const excelPos = placeOfSupply.toLowerCase().trim();
+                            const excelPosCode = excelPos.match(/^[0-9]+/)?.[0] || excelPos.match(/\(([0-9]+)\)/)?.[1] || "";
+                            const supplierGstinCode = gstin.slice(0, 2);
+                            const isIntra = supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode;
+                            if (isIntra) {
+                                cgst = (amount * (gstRate / 2)) / 100;
+                                sgst = (amount * (gstRate / 2)) / 100;
+                            } else {
+                                igst = (amount * gstRate) / 100;
+                            }
+                        } else if (gstRate > 0) {
+                            const expectedTax = (amount * gstRate) / 100;
+                            const foundTax = igst + cgst + sgst;
+                            if (Math.abs(expectedTax - foundTax) > 0.5) {
+                                calculationWarning += `Tax Discrepancy: Expected ${expectedTax}, found ${foundTax}.`;
+                            }
+                        }
+
+                        const matchedLedger = ledgers.find(l => l.name.toLowerCase().trim() === particulars.toLowerCase().trim());
+                        voucherGroups[groupKey].accountingEntries!.push({
+                            "Particulars (Ledger Name)": particulars,
+                            "Amount (₹)": amount,
+                            "Type": type,
+                            "Rate (%)": gstRate,
+                            "Integrated Tax (₹)": igst,
+                            "Central Tax (₹)": cgst,
+                            "State/UT tax (₹)": sgst,
+                            calculationWarning,
+                            _matchedLedgerId: matchedLedger?.id || undefined
+                        });
+
+                        const totalCredit = voucherGroups[groupKey].accountingEntries!.reduce((sum, ae) => ae.Type === 'credit' ? sum + ae["Amount (₹)"] : sum, 0);
+                        if (voucherGroups[groupKey]["Invoice Value (₹)"] === 0 || Math.abs(voucherGroups[groupKey]["Invoice Value (₹)"] - totalCredit) > 1) {
+                            voucherGroups[groupKey]["Invoice Value (₹)"] = totalCredit;
+                        }
                     }
                 }
             });
@@ -608,7 +725,70 @@ const PurchaseImport: React.FC = () => {
                     "Invoice Value (₹)": newSubtotal + newTax
                 };
             } else { // Accounting mode
-                const updatedAccountingEntries = voucher.accountingEntries?.map(ae => {
+                if (voucher.accSummaryRows) {
+                    // Update rows directly if they exist
+                    voucher.accSummaryRows = voucher.accSummaryRows.map(row => {
+                        const amount = row.taxableValue;
+                        const rate = row.gstRate;
+
+                        const excelPos = voucher["Place of supply"].toLowerCase().trim();
+                        const excelPosCode = excelPos.match(/^[0-9]+/)?.[0] || excelPos.match(/\(([0-9]+)\)/)?.[1] || "";
+                        
+                        const supplierGstin = String(voucher["GSTIN of supplier"] || "").trim();
+                        const supplierGstinCode = supplierGstin.slice(0, 2);
+
+                        const isIntra = (supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode);
+
+                        let newIgst = 0, newCgst = 0, newSgst = 0;
+                        if (isIntra) {
+                            newCgst = (amount * (rate / 2)) / 100;
+                            newSgst = (amount * (rate / 2)) / 100;
+                            newIgst = 0;
+                        } else {
+                            newIgst = (amount * rate) / 100;
+                            newCgst = 0;
+                            newSgst = 0;
+                        }
+
+                        return {
+                            ...row,
+                            igst: newIgst,
+                            cgst: newCgst,
+                            sgst: newSgst,
+                            calculationWarning: "",
+                            rowTotal: amount + newIgst + newCgst + newSgst - row.discount
+                        };
+                    });
+
+                    // Rebuild accounting entries from fixed rows
+                    const newEntries: AccountingEntry[] = [];
+                    voucher.accSummaryRows.forEach(row => {
+                         // Debit Purchase
+                         const matchedPL = row.purchaseLedger ? ledgers.find(l => String(l.name).toLowerCase().trim() === row.purchaseLedger.toLowerCase().trim()) : null;
+                         newEntries.push({
+                             "Particulars (Ledger Name)": row.purchaseLedger || "Purchase Account",
+                             "Amount (₹)": row.taxableValue - row.discount,
+                             "Type": "debit", "Rate (%)": row.gstRate, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: matchedPL?.id
+                         });
+                         // Debit Taxes
+                         if (row.igst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /igst/i.test(l.name))?.name || "IGST", "Amount (₹)": row.igst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /igst/i.test(l.name))?.id });
+                         if (row.cgst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /cgst/i.test(l.name))?.name || "CGST", "Amount (₹)": row.cgst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /cgst/i.test(l.name))?.id });
+                         if (row.sgst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /sgst|utgst/i.test(l.name))?.name || "SGST/UTGST", "Amount (₹)": row.sgst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /sgst|utgst/i.test(l.name))?.id });
+                    });
+
+                    const totalInvoiceValue = voucher.accSummaryRows.reduce((s, r) => s + r.rowTotal, 0);
+                    // Add Credit Entry
+                    const partyLedgerMatch = ledgers.find(l => String(l.name).toLowerCase().trim() === voucher["Trade/Legal name of the Supplier"].toLowerCase().trim());
+                    newEntries.push({
+                         "Particulars (Ledger Name)": voucher["Trade/Legal name of the Supplier"] || "Supplier",
+                         "Amount (₹)": totalInvoiceValue,
+                         "Type": "credit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: partyLedgerMatch?.id
+                    });
+
+                    return { ...voucher, accSummaryRows: voucher.accSummaryRows, accountingEntries: newEntries, "Invoice Value (₹)": totalInvoiceValue };
+
+                } else {
+                    const updatedAccountingEntries = voucher.accountingEntries?.map(ae => {
                     const amount = ae["Amount (₹)"];
                     const gstRate = ae["Rate (%)"];
 
@@ -645,8 +825,11 @@ const PurchaseImport: React.FC = () => {
                 return {
                     ...voucher,
                     accountingEntries: updatedAccountingEntries,
-                    "Invoice Value (₹)": totalCredit
+                    "Invoice Value (₹)": totalCredit,
+                    // If summary rows exist, we should ideally update them too, but 
+                    // for now, we ensure the entries used for saving are correct.
                 };
+                }
             }
         });
 
@@ -656,18 +839,15 @@ const PurchaseImport: React.FC = () => {
 
     const downloadTemplate = (mode: 'item' | 'accounting') => {
         const itemH = ["GSTIN of supplier", "Trade/Legal name of the Supplier", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Purchase Ledger", "Item Name", "HSN Code", "Batch No", "Quantity", "Item Rate (₹)", "Rate (%)", "Taxable Value (₹)", "Integrated Tax (₹)", "Central Tax (₹)", "State/UT tax (₹)"];
-        const accH = ["Invoice number", "Invoice Date", "Particulars (Ledger Name)", "Amount (₹)", "Type"];
+        const accH = ["GSTIN of supplier", "Trade/Legal name of the Supplier", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Taxable Value (₹)", "Integrated Tax (₹)", "Central Tax (₹)", "State/UT tax (₹)", "GST Rate (%)", "Purchase Ledger", "Discount (₹)"];
 
         const itemData = [
             ["20AABCM4621M1ZR", "MONGIA STEEL LIMITED", "MSL/25-26/14420", "16-02-2026", 938100, "Jharkhand(20)", "18% Inter State Purchase", "Biscute", "5555", "B-001", 100, 4000, 18, 400000, 0, 36000, 36000],
             ["", "", "", "", "", "", "", "Tea Powder", "5555", "B-002", 50, 7900, 18, 395000, 0, 35550, 35550]
         ];
         const accData = [
-            ["INV-002", "26-03-2025", "18% Intera state puchse", 50000, "debit"],
-            ["", "", "Acc Limited", 72250, "credit"],
-            ["", "", "18igst", 9000, "debit"],
-            ["", "", "9%cgst", 4500, "debit"],
-            ["", "", "9%cgst", 4500, "debit"]
+            ["20BDAPP6208H2ZY", "nuvoico trader", "123", "30/03/2026", 11180, "jharkhand", 10000, 0, 900, 900, 18, "18% intra state", 1000],
+            ["", "", "", "", "", "", 1000, 0, 90, 90, 18, "18% intra state", 0]
         ];
 
         const worksheet = XLSX.utils.aoa_to_sheet([mode === 'item' ? itemH : accH, ...(mode === 'item' ? itemData : accData)]);
@@ -759,7 +939,11 @@ const PurchaseImport: React.FC = () => {
                                         Saving: {saveProgress.done}/{saveProgress.total}
                                     </div>
                                 )}
-                                {groupedVouchers.some(v => v.items.some(it => it.calculationWarning) || v.accountingEntries?.some(ae => ae.calculationWarning)) && (
+                                {groupedVouchers.some(v => 
+                                    v.items.some(it => it.calculationWarning) || 
+                                    v.accountingEntries?.some(ae => ae.calculationWarning) || 
+                                    v.accSummaryRows?.some(r => r.calculationWarning)
+                                ) && (
                                     <button
                                         onClick={fixAllCalculations}
                                         className="px-4 py-2 bg-amber-100 text-amber-700 font-bold rounded-lg hover:bg-amber-200 transition-colors flex items-center border border-amber-200"
@@ -785,7 +969,11 @@ const PurchaseImport: React.FC = () => {
                             </div>
                         </div>
 
-                        {groupedVouchers.some(v => v.items.some(it => it.calculationWarning) || v.accountingEntries?.some(ae => ae.calculationWarning)) && (
+                        {groupedVouchers.some(v => 
+                            v.items.some(it => it.calculationWarning) || 
+                            v.accountingEntries?.some(ae => ae.calculationWarning) ||
+                            v.accSummaryRows?.some(r => r.calculationWarning)
+                        ) && (
                             <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl flex items-center justify-between">
                                 <div className="flex items-center">
                                     <AlertTriangle className="text-red-500 mr-3" size={24} />
@@ -807,7 +995,7 @@ const PurchaseImport: React.FC = () => {
                                                 <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
                                                     {vi + 1}
                                                 </div>
-                                                {importMode === 'item' && (
+                                                {(importMode === 'item' || importMode === 'accounting') && (
                                                     <div>
                                                         <p className="text-xs font-bold text-gray-400 uppercase">Supplier {voucher._matchedLedgerId && `(ID: ${voucher._matchedLedgerId})`}</p>
                                                         <p className={`font-bold text-sm flex items-center gap-1 ${!voucher.partyMatch ? "text-red-500" : "text-gray-900"}`}>
@@ -834,13 +1022,13 @@ const PurchaseImport: React.FC = () => {
                                             </div>
                                             <div>
                                                 <p className="text-xs font-bold text-gray-400 uppercase">
-                                                    Totals {importMode === 'accounting' 
-                                                        ? `(${voucher.accountingEntries?.filter(ae => ae.Type === 'credit').length} Cr / ${voucher.accountingEntries?.filter(ae => ae.Type === 'debit').length} Dr)` 
-                                                        : '(Invoice Value)'
+                                                    {(importMode === 'accounting' && !voucher.accSummaryRows)
+                                                        ? `Totals (${voucher.accountingEntries?.filter(ae => ae.Type === 'credit').length} Cr / ${voucher.accountingEntries?.filter(ae => ae.Type === 'debit').length} Dr)` 
+                                                        : 'Invoice Value'
                                                     }
                                                 </p>
                                                 <p className="text-sm font-bold text-blue-600 flex items-center gap-3">
-                                                    {importMode === 'accounting' 
+                                                    {(importMode === 'accounting' && !voucher.accSummaryRows)
                                                         ? <>
                                                             <span className="flex items-center gap-1">
                                                                 <span className="text-[10px] text-gray-400 font-bold uppercase">Cr:</span>
@@ -884,19 +1072,27 @@ const PurchaseImport: React.FC = () => {
                                         <table className="w-full text-left">
                                             <thead className="bg-white border-b border-gray-100">
                                                 <tr>
-                                                    <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider w-16">No</th>
-                                                    <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">{importMode === 'item' ? 'Item Name' : 'Particulars'}</th>
-                                                    <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">{importMode === 'item' ? 'HSN' : 'Type'}</th>
-                                                    {importMode === 'item' && (
+                                                    {voucher.accSummaryRows ? (
                                                         <>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider w-16">No</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Taxable Value</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">IGST (₹)</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">CGST (₹)</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">SGST (₹)</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-center">GST Rate</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Purchase Ledger</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Discount (₹)</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Invoice Total</th>
+                                                        </>
+                                                    ) : importMode === 'item' ? (
+                                                        <>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider w-16">No</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Item Name</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">HSN</th>
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Batch No</th>
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Qty</th>
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Rate</th>
-                                                        </>
-                                                    )}
-                                                    <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">{importMode === 'item' ? 'Taxable' : 'Amount'}</th>
-                                                    {importMode === 'item' && (
-                                                        <>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Taxable</th>
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">GST %</th>
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">IGST</th>
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">CGST</th>
@@ -904,12 +1100,19 @@ const PurchaseImport: React.FC = () => {
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Tax Amt</th>
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Purchase Ledger</th>
                                                         </>
+                                                    ) : (
+                                                        <>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider w-16">No</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Particulars</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Type</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Amount</th>
+                                                        </>
                                                     )}
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-gray-50">
                                                 {importMode === 'item' ? (
-                                                    voucher.items.map((item, ii) => {
+                                                    voucher.items.map((item, ii) => { // item rows below
                                                         const taxAmt = (item["Integrated Tax (₹)"] || 0) + (item["Central Tax (₹)"] || 0) + (item["State/UT tax (₹)"] || 0);
                                                         return (
                                                             <tr key={ii} className="hover:bg-blue-50/30 transition-colors">
@@ -964,7 +1167,33 @@ const PurchaseImport: React.FC = () => {
                                                             </tr>
                                                         );
                                                     })
+                                                ) : voucher.accSummaryRows ? (
+                                                    // ── NEW ACCOUNTING SUMMARY FORMAT: multi-row support ──
+                                                    voucher.accSummaryRows.map((row, ri) => (
+                                                        <tr key={ri} className="hover:bg-blue-50/30 transition-colors">
+                                                            <td className="px-6 py-3 text-sm text-gray-400 font-medium">{ri + 1}</td>
+                                                            <td className="px-6 py-3 text-sm text-gray-900 text-right font-bold">₹{row.taxableValue.toLocaleString()}</td>
+                                                            <td className="px-6 py-3 text-sm text-gray-700 text-right">₹{row.igst.toLocaleString()}</td>
+                                                            <td className="px-6 py-3 text-sm text-gray-700 text-right">₹{row.cgst.toLocaleString()}</td>
+                                                            <td className="px-6 py-3 text-sm text-gray-700 text-right">₹{row.sgst.toLocaleString()}</td>
+                                                            <td className="px-6 py-3 text-sm text-gray-600 text-center">{row.gstRate}%</td>
+                                                            <td className="px-6 py-3">
+                                                                <div className="flex items-center gap-1">
+                                                                    <span className="text-xs text-gray-700">{row.purchaseLedger}</span>
+                                                                    {ledgers.some(l => String(l.name).toLowerCase().trim() === row.purchaseLedger.toLowerCase().trim())
+                                                                        ? <CheckCircle size={10} className="text-green-500" />
+                                                                        : <AlertTriangle size={10} className="text-amber-400" />}
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-6 py-3 text-sm text-gray-700 text-right">₹{row.discount.toLocaleString()}</td>
+                                                            <td className="px-6 py-3 text-sm text-blue-600 text-right font-bold relative">
+                                                                ₹{row.rowTotal.toLocaleString()}
+                                                                {row.calculationWarning && <AlertTriangle size={12} className="text-amber-500 absolute -top-1 right-1" title={row.calculationWarning} />}
+                                                            </td>
+                                                        </tr>
+                                                    ))
                                                 ) : (
+                                                    // ── LEGACY MULTI-ROW ACCOUNTING FORMAT ──
                                                     voucher.accountingEntries?.map((ae, ai) => {
                                                         const isMatch = ledgers.some(l => l.name.toLowerCase().trim() === ae["Particulars (Ledger Name)"].toLowerCase().trim());
                                                         return (

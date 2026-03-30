@@ -2582,7 +2582,9 @@ const PurchaseVoucher: React.FC = () => {
                   >
                     <option value="">-- Select Party --</option>
                     {partyLedgers.map((ledger) => (
-                      <option key={ledger.id} value={ledger.id}>{ledger.name}</option>
+                      <option key={ledger.id} value={ledger.id}>
+                        {ledger.name} {ledger.gstNumber ? `\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 ${ledger.gstNumber}` : ""}
+                      </option>
                     ))}
                     <option value="add-new" className="text-blue-600 font-bold">+ Create New Ledger</option>
                   </select>
@@ -3157,7 +3159,7 @@ const PurchaseVoucher: React.FC = () => {
                               <option value="">Select Discount</option>
                               {discount.map((l) => (
                                 <option key={l.id} value={l.id}>
-                                  {l.name}
+                                  {l.name} {l.gstNumber ? `\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 ${l.gstNumber}` : ""}
                                 </option>
                               ))}
                             </select>
@@ -3210,7 +3212,7 @@ const PurchaseVoucher: React.FC = () => {
                               <option value="">Select Ledger</option>
                               {purchaseLedgers.map((ledger) => (
                                 <option key={ledger.id} value={ledger.id}>
-                                  {ledger.name}
+                                  {ledger.name} {ledger.gstNumber ? `\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 ${ledger.gstNumber}` : ""}
                                 </option>
                               ))}
                             </select>
@@ -3296,7 +3298,7 @@ const PurchaseVoucher: React.FC = () => {
 
                                     {tdsLedgers.map((l) => (
                                       <option key={l.id} value={l.id}>
-                                        {l.name}
+                                        {l.name} {l.gstNumber ? `\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 ${l.gstNumber}` : ""}
                                       </option>
                                     ))}
                                   </select>
@@ -3465,7 +3467,7 @@ const PurchaseVoucher: React.FC = () => {
                             <option value="">Select Ledger</option>
                             {safeLedgers.map((ledger) => (
                               <option key={ledger.id} value={ledger.id}>
-                                {ledger.name}
+                                {ledger.name} {ledger.gstNumber ? `\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 ${ledger.gstNumber}` : ""}
                               </option>
                             ))}
                           </select>
