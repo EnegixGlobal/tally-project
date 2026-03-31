@@ -116,23 +116,68 @@ const Pricing: React.FC = () => {
       };
 
       const resp = await createOrder(payload);
-      if (resp && resp.action && resp.params) {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = resp.action;
-        form.style.display = 'none';
-        Object.entries(resp.params).forEach(([k, v]) => {
-          const input = document.createElement('input');
-          input.type = 'hidden';
-          input.name = k;
-          input.value = String(v ?? '');
-          form.appendChild(input);
-        });
-        document.body.appendChild(form);
-        form.submit();
-      } else {
+      if (!resp || !resp.order || !resp.key) {
         alert('Could not initiate payment.');
+        return;
       }
+
+      // Load Razorpay script if not already loaded
+      const loadRazorpay = () => new Promise<void>((resolve, reject) => {
+        if ((window as any).Razorpay) return resolve();
+        const script = document.createElement('script');
+        script.src = 'https://checkout.razorpay.com/v1/checkout.js';
+        script.onload = () => resolve();
+        script.onerror = () => reject(new Error('Razorpay SDK failed to load'));
+        document.body.appendChild(script);
+      });
+
+      try {
+        await loadRazorpay();
+      } catch (e) {
+        console.error(e);
+        alert('Payment SDK load failed.');
+        return;
+      }
+
+      const options = {
+        key: resp.key,
+        amount: resp.order.amount,
+        currency: resp.order.currency,
+        name: 'Tally',
+        description: payload.productinfo || 'Tally Payment',
+        order_id: resp.order.id,
+        prefill: {
+          name: payload.user?.name || '',
+          email: payload.user?.email || '',
+          contact: payload.user?.phone || '',
+        },
+        handler: async function (response: any) {
+          try {
+            // Send payment details to backend for verification
+            await import('../../services/payments').then(async (mod) => {
+              await mod.confirmPayment({
+                razorpay_payment_id: response.razorpay_payment_id,
+                razorpay_order_id: response.razorpay_order_id,
+                razorpay_signature: response.razorpay_signature,
+              });
+            });
+
+            // Redirect to frontend success page
+            window.location.href = `/app/payments/success?paymentId=${encodeURIComponent(response.razorpay_payment_id)}&orderId=${encodeURIComponent(response.razorpay_order_id)}`;
+          } catch (err) {
+            console.error('Payment confirmation failed', err);
+            // window.location.href = `/app/payments/failure`;
+          }
+        },
+        modal: {
+          ondismiss: function () {
+            // User closed the modal
+          }
+        }
+      } as any;
+
+      const rzp = new (window as any).Razorpay(options);
+      rzp.open();
     } catch (err) {
       console.error(err);
       alert('Payment error');
