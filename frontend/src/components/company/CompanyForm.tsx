@@ -329,9 +329,6 @@ const CompanyForm: React.FC = () => {
     if (!company.state) newErrors.state = "State is required";
     if (!company.panNumber.trim()) newErrors.panNumber = "PAN number is required";
     if (!company.email) newErrors.email = "Email is required";
-    if (!company.tanNumber.trim()) {
-      newErrors.tanNumber = "TAN number is required";
-    }
 
 
 
@@ -797,15 +794,15 @@ const CompanyForm: React.FC = () => {
                 {/* TAN */}
                 <div>
                   <InputField
-                    id="tanNumber"
-                    name="tanNumber"
-                    label="TAN Number *"
-                    value={company.tanNumber}
-                    onChange={handleChange}
-                    icon={<CreditCard size={16} />}
-                    theme={theme}
-                    placeholder="e.g., ABCD12345E"
-                  />
+                      id="tanNumber"
+                      name="tanNumber"
+                      label="TAN Number"
+                      value={company.tanNumber}
+                      onChange={handleChange}
+                      icon={<CreditCard size={16} />}
+                      theme={theme}
+                      placeholder="e.g., ABCD12345E (optional)"
+                    />
                   {errors.tanNumber && (
                     <p className="text-red-500 text-sm mt-1">{errors.tanNumber}</p>
                   )}
