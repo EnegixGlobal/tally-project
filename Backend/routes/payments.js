@@ -2,6 +2,7 @@ const express = require('express');
 const crypto = require('crypto');
 const Razorpay = require('razorpay');
 const db = require('../db');
+const { upsertCompanySubscription } = require('../utils/subscriptions');
 
 const router = express.Router();
 
@@ -155,41 +156,48 @@ router.post('/confirm', async (req, res) => {
       ['success', JSON.stringify({ body: req.body, paymentDetails }), razorpay_payment_id, razorpay_order_id]
     );
 
-    // Activate subscription if applicable
-    const [payRowsFirst] = await db.execute(
-      `SELECT company_id, plan_id, status FROM payments WHERE razorpay_order_id = ? LIMIT 1`,
-      [razorpay_order_id]
-    );
+    // Activate/Upsert subscription using plan_id and payments.id
+    try {
+      const [payRowsFirst] = await db.execute(
+        `SELECT id, company_id, plan_id, status FROM payments WHERE razorpay_order_id = ? LIMIT 1`,
+        [razorpay_order_id]
+      );
 
-    if (payRowsFirst && payRowsFirst.length > 0) {
-      const { company_id, plan_id, status: oldStatus } = payRowsFirst[0];
-      if (oldStatus === 'created' && company_id && plan_id) {
-        try {
-          const [planRows] = await db.execute(`SELECT name, duration FROM subscription_plans WHERE id = ?`, [plan_id]);
-          if (planRows && planRows.length > 0) {
-            const plan = planRows[0];
-            const duration = (plan.duration || 'monthly').toLowerCase();
-            const interval = duration === 'yearly' ? '1 YEAR' : '1 MONTH';
+      if (payRowsFirst && payRowsFirst.length > 0) {
+        const paymentRow = payRowsFirst[0];
+        const { id: paymentRecordId, company_id: companyId, plan_id: planId, status: oldStatus } = paymentRow;
 
-            const [updateResult] = await db.execute(
-              `UPDATE company_subscriptions 
-               SET plan = ?, is_trial = 0, status = 'active', start_date = NOW(), end_date = DATE_ADD(NOW(), INTERVAL ${interval})
-               WHERE company_id = ?`,
-              [plan.name, company_id]
-            );
+        if (oldStatus === 'created' || oldStatus === 'success') {
+            if (companyId && planId) {
+              try {
+                const [planRows] = await db.execute(`SELECT duration FROM subscription_plans WHERE id = ? LIMIT 1`, [planId]);
+                const planDuration = (planRows && planRows[0] && planRows[0].duration) ? planRows[0].duration : 'monthly';
 
-            if (updateResult.affectedRows === 0) {
-              await db.execute(
-                `INSERT INTO company_subscriptions (company_id, plan, is_trial, status, start_date, end_date)
-                 VALUES (?, ?, 0, 'active', NOW(), DATE_ADD(NOW(), INTERVAL ${interval}))`,
-                [company_id, plan.name]
-              );
+                const subscription = await upsertCompanySubscription(db, companyId, planId, paymentRecordId, planDuration);
+                if (subscription) {
+                  const now = new Date();
+                  const end = new Date(subscription.end_date || subscription.endDate || subscription.end_date);
+                  const msDiff = end.getTime() - now.getTime();
+                  const daysRemaining = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+                  paymentDetails = paymentDetails || {};
+                  paymentDetails.subscription = {
+                    id: subscription.id,
+                    plan: subscription.plan,
+                    isTrial: !!subscription.is_trial,
+                    status: subscription.status,
+                    startDate: subscription.start_date,
+                    endDate: subscription.end_date,
+                    daysRemaining: Math.max(daysRemaining, 0),
+                  };
+                }
+              } catch (subErr) {
+                console.error('Error upserting company_subscriptions after razorpay payment:', subErr);
+              }
             }
-          }
-        } catch (subErr) {
-          console.error('Error activating subscription after razorpay payment:', subErr);
         }
       }
+    } catch (subOuterErr) {
+      console.error('Subscription activation error (outer):', subOuterErr);
     }
 
     // Return JSON to AJAX callers so frontend can handle routing reliably
