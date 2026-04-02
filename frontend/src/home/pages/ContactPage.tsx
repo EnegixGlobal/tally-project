@@ -195,8 +195,23 @@ const ContactPage: React.FC = () => {
                   <p className="text-gray-600">+91 91539 92348</p>
                 </div>
 
+                {/* Address 1 */}
                 <div>
-                  <h4 className="font-semibold text-gray-900">Address</h4>
+                  <h4 className="font-semibold text-gray-900">Address (Dhanbad)</h4>
+                  <p className="text-gray-600">
+                    Durga Mandir Road,
+                    <br />
+                    Near Hawai Adda,
+                    <br />
+                    Vigyan Vihar Colony,
+                    <br />
+                    Dhanbad, Jharkhand - 826004
+                  </p>
+                </div>
+
+                {/* Address 2 */}
+                <div>
+                  <h4 className="font-semibold text-gray-900">Address (Bengaluru)</h4>
                   <p className="text-gray-600">
                     Allen Institute, 9th Cross,
                     <br />

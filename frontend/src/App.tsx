@@ -202,6 +202,8 @@ import ContactPage from "./home/pages/ContactPage";
 import PrivacyPolicyPage from "./home/pages/PrivacyPolicyPage";
 import LoginPage from "./home/auth/LoginPage";
 import Register from "./home/auth/Register";
+import ForgotPassword from "./home/auth/ForgotPassword";
+import ResetPassword from "./home/auth/ResetPassword";
 import { AuthProvider } from "./home/context/AuthContext";
 
 //config module
@@ -271,6 +273,8 @@ function App() {
               <Route path="/home" element={<HomePage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/signup" element={<Register />} />
               <Route path="/purchase" element={<PurchasePage />} />
               <Route path="/about" element={<AboutUsPage />} />
@@ -323,7 +327,9 @@ function App() {
                   path="masters/ledger/create"
                   element={
                     <RequireCompany>
-                      <LedgerForm />
+                      <RequireSubscription>
+                        <LedgerForm />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -339,7 +345,9 @@ function App() {
                   path="masters/ledger/edit/:id"
                   element={
                     <RequireCompany>
-                      <LedgerForm />
+                      <RequireSubscription>
+                        <LedgerForm />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -682,7 +690,9 @@ function App() {
                   path="vouchers/payment/create"
                   element={
                     <RequireCompany>
-                      <PaymentVoucher />
+                      <RequireSubscription>
+                        <PaymentVoucher />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -690,7 +700,9 @@ function App() {
                   path="vouchers/payment/edit/:id"
                   element={
                     <RequireCompany>
-                      <PaymentVoucher />
+                      <RequireSubscription>
+                        <PaymentVoucher />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -698,7 +710,9 @@ function App() {
                   path="vouchers/receipt/create"
                   element={
                     <RequireCompany>
-                      <ReceiptVoucher />
+                      <RequireSubscription>
+                        <ReceiptVoucher />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -706,7 +720,9 @@ function App() {
                   path="vouchers/receipt/edit/:id"
                   element={
                     <RequireCompany>
-                      <ReceiptVoucher />
+                      <RequireSubscription>
+                        <ReceiptVoucher />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -714,7 +730,9 @@ function App() {
                   path="vouchers/contra/create"
                   element={
                     <RequireCompany>
-                      <ContraVoucher />
+                      <RequireSubscription>
+                        <ContraVoucher />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -722,7 +740,9 @@ function App() {
                   path="vouchers/contra/edit/:id"
                   element={
                     <RequireCompany>
-                      <ContraVoucher />
+                      <RequireSubscription>
+                        <ContraVoucher />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -778,7 +798,9 @@ function App() {
                   path="vouchers/journal/create"
                   element={
                     <RequireCompany>
-                      <JournalVoucher />
+                      <RequireSubscription>
+                        <JournalVoucher />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -794,7 +816,9 @@ function App() {
                   path="vouchers/journal/edit/:id"
                   element={
                     <RequireCompany>
-                      <JournalVoucher />
+                      <RequireSubscription>
+                        <JournalVoucher />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -802,7 +826,9 @@ function App() {
                   path="vouchers/purchase/create"
                   element={
                     <RequireCompany>
-                      <PurchaseVoucher1 />
+                      <RequireSubscription>
+                        <PurchaseVoucher1 />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -810,7 +836,9 @@ function App() {
                   path="vouchers/purchase/edit/:id"
                   element={
                     <RequireCompany>
-                      <PurchaseVoucher1 />
+                      <RequireSubscription>
+                        <PurchaseVoucher1 />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -826,7 +854,9 @@ function App() {
                   path="vouchers/stock-journal/edit/:id"
                   element={
                     <RequireCompany>
-                      <StockJournalVoucher1 />
+                      <RequireSubscription>
+                        <StockJournalVoucher1 />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -834,7 +864,9 @@ function App() {
                   path="vouchers/sales/create"
                   element={
                     <RequireCompany>
-                      <SalesVoucher1 />
+                      <RequireSubscription>
+                        <SalesVoucher1 />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -842,7 +874,9 @@ function App() {
                   path="vouchers/sales/edit/:id"
                   element={
                     <RequireCompany>
-                      <SalesVoucher1 />
+                      <RequireSubscription>
+                        <SalesVoucher1 />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -931,7 +965,9 @@ function App() {
                   path="voucher-register"
                   element={
                     <RequireCompany>
-                      <VoucherRegisterIndex />
+                      <RequireSubscription>
+                        <VoucherRegisterIndex />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -939,7 +975,9 @@ function App() {
                   path="voucher-register/payment"
                   element={
                     <RequireCompany>
-                      <PaymentRegister />
+                      <RequireSubscription>
+                        <PaymentRegister />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -947,7 +985,9 @@ function App() {
                   path="voucher-register/receipt"
                   element={
                     <RequireCompany>
-                      <ReceiptRegister />
+                      <RequireSubscription>
+                        <ReceiptRegister />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -955,7 +995,9 @@ function App() {
                   path="voucher-register/contra"
                   element={
                     <RequireCompany>
-                      <ContraRegister />
+                      <RequireSubscription>
+                        <ContraRegister />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -963,7 +1005,9 @@ function App() {
                   path="voucher-register/journal"
                   element={
                     <RequireCompany>
-                      <JournalRegister />
+                      <RequireSubscription>
+                        <JournalRegister />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -971,7 +1015,9 @@ function App() {
                   path="voucher-register/sales"
                   element={
                     <RequireCompany>
-                      <SalesRegister />
+                      <RequireSubscription>
+                        <SalesRegister />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -979,7 +1025,9 @@ function App() {
                   path="voucher-register/debit-note"
                   element={
                     <RequireCompany>
-                      <DebitNoteRegiser />
+                      <RequireSubscription>
+                        <DebitNoteRegiser />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -995,7 +1043,9 @@ function App() {
                   path="voucher-register/purchase"
                   element={
                     <RequireCompany>
-                      <PurchaseRegister />
+                      <RequireSubscription>
+                        <PurchaseRegister />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />
@@ -1003,7 +1053,9 @@ function App() {
                   path="voucher-register/purchase/detail/:month"
                   element={
                     <RequireCompany>
-                      <PurchseReportDetil />
+                      <RequireSubscription>
+                        <PurchseReportDetil />
+                      </RequireSubscription>
                     </RequireCompany>
                   }
                 />

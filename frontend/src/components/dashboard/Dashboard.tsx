@@ -467,8 +467,10 @@ const Dashboard: React.FC = () => {
           </div>
 
           {/* Trial / subscription banner */}
-          {user?.isTrial && user.trialDaysRemaining !== undefined && (() => {
-            const isActive = user.trialDaysRemaining > 0;
+          {user?.trialDaysRemaining !== undefined && (() => {
+            const isActive = user.trialDaysRemaining >= 0 && !user.isExpired;
+            const isFreeTrial = user.isTrial;
+
             return (
               <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${isActive ? 'border-green-300 bg-green-50 text-green-900' : 'border-red-300 bg-red-50 text-red-800'}`}>
                 <div className="flex items-start gap-3">
@@ -477,16 +479,18 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div>
                     <div className={`font-semibold ${isActive ? 'text-green-800' : 'text-red-800'}`}>
-                      {isActive ? 'Free Trial — Active' : 'Free Trial — Ended'}
+                        {isActive 
+                          ? (isFreeTrial ? 'Free Trial — Active' : 'Subscription — Active') 
+                          : (isFreeTrial ? 'Free Trial — Ended' : 'Subscription — Ended')}
                     </div>
                     {isActive ? (
                       <div>
-                        Your {user.trialDaysRemaining}-day free trial is active —
-                        <span className="font-bold"> {user.trialDaysRemaining} days</span> remaining. After the trial ends, a subscription is required to continue using the service.
+                        Your {isFreeTrial ? 'free trial' : 'subscription'} is active —
+                        <span className="font-bold"> {user.trialDaysRemaining} days</span> remaining. {isFreeTrial ? 'After the trial ends, a subscription is required to continue using the service.' : ''}
                       </div>
                     ) : (
                       <div>
-                        Your {user.trialDaysRemaining}-day free trial has ended. To continue using the service, please renew your subscription.
+                        Your {isFreeTrial ? 'trial period' : 'subscription'} has ended. To continue using the service, please renew your subscription.
                       </div>
                     )}
                   </div>
