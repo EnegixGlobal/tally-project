@@ -65,7 +65,7 @@ router.get('/status/:companyId', async (req, res) => {
     const msDiff = end.getTime() - now.getTime();
     const daysRemaining = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
     const isExpired =
-      msDiff < 0 || s.status === 'expired' || s.status === 'cancelled';
+      daysRemaining < 0 || s.status === 'expired' || s.status === 'cancelled';
 
     return res.json({
       success: true,

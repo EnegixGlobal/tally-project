@@ -1,9 +1,9 @@
 import React, { useEffect, useState } from "react";
 import { useAuth } from "../../home/context/AuthContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Outlet } from "react-router-dom";
 
 interface RequireSubscriptionProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 const RequireSubscription: React.FC<RequireSubscriptionProps> = ({ children }) => {
@@ -39,7 +39,7 @@ const RequireSubscription: React.FC<RequireSubscriptionProps> = ({ children }) =
           setIsBlocked(true);
           setMessage(
               status?.isTrial
-                ? "Your 14-day free trial has ended. To continue using the product, please renew your subscription."
+                ? "Your free trial has ended. To continue using the product, please renew your subscription."
                 : "Your subscription has expired. Please renew or subscribe to continue using the service."
             );
         }
@@ -70,7 +70,7 @@ const RequireSubscription: React.FC<RequireSubscriptionProps> = ({ children }) =
           </h2>
           <p className="text-sm text-gray-700 mb-4">{message}</p>
           <button
-            onClick={() => navigate("/pricing")}
+            onClick={() => navigate("/app/pricing")}
             className="w-full rounded-md bg-blue-600 px-4 py-2 text-sm font-medium text-white hover:bg-blue-700"
           >
             View Plans / Renew Now
@@ -80,7 +80,7 @@ const RequireSubscription: React.FC<RequireSubscriptionProps> = ({ children }) =
     );
   }
 
-  return <>{children}</>;
+  return children ? <>{children}</> : <Outlet />;
 };
 
 export default RequireSubscription;

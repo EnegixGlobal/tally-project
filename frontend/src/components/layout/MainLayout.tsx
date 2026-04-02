@@ -64,19 +64,25 @@ const MainLayout: React.FC = () => {
     const status = user.subscriptionStatus ?? null;
 
     const isExpired =
+      user.isExpired ||
       status === 'expired' ||
-      (user.isTrial && trialDays !== null && trialDays <= 0);
+      (user.isTrial && trialDays !== null && trialDays < 0);
 
     // Allow access to dashboard (index) even if expired
     const isAtDashboard = location.pathname === '/app' || location.pathname === '/app/';
+    // Allow pricing and payments even when expired to allow renewal
+    const isPricingPath = location.pathname.startsWith('/app/pricing') || 
+                         location.pathname.startsWith('/app/payments');
     // Allow config pages and company-creation to be viewed even when expired
     const isConfigPath = location.pathname.startsWith('/app/config');
     const isCompanyPath = location.pathname.startsWith('/app/company');
 
-    if (isExpired && !isAtDashboard && !isConfigPath && !isCompanyPath) {
-      // Redirect user to dashboard and show a modal prompting renewal
-      navigate('/app');
+    if (isExpired && !isAtDashboard && !isPricingPath && !isConfigPath && !isCompanyPath) {
+      // Show a modal prompting renewal (Removed navigate('/app') to stay on current page)
       setShowSubscriptionModal(true);
+    } else if (!isExpired || isAtDashboard || isPricingPath) {
+      // Hide modal if we are in a "safe" place or no longer expired
+      setShowSubscriptionModal(false);
     }
   }, [isLoading, isAuthenticated, user, location.pathname, navigate]);
 
@@ -130,7 +136,7 @@ const MainLayout: React.FC = () => {
                 Close
               </button>
               <button
-                onClick={() => { setShowSubscriptionModal(false); navigate('/pricing'); }}
+                onClick={() => { setShowSubscriptionModal(false); navigate('/app/pricing'); }}
                 className="px-4 py-2 rounded-md bg-blue-600 text-white"
               >
                 Renew Now

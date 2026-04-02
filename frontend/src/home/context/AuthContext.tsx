@@ -15,6 +15,7 @@ interface User {
   isTrial?: boolean;
   trialEndsAt?: string | null;
   trialDaysRemaining?: number;
+  isExpired?: boolean;
   hasCompany?: boolean;
   companyId?: string | null;
   subscriptionPlan?: "basic" | "professional" | "enterprise";
@@ -130,6 +131,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
           isTrial: !!status.isTrial,
           trialEndsAt: status.endDate ?? null,
           trialDaysRemaining: status.daysRemaining,
+          isExpired: !!status.isExpired,
           hasSubscription: !!status.hasSubscription,
         };
         setUser(updatedUser);
@@ -194,7 +196,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         subscriptionStatus: subscription?.status,
         isTrial: subscription?.isTrial ?? false,
         trialEndsAt: subscription?.endDate ?? null,
-        trialDaysRemaining: subscription?.daysRemaining ?? undefined,
+        isExpired: subscription?.isExpired ?? false,
         hasCompany: data.hasCompany ?? false,
         companyId: data.companyId?.toString() ?? null,
         subscriptionPlan: userFromResponse.subscriptionPlan,

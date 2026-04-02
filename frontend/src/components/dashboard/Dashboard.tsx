@@ -468,7 +468,7 @@ const Dashboard: React.FC = () => {
 
           {/* Trial / subscription banner */}
           {user?.isTrial && user.trialDaysRemaining !== undefined && (() => {
-            const isActive = user.trialDaysRemaining > 0;
+            const isActive = user.trialDaysRemaining >= 0 && !user.isExpired;
             return (
               <div className={`mb-6 rounded-2xl border px-4 py-3 text-sm shadow-sm flex flex-col md:flex-row items-start md:items-center justify-between gap-3 ${isActive ? 'border-green-300 bg-green-50 text-green-900' : 'border-red-300 bg-red-50 text-red-800'}`}>
                 <div className="flex items-start gap-3">
@@ -477,7 +477,7 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div>
                     <div className={`font-semibold ${isActive ? 'text-green-800' : 'text-red-800'}`}>
-                      {isActive ? 'Free Trial — Active' : 'Free Trial — Ended'}
+                        {isActive ? 'Free Trial — Active' : 'Free Trial — Ended'}
                     </div>
                     {isActive ? (
                       <div>
@@ -486,7 +486,7 @@ const Dashboard: React.FC = () => {
                       </div>
                     ) : (
                       <div>
-                        Your {user.trialDaysRemaining}-day free trial has ended. To continue using the service, please renew your subscription.
+                        Your trial period has ended. To continue using the service, please renew your subscription.
                       </div>
                     )}
                   </div>
