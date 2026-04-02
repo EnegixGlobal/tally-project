@@ -481,12 +481,12 @@ const Dashboard: React.FC = () => {
                     </div>
                     {isActive ? (
                       <div>
-                        Your 14-day free trial is active —
+                        Your {user.trialDaysRemaining}-day free trial is active —
                         <span className="font-bold"> {user.trialDaysRemaining} days</span> remaining. After the trial ends, a subscription is required to continue using the service.
                       </div>
                     ) : (
                       <div>
-                        Your 14-day free trial has ended. To continue using the service, please renew your subscription.
+                        Your {user.trialDaysRemaining}-day free trial has ended. To continue using the service, please renew your subscription.
                       </div>
                     )}
                   </div>

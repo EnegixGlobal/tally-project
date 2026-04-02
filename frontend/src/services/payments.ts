@@ -27,6 +27,23 @@ export async function createOrder(payload: CreateOrderPayload) {
   return res.json();
 }
 
+export async function confirmPayment(payload: Record<string, any>) {
+  const token = localStorage.getItem('token');
+  const res = await fetch(`${API_BASE}/api/payments/confirm`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+    body: JSON.stringify(payload),
+  });
+  if (!res.ok) {
+    const text = await res.text();
+    throw new Error(`confirmPayment failed: ${res.status} ${text}`);
+  }
+  return res;
+}
+
 export async function getPaymentStatus(orderId: string) {
   const token = localStorage.getItem('token');
   const res = await fetch(`${API_BASE}/api/payments/status/${encodeURIComponent(orderId)}`, {

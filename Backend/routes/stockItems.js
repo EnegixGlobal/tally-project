@@ -79,6 +79,18 @@ router.get("/", async (req, res) => {
 
     const [rows] = await connection.execute(query, params);
 
+    // Fetch attributes for these items
+    const itemIds = rows.map(i => i.id);
+    let allAttributes = [];
+    if (itemIds.length > 0) {
+      const [attrRows] = await connection.execute(
+        `SELECT id, stock_item_id, attribute_name as name, attribute_value as value 
+         FROM stock_item_attributes 
+         WHERE stock_item_id IN (${itemIds.join(',')})`
+      );
+      allAttributes = attrRows;
+    }
+
     const formattedRows = rows.map((item) => ({
       ...item,
       batches: (() => {
@@ -88,6 +100,7 @@ router.get("/", async (req, res) => {
           return [];
         }
       })(),
+      attributes: allAttributes.filter(a => a.stock_item_id === item.id)
     }));
 
     return res.json({

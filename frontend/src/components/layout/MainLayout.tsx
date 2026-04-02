@@ -69,10 +69,11 @@ const MainLayout: React.FC = () => {
 
     // Allow access to dashboard (index) even if expired
     const isAtDashboard = location.pathname === '/app' || location.pathname === '/app/';
-    // Allow config pages to be viewed even when expired
+    // Allow config pages and company-creation to be viewed even when expired
     const isConfigPath = location.pathname.startsWith('/app/config');
+    const isCompanyPath = location.pathname.startsWith('/app/company');
 
-    if (isExpired && !isAtDashboard && !isConfigPath) {
+    if (isExpired && !isAtDashboard && !isConfigPath && !isCompanyPath) {
       // Redirect user to dashboard and show a modal prompting renewal
       navigate('/app');
       setShowSubscriptionModal(true);

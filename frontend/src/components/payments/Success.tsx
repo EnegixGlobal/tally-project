@@ -1,15 +1,74 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { CheckCircle2, ArrowRight, Home, Printer, ShieldCheck, Star } from 'lucide-react';
+
+const API_BASE = import.meta.env.VITE_API_URL || '';
 
 const Success: React.FC = () => {
   const [search] = useSearchParams();
   const navigate = useNavigate();
-  const txnid = search.get('txnid') || 'N/A';
-  const orderId = search.get('orderId') || 'N/A';
-  const amount = search.get('amount') || '0';
-  const planName = search.get('productinfo') || 'Subscription Plan';
-  const date = new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const [data, setData] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+
+  const queryTxnid = search.get('txnid');
+  const queryOrderId = search.get('orderId') || search.get('order_id') || 'N/A';
+  const queryPaymentId = search.get('paymentId') || search.get('payment_id');
+  const queryAmount = search.get('amount');
+  const queryProduct = search.get('productinfo') || 'Subscription Plan';
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const orderId = queryOrderId;
+        if (!orderId || orderId === 'N/A') {
+          setData({ txnid: queryTxnid || queryPaymentId || 'N/A', orderId: orderId || 'N/A', amount: queryAmount || '0', planName: queryProduct, date: new Date().toISOString() });
+          setLoading(false);
+          return;
+        }
+
+        const token = localStorage.getItem('token');
+        const res = await fetch(`${API_BASE}/api/payments/status/${encodeURIComponent(orderId)}`, {
+          headers: {
+            'Content-Type': 'application/json',
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        });
+
+        if (!res.ok) {
+          setData({ txnid: queryTxnid || queryPaymentId || 'N/A', orderId, amount: queryAmount || '0', planName: queryProduct, date: new Date().toISOString() });
+          setLoading(false);
+          return;
+        }
+
+        const json = await res.json();
+        const txnid = json.razorpay_payment_id || json.payu_txn_id || queryTxnid || queryPaymentId || 'N/A';
+        const amount = json.final_amount || json.amount || queryAmount || 0;
+        const planName = json.plan || json.productinfo || queryProduct || 'Subscription Plan';
+        const date = json.updated_at || json.created_at || new Date().toISOString();
+
+        setData({ txnid, orderId: json.order_id || orderId, amount, planName, date });
+      } catch (e) {
+        setData({ txnid: queryTxnid || queryPaymentId || 'N/A', orderId: queryOrderId || 'N/A', amount: queryAmount || '0', planName: queryProduct, date: new Date().toISOString() });
+      } finally {
+        setLoading(false);
+      }
+    })();
+  }, []);
+
+  const txnid = data?.txnid || 'N/A';
+  const orderId = data?.orderId || queryOrderId || 'N/A';
+  const amount = data?.amount ?? queryAmount ?? '0';
+  const planName = data?.planName || queryProduct || 'Subscription Plan';
+  const date = data?.date ? new Date(data.date).toLocaleString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleDateString('en-IN', { day: '2-digit', month: 'short', year: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  if (loading) return (
+    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="flex flex-col items-center gap-4">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-indigo-600"></div>
+        <p className="text-gray-600 font-medium animate-pulse">Loading receipt...</p>
+      </div>
+    </div>
+  );
 
   return (
     <div className="min-h-screen bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-green-50 via-white to-indigo-50 py-20 px-6 flex items-center justify-center">
