@@ -202,6 +202,8 @@ import ContactPage from "./home/pages/ContactPage";
 import PrivacyPolicyPage from "./home/pages/PrivacyPolicyPage";
 import LoginPage from "./home/auth/LoginPage";
 import Register from "./home/auth/Register";
+import ForgotPassword from "./home/auth/ForgotPassword";
+import ResetPassword from "./home/auth/ResetPassword";
 import { AuthProvider } from "./home/context/AuthContext";
 
 //config module
@@ -271,6 +273,8 @@ function App() {
               <Route path="/home" element={<HomePage />} />
               <Route path="/pricing" element={<PricingPage />} />
               <Route path="/login" element={<LoginPage />} />
+              <Route path="/forgot-password" element={<ForgotPassword />} />
+              <Route path="/reset-password" element={<ResetPassword />} />
               <Route path="/signup" element={<Register />} />
               <Route path="/purchase" element={<PurchasePage />} />
               <Route path="/about" element={<AboutUsPage />} />

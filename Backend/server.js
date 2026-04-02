@@ -30,6 +30,8 @@ app.use("/uploads", express.static("uploads"));
 // const loadPermissions = require('./middlewares/loadPermissions');
 const loginRoute = require("./routes/login");
 app.use("/api/login", loginRoute);
+const forgotPasswordRoute = require("./routes/forgotPassword");
+app.use("/api/auth", forgotPasswordRoute);
 const checkSubscription = require('./middlewares/checkSubscription');
 // Install subscription check AFTER login route so status endpoint and login remain accessible
 app.use(checkSubscription);
