@@ -94,6 +94,11 @@ const MastersIndex: React.FC = () => {
           name: "Barcode Managment",
           path: "/app/masters/stock-item/barcode",
         },
+        {
+          icon: <Briefcase size={20} />,
+          name: "Item Management",
+          path: "/app/masters/stock-item/manage",
+        },
       ],
     },
     {
