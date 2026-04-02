@@ -155,20 +155,28 @@ const Login: React.FC = () => {
               </div>
 
               {isLogin && (
-                <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    name="rememberMe"
-                    checked={formData.rememberMe}
-                    className="h-4 w-4 xl:h-5 xl:w-5 text-white focus:ring-white/50 border-white/30 rounded bg-white/10"
-                    onChange={(e) =>
-                      setFormData({ ...formData, rememberMe: e.target.checked })
-                    }
-                  />
-
-                  <label className="ml-3 text-sm xl:text-base text-white font-medium">
-                    Remember Password
-                  </label>
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center">
+                    <input
+                      type="checkbox"
+                      name="rememberMe"
+                      checked={formData.rememberMe}
+                      className="h-4 w-4 xl:h-5 xl:w-5 text-white focus:ring-white/50 border-white/30 rounded bg-white/10"
+                      onChange={(e) =>
+                        setFormData({ ...formData, rememberMe: e.target.checked })
+                      }
+                    />
+                    <label className="ml-3 text-sm xl:text-base text-white font-medium">
+                      Remember Password
+                    </label>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={() => navigate('/forgot-password')} 
+                    className="text-sm xl:text-base text-white/90 hover:text-white border-b border-transparent hover:border-white transition-all pb-0.5"
+                  >
+                    Forgot Password?
+                  </button>
                 </div>
               )}
 

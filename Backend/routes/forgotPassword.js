@@ -13,8 +13,12 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 async function findUserByEmail(email) {
   const emailTrim = email.trim();
 
+  // Check tbadmin (super admin)
+  let [rows] = await db.query('SELECT * FROM tbadmin WHERE email = ?', [emailTrim]);
+  if (rows.length) return { table: 'tbadmin', user: rows[0], passwordField: 'password', idField: 'id' };
+
   // Check tbemployees
-  let [rows] = await db.query('SELECT * FROM tbemployees WHERE email = ?', [emailTrim]);
+  [rows] = await db.query('SELECT * FROM tbemployees WHERE email = ?', [emailTrim]);
   if (rows.length) return { table: 'tbemployees', user: rows[0], passwordField: 'password', idField: 'id' };
 
   // Check tbca
