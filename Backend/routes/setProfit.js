@@ -24,22 +24,30 @@ const ensureTableAndColumns = async () => {
 
     const columnNames = columns.map((c) => c.Field);
 
-    // 3️⃣ Required columns list
+    // 3️⃣ Required columns list (making them nullable to avoid 'no default value' errors)
     const requiredColumns = [
-      { name: "wholesale_method", type: "VARCHAR(50)" },
-      { name: "wholesale_value", type: "DECIMAL(10,2)" },
-      { name: "retailer_method", type: "VARCHAR(50)" },
-      { name: "retailer_value", type: "DECIMAL(10,2)" },
+      { name: "wholesale_method", type: "VARCHAR(50) NULL" },
+      { name: "wholesale_value", type: "DECIMAL(10,2) NULL" },
+      { name: "retailer_method", type: "VARCHAR(50) NULL" },
+      { name: "retailer_value", type: "DECIMAL(10,2) NULL" },
+      { name: "customer_type", type: "VARCHAR(50) NULL" },
+      { name: "method", type: "VARCHAR(50) NULL" },
+      { name: "value", type: "DECIMAL(10,2) NULL" },
     ];
 
-    // 4️⃣ Add missing columns automatically
+    // 4️⃣ Add missing columns or update existing to be nullable
     for (const col of requiredColumns) {
       if (!columnNames.includes(col.name)) {
         await db.query(`
           ALTER TABLE set_profit
           ADD COLUMN ${col.name} ${col.type};
         `);
-     
+      } else {
+        // Force existing columns to be nullable if they weren't before
+        await db.query(`
+          ALTER TABLE set_profit
+          MODIFY COLUMN ${col.name} ${col.type};
+        `);
       }
     }
 
