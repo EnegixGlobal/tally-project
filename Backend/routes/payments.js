@@ -294,4 +294,52 @@ router.get('/verify-status/:paymentId', async (req, res) => {
   }
 });
 
+// Admin: Get all payments with company details
+router.get('/admin/all', async (req, res) => {
+  try {
+    const [rows] = await db.query(`
+      SELECT 
+        p.id, 
+        p.razorpay_payment_id as transactionId,
+        c.name as userName,
+        c.email as userEmail,
+        c.phone_number as userPhone,
+        p.amount,
+        p.status,
+        p.created_at as date,
+        p.payment_gateway as method,
+        p.response_json,
+        p.order_id,
+        sp.name as planName
+      FROM payments p
+      LEFT JOIN tbcompanies c ON p.company_id = c.id
+      LEFT JOIN subscription_plans sp ON p.plan_id = sp.id
+      ORDER BY p.created_at DESC
+    `);
+
+    // Parse response_json to extract the actual payment mode (upi, card, netbanking, etc.)
+    const formattedRows = rows.map(row => {
+      let mode = 'N/A';
+      try {
+        if (row.response_json) {
+          const json = JSON.parse(row.response_json);
+          // Look for mode in various possible places
+          mode = json.paymentDetails?.method || json.method || row.method || 'N/A';
+        }
+      } catch (e) {
+        console.warn('Could not parse response_json for payment id', row.id);
+      }
+      
+      // Remove response_json from the output to save bandwidth
+      const { response_json, ...rest } = row;
+      return { ...rest, mode };
+    });
+    
+    return res.json(formattedRows);
+  } catch (err) {
+    console.error('Error fetching all payments for admin:', err);
+    return res.status(500).json({ error: 'internal_error' });
+  }
+});
+
 module.exports = router;
