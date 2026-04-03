@@ -189,6 +189,13 @@ export type VoucherEntry = {
   safeDate?: Date | null;
 };
 
+export type StockItemAttribute = {
+  id: string | number;
+  stock_item_id: string | number;
+  name: string;
+  value: string;
+};
+
 export type StockItem = {
   id: string;
   name: string;
@@ -238,6 +245,8 @@ export type StockItem = {
 
   // API or future mapping may use this (KEEP)
   batches?: any;
+
+  attributes?: StockItemAttribute[];
 };
 
 

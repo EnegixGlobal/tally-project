@@ -183,6 +183,7 @@ const SalesVoucher: React.FC = () => {
         if (!item.batches) return [];
         try { return typeof item.batches === "string" ? JSON.parse(item.batches) : item.batches; } catch { return []; }
       })(),
+      attributes: (item as any).attributes || [],
     };
   };
 
@@ -2756,12 +2757,12 @@ const SalesVoucher: React.FC = () => {
                               }`}
                           >
                             {/* SR */}
-                            <td className="px-1 py-2 text-center min-w-[28px] text-xs">
+                            <td className="px-1 py-2 text-center min-w-[28px] text-xs align-top">
                               {index + 1}
                             </td>
 
                             {/* ITEM */}
-                            <td className="px-1 py-2 min-w-[110px]">
+                            <td className="px-1 py-2 min-w-[110px] align-top">
                               <select
                                 name="itemId"
                                 value={entry.itemId}
@@ -2777,10 +2778,30 @@ const SalesVoucher: React.FC = () => {
                                   </option>
                                 ))}
                               </select>
+                              {/* Item Attributes Display */}
+                              {(() => {
+                                const attributes = itemDetails.attributes || [];
+                                if (attributes.length === 0) return null;
+                                return (
+                                  <div className="mt-1 space-y-1">
+                                    {attributes.map((attr: any, i: number) => (
+                                      <div key={i} className="flex items-center gap-1">
+                                        <span className="text-[11px] font-medium min-w-[40px] capitalize text-gray-500">{attr.name}:</span>
+                                        <input
+                                          type="text"
+                                          value={attr.value || ""}
+                                          readOnly
+                                          className={`${FORM_STYLES.tableInput(theme)} text-[11px] h-6 flex-1 px-1 py-0`}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                );
+                              })()}
                             </td>
 
                             {/* HSN */}
-                            <td className="px-1 py-2 text-center min-w-[55px] text-xs">
+                            <td className="px-1 py-2 text-center min-w-[55px] text-xs align-top">
                               <input
                                 type="text"
                                 name="hsnCode"
@@ -2796,7 +2817,7 @@ const SalesVoucher: React.FC = () => {
                             {/* BATCH */}
                             {columnSettings.showBatch &&
                               entry.batches?.some((b) => b.batchName) && (
-                                <td className="px-1 py-2 min-w-[180px]">
+                                <td className="px-1 py-2 min-w-[180px] align-top">
                                   <select
                                     name="batchNumber"
                                     value={entry.batchNumber || ""}
@@ -2834,7 +2855,7 @@ const SalesVoucher: React.FC = () => {
                               )}
 
                             {/* ✅ QTY (BATCH WISE) */}
-                            <td className="px-1 py-2 min-w-[55px]">
+                            <td className="px-1 py-2 min-w-[55px] align-top">
                               <input
                                 type="number"
                                 name="quantity"
@@ -2848,12 +2869,12 @@ const SalesVoucher: React.FC = () => {
                             </td>
 
                             {/* UNIT */}
-                            <td className="px-1 py-2 min-w-[45px] text-center text-xs">
+                            <td className="px-1 py-2 min-w-[45px] text-center text-xs align-top">
                               {itemDetails.unit || getUnitName(entry.unitId)}
                             </td>
 
                             {/* RATE */}
-                            <td className="px-1 py-2 min-w-[70px]">
+                            <td className="px-1 py-2 min-w-[70px] align-top">
                               <input
                                 type="number"
                                 name="rate"
@@ -2896,12 +2917,12 @@ const SalesVoucher: React.FC = () => {
 
 
                             {/* AMOUNT */}
-                            <td className="px-1 py-2 text-right min-w-[75px] font-medium text-xs">
+                            <td className="px-1 py-2 text-right min-w-[75px] font-medium text-xs align-top">
                               {Number(entry.amount ?? 0).toLocaleString()}
                             </td>
 
                             {/* DISCOUNT */}
-                            <td className="px-1 py-2 min-w-[70px]">
+                            <td className="px-1 py-2 min-w-[70px] align-top">
                               <select
                                 name="discountLedgerId"
                                 value={entry.discountLedgerId || ""}
@@ -2964,7 +2985,7 @@ const SalesVoucher: React.FC = () => {
                             </td>
 
                             {/* DELETE */}
-                            <td className="px-1 py-2 text-center min-w-[40px]">
+                            <td className="px-1 py-2 text-center min-w-[40px] align-top">
                               <button
                                 onClick={() => removeEntry(index)}
                                 disabled={formData.entries.length <= 1}

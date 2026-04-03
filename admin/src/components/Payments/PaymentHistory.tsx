@@ -1,18 +1,38 @@
-import React, { useState } from 'react';
-import { mockPayments } from '../../data/mockData';
-import type  { Payment } from '../../types';
-import { Search, Filter, Download, RefreshCw, Eye } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import api from '../../services/api';
+import type { Payment } from '../../types';
+import { Search, Filter, Download, RefreshCw, Eye, Loader2, AlertCircle } from 'lucide-react';
 import { format } from 'date-fns';
 import { useTheme } from '../../context/ThemeContext';
 
 const PaymentHistory: React.FC = () => {
   const { theme } = useTheme();
-  const [payments, setPayments] = useState<Payment[]>(mockPayments);
+  const [payments, setPayments] = useState<Payment[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [methodFilter, setMethodFilter] = useState<string>('all');
   const [selectedPayment, setSelectedPayment] = useState<Payment | null>(null);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+
+  const fetchPayments = async () => {
+    try {
+      setLoading(true);
+      const response = await api.get('/api/payments/admin/all');
+      setPayments(response.data);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching payments:', err);
+      setError('Failed to fetch payment history');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchPayments();
+  }, []);
 
   const filteredPayments = payments.filter(payment => {
     const matchesSearch = payment.userName.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -34,17 +54,34 @@ const PaymentHistory: React.FC = () => {
   };
 
   const getStatusBadge = (status: string) => {
-    switch (status) {
+    switch (status.toLowerCase()) {
       case 'success':
+      case 'captured':
         return theme === 'dark' ? 'bg-green-900 text-green-100' : 'bg-green-100 text-green-800';
       case 'failed':
-        return theme === 'dark' ? 'bg-red-900 text-red-100' : 'bg-red-100 text-red-800';
       case 'pending':
-        return theme === 'dark' ? 'bg-yellow-900 text-yellow-100' : 'bg-yellow-100 text-yellow-800';
+      case 'created':
+        return theme === 'dark' ? 'bg-red-900 text-red-100' : 'bg-red-100 text-red-800';
       case 'refunded':
         return theme === 'dark' ? 'bg-purple-900 text-purple-100' : 'bg-purple-100 text-purple-800';
       default:
         return theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-gray-100 text-gray-800';
+    }
+  };
+
+  const getStatusLabel = (status: string) => {
+    switch (status.toLowerCase()) {
+      case 'success':
+      case 'captured':
+        return 'Success';
+      case 'failed':
+      case 'pending':
+      case 'created':
+        return 'Error';
+      case 'refunded':
+        return 'Refunded';
+      default:
+        return status.charAt(0).toUpperCase() + status.slice(1);
     }
   };
 
@@ -78,8 +115,12 @@ const PaymentHistory: React.FC = () => {
             <Download className="w-4 h-4" />
             Export
           </button>
-          <button className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primaryDark transition-colors flex items-center gap-2">
-            <RefreshCw className="w-4 h-4" />
+          <button 
+            onClick={fetchPayments}
+            disabled={loading}
+            className="px-4 py-2 bg-primary text-white rounded-lg hover:bg-primaryDark transition-colors flex items-center gap-2 disabled:opacity-50"
+          >
+            <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
             Refresh
           </button>
         </div>
@@ -98,7 +139,7 @@ const PaymentHistory: React.FC = () => {
           <div className={`text-2xl font-bold mt-1 ${
             theme === 'dark' ? 'text-white' : 'text-gray-900'
           }`}>
-            ₹{filteredPayments.reduce((sum, p) => sum + p.amount, 0).toLocaleString()}
+            ₹{payments.filter(p => ['success', 'captured'].includes(p.status.toLowerCase())).reduce((sum, p) => sum + Number(p.amount || 0), 0).toLocaleString()}
           </div>
         </div>
         <div className={`rounded-xl shadow-sm border p-6 ${
@@ -110,7 +151,7 @@ const PaymentHistory: React.FC = () => {
             theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
           }`}>Successful</h3>
           <div className="text-2xl font-bold text-green-600 mt-1">
-            {filteredPayments.filter(p => p.status === 'success').length}
+            {payments.filter(p => ['success', 'captured'].includes(p.status.toLowerCase())).length}
           </div>
         </div>
         <div className={`rounded-xl shadow-sm border p-6 ${
@@ -122,7 +163,7 @@ const PaymentHistory: React.FC = () => {
             theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
           }`}>Failed</h3>
           <div className="text-2xl font-bold text-red-600 mt-1">
-            {filteredPayments.filter(p => p.status === 'failed').length}
+            {payments.filter(p => ['failed', 'created', 'pending'].includes(p.status.toLowerCase())).length}
           </div>
         </div>
         <div className={`rounded-xl shadow-sm border p-6 ${
@@ -134,7 +175,7 @@ const PaymentHistory: React.FC = () => {
             theme === 'dark' ? 'text-gray-400' : 'text-gray-500'
           }`}>Refunded</h3>
           <div className="text-2xl font-bold text-purple-600 mt-1">
-            {filteredPayments.filter(p => p.status === 'refunded').length}
+            {payments.filter(p => p.status.toLowerCase() === 'refunded').length}
           </div>
         </div>
       </div>
@@ -201,117 +242,158 @@ const PaymentHistory: React.FC = () => {
       </div>
 
       {/* Payments Table */}
-      <div className={`rounded-xl shadow-sm border overflow-hidden ${
-        theme === 'dark' 
-          ? 'bg-gray-800 border-gray-700' 
-          : 'bg-white border-gray-200'
-      }`}>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
-              <tr>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
-                  Transaction
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
-                  User
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
-                  Amount
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
-                  Status
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
-                  Method
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider hidden lg:table-cell ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
-                  Date
-                </th>
-                <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
-                  theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
-                }`}>
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
-              {filteredPayments.map((payment) => (
-                <tr key={payment.id} className={`${
-                  theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
-                }`}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className={`text-sm font-medium ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-900'
-                    }`}>
-                      {payment.transactionId}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className={`text-sm ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-900'
-                    }`}>
-                      {payment.userName}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className={`text-sm font-medium ${
-                      theme === 'dark' ? 'text-white' : 'text-gray-900'
-                    }`}>
-                      ₹{payment.amount.toLocaleString()}
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(payment.status)}`}>
-                      {payment.status}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getMethodBadge(payment.method)}`}>
-                      {payment.method}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 hidden lg:table-cell">
-                    {format(new Date(payment.date), 'MMM dd, yyyy HH:mm')}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <button 
-                      title='View Payment Details'
-                        onClick={() => handleViewPayment(payment)}
-                        className="text-primary hover:text-primaryDark dark:text-purple-400 dark:hover:text-purple-200"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {payment.status === 'success' && (
-                        <button
-                        title='Process Refund' 
-                          onClick={() => handleRefund(payment.id)}
-                          className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200"
-                        >
-                          <RefreshCw className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
+      {loading ? (
+        <div className={`flex flex-col items-center justify-center py-20 rounded-xl border ${
+          theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <Loader2 className="w-10 h-10 text-primary animate-spin mb-4" />
+          <p className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}>Loading payment history...</p>
         </div>
-      </div>
+      ) : error ? (
+        <div className={`flex flex-col items-center justify-center py-20 rounded-xl border ${
+          theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <AlertCircle className="w-10 h-10 text-red-500 mb-4" />
+          <p className="text-red-500 font-medium">{error}</p>
+          <button 
+            onClick={fetchPayments}
+            className="mt-4 px-4 py-2 bg-primary text-white rounded-lg hover:bg-primaryDark transition-colors"
+          >
+            Try Again
+          </button>
+        </div>
+      ) : filteredPayments.length === 0 ? (
+        <div className={`flex flex-col items-center justify-center py-20 rounded-xl border ${
+          theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'
+        }`}>
+          <p className={theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}>No matching payments found.</p>
+        </div>
+      ) : (
+        <div className={`rounded-xl shadow-sm border overflow-hidden ${
+          theme === 'dark' 
+            ? 'bg-gray-800 border-gray-700' 
+            : 'bg-white border-gray-200'
+        }`}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                <tr>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
+                    Transaction
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
+                    User / Company
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
+                    Amount
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
+                    Status
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
+                    Method
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
+                    Mode
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider hidden lg:table-cell ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
+                    Date
+                  </th>
+                  <th className={`px-6 py-3 text-left text-xs font-medium uppercase tracking-wider ${
+                    theme === 'dark' ? 'text-gray-300' : 'text-gray-500'
+                  }`}>
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                {filteredPayments.map((payment) => (
+                  <tr key={payment.id} className={`${
+                    theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-50'
+                  }`}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className={`text-sm font-medium ${
+                        theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {payment.transactionId || 'N/A'}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className={`text-sm font-medium ${
+                        theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        {payment.userName}
+                      </div>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {payment.userEmail}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className={`text-sm font-medium ${
+                        theme === 'dark' ? 'text-white' : 'text-gray-900'
+                      }`}>
+                        ₹{Number(payment.amount).toLocaleString()}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(payment.status)}`}>
+                        {getStatusLabel(payment.status)}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {payment.method || 'Razorpay'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 py-1 text-xs font-bold rounded-md uppercase ${
+                        theme === 'dark' ? 'bg-blue-900/30 text-blue-300' : 'bg-blue-50 text-blue-700'
+                      }`}>
+                        {payment.mode || 'N/A'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 hidden lg:table-cell">
+                      {payment.date ? format(new Date(payment.date), 'MMM dd, yyyy HH:mm') : 'N/A'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center gap-2">
+                        <button 
+                        title='View Payment Details'
+                          onClick={() => handleViewPayment(payment)}
+                          className="text-primary hover:text-primaryDark dark:text-purple-400 dark:hover:text-purple-200"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </button>
+                        {payment.status === 'success' && (
+                          <button
+                          title='Process Refund' 
+                            onClick={() => handleRefund(payment.id.toString())}
+                            className="text-purple-600 hover:text-purple-800 dark:text-purple-400 dark:hover:text-purple-200"
+                          >
+                            <RefreshCw className="w-4 h-4" />
+                          </button>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
 
       {/* Payment Details Modal */}
       {showPaymentModal && selectedPayment && (
@@ -329,31 +411,43 @@ const PaymentHistory: React.FC = () => {
             <div className="space-y-3">
               <div>
                 <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Transaction ID</label>
-                <p className="text-gray-900 dark:text-white">{selectedPayment.transactionId}</p>
+                <p className="text-gray-900 dark:text-white font-mono text-xs">{selectedPayment.transactionId || 'N/A'}</p>
               </div>
               <div>
-                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">User</label>
-                <p className="text-gray-900 dark:text-white">{selectedPayment.userName}</p>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">User / Company</label>
+                <p className="text-gray-900 dark:text-white font-semibold">{selectedPayment.userName}</p>
+                <p className="text-gray-500 dark:text-gray-400 text-sm">{selectedPayment.userEmail}</p>
+                {selectedPayment.userPhone && <p className="text-gray-500 dark:text-gray-400 text-sm">{selectedPayment.userPhone}</p>}
+              </div>
+              <div>
+                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Subscription Plan</label>
+                <p className="text-gray-900 dark:text-white">{selectedPayment.planName || 'N/A'}</p>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Amount</label>
-                <p className="text-gray-900 dark:text-white">₹{selectedPayment.amount.toLocaleString()}</p>
+                <p className="text-gray-900 dark:text-white">₹{Number(selectedPayment.amount).toLocaleString()}</p>
               </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</label>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(selectedPayment.status)}`}>
-                  {selectedPayment.status}
-                </span>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Method</label>
-                <span className={`px-2 py-1 text-xs font-medium rounded-full ${getMethodBadge(selectedPayment.method)}`}>
-                  {selectedPayment.method}
-                </span>
+              <div className="flex gap-4">
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Status</label>
+                  <div className="mt-1">
+                    <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(selectedPayment.status)}`}>
+                      {getStatusLabel(selectedPayment.status)}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Method</label>
+                  <p className="text-gray-900 dark:text-white">{selectedPayment.method || 'Razorpay'}</p>
+                </div>
+                <div className="flex-1">
+                  <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Mode</label>
+                  <p className="text-gray-900 dark:text-white uppercase font-bold">{selectedPayment.mode || 'N/A'}</p>
+                </div>
               </div>
               <div>
                 <label className="text-sm font-medium text-gray-500 dark:text-gray-400">Date</label>
-                <p className="text-gray-900 dark:text-white">{format(new Date(selectedPayment.date), 'MMM dd, yyyy HH:mm')}</p>
+                <p className="text-gray-900 dark:text-white">{selectedPayment.date ? format(new Date(selectedPayment.date), 'MMM dd, yyyy HH:mm') : 'N/A'}</p>
               </div>
             </div>
             <div className="flex justify-end gap-3 mt-6">

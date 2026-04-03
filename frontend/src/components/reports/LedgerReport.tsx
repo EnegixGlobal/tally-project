@@ -570,6 +570,9 @@ const LedgerReport: React.FC = () => {
         if (data) {
           setSelectedVoucher({
             ...data,
+            voucherNo: txn.voucherNo || "",
+            voucherType: txn.voucherType || "",
+            date: txn.date || "",
             amount: data.total || 0,
           });
         }
@@ -1261,7 +1264,7 @@ const LedgerReport: React.FC = () => {
 
       {/* Voucher Detail Modal */}
       {selectedVoucher && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+        <div className="fixed inset-0 flex items-center justify-center z-50 p-4 backdrop-blur-sm bg-black/50">
           <div className={`w-full max-w-4xl max-h-[90vh] rounded-lg overflow-hidden flex flex-col ${theme === "dark" ? "bg-gray-800" : "bg-white"}`}>
             {/* Header */}
             <div className="p-6 border-b border-gray-200 dark:border-gray-700 flex-shrink-0">
@@ -1269,7 +1272,7 @@ const LedgerReport: React.FC = () => {
                 <h3 className="text-lg font-semibold">Voucher Details - {selectedVoucher.voucherNo}</h3>
                 <button
                   onClick={() => setSelectedVoucher(null)}
-                  className={`p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"}`}
+                  className={`p-2 text-3xl bg-gray-300 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-500"}`}
                 >
                   ×
                 </button>

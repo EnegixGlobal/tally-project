@@ -264,6 +264,7 @@ const PurchaseVoucher: React.FC = () => {
       // For Purchase, we usually use standardPurchaseRate, but fallback to rate/mrp if needed
       standardPurchaseRate: Number(item.standardPurchaseRate || item.purchaseRate || item.rate || 0),
       batches: item.batches,
+      attributes: (item as any).attributes || [],
       gstLedgerId: item.gstLedgerId,
       sgstLedgerId: item.sgstLedgerId,
       cgstLedgerId: item.cgstLedgerId,
@@ -1971,7 +1972,11 @@ const PurchaseVoucher: React.FC = () => {
   // Helper functions for print layout
   const getItemDetails = (itemId: string) => {
     const item = safeStockItems.find((item) => String(item.id) === String(itemId));
-    return item || { name: "-", hsnCode: "-", unit: "-", gstRate: 0, rate: 0 };
+    if (!item) return { name: "-", hsnCode: "-", unit: "-", gstRate: 0, rate: 0, attributes: [] };
+    return {
+      ...item,
+      attributes: (item as any).attributes || [],
+    };
   };
 
   const getPartyName = (partyId: string) => {
@@ -2790,12 +2795,12 @@ const PurchaseVoucher: React.FC = () => {
                             }`}
                         >
                           {/* SR */}
-                          <td className="px-1 py-2 text-center min-w-[28px] text-xs font-semibold">
+                          <td className="px-1 py-2 text-center min-w-[28px] text-xs font-semibold align-top">
                             {index + 1}
                           </td>
 
                           {/* ITEM */}
-                          <td className="px-1 py-2 min-w-[110px]">
+                          <td className="px-1 py-2 min-w-[110px] align-top">
                             <select
                               name="itemId"
                               value={entry.itemId}
@@ -2809,11 +2814,32 @@ const PurchaseVoucher: React.FC = () => {
                                 </option>
                               ))}
                             </select>
+
+                            {/* Item Attributes Display */}
+                            {(() => {
+                              const attributes = itemDetails.attributes || [];
+                              if (attributes.length === 0) return null;
+                              return (
+                                <div className="mt-1 space-y-1">
+                                  {attributes.map((attr: any, i: number) => (
+                                    <div key={i} className="flex items-center gap-1">
+                                      <span className="text-[11px] font-medium min-w-[40px] capitalize ">{attr.name}:</span>
+                                      <input
+                                        type="text"
+                                        value={attr.value || ""}
+                                        readOnly
+                                        className={`${theme === "dark" ? "bg-gray-700 border-gray-600 focus:border-blue-500" : "bg-white border-gray-300 focus:border-blue-500"} w-full p-2 rounded border outline-none transition-colors text-[11px] h-6 flex-1 px-1 py-0`}
+                                      />
+                                    </div>
+                                  ))}
+                                </div>
+                              );
+                            })()}
                           </td>
 
                           {/* HSN */}
                           {visibleColumns.hsn && (
-                            <td className="px-1 py-2 min-w-[55px] text-center text-xs">
+                            <td className="px-1 py-2 min-w-[55px] text-center text-xs align-top">
                               <input
                                 type="text"
                                 name="hsnCode"
@@ -2827,7 +2853,7 @@ const PurchaseVoucher: React.FC = () => {
 
                           {/* BATCH — only show when items have batches */}
                           {visibleColumns.batch && hasAnyBatch && (
-                            <td className="px-1 py-2 min-w-[140px] flex items-center gap-2">
+                            <td className="px-1 py-2 min-w-[140px] flex items-center gap-2 align-top">
                               <select
                                 name="batchNumber"
                                 value={entry.batchNumber || ""}
@@ -3089,7 +3115,7 @@ const PurchaseVoucher: React.FC = () => {
                           )}
 
                           {/* QUANTITY */}
-                          <td className="px-1 py-2 min-w-[55px]">
+                          <td className="px-1 py-2 min-w-[55px] align-top">
                             {!isAddingBatch && (
                               <input
                                 type="number"
@@ -3102,12 +3128,12 @@ const PurchaseVoucher: React.FC = () => {
                           </td>
 
                           {/* UNIT */}
-                          <td className="px-1 py-2 min-w-[45px] text-center text-xs">
+                          <td className="px-1 py-2 min-w-[45px] text-center text-xs align-top">
                             {getUnitName(entry.unitName)}
                           </td>
 
                           {/* RATE */}
-                          <td className="px-1 py-2 min-w-[70px]">
+                          <td className="px-1 py-2 min-w-[70px] align-top">
                             {!isAddingBatch && (
                               <input
                                 type="number"
@@ -3127,11 +3153,11 @@ const PurchaseVoucher: React.FC = () => {
                           {/* Intra State */}
                           {visibleColumns.gst && isIntraState && (
                             <>
-                              <td className="px-1 py-2 text-xs text-center">
+                              <td className="px-1 py-2 text-xs text-center align-top">
                                 {extractGstPercent(getLedgerNameById(entry.sgstLedgerId))}%
                               </td>
 
-                              <td className="px-1 py-2 text-xs text-center">
+                              <td className="px-1 py-2 text-xs text-center align-top">
                                 {extractGstPercent(getLedgerNameById(entry.cgstLedgerId))}%
                               </td>
                             </>
@@ -3139,7 +3165,7 @@ const PurchaseVoucher: React.FC = () => {
 
                           {/* Inter State */}
                           {visibleColumns.gst && !isIntraState && (
-                            <td className="px-1 py-2 text-xs text-center">
+                            <td className="px-1 py-2 text-xs text-center align-top">
                               {extractGstPercent(getLedgerNameById(entry.gstLedgerId))}%
                             </td>
                           )}
@@ -3149,7 +3175,7 @@ const PurchaseVoucher: React.FC = () => {
 
 
                           {/* DISCOUNT */}
-                          <td className="px-1 py-2 min-w-[70px]">
+                          <td className="px-1 py-2 min-w-[70px] align-top">
                             <select
                               name="discountLedgerId"
                               value={(entry as any).discountLedgerId || ""}
@@ -3166,13 +3192,13 @@ const PurchaseVoucher: React.FC = () => {
                           </td>
 
                           {/* AMOUNT */}
-                          <td className="px-1 py-2 min-w-[75px] text-right text-xs font-medium">
+                          <td className="px-1 py-2 min-w-[75px] text-right text-xs font-medium align-top">
                             {Number(entry.amount ?? 0).toLocaleString()}
                           </td>
 
                           {/* GODOWN (Show only if Enabled) */}
                           {godownEnabled === "yes" && visibleColumns.godown && (
-                            <td className="px-1 py-2 min-w-[95px]">
+                            <td className="px-1 py-2 min-w-[95px] align-top">
                               <select
                                 name="godownId"
                                 value={entry.godownId || ""}
@@ -3199,7 +3225,7 @@ const PurchaseVoucher: React.FC = () => {
                           )}
 
                           {/* Purchase Ledger */}
-                          <td className="px-1 py-2 min-w-[120px]">
+                          <td className="px-1 py-2 min-w-[120px] align-top">
                             <select
                               name="purchaseLedgerId"
                               value={entry.purchaseLedgerId || ""}
@@ -3224,7 +3250,7 @@ const PurchaseVoucher: React.FC = () => {
                           </td>
 
                           {/* ACTION */}
-                          <td className="px-1 py-2 text-center min-w-[40px]">
+                          <td className="px-1 py-2 text-center min-w-[40px] align-top">
                             <button
                               onClick={() => removeEntry(index)}
                               className="p-1 rounded hover:bg-gray-200"
