@@ -28,11 +28,16 @@ export interface Payment {
   id: string;
   userId: string;
   userName: string;
+  userEmail?: string;
+  userPhone?: string;
+  planName?: string;
   amount: number;
-  status: 'success' | 'failed' | 'pending' | 'refunded';
+  status: 'success' | 'failed' | 'pending' | 'refunded' | 'captured' | 'created';
   date: string;
-  method: 'card' | 'upi' | 'netbanking';
+  method: string;
+  mode?: string;
   transactionId: string;
+  order_id?: string;
 }
 
 export interface SupportTicket {
