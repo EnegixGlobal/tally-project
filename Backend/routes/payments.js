@@ -9,8 +9,8 @@ const router = express.Router();
 // Environment Variables
 const RAZORPAY_KEY_ID = process.env.RAZORPAY_KEY_ID || '';
 const RAZORPAY_KEY_SECRET = process.env.RAZORPAY_KEY_SECRET || '';
-const FRONTEND_URL = process.env.FRONTEND_URL ;
-const BACKEND_URL = process.env.BACKEND_URL ;
+const FRONTEND_URL = process.env.FRONTEND_URL;
+const BACKEND_URL = process.env.BACKEND_URL;
 
 let razorpay = null;
 if (RAZORPAY_KEY_ID && RAZORPAY_KEY_SECRET) {
@@ -168,32 +168,32 @@ router.post('/confirm', async (req, res) => {
         const { id: paymentRecordId, company_id: companyId, plan_id: planId, status: oldStatus } = paymentRow;
 
         if (oldStatus === 'created' || oldStatus === 'success') {
-            if (companyId && planId) {
-              try {
-                const [planRows] = await db.execute(`SELECT duration FROM subscription_plans WHERE id = ? LIMIT 1`, [planId]);
-                const planDuration = (planRows && planRows[0] && planRows[0].duration) ? planRows[0].duration : 'monthly';
+          if (companyId && planId) {
+            try {
+              const [planRows] = await db.execute(`SELECT duration FROM subscription_plans WHERE id = ? LIMIT 1`, [planId]);
+              const planDuration = (planRows && planRows[0] && planRows[0].duration) ? planRows[0].duration : 'monthly';
 
-                const subscription = await upsertCompanySubscription(db, companyId, planId, paymentRecordId, planDuration);
-                if (subscription) {
-                  const now = new Date();
-                  const end = new Date(subscription.end_date || subscription.endDate || subscription.end_date);
-                  const msDiff = end.getTime() - now.getTime();
-                  const daysRemaining = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
-                  paymentDetails = paymentDetails || {};
-                  paymentDetails.subscription = {
-                    id: subscription.id,
-                    plan: subscription.plan,
-                    isTrial: !!subscription.is_trial,
-                    status: subscription.status,
-                    startDate: subscription.start_date,
-                    endDate: subscription.end_date,
-                    daysRemaining: Math.max(daysRemaining, 0),
-                  };
-                }
-              } catch (subErr) {
-                console.error('Error upserting company_subscriptions after razorpay payment:', subErr);
+              const subscription = await upsertCompanySubscription(db, companyId, planId, paymentRecordId, planDuration);
+              if (subscription) {
+                const now = new Date();
+                const end = new Date(subscription.end_date || subscription.endDate || subscription.end_date);
+                const msDiff = end.getTime() - now.getTime();
+                const daysRemaining = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+                paymentDetails = paymentDetails || {};
+                paymentDetails.subscription = {
+                  id: subscription.id,
+                  plan: subscription.plan,
+                  isTrial: !!subscription.is_trial,
+                  status: subscription.status,
+                  startDate: subscription.start_date,
+                  endDate: subscription.end_date,
+                  daysRemaining: Math.max(daysRemaining, 0),
+                };
               }
+            } catch (subErr) {
+              console.error('Error upserting company_subscriptions after razorpay payment:', subErr);
             }
+          }
         }
       }
     } catch (subOuterErr) {
@@ -237,9 +237,38 @@ router.get('/confirm', (req, res) => {
 router.get('/status/:orderId', async (req, res) => {
   try {
     const { orderId } = req.params;
-    const [rows] = await db.execute(`SELECT * FROM payments WHERE order_id = ? OR razorpay_order_id = ? LIMIT 1`, [orderId, orderId]);
+    const [rows] = await db.execute(
+      `SELECT p.*, sp.duration as plan_duration, 
+              DATEDIFF(cs.end_date, cs.start_date) as validity_days
+       FROM payments p 
+       LEFT JOIN subscription_plans sp ON p.plan_id = sp.id 
+       LEFT JOIN company_subscriptions cs ON p.company_id = cs.company_id AND p.id = cs.payment_id
+       WHERE p.order_id = ? OR p.razorpay_order_id = ? LIMIT 1`, 
+      [orderId, orderId]
+    );
     if (!rows || rows.length === 0) return res.status(404).json({});
-    return res.json(rows[0]);
+    
+    const data = rows[0];
+    
+    // Calculate validity days on the fly using fiscal year logic (April to March)
+    try {
+        const startDate = data.created_at ? new Date(data.created_at) : new Date();
+        const month = startDate.getMonth() + 1;
+        let fiscalEndYear;
+        if (month >= 4) {
+            fiscalEndYear = startDate.getFullYear() + 1;
+        } else {
+            fiscalEndYear = startDate.getFullYear();
+        }
+        const endDate = new Date(fiscalEndYear, 2, 31, 23, 59, 59, 999);
+        const msDiff = endDate.getTime() - startDate.getTime();
+        const days = Math.ceil(msDiff / (1000 * 60 * 60 * 24));
+        data.plan_duration = `${days} Days`;
+    } catch (e) {
+        console.warn('Error calculating duration on the fly', e);
+    }
+    
+    return res.json(data);
   } catch (err) {
     console.error('status error', err);
     return res.status(500).json({ error: 'internal_error' });
