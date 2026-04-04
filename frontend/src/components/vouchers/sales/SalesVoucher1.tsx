@@ -2758,7 +2758,7 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-right">Amount</th>
                         {columnSettings.showDiscount && <th>Discount</th>}
 
-                        {godownEnabled === "yes" && (
+                        {godownEnabled === "yes" && columnSettings.showGodown && (
                           <th className="px-4 py-2 text-left">Godown</th>
                         )}
                         <th className="px-4 py-2 text-left">Sales Ledger</th>
@@ -2959,25 +2959,27 @@ const SalesVoucher: React.FC = () => {
                             </td>
 
                             {/* DISCOUNT */}
-                            <td className="px-1 py-2 min-w-[70px] align-top">
-                              <select
-                                name="discountLedgerId"
-                                value={entry.discountLedgerId || ""}
-                                onChange={(e) => handleEntryChange(index, e)}
-                                className={`${FORM_STYLES.tableSelect(theme)} text-xs min-w-[100px]`}
-                              >
-                                <option value="">Select Discount</option>
-                                {discount.map(l => (
-                                  <option key={l.id} value={l.id}>{l.name}</option>
-                                ))
-                                }
-                              </select>
-                            </td>
+                            {columnSettings.showDiscount && (
+                              <td className="px-1 py-2 min-w-[70px] align-top">
+                                <select
+                                  name="discountLedgerId"
+                                  value={entry.discountLedgerId || ""}
+                                  onChange={(e) => handleEntryChange(index, e)}
+                                  className={`${FORM_STYLES.tableSelect(theme)} text-xs min-w-[100px]`}
+                                >
+                                  <option value="">Select Discount</option>
+                                  {discount.map(l => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
+                                  ))
+                                  }
+                                </select>
+                              </td>
+                            )}
 
 
 
                             {/* GODOWN */}
-                            {godownEnabled === "yes" && (
+                            {godownEnabled === "yes" && columnSettings.showGodown && (
                               <td className="px-1 py-2 min-w-[95px]">
                                 <select
                                   name="godownId"
@@ -3070,7 +3072,7 @@ const SalesVoucher: React.FC = () => {
                           }
                         }
                         if (columnSettings.showDiscount) totalCols += 1; // Discount
-                        if (godownEnabled === "yes") totalCols += 1; // Godown
+                        if (godownEnabled === "yes" && columnSettings.showGodown) totalCols += 1; // Godown
                         totalCols += 1; // Sales Ledger
                         // Action column is separate, so colspan = totalCols - 1 (excluding Action)
                         const colspan = totalCols - 1;
@@ -3095,8 +3097,7 @@ const SalesVoucher: React.FC = () => {
                             </tr>
 
                             {/* CGST TOTAL - Only show when party selected and states match */}
-                            {columnSettings.showGST &&
-                              hasParty &&
+                            {hasParty &&
                               statesMatch &&
                               cgstTotal > 0 && (
                                 <tr
@@ -3118,8 +3119,7 @@ const SalesVoucher: React.FC = () => {
                               )}
 
                             {/* SGST TOTAL - Only show when party selected and states match */}
-                            {columnSettings.showGST &&
-                              hasParty &&
+                            {hasParty &&
                               statesMatch &&
                               sgstTotal > 0 && (
                                 <tr
@@ -3141,8 +3141,7 @@ const SalesVoucher: React.FC = () => {
                               )}
 
                             {/* IGST TOTAL - Only show when party selected and states don't match */}
-                            {columnSettings.showGST &&
-                              hasParty &&
+                            {hasParty &&
                               !statesMatch &&
                               igstTotal > 0 && (
                                 <tr
@@ -3163,8 +3162,8 @@ const SalesVoucher: React.FC = () => {
                                 </tr>
                               )}
 
-                            {/* GST TOTAL - Always show when GST is enabled */}
-                            {columnSettings.showGST && (
+                            {/* GST TOTAL - Always show when GST is present */}
+                            {(cgstTotal + sgstTotal + igstTotal) > 0 && (
                               <tr
                                 className={`font-semibold ${theme === "dark"
                                   ? "border-t border-gray-600"
@@ -3187,7 +3186,7 @@ const SalesVoucher: React.FC = () => {
                             )}
 
                             {/* DISCOUNT */}
-                            {columnSettings.showDiscount && (
+                            {discountTotal > 0 && (
                               <tr
                                 className={`font-semibold ${theme === "dark"
                                   ? "border-t border-gray-600"
