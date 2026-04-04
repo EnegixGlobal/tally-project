@@ -365,6 +365,18 @@ router.post("/", async (req, res) => {
 
     const voucherId = voucherResult.insertId;
 
+    // ================= INCREMENT SALES TYPE CURRENT NO =================
+    if (sales_type_id && sales_type_id !== "custom") {
+      try {
+        await db.execute(
+          `UPDATE sales_types SET current_no = current_no + 1 WHERE id = ?`,
+          [sales_type_id]
+        );
+      } catch (err) {
+        console.error("Failed to increment sales type current_no:", err);
+      }
+    }
+
     // ================= INSERT ENTRIES (BASED ON MODE) =================
     if (mode === "accounting-invoice") {
       const ledgerEntries = receivedEntries.filter((e) => e.ledgerId);
