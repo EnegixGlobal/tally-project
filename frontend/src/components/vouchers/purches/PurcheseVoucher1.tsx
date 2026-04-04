@@ -169,7 +169,7 @@ const calculateEntryValues = (
   const gstAmount = (baseAmount * totalTaxRate) / 100;
 
 
-  const totalAmount = baseAmount + gstAmount - disc;
+  const totalAmount = baseAmount - disc;
 
   return {
     quantity: qty,
@@ -559,7 +559,7 @@ const PurchaseVoucher: React.FC = () => {
                 itemId: e.itemId || "",
                 quantity: Math.round(e.quantity || 0),
                 rate: Math.round(e.rate || 0),
-                amount: Math.round(e.amount || 0),
+                amount: Math.round((e.quantity || 0) * (e.rate || 0) - (e.discount || 0)),
 
                 // AUTO FILL: Prioritize saved data, fallback to Item Master if missing
                 hsnCode: e.hsnCode || stockItem?.hsnCode || "",
@@ -1873,68 +1873,68 @@ const PurchaseVoucher: React.FC = () => {
 
         // 1. Process active entries (new ones get added fully, edited ones get diffed)
         for (const entry of formData.entries) {
-            if (!entry.itemId) continue;
-            if (entry.batchMeta?.isNew) continue; // New batches already handled by POST above
+          if (!entry.itemId) continue;
+          if (entry.batchMeta?.isNew) continue; // New batches already handled by POST above
 
-            const targetBatchName = entry.batchNumber ?? "";
-            
-            let diffQuantity = Number(entry.quantity || 0);
+          const targetBatchName = entry.batchNumber ?? "";
 
-            if (isEditMode && originalEntries.length > 0) {
-              const oldEntry = originalEntries.find(
-                 e => String(e.itemId) === String(entry.itemId) && (e.batchNumber ?? "") === targetBatchName
-              );
-              if (oldEntry) {
-                 diffQuantity = diffQuantity - Number(oldEntry.quantity || 0);
-              }
-            }
+          let diffQuantity = Number(entry.quantity || 0);
 
-            if (diffQuantity === 0) continue;
-
-            const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
-            const patchBody = {
-              batchName: targetBatchName,
-              quantity: diffQuantity,
-              mode: "add",
-            };
-
-            patchPromises.push(
-               fetch(patchUrl, {
-                 method: "PATCH",
-                 headers: { "Content-Type": "application/json" },
-                 body: JSON.stringify(patchBody),
-               }).catch(err => console.error(`⚠️ Stock update failed:`, err))
+          if (isEditMode && originalEntries.length > 0) {
+            const oldEntry = originalEntries.find(
+              e => String(e.itemId) === String(entry.itemId) && (e.batchNumber ?? "") === targetBatchName
             );
+            if (oldEntry) {
+              diffQuantity = diffQuantity - Number(oldEntry.quantity || 0);
+            }
+          }
+
+          if (diffQuantity === 0) continue;
+
+          const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+          const patchBody = {
+            batchName: targetBatchName,
+            quantity: diffQuantity,
+            mode: "add",
+          };
+
+          patchPromises.push(
+            fetch(patchUrl, {
+              method: "PATCH",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify(patchBody),
+            }).catch(err => console.error(`⚠️ Stock update failed:`, err))
+          );
         }
 
         // 2. Process REMOVED entries (were in original, not in form now)
         if (isEditMode && originalEntries.length > 0) {
           for (const oldEntry of originalEntries) {
-             if (!oldEntry.itemId) continue;
-             const oldTargetBatchName = oldEntry.batchNumber ?? "";
-             
-             // Did it get removed?
-             const stillExists = formData.entries.find(
-                 e => String(e.itemId) === String(oldEntry.itemId) && (e.batchNumber ?? "") === oldTargetBatchName
-             );
+            if (!oldEntry.itemId) continue;
+            const oldTargetBatchName = oldEntry.batchNumber ?? "";
 
-             if (!stillExists) {
-                // Completely removed => revert the whole previous quantity (subtract it)
-                const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${oldEntry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
-                const patchBody = {
-                  batchName: oldTargetBatchName,
-                  quantity: -Number(oldEntry.quantity || 0),
-                  mode: "add",
-                };
+            // Did it get removed?
+            const stillExists = formData.entries.find(
+              e => String(e.itemId) === String(oldEntry.itemId) && (e.batchNumber ?? "") === oldTargetBatchName
+            );
 
-                patchPromises.push(
-                   fetch(patchUrl, {
-                     method: "PATCH",
-                     headers: { "Content-Type": "application/json" },
-                     body: JSON.stringify(patchBody),
-                   }).catch(err => console.error(`⚠️ Revert stock failed:`, err))
-                );
-             }
+            if (!stillExists) {
+              // Completely removed => revert the whole previous quantity (subtract it)
+              const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${oldEntry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+              const patchBody = {
+                batchName: oldTargetBatchName,
+                quantity: -Number(oldEntry.quantity || 0),
+                mode: "add",
+              };
+
+              patchPromises.push(
+                fetch(patchUrl, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify(patchBody),
+                }).catch(err => console.error(`⚠️ Revert stock failed:`, err))
+              );
+            }
           }
         }
 
