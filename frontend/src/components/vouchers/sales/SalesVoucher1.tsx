@@ -70,6 +70,7 @@ const SalesVoucher: React.FC = () => {
   );
 
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
+  const [originalEntries, setOriginalEntries] = useState<any[]>([]); // Edit mode: purani entries store karo
   const [selectedPartyState, setSelectedPartyState] = useState<string>(""); // Store selected party's state
   const [selectedPartyGst, setSelectedPartyGst] = useState<string>(""); // Store selected party's GST number
   const [salesTypes, setSalesTypes] = useState<SalesType[]>([]);
@@ -671,6 +672,9 @@ const SalesVoucher: React.FC = () => {
 
           type: "sales",
         });
+
+        // ✅ Original entries save karo (stock revert ke liye edit mode mein)
+        setOriginalEntries(data.entries || []);
 
         setIsQuotation(data.isQuotation === 1);
         setSelectedSalesTypeId(data.sales_type_id?.toString() || "");
@@ -2048,8 +2052,41 @@ const SalesVoucher: React.FC = () => {
         return;
       }
 
-      // ================= STOCK DEDUCTION (FINAL & IMPORTANT) =================
-      console.log("🔴 SALE STOCK DEDUCTION — companyId:", companyId, "ownerType:", ownerType, "ownerId:", ownerId);
+      // ================= STOCK UPDATE (EDIT MODE: REVERT OLD + DEDUCT NEW) =================
+      console.log("🔴 SALE STOCK UPDATE — companyId:", companyId, "ownerType:", ownerType, "ownerId:", ownerId);
+
+      // ✅ STEP 1: Edit mode mein — pehle purani (original) entries ki quantity wapas stock mein add karo
+      if (isEditMode && originalEntries.length > 0) {
+        console.log("🔁 Edit mode: Purani entries ka stock wapas add kar rahe hain...");
+        await Promise.all(
+          originalEntries.map(async (origEntry: any) => {
+            if (!origEntry.itemId) return;
+
+            const batchName = origEntry.batchNumber || "";
+            const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${origEntry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+            const patchBody = {
+              batchName: batchName,
+              quantity: +Number(origEntry.quantity || 0), // ✅ Positive: stock wapas add
+              mode: "add",
+            };
+            console.log("🔁 PATCH revert old stock:", patchUrl, patchBody);
+
+            try {
+              const patchRes = await fetch(patchUrl, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(patchBody),
+              });
+              const patchData = await patchRes.json();
+              console.log("🟡 PATCH revert response:", patchRes.status, patchData);
+            } catch (err) {
+              console.error(`⚠️ Stock revert failed for item ${origEntry.itemId}:`, err);
+            }
+          })
+        );
+      }
+
+      // ✅ STEP 2: Nayi entries ki quantity stock se deduct karo
       await Promise.all(
         formData.entries.map(async (entry) => {
           if (!entry.itemId) return;
@@ -2058,7 +2095,7 @@ const SalesVoucher: React.FC = () => {
           const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
           const patchBody = {
             batchName: targetBatchName,
-            quantity: -Number(entry.quantity || 0),
+            quantity: -Number(entry.quantity || 0), // ✅ Negative: stock deduct
             mode: "add",
           };
           console.log("🔴 PATCH sale stock deduct:", patchUrl, patchBody);

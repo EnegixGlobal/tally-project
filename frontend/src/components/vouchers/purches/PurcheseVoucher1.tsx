@@ -205,6 +205,7 @@ const PurchaseVoucher: React.FC = () => {
   );
 
   const [ledgers, setLedgers] = useState<LedgerWithGroup[]>([]);
+  const [originalEntries, setOriginalEntries] = useState<any[]>([]);
   const partyLedgers = ledgers;
 
   const purchaseLedgers = ledgers.filter((l) =>
@@ -518,6 +519,7 @@ const PurchaseVoucher: React.FC = () => {
     fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${id}`)
       .then((res) => res.json())
       .then((data) => {
+        setOriginalEntries(data.entries || []);
         setFormData((prev) => ({
           ...prev,
 
@@ -1865,40 +1867,78 @@ const PurchaseVoucher: React.FC = () => {
         );
       }
 
-      // 🔥 3.5. EXISTING BATCHES — ADD quantity (purchase stock addition)
-      // Same logic as Sales Voucher (which subtracts via negative quantity)
-      // Here we ADD positive quantity to existing batches on purchase
+      // 🔥 3.5. EXISTING BATCHES — UPDATE STOCK DIFFERENCE
       if (formData.mode === "item-invoice") {
-        // console.log("🔵 PURCHASE STOCK UPDATE — companyId:", companyId, "ownerType:", ownerType, "ownerId:", ownerId);
-        await Promise.all(
-          formData.entries.map(async (entry) => {
-            // Only for existing items (not new batch creations handled above)
-            if (!entry.itemId) return;
-            if (entry.batchMeta?.isNew) return; // New batches already handled by POST above
+        const patchPromises = [];
 
-            // Use batchNumber if selected, else use "" (default/no-batch item)
+        // 1. Process active entries (new ones get added fully, edited ones get diffed)
+        for (const entry of formData.entries) {
+            if (!entry.itemId) continue;
+            if (entry.batchMeta?.isNew) continue; // New batches already handled by POST above
+
             const targetBatchName = entry.batchNumber ?? "";
+            
+            let diffQuantity = Number(entry.quantity || 0);
+
+            if (isEditMode && originalEntries.length > 0) {
+              const oldEntry = originalEntries.find(
+                 e => String(e.itemId) === String(entry.itemId) && (e.batchNumber ?? "") === targetBatchName
+              );
+              if (oldEntry) {
+                 diffQuantity = diffQuantity - Number(oldEntry.quantity || 0);
+              }
+            }
+
+            if (diffQuantity === 0) continue;
+
             const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
             const patchBody = {
               batchName: targetBatchName,
-              quantity: Number(entry.quantity || 0),
+              quantity: diffQuantity,
               mode: "add",
             };
-            // console.log("🔵 PATCH purchase stock:", patchUrl, patchBody);
 
-            try {
-              const patchRes = await fetch(patchUrl, {
-                method: "PATCH",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(patchBody),
-              });
-              const patchData = await patchRes.json();
-              // console.log("🟢 PATCH response:", patchRes.status, patchData);
-            } catch (err) {
-              console.error(`⚠️ Stock batch update failed for item ${entry.itemId}:`, err);
-            }
-          })
-        );
+            patchPromises.push(
+               fetch(patchUrl, {
+                 method: "PATCH",
+                 headers: { "Content-Type": "application/json" },
+                 body: JSON.stringify(patchBody),
+               }).catch(err => console.error(`⚠️ Stock update failed:`, err))
+            );
+        }
+
+        // 2. Process REMOVED entries (were in original, not in form now)
+        if (isEditMode && originalEntries.length > 0) {
+          for (const oldEntry of originalEntries) {
+             if (!oldEntry.itemId) continue;
+             const oldTargetBatchName = oldEntry.batchNumber ?? "";
+             
+             // Did it get removed?
+             const stillExists = formData.entries.find(
+                 e => String(e.itemId) === String(oldEntry.itemId) && (e.batchNumber ?? "") === oldTargetBatchName
+             );
+
+             if (!stillExists) {
+                // Completely removed => revert the whole previous quantity (subtract it)
+                const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${oldEntry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+                const patchBody = {
+                  batchName: oldTargetBatchName,
+                  quantity: -Number(oldEntry.quantity || 0),
+                  mode: "add",
+                };
+
+                patchPromises.push(
+                   fetch(patchUrl, {
+                     method: "PATCH",
+                     headers: { "Content-Type": "application/json" },
+                     body: JSON.stringify(patchBody),
+                   }).catch(err => console.error(`⚠️ Revert stock failed:`, err))
+                );
+             }
+          }
+        }
+
+        await Promise.all(patchPromises);
       }
 
       // 🔥 4. Purchase history (unchanged)

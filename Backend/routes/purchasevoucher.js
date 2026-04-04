@@ -1045,7 +1045,7 @@ router.put("/:id", async (req, res) => {
   try {
     // 🔍 Fetch voucher first
     const [voucherRows] = await db.execute(
-      "SELECT company_id, owner_type, owner_id FROM purchase_vouchers WHERE id = ?",
+      "SELECT number, company_id, owner_type, owner_id FROM purchase_vouchers WHERE id = ?",
       [voucherId]
     );
 
@@ -1208,13 +1208,19 @@ router.put("/:id", async (req, res) => {
 
     // ================= UPDATE ITEMS / ENTRIES (DELETE OLD + INSERT NEW) =================
 
-    // 1️⃣ Delete old entries (both from items and voucher_entries)
+    // 1️⃣ Delete old entries (from items, voucher_entries, and purchase_history)
     await db.execute("DELETE FROM purchase_voucher_items WHERE voucherId = ?", [
       voucherId,
     ]);
     await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [
       voucherId,
     ]);
+    if (existing && existing.number) {
+      await db.execute("DELETE FROM purchase_history WHERE voucherNumber = ? AND companyId = ?", [
+        existing.number,
+        finalCompanyId,
+      ]);
+    }
 
     // 2️⃣ Insert new entries based on mode
     if (mode === "item-invoice") {
