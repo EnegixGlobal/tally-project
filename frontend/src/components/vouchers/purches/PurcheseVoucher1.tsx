@@ -169,7 +169,7 @@ const calculateEntryValues = (
   const gstAmount = (baseAmount * totalTaxRate) / 100;
 
 
-  const totalAmount = baseAmount - disc;
+  const totalAmount = baseAmount;
 
   return {
     quantity: qty,
@@ -559,7 +559,7 @@ const PurchaseVoucher: React.FC = () => {
                 itemId: e.itemId || "",
                 quantity: Math.round(e.quantity || 0),
                 rate: Math.round(e.rate || 0),
-                amount: Math.round((e.quantity || 0) * (e.rate || 0) - (e.discount || 0)),
+                amount: Math.round((e.quantity || 0) * (e.rate || 0)),
 
                 // AUTO FILL: Prioritize saved data, fallback to Item Master if missing
                 hsnCode: e.hsnCode || stockItem?.hsnCode || "",
