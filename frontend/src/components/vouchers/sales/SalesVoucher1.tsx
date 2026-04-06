@@ -860,7 +860,20 @@ const SalesVoucher: React.FC = () => {
 
         const res = await fetch(url);
         const data = await res.json();
-        setGodownList(data.data);
+        const list = data.data || [];
+        setGodownList(list);
+
+        // If only 1 godown, auto-fill it for all entries
+        if (list.length === 1) {
+          const singleGodownId = String(list[0].id);
+          setFormData((prev) => ({
+            ...prev,
+            entries: prev.entries.map((entry) => ({
+              ...entry,
+              godownId: singleGodownId,
+            })),
+          }));
+        }
       } catch (err) {
         console.error("Error loading godowns:", err);
       }
@@ -1525,7 +1538,7 @@ const SalesVoucher: React.FC = () => {
         cgstRate: 0,
         sgstRate: 0,
         igstRate: 0,
-        godownId: "",
+        godownId: godownList.length === 1 ? String(godownList[0].id) : "",
         salesLedgerId: "",
         discount: 0,
         discountLedgerId: "",
@@ -1670,7 +1683,7 @@ const SalesVoucher: React.FC = () => {
             sgstLedgerId: details.sgstLedgerId || "",
             igstLedgerId: details.igstLedgerId || "",
             salesLedgerId: matchingSalesLedger ? String(matchingSalesLedger.id) : "",
-            godownId: "",
+            godownId: godownList.length === 1 ? String(godownList[0].id) : "",
             discount: 0,
           };
 
@@ -2360,6 +2373,7 @@ const SalesVoucher: React.FC = () => {
           {/* LEFT SIDE - Back Button + Page Title */}
           <div className="flex items-center">
             <button
+              type="button"
               onClick={() => navigate("/app/vouchers")}
               className="mr-4 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
             >
@@ -2398,6 +2412,7 @@ const SalesVoucher: React.FC = () => {
             </select>
 
             <button
+              type="button"
               onClick={() => setShowConfig(true)}
               className="p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
               title="Voucher Display Settings"
@@ -2898,6 +2913,9 @@ const SalesVoucher: React.FC = () => {
                                 name="quantity"
                                 value={entry.quantity ?? ""}
                                 onChange={(e) => handleEntryChange(index, e)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.preventDefault();
+                                }}
                                 className={`${FORM_STYLES.tableInput(
                                   theme
                                 )} text-right text-xs`}
@@ -2917,6 +2935,9 @@ const SalesVoucher: React.FC = () => {
                                 name="rate"
                                 value={entry.rate ?? ""}
                                 onChange={(e) => handleEntryChange(index, e)}
+                                onKeyDown={(e) => {
+                                  if (e.key === "Enter") e.preventDefault();
+                                }}
                                 className={`${FORM_STYLES.tableInput(
                                   theme
                                 )} text-right text-xs`}
@@ -2981,21 +3002,28 @@ const SalesVoucher: React.FC = () => {
                             {/* GODOWN */}
                             {godownEnabled === "yes" && columnSettings.showGodown && (
                               <td className="px-1 py-2 min-w-[95px]">
-                                <select
-                                  name="godownId"
-                                  value={entry.godownId}
-                                  onChange={(e) => handleEntryChange(index, e)}
-                                  className={`${FORM_STYLES.tableSelect(
-                                    theme
-                                  )} min-w-[95px] text-xs`}
-                                >
-                                  <option value="">Select Godown</option>
-                                  {godownList.map((g) => (
-                                    <option key={g.id} value={g.id}>
-                                      {g.name}
-                                    </option>
-                                  ))}
-                                </select>
+                                {godownList.length === 1 ? (
+                                  <input
+                                    readOnly
+                                    tabIndex={-1}
+                                    value={godownList[0].name}
+                                    className={`${FORM_STYLES.tableInput(theme)} min-w-[95px] text-xs`}
+                                  />
+                                ) : (
+                                  <select
+                                    name="godownId"
+                                    value={entry.godownId}
+                                    onChange={(e) => handleEntryChange(index, e)}
+                                    className={`${FORM_STYLES.tableSelect(theme)} min-w-[95px] text-xs`}
+                                  >
+                                    <option value="">Select Godown</option>
+                                    {godownList.map((g) => (
+                                      <option key={g.id} value={g.id}>
+                                        {g.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                )}
                               </td>
                             )}
 
@@ -3025,7 +3053,8 @@ const SalesVoucher: React.FC = () => {
 
                             {/* DELETE */}
                             <td className="px-1 py-2 text-center min-w-[40px] align-top">
-                              <button
+                             <button
+                                type="button"
                                 onClick={() => removeEntry(index)}
                                 disabled={formData.entries.length <= 1}
                                 className={`p-1 rounded ${formData.entries.length <= 1
@@ -3295,6 +3324,9 @@ const SalesVoucher: React.FC = () => {
                               name="amount"
                               value={Math.round(entry.amount ?? 0) || ""}
                               onChange={(e) => handleEntryChange(index, e)}
+                              onKeyDown={(e) => {
+                                if (e.key === "Enter") e.preventDefault();
+                              }}
                               required
                               min="0"
                               step="0.01"
@@ -3334,20 +3366,20 @@ const SalesVoucher: React.FC = () => {
                             />
                           </td>
                           <td className="px-4 py-2 text-center">
-                            <button
-                              title="Remove Ledger"
-                              type="button"
-                              onClick={() => removeEntry(index)}
-                              disabled={formData.entries.length <= 1}
-                              className={`p-1 rounded ${formData.entries.length <= 1
-                                ? "opacity-50 cursor-not-allowed"
-                                : theme === "dark"
-                                  ? "hover:bg-gray-600"
-                                  : "hover:bg-gray-300"
-                                }`}
-                            >
-                              <Trash2 size={16} />
-                            </button>
+                              <button
+                               title="Remove Ledger"
+                               type="button"
+                               onClick={() => removeEntry(index)}
+                               disabled={formData.entries.length <= 1}
+                               className={`p-1 rounded ${formData.entries.length <= 1
+                                 ? "opacity-50 cursor-not-allowed"
+                                 : theme === "dark"
+                                   ? "hover:bg-gray-600"
+                                   : "hover:bg-gray-300"
+                                 }`}
+                             >
+                               <Trash2 size={16} />
+                             </button>
                           </td>
                         </tr>
                       ))}

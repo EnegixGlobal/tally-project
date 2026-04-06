@@ -158,8 +158,8 @@ const BalanceSheet: React.FC = () => {
       CurrentAssets: CurrentAssets,
       TDSPayable: tdsPayable,
       ProfitAndLossGroup: pnlGroupTotal,
-      LaiblityTotal: liabSum + (pnlSigned < 0 ? Math.abs(pnlSigned) : 0),
-      AssetTotal: assetSum + (pnlSigned > 0 ? Math.abs(pnlSigned) : 0),
+      LaiblityTotal: liabSum - pnlSigned,
+      AssetTotal: assetSum,
     });
   }, [ledgers, debitCreditData, ledgerGroups, netProfit, netLoss, transferredProfit, transferredLoss, closingStock]);
 
@@ -408,7 +408,7 @@ const BalanceSheet: React.FC = () => {
                       Profit & Loss
                     </span>
                     <span className="text-right font-mono font-bold">
-                      {(netProfit - netLoss - (transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup)).toLocaleString()}
+                      {formatBalance(-(netProfit - netLoss - (transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup)))}
                     </span>
                   </div>
 
@@ -417,14 +417,14 @@ const BalanceSheet: React.FC = () => {
                     <div className="grid grid-cols-2">
                       <span className="opacity-75">Current Period</span>
                       <span className="text-right font-mono">
-                        {(netProfit - netLoss).toLocaleString()}
+                        {formatBalance(-(netProfit - netLoss))}
                       </span>
                     </div>
 
                     <div className="grid grid-cols-2">
                       <span className="opacity-75">Less Transferred</span>
                       <span className="text-right font-mono ">
-                        -{(transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup).toLocaleString()}
+                        {formatBalance(-(transferredProfit - transferredLoss + calculatedTotal.ProfitAndLossGroup))}
                       </span>
                     </div>
                   </div>
@@ -433,7 +433,7 @@ const BalanceSheet: React.FC = () => {
 
                 <div className="flex justify-between font-bold text-lg border-t-2 border-gray-400 mt-4 pt-2">
                   <span>Total Liabilities</span>
-                  <span className="text-indigo-600">{calculatedTotal.LaiblityTotal.toLocaleString()}</span>
+                  <span className="text-indigo-600">{Math.abs(calculatedTotal.LaiblityTotal).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -483,7 +483,7 @@ const BalanceSheet: React.FC = () => {
 
                 <div className="flex justify-between font-bold text-lg border-t-2 border-gray-400 mt-4 pt-2">
                   <span>Total Assets</span>
-                  <span className="text-indigo-600">{calculatedTotal.AssetTotal.toLocaleString()}</span>
+                  <span className="text-indigo-600">{Math.abs(calculatedTotal.AssetTotal).toLocaleString()}</span>
                 </div>
               </div>
             </div>
@@ -493,8 +493,8 @@ const BalanceSheet: React.FC = () => {
           <div className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"}`}>
             <h2 className="mb-4 text-xl font-bold text-center">Verification</h2>
             <div className="grid grid-cols-3 text-center gap-4">
-              <div><p className="opacity-75">Assets</p><p className="text-xl font-bold">₹{calculatedTotal.AssetTotal.toLocaleString()}</p></div>
-              <div><p className="opacity-75">Liabilities</p><p className="text-xl font-bold">₹{calculatedTotal.LaiblityTotal.toLocaleString()}</p></div>
+              <div><p className="opacity-75">Assets</p><p className="text-xl font-bold">₹{Math.abs(calculatedTotal.AssetTotal).toLocaleString()}</p></div>
+              <div><p className="opacity-75">Liabilities</p><p className="text-xl font-bold">₹{Math.abs(calculatedTotal.LaiblityTotal).toLocaleString()}</p></div>
               <div>
                 <p className="opacity-75">Difference</p>
                 <p className={`text-xl font-bold ${Math.abs(calculatedTotal.AssetTotal - calculatedTotal.LaiblityTotal) > 1 ? 'text-red-500' : 'text-green-500'}`}>
