@@ -16,6 +16,7 @@ const BulkStockItemCreate: React.FC = () => {
   const navigate = useNavigate();
   const fileInputRef = useRef<HTMLInputElement>(null);
 const [categories, setCategories] = useState<{ value: string, label: string }[]>([]);
+const [units, setUnits] = useState<{ value: string, label: string }[]>([]);
 
 React.useEffect(() => {
   const companyId = localStorage.getItem('company_id');
@@ -39,6 +40,19 @@ React.useEffect(() => {
     })
     .catch(error => {
       setCategories([{ value: '', label: 'Failed to load categories' }]);
+      console.error(error);
+    });
+
+  fetch(`${import.meta.env.VITE_API_URL}/api/stock-units?${params.toString()}`)
+    .then(res => res.json())
+    .then(unitsData => {
+      setUnits(Array.isArray(unitsData) && unitsData.length
+        ? unitsData.map((u: any) => ({ value: u.id.toString(), label: u.symbol }))
+        : [{ value: '', label: 'No units available' }]
+      );
+    })
+    .catch(error => {
+      setUnits([{ value: '', label: 'Failed to load units' }]);
       console.error(error);
     });
 }, []);
@@ -76,7 +90,7 @@ React.useEffect(() => {
     {
       tempId: '1',
       name: '',
-      unit: 'Piece',
+      unit: '',
       openingBalance: 0,
       openingValue: 0,
       stockGroupId: '',
@@ -98,11 +112,6 @@ React.useEffect(() => {
 
   const [showPreview, setShowPreview] = useState(false);
 
-  // Common units for dropdown
-  const commonUnits = [
-    'Piece', 'Box', 'Kg', 'Gram', 'Litre', 'Meter', 'Feet', 'Dozen', 'Set', 'Pack'
-  ];
-
   // Sample CSV template data
   const csvTemplate = [
     ['Name', 'Unit', 'Opening Balance', 'Opening Value', 'Stock Group', 'GST Rate', 'HSN Code', 'Tax Type', 'Purchase Rate', 'Sale Rate', 'Enable Batch', 'Allow Negative', 'Maintain Pieces', 'Secondary Unit'],
@@ -115,7 +124,7 @@ React.useEffect(() => {
     const newRow: BulkStockItemRow = {
       tempId: (bulkItems.length + 1).toString(),
       name: '',
-      unit: 'Piece',
+      unit: '',
       openingBalance: 0,
       openingValue: 0,
       stockGroupId: '',
@@ -508,8 +517,9 @@ const handleSaveAll = async (bulkItems: BulkStockItemRow[]) => {
                               : 'bg-white border-gray-300'
                         }`}
                       >
-                        {commonUnits.map(unit => (
-                          <option key={unit} value={unit}>{unit}</option>
+                        <option value="">-- Select Unit --</option>
+                        {units.map(unit => (
+                          <option key={unit.value} value={unit.value}>{unit.label}</option>
                         ))}
                       </select>
                       {item.errors.unit && <span className="text-red-500 text-xs">{item.errors.unit}</span>}
@@ -718,7 +728,7 @@ const handleSaveAll = async (bulkItems: BulkStockItemRow[]) => {
                   }`}>
                     <h4 className="font-medium mb-2">{index + 1}. {item.name}</h4>
                     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                      <div><strong>Unit:</strong> {item.unit}</div>
+                      <div><strong>Unit:</strong> {units.find(u => u.value === item.unit)?.label || item.unit}</div>
                       <div><strong>Stock Group:</strong> {stockGroups.find(g => g.id === item.stockGroupId)?.name || 'N/A'}</div>
                       <div><strong>Opening Balance:</strong> {item.openingBalance}</div>
                       <div><strong>Opening Value:</strong> ₹{item.openingValue.toLocaleString()}</div>
