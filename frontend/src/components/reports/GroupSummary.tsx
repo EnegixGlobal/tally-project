@@ -130,23 +130,55 @@ const GroupSummary: React.FC = () => {
 
         const groupIdFromUrl = Number(groupType);
         let resolvedName = "Unknown Group";
+        let targetType = "";
 
         if (groupIdFromUrl < 0) {
           const matchedBaseGroup = baseGroups.find((g) => g.id === groupIdFromUrl);
-          if (matchedBaseGroup) resolvedName = matchedBaseGroup.name;
+          if (matchedBaseGroup) {
+            resolvedName = matchedBaseGroup.name;
+            // Map common types for better matching
+            if (resolvedName === "Indirect Income") targetType = "indirect-income";
+            else if (resolvedName === "Indirect Expenses") targetType = "indirect-expenses";
+            else if (resolvedName === "Direct Income") targetType = "direct-income";
+            else if (resolvedName === "Direct Expenses") targetType = "direct-expenses";
+            else if (resolvedName === "Sales Accounts") targetType = "sales";
+            else if (resolvedName === "Purchase Accounts") targetType = "purchase";
+          }
         }
 
         if (groupIdFromUrl > 0) {
           const matchedLedgerGroup = groups.find((g) => Number(g.id) === groupIdFromUrl);
-          if (matchedLedgerGroup) resolvedName = matchedLedgerGroup.name;
+          if (matchedLedgerGroup) {
+            resolvedName = matchedLedgerGroup.name;
+            targetType = matchedLedgerGroup.type;
+          }
         }
 
         setResolvedGroupName(resolvedName);
 
-        // Child groups
-        const childGroups = groups.filter((g) => Number(g.parent) === groupIdFromUrl);
-        // Direct ledgers
-        const directLedgers = allLedgersData.filter((item: any) => Number(item.groupId) === groupIdFromUrl);
+        // Find the "real" database group ID(s) that match this base group by name OR type
+        const realGroupIds = groups
+          .filter(g =>
+            (targetType && String(g.type || "").toLowerCase() === targetType.toLowerCase()) ||
+            String(g.name || "").toLowerCase() === resolvedName.toLowerCase()
+          )
+          .map(g => Number(g.id));
+
+        // Child groups: they point to the negative ID OR the real DB ID
+        const childGroups = groups.filter((g) =>
+          Number(g.parent) === groupIdFromUrl ||
+          (realGroupIds.length > 0 && realGroupIds.includes(Number(g.parent)))
+        );
+
+        // Direct ledgers: they point to the negative ID OR the real DB ID OR match the type
+        const directLedgers = allLedgersData.filter((item: any) => {
+          const itemGid = Number(item.groupId || item.group_id);
+          const itemGtype = String(item.groupType || item.group_type || "").toLowerCase();
+
+          return itemGid === groupIdFromUrl ||
+            (realGroupIds.length > 0 && realGroupIds.includes(itemGid)) ||
+            (targetType && itemGtype === targetType.toLowerCase());
+        });
 
         // We'll calculate balances later after taxData is loaded
         // For now, let's just combine them as placeholders

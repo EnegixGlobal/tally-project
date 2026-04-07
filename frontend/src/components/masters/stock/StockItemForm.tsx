@@ -997,7 +997,7 @@ const StockItemForm = () => {
                       <InputField
                         id={`batchName-${index}`}
                         name={`batchName-${index}`}
-                        label="Batch"
+                        label="Batch/Serial Number"
                         value={row.batchName}
                         onChange={(e) =>
                           updateBatchRow(index, "batchName", e.target.value)

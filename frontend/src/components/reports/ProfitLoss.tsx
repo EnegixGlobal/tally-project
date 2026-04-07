@@ -170,7 +170,12 @@ const ProfitLoss: React.FC = () => {
         const directExpense: SimpleLedger[] = ledgers
           .filter((l: any) => {
             const gid = String(l.group_id);
+            const gtype = (l.group_type || "").toLowerCase();
+            const pgtype = (l.parent_group_type || "").toLowerCase();
+
             if (gid === "-7") return true;
+            if (gtype === "direct-expenses" || pgtype === "direct-expenses" || gtype === "direct-expense" || pgtype === "direct-expense") return true;
+
             const group = (ledgerGroups || []).find(g => String(g.id) === gid);
             return group?.type === "direct-expenses";
           })
@@ -184,7 +189,12 @@ const ProfitLoss: React.FC = () => {
         const indExpenses: SimpleLedger[] = ledgers
           .filter((l: any) => {
             const gid = String(l.group_id);
+            const gtype = (l.group_type || "").toLowerCase();
+            const pgtype = (l.parent_group_type || "").toLowerCase();
+
             if (gid === "-10") return true;
+            if (gtype === "indirect-expenses" || pgtype === "indirect-expenses" || gtype === "indirect-expense" || pgtype === "indirect-expense") return true;
+
             const group = (ledgerGroups || []).find(g => String(g.id) === gid);
             return group?.type === "indirect-expenses";
           })
@@ -198,7 +208,12 @@ const ProfitLoss: React.FC = () => {
         const dirIncome: SimpleLedger[] = ledgers
           .filter((l: any) => {
             const gid = String(l.group_id);
+            const gtype = (l.group_type || "").toLowerCase();
+            const pgtype = (l.parent_group_type || "").toLowerCase();
+
             if (gid === "-8") return true;
+            if (gtype === "direct-income" || pgtype === "direct-income" || gtype === "direct-incomes" || pgtype === "direct-incomes") return true;
+
             const group = (ledgerGroups || []).find(g => String(g.id) === gid);
             return group?.type === "direct-income";
           })
@@ -212,7 +227,12 @@ const ProfitLoss: React.FC = () => {
         const indIncome: SimpleLedger[] = ledgers
           .filter((l: any) => {
             const gid = String(l.group_id);
+            const gtype = (l.group_type || "").toLowerCase();
+            const pgtype = (l.parent_group_type || "").toLowerCase();
+
             if (gid === "-11") return true;
+            if (gtype === "indirect-income" || pgtype === "indirect-income" || gtype === "indirect-incomes" || pgtype === "indirect-incomes") return true;
+
             const group = (ledgerGroups || []).find(g => String(g.id) === gid);
             return group?.type === "indirect-income";
           })
@@ -559,19 +579,25 @@ const ProfitLoss: React.FC = () => {
   };
 
   const getIndirectIncomeLedgers = () => {
-    return ledgers.filter(
-      (l) =>
-        ledgerGroups.find((g) => g.id === l.groupId)?.type ===
-        "indirect-income"
-    );
+    return ledgers.filter((l) => {
+      const gid = String(l.groupId || l.group_id);
+      const group = ledgerGroups.find((g) => String(g.id) === gid);
+      const gtype = (group?.type || l.groupType || l.group_type || "").toLowerCase();
+      const pgtype = (l.parent_group_type || "").toLowerCase();
+      
+      return gid === "-11" || gtype === "indirect-income" || gtype === "indirect-incomes" || pgtype === "indirect-income" || pgtype === "indirect-incomes";
+    });
   };
 
   const getIndirectExpensesLedgers = () => {
-    return ledgers.filter(
-      (l) =>
-        ledgerGroups.find((g) => g.id === l.groupId)?.type ===
-        "indirect-expenses"
-    );
+    return ledgers.filter((l) => {
+      const gid = String(l.groupId || l.group_id);
+      const group = ledgerGroups.find((g) => String(g.id) === gid);
+      const gtype = (group?.type || l.groupType || l.group_type || "").toLowerCase();
+      const pgtype = (l.parent_group_type || "").toLowerCase();
+
+      return gid === "-10" || gtype === "indirect-expenses" || gtype === "indirect-expense" || pgtype === "indirect-expenses" || pgtype === "indirect-expense";
+    });
   };
 
   // Drilldown handlers for GST breakup rows
