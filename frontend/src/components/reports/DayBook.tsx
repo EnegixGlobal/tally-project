@@ -288,10 +288,25 @@ const DayBook: React.FC = () => {
         })[] = [];
 
         entryGroups.forEach((group) => {
-          group.forEach((entry, index) => {
+          // Group entries within this voucher by ledgerName
+          const aggregated: DayBookEntry[] = [];
+          group.forEach((entry) => {
+            const existing = aggregated.find(
+              (e) => e.ledgerName === entry.ledgerName
+            );
+            if (existing) {
+              existing.debit += entry.debit;
+              existing.credit += entry.credit;
+              existing.isChild = existing.isChild || entry.isChild;
+            } else {
+              aggregated.push({ ...entry });
+            }
+          });
+
+          aggregated.forEach((entry, index) => {
             processedWithRowspan.push({
               ...entry,
-              rowspan: index === 0 ? group.length : 0,
+              rowspan: index === 0 ? aggregated.length : 0,
               isFirstInGroup: index === 0,
             });
           });
@@ -1113,49 +1128,63 @@ const DayBook: React.FC = () => {
                             )}
 
                             {/* SUBTOTAL + GST ROWS */}
-                            {otherEntries.map((entry, index) => (
-                              <tr
-                                key={index}
-                                className="border-t border-gray-200 dark:border-gray-600"
-                              >
-                                {/* Particulars */}
-                                <td
-                                  className={`px-3 py-2 ${entry.isChild
-                                    ? "pl-10 text-gray-600"
-                                    : ""
-                                    }`}
-                                >
-                                  {entry.ledgerName}
-                                </td>
+                            {(() => {
+                              const groupedOtherEntries: DayBookEntry[] = [];
+                              otherEntries.forEach(entry => {
+                                const existing = groupedOtherEntries.find(e => e.ledgerName === entry.ledgerName);
+                                if (existing) {
+                                  existing.debit += entry.debit;
+                                  existing.credit += entry.credit;
+                                  existing.isChild = existing.isChild || entry.isChild;
+                                } else {
+                                  groupedOtherEntries.push({ ...entry });
+                                }
+                              });
 
-                                <td></td>
-                                <td></td>
-
-                                {/* Debit */}
-                                <td
-                                  className={`px-3 py-2 text-right font-mono ${entry.isChild
-                                    ? "text-sm text-gray-600"
-                                    : ""
-                                    }`}
+                              return groupedOtherEntries.map((entry, index) => (
+                                <tr
+                                  key={index}
+                                  className="border-t border-gray-200 dark:border-gray-600"
                                 >
-                                  {entry.debit > 0
-                                    ? formatCurrency(entry.debit)
-                                    : "-"}
-                                </td>
+                                  {/* Particulars */}
+                                  <td
+                                    className={`px-3 py-2 ${entry.isChild
+                                      ? "pl-10 text-gray-600"
+                                      : ""
+                                      }`}
+                                  >
+                                    {entry.ledgerName}
+                                  </td>
 
-                                {/* Credit */}
-                                <td
-                                  className={`px-3 py-2 text-right font-mono ${entry.isChild
-                                    ? "text-sm text-gray-600"
-                                    : ""
-                                    }`}
-                                >
-                                  {entry.credit > 0
-                                    ? formatCurrency(entry.credit)
-                                    : "-"}
-                                </td>
-                              </tr>
-                            ))}
+                                  <td></td>
+                                  <td></td>
+
+                                  {/* Debit */}
+                                  <td
+                                    className={`px-3 py-2 text-right font-mono ${entry.isChild
+                                      ? "text-sm text-gray-600"
+                                      : ""
+                                      }`}
+                                  >
+                                    {entry.debit > 0
+                                      ? formatCurrency(entry.debit)
+                                      : "-"}
+                                  </td>
+
+                                  {/* Credit */}
+                                  <td
+                                    className={`px-3 py-2 text-right font-mono ${entry.isChild
+                                      ? "text-sm text-gray-600"
+                                      : ""
+                                      }`}
+                                  >
+                                    {entry.credit > 0
+                                      ? formatCurrency(entry.credit)
+                                      : "-"}
+                                  </td>
+                                </tr>
+                              ));
+                            })()}
                           </>
                         );
                       })()}
