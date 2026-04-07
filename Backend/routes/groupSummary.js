@@ -122,19 +122,23 @@ router.get("/api/group", async (req, res) => {
           AND pv.owner_type = ?
           AND pv.owner_id = ?
 
-        /* ================= PURCHASE DISCOUNT ================= */
+        /* ================= PURCHASE DISCOUNT (GLOBAL) ================= */
         UNION ALL
 
         SELECT
-          CAST(pvi.discountLedgerId AS UNSIGNED) AS ledgerId,
+          CAST(pvi_agg.discountLedgerId AS UNSIGNED) AS ledgerId,
           0 AS debit,
-          pvi.discount AS credit
-        FROM purchase_voucher_items pvi
-        JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
-        WHERE pvi.discountLedgerId IN (?)
-          AND pv.company_id = ?
+          pv.discountTotal AS credit
+        FROM purchase_vouchers pv
+        JOIN (
+          SELECT DISTINCT voucherId, discountLedgerId
+          FROM purchase_voucher_items
+          WHERE discountLedgerId IN (?) AND discountLedgerId > 0
+        ) pvi_agg ON pvi_agg.voucherId = pv.id
+        WHERE pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
+          AND pv.discountTotal > 0
 
 
         /* ================= SALES (ITEM-INVOICE MODE) ================= */
@@ -205,21 +209,24 @@ router.get("/api/group", async (req, res) => {
           AND sv.owner_id = ?
 
 
-        /* ================= SALES DISCOUNT ================= */
+        /* ================= SALES DISCOUNT (GLOBAL) ================= */
 
         UNION ALL
 
         SELECT
-          CAST(MAX(svi.discountLedgerId) AS UNSIGNED) AS ledgerId,
-          MAX(sv.discountTotal) AS debit,
+          CAST(svi_agg.discountLedgerId AS UNSIGNED) AS ledgerId,
+          sv.discountTotal AS debit,
           0 AS credit
-        FROM sales_voucher_items svi
-        JOIN sales_vouchers sv ON svi.voucherId = sv.id
-        WHERE svi.discountLedgerId IN (?)
-          AND sv.company_id = ?
+        FROM sales_vouchers sv
+        JOIN (
+          SELECT DISTINCT voucherId, discountLedgerId
+          FROM sales_voucher_items
+          WHERE discountLedgerId IN (?) AND discountLedgerId > 0
+        ) svi_agg ON svi_agg.voucherId = sv.id
+        WHERE sv.company_id = ?
           AND sv.owner_type = ?
           AND sv.owner_id = ?
-        GROUP BY sv.id
+          AND sv.discountTotal > 0
 
 
         /* ================= PARTY ================= */
