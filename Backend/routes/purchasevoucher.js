@@ -326,6 +326,7 @@ router.post("/", async (req, res) => {
     entries = [],
     mode,
     purchaseLedgerId, // header
+    discountLedgerId,
     companyId,
     ownerType,
     ownerId,
@@ -530,7 +531,7 @@ router.post("/", async (req, res) => {
               Number(e.tdsRate || 0),
               e.godownId || null,
               e.purchaseLedgerId || purchaseLedgerId || null,
-              Number(e.discountLedgerId || 0),
+              Number(discountLedgerId || 0),
             ];
           }
 
@@ -547,7 +548,7 @@ router.post("/", async (req, res) => {
             Number(e.tdsRate || 0),
             e.godownId || null,
             e.purchaseLedgerId || purchaseLedgerId || null,
-            Number(e.discountLedgerId || 0),
+            Number(discountLedgerId || 0),
           ];
         });
 
@@ -942,12 +943,17 @@ router.get("/:id", async (req, res) => {
     // 🔍 Fallback: If tdsLedgerId is missing in main row, try to get it from first item
     // ⚠️ tdsRate column might be DECIMAL(10,2), so we must parse it to INT to match matches frontend ID
     let fallbackTdsId = 0;
+    let fallbackDiscountId = 0;
     if (voucher.mode === "item-invoice") {
       const itemWithTds = entries.find(i => Number(i.tdsRate) > 0);
       if (itemWithTds) fallbackTdsId = Math.round(Number(itemWithTds.tdsRate));
+
+      const itemWithDiscount = entries.find(i => Number(i.discountLedgerId) > 0);
+      if (itemWithDiscount) fallbackDiscountId = Math.round(Number(itemWithDiscount.discountLedgerId));
     }
 
     const tdsLedgerId = voucher.tdsLedgerId || (fallbackTdsId > 0 ? fallbackTdsId : null);
+    const discountLedgerId = voucher.discountLedgerId || (fallbackDiscountId > 0 ? fallbackDiscountId : null);
 
     console.log('subtotal: voucher.subtotal', voucher.subtotal,
       voucher.cgstTotal,
@@ -980,6 +986,7 @@ router.get("/:id", async (req, res) => {
       sgstTotal: voucher.sgstTotal,
       igstTotal: voucher.igstTotal,
       discountTotal: voucher.discountTotal,
+      discountLedgerId,
       tdsTotal: voucher.tdsTotal, // ✅ Added
       tdsLedgerId: tdsLedgerId, // ✅ Use the calculated variable with fallback
       total: voucher.total,
@@ -1024,6 +1031,7 @@ router.put("/:id", async (req, res) => {
     entries = [],
     mode,
     purchaseLedgerId,
+    discountLedgerId,
     companyId,
     ownerType,
     ownerId,
@@ -1260,7 +1268,7 @@ router.put("/:id", async (req, res) => {
               Number(e.tdsRate || 0),
               e.godownId || null,
               e.purchaseLedgerId || purchaseLedgerId || null,
-              Number(e.discountLedgerId || 0),
+              Number(discountLedgerId || 0),
             ];
           }
 
@@ -1277,7 +1285,7 @@ router.put("/:id", async (req, res) => {
             Number(e.tdsRate || 0),
             e.godownId || null,
             e.purchaseLedgerId || purchaseLedgerId || null,
-            Number(e.discountLedgerId || 0),
+            Number(discountLedgerId || 0),
           ];
         });
 

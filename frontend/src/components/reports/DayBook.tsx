@@ -1159,6 +1159,24 @@ const DayBook: React.FC = () => {
                           </>
                         );
                       })()}
+                      {/* Grand Total Row */}
+                      {selectedVoucher.entries && rawVoucherEntries[selectedVoucher.voucherId] && (
+                        <tr className={`border-t-2 font-bold ${theme === "dark" ? "border-gray-500 bg-gray-700/50" : "border-gray-300 bg-gray-50"}`}>
+                          <td className="px-3 py-3" colSpan={3}>
+                            Grand Total
+                          </td>
+                          <td className="px-3 py-3 text-right font-mono text-blue-600 dark:text-blue-400">
+                            {formatCurrency(
+                              (rawVoucherEntries[selectedVoucher.voucherId] || []).reduce((sum, e) => sum + (e.debit > 0 ? e.debit : 0), 0)
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-right font-mono text-purple-600 dark:text-purple-400">
+                            {formatCurrency(
+                              (rawVoucherEntries[selectedVoucher.voucherId] || []).reduce((sum, e) => sum + (e.credit > 0 ? e.credit : 0), 0)
+                            )}
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

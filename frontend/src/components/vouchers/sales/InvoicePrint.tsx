@@ -3,6 +3,20 @@ import { useReactToPrint } from "react-to-print";
 import { Printer, X, MapPin } from "lucide-react";
 import type { VoucherEntry } from "../../../types";
 
+// Helper: extract numeric GST % from ledger name e.g. "CGST 9%" → 9
+const extractGstPercent = (name = "") => {
+  if (!name) return 0;
+  const match = name.match(/(\d+(\.\d+)?)/);
+  return match ? Number(match[1]) : 0;
+};
+
+// Helper: find ledger name by id
+const getLedgerNameById = (id: any, ledgers: any[]) => {
+  if (!id) return "";
+  const ledger = ledgers.find((l: any) => String(l.id) === String(id));
+  return ledger?.name || "";
+};
+
 // Print styles for invoice layout
 const PRINT_STYLES = {
   container:
@@ -170,7 +184,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
     !!companyInfo?.state &&
     !!partyLedger?.state &&
     companyInfo.state.toLowerCase().trim() !==
-      partyLedger.state.toLowerCase().trim();
+    partyLedger.state.toLowerCase().trim();
 
   // Handle shipping address changes
   const handleShippingChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -265,9 +279,8 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
 
   const handlePrint = useReactToPrint({
     contentRef: printRef,
-    documentTitle: `${isQuotation ? "Sales_Quotation" : "Sales_Voucher"}_${
-      voucherData.number
-    }`,
+    documentTitle: `${isQuotation ? "Sales_Quotation" : "Sales_Voucher"}_${voucherData.number
+      }`,
     onBeforePrint: () => {
       console.log("Starting print process...");
       const selectedItems = voucherData.entries.filter(
@@ -323,15 +336,13 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
   return (
     <div className={PRINT_STYLES.container}>
       <div
-        className={`${PRINT_STYLES.modal} ${
-          theme === "dark" ? "bg-gray-800 text-white" : "bg-white text-gray-900"
-        }`}
+        className={`${PRINT_STYLES.modal} ${theme === "dark" ? "bg-gray-800 text-white" : "bg-white text-gray-900"
+          }`}
       >
         {/* Header */}
         <div
-          className={`p-6 border-b ${
-            theme === "dark" ? "border-gray-700" : "border-gray-200"
-          } no-print`}
+          className={`p-6 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"
+            } no-print`}
         >
           <div className="flex items-center justify-between">
             <h2 className="text-2xl font-bold flex items-center">
@@ -355,9 +366,8 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
               <button
                 title="Close Print Preview"
                 onClick={onClose}
-                className={`p-2 rounded-full transition-colors ${
-                  theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-                }`}
+                className={`p-2 rounded-full transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+                  }`}
               >
                 <X size={20} />
               </button>
@@ -368,9 +378,8 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
         {/* Shipping Address Form */}
         {showShippingForm && (
           <div
-            className={`p-6 border-b ${
-              theme === "dark" ? "border-gray-700" : "border-gray-200"
-            } no-print`}
+            className={`p-6 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"
+              } no-print`}
           >
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold">📦 Shipping Address</h3>
@@ -390,11 +399,10 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                   value={shippingAddress.name}
                   onChange={handleShippingChange}
                   placeholder="Enter shipping contact name"
-                  className={`w-full p-2 border rounded ${
-                    theme === "dark"
+                  className={`w-full p-2 border rounded ${theme === "dark"
                       ? "bg-gray-700 border-gray-600"
                       : "bg-white border-gray-300"
-                  }`}
+                    }`}
                 />
               </div>
               <div>
@@ -405,11 +413,10 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                   value={shippingAddress.phone}
                   onChange={handleShippingChange}
                   placeholder="Enter phone number"
-                  className={`w-full p-2 border rounded ${
-                    theme === "dark"
+                  className={`w-full p-2 border rounded ${theme === "dark"
                       ? "bg-gray-700 border-gray-600"
                       : "bg-white border-gray-300"
-                  }`}
+                    }`}
                 />
               </div>
               <div className="md:col-span-2">
@@ -422,11 +429,10 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                   value={shippingAddress.address}
                   onChange={handleShippingChange}
                   placeholder="Enter complete shipping address"
-                  className={`w-full p-2 border rounded ${
-                    theme === "dark"
+                  className={`w-full p-2 border rounded ${theme === "dark"
                       ? "bg-gray-700 border-gray-600"
                       : "bg-white border-gray-300"
-                  }`}
+                    }`}
                 />
               </div>
               <div>
@@ -437,11 +443,10 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                   value={shippingAddress.city}
                   onChange={handleShippingChange}
                   placeholder="Enter city"
-                  className={`w-full p-2 border rounded ${
-                    theme === "dark"
+                  className={`w-full p-2 border rounded ${theme === "dark"
                       ? "bg-gray-700 border-gray-600"
                       : "bg-white border-gray-300"
-                  }`}
+                    }`}
                 />
               </div>
               <div>
@@ -452,11 +457,10 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                   value={shippingAddress.state}
                   onChange={handleShippingChange}
                   placeholder="Enter state"
-                  className={`w-full p-2 border rounded ${
-                    theme === "dark"
+                  className={`w-full p-2 border rounded ${theme === "dark"
                       ? "bg-gray-700 border-gray-600"
                       : "bg-white border-gray-300"
-                  }`}
+                    }`}
                 />
               </div>
               <div>
@@ -469,11 +473,10 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                   value={shippingAddress.pinCode}
                   onChange={handleShippingChange}
                   placeholder="Enter PIN code"
-                  className={`w-full p-2 border rounded ${
-                    theme === "dark"
+                  className={`w-full p-2 border rounded ${theme === "dark"
                       ? "bg-gray-700 border-gray-600"
                       : "bg-white border-gray-300"
-                  }`}
+                    }`}
                 />
               </div>
               <div>
@@ -484,11 +487,10 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                   value={shippingAddress.gstin}
                   onChange={handleShippingChange}
                   placeholder="Enter GSTIN (if different)"
-                  className={`w-full p-2 border rounded ${
-                    theme === "dark"
+                  className={`w-full p-2 border rounded ${theme === "dark"
                       ? "bg-gray-700 border-gray-600"
                       : "bg-white border-gray-300"
-                  }`}
+                    }`}
                 />
               </div>
             </div>
@@ -702,7 +704,13 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                     Rate
                   </th>
                   <th className={`${PRINT_STYLES.table.headerCellCenter} w-15`}>
-                    GST %
+                    IGST
+                  </th>
+                  <th className={`${PRINT_STYLES.table.headerCellCenter} w-15`}>
+                    CGST
+                  </th>
+                  <th className={`${PRINT_STYLES.table.headerCellCenter} w-15`}>
+                    SGST
                   </th>
                   <th className={`${PRINT_STYLES.table.headerCellRight} w-25`}>
                     Amount
@@ -714,7 +722,17 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                 {selectedItems.map((entry, index) => {
                   const itemDetails = getItemDetails(entry.itemId || "");
                   const baseAmount = (entry.quantity || 0) * (entry.rate || 0);
-                  const gstRate = itemDetails.gstRate || 0;
+                  const gstRate = Number(itemDetails.gstRate || 0);
+
+                  // Extract % from ledger names (primary source)
+                  const igstLedgerRate = extractGstPercent(getLedgerNameById(entry.igstLedgerId, ledgers));
+                  const cgstLedgerRate = extractGstPercent(getLedgerNameById(entry.cgstLedgerId, ledgers));
+                  const sgstLedgerRate = extractGstPercent(getLedgerNameById(entry.sgstLedgerId, ledgers));
+
+                  // Fallback: use item gstRate + intra/inter state logic
+                  const igstPct = igstLedgerRate || (isIgstInvoice && gstRate > 0 ? gstRate : 0);
+                  const cgstPct = cgstLedgerRate || (!isIgstInvoice && gstRate > 0 ? gstRate / 2 : 0);
+                  const sgstPct = sgstLedgerRate || (!isIgstInvoice && gstRate > 0 ? gstRate / 2 : 0);
 
                   return (
                     <tr key={entry.id}>
@@ -735,7 +753,13 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                         ₹{entry.rate?.toLocaleString() || "0"}
                       </td>
                       <td className={PRINT_STYLES.table.dataCellCenter}>
-                        {gstRate}%
+                        {igstPct > 0 ? `${igstPct}%` : "0"}
+                      </td>
+                      <td className={PRINT_STYLES.table.dataCellCenter}>
+                        {cgstPct > 0 ? `${cgstPct}%` : "0"}
+                      </td>
+                      <td className={PRINT_STYLES.table.dataCellCenter}>
+                        {sgstPct > 0 ? `${sgstPct}%` : "0"}
                       </td>
                       <td className={PRINT_STYLES.table.dataCellRight}>
                         ₹{baseAmount.toLocaleString()}
@@ -750,7 +774,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                     <tr>
                       <td
                         className={`${PRINT_STYLES.table.emptyCell} text-center`}
-                        colSpan={7}
+                        colSpan={9}
                       >
                         No items selected
                       </td>
@@ -759,27 +783,15 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                       .fill(0)
                       .map((_, index) => (
                         <tr key={`empty-${index}`}>
-                          <td className={PRINT_STYLES.table.emptyCell}>
-                            &nbsp;
-                          </td>
-                          <td className={PRINT_STYLES.table.emptyCell}>
-                            &nbsp;
-                          </td>
-                          <td className={PRINT_STYLES.table.emptyCell}>
-                            &nbsp;
-                          </td>
-                          <td className={PRINT_STYLES.table.emptyCell}>
-                            &nbsp;
-                          </td>
-                          <td className={PRINT_STYLES.table.emptyCell}>
-                            &nbsp;
-                          </td>
-                          <td className={PRINT_STYLES.table.emptyCell}>
-                            &nbsp;
-                          </td>
-                          <td className={PRINT_STYLES.table.emptyCell}>
-                            &nbsp;
-                          </td>
+                          <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
+                          <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
+                          <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
+                          <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
+                          <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
+                          <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
+                          <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
+                          <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
+                          <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
                         </tr>
                       ))}
                   </>
@@ -799,6 +811,8 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                         <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
                         <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
                         <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
+                        <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
+                        <td className={PRINT_STYLES.table.emptyCell}>&nbsp;</td>
                       </tr>
                     ))}
               </tbody>
@@ -807,7 +821,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
               <tfoot>
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={7}
                     className="border border-black p-1_5 text-9pt"
                   >
                     <strong>Terms & Conditions:</strong>
@@ -864,101 +878,6 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
               </tfoot>
             </table>
 
-            {/* Amount in Words */}
-            <div className="mt-6 border border-black text-[11px] w-full">
-              {/* HEADER ROW 1 */}
-              <div className="grid grid-cols-7 border-b border-black font-bold text-center">
-                <div className="p-2 border-r border-black">HSN / SAC</div>
-                <div className="p-2 border-r border-black">Taxable Value</div>
-
-                <div className="p-2 border-r border-black col-span-2">CGST</div>
-
-                <div className="p-2 border-r border-black col-span-2">SGST</div>
-
-                <div className="p-2">Total Tax Amount</div>
-              </div>
-
-              {/* HEADER ROW 2 (SUB HEADINGS) */}
-              <div className="grid grid-cols-7 border-b border-black font-bold text-center">
-                <div className="p-1 border-r border-black"></div>
-                <div className="p-1 border-r border-black"></div>
-
-                <div className="p-1 border-r border-black">Rate</div>
-                <div className="p-1 border-r border-black">Amount</div>
-
-                <div className="p-1 border-r border-black">Rate</div>
-                <div className="p-1 border-r border-black">Amount</div>
-
-                <div className="p-1"></div>
-              </div>
-
-              {/* DATA */}
-              {gstSummary.map((r, i) => {
-                const totalTax = r.cgstAmount + r.sgstAmount;
-
-                return (
-                  <div
-                    key={i}
-                    className="grid grid-cols-7 border-b border-black text-right"
-                  >
-                    <div className="p-1 border-r border-black text-center">
-                      {r.hsn}
-                    </div>
-
-                    <div className="p-1 border-r border-black">
-                      {r.taxableValue.toFixed(2)}
-                    </div>
-
-                    <div className="p-1 border-r border-black text-center">
-                      {r.cgstRate}%
-                    </div>
-
-                    <div className="p-1 border-r border-black">
-                      ₹{r.cgstAmount.toFixed(2)}
-                    </div>
-
-                    <div className="p-1 border-r border-black text-center">
-                      {r.sgstRate}%
-                    </div>
-
-                    <div className="p-1 border-r border-black">
-                      ₹{r.sgstAmount.toFixed(2)}
-                    </div>
-
-                    <div className="p-1 font-semibold">
-                      ₹{totalTax.toFixed(2)}
-                    </div>
-                  </div>
-                );
-              })}
-
-              {/* TOTAL */}
-              <div className="grid grid-cols-7 font-bold text-right">
-                <div className="p-2 border-r border-black text-center">
-                  Total
-                </div>
-
-                <div className="p-2 border-r border-black">
-                  {totalTaxableValue.toFixed(2)}
-                </div>
-
-                <div className="p-2 border-r border-black"></div>
-
-                <div className="p-2 border-r border-black">
-                  ₹{totalCgstAmount.toFixed(2)}
-                </div>
-
-                <div className="p-2 border-r border-black"></div>
-
-                <div className="p-2 border-r border-black">
-                  ₹{totalSgstAmount.toFixed(2)}
-                </div>
-
-                <div className="p-2">
-                  ₹{(totalCgstAmount + totalSgstAmount).toFixed(2)}
-                </div>
-              </div>
-            </div>
 
             {/* ===== AMOUNT IN WORDS ===== */}
             <div className="mt-4 text-sm">

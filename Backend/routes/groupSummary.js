@@ -40,51 +40,64 @@ router.get("/api/group", async (req, res) => {
 
       FROM (
 
-        /* ================= PURCHASE ================= */
+        /* ================= PURCHASE (ITEM-INVOICE MODE) ================= */
 
+        /* CGST - use DISTINCT subquery so voucher-level total is counted once per voucher, not once per item */
         SELECT
-          CAST(pvi.cgstRate AS UNSIGNED) AS ledgerId,
+          CAST(pvi_agg.cgstRate AS UNSIGNED) AS ledgerId,
           pv.cgstTotal AS debit,
           0 AS credit
-        FROM purchase_voucher_items pvi
-        JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
-        WHERE pvi.cgstRate IN (?)
-          AND pv.company_id = ?
+        FROM purchase_vouchers pv
+        JOIN (
+          SELECT DISTINCT voucherId, cgstRate
+          FROM purchase_voucher_items
+          WHERE cgstRate IN (?) AND cgstRate > 0
+        ) pvi_agg ON pvi_agg.voucherId = pv.id
+        WHERE pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
 
         UNION ALL
 
+        /* SGST - one row per voucher */
         SELECT
-          CAST(pvi.sgstRate AS UNSIGNED) AS ledgerId,
-          pv.sgstTotal,
-          0
-        FROM purchase_voucher_items pvi
-        JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
-        WHERE pvi.sgstRate IN (?)
-          AND pv.company_id = ?
+          CAST(pvi_agg.sgstRate AS UNSIGNED) AS ledgerId,
+          pv.sgstTotal AS debit,
+          0 AS credit
+        FROM purchase_vouchers pv
+        JOIN (
+          SELECT DISTINCT voucherId, sgstRate
+          FROM purchase_voucher_items
+          WHERE sgstRate IN (?) AND sgstRate > 0
+        ) pvi_agg ON pvi_agg.voucherId = pv.id
+        WHERE pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
 
         UNION ALL
 
+        /* IGST - one row per voucher */
         SELECT
-          CAST(pvi.igstRate AS UNSIGNED) AS ledgerId,
-          pv.igstTotal,
-          0
-        FROM purchase_voucher_items pvi
-        JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
-        WHERE pvi.igstRate IN (?)
-          AND pv.company_id = ?
+          CAST(pvi_agg.igstRate AS UNSIGNED) AS ledgerId,
+          pv.igstTotal AS debit,
+          0 AS credit
+        FROM purchase_vouchers pv
+        JOIN (
+          SELECT DISTINCT voucherId, igstRate
+          FROM purchase_voucher_items
+          WHERE igstRate IN (?) AND igstRate > 0
+        ) pvi_agg ON pvi_agg.voucherId = pv.id
+        WHERE pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
 
         UNION ALL
 
+        /* Purchase Ledger - per item amount (correct, item-level) */
         SELECT
           CAST(pvi.purchaseLedgerId AS UNSIGNED) AS ledgerId,
-          pvi.amount,
-          0
+          pvi.amount AS debit,
+          0 AS credit
         FROM purchase_voucher_items pvi
         JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
         WHERE pvi.purchaseLedgerId IN (?)
@@ -92,20 +105,22 @@ router.get("/api/group", async (req, res) => {
           AND pv.owner_type = ?
           AND pv.owner_id = ?
 
-
         UNION ALL
 
+        /* TDS - one row per voucher */
         SELECT
-          CAST(pvi.tdsRate AS UNSIGNED) AS ledgerId,
+          CAST(pvi_agg.tdsRate AS UNSIGNED) AS ledgerId,
           pv.tdsTotal AS debit,
           0 AS credit
-        FROM purchase_voucher_items pvi
-        JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
-        WHERE pvi.tdsRate IN (?)
-          AND pv.company_id = ?
+        FROM purchase_vouchers pv
+        JOIN (
+          SELECT DISTINCT voucherId, tdsRate
+          FROM purchase_voucher_items
+          WHERE tdsRate IN (?) AND tdsRate > 0
+        ) pvi_agg ON pvi_agg.voucherId = pv.id
+        WHERE pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
-
 
         /* ================= PURCHASE DISCOUNT ================= */
         UNION ALL
@@ -122,53 +137,66 @@ router.get("/api/group", async (req, res) => {
           AND pv.owner_id = ?
 
 
-        /* ================= SALES ================= */
+        /* ================= SALES (ITEM-INVOICE MODE) ================= */
 
         UNION ALL
 
+        /* Sales CGST - one row per voucher */
         SELECT
-          CAST(svi.cgstRate AS UNSIGNED) AS ledgerId,
-          0,
-          sv.cgstTotal
-        FROM sales_voucher_items svi
-        JOIN sales_vouchers sv ON svi.voucherId = sv.id
-        WHERE svi.cgstRate IN (?)
-          AND sv.company_id = ?
+          CAST(svi_agg.cgstRate AS UNSIGNED) AS ledgerId,
+          0 AS debit,
+          sv.cgstTotal AS credit
+        FROM sales_vouchers sv
+        JOIN (
+          SELECT DISTINCT voucherId, cgstRate
+          FROM sales_voucher_items
+          WHERE cgstRate IN (?) AND cgstRate > 0
+        ) svi_agg ON svi_agg.voucherId = sv.id
+        WHERE sv.company_id = ?
           AND sv.owner_type = ?
           AND sv.owner_id = ?
 
         UNION ALL
 
+        /* Sales SGST - one row per voucher */
         SELECT
-          CAST(svi.sgstRate AS UNSIGNED) AS ledgerId,
-          0,
-          sv.sgstTotal
-        FROM sales_voucher_items svi
-        JOIN sales_vouchers sv ON svi.voucherId = sv.id
-        WHERE svi.sgstRate IN (?)
-          AND sv.company_id = ?
+          CAST(svi_agg.sgstRate AS UNSIGNED) AS ledgerId,
+          0 AS debit,
+          sv.sgstTotal AS credit
+        FROM sales_vouchers sv
+        JOIN (
+          SELECT DISTINCT voucherId, sgstRate
+          FROM sales_voucher_items
+          WHERE sgstRate IN (?) AND sgstRate > 0
+        ) svi_agg ON svi_agg.voucherId = sv.id
+        WHERE sv.company_id = ?
           AND sv.owner_type = ?
           AND sv.owner_id = ?
 
         UNION ALL
 
+        /* Sales IGST - one row per voucher */
         SELECT
-          CAST(svi.igstRate AS UNSIGNED) AS ledgerId,
-          0,
-          sv.igstTotal
-        FROM sales_voucher_items svi
-        JOIN sales_vouchers sv ON svi.voucherId = sv.id
-        WHERE svi.igstRate IN (?)
-          AND sv.company_id = ?
+          CAST(svi_agg.igstRate AS UNSIGNED) AS ledgerId,
+          0 AS debit,
+          sv.igstTotal AS credit
+        FROM sales_vouchers sv
+        JOIN (
+          SELECT DISTINCT voucherId, igstRate
+          FROM sales_voucher_items
+          WHERE igstRate IN (?) AND igstRate > 0
+        ) svi_agg ON svi_agg.voucherId = sv.id
+        WHERE sv.company_id = ?
           AND sv.owner_type = ?
           AND sv.owner_id = ?
 
         UNION ALL
 
+        /* Sales Ledger - per item amount */
         SELECT
           CAST(svi.salesLedgerId AS UNSIGNED) AS ledgerId,
-          0,
-          svi.amount
+          0 AS debit,
+          svi.amount AS credit
         FROM sales_voucher_items svi
         JOIN sales_vouchers sv ON svi.voucherId = sv.id
         WHERE svi.salesLedgerId IN (?)
@@ -183,8 +211,8 @@ router.get("/api/group", async (req, res) => {
 
         SELECT
           CAST(MAX(svi.discountLedgerId) AS UNSIGNED) AS ledgerId,
-          MAX(sv.discountTotal),
-          0
+          MAX(sv.discountTotal) AS debit,
+          0 AS credit
         FROM sales_voucher_items svi
         JOIN sales_vouchers sv ON svi.voucherId = sv.id
         WHERE svi.discountLedgerId IN (?)
@@ -200,8 +228,8 @@ router.get("/api/group", async (req, res) => {
 
         SELECT
           CAST(pv.partyId AS UNSIGNED) AS ledgerId,
-          0,
-          pv.total
+          0 AS debit,
+          pv.total AS credit
         FROM purchase_vouchers pv
         WHERE pv.partyId IN (?)
           AND pv.company_id = ?
@@ -212,8 +240,8 @@ router.get("/api/group", async (req, res) => {
 
         SELECT
           CAST(sv.partyId AS UNSIGNED) AS ledgerId,
-          sv.total,
-          0
+          sv.total AS debit,
+          0 AS credit
         FROM sales_vouchers sv
         WHERE sv.partyId IN (?)
           AND sv.company_id = ?
@@ -221,7 +249,7 @@ router.get("/api/group", async (req, res) => {
           AND sv.owner_id = ?
 
 
-        /* ================= JOURNAL / CONTRA / PAYMENT ================= */
+        /* ================= JOURNAL / CONTRA / PAYMENT / RECEIPT ================= */
 
         UNION ALL
 
@@ -247,6 +275,58 @@ router.get("/api/group", async (req, res) => {
           AND vm.owner_type = ?
           AND vm.owner_id = ?
 
+        /* ================= ACCOUNTING-MODE PURCHASE VOUCHER ENTRIES ================= */
+        /* These entries have voucher_id = purchase_vouchers.id (not voucher_main.id) */
+
+        UNION ALL
+
+        SELECT
+          CAST(ve.ledger_id AS UNSIGNED) AS ledgerId,
+
+          CASE
+            WHEN ve.entry_type = 'debit' THEN ve.amount
+            ELSE 0
+          END AS debit,
+
+          CASE
+            WHEN ve.entry_type = 'credit' THEN ve.amount
+            ELSE 0
+          END AS credit
+
+        FROM voucher_entries ve
+        JOIN purchase_vouchers pv ON pv.id = ve.voucher_id
+
+        WHERE ve.ledger_id IN (?)
+          AND pv.company_id = ?
+          AND pv.owner_type = ?
+          AND pv.owner_id = ?
+
+        /* ================= ACCOUNTING-MODE SALES VOUCHER ENTRIES ================= */
+        /* These entries have voucher_id = sales_vouchers.id (not voucher_main.id) */
+
+        UNION ALL
+
+        SELECT
+          CAST(ve.ledger_id AS UNSIGNED) AS ledgerId,
+
+          CASE
+            WHEN ve.entry_type = 'debit' THEN ve.amount
+            ELSE 0
+          END AS debit,
+
+          CASE
+            WHEN ve.entry_type = 'credit' THEN ve.amount
+            ELSE 0
+          END AS credit
+
+        FROM voucher_entries ve
+        JOIN sales_vouchers sv ON sv.id = ve.voucher_id
+
+        WHERE ve.ledger_id IN (?)
+          AND sv.company_id = ?
+          AND sv.owner_type = ?
+          AND sv.owner_id = ?
+
       ) AS final_data
 
       GROUP BY ledgerId
@@ -254,26 +334,32 @@ router.get("/api/group", async (req, res) => {
 
       [
 
-        // Purchase
-        idArray, company_id, owner_type, owner_id,
-        idArray, company_id, owner_type, owner_id,
-        idArray, company_id, owner_type, owner_id,
-        idArray, company_id, owner_type, owner_id,
-        idArray, company_id, owner_type, owner_id,
-        idArray, company_id, owner_type, owner_id,
+        // Purchase item-invoice mode
+        idArray, company_id, owner_type, owner_id,   // CGST
+        idArray, company_id, owner_type, owner_id,   // SGST
+        idArray, company_id, owner_type, owner_id,   // IGST
+        idArray, company_id, owner_type, owner_id,   // Purchase Ledger
+        idArray, company_id, owner_type, owner_id,   // TDS
+        idArray, company_id, owner_type, owner_id,   // Purchase Discount
 
-        // Sales
-        idArray, company_id, owner_type, owner_id,
-        idArray, company_id, owner_type, owner_id,
-        idArray, company_id, owner_type, owner_id,
-        idArray, company_id, owner_type, owner_id,
-        idArray, company_id, owner_type, owner_id,
+        // Sales item-invoice mode
+        idArray, company_id, owner_type, owner_id,   // CGST
+        idArray, company_id, owner_type, owner_id,   // SGST
+        idArray, company_id, owner_type, owner_id,   // IGST
+        idArray, company_id, owner_type, owner_id,   // Sales Ledger
+        idArray, company_id, owner_type, owner_id,   // Sales Discount
 
         // Party
-        idArray, company_id, owner_type, owner_id,
+        idArray, company_id, owner_type, owner_id,   // Purchase Party
+        idArray, company_id, owner_type, owner_id,   // Sales Party
+
+        // Normal vouchers (journal/contra/payment/receipt via voucher_main)
         idArray, company_id, owner_type, owner_id,
 
-        // Journal
+        // Accounting-mode Purchase voucher entries (voucher_id = purchase_vouchers.id)
+        idArray, company_id, owner_type, owner_id,
+
+        // Accounting-mode Sales voucher entries (voucher_id = sales_vouchers.id)
         idArray, company_id, owner_type, owner_id,
       ]
     );
