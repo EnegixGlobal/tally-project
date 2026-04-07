@@ -157,12 +157,15 @@ router.get("/:id", async (req, res) => {
           pv.discountTotal,
           pv.total,
           pi.purchaseLedgerId,
+          pi.discountLedgerId,
           l.name AS purchase_ledger_name,
+          dl.name AS discount_ledger_name,
           pi.amount AS item_amount
          FROM purchase_vouchers pv
         LEFT JOIN purchase_voucher_items pi ON pi.voucherId = pv.id
         LEFT JOIN ledgers l ON l.id = pi.purchaseLedgerId
         LEFT JOIN ledgers party ON party.id = pv.partyId
+        LEFT JOIN ledgers dl ON dl.id = pi.discountLedgerId
         WHERE pv.id = ? AND pv.company_id = ?
         `,
                     [voucherId, company_id]
@@ -215,6 +218,21 @@ router.get("/:id", async (req, res) => {
                     // Add Taxes
                     const subtotal = Number(voucher.subtotal || 0);
                     if (subtotal > 0) {
+                        if (Number(voucher.discountTotal) > 0) {
+                            const discountRow = rows.find(r => r.discountLedgerId);
+                            const discountLedgerName = discountRow ? discountRow.discount_ledger_name : "Discount";
+                            const discountLedgerId = discountRow ? discountRow.discountLedgerId : null;
+
+                            voucher.entries.push({
+                                id: `PUR-DISC-${voucherId}`,
+                                ledger_name: discountLedgerName,
+                                ledger_id: discountLedgerId,
+                                amount: Number(voucher.discountTotal),
+                                entry_type: 'credit',
+                                isChild: true
+                            });
+                        }
+
                         if (Number(voucher.igstTotal) > 0) {
                             const rate = ((voucher.igstTotal / subtotal) * 100).toFixed(2);
                             voucher.entries.push({ id: `PUR-IGST-${voucherId}`, ledger_name: `IGST @ ${rate}%`, amount: Number(voucher.igstTotal), entry_type: 'debit', isChild: true });

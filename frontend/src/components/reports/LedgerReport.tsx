@@ -1322,6 +1322,28 @@ const LedgerReport: React.FC = () => {
                           </td>
                         </tr>
                       ))}
+                      {/* Grand Total Row */}
+                      {selectedVoucher.entries && selectedVoucher.entries.length > 0 && (
+                        <tr className={`border-t-2 font-bold ${theme === "dark" ? "border-gray-500 bg-gray-700/50" : "border-gray-300 bg-gray-50"}`}>
+                          <td className="px-3 py-3">
+                            Grand Total
+                          </td>
+                          <td className="px-3 py-3 text-right font-mono text-blue-600 dark:text-blue-400">
+                            {formatCurrency(
+                              selectedVoucher.entries.reduce((sum: number, entr: any) => 
+                                sum + (entr.entry_type === "debit" || (entr.debit > 0) ? Number(entr.amount || entr.debit || 0) : 0)
+                              , 0)
+                            )}
+                          </td>
+                          <td className="px-3 py-3 text-right font-mono text-purple-600 dark:text-purple-400">
+                            {formatCurrency(
+                              selectedVoucher.entries.reduce((sum: number, entr: any) => 
+                                sum + (entr.entry_type === "credit" || (entr.credit > 0) ? Number(entr.amount || entr.credit || 0) : 0)
+                              , 0)
+                            )}
+                          </td>
+                        </tr>
+                      )}
                     </tbody>
                   </table>
                 </div>

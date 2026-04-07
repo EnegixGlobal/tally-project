@@ -82,6 +82,7 @@ SELECT
   pv.igstTotal,
   pv.tdsTotal,
   pv.total,
+  pv.discountTotal,
 
   MAX(pvi.purchaseLedgerId) AS purchaseLedgerId,
   MAX(pvi.cgstRate)        AS cgstRate,
@@ -89,7 +90,6 @@ SELECT
   MAX(pvi.igstRate)        AS igstRate,
   MAX(pvi.tdsRate)         AS tdsRate,
   MAX(pvi.discountLedgerId) AS discountLedgerId,
-  SUM(CASE WHEN pvi.discountLedgerId = ? THEN pvi.discount ELSE 0 END) AS specificDiscount,
 
   MAX(l_party.name)    AS partyName,
   MAX(l_purchase.name) AS purchaseLedgerName
@@ -118,7 +118,7 @@ GROUP BY pv.id
 
 ORDER BY pv.date ASC
 `,
-      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
+      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
     );
 
 
@@ -552,11 +552,9 @@ ORDER BY vm.date ASC
       }
 
       /* ========= TDS ========= */
-      /* ========= TDS ========= */
       /* ========= DISCOUNT ========= */
-      /* ========= DISCOUNT ========= */
-      else if (Number(pv.specificDiscount) > 0) {
-        credit = Number(pv.specificDiscount || 0); // Income/Rebate
+      else if (currentLedger === Number(pv.discountLedgerId)) {
+        credit = Number(pv.discountTotal || 0); // Income/Rebate
         particulars = pv.partyName;
       }
 

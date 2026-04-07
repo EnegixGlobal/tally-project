@@ -184,6 +184,8 @@ export type VoucherEntry = {
   tdsLedgerId?: string;
   tdsRate?: number;
   tdsAmount?: number;
+  discountLedgerId?: string;
+  discountAmount?: number;
   total?: number;
 
   safeDate?: Date | null;

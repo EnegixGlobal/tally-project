@@ -107,7 +107,9 @@ router.get("/", async (req, res) => {
     pv.mode,
 
     pi.purchaseLedgerId,
+    pi.discountLedgerId,
     l.name AS purchase_ledger_name,
+    dl.name AS discount_ledger_name,
 
     pi.amount AS item_amount
 
@@ -121,6 +123,9 @@ router.get("/", async (req, res) => {
 
   LEFT JOIN ledgers party
     ON party.id = pv.partyId
+
+  LEFT JOIN ledgers dl
+    ON dl.id = pi.discountLedgerId
 
   WHERE pv.company_id = ?
     AND pv.owner_type = ?
@@ -153,6 +158,8 @@ router.get("/", async (req, res) => {
           partyId: row.partyId,
           partyName: row.party_name,
           mode: row.mode || "item-invoice",
+          discountLedgerId: row.discountLedgerId,
+          discountLedgerName: row.discount_ledger_name,
           entries: [],
         };
 
@@ -187,6 +194,12 @@ router.get("/", async (req, res) => {
           isChild: true,
         });
       }
+
+      // Capture discount info if not already captured
+      if (!vouchers[key].discountLedgerId && row.discountLedgerId) {
+        vouchers[key].discountLedgerId = row.discountLedgerId;
+        vouchers[key].discountLedgerName = row.discount_ledger_name;
+      }
     });
 
     /* =====================================================
@@ -198,6 +211,20 @@ router.get("/", async (req, res) => {
         const vid = v.id.split("-")[1];
 
         if (subtotal > 0) {
+          // DISCOUNT
+          if (Number(v.discountTotal) > 0) {
+            v.entries.push({
+              id: `PUR-DISC-${vid}`,
+              ledger_id: v.discountLedgerId,
+              ledger_name: v.discountLedgerName || "Discount",
+              amount: Number(v.discountTotal),
+              entry_type: "credit",
+              narration: "Discount",
+              isParty: false,
+              isChild: true,
+            });
+          }
+
           // IGST
           if (Number(v.igstTotal) > 0) {
             const igstRate = ((v.igstTotal / subtotal) * 100).toFixed(2);

@@ -31,7 +31,7 @@ const PRINT_STYLES = {
 
 // DRY Principle - Colspan values for table consistency
 const COLSPAN_VALUES = {
-  ITEM_TABLE_TOTAL: 9, // Sr No + Item + HSN + Batch + Qty + Unit + Rate + GST + Discount = 9 columns before Amount
+  ITEM_TABLE_TOTAL: 8, // Sr No + Item + HSN + Batch + Qty + Unit + Rate + GST = 8 columns before Amount
   PRINT_TABLE_NO_ITEMS: 7, // All columns in print table
   PRINT_TABLE_TERMS: 5, // Columns for terms and conditions
 };
@@ -139,7 +139,6 @@ const normalizeGstForSave = (
 const calculateEntryValues = (
   quantity: number,
   rate: number,
-  discount: number,
   gstRate: number,
   companyState: string,
   supplierState: string
@@ -148,18 +147,16 @@ const calculateEntryValues = (
   console.log("CALC ENTRY =>", {
     quantity,
     rate,
-    discount,
     gstRate,
     companyState,
     supplierState,
   });
   const qty = Number(quantity || 0);
   const r = Number(rate || 0);
-  const disc = Number(discount || 0);
 
   const baseAmount = qty * r;
 
-  const { cgstRate, sgstRate, igstRate, isIntra } = resolvePurchaseGst(
+  const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(
     gstRate,
     companyState,
     supplierState
@@ -174,18 +171,30 @@ const calculateEntryValues = (
   return {
     quantity: qty,
     rate: r,
-    discount: disc,
-    amount: totalAmount,
     baseAmount,
     gstAmount,
+    amount: baseAmount, 
     cgstRate,
     sgstRate,
     igstRate,
   };
 };
 
+// 🔹 Move utility functions here to avoid TDZ errors (used in handleEntryChange)
+const getLedgerNameById = (id: any, ledgers: LedgerWithGroup[]) => {
+  if (!id) return "-";
+  const ledger = ledgers.find((l) => String(l.id) === String(id));
+  return ledger?.name || "-";
+};
+
+const extractGstPercent = (name = "") => {
+  if (!name) return 0;
+  const match = name.match(/(\d+(\.\d+)?)/);
+  return match ? Number(match[1]) : 0;
+};
+
 const PurchaseVoucher: React.FC = () => {
-  const { theme, godowns = [], companyInfo, units = [] } = useAppContext();
+  const { theme, companyInfo } = useAppContext();
 
   //get companyInfo
   // 🔹 Get Company State from localStorage
@@ -215,6 +224,14 @@ const PurchaseVoucher: React.FC = () => {
 
   const tdsLedgers = useMemo(() => ledgers.filter((l) =>
     String(l.name).toUpperCase().includes("TDS")
+  ), [ledgers]);
+
+  const discountLedgers = useMemo(() => ledgers.filter((l) =>
+    String(l.name).toLowerCase().includes("discount") &&
+    (Number(l.groupId) === -11 ||
+     String(l.groupName).toLowerCase().includes("income") || 
+     String(l.type).toLowerCase().includes("income") ||
+     String(l.groupType).toLowerCase().includes("income"))
   ), [ledgers]);
 
   // Auto-select TDS Ledger if only one exists
@@ -410,8 +427,6 @@ const PurchaseVoucher: React.FC = () => {
             batches: details.batches || [],
             batchNumber: "",
             godownId: "",
-            discount: 0,
-            discountLedgerId: "",
             purchaseLedgerId: matchingPurchaseLedger?.id || prev.purchaseLedgerId || "",
 
             // Fill other required fields based on Type
@@ -533,6 +548,8 @@ const PurchaseVoucher: React.FC = () => {
           purchaseLedgerId: data.purchaseLedgerId || "",
           tdsLedgerId: data.tdsLedgerId || "",
           tdsAmount: data.tdsAmount || 0,
+          discountLedgerId: data.discountLedgerId || "",
+          discountAmount: data.discountAmount || 0,
           narration: data.narration || "",
           number: data.number || prev.number,
           mode: data.mode || "item-invoice",
@@ -835,6 +852,8 @@ const PurchaseVoucher: React.FC = () => {
     tdsLedgerId: "",
     tdsRate: 0,
     tdsAmount: 0,
+    discountLedgerId: "",
+    discountAmount: 0,
     dispatchDetails: { docNo: "", through: "", destination: "", approxDistance: "" },
     entries: [
       {
@@ -850,10 +869,7 @@ const PurchaseVoucher: React.FC = () => {
         gstLedgerId: "",
         sgstLedgerId: "",
         cgstLedgerId: "",
-
         godownId: "",
-        discount: 0,
-        discountLedgerId: "",
         batchNumber: "",
         batchExpiryDate: "",
         batchManufacturingDate: "",
@@ -999,6 +1015,8 @@ const PurchaseVoucher: React.FC = () => {
       tdsLedgerId: "",
       tdsRate: 0,
       tdsAmount: 0,
+      discountLedgerId: "",
+      discountAmount: 0,
       dispatchDetails: { docNo: "", through: "", destination: "", approxDistance: "" },
       entries: [
         {
@@ -1016,7 +1034,6 @@ const PurchaseVoucher: React.FC = () => {
           cgstLedgerId: "",
 
           godownId: "",
-          discount: 0,
           batchNumber: "",
           batchExpiryDate: "",
           batchManufacturingDate: "",
@@ -1163,7 +1180,6 @@ const PurchaseVoucher: React.FC = () => {
               sgstRate: 0,
               igstRate: 0,
               godownId: "",
-              discount: 0,
             },
           ],
         }));
@@ -1196,7 +1212,6 @@ const PurchaseVoucher: React.FC = () => {
         const calculated = calculateEntryValues(
           0, // quantity
           Number(selected?.standardPurchaseRate ?? selected?.rate ?? 0),
-          0, // discount
           gst,
           companyState || "",
           supplierState
@@ -1206,7 +1221,7 @@ const PurchaseVoucher: React.FC = () => {
         // Improved matching: Case-insensitive, handles various formats like "18%", "18 %", "@18%"
         let gstToMatch = gst;
         if (gstToMatch === 0 && selected?.gstLedgerId) {
-          const taxLedgerName = getLedgerNameById(selected.gstLedgerId);
+          const taxLedgerName = getLedgerNameById(selected.gstLedgerId, ledgers);
           gstToMatch = extractGstPercent(taxLedgerName);
         }
 
@@ -1267,7 +1282,6 @@ const PurchaseVoucher: React.FC = () => {
           batchExpiryDate: "",
           batchManufacturingDate: "",
           quantity: 1, // ✅ Fixed: Set to 1 instead of 0 for 'real' feel
-          discount: 0,
         };
 
         setFormData(prev => ({ ...prev, entries: updatedEntries }));
@@ -1307,55 +1321,19 @@ const PurchaseVoucher: React.FC = () => {
         return;
       }
 
-      // 🆕 DISCOUNT LEDGER CHANGE
-      if (name === "discountLedgerId") {
-        let newDiscount = 0;
-        if (value) {
-          const ledger = safeLedgers.find((l) => String(l.id) === String(value));
-          if (ledger) {
-            const m = ledger.name.match(/(\d+(\.\d+)?)/);
-            const percent = m ? Number(m[1]) : 0;
-            const qty = Number(entry.quantity || 0);
-            const rate = Number(entry.rate || 0);
-            const baseAmount = qty * rate;
-            newDiscount = (baseAmount * percent) / 100;
-          }
-        }
-
-        const calculated = calculateEntryValues(
-          Number(entry.quantity || 0),
-          Number(entry.rate || 0),
-          newDiscount,
-          Number(entry.gstRate || 0),
-          companyState || "",
-          supplierState
-        );
-
-        updatedEntries[index] = {
-          ...entry,
-          discountLedgerId: value,
-          discount: newDiscount,
-          amount: calculated.amount,
-        };
-        setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-        return;
-      }
-
-      // 3️⃣ QUANTITY / RATE / DISCOUNT CHANGE
-      if (["quantity", "rate", "discount"].includes(name)) {
+      // 3️⃣ QUANTITY / RATE CHANGE
+      if (["quantity", "rate"].includes(name)) {
         const newVal = Number(value || 0);
 
         // Prepare inputs for calc
         let newQty = name === "quantity" ? newVal : Number(entry.quantity || 0);
         let newRate = name === "rate" ? newVal : Number(entry.rate || 0);
-        let newDisc = name === "discount" ? newVal : Number(entry.discount || 0);
 
         const gst = Number(entry.gstRate || 0);
 
         const calculated = calculateEntryValues(
           newQty,
           newRate,
-          newDisc,
           gst,
           companyState || "",
           supplierState
@@ -1368,9 +1346,6 @@ const PurchaseVoucher: React.FC = () => {
         };
 
         setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-
-        // NOTE: Stock batch quantity is updated only on final submit (in handleSubmit Step 3.5)
-        // Real-time PATCH removed to prevent intermediate/incorrect updates
         return;
       }
 
@@ -1381,37 +1356,36 @@ const PurchaseVoucher: React.FC = () => {
       };
 
       setFormData((prev) => ({ ...prev, entries: updatedEntries }));
-      return;
     }
-
 
     // ⭐ ACCOUNTING MODE
-    if (name === "ledgerId") {
-      updatedEntries[index] = {
-        ...entry,
-        ledgerId: value,
-        itemId: undefined,
-        unitName: undefined,
-        quantity: undefined,
-        rate: undefined,
-        cgstRate: undefined,
-        sgstRate: undefined,
-        igstRate: undefined,
-        discount: undefined,
-      };
-    } else if (name === "amount") {
-      updatedEntries[index] = {
-        ...entry,
-        amount: Number(value) || 0,
-      };
-    } else {
-      updatedEntries[index] = {
-        ...entry,
-        [name]: value,
-      };
-    }
+    else {
+      if (name === "ledgerId") {
+        updatedEntries[index] = {
+          ...entry,
+          ledgerId: value,
+          itemId: undefined,
+          unitName: undefined,
+          quantity: undefined,
+          rate: undefined,
+          cgstRate: undefined,
+          sgstRate: undefined,
+          igstRate: undefined,
+        };
+      } else if (name === "amount") {
+        updatedEntries[index] = {
+          ...entry,
+          amount: Number(value) || 0,
+        };
+      } else {
+        updatedEntries[index] = {
+          ...entry,
+          [name]: value,
+        };
+      }
 
-    setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+      setFormData((prev) => ({ ...prev, entries: updatedEntries }));
+    }
   };
 
 
@@ -1433,14 +1407,13 @@ const PurchaseVoucher: React.FC = () => {
           ...e,
           ...resolvePurchaseGst(
             gst,
-            safeCompanyInfo.state || "",
+            companyState || "",
             supplierState
           ),
           amount: (() => {
             const calculated = calculateEntryValues(
               Number(e.quantity || 0),
               Number(e.rate || 0),
-              Number(e.discount || 0),
               gst,
               companyState || "",
               supplierState
@@ -1489,8 +1462,6 @@ const PurchaseVoucher: React.FC = () => {
         sgstRate: 0,
         igstRate: 0,
         godownId: "",
-        discount: 0,
-        discountLedgerId: "",
         batchNumber: "",
         batchExpiryDate: "",
         batchManufacturingDate: "",
@@ -1607,25 +1578,6 @@ const PurchaseVoucher: React.FC = () => {
     return Object.keys(newErrors).filter((k) => newErrors[k]).length === 0;
   };
 
-  // get ledget it to name like sgst, cgst,igst
-  // 🔹 Get Ledger Name by ID
-  const getLedgerNameById = (id: any) => {
-    if (!id) return "-";
-
-    const ledger = safeLedgers.find(
-      (l) => String(l.id) === String(id)
-    );
-
-    return ledger?.name || "-";
-  };
-  // ✅ Extract GST % from Ledger Name (like "SGST@9%" → 9)
-  const extractGstPercent = (name = "") => {
-    if (!name) return 0;
-
-    const match = name.match(/(\d+(\.\d+)?)/); // number find karega
-
-    return match ? Number(match[1]) : 0;
-  };
 
   // 🔹 Intra / Inter State Check
   const isIntraState =
@@ -1643,15 +1595,15 @@ const PurchaseVoucher: React.FC = () => {
 
           // ✅ GST % from Ledger Names
           const sgst = extractGstPercent(
-            getLedgerNameById(entry.sgstLedgerId)
+            getLedgerNameById(entry.sgstLedgerId, ledgers)
           );
 
           const cgst = extractGstPercent(
-            getLedgerNameById(entry.cgstLedgerId)
+            getLedgerNameById(entry.cgstLedgerId, ledgers)
           );
 
           const igst = extractGstPercent(
-            getLedgerNameById(entry.gstLedgerId)
+            getLedgerNameById(entry.gstLedgerId, ledgers)
           );
 
           // ✅ Total GST Rate (respecting Intra/Inter state)
@@ -1668,8 +1620,7 @@ const PurchaseVoucher: React.FC = () => {
             sgstTotal: acc.sgstTotal + (isIntraState ? (baseAmount * sgst) / 100 : 0),
             igstTotal: acc.igstTotal + (!isIntraState ? (baseAmount * igst) / 100 : 0),
 
-            discountTotal: acc.discountTotal + discount,
-            total: acc.total + totalAmount,
+            total: acc.total + baseAmount + gstAmount,
           };
         },
         {
@@ -1677,26 +1628,32 @@ const PurchaseVoucher: React.FC = () => {
           cgstTotal: 0,
           sgstTotal: 0,
           igstTotal: 0,
-          discountTotal: 0,
           total: 0,
         }
       );
 
       const tdsRatePercent = extractGstPercent(
-        getLedgerNameById(formData.tdsLedgerId)
+        getLedgerNameById(formData.tdsLedgerId, ledgers)
+      );
+
+      const discountRatePercent = extractGstPercent(
+        getLedgerNameById(formData.discountLedgerId, ledgers)
       );
 
       const tdsAmount = (totals.subtotal * tdsRatePercent) / 100;
+      const discountAmount = (totals.subtotal * discountRatePercent) / 100;
 
       return {
         ...totals,
         gstTotal: totals.cgstTotal + totals.sgstTotal + totals.igstTotal,
         tdsAmount,
-        tdsTotal: tdsAmount, // ✅ Added for backend
-        tdsRate: tdsRatePercent, // Keep percentage for UI if needed
-        total: visibleColumns.enableTdsCredit
-          ? totals.total - tdsAmount // ✅ Subtracted (Credit behavior)
-          : totals.total + tdsAmount, // ✅ Added to total (Debit behavior)
+        tdsTotal: tdsAmount,
+        tdsRate: tdsRatePercent,
+        discountTotal: discountAmount,
+        discountAmount: discountAmount,
+        total: (visibleColumns.enableTdsCredit
+          ? totals.total - tdsAmount
+          : totals.total + tdsAmount) - discountAmount,
       };
     }
     else {
@@ -1708,18 +1665,33 @@ const PurchaseVoucher: React.FC = () => {
         .filter((e) => e.type === "credit")
         .reduce((sum, e) => sum + (e.amount ?? 0), 0);
 
-      // In accounting-invoice, total is usually the sum of debits/expenses
-      // In accounting-invoice, it's also the balancing amount.
+      const discountRatePercent = extractGstPercent(
+        getLedgerNameById(formData.discountLedgerId, ledgers)
+      );
+
+      const tdsRatePercent = extractGstPercent(
+        getLedgerNameById(formData.tdsLedgerId, ledgers)
+      );
+
+      const discountAmount = (debitTotal * discountRatePercent) / 100;
+      const tdsAmount = (debitTotal * tdsRatePercent) / 100;
+
       return {
         debitTotal,
         creditTotal,
-        total: debitTotal,
-        subtotal: debitTotal, // Added for consistency in backend
+        total: (visibleColumns.enableTdsCredit
+          ? debitTotal - tdsAmount
+          : debitTotal + tdsAmount) - discountAmount,
+        subtotal: debitTotal,
         cgstTotal: 0,
         sgstTotal: 0,
         igstTotal: 0,
-        discountTotal: 0,
-        tdsTotal: 0
+        gstTotal: 0,
+        discountTotal: discountAmount,
+        discountAmount: discountAmount,
+        tdsTotal: tdsAmount,
+        tdsAmount: tdsAmount,
+        tdsRate: tdsRatePercent,
       };
     }
   };
@@ -2811,7 +2783,6 @@ const PurchaseVoucher: React.FC = () => {
                         <th className={TABLE_STYLES.headerRight}>IGST</th>
                       )}
 
-                      <th className={TABLE_STYLES.headerRight}>Discount</th>
                       <th className={TABLE_STYLES.headerRight}>Amount</th>
                       {godownEnabled === "yes" && visibleColumns.godown && (
                         <th className={TABLE_STYLES.header}>Godown</th>
@@ -3194,11 +3165,11 @@ const PurchaseVoucher: React.FC = () => {
                           {visibleColumns.gst && isIntraState && (
                             <>
                               <td className="px-1 py-2 text-xs text-center align-top">
-                                {extractGstPercent(getLedgerNameById(entry.sgstLedgerId))}%
+                                {extractGstPercent(getLedgerNameById(entry.sgstLedgerId, ledgers))}%
                               </td>
 
                               <td className="px-1 py-2 text-xs text-center align-top">
-                                {extractGstPercent(getLedgerNameById(entry.cgstLedgerId))}%
+                                {extractGstPercent(getLedgerNameById(entry.cgstLedgerId, ledgers))}%
                               </td>
                             </>
                           )}
@@ -3206,30 +3177,13 @@ const PurchaseVoucher: React.FC = () => {
                           {/* Inter State */}
                           {visibleColumns.gst && !isIntraState && (
                             <td className="px-1 py-2 text-xs text-center align-top">
-                              {extractGstPercent(getLedgerNameById(entry.gstLedgerId))}%
+                              {extractGstPercent(getLedgerNameById(entry.gstLedgerId, ledgers))}%
                             </td>
                           )}
 
 
 
 
-
-                          {/* DISCOUNT */}
-                          <td className="px-1 py-2 min-w-[70px] align-top">
-                            <select
-                              name="discountLedgerId"
-                              value={(entry as any).discountLedgerId || ""}
-                              onChange={(e) => handleEntryChange(index, e)}
-                              className={`${TABLE_STYLES.select} text-xs min-w-[100px]`}
-                            >
-                              <option value="">Select Discount</option>
-                              {discount.map((l) => (
-                                <option key={l.id} value={l.id}>
-                                  {l.name} {l.gstNumber ? `\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0\u00A0 ${l.gstNumber}` : ""}
-                                </option>
-                              ))}
-                            </select>
-                          </td>
 
                           {/* AMOUNT */}
                           <td className="px-1 py-2 min-w-[75px] text-right text-xs font-medium align-top">
@@ -3308,7 +3262,7 @@ const PurchaseVoucher: React.FC = () => {
                     {/* Calculate dynamic colspan based on visible columns */}
                     {(() => {
                       const colSpanBeforeAmount =
-                        6 + // Sr(1) + Item(1) + Qty(1) + Unit(1) + Rate(1) + Discount(1)
+                        5 + // Sr(1) + Item(1) + Qty(1) + Unit(1) + Rate(1)
                         (visibleColumns.hsn ? 1 : 0) +
                         (visibleColumns.batch ? 1 : 0) +
                         (visibleColumns.gst ? (isIntraState ? 2 : 1) : 0);
@@ -3441,7 +3395,7 @@ const PurchaseVoucher: React.FC = () => {
                             </tr>
                           )}
 
-                          {/* Discount */}
+                          {/* Discount Row */}
                           <tr
                             className={`font-semibold ${theme === "dark"
                               ? "border-t border-gray-600"
@@ -3449,14 +3403,33 @@ const PurchaseVoucher: React.FC = () => {
                               }`}
                           >
                             <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
-                              Discount Total:
+                              <div className="flex items-center justify-end gap-3 pr-6">
+                                <span className="whitespace-nowrap">
+                                  Discount:
+                                </span>
+                                <select
+                                  name="discountLedgerId"
+                                  value={formData.discountLedgerId}
+                                  onChange={handleChange}
+                                  className={`${TABLE_STYLES.select} !w-32 text-[11px] h-8 inline-block`}
+                                >
+                                  <option value="">Select Discount</option>
+                                  {discountLedgers.map((l) => (
+                                    <option key={l.id} value={l.id}>
+                                      {l.name}
+                                    </option>
+                                  ))}
+                                </select>
+                              </div>
                             </td>
 
-                            <td className="px-4 py-2 text-right">
+                            <td className="px-4 py-2 text-right font-bold text-red-600">
                               {discountTotal.toLocaleString()}
                             </td>
 
-                            <td colSpan={colSpanAfterAmount}></td>
+                            <td colSpan={colSpanAfterAmount} className="px-4 py-2">
+                              &nbsp;
+                            </td>
                           </tr>
 
                           {/* Grand Total */}
@@ -3477,8 +3450,6 @@ const PurchaseVoucher: React.FC = () => {
                             <td colSpan={colSpanAfterAmount}></td>
                           </tr>
                         </>
-
-
                       );
                     })()}
                   </tfoot>
@@ -3649,6 +3620,53 @@ const PurchaseVoucher: React.FC = () => {
                       <td className="px-4 py-2 text-right">Credit Total:</td>
                       <td className="px-4 py-2 text-right">
                         {Math.round(creditTotal).toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2"></td>
+                      <td className="px-4 py-2"></td>
+                    </tr>
+
+                    {/* Discount Row (Accounting Mode) */}
+                    <tr
+                      className={`font-semibold ${theme === "dark"
+                        ? "border-t border-gray-600"
+                        : "border-t border-gray-300"
+                        }`}
+                    >
+                      <td className="px-4 py-2 text-right">
+                        <div className="flex items-center justify-end gap-3 pr-6">
+                          <span className="whitespace-nowrap">Discount:</span>
+                          <select
+                            name="discountLedgerId"
+                            value={formData.discountLedgerId}
+                            onChange={handleChange}
+                            className={`${TABLE_STYLES.select} !w-32 text-[11px] h-8 inline-block`}
+                          >
+                            <option value="">Select Discount</option>
+                            {discountLedgers.map((l) => (
+                              <option key={l.id} value={l.id}>
+                                {l.name}
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+                      </td>
+                      <td className="px-4 py-2 text-right font-bold text-red-600">
+                        {discountTotal.toLocaleString()}
+                      </td>
+                      <td className="px-4 py-2"></td>
+                      <td className="px-4 py-2"></td>
+                    </tr>
+
+                    {/* Grand Total (Accounting Mode) */}
+                    <tr
+                      className={`font-semibold text-lg ${theme === "dark"
+                        ? "bg-gray-700/50 border-t-2 border-blue-500"
+                        : "bg-blue-50 border-t-2 border-blue-600 text-blue-900"
+                        }`}
+                    >
+                      <td className="px-4 py-2 text-right">Grand Total:</td>
+                      <td className="px-4 py-2 text-right font-bold text-green-600">
+                        {total.toLocaleString()}
                       </td>
                       <td className="px-4 py-2"></td>
                       <td className="px-4 py-2"></td>
@@ -4155,6 +4173,27 @@ const PurchaseVoucher: React.FC = () => {
                     {creditTotal.toLocaleString()}
                   </td>
                   <td className="border border-black p-1.5"></td>
+                </tr>
+
+                {discountTotal > 0 && (
+                  <tr>
+                    <td className="border border-black p-1.5 text-right font-bold">
+                      Less: Discount:
+                    </td>
+                    <td className="border border-black p-1.5 text-right">
+                      {discountTotal.toLocaleString()}
+                    </td>
+                    <td className="border border-black p-1.5"></td>
+                  </tr>
+                )}
+
+                <tr className="bg-gray-100">
+                  <td className="border border-black p-1.5 text-right font-bold">
+                    Grand Total:
+                  </td>
+                  <td className="border border-black p-1.5 text-right font-bold">
+                    ₹{total.toLocaleString()}
+                  </td>
                   <td className="border border-black p-1.5"></td>
                 </tr>
               </tfoot>
