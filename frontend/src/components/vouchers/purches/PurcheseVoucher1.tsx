@@ -32,8 +32,8 @@ const PRINT_STYLES = {
 // DRY Principle - Colspan values for table consistency
 const COLSPAN_VALUES = {
   ITEM_TABLE_TOTAL: 8, // Sr No + Item + HSN + Batch + Qty + Unit + Rate + GST = 8 columns before Amount
-  PRINT_TABLE_NO_ITEMS: 7, // All columns in print table
-  PRINT_TABLE_TERMS: 5, // Columns for terms and conditions
+  PRINT_TABLE_NO_ITEMS: 9, // All columns in print table
+  PRINT_TABLE_TERMS: 7, // Columns for terms and conditions
 };
 
 // Reusable function to get themed input classes
@@ -3918,7 +3918,13 @@ const PurchaseVoucher: React.FC = () => {
                     Rate
                   </th>
                   <th className={`${PRINT_STYLES.headerCell} w-16 text-center`}>
-                    GST %
+                    IGST
+                  </th>
+                  <th className={`${PRINT_STYLES.headerCell} w-16 text-center`}>
+                    CGST
+                  </th>
+                  <th className={`${PRINT_STYLES.headerCell} w-16 text-center`}>
+                    SGST
                   </th>
                   <th className={`${PRINT_STYLES.headerCell} w-24 text-right`}>
                     Amount
@@ -3939,6 +3945,16 @@ const PurchaseVoucher: React.FC = () => {
                       (entry.quantity || 0) * (entry.rate || 0);
                     const gstRate = itemDetails.gstRate || 0;
 
+                    // Get rates from ledgers if available
+                    const igstLedgerRate = extractGstPercent(getLedgerNameById(entry.igstLedgerId, ledgers));
+                    const cgstLedgerRate = extractGstPercent(getLedgerNameById(entry.cgstLedgerId, ledgers));
+                    const sgstLedgerRate = extractGstPercent(getLedgerNameById(entry.sgstLedgerId, ledgers));
+
+                    // Fallback hierarchy: Ledger Name % -> Entry state -> Item Master % calculation -> 0
+                    const finalIgst = igstLedgerRate || (!isIntraState && gstRate ? gstRate : 0);
+                    const finalCgst = cgstLedgerRate || (isIntraState && gstRate ? gstRate / 2 : 0);
+                    const finalSgst = sgstLedgerRate || (isIntraState && gstRate ? gstRate / 2 : 0);
+
                     return (
                       <tr key={entry.id}>
                         <td className={`${PRINT_STYLES.cellCenter} font-bold`}>
@@ -3957,7 +3973,15 @@ const PurchaseVoucher: React.FC = () => {
                         <td className={PRINT_STYLES.cellRight}>
                           ₹{entry.rate?.toLocaleString() || "0"}
                         </td>
-                        <td className={PRINT_STYLES.cellCenter}>{gstRate}%</td>
+                        <td className={PRINT_STYLES.cellCenter}>
+                          {finalIgst ? `${finalIgst}%` : "0"}
+                        </td>
+                        <td className={PRINT_STYLES.cellCenter}>
+                          {finalCgst ? `${finalCgst}%` : "0"}
+                        </td>
+                        <td className={PRINT_STYLES.cellCenter}>
+                          {finalSgst ? `${finalSgst}%` : "0"}
+                        </td>
                         <td className={PRINT_STYLES.cellRight}>
                           ₹{baseAmount.toLocaleString()}
                         </td>
@@ -3984,6 +4008,12 @@ const PurchaseVoucher: React.FC = () => {
                         .fill(0)
                         .map((_, index) => (
                           <tr key={`empty-${index}`}>
+                            <td className="border border-black p-5 text-[10pt]">
+                              &nbsp;
+                            </td>
+                            <td className="border border-black p-5 text-[10pt]">
+                              &nbsp;
+                            </td>
                             <td className="border border-black p-5 text-[10pt]">
                               &nbsp;
                             </td>
@@ -4059,6 +4089,12 @@ const PurchaseVoucher: React.FC = () => {
                         <td className="border border-black p-5 text-[10pt]">
                           &nbsp;
                         </td>
+                        <td className="border border-black p-5 text-[10pt]">
+                          &nbsp;
+                        </td>
+                        <td className="border border-black p-5 text-[10pt]">
+                          &nbsp;
+                        </td>
                       </tr>
                     ))}
               </tbody>
@@ -4066,7 +4102,7 @@ const PurchaseVoucher: React.FC = () => {
               <tfoot>
                 <tr>
                   <td
-                    colSpan={5}
+                    colSpan={COLSPAN_VALUES.PRINT_TABLE_TERMS}
                     className="border border-black p-1.5 text-[9pt]"
                   >
                     <strong>Terms & Conditions:</strong>
