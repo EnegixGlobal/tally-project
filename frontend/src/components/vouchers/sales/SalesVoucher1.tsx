@@ -2776,7 +2776,7 @@ const SalesVoucher: React.FC = () => {
                           })()}
 
 
-                        <th className="px-4 py-2 text-right">Amount</th>
+                        <th className="px-4 py-2 text-right">Taxable</th>
                         {columnSettings.showDiscount && <th>Discount</th>}
 
                         {godownEnabled === "yes" && columnSettings.showGodown && (
@@ -2981,7 +2981,7 @@ const SalesVoucher: React.FC = () => {
 
 
                             {/* AMOUNT */}
-                            <td className="px-1 py-2 text-right min-w-[75px] font-medium text-xs align-top">
+                            <td className="px-1 py-2 text-center min-w-[75px] font-medium text-xs align-top">
                               {Number(entry.amount ?? 0).toLocaleString()}
                             </td>
 
@@ -3124,7 +3124,7 @@ const SalesVoucher: React.FC = () => {
                                 className="px-4 py-2 text-left"
                                 colSpan={colspan}
                               >
-                                Subtotal:
+                                Taxable Value:
                               </td>
                               <td className="px-4 py-2 text-right">
                                 ₹{subtotal.toLocaleString()}
