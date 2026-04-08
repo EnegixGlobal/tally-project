@@ -377,7 +377,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
     const userType = localStorage.getItem("userType");
 
     // Restrictions for Trading (employee) and Trading Employee (company_user)
-    if (userType === "employee" || userType === "company_user") {
+    // if (userType === "employee" || userType === "company_user") {
+    //   const restrictedModules = ["gst", "tds", "audit", "income-tax"];
+    //   if (restrictedModules.includes(moduleId)) {
+    //     return false;
+    //   }
+    // }
+
+    if (userType === "company_user") {
       const restrictedModules = ["gst", "tds", "audit", "income-tax"];
       if (restrictedModules.includes(moduleId)) {
         return false;
