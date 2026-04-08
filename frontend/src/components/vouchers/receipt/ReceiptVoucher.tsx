@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Swal from "sweetalert2";
 import { useAppContext } from "../../../context/AppContext";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
@@ -10,6 +10,8 @@ const ReceiptVoucher: React.FC = () => {
   const { theme, companyInfo } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const copyId = location.state?.copyId;
   const isEditMode = !!id;
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const companyId = localStorage.getItem("company_id");
@@ -52,9 +54,8 @@ const ReceiptVoucher: React.FC = () => {
   });
 
 
-  //voucher number get 
   useEffect(() => {
-    if (isEditMode) return;
+    if (isEditMode || formData.number) return;
     if (!companyId || !ownerType || !ownerId || !formData.date) return;
 
     const fetchNextNumber = async () => {
@@ -82,7 +83,7 @@ const ReceiptVoucher: React.FC = () => {
     };
 
     fetchNextNumber();
-  }, [formData.date, isEditMode]);
+  }, [formData.date, isEditMode, formData.number]);
 
   // Mock cost centres
   const costCentres = useMemo(
@@ -228,14 +229,14 @@ const ReceiptVoucher: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!isEditMode) return;
-    if (!id) return;
+    if (!id && !copyId) return;
 
     const fetchSingleVoucher = async () => {
       try {
+        const fetchId = id || copyId;
         const res = await fetch(
           `${import.meta.env.VITE_API_URL
-          }/api/vouchers/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
+          }/api/vouchers/${fetchId}?owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
         const resJson = await res.json();
@@ -244,7 +245,7 @@ const ReceiptVoucher: React.FC = () => {
         const v = resJson?.data ?? resJson;
 
         if (!v) {
-          console.warn("No voucher data returned for id", id);
+          console.warn("No voucher data returned for id", fetchId);
           return;
         }
 
@@ -296,9 +297,9 @@ const ReceiptVoucher: React.FC = () => {
         }
 
         setFormData({
-          date: normalize(v.date),
+          date: id ? normalize(v.date) : defaultDate,
           type: v.type ?? "receipt",
-          number: v.number ?? initialFormData.number,
+          number: id ? (v.number ?? initialFormData.number) : "", // Clear number for copy
           narration: v.narration ?? "",
           mode: v.mode ?? "double-entry",
           referenceNo: v.reference_no ?? "",
@@ -330,7 +331,7 @@ const ReceiptVoucher: React.FC = () => {
     };
 
     fetchSingleVoucher();
-  }, [isEditMode, id]); // no dependence on ledgers/cashBankLedgers
+  }, [id, copyId]);
 
   const addEntry = () => {
     if (formData.mode === "single-entry") {

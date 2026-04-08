@@ -12,37 +12,47 @@ const ReceiptRegister: React.FC = () => {
     navigate(`/app/vouchers/receipt/edit/${voucher.id}`);
   };
 
+  // ➤ VIEW Handler
+  const handleView = (voucher: any) => {
+    navigate(`/app/vouchers/receipt/view/${voucher.id}`);
+  };
+
+  // ➤ COPY Handler
+  const handleCopy = (voucher: any) => {
+    navigate(`/app/vouchers/receipt/create`, { state: { copyId: voucher.id } });
+  };
+
   // ➤ DELETE Handler
- const handleDelete = async (id: string) => {
-  const confirm = await Swal.fire({
-    title: "Are you sure?",
-    text: "This voucher will be deleted permanently!",
-    icon: "warning",
-    showCancelButton: true,
-    confirmButtonText: "Yes, delete it!",
-  });
-
-  if (!confirm.isConfirmed) return;
-
-  try {
-    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers/${id}`, {
-      method: "DELETE",
+  const handleDelete = async (id: string) => {
+    const confirm = await Swal.fire({
+      title: "Are you sure?",
+      text: "This voucher will be deleted permanently!",
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete it!",
     });
 
-    const data = await res.json();
+    if (!confirm.isConfirmed) return;
 
-    if (res.ok) {
-      Swal.fire("Deleted!", data.message, "success");
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/vouchers/${id}`, {
+        method: "DELETE",
+      });
 
-      // 🔥 Force refresh UI
-      window.dispatchEvent(new CustomEvent("voucher-deleted", { detail: { id } }));
-    } else {
-      Swal.fire("Error", data.message || "Deletion failed", "error");
+      const data = await res.json();
+
+      if (res.ok) {
+        Swal.fire("Deleted!", data.message, "success");
+
+        // 🔥 Force refresh UI
+        window.dispatchEvent(new CustomEvent("voucher-deleted", { detail: { id } }));
+      } else {
+        Swal.fire("Error", data.message || "Deletion failed", "error");
+      }
+    } catch (err) {
+      Swal.fire("Error", "Network error while deleting", "error");
     }
-  } catch (err) {
-    Swal.fire("Error", "Network error while deleting", "error");
-  }
-};
+  };
 
   return (
     <VoucherRegisterBase
@@ -51,10 +61,10 @@ const ReceiptRegister: React.FC = () => {
       icon={<Receipt className="w-6 h-6" />}
       color="green"
       description="Manage all receipt vouchers and collections"
-
-      // 👇👇 ADDING EDIT + DELETE HERE
       onEdit={handleEdit}
       onDelete={handleDelete}
+      onView={handleView}
+      onCopy={handleCopy}
     />
   );
 };

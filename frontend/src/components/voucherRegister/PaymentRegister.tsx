@@ -835,12 +835,14 @@ const PaymentRegister: React.FC = () => {
                         {hasPermission("view") && (
                           <button
                             onClick={() =>
-                              console.log("View voucher:", voucher.id)
+                              navigate(`/app/vouchers/payment/create`, {
+                                state: { copyId: voucher.id },
+                              })
                             }
                             className="text-blue-600 hover:text-blue-900"
-                            title="View voucher"
+                            title="Copy voucher"
                           >
-                            View
+                            Copy
                           </button>
                         )}
                         {hasPermission("edit") && (

@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from "react";
 import { useAppContext } from "../../../context/AppContext";
-import { useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { useNavigate, useParams, useSearchParams, useLocation } from "react-router-dom";
 import type {
   VoucherEntry,
   Ledger,
@@ -60,7 +60,8 @@ const SalesVoucher: React.FC = () => {
   } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-
+  const location = useLocation();
+  const copyId = location.state?.copyId;
   const [searchParams] = useSearchParams();
   const isEditMode = !!id;
   const companyId = localStorage.getItem("company_id");
@@ -78,6 +79,13 @@ const SalesVoucher: React.FC = () => {
   const [isReadyToSave, setIsReadyToSave] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const DRAFT_KEY = "SALES_VOUCHER_CREATE_DRAFT";
+
+  //wholsell or retailer
+  const [profitConfig, setProfitConfig] = useState({
+    customerType: "",
+    method: "",
+    value: "",
+  });
 
   const { selectedFinYear } = useFinancialYear();
   const { defaultDate, minDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
@@ -375,7 +383,8 @@ const SalesVoucher: React.FC = () => {
 
   // --- DRAFT PERSISTENCE (RESTORE) ---
   useEffect(() => {
-    if (isEditMode) {
+    // Skip if in Edit Mode or Copy Mode
+    if (isEditMode || copyId) {
       setIsReadyToSave(true);
       return;
     }
@@ -409,7 +418,75 @@ const SalesVoucher: React.FC = () => {
       }
     }
     setIsReadyToSave(true);
-  }, [isEditMode]);
+  }, [isEditMode, copyId]);
+
+  // --- FETCH DATA FOR COPY ---
+  useEffect(() => {
+    if (!copyId || isEditMode) return;
+
+    const fetchVoucherForCopy = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers/${copyId}`);
+        const data = await res.json();
+        
+        // Sales API returns flat JSON on success
+        if (data.success || data.id) {
+          const v = data;
+          
+          // Map entries precisely as loadSingleVoucher does
+          const mappedEntries = (v.entries || []).map((e: any, idx: number) => ({
+            id: `e${idx + 1}`,
+            itemId: e.itemId || e.item_id || "",
+            quantity: Number(e.quantity) || 0,
+            rate: Number(e.rate) || 0,
+            amount: Number(e.amount) || 0,
+            type: e.type || "debit",
+            // The component logic expects ledger IDs in these fields, 
+            // which are then hydrated into rates by a separate useEffect.
+            cgstLedgerId: e.cgstRate ? String(Math.round(Number(e.cgstRate))) : "",
+            sgstLedgerId: e.sgstRate ? String(Math.round(Number(e.sgstRate))) : "",
+            igstLedgerId: e.igstRate ? String(Math.round(Number(e.igstRate))) : "",
+            cgstRate: 0,
+            sgstRate: 0,
+            igstRate: 0,
+            godownId: e.godownId || e.godown_id || "",
+            salesLedgerId: e.salesLedgerId?.toString() || e.sales_ledger_id?.toString() || "",
+            discount: Number(e.discount) || 0,
+            discountLedgerId: e.discountLedgerId || e.discount_ledger_id || "",
+            hsnCode: e.hsnCode || e.hsn_code || "",
+            batchNumber: e.batchNumber || e.batch_number || "",
+          }));
+
+          setFormData({
+            date: defaultDate,
+            type: v.type || "sales",
+            number: "", // Clear number for copy
+            narration: v.narration || "",
+            referenceNo: v.referenceNo || v.reference_no || "",
+            partyId: String(v.partyId || v.party_id || ""),
+            mode: v.mode || "item-invoice",
+            dispatchDetails: v.dispatch_details ? (typeof v.dispatch_details === 'string' ? JSON.parse(v.dispatch_details) : v.dispatch_details) : { 
+              docNo: v.dispatchDocNo || "", 
+              through: v.dispatchThrough || "", 
+              destination: v.destination || "", 
+              approxDistance: v.approxDistance || "" 
+            },
+            salesLedgerId: String(v.sales_ledger_id || v.salesLedgerId || ""),
+            entries: mappedEntries.length > 0 ? mappedEntries : getInitialFormData().entries,
+          });
+
+          // Set Sales Type ID if it exists
+          if (v.sales_type_id) {
+            setSelectedSalesTypeId(String(v.sales_type_id));
+          }
+        }
+      } catch (err) {
+        console.error("Failed to fetch voucher for copy:", err);
+      }
+    };
+
+    fetchVoucherForCopy();
+  }, [copyId, isEditMode, defaultDate]);
 
   // --- DRAFT PERSISTENCE (SAVE) ---
   useEffect(() => {
@@ -425,7 +502,7 @@ const SalesVoucher: React.FC = () => {
         localStorage.setItem(DRAFT_KEY, JSON.stringify(draftData));
       }
     }
-  }, [formData, isEditMode, isReadyToSave, selectedSalesTypeId]);
+  }, [formData, isEditMode, isReadyToSave, selectedSalesTypeId, profitConfig]);
 
   const clearDraft = () => {
     localStorage.removeItem(DRAFT_KEY);
@@ -498,12 +575,7 @@ const SalesVoucher: React.FC = () => {
     showDispatchDetails: false,
   });
 
-  //wholsell or retailer
-  const [profitConfig, setProfitConfig] = useState({
-    customerType: "",
-    method: "",
-    value: "",
-  });
+
 
   // Add these states at top of your component:
   const [statusMsg, setStatusMsg] = useState("");
