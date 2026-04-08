@@ -69,6 +69,7 @@ router.get("/", async (req, res) => {
             svi.cgstRate, svi.sgstRate, svi.igstRate, 
             svi.discount, 
             svi.salesLedgerId,
+            svi.discountLedgerId,
             
             sl.name AS salesLedgerName, 
             sl.group_id AS salesLedgerGroupId,
@@ -76,7 +77,9 @@ router.get("/", async (req, res) => {
 
             l_cgst.name AS cgstLedgerName,
             l_sgst.name AS sgstLedgerName,
-            l_igst.name AS igstLedgerName
+            l_igst.name AS igstLedgerName,
+            
+            l_disc.name AS discountLedgerName
 
          FROM sales_voucher_items svi
          
@@ -86,6 +89,8 @@ router.get("/", async (req, res) => {
          LEFT JOIN ledgers l_cgst ON svi.cgstRate = l_cgst.id
          LEFT JOIN ledgers l_sgst ON svi.sgstRate = l_sgst.id
          LEFT JOIN ledgers l_igst ON svi.igstRate = l_igst.id
+         
+         LEFT JOIN ledgers l_disc ON svi.discountLedgerId = l_disc.id
 
          WHERE svi.voucherId IN (?)`,
         [voucherIds]
@@ -108,6 +113,7 @@ router.get("/", async (req, res) => {
           cgstRate: Number(item.cgstRate) || 0,
           sgstRate: Number(item.sgstRate) || 0,
           igstRate: Number(item.igstRate) || 0,
+          discountLedgerName: item.discountLedgerName || null,
         });
       });
 

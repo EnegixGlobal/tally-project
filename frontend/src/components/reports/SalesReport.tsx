@@ -332,6 +332,52 @@ const SalesReport: React.FC = () => {
         addTaxTransaction(sgst, sgstLedgers, "Output SGST");
         addTaxTransaction(igst, igstLedgers, "Output IGST");
       }
+
+      // 4️⃣ INDIRECT EXPENSES (Debit / Expense - Discount Allowed)
+      const expGroupName = "Indirect Expenses";
+      let totalVoucherDiscountSeen = 0;
+
+      // Check item level discounts
+      if (voucher.items && voucher.items.length > 0) {
+        voucher.items.forEach((item: any) => {
+          const discountAmt = Number(item.discount || 0);
+          if (discountAmt > 0) {
+            totalVoucherDiscountSeen += discountAmt;
+            const ledgerName = item.discountLedgerName || "Discount to Customer 1%";
+            
+            if (!groups[expGroupName]) {
+              groups[expGroupName] = { totalDebit: 0, totalCredit: 0, transactions: [] };
+            }
+            groups[expGroupName].totalDebit += discountAmt;
+
+            const existingExp = groups[expGroupName].transactions.find(t => t.name === ledgerName);
+            if (existingExp) {
+              existingExp.debit += discountAmt;
+            } else {
+              groups[expGroupName].transactions.push({ name: ledgerName, debit: discountAmt, credit: 0 });
+            }
+          }
+        });
+      }
+
+      // Check voucher level global discount (if it wasn't already covered by items)
+      const globalDiscount = Number(voucher.discountTotal || 0);
+      if (globalDiscount > totalVoucherDiscountSeen) {
+        const remainingDiscount = globalDiscount - totalVoucherDiscountSeen;
+        const ledgerName = "Discount to Customer 1%";
+        
+        if (!groups[expGroupName]) {
+          groups[expGroupName] = { totalDebit: 0, totalCredit: 0, transactions: [] };
+        }
+        groups[expGroupName].totalDebit += remainingDiscount;
+
+        const existingExp = groups[expGroupName].transactions.find(t => t.name === ledgerName);
+        if (existingExp) {
+          existingExp.debit += remainingDiscount;
+        } else {
+          groups[expGroupName].transactions.push({ name: ledgerName, debit: remainingDiscount, credit: 0 });
+        }
+      }
     });
 
     return groups;

@@ -1141,6 +1141,17 @@ const DayBook: React.FC = () => {
                                 }
                               });
 
+                              // ✅ Sort entries: purchase/subtotal first → GST → discount last
+                              groupedOtherEntries.sort((a, b) => {
+                                const getSortPriority = (e: DayBookEntry) => {
+                                  const name = (e.ledgerName || "").toLowerCase();
+                                  if (name.includes("discount") || name.includes("rebate")) return 3; // bottom
+                                  if (name.includes("cgst") || name.includes("sgst") || name.includes("igst") || name.includes("gst")) return 2; // middle
+                                  return 1; // top
+                                };
+                                return getSortPriority(a) - getSortPriority(b);
+                              });
+
                               return groupedOtherEntries.map((entry, index) => (
                                 <tr
                                   key={index}
