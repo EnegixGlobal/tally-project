@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import { useAppContext } from "../../../context/AppContext";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 import type { VoucherEntry, Ledger } from "../../../types";
@@ -15,6 +15,8 @@ const PaymentVoucher: React.FC = () => {
 
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const copyId = location.state?.copyId;
 
   const isEditMode = !!id;
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
@@ -54,30 +56,35 @@ const PaymentVoucher: React.FC = () => {
   //auto voucher number fill
 
   useEffect(() => {
-    if (isEditMode) return;
+    if (isEditMode || formData.number) return;
     if (!companyId || !ownerType || !ownerId) return;
 
     const fetchNextNumber = async () => {
-      const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/vouchers/next-number` +
-        `?company_id=${companyId}` +
-        `&owner_type=${ownerType}` +
-        `&owner_id=${ownerId}` +
-        `&voucherType=payment` +
-        `&date=${formData.date}`
-      );
-
-      const data = await res.json();
-
-      if (data.success) {
-        setFormData((prev) =>
-          prev.number ? prev : { ...prev, number: data.voucherNumber }
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/vouchers/next-number` +
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}` +
+          `&voucherType=payment` +
+          `&date=${formData.date}`
         );
+
+        const data = await res.json();
+
+        if (data.success) {
+          setFormData((prev) => ({
+            ...prev,
+            number: data.voucherNumber,
+          }));
+        }
+      } catch (err) {
+        console.error("Payment voucher number preview error", err);
       }
     };
 
     fetchNextNumber();
-  }, [formData.date, companyId, ownerType, ownerId]);
+  }, [formData.date, isEditMode, formData.number, companyId, ownerType, ownerId]);
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
   const [showConfigPanel, setShowConfigPanel] = useState(false);
@@ -103,12 +110,13 @@ const PaymentVoucher: React.FC = () => {
   // FETCH SINGLE VOUCHER
   // =====================
   useEffect(() => {
-    if (!id) return;
+    if (!id && !copyId) return;
 
     const fetchVoucher = async () => {
       try {
+        const fetchId = id || copyId;
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`
+          `${import.meta.env.VITE_API_URL}/api/vouchers/${fetchId}`
         );
         const json = await res.json();
 
@@ -146,9 +154,9 @@ const PaymentVoucher: React.FC = () => {
         // -----------------------------
         setFormData((prev) => ({
           ...prev,
-          number: v.number || "",
+          number: id ? (v.number || "") : "", // Clear number for copy
           type: v.type || "payment",
-          date: v.date ? v.date.substring(0, 10) : "",
+          date: id ? (v.date ? v.date.substring(0, 10) : "") : defaultDate,
           narration: v.narration || "",
           referenceNo: v.reference_no || "",
           supplierInvoiceDate: formattedSupplierInvoiceDate,
@@ -167,7 +175,7 @@ const PaymentVoucher: React.FC = () => {
     };
 
     fetchVoucher();
-  }, [id]);
+  }, [id, copyId]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};

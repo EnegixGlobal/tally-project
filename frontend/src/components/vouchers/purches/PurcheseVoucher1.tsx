@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useReactToPrint } from "react-to-print";
 
 import { useAppContext } from "../../../context/AppContext";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import type { LedgerWithGroup, VoucherEntry } from "../../../types";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 import Swal from "sweetalert2";
@@ -243,6 +243,8 @@ const PurchaseVoucher: React.FC = () => {
 
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const { id } = useParams();
+  const location = useLocation();
+  const copyId = location.state?.copyId;
   const isEditMode = Boolean(id);
 
   const [showTableConfig, setShowTableConfig] = useState(false);
@@ -529,9 +531,11 @@ const PurchaseVoucher: React.FC = () => {
   };
 
   useEffect(() => {
-    if (!isEditMode || !id) return;
+    if (!id && !copyId) return;
 
-    fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${id}`)
+    const fetchId = id || copyId;
+
+    fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${fetchId}`)
       .then((res) => res.json())
       .then((data) => {
         setOriginalEntries(data.entries || []);
@@ -539,7 +543,7 @@ const PurchaseVoucher: React.FC = () => {
           ...prev,
 
           // MAIN FIELDS
-          date: data.date ? data.date.split("T")[0] : "",
+          date: id ? (data.date ? data.date.split("T")[0] : "") : defaultDate,
           supplierInvoiceDate: data.supplierInvoiceDate
             ? data.supplierInvoiceDate.split("T")[0]
             : "",
@@ -551,7 +555,7 @@ const PurchaseVoucher: React.FC = () => {
           discountLedgerId: data.discountLedgerId || "",
           discountAmount: data.discountAmount || 0,
           narration: data.narration || "",
-          number: data.number || prev.number,
+          number: id ? (data.number || prev.number) : "", // Clear number for copy
           mode: data.mode || "item-invoice",
 
           dispatchDetails: {
@@ -663,7 +667,7 @@ const PurchaseVoucher: React.FC = () => {
 
       })
       .catch((err) => console.error("Single voucher fetch error:", err));
-  }, [id, isEditMode, stockItems]);
+  }, [id, copyId, stockItems]); // dependency on copyId added
 
   useEffect(() => {
     const fetchStockItems = async () => {
@@ -919,9 +923,8 @@ const PurchaseVoucher: React.FC = () => {
     }
   }, [formData.number, voucherMode, companyId, isEditMode]);
 
-  // Auto-fetch voucher number when mode is "auto"
   useEffect(() => {
-    if (voucherMode === "auto" && !isEditMode && formData.date) {
+    if (voucherMode === "auto" && !isEditMode && formData.date && !formData.number) {
       const fetchNextNumber = async () => {
         try {
           const res = await fetch(
@@ -937,14 +940,15 @@ const PurchaseVoucher: React.FC = () => {
       };
       fetchNextNumber();
     }
-  }, [voucherMode, formData.date, companyId, ownerType, ownerId, isEditMode]);
+  }, [voucherMode, formData.date, companyId, ownerType, ownerId, isEditMode, formData.number]);
 
   // Draft Persistence Logic
   const DRAFT_KEY = "PURCHASE_VOUCHER_CREATE_DRAFT";
 
   // 1. RESTORE DRAFT ON MOUNT (First Priority)
   useEffect(() => {
-    if (isEditMode) {
+    // Skip if in Edit Mode or Copy mode
+    if (isEditMode || copyId) {
       setIsReadyToSave(true);
       return;
     }

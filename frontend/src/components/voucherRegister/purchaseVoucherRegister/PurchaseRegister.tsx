@@ -17,6 +17,11 @@ const PurchaseRegister: React.FC = () => {
       onEdit={(voucher) =>
         navigate(`/app/vouchers/purchase/edit/${voucher.id}`)
       }
+      onCopy={(voucher) =>
+        navigate(`/app/vouchers/purchase/create`, {
+          state: { copyId: voucher.id },
+        })
+      }
       onDelete={(id) => {
         Swal.fire({
           title: "Are you sure?",

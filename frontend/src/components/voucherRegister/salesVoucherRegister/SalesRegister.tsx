@@ -13,6 +13,16 @@ const SalesRegister: React.FC = () => {
     navigate(`/app/vouchers/sales/edit/${voucher.id}`);
   };
 
+  // ---- VIEW ---
+  const handleView = (voucher: any) => {
+    navigate(`/app/vouchers/sales/view/${voucher.id}`);
+  };
+
+  // ---- COPY ---
+  const handleCopy = (voucher: any) => {
+    navigate(`/app/vouchers/sales/create`, { state: { copyId: voucher.id } });
+  };
+
   // ---- DELETE ----
   const handleDelete = async (id: string) => {
     const result = await Swal.fire({
@@ -59,6 +69,8 @@ const SalesRegister: React.FC = () => {
       description="Manage all sales vouchers and invoices"
       onEdit={handleEdit}
       onDelete={handleDelete}
+      onView={handleView}
+      onCopy={handleCopy}
     />
   );
 };

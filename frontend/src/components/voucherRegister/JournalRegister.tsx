@@ -22,6 +22,11 @@ const JournalRegister: React.FC = () => {
     navigate(`/app/vouchers/journal/view/${voucher.id}`);
   };
 
+  // 🔹 COPY Journal Voucher
+  const handleCopy = (voucher: any) => {
+    navigate(`/app/vouchers/journal/create`, { state: { copyId: voucher.id } });
+  };
+
   // 🔹 DELETE Journal Voucher with SWEET ALERT + AUTO UI REFRESH
  const handleDelete = async (id: string) => {
   const confirm = await Swal.fire({
@@ -76,6 +81,7 @@ const JournalRegister: React.FC = () => {
       onEdit={handleEdit}
       onDelete={handleDelete}
       onView={handleView}
+      onCopy={handleCopy}
     />
   );
 };

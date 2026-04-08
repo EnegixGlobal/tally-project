@@ -17,6 +17,8 @@ interface VoucherRegisterBaseProps {
   onEdit?: (voucher: VoucherEntry) => void;
   onDelete?: (id: string) => void;
   onView?: (voucher: VoucherEntry) => void;
+  onCopy?: (voucher: VoucherEntry) => void;
+  onExport?: (data: any) => void;
 }
 
 interface PurchaseVoucher {
@@ -85,6 +87,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   onEdit,
   onDelete,
   onView,
+  onCopy,
+  onExport,
 }) => {
   const navigate = useNavigate();
   const { theme } = useAppContext();
@@ -1573,12 +1577,12 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     )}
 
                     <td className="px-6 py-4 text-sm font-medium space-x-3">
-                      {onView && (
+                      {onCopy && (
                         <button
-                          onClick={() => onView(voucher)}
+                          onClick={() => onCopy(voucher)}
                           className="text-blue-600 hover:text-blue-900"
                         >
-                          View
+                          Copy
                         </button>
                       )}
 

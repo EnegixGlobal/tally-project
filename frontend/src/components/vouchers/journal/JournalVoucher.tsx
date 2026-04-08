@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from "react";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate, useParams, useLocation } from "react-router-dom";
 import Swal from "sweetalert2";
 import { useAppContext } from "../../../context/AppContext";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
@@ -10,6 +10,8 @@ const JournalVoucher: React.FC = () => {
   const { theme, companyInfo, vouchers } = useAppContext();
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
+  const location = useLocation();
+  const copyId = location.state?.copyId;
   const isEditMode = !!id;
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -50,9 +52,8 @@ const JournalVoucher: React.FC = () => {
     showEntryNarration: false,
   });
 
-  //get voucher number
   useEffect(() => {
-    if (isEditMode) return;
+    if (isEditMode || formData.number) return;
     if (!companyId || !ownerType || !ownerId) return;
 
     const fetchNextJournalNumber = async () => {
@@ -75,12 +76,12 @@ const JournalVoucher: React.FC = () => {
           }));
         }
       } catch (err) {
-        console.error("Next journal number fetch failed", err);
+        console.error("Journal voucher number preview error", err);
       }
     };
 
     fetchNextJournalNumber();
-  }, [formData.date]);
+  }, [formData.date, isEditMode, formData.number]);
 
   // Mock cost centres
   const costCentres = useMemo(
@@ -218,12 +219,13 @@ const JournalVoucher: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    if (!isEditMode) return;
+    if (!isEditMode && !copyId) return;
 
     const fetchVoucher = async () => {
       try {
+        const fetchId = isEditMode ? id : copyId;
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/vouchers/${id}`
+          `${import.meta.env.VITE_API_URL}/api/vouchers/${fetchId}`
         );
         const json = await res.json();
 
@@ -241,9 +243,9 @@ const JournalVoucher: React.FC = () => {
         }));
 
         setFormData({
-          date: v.date?.split("T")[0] || "",
+          date: isEditMode ? (v.date?.split("T")[0] || "") : defaultDate,
           type: v.type || "journal",
-          number: v.number || "",
+          number: isEditMode ? (v.number || "") : "", // Clear number for copy so auto-numbering can run
           narration: v.narration || "",
           referenceNo: v.reference_no || "",
           supplierInvoiceDate: v.supplier_invoice_date
@@ -257,7 +259,7 @@ const JournalVoucher: React.FC = () => {
     };
 
     fetchVoucher();
-  }, [isEditMode, id]);
+  }, [isEditMode, id, copyId]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
