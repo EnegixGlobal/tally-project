@@ -2806,7 +2806,7 @@ const PurchaseVoucher: React.FC = () => {
                         <th className={TABLE_STYLES.headerRight}>IGST</th>
                       )}
 
-                      <th className={TABLE_STYLES.headerRight}>Amount</th>
+                      <th className={TABLE_STYLES.headerRight}>Taxable </th>
                       {godownEnabled === "yes" && visibleColumns.godown && (
                         <th className={TABLE_STYLES.header}>Godown</th>
                       )}
@@ -3304,7 +3304,7 @@ const PurchaseVoucher: React.FC = () => {
                               }`}
                           >
                             <td colSpan={colSpanBeforeAmount} className="px-4 py-2 text-right">
-                              Subtotal:
+                              Taxable Value
                             </td>
 
                             <td className="px-4 py-2 text-right">
@@ -4144,7 +4144,7 @@ const PurchaseVoucher: React.FC = () => {
                     </span>
                   </td>
                   <td className="border border-black p-1.5 text-[10pt] text-right font-bold">
-                    <div className="mb-1.5">Subtotal</div>
+                    <div className="mb-1.5">Taxable Value</div>
                     {cgstTotal > 0 && <div className="mb-1.5">Add: CGST</div>}
                     {sgstTotal > 0 && <div className="mb-1.5">Add: SGST</div>}
                     {igstTotal > 0 && <div className="mb-1.5">Add: IGST</div>}
