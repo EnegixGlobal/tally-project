@@ -293,7 +293,7 @@ const PurchaseReport1: React.FC = () => {
       const igstLedgers = new Set<string>();
 
       if (voucher.items) {
-        voucher.items.forEach(i => {
+        voucher.items.forEach((i: any) => {
           if (i.cgstLedgerName) cgstLedgers.add(i.cgstLedgerName);
           if (i.sgstLedgerName) sgstLedgers.add(i.sgstLedgerName);
           if (i.igstLedgerName) igstLedgers.add(i.igstLedgerName);
@@ -384,7 +384,7 @@ const PurchaseReport1: React.FC = () => {
           if (discountAmt > 0) {
             totalVoucherDiscountSeen += discountAmt;
             const ledgerName = item.discountLedgerName || "Rebate & Discount 20%";
-            
+
             if (!groups[incGroupName]) {
               groups[incGroupName] = { totalDebit: 0, totalCredit: 0, transactions: [] };
             }
@@ -404,8 +404,17 @@ const PurchaseReport1: React.FC = () => {
       const globalDiscount = Number(voucher.discountTotal || 0);
       if (globalDiscount > totalVoucherDiscountSeen) {
         const remainingDiscount = globalDiscount - totalVoucherDiscountSeen;
-        const ledgerName = "Rebate & Discount 20%";
-        
+
+        let globalDiscountLedgerName = null;
+        if (voucher.items && voucher.items.length > 0) {
+          const itemWithDiscountLedger = voucher.items.find((i: any) => i.discountLedgerName);
+          if (itemWithDiscountLedger) {
+            globalDiscountLedgerName = itemWithDiscountLedger.discountLedgerName;
+          }
+        }
+
+        const ledgerName = globalDiscountLedgerName || "Rebate & Discount 20%";
+
         if (!groups[incGroupName]) {
           groups[incGroupName] = { totalDebit: 0, totalCredit: 0, transactions: [] };
         }
@@ -432,15 +441,32 @@ const PurchaseReport1: React.FC = () => {
         // Check Party Name
         if ((v.partyName || "Unknown Party") === columnarDrillDown) return true;
 
-        // Check Items for Ledgers (Purchase, Tax, TDS)
+        // Check Items for Ledgers (Purchase, Tax, TDS, Discount)
         if (v.items) {
-          return v.items.some((item: any) =>
+          const itemMatched = v.items.some((item: any) =>
             (item.purchaseLedgerName === columnarDrillDown) ||
             (item.cgstLedgerName === columnarDrillDown) ||
             (item.sgstLedgerName === columnarDrillDown) ||
             (item.igstLedgerName === columnarDrillDown) ||
-            (item.tdsLedgerName === columnarDrillDown)
+            (item.tdsLedgerName === columnarDrillDown) ||
+            (item.discountLedgerName === columnarDrillDown) ||
+            (Number(item.discount) > 0 && "Rebate & Discount 20%" === columnarDrillDown && !item.discountLedgerName)
           );
+          if (itemMatched) return true;
+        }
+
+        // Check global discount
+        let globalDiscountLedgerName = null;
+        if (v.items && v.items.length > 0) {
+          const itemWithDiscountLedger = v.items.find((i: any) => i.discountLedgerName);
+          if (itemWithDiscountLedger) {
+            globalDiscountLedgerName = itemWithDiscountLedger.discountLedgerName;
+          }
+        }
+        const globalLedgerName = globalDiscountLedgerName || "Rebate & Discount 20%";
+        const globalDiscount = Number(v.discountTotal || 0);
+        if (globalDiscount > 0 && globalLedgerName === columnarDrillDown) {
+          return true;
         }
         return false;
       });
@@ -449,10 +475,11 @@ const PurchaseReport1: React.FC = () => {
     const purchaseColumns = new Set<string>();
     const taxColumns = new Set<string>();
     const tdsColumns = new Set<string>();
+    const discountColumns = new Set<string>();
 
     // 1. Collect all unique Ledger Names for Headers
     vouchersToProcess.forEach(voucher => {
-      // Purchase Ledgers & Tax Ledgers from items
+      // Purchase Ledgers & Tax/Discount Ledgers from items
       if (voucher.items) {
         voucher.items.forEach(item => {
           if (item.purchaseLedgerName) purchaseColumns.add(item.purchaseLedgerName);
@@ -460,15 +487,29 @@ const PurchaseReport1: React.FC = () => {
           if (item.sgstLedgerName) taxColumns.add(item.sgstLedgerName);
           if (item.igstLedgerName) taxColumns.add(item.igstLedgerName);
           if (item.tdsLedgerName) tdsColumns.add(item.tdsLedgerName);
+          if (Number(item.discount) > 0) {
+            discountColumns.add(item.discountLedgerName || "Rebate & Discount 20%");
+          }
         });
+      }
+      // Global discount column
+      const gDiscount = Number(voucher.discountTotal || 0);
+      if (gDiscount > 0) {
+        let globalName = null;
+        if (voucher.items && voucher.items.length > 0) {
+          const dItem = voucher.items.find((i: any) => i.discountLedgerName);
+          if (dItem) globalName = dItem.discountLedgerName;
+        }
+        discountColumns.add(globalName || "Rebate & Discount 20%");
       }
     });
 
     const sortedPurchaseCols = Array.from(purchaseColumns).sort();
     const sortedTaxCols = Array.from(taxColumns).sort();
     const sortedTdsCols = Array.from(tdsColumns).sort();
+    const sortedDiscountCols = Array.from(discountColumns).sort();
 
-    const allDynamicCols = [...sortedPurchaseCols, ...sortedTaxCols, ...sortedTdsCols];
+    const allDynamicCols = [...sortedPurchaseCols, ...sortedTaxCols, ...sortedTdsCols, ...sortedDiscountCols];
 
     // 2. Prepare Row Data
     const rows = vouchersToProcess.map(voucher => {
@@ -505,8 +546,9 @@ const PurchaseReport1: React.FC = () => {
       row.rate = isMixedRate ? 0 : (consistentRate === -1 ? 0 : consistentRate);
 
       // Map Amounts to Columns
+      let totalDiscSeen = 0;
       if (voucher.items) {
-        voucher.items.forEach(item => {
+        voucher.items.forEach((item: any) => {
           // Purchase Amount
           if (item.purchaseLedgerName) {
             row[item.purchaseLedgerName] = (row[item.purchaseLedgerName] || 0) + Number(item.amount || 0);
@@ -519,7 +561,7 @@ const PurchaseReport1: React.FC = () => {
         const vIgstLedgers = new Set<string>();
         const vTdsLedgers = new Set<string>();
 
-        voucher.items.forEach(item => {
+        voucher.items.forEach((item: any) => {
           if (item.cgstLedgerName) vCgstLedgers.add(item.cgstLedgerName);
           if (item.sgstLedgerName) vSgstLedgers.add(item.sgstLedgerName);
           if (item.igstLedgerName) vIgstLedgers.add(item.igstLedgerName);
@@ -543,6 +585,28 @@ const PurchaseReport1: React.FC = () => {
           const first = Array.from(vTdsLedgers)[0];
           row[first] = (row[first] || 0) + Number(voucher.tdsAmount || 0);
         }
+
+        // Discounts
+        voucher.items.forEach((item: any) => {
+          const disc = Number(item.discount || 0);
+          if (disc > 0) {
+            totalDiscSeen += disc;
+            const dName = item.discountLedgerName || "Rebate & Discount 20%";
+            row[dName] = (row[dName] || 0) + disc;
+          }
+        });
+      }
+
+      const gDiscount = Number(voucher.discountTotal || 0);
+      if (gDiscount > totalDiscSeen) {
+        const diff = gDiscount - totalDiscSeen;
+        let globalName = null;
+        if (voucher.items && voucher.items.length > 0) {
+          const dItem = voucher.items.find((i: any) => i.discountLedgerName);
+          if (dItem) globalName = dItem.discountLedgerName;
+        }
+        const finalName = globalName || "Rebate & Discount 20%";
+        row[finalName] = (row[finalName] || 0) + diff;
       }
 
       return row;
