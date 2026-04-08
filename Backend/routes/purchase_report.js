@@ -137,6 +137,7 @@ router.get("/", async (req, res) => {
           pv.date,
           pv.total AS netAmount,
           pv.total,
+          pv.discountTotal,
           pv.subtotal AS taxableAmount,
           pv.cgstTotal AS cgstAmount,
           pv.sgstTotal AS sgstAmount,
@@ -184,6 +185,7 @@ router.get("/", async (req, res) => {
             pvi.cgstRate, pvi.sgstRate, pvi.igstRate, pvi.tdsRate,
             pvi.discount, 
             pvi.purchaseLedgerId,
+            pvi.discountLedgerId,
             
             pl.name AS purchaseLedgerName, 
             pl.group_id AS purchaseLedgerGroupId,
@@ -192,12 +194,14 @@ router.get("/", async (req, res) => {
             l_cgst.name AS cgstLedgerName,
             l_sgst.name AS sgstLedgerName,
             l_igst.name AS igstLedgerName,
-            l_tds.name  AS tdsLedgerName
+            l_tds.name  AS tdsLedgerName,
+            dl.name AS discountLedgerName
 
          FROM purchase_voucher_items pvi
          
          LEFT JOIN ledgers pl ON pvi.purchaseLedgerId = pl.id
          LEFT JOIN ledger_groups lg ON pl.group_id = lg.id
+         LEFT JOIN ledgers dl ON pvi.discountLedgerId = dl.id
 
          LEFT JOIN ledgers l_cgst ON pvi.cgstRate = l_cgst.id
          LEFT JOIN ledgers l_sgst ON pvi.sgstRate = l_sgst.id
@@ -226,6 +230,7 @@ router.get("/", async (req, res) => {
           sgstRate: Number(item.sgstRate) || 0,
           igstRate: Number(item.igstRate) || 0,
           tdsRate: Number(item.tdsRate) || 0,
+          discountLedgerName: item.discountLedgerName || null,
         });
       });
 
@@ -235,6 +240,7 @@ router.get("/", async (req, res) => {
         // Ensure voucher level totals are numbers
         row.netAmount = Number(row.netAmount) || 0;
         row.total = Number(row.total) || 0;
+        row.discountTotal = Number(row.discountTotal) || 0;
         row.taxableAmount = Number(row.taxableAmount) || 0;
         row.cgstAmount = Number(row.cgstAmount) || 0;
         row.sgstAmount = Number(row.sgstAmount) || 0;
