@@ -1025,10 +1025,11 @@ router.post("/:id/batches", async (req, res) => {
       owner_id,
     } = req.body;
 
-    if (!id || !batchName) {
+    // Allow null/empty batchName for no-batch purchase items
+    if (!id) {
       return res
         .status(400)
-        .json({ success: false, message: "Missing item id or batchName" });
+        .json({ success: false, message: "Missing item id" });
     }
 
     // Fetch existing item
@@ -1067,7 +1068,7 @@ router.post("/:id/batches", async (req, res) => {
     }
 
     const newBatch = {
-      batchName,
+      batchName: batchName || null,  // null for no-batch items
       batchQuantity: Number(batchQuantity) || 0,
       batchRate: Number(batchRate) || 0,
       batchExpiryDate: batchExpiryDate || null,

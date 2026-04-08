@@ -1304,7 +1304,7 @@ const SalesVoucher: React.FC = () => {
         const oldQty = Number(entry.quantity || 0);
         const newQty = Number(value || 0);
 
-        // 🟢 If NO batch system → allow free quantity, NO stock error
+        // 🟢 If NO batch system → check for a null-name purchase batch first
         if (!entry.batches || entry.batches.length === 0) {
           updatedEntries[index].quantity = newQty;
           updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
@@ -1348,10 +1348,13 @@ const SalesVoucher: React.FC = () => {
           // Stock diff logic removed - we should not patch stock on input change
           // Stock will be deducted ONLY on Voucher Save
 
-          // Optional: Client-side validation against available stock (if desired)
+          // Check stock against candidateBatch (null-name purchase batch)
           if (candidateBatch) {
             const availableQty = Number(candidateBatch.batchQuantity ?? candidateBatch.quantity ?? 0);
-            if (newQty > availableQty) {
+            const itemDetails = getItemDetails(entry.itemId);
+            const allowNegative = !!itemDetails?.allowNegativeStock;
+
+            if (newQty > availableQty && !allowNegative) {
               Swal.fire({
                 icon: "warning",
                 title: "Stock Warning",
@@ -1359,10 +1362,11 @@ const SalesVoucher: React.FC = () => {
                 timer: 2000,
                 showConfirmButton: false
               });
-              // We allow the user to enter it (maybe negative stock allowed?), 
-              // or you can cap it here if strictly enforced:
-              // updatedEntries[index].quantity = availableQty;
-              // finalQty = availableQty; 
+              // ✅ CAP the quantity — don't allow going over
+              updatedEntries[index].quantity = availableQty;
+              updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+              setFormData((p) => ({ ...p, entries: updatedEntries }));
+              return;
             }
           }
           return;

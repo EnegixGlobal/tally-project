@@ -694,13 +694,13 @@ const StockItemForm = () => {
       maintainInPieces: formData.maintainInPieces,
       secondaryUnit: formData.secondaryUnit,
 
-      batches: batchRows.map((b) => ({
+      batches: formData.enableBatchTracking ? batchRows.map((b) => ({
         ...b,
         mode: "opening",
         batchQuantity: Number(b.batchQuantity) || 0,
         batchRate: Number(b.batchRate) || 0,
         openingRate: Number(b.batchRate || 0) * Number(b.batchQuantity || 0),
-      })),
+      })) : [],
       godownAllocations,
       barcode,
       company_id: companyId,
@@ -986,14 +986,14 @@ const StockItemForm = () => {
               )}
             </div>
 
-            <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
-              {batchRows.map((row, index) => (
-                <div
-                  key={row.id}
-                  className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-7 gap-3 items-end w-full"
-                >
-                  {formData.enableBatchTracking && (
-                    <div className="flex-1 min-w-[120px]">
+            {formData.enableBatchTracking && (
+              <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
+                {batchRows.map((row, index) => (
+                  <div
+                    key={row.id}
+                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 items-end w-full"
+                  >
+                    <div className="md:col-span-2">
                       <InputField
                         id={`batchName-${index}`}
                         name={`batchName-${index}`}
@@ -1005,65 +1005,64 @@ const StockItemForm = () => {
                         error={errors[`batchName-${index}`]}
                       />
                     </div>
-                  )}
 
-                  <div className="flex-1 min-w-[120px]">
-                    <InputField
-                      id={`batchQuantity-${index}`}
-                      name={`batchQuantity-${index}`}
-                      label="Qty"
-                      value={row.batchQuantity}
-                      onChange={(e) =>
-                        updateBatchRow(index, "batchQuantity", e.target.value)
-                      }
-                      error={errors[`batchQuantity-${index}`]}
-                    />
-                  </div>
+                    <div className="md:col-span-1">
+                      <InputField
+                        id={`batchQuantity-${index}`}
+                        name={`batchQuantity-${index}`}
+                        label="Qty"
+                        value={row.batchQuantity}
+                        onChange={(e) =>
+                          updateBatchRow(index, "batchQuantity", e.target.value)
+                        }
+                        error={errors[`batchQuantity-${index}`]}
+                      />
+                    </div>
 
-                  <div className="flex-1 min-w-[120px]">
-                    <InputField
-                      id={`batchRate-${index}`}
-                      name={`batchRate-${index}`}
-                      label="Rate"
-                      value={row.batchRate}
-                      onChange={(e) =>
-                        updateBatchRow(index, "batchRate", e.target.value)
-                      }
-                      error={errors[`batchRate-${index}`]}
-                    />
-                  </div>
+                    <div className="md:col-span-1">
+                      <InputField
+                        id={`batchRate-${index}`}
+                        name={`batchRate-${index}`}
+                        label="Rate"
+                        value={row.batchRate}
+                        onChange={(e) =>
+                          updateBatchRow(index, "batchRate", e.target.value)
+                        }
+                        error={errors[`batchRate-${index}`]}
+                      />
+                    </div>
 
-                  <div className="flex-1 min-w-[120px]">
-                    <InputField
-                      id={`openingRate-${index}`}
-                      name={`openingRate-${index}`}
-                      label="Opening Rate"
-                      type="number"
-                      value={Number(row.batchRate) * Number(row.batchQuantity)}
-                      onChange={() => { }}
-                      error={errors[`openingRate-${index}`]}
-                      disabled
-                    />
-                  </div>
-                  <div className="flex-1 min-w-[120px]">
-                    <InputField
-                      id={`mrp-${index}`}
-                      name={`mrp-${index}`}
-                      label="MRP"
-                      type="number"
-                      value={row.mrp || ""}
-                      onChange={(e) => updateBatchRow(index, "mrp", e.target.value)}
-                      error={errors[`mrp-${index}`]}
-                    />
-                  </div>
+                    <div className="md:col-span-1">
+                      <InputField
+                        id={`openingRate-${index}`}
+                        name={`openingRate-${index}`}
+                        label="Total Value"
+                        type="number"
+                        value={row.batchRate && row.batchQuantity ? Number(row.batchRate) * Number(row.batchQuantity) : ""}
+                        onChange={() => { }}
+                        error={errors[`openingRate-${index}`]}
+                        disabled
+                      />
+                    </div>
 
-                  {formData.enableBatchTracking && (
-                    <div className="flex-1 min-w-[120px]">
+                    <div className="md:col-span-1">
+                      <InputField
+                        id={`mrp-${index}`}
+                        name={`mrp-${index}`}
+                        label="MRP"
+                        type="number"
+                        value={row.mrp || ""}
+                        onChange={(e) => updateBatchRow(index, "mrp", e.target.value)}
+                        error={errors[`mrp-${index}`]}
+                      />
+                    </div>
+
+                    <div className="md:col-span-2">
                       <InputField
                         id={`batchManufacturingDate-${index}`}
                         name={`batchManufacturingDate-${index}`}
                         type="date"
-                        label="MFG"
+                        label="MFG Date"
                         value={row.batchManufacturingDate}
                         onChange={(e) =>
                           updateBatchRow(
@@ -1074,15 +1073,13 @@ const StockItemForm = () => {
                         }
                       />
                     </div>
-                  )}
 
-                  {formData.enableBatchTracking && (
-                    <div className="flex-1 min-w-[120px]">
+                    <div className="md:col-span-2">
                       <InputField
                         id={`batchExpiryDate-${index}`}
                         name={`batchExpiryDate-${index}`}
                         type="date"
-                        label="Expiry"
+                        label="Expiry Date"
                         value={row.batchExpiryDate}
                         onChange={(e) =>
                           updateBatchRow(
@@ -1093,18 +1090,20 @@ const StockItemForm = () => {
                         }
                       />
                     </div>
-                  )}
 
-                  <button
-                    type="button"
-                    onClick={() => removeBatchRow(index)}
-                    className="p-2 text-red-700 hover:text-red-900"
-                  >
-                    <Trash2 size={20} />
-                  </button>
-                </div>
-              ))}
-            </div>
+                    <div className="md:col-span-1 flex justify-center pb-2">
+                      <button
+                        type="button"
+                        onClick={() => removeBatchRow(index)}
+                        className="p-2 text-red-700 hover:text-red-900"
+                      >
+                        <Trash2 size={20} />
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* ---------------------------------------------------------------- */}
 

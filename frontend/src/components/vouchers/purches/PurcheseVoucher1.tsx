@@ -1813,97 +1813,120 @@ const PurchaseVoucher: React.FC = () => {
         localStorage.removeItem(DRAFT_KEY);
       }
 
-      // 🔥 3. NOW save ONLY NEW batches
-      for (const entry of formData.entries) {
-        if (!entry.batchMeta?.isNew) continue;
+      const finalVoucherNumber = data.voucherNumber || formData.number;
 
-        await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId
-          }/batches`,
-          {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
-              batchName: entry.batchMeta.batchName,
-              batchQuantity: entry.batchMeta.quantity,
-              batchRate: entry.batchMeta.rate,
-              batchExpiryDate: entry.batchMeta.expDate || null,
-              batchManufacturingDate: entry.batchMeta.mfgDate || null,
-              mrp: entry.batchMeta.mrp || 0,
-              mode: "purchase",
-              company_id: companyId,
-              owner_type: ownerType,
-              owner_id: ownerId,
-            }),
-          }
-        );
-      }
-
-      // 🔥 3.5. EXISTING BATCHES — UPDATE STOCK DIFFERENCE
+      // 🔥 3. NOW save Batches
       if (formData.mode === "item-invoice") {
-        const patchPromises = [];
+        const patchPromises: Promise<any>[] = [];
 
-        // 1. Process active entries (new ones get added fully, edited ones get diffed)
-        for (const entry of formData.entries) {
-          if (!entry.itemId) continue;
-          if (entry.batchMeta?.isNew) continue; // New batches already handled by POST above
-
-          const targetBatchName = entry.batchNumber ?? "";
-
-          let diffQuantity = Number(entry.quantity || 0);
-
-          if (isEditMode && originalEntries.length > 0) {
-            const oldEntry = originalEntries.find(
-              e => String(e.itemId) === String(entry.itemId) && (e.batchNumber ?? "") === targetBatchName
-            );
-            if (oldEntry) {
-              diffQuantity = diffQuantity - Number(oldEntry.quantity || 0);
-            }
+        // Group entries by [itemId + batchNumber] to avoid duplicate PATCH calls
+        const groupedEntries: Record<string, any> = {};
+        formData.entries.forEach(e => {
+          if (!e.itemId) return;
+          const bName = (e.batchNumber && e.batchNumber.trim() !== "") ? e.batchNumber : "";
+          const key = `${e.itemId}_${bName}`;
+          if (!groupedEntries[key]) {
+            groupedEntries[key] = { ...e, _totalQty: 0, _batchName: bName };
           }
+          groupedEntries[key]._totalQty += Number(e.quantity || 0);
+        });
 
-          if (diffQuantity === 0) continue;
+        for (const key in groupedEntries) {
+          const entry = groupedEntries[key];
+          const hasExplicitBatch = entry._batchName !== "";
+          const isInlineNewBatch = entry.batchMeta?.isNew === true;
 
-          const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
-          const patchBody = {
-            batchName: targetBatchName,
-            quantity: diffQuantity,
-            mode: "add",
-          };
+          if (isInlineNewBatch) {
+            // ✅ Case A: User explicitly created a new batch inline → POST it with mode=purchase
+            patchPromises.push(
+              fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches`, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  batchName: entry.batchMeta.batchName,
+                  batchQuantity: entry._totalQty,
+                  batchRate: entry.batchMeta.rate ?? entry.rate,
+                  batchExpiryDate: entry.batchMeta?.expDate || null,
+                  batchManufacturingDate: entry.batchMeta?.mfgDate || null,
+                  mrp: entry.batchMeta?.mrp || 0,
+                  mode: "purchase",
+                  company_id: companyId,
+                  owner_type: ownerType,
+                  owner_id: ownerId,
+                }),
+              }).catch(err => console.error(`⚠️ Batch creation failed:`, err))
+            );
+          } else if (hasExplicitBatch) {
+            // ✅ Case B: Existing named batch → PATCH to update quantity
+            let diffQuantity = entry._totalQty;
 
-          patchPromises.push(
-            fetch(patchUrl, {
-              method: "PATCH",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify(patchBody),
-            }).catch(err => console.error(`⚠️ Stock update failed:`, err))
-          );
+            if (isEditMode && originalEntries.length > 0) {
+              const oldQuantity = originalEntries
+                .filter(oe => String(oe.itemId) === String(entry.itemId) && (oe.batchNumber || "") === entry._batchName)
+                .reduce((sum, oe) => sum + Number(oe.quantity || 0), 0);
+              diffQuantity -= oldQuantity;
+            }
+
+            if (diffQuantity !== 0) {
+              const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+              patchPromises.push(
+                fetch(patchUrl, {
+                  method: "PATCH",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    batchName: entry._batchName,
+                    quantity: diffQuantity,
+                    mode: "add",
+                  }),
+                }).catch(err => console.error(`⚠️ Stock update failed:`, err))
+              );
+            }
+          } else {
+            // ✅ Case C: No batch item → POST a new purchase batch with batchName=null
+            // This creates a mode="purchase" entry in the batches array (visible in Batch Management)
+            const postUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${entry.itemId}/batches`;
+            patchPromises.push(
+              fetch(postUrl, {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  batchName: null,          // no batch name for non-batch items
+                  batchQuantity: entry._totalQty,
+                  batchRate: entry.rate,
+                  batchExpiryDate: null,
+                  batchManufacturingDate: null,
+                  mrp: 0,
+                  mode: "purchase",
+                  company_id: companyId,
+                  owner_type: ownerType,
+                  owner_id: ownerId,
+                }),
+              }).catch(err => console.error(`⚠️ No-batch purchase save failed:`, err))
+            );
+          }
         }
 
         // 2. Process REMOVED entries (were in original, not in form now)
         if (isEditMode && originalEntries.length > 0) {
           for (const oldEntry of originalEntries) {
             if (!oldEntry.itemId) continue;
-            const oldTargetBatchName = oldEntry.batchNumber ?? "";
+            const bName = oldEntry.batchNumber || ""; 
 
-            // Did it get removed?
             const stillExists = formData.entries.find(
-              e => String(e.itemId) === String(oldEntry.itemId) && (e.batchNumber ?? "") === oldTargetBatchName
+              e => String(e.itemId) === String(oldEntry.itemId) && (e.batchNumber || "") === bName
             );
 
             if (!stillExists) {
-              // Completely removed => revert the whole previous quantity (subtract it)
               const patchUrl = `${import.meta.env.VITE_API_URL}/api/stock-items/${oldEntry.itemId}/batches?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
-              const patchBody = {
-                batchName: oldTargetBatchName,
-                quantity: -Number(oldEntry.quantity || 0),
-                mode: "add",
-              };
-
               patchPromises.push(
                 fetch(patchUrl, {
                   method: "PATCH",
                   headers: { "Content-Type": "application/json" },
-                  body: JSON.stringify(patchBody),
+                  body: JSON.stringify({
+                    batchName: bName,
+                    quantity: -Number(oldEntry.quantity || 0),
+                    mode: "add",
+                  }),
                 }).catch(err => console.error(`⚠️ Revert stock failed:`, err))
               );
             }
@@ -1913,8 +1936,7 @@ const PurchaseVoucher: React.FC = () => {
         await Promise.all(patchPromises);
       }
 
-      // 🔥 4. Purchase history (unchanged)
-      const finalVoucherNumber = data.voucherNumber || formData.number;
+      // 🔥 4. Purchase history (updated to include auto-generated batch names)
       if (formData.mode === "item-invoice") {
         const historyData = formData.entries
           .filter((e) => e.itemId && e.quantity > 0)
@@ -1923,7 +1945,7 @@ const PurchaseVoucher: React.FC = () => {
               stockItems.find((i) => String(i.id) === String(e.itemId))?.name ||
               "",
             hsnCode: e.hsnCode || "",
-            batchNumber: e.batchNumber || null,
+            batchNumber: (e.batchNumber && e.batchNumber.trim() !== "") ? e.batchNumber : null,
             purchaseQuantity: Number(e.quantity),
             rate: Number(e.rate),
             purchaseDate: formData.date,
@@ -1935,6 +1957,7 @@ const PurchaseVoucher: React.FC = () => {
             ownerType,
             ownerId,
           }));
+
 
         await fetch(
           `${import.meta.env.VITE_API_URL
