@@ -324,19 +324,19 @@ const DayBook: React.FC = () => {
          🔹 TOTALS
       ========================== */
         const totalDebit = groupedArray.reduce(
-          (sum, v) => sum + v.totalDebit,
+          (sum, v) => sum + getGroupedAmounts(v).debit,
           0
         );
         const totalCredit = groupedArray.reduce(
-          (sum, v) => sum + v.totalCredit,
+          (sum, v) => sum + getGroupedAmounts(v).credit,
           0
         );
 
         setTotals({
           totalDebit,
           totalCredit,
-          netDifference: totalDebit - totalCredit,
           vouchersCount: groupedArray.length,
+          netDifference: totalDebit - totalCredit,
         });
       })
       .catch((err) => console.error("DayBook Error:", err));
@@ -391,12 +391,12 @@ const DayBook: React.FC = () => {
     setProcessedEntries(filteredEntries);
 
     const totalDebit = filteredGrouped.reduce(
-      (sum, v) => sum + v.totalDebit,
+      (sum, v) => sum + getGroupedAmounts(v).debit,
       0
     );
 
     const totalCredit = filteredGrouped.reduce(
-      (sum, v) => sum + v.totalCredit,
+      (sum, v) => sum + getGroupedAmounts(v).credit,
       0
     );
 
@@ -768,9 +768,17 @@ const DayBook: React.FC = () => {
 
                       <td className="px-4 py-3">
                         <div className="font-medium">
-                          {voucher.entries?.[0]?.itemId
-                            ? getItemName(voucher.entries[0].itemId)
-                            : voucher.entries?.[0]?.ledgerName || "—"}
+                          {(() => {
+                            const amt = getGroupedAmounts(voucher);
+                            // Find the entry that corresponds to the displayed side
+                            const primaryEntry = voucher.entries.find(e => 
+                              (amt.debit > 0 && e.debit > 0) || (amt.credit > 0 && e.credit > 0)
+                            ) || voucher.entries[0];
+                            
+                            return primaryEntry?.itemId 
+                              ? getItemName(primaryEntry.itemId)
+                              : primaryEntry?.ledgerName || "—";
+                          })()}
                         </div>
                       </td>
 
@@ -840,7 +848,7 @@ const DayBook: React.FC = () => {
                       : "border-t-2 border-gray-400 bg-gray-50"
                       }`}
                   >
-                    <td colSpan={4} className="px-4 py-3 font-bold">
+                    <td colSpan={5} className="px-4 py-3 font-bold text-center">
                       Total:
                     </td>
                     <td className="px-4 py-3 text-right font-bold font-mono">
