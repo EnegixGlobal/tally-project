@@ -1818,10 +1818,12 @@ const SalesVoucher: React.FC = () => {
           entry.batches?.length &&
           !entry.batchNumber
         ) {
-          // Check if the only batch is a default/null batch
-          const hasOnlyDefaultBatch = entry.batches.length === 1 && !entry.batches[0].batchName;
+          // Check if there are any selectable batches (with a valid batchName)
+          const hasSelectableBatches = entry.batches.some(
+            (b) => b && b.batchName && String(b.batchName).trim() !== ""
+          );
 
-          if (!hasOnlyDefaultBatch) {
+          if (hasSelectableBatches) {
             pushError(
               `entry.${index}.batchNumber`,
               `Row ${row}: Batch selection is required`
