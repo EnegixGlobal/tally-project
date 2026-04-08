@@ -372,6 +372,52 @@ const PurchaseReport1: React.FC = () => {
           });
         }
       }
+
+      // 5️⃣ INDIRECT INCOME (Credit / Income - Discount Received)
+      const incGroupName = "Indirect Income";
+      let totalVoucherDiscountSeen = 0;
+
+      // Check item level discounts
+      if (voucher.items && voucher.items.length > 0) {
+        voucher.items.forEach((item: any) => {
+          const discountAmt = Number(item.discount || 0);
+          if (discountAmt > 0) {
+            totalVoucherDiscountSeen += discountAmt;
+            const ledgerName = item.discountLedgerName || "Rebate & Discount 20%";
+            
+            if (!groups[incGroupName]) {
+              groups[incGroupName] = { totalDebit: 0, totalCredit: 0, transactions: [] };
+            }
+            groups[incGroupName].totalCredit += discountAmt;
+
+            const existingInc = groups[incGroupName].transactions.find(t => t.name === ledgerName);
+            if (existingInc) {
+              existingInc.credit += discountAmt;
+            } else {
+              groups[incGroupName].transactions.push({ name: ledgerName, debit: 0, credit: discountAmt });
+            }
+          }
+        });
+      }
+
+      // Check voucher level global discount (if it wasn't already covered by items)
+      const globalDiscount = Number(voucher.discountTotal || 0);
+      if (globalDiscount > totalVoucherDiscountSeen) {
+        const remainingDiscount = globalDiscount - totalVoucherDiscountSeen;
+        const ledgerName = "Rebate & Discount 20%";
+        
+        if (!groups[incGroupName]) {
+          groups[incGroupName] = { totalDebit: 0, totalCredit: 0, transactions: [] };
+        }
+        groups[incGroupName].totalCredit += remainingDiscount;
+
+        const existingInc = groups[incGroupName].transactions.find(t => t.name === ledgerName);
+        if (existingInc) {
+          existingInc.credit += remainingDiscount;
+        } else {
+          groups[incGroupName].transactions.push({ name: ledgerName, debit: 0, credit: remainingDiscount });
+        }
+      }
     });
 
     return groups;
