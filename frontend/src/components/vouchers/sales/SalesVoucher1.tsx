@@ -1136,7 +1136,7 @@ const SalesVoucher: React.FC = () => {
       const discount = Number(ent.discount || 0);
 
       // ✅ Only base amount (NO GST here)
-      return qty * rate - discount;
+      return qty * rate;
     };
 
 
