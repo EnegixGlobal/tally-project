@@ -145,7 +145,7 @@ const BatchList: React.FC = () => {
     try {
       const res = await fetch(
         `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/batch` +
-          `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`,
+        `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`,
         {
           method: "DELETE",
           headers: {
@@ -189,10 +189,9 @@ const BatchList: React.FC = () => {
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/stock-items/${
-          editingBatch.itemId
+        `${import.meta.env.VITE_API_URL}/api/stock-items/${editingBatch.itemId
         }/batches` +
-          `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`,
+        `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`,
         {
           method: "PATCH",
           headers: { "Content-Type": "application/json" },
@@ -224,43 +223,43 @@ const BatchList: React.FC = () => {
 
 
   const handleDeleteByHSN = async (itemId: string, hsnCode?: string) => {
-  if (!hsnCode) {
-    alert("HSN Code not found");
-    return;
-  }
+    if (!hsnCode) {
+      alert("HSN Code not found");
+      return;
+    }
 
-  const company_id = localStorage.getItem("company_id");
-  const owner_type = localStorage.getItem("supplier");
-  const owner_id = localStorage.getItem(
-    owner_type === "employee" ? "employee_id" : "user_id"
-  );
-
-  if (!window.confirm(`Delete stock item with HSN ${hsnCode}?`)) return;
-
-  try {
-    const res = await fetch(
-      `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/delete-by-hsn` +
-        `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`,
-      {
-        method: "DELETE",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ hsnCode }),
-      }
+    const company_id = localStorage.getItem("company_id");
+    const owner_type = localStorage.getItem("supplier");
+    const owner_id = localStorage.getItem(
+      owner_type === "employee" ? "employee_id" : "user_id"
     );
 
-    const data = await res.json();
+    if (!window.confirm(`Delete stock item with HSN ${hsnCode}?`)) return;
 
-    if (data.success) {
-      alert("Stock item deleted successfully ");
-      await loadStockItems();
-    } else {
-      alert(data.message || "Delete failed");
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}/delete-by-hsn` +
+        `?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`,
+        {
+          method: "DELETE",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ hsnCode }),
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert("Stock item deleted successfully ");
+        await loadStockItems();
+      } else {
+        alert(data.message || "Delete failed");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error deleting stock item");
     }
-  } catch (err) {
-    console.error(err);
-    alert("Error deleting stock item");
-  }
-};
+  };
 
 
   // Load stock items
@@ -317,7 +316,7 @@ const BatchList: React.FC = () => {
 
     const days = Math.ceil(
       (new Date(batch.batchExpiryDate).getTime() - Date.now()) /
-        (1000 * 60 * 60 * 24)
+      (1000 * 60 * 60 * 24)
     );
 
     if (days < 0) return "expired";
@@ -342,17 +341,21 @@ const BatchList: React.FC = () => {
 
   // Merge stock items with purchase history data
   const mergedStockItems = useMemo(() => {
-    return stockItems.map((item) => {
-      const batches = (item.batches || []).map((batch: any) => ({
-        ...batch,
-        batchType: batch.batchType || batch.mode || "opening",
-      }));
+    return stockItems
+      .map((item) => {
+        const batches = (item.batches || [])
+          .filter((batch: any) => batch.mode === "purchase")
+          .map((batch: any) => ({
+            ...batch,
+            batchType: batch.batchType || batch.mode || "opening",
+          }));
 
-      return {
-        ...item,
-        batches,
-      };
-    });
+        return {
+          ...item,
+          batches,
+        };
+      })
+      .filter((item) => item.batches.length > 0);
   }, [stockItems]);
 
   // NEW: filtered stock items with filtered batches
@@ -423,12 +426,13 @@ const BatchList: React.FC = () => {
     let expired = 0;
 
     mergedStockItems.forEach((item) => {
-      total++;
-      const status = getOverallStatus(item.batches || []);
-
-      if (status === "active") active++;
-      else if (status === "expiring") expiring++;
-      else if (status === "expired") expired++;
+      (item.batches || []).forEach((batch) => {
+        total++;
+        const status = getBatchStatus(batch);
+        if (status === "active") active++;
+        else if (status === "expiring") expiring++;
+        else if (status === "expired") expired++;
+      });
     });
 
     return { total, active, expiring, expired };
@@ -445,9 +449,8 @@ const BatchList: React.FC = () => {
         <div className="flex items-center">
           <button
             onClick={() => navigate("/app/masters/stock-item")}
-            className={`mr-4 p-2 rounded-full ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
             aria-label="Back"
           >
             <ArrowLeft size={20} />
@@ -467,9 +470,8 @@ const BatchList: React.FC = () => {
       {/* Statistics */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <div
-          className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <div className="flex items-center">
             <Package size={24} className="text-blue-600 mr-3" />
@@ -480,9 +482,8 @@ const BatchList: React.FC = () => {
           </div>
         </div>
         <div
-          className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <div className="flex items-center">
             <Package size={24} className="text-green-600 mr-3" />
@@ -495,9 +496,8 @@ const BatchList: React.FC = () => {
           </div>
         </div>
         <div
-          className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <div className="flex items-center">
             <AlertTriangle size={24} className="text-yellow-600 mr-3" />
@@ -510,9 +510,8 @@ const BatchList: React.FC = () => {
           </div>
         </div>
         <div
-          className={`p-4 rounded-lg ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <div className="flex items-center">
             <AlertTriangle size={24} className="text-red-600 mr-3" />
@@ -526,9 +525,8 @@ const BatchList: React.FC = () => {
 
       {/* Search and Filter */}
       <div
-        className={`p-4 rounded-lg mb-6 ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-4 rounded-lg mb-6 ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div>
@@ -541,11 +539,10 @@ const BatchList: React.FC = () => {
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               placeholder="Search batch or item name..."
-              className={`w-full p-2 rounded border ${
-                theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-              } outline-none transition-colors`}
+              className={`w-full p-2 rounded border ${theme === "dark"
+                ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                : "bg-white border-gray-300 focus:border-blue-500"
+                } outline-none transition-colors`}
             />
           </div>
 
@@ -562,11 +559,10 @@ const BatchList: React.FC = () => {
                 )
               }
               title="Filter by Status"
-              className={`w-full p-2 rounded border ${
-                theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-              } outline-none transition-colors`}
+              className={`w-full p-2 rounded border ${theme === "dark"
+                ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                : "bg-white border-gray-300 focus:border-blue-500"
+                } outline-none transition-colors`}
             >
               <option value="all">All Status</option>
               <option value="active">Active</option>
@@ -584,11 +580,10 @@ const BatchList: React.FC = () => {
               value={filterStockItem}
               onChange={(e) => setFilterStockItem(e.target.value)}
               title="Filter by Stock Item"
-              className={`w-full p-2 rounded border ${
-                theme === "dark"
-                  ? "bg-gray-700 border-gray-600 focus:border-blue-500"
-                  : "bg-white border-gray-300 focus:border-blue-500"
-              } outline-none transition-colors`}
+              className={`w-full p-2 rounded border ${theme === "dark"
+                ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                : "bg-white border-gray-300 focus:border-blue-500"
+                } outline-none transition-colors`}
             >
               <option value="">All Items</option>
               {mergedStockItems
@@ -608,11 +603,10 @@ const BatchList: React.FC = () => {
                 setFilterStatus("all");
                 setFilterStockItem("");
               }}
-              className={`w-full px-4 py-2 rounded ${
-                theme === "dark"
-                  ? "bg-blue-600 hover:bg-blue-700 text-white"
-                  : "bg-blue-600 hover:bg-blue-700 text-white"
-              }`}
+              className={`w-full px-4 py-2 rounded ${theme === "dark"
+                ? "bg-blue-600 hover:bg-blue-700 text-white"
+                : "bg-blue-600 hover:bg-blue-700 text-white"
+                }`}
             >
               Clear Filters
             </button>
@@ -622,9 +616,8 @@ const BatchList: React.FC = () => {
 
       {/* Batch List */}
       <div
-        className={`rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <div className="p-4 border-b border-gray-200 dark:border-gray-700">
           <div className="flex justify-between items-center">
@@ -682,9 +675,8 @@ const BatchList: React.FC = () => {
               </tr>
             </thead>
             <tbody
-              className={`divide-y ${
-                theme === "dark" ? "divide-gray-700" : "divide-gray-200"
-              }`}
+              className={`divide-y ${theme === "dark" ? "divide-gray-700" : "divide-gray-200"
+                }`}
             >
               {batchRows.length === 0 ? (
                 <tr>
@@ -701,32 +693,30 @@ const BatchList: React.FC = () => {
 
                   const days = batch.batchExpiryDate
                     ? Math.ceil(
-                        (new Date(batch.batchExpiryDate).getTime() -
-                          Date.now()) /
-                          (1000 * 60 * 60 * 24)
-                      )
+                      (new Date(batch.batchExpiryDate).getTime() -
+                        Date.now()) /
+                      (1000 * 60 * 60 * 24)
+                    )
                     : null;
 
                   return (
                     <React.Fragment key={`${item.id}-${index}`}>
                       {/* ================= BATCH ROW ================= */}
                       <tr
-                        className={`${
-                          theme === "dark"
-                            ? "hover:bg-gray-700"
-                            : "hover:bg-gray-50"
-                        }`}
+                        className={`${theme === "dark"
+                          ? "hover:bg-gray-700"
+                          : "hover:bg-gray-50"
+                          }`}
                       >
                         {/* STATUS */}
                         <td className="px-4 py-3">
                           <span
-                            className={`px-2 py-1 text-xs font-semibold rounded-full ${
-                              status === "active"
-                                ? "bg-green-100 text-green-800"
-                                : status === "expiring"
+                            className={`px-2 py-1 text-xs font-semibold rounded-full ${status === "active"
+                              ? "bg-green-100 text-green-800"
+                              : status === "expiring"
                                 ? "bg-yellow-100 text-yellow-800"
                                 : "bg-red-100 text-red-800"
-                            }`}
+                              }`}
                           >
                             {status.toUpperCase()}
                           </span>
@@ -751,7 +741,11 @@ const BatchList: React.FC = () => {
                         <td className="px-4 py-3">{item.hsnCode || "—"}</td>
 
                         {/* BATCH NO */}
-                        <td className="px-4 py-3">{batch.batchName}</td>
+                        <td className="px-4 py-3">
+                          {batch.batchName
+                            ? batch.batchName
+                            : <span className="text-xs text-gray-400 italic">No Batch</span>}
+                        </td>
 
                         {/* QTY */}
                         <td className="px-4 py-3">{batch.batchQuantity}</td>
@@ -765,8 +759,8 @@ const BatchList: React.FC = () => {
                         <td className="px-4 py-3">
                           {batch.batchManufacturingDate
                             ? new Date(
-                                batch.batchManufacturingDate
-                              ).toLocaleDateString()
+                              batch.batchManufacturingDate
+                            ).toLocaleDateString()
                             : "—"}
                         </td>
 
@@ -774,8 +768,8 @@ const BatchList: React.FC = () => {
                         <td className="px-4 py-3">
                           {batch.batchExpiryDate
                             ? new Date(
-                                batch.batchExpiryDate
-                              ).toLocaleDateString()
+                              batch.batchExpiryDate
+                            ).toLocaleDateString()
                             : "—"}
                         </td>
 
@@ -784,8 +778,8 @@ const BatchList: React.FC = () => {
                           {days === null
                             ? "—"
                             : days < 0
-                            ? `Expired ${Math.abs(days)} days`
-                            : `${days} days`}
+                              ? `Expired ${Math.abs(days)} days`
+                              : `${days} days`}
                         </td>
 
                         {/* ACTIONS */}
@@ -856,9 +850,8 @@ const BatchList: React.FC = () => {
                         <tr>
                           <td
                             colSpan={11}
-                            className={`p-4 ${
-                              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                            }`}
+                            className={`p-4 ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                              }`}
                           >
                             <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
                               <input

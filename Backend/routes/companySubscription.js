@@ -11,24 +11,6 @@ router.get('/status/:companyId', async (req, res) => {
   }
 
   try {
-    // Ensure table exists (defensive)
-    const [subscriptionTable] = await db.query(
-      "SHOW TABLES LIKE 'company_subscriptions'"
-    );
-
-    if (subscriptionTable.length === 0) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          hasSubscription: false,
-          isTrial: false,
-          status: 'expired',
-          daysRemaining: 0,
-          isExpired: true,
-        },
-      });
-    }
-
     const [rows] = await db.query(
       `
         SELECT 
