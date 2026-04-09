@@ -32,13 +32,16 @@ router.get("/", async (req, res) => {
           l.name AS partyName,
           l.group_id AS groupId,
           lg.name AS groupName,
-          l.gst_number AS partyGSTIN
-
+          l.gst_number AS partyGSTIN,
+          sv.overallDiscountAmount AS overallDiscount,
+          ld.name AS overallDiscountLedgerName
         FROM sales_vouchers sv
         LEFT JOIN ledgers l 
           ON sv.partyId = l.id
         LEFT JOIN ledger_groups lg 
           ON l.group_id = lg.id
+        LEFT JOIN ledgers ld
+          ON sv.overallDiscountLedgerId = ld.id
 
         WHERE sv.company_id = ?
           AND sv.owner_type = ?
@@ -127,6 +130,7 @@ router.get("/", async (req, res) => {
         row.cgstAmount = Number(row.cgstAmount) || 0;
         row.sgstAmount = Number(row.sgstAmount) || 0;
         row.igstAmount = Number(row.igstAmount) || 0;
+        row.overallDiscount = Number(row.overallDiscount) || 0;
       });
     }
 

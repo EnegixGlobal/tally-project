@@ -173,7 +173,7 @@ const calculateEntryValues = (
     rate: r,
     baseAmount,
     gstAmount,
-    amount: baseAmount, 
+    amount: baseAmount,
     cgstRate,
     sgstRate,
     igstRate,
@@ -229,9 +229,9 @@ const PurchaseVoucher: React.FC = () => {
   const discountLedgers = useMemo(() => ledgers.filter((l) =>
     String(l.name).toLowerCase().includes("discount") &&
     (Number(l.groupId) === -11 ||
-     String(l.groupName).toLowerCase().includes("income") || 
-     String(l.type).toLowerCase().includes("income") ||
-     String(l.groupType).toLowerCase().includes("income"))
+      String(l.groupName).toLowerCase().includes("income") ||
+      String(l.type).toLowerCase().includes("income") ||
+      String(l.groupType).toLowerCase().includes("income"))
   ), [ledgers]);
 
   // Auto-select TDS Ledger if only one exists
@@ -1914,7 +1914,7 @@ const PurchaseVoucher: React.FC = () => {
         if (isEditMode && originalEntries.length > 0) {
           for (const oldEntry of originalEntries) {
             if (!oldEntry.itemId) continue;
-            const bName = oldEntry.batchNumber || ""; 
+            const bName = oldEntry.batchNumber || "";
 
             const stillExists = formData.entries.find(
               e => String(e.itemId) === String(oldEntry.itemId) && (e.batchNumber || "") === bName

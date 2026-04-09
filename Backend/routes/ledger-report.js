@@ -146,7 +146,10 @@ ORDER BY pv.date ASC
 
     MAX(l_party.name) AS partyName,
     MAX(l_sales.name) AS salesLedgerName,
-    MAX(sv.discountTotal) AS discountTotal
+    MAX(sv.discountTotal) AS discountTotal,
+    MAX(sv.overallDiscountLedgerId) AS overallDiscountLedgerId,
+    MAX(sv.overallDiscountAmount) AS overallDiscountAmount,
+    SUM(CASE WHEN svi.discountLedgerId = ? THEN svi.discount ELSE 0 END) AS itemDiscountForThisLedger
 
   FROM sales_vouchers sv
 
@@ -163,6 +166,7 @@ ORDER BY pv.date ASC
        sv.partyId = ?
     OR svi.salesLedgerId = ?
     OR svi.discountLedgerId = ?
+    OR sv.overallDiscountLedgerId = ?
     OR svi.cgstRate = ?
     OR svi.sgstRate = ?
     OR svi.igstRate = ?
@@ -171,7 +175,7 @@ ORDER BY pv.date ASC
 
   ORDER BY sv.date ASC
   `,
-      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
+      [ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId, ledgerId]
     );
 
     /* ===============================
@@ -648,8 +652,16 @@ ORDER BY vm.date ASC
       }
 
       /* ========= DISCOUNT ========= */
-      else if (currentLedger === Number(sv.discountLedgerId)) {
-        debit = Number(sv.discountTotal || 0);
+      else if (Number(sv.itemDiscountForThisLedger) > 0 || currentLedger === Number(sv.overallDiscountLedgerId)) {
+        let amt = 0;
+        // 1. Add item-wise discounts assigned to this ledger
+        amt += Number(sv.itemDiscountForThisLedger || 0);
+
+        // 2. Add overall manual discount if assigned to this ledger
+        if (currentLedger === Number(sv.overallDiscountLedgerId)) {
+          amt += Number(sv.overallDiscountAmount || 0);
+        }
+        debit = amt;
         particulars = sv.partyName; // ✅ Party
       }
 
@@ -659,7 +671,8 @@ ORDER BY vm.date ASC
       if (
         currentLedger === Number(sv.partyId) ||
         currentLedger === Number(sv.salesLedgerId) ||
-        currentLedger === Number(sv.discountLedgerId)
+        currentLedger === Number(sv.discountLedgerId) ||
+        currentLedger === Number(sv.overallDiscountLedgerId)
       ) {
         balance += debit - credit;
       }

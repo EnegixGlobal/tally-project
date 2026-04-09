@@ -208,25 +208,38 @@ router.get("/api/group", async (req, res) => {
           AND sv.owner_type = ?
           AND sv.owner_id = ?
 
-
-        /* ================= SALES DISCOUNT (GLOBAL) ================= */
+        /* ================= SALES DISCOUNT (ITEM-WISE) ================= */
 
         UNION ALL
 
         SELECT
-          CAST(svi_agg.discountLedgerId AS UNSIGNED) AS ledgerId,
-          sv.discountTotal AS debit,
+          CAST(svi.discountLedgerId AS UNSIGNED) AS ledgerId,
+          SUM(svi.discount) AS debit,
           0 AS credit
-        FROM sales_vouchers sv
-        JOIN (
-          SELECT DISTINCT voucherId, discountLedgerId
-          FROM sales_voucher_items
-          WHERE discountLedgerId IN (?) AND discountLedgerId > 0
-        ) svi_agg ON svi_agg.voucherId = sv.id
-        WHERE sv.company_id = ?
+        FROM sales_voucher_items svi
+        JOIN sales_vouchers sv ON svi.voucherId = sv.id
+        WHERE svi.discountLedgerId IN (?)
+          AND sv.company_id = ?
           AND sv.owner_type = ?
           AND sv.owner_id = ?
-          AND sv.discountTotal > 0
+          AND svi.discount > 0
+        GROUP BY svi.discountLedgerId
+
+
+        /* ================= SALES OVERALL DISCOUNT (MANUAL) ================= */
+
+        UNION ALL
+
+        SELECT
+          CAST(sv.overallDiscountLedgerId AS UNSIGNED) AS ledgerId,
+          sv.overallDiscountAmount AS debit,
+          0 AS credit
+        FROM sales_vouchers sv
+        WHERE sv.overallDiscountLedgerId IN (?)
+          AND sv.company_id = ?
+          AND sv.owner_type = ?
+          AND sv.owner_id = ?
+          AND sv.overallDiscountAmount > 0
 
 
         /* ================= PARTY ================= */
@@ -354,7 +367,8 @@ router.get("/api/group", async (req, res) => {
         idArray, company_id, owner_type, owner_id,   // SGST
         idArray, company_id, owner_type, owner_id,   // IGST
         idArray, company_id, owner_type, owner_id,   // Sales Ledger
-        idArray, company_id, owner_type, owner_id,   // Sales Discount
+        idArray, company_id, owner_type, owner_id,   // Sales Discount (Items)
+        idArray, company_id, owner_type, owner_id,   // Sales Discount (Overall/Manual)
 
         // Party
         idArray, company_id, owner_type, owner_id,   // Purchase Party

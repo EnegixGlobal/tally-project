@@ -179,6 +179,36 @@ async function ensureModeColumn() {
   }
 }
 
+// ✅ Auto-create overall discount columns if missing
+async function ensureOverallDiscountColumns() {
+  const columns = [
+    { name: "overallDiscountLedgerId", type: "INT" },
+    { name: "overallDiscountAmount", type: "DECIMAL(10,2)" },
+  ];
+
+  for (const col of columns) {
+    const [rows] = await db.query(
+      `
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'sales_vouchers'
+        AND COLUMN_NAME = ?
+      `,
+      [col.name]
+    );
+
+    if (rows.length === 0) {
+      console.log(`⚠️ ${col.name} missing in sales_vouchers → creating...`);
+      await db.query(`
+        ALTER TABLE sales_vouchers 
+        ADD COLUMN ${col.name} ${col.type} NULL DEFAULT NULL
+      `);
+      console.log(`✅ ${col.name} column created`);
+    }
+  }
+}
+
 // ================= SAVE SALES VOUCHER =================
 router.post("/", async (req, res) => {
   console.log("POST /sales-vouchers hit");
@@ -189,6 +219,7 @@ router.post("/", async (req, res) => {
     await ensureDiscountLedgerColumn();
     await ensureDispatchColumns();
     await ensureModeColumn();
+    await ensureOverallDiscountColumns();
 
     const {
       number,
@@ -218,7 +249,9 @@ router.post("/", async (req, res) => {
       items,
       sales_type_id,
       bill_no,
-      mode
+      mode,
+      discountLedgerId: overallDiscountLedgerId,
+      discountAmount: overallDiscountAmount,
     } = req.body;
 
     // ================= AUTH =================
@@ -304,9 +337,11 @@ router.post("/", async (req, res) => {
         owner_id,
         sales_type_id,
         bill_no,
-        mode
+        mode,
+        overallDiscountLedgerId,
+        overallDiscountAmount
       )
-      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
+      VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)
     `;
 
     const voucherValues = [
@@ -340,7 +375,9 @@ router.post("/", async (req, res) => {
 
       sales_type_id ?? null,
       bill_no ?? null,
-      mode || 'item-invoice'
+      mode || 'item-invoice',
+      overallDiscountLedgerId ?? null,
+      overallDiscountAmount ?? 0
     ];
 
     // ================= GENERATE NUMBER =================
@@ -646,7 +683,8 @@ router.get("/", async (req, res) => {
         dispatchThrough, destination, subtotal, cgstTotal, sgstTotal,
         igstTotal, discountTotal, total, createdAt, company_id, owner_type,
         owner_id, type, isQuotation, salesLedgerId, supplierInvoiceDate,
-        sales_type_id, bill_no, mode
+        sales_type_id, bill_no, mode,
+        overallDiscountLedgerId, overallDiscountAmount
       FROM sales_vouchers
       WHERE owner_type = ? AND owner_id = ?
     `;
@@ -901,6 +939,8 @@ router.get("/:id", async (req, res) => {
       supplierInvoiceDate: voucher.supplierInvoiceDate,
       sales_type_id: voucher.sales_type_id,
       mode: voucher.mode,
+      overallDiscountLedgerId: voucher.overallDiscountLedgerId,
+      overallDiscountAmount: voucher.overallDiscountAmount,
 
       // ⭐ MAIN DATA
       entries,
@@ -940,13 +980,16 @@ router.put("/:id", async (req, res) => {
     salesLedgerId,
     sales_type_id,
     bill_no,
-    mode
+    mode,
+    discountLedgerId: overallDiscountLedgerId,
+    discountAmount: overallDiscountAmount
   } = req.body;
 
   try {
     await ensureSalesLedgerColumn();
     await ensureDiscountLedgerColumn();
     await ensureDispatchColumns();
+    await ensureOverallDiscountColumns();
 
     // ---- 1) UPDATE MAIN TABLE ----
     await db.execute(
@@ -971,7 +1014,9 @@ router.put("/:id", async (req, res) => {
          salesLedgerId = ?,
          sales_type_id = ?,
          bill_no = ?,
-         mode = ?
+         mode = ?,
+         overallDiscountLedgerId = ?,
+         overallDiscountAmount = ?
        WHERE id = ?`,
       [
         date,
@@ -994,6 +1039,8 @@ router.put("/:id", async (req, res) => {
         sales_type_id ?? null,
         bill_no ?? null,
         mode || 'item-invoice',
+        overallDiscountLedgerId ?? null,
+        overallDiscountAmount ?? 0,
         voucherId,
       ]
     );
