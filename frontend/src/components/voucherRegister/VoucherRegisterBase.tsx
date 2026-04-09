@@ -84,6 +84,16 @@ const formatCurrency = (amount: number): string => {
   }).format(amount);
 };
 
+// Helper for consistent table cell formatting
+const formatTableAmount = (val: any) => {
+  const n = Number(val);
+  if (!n || n === 0) return "";
+  return n.toLocaleString("en-IN", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  });
+};
+
 const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   title,
   voucherType,
@@ -1455,14 +1465,23 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Reference No
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Subtotal
-                    </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Taxable Value
                     </th>
-                    <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Total
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      IGST
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      CGST
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      SGST
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Total GST
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Invoice Value
                     </th>
                   </>
                 )}
@@ -1575,19 +1594,34 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                           {voucher.referenceNo ?? "-"}
                         </td>
 
-                        {/* Subtotal */}
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {subtotal.toLocaleString()}
+                        {/* Taxable Value */}
+                        <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                          {formatTableAmount(subtotal)}
+                        </td>
+
+                        {/* IGST */}
+                        <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                          {formatTableAmount(igst)}
+                        </td>
+
+                        {/* CGST */}
+                        <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                          {formatTableAmount(cgst)}
+                        </td>
+
+                        {/* SGST */}
+                        <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                          {formatTableAmount(sgst)}
                         </td>
 
                         {/* GST Total */}
-                        <td className="px-6 py-4 text-sm text-gray-900">
-                          {(cgst + sgst + igst).toLocaleString()}
+                        <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                          {formatTableAmount(cgst + sgst + igst)}
                         </td>
 
                         {/* Total */}
-                        <td className="px-6 py-4 text-sm text-gray-900 font-bold">
-                          {total.toLocaleString()}
+                        <td className="px-6 py-4 text-sm text-gray-900 font-bold text-right">
+                          {formatTableAmount(total)}
                         </td>
                       </>
                     )}
@@ -1649,21 +1683,46 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 >
                   Total ({filteredVouchers.length} vouchers)
                 </td>
-                {voucherType === "sales" ? (
+                {["sales", "purchase", "quotation", "debit_note", "credit_note"].includes(voucherType) ? (
                   <>
+                    <td className="px-6 py-4"></td> {/* Blank for Reference No column */}
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                      {/* Subtotal Total */}
+                      {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.subtotal) || 0), 0))}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                      {/* IGST Total */}
+                      {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.igstTotal) || 0), 0))}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                      {/* CGST Total */}
+                      {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.cgstTotal) || 0), 0))}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                      {/* SGST Total */}
+                      {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.sgstTotal) || 0), 0))}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                      {/* Tax Total */}
+                      {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.cgstTotal || 0) + Number(v.sgstTotal || 0) + Number(v.igstTotal || 0)), 0))}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600 text-right">
-                      {formatCurrency(
+                      {formatTableAmount(
                         filteredVouchers.reduce(
-                          (sum: number, v: VoucherEntry) =>
-                            sum + calculateDebitCredit(v).debit,
+                          (sum: number, v: VoucherEntry) => {
+                             const { debit, credit } = calculateDebitCredit(v);
+                             if (["sales", "quotation", "credit_note"].includes(voucherType)) return sum + debit;
+                             return sum + credit;
+                          },
                           0
                         )
                       )}
                     </td>
+                    <td className="px-6 py-4"></td> {/* Blank for Actions column */}
                   </>
                 ) : (
                   <>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
                       {formatCurrency(
                         filteredVouchers.reduce(
                           (sum: number, v: VoucherEntry) =>
@@ -1672,7 +1731,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         )
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
                       {formatCurrency(
                         filteredVouchers.reduce(
                           (sum: number, v: VoucherEntry) =>
@@ -1681,6 +1740,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         )
                       )}
                     </td>
+                    <td colSpan={2}></td>
                   </>
                 )}
                 <td colSpan={2}></td>

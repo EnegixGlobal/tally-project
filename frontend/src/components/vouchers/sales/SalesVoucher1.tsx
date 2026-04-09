@@ -188,6 +188,7 @@ const SalesVoucher: React.FC = () => {
       igstLedgerId: (item as any).igstLedgerId || "",
       rate: Number(item.standardSaleRate || item.sellingRate || item.sellingPrice || item.saleRate || item.rate || item.mrp || 0),
       mrp: Number(item.mrp || item.MRP || item.sellingPrice || 0),
+      barcode: item.barcode || (item as any).bar_code || (item as any).Barcode || (item as any).barcode_number || (item as any).item_barcode || "",
       batches: (() => {
         if (!item.batches) return [];
         try { return typeof item.batches === "string" ? JSON.parse(item.batches) : item.batches; } catch { return []; }
@@ -209,6 +210,8 @@ const SalesVoucher: React.FC = () => {
   // Safe fallbacks for context data - Remove demo data and use only from context
   const safeStockItems = stockItems || [];
   const safeLedgers = ledgers || [];
+
+
 
   // Fetch company info if not available in context
   useEffect(() => {
@@ -347,6 +350,8 @@ const SalesVoucher: React.FC = () => {
           hsnCode: "",
         },
       ],
+      discountLedgerId: "",
+      discountAmount: 0,
     };
   };
 
@@ -741,6 +746,9 @@ const SalesVoucher: React.FC = () => {
             type: e.type || "debit",
             narration: e.narration || "",
           })),
+
+          discountLedgerId: data.overallDiscountLedgerId?.toString() || "",
+          discountAmount: Number(data.overallDiscountAmount || 0),
 
           type: "sales",
         });
@@ -1985,14 +1993,17 @@ const SalesVoucher: React.FC = () => {
         igstTotal += (baseAmount * (entry.igstRate || 0)) / 100;
       });
 
-      const total = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
+      const overallDiscount = Number(formData.discountAmount || 0);
+      const total = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal - overallDiscount;
 
       return {
         subtotal,
         cgstTotal,
         sgstTotal,
         igstTotal,
-        discountTotal,
+        itemDiscountTotal: discountTotal,
+        overallDiscount,
+        discountTotal: overallDiscount, // Return manual for footer display or keep both
         total,
       };
     } else {
@@ -2103,6 +2114,9 @@ const SalesVoucher: React.FC = () => {
       igstTotal: Number((totals.igstTotal || 0).toFixed(2)),
       discountTotal: Number((totals.discountTotal || 0).toFixed(2)),
       total: Number((totals.total || 0).toFixed(2)),
+
+      discountLedgerId: formData.discountLedgerId,
+      discountAmount: formData.discountAmount,
     };
 
     try {
@@ -2440,6 +2454,16 @@ const SalesVoucher: React.FC = () => {
       ledger.groupId === -10 &&
       ledger.name.toLowerCase().includes("discount")
   );
+
+  const footerDiscountLedgers = useMemo(() => {
+    return discount.filter(l => {
+      const name = l.name.toLowerCase();
+      // Exclude any ledger that contains a percentage sign or a digit (e.g., '1%', '5%')
+      if (name.includes("%") || /\d/.test(name)) return false;
+      // Include ledgers meant for manual/custom entry
+      return true;
+    });
+  }, [discount]);
 
 
 
@@ -3293,24 +3317,47 @@ const SalesVoucher: React.FC = () => {
                             )}
 
                             {/* DISCOUNT */}
-                            {discountTotal > 0 && (
-                              <tr
-                                className={`font-semibold ${theme === "dark"
-                                  ? "border-t border-gray-600"
-                                  : "border-t border-gray-300"
-                                  }`}
+                            <tr
+                              className={`font-semibold ${theme === "dark"
+                                ? "border-t border-gray-600"
+                                : "border-t border-gray-300"
+                                }`}
+                            >
+                              <td
+                                className="px-4 py-2 text-left"
+                                colSpan={colspan}
                               >
-                                <td
-                                  className="px-4 py-2 text-left"
-                                  colSpan={colspan}
-                                >
-                                  Discount:
-                                </td>
-                                <td className="px-4 py-2 text-right text-red-600 font-bold">
-                                  ₹{discountTotal}
-                                </td>
-                              </tr>
-                            )}
+                                <div className="flex items-center gap-3">
+                                  <span>Overall Discount:</span>
+                                  <select
+                                    name="discountLedgerId"
+                                    value={formData.discountLedgerId}
+                                    onChange={handleChange}
+                                    className={`${FORM_STYLES.tableSelect(theme)} !w-48 text-xs`}
+                                  >
+                                    <option value="">Select Discount Ledger</option>
+                                    {footerDiscountLedgers.map((l) => (
+                                      <option key={l.id} value={l.id}>
+                                        {l.name}
+                                      </option>
+                                    ))}
+                                  </select>
+                                </div>
+                              </td>
+                              <td className="px-4 py-2 text-right text-red-600 font-bold">
+                                <div className="flex items-center justify-end gap-1">
+                                  <span>₹</span>
+                                  <input
+                                    type="number"
+                                    name="discountAmount"
+                                    value={formData.discountAmount || ""}
+                                    onChange={handleChange}
+                                    placeholder="0"
+                                    className="w-24 p-1 text-right border rounded bg-transparent font-bold text-red-600 outline-none focus:border-blue-500"
+                                  />
+                                </div>
+                              </td>
+                            </tr>
 
                             {/* GRAND TOTAL */}
                             <tr

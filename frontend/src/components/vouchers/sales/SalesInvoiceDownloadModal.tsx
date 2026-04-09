@@ -195,7 +195,8 @@ const SalesInvoiceDownloadModal: React.FC<Props> = ({ voucherId, onClose }) => {
 
     return {
       name: item.name,
-      hsnCode: item.hsnCode || "",
+      hsnCode: item.hsnCode || (item as any).hsn_code || "",
+      barcode: item.barcode || (item as any).bar_code || (item as any).Barcode || (item as any).barcode_number || (item as any).item_barcode || "",
       unit: unitLabelResult,
       unitId: unitIdResult,
       unitLabel: unitLabelResult,

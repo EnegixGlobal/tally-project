@@ -173,7 +173,7 @@ const calculateEntryValues = (
     rate: r,
     baseAmount,
     gstAmount,
-    amount: baseAmount, 
+    amount: baseAmount,
     cgstRate,
     sgstRate,
     igstRate,
@@ -229,9 +229,9 @@ const PurchaseVoucher: React.FC = () => {
   const discountLedgers = useMemo(() => ledgers.filter((l) =>
     String(l.name).toLowerCase().includes("discount") &&
     (Number(l.groupId) === -11 ||
-     String(l.groupName).toLowerCase().includes("income") || 
-     String(l.type).toLowerCase().includes("income") ||
-     String(l.groupType).toLowerCase().includes("income"))
+      String(l.groupName).toLowerCase().includes("income") ||
+      String(l.type).toLowerCase().includes("income") ||
+      String(l.groupType).toLowerCase().includes("income"))
   ), [ledgers]);
 
   // Auto-select TDS Ledger if only one exists
@@ -1645,7 +1645,7 @@ const PurchaseVoucher: React.FC = () => {
       );
 
       const tdsAmount = (totals.subtotal * tdsRatePercent) / 100;
-      const discountAmount = (totals.subtotal * discountRatePercent) / 100;
+      const discountAmount = Number(formData.discountAmount || 0);
 
       return {
         ...totals,
@@ -1677,7 +1677,7 @@ const PurchaseVoucher: React.FC = () => {
         getLedgerNameById(formData.tdsLedgerId, ledgers)
       );
 
-      const discountAmount = (debitTotal * discountRatePercent) / 100;
+      const discountAmount = Number(formData.discountAmount || 0);
       const tdsAmount = (debitTotal * tdsRatePercent) / 100;
 
       return {
@@ -1914,7 +1914,7 @@ const PurchaseVoucher: React.FC = () => {
         if (isEditMode && originalEntries.length > 0) {
           for (const oldEntry of originalEntries) {
             if (!oldEntry.itemId) continue;
-            const bName = oldEntry.batchNumber || ""; 
+            const bName = oldEntry.batchNumber || "";
 
             const stillExists = formData.entries.find(
               e => String(e.itemId) === String(oldEntry.itemId) && (e.batchNumber || "") === bName
@@ -3451,7 +3451,14 @@ const PurchaseVoucher: React.FC = () => {
                             </td>
 
                             <td className="px-4 py-2 text-right font-bold text-red-600">
-                              {discountTotal.toLocaleString()}
+                              <input
+                                type="number"
+                                name="discountAmount"
+                                value={formData.discountAmount || ""}
+                                onChange={handleChange}
+                                placeholder="0"
+                                className="w-full p-1 text-right border rounded bg-transparent font-bold text-red-600 outline-none focus:border-blue-500"
+                              />
                             </td>
 
                             <td colSpan={colSpanAfterAmount} className="px-4 py-2">
@@ -3678,7 +3685,14 @@ const PurchaseVoucher: React.FC = () => {
                         </div>
                       </td>
                       <td className="px-4 py-2 text-right font-bold text-red-600">
-                        {discountTotal.toLocaleString()}
+                        <input
+                          type="number"
+                          name="discountAmount"
+                          value={formData.discountAmount || ""}
+                          onChange={handleChange}
+                          placeholder="0"
+                          className="w-full p-1 text-right border rounded bg-transparent font-bold text-red-600 outline-none focus:border-blue-500"
+                        />
                       </td>
                       <td className="px-4 py-2"></td>
                       <td className="px-4 py-2"></td>

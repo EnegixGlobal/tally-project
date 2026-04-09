@@ -364,7 +364,11 @@ router.get("/", async (req, res) => {
     l.name AS sales_ledger_name,
     dl.name AS discount_ledger_name,
 
-    si.amount AS item_amount
+    si.amount AS item_amount,
+    si.discount AS item_discount,
+    sv.overallDiscountLedgerId,
+    sv.overallDiscountAmount,
+    l_ov_disc.name AS overall_discount_ledger_name
 
   FROM sales_vouchers sv
 
@@ -379,6 +383,9 @@ router.get("/", async (req, res) => {
 
   LEFT JOIN ledgers dl
     ON dl.id = si.discountLedgerId
+
+  LEFT JOIN ledgers l_ov_disc
+    ON l_ov_disc.id = sv.overallDiscountLedgerId
 
   WHERE sv.company_id = ?
     AND sv.owner_type = ?
@@ -412,8 +419,12 @@ router.get("/", async (req, res) => {
           partyId: row.partyId,
           partyName: row.party_name,
           mode: row.mode || "item-invoice",
-          discountLedgerId: row.discountLedgerId,
-          discountLedgerName: row.discount_ledger_name,
+          mode: row.mode || "item-invoice",
+          discountLedgerId: row.overallDiscountLedgerId || row.discountLedgerId,
+          discountLedgerName: row.overall_discount_ledger_name || row.discount_ledger_name,
+          overallDiscountAmount: row.overallDiscountAmount,
+          overallDiscountLedgerId: row.overallDiscountLedgerId,
+          overallDiscountLedgerName: row.overall_discount_ledger_name,
           entries: [],
         };
 
@@ -433,9 +444,9 @@ router.get("/", async (req, res) => {
       }
 
       // Capture discount info if not already captured
-      if (!vouchers[key].discountLedgerId && row.discountLedgerId) {
-        vouchers[key].discountLedgerId = row.discountLedgerId;
-        vouchers[key].discountLedgerName = row.discount_ledger_name;
+      if (!vouchers[key].discountLedgerId && (row.overallDiscountLedgerId || row.discountLedgerId)) {
+        vouchers[key].discountLedgerId = row.overallDiscountLedgerId || row.discountLedgerId;
+        vouchers[key].discountLedgerName = row.overall_discount_ledger_name || row.discount_ledger_name;
       }
 
       /* ================================
@@ -453,6 +464,20 @@ router.get("/", async (req, res) => {
           isChild: true,
         });
       }
+
+      /* 🔵 ITEM-WISE DISCOUNT → DEBIT */
+      if (row.discountLedgerId && Number(row.item_discount) > 0) {
+        vouchers[key].entries.push({
+          id: `SAL-DISC-ITEM-${row.voucher_id}-${row.discountLedgerId}-${vouchers[key].entries.length}`,
+          ledger_id: row.discountLedgerId,
+          ledger_name: row.discount_ledger_name,
+          amount: Number(row.item_discount),
+          entry_type: "debit",
+          narration: `Discount on ${row.sales_ledger_name}`,
+          isParty: false,
+          isChild: true,
+        });
+      }
     });
 
     /* =====================================================
@@ -464,15 +489,15 @@ router.get("/", async (req, res) => {
         const vid = v.id.split("-")[1];
 
         if (subtotal > 0) {
-          // DISCOUNT
-          if (Number(v.discountTotal) > 0) {
+          // 🔴 OVERALL DISCOUNT (FROM HEADER)
+          if (Number(v.overallDiscountAmount) > 0) {
             v.entries.push({
-              id: `SAL-DISC-${vid}`,
-              ledger_id: v.discountLedgerId,
-              ledger_name: v.discountLedgerName || "Discount",
-              amount: Number(v.discountTotal),
+              id: `SAL-DISC-OV-${vid}`,
+              ledger_id: v.overallDiscountLedgerId,
+              ledger_name: v.overallDiscountLedgerName || "Discount",
+              amount: Number(v.overallDiscountAmount),
               entry_type: "debit",
-              narration: "Discount",
+              narration: "Overall Discount",
               isParty: false,
               isChild: true,
             });
