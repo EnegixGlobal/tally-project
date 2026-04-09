@@ -335,19 +335,19 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
 
 
   const formatSmart = (num: number) => {
-  const n = Number(num || 0);
+    const n = Number(num || 0);
 
-  // agar integer hai → direct
-  if (Number.isInteger(n)) {
-    return n.toLocaleString("en-IN");
-  }
+    // agar integer hai → direct
+    if (Number.isInteger(n)) {
+      return n.toLocaleString("en-IN");
+    }
 
-  // agar decimal hai → sirf 2 digit
-  return n.toLocaleString("en-IN", {
-    minimumFractionDigits: 0,
-    maximumFractionDigits: 2,
-  });
-};
+    // agar decimal hai → sirf 2 digit
+    return n.toLocaleString("en-IN", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    });
+  };
 
   return (
     <div className={PRINT_STYLES.container}>
@@ -707,8 +707,11 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                   <th className={`${PRINT_STYLES.table.headerCellCenter} w-12 whitespace-nowrap`}>
                     Sr No
                   </th>
-                  <th className={`${PRINT_STYLES.table.headerCell} whitespace-nowrap`}>
+                  <th className={`${PRINT_STYLES.table.headerCell} w-20 whitespace-nowrap`}>
                     Particulars (Description & Specifications)
+                  </th>
+                  <th className={`${PRINT_STYLES.table.headerCellCenter} w-15 whitespace-nowrap`}>
+                    Barcode
                   </th>
                   <th className={`${PRINT_STYLES.table.headerCell} w-20 whitespace-nowrap`}>
                     HSN Code
@@ -766,7 +769,9 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                       <td className={`${PRINT_STYLES.table.dataCell} whitespace-nowrap`}>
                         <strong>{itemDetails.name}</strong>
                       </td>
-
+                      <td className={`${PRINT_STYLES.table.dataCellCenter} whitespace-nowrap`}>
+                        {itemDetails.barcode || "-"}
+                      </td>
                       <td className={`${PRINT_STYLES.table.dataCellCenter} whitespace-nowrap`}>
                         {itemDetails.hsnCode}
                       </td>
@@ -808,7 +813,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                     <tr>
                       <td
                         className={`${PRINT_STYLES.table.emptyCell} text-center whitespace-nowrap`}
-                        colSpan={9}
+                        colSpan={10}
                       >
                         No items selected
                       </td>
@@ -818,7 +823,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                       .fill(0)
                       .map((_, index) => (
                         <tr key={`empty-${index}`}>
-                          {Array(9)
+                          {Array(10)
                             .fill(0)
                             .map((_, i) => (
                               <td
@@ -840,7 +845,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                     .fill(0)
                     .map((_, index) => (
                       <tr key={`empty-${index}`}>
-                        {Array(9)
+                        {Array(10)
                           .fill(0)
                           .map((_, i) => (
                             <td
@@ -927,7 +932,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                             Grand Total
                           </td>
                           <td className="border border-black p-2 text-right font-bold">
-                           ₹{formatSmart(total)}
+                            ₹{formatSmart(total)}
                           </td>
                         </tr>
                       </tbody>

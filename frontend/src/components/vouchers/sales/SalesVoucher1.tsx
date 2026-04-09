@@ -188,6 +188,7 @@ const SalesVoucher: React.FC = () => {
       igstLedgerId: (item as any).igstLedgerId || "",
       rate: Number(item.standardSaleRate || item.sellingRate || item.sellingPrice || item.saleRate || item.rate || item.mrp || 0),
       mrp: Number(item.mrp || item.MRP || item.sellingPrice || 0),
+      barcode: item.barcode || (item as any).bar_code || (item as any).Barcode || (item as any).barcode_number || (item as any).item_barcode || "",
       batches: (() => {
         if (!item.batches) return [];
         try { return typeof item.batches === "string" ? JSON.parse(item.batches) : item.batches; } catch { return []; }

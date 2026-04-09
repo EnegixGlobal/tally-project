@@ -249,6 +249,7 @@ export type StockItem = {
   batches?: any;
 
   attributes?: StockItemAttribute[];
+  barcode?: string;
 };
 
 
