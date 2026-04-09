@@ -428,11 +428,11 @@ const SalesVoucher: React.FC = () => {
       try {
         const res = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers/${copyId}`);
         const data = await res.json();
-        
+
         // Sales API returns flat JSON on success
         if (data.success || data.id) {
           const v = data;
-          
+
           // Map entries precisely as loadSingleVoucher does
           const mappedEntries = (v.entries || []).map((e: any, idx: number) => ({
             id: `e${idx + 1}`,
@@ -465,11 +465,11 @@ const SalesVoucher: React.FC = () => {
             referenceNo: v.referenceNo || v.reference_no || "",
             partyId: String(v.partyId || v.party_id || ""),
             mode: v.mode || "item-invoice",
-            dispatchDetails: v.dispatch_details ? (typeof v.dispatch_details === 'string' ? JSON.parse(v.dispatch_details) : v.dispatch_details) : { 
-              docNo: v.dispatchDocNo || "", 
-              through: v.dispatchThrough || "", 
-              destination: v.destination || "", 
-              approxDistance: v.approxDistance || "" 
+            dispatchDetails: v.dispatch_details ? (typeof v.dispatch_details === 'string' ? JSON.parse(v.dispatch_details) : v.dispatch_details) : {
+              docNo: v.dispatchDocNo || "",
+              through: v.dispatchThrough || "",
+              destination: v.destination || "",
+              approxDistance: v.approxDistance || ""
             },
             salesLedgerId: String(v.sales_ledger_id || v.salesLedgerId || ""),
             entries: mappedEntries.length > 0 ? mappedEntries : getInitialFormData().entries,
@@ -3131,7 +3131,7 @@ const SalesVoucher: React.FC = () => {
 
                             {/* DELETE */}
                             <td className="px-1 py-2 text-center min-w-[40px] align-top">
-                             <button
+                              <button
                                 type="button"
                                 onClick={() => removeEntry(index)}
                                 disabled={formData.entries.length <= 1}
@@ -3444,20 +3444,20 @@ const SalesVoucher: React.FC = () => {
                             />
                           </td>
                           <td className="px-4 py-2 text-center">
-                              <button
-                               title="Remove Ledger"
-                               type="button"
-                               onClick={() => removeEntry(index)}
-                               disabled={formData.entries.length <= 1}
-                               className={`p-1 rounded ${formData.entries.length <= 1
-                                 ? "opacity-50 cursor-not-allowed"
-                                 : theme === "dark"
-                                   ? "hover:bg-gray-600"
-                                   : "hover:bg-gray-300"
-                                 }`}
-                             >
-                               <Trash2 size={16} />
-                             </button>
+                            <button
+                              title="Remove Ledger"
+                              type="button"
+                              onClick={() => removeEntry(index)}
+                              disabled={formData.entries.length <= 1}
+                              className={`p-1 rounded ${formData.entries.length <= 1
+                                ? "opacity-50 cursor-not-allowed"
+                                : theme === "dark"
+                                  ? "hover:bg-gray-600"
+                                  : "hover:bg-gray-300"
+                                }`}
+                            >
+                              <Trash2 size={16} />
+                            </button>
                           </td>
                         </tr>
                       ))}

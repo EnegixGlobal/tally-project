@@ -1,11 +1,15 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCompany } from "../../context/CompanyContext";
-import { ArrowLeft } from "lucide-react";
 import type { VoucherEntry } from "../../types";
+import { ArrowLeft, Download } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import PrintOptions from "../vouchers/sales/PrintOptions";
-import { useFinancialYear, filterByFinancialYear } from "../../hooks/useFinancialYear";
+import SalesInvoiceDownloadModal from "../vouchers/sales/SalesInvoiceDownloadModal";
+import {
+  useFinancialYear,
+  filterByFinancialYear,
+} from "../../hooks/useFinancialYear";
 
 interface VoucherRegisterBaseProps {
   title: string;
@@ -106,6 +110,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     null
   );
   const [ledgerList, setLedgerList] = useState<any[]>([]);
+  // State for inline invoice download (sales only)
+  const [downloadVoucherId, setDownloadVoucherId] = useState<string | null>(null);
 
   const { selectedFinYear } = useFinancialYear();
 
@@ -139,7 +145,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     if (!ledgerId) return "Unknown Ledger (-)";
 
     // Try finding in locally fetched ledgerList first (most up-to-date)
-    let ledger = ledgerList?.find((l: any) => String(l.id) === String(ledgerId));
+    let ledger = ledgerList?.find(
+      (l: any) => String(l.id) === String(ledgerId)
+    );
 
     // Fallback to context ledgers
     if (!ledger) {
@@ -581,8 +589,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       };
     }
 
-
-
     // ---------------------- RECEIPT ----------------------
     if (voucherType === "receipt") {
       return {
@@ -703,7 +709,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       });
 
       // Apply Financial Year filter
-      const finYearFiltered = filterByFinancialYear(converted, "date", selectedFinYear);
+      const finYearFiltered = filterByFinancialYear(
+        converted,
+        "date",
+        selectedFinYear
+      );
 
       // Apply View Type filter
       const viewFiltered = filterVouchersByView(finYearFiltered);
@@ -1031,13 +1041,15 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           url = `${import.meta.env.VITE_API_URL
             }/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
         } else if (voucherType === "receipt") {
-          url = `${import.meta.env.VITE_API_URL}/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=receipt`;
+          url = `${import.meta.env.VITE_API_URL
+            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=receipt`;
         } else if (voucherType === "contra") {
-          url = `${import.meta.env.VITE_API_URL}/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=contra`;
+          url = `${import.meta.env.VITE_API_URL
+            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=contra`;
         } else if (voucherType === "journal") {
-          url = `${import.meta.env.VITE_API_URL}/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=journal`;
-        }
-        else {
+          url = `${import.meta.env.VITE_API_URL
+            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=journal`;
+        } else {
           console.warn("Unknown voucherType:", voucherType);
           return;
         }
@@ -1513,13 +1525,17 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         {/* Debit Amount */}
                         <td className="px-6 py-4 text-sm text-gray-900 text-right">
                           {calculateDebitCredit(voucher).debit > 0
-                            ? calculateDebitCredit(voucher).debit.toLocaleString()
+                            ? calculateDebitCredit(
+                              voucher
+                            ).debit.toLocaleString()
                             : "-"}
                         </td>
                         {/* Credit Amount */}
                         <td className="px-6 py-4 text-sm text-gray-900 text-right">
                           {calculateDebitCredit(voucher).credit > 0
-                            ? calculateDebitCredit(voucher).credit.toLocaleString()
+                            ? calculateDebitCredit(
+                              voucher
+                            ).credit.toLocaleString()
                             : "-"}
                         </td>
                         {/* Status */}
@@ -1539,12 +1555,12 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         <td className="px-6 py-4 text-sm text-gray-500">
                           {voucherType === "debit_note"
                             ? getLedgerNameById(
-                                voucher.entries.find((e) => e.type === "credit")
-                                  ?.ledgerId
-                              )
+                              voucher.entries.find((e) => e.type === "credit")
+                                ?.ledgerId
+                            )
                             : voucherType === "sales"
-                            ? getLedgerNameById(debitEntry?.ledgerId)
-                            : getLedgerNameById(creditEntry?.ledgerId)}
+                              ? getLedgerNameById(debitEntry?.ledgerId)
+                              : getLedgerNameById(creditEntry?.ledgerId)}
                         </td>
 
                         {/* Supplier Invoice Date */}
@@ -1603,6 +1619,17 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                           Delete
                         </button>
                       )}
+
+                      {/* Download Invoice — only for sales vouchers */}
+                      {voucherType === "sales" && (
+                        <button
+                          title="Download / Print Invoice"
+                          onClick={() => setDownloadVoucherId(String(voucher.id))}
+                          className="text-green-600 hover:text-green-900 transition-colors"
+                        >
+                          <Download className="w-4 h-4" />
+                        </button>
+                      )}
                     </td>
                   </tr>
                 );
@@ -1613,7 +1640,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             <tfoot className="bg-gray-100">
               <tr>
                 <td
-                  colSpan={["receipt", "contra", "journal"].includes(voucherType) ? 5 : 4}
+                  colSpan={
+                    ["receipt", "contra", "journal"].includes(voucherType)
+                      ? 5
+                      : 4
+                  }
                   className="px-6 py-4 text-sm font-semibold text-gray-900"
                 >
                   Total ({filteredVouchers.length} vouchers)
@@ -1706,8 +1737,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         key={page}
                         onClick={() => setCurrentPage(page)}
                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === currentPage
-                          ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
-                          : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                            ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
+                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
                           }`}
                       >
                         {page}
@@ -1741,6 +1772,14 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         onSendToEmail={onSendToEmail}
         onSendToWhatsApp={onSendToWhatsApp}
       />
+
+      {/* Sales Invoice Download Modal */}
+      {downloadVoucherId && (
+        <SalesInvoiceDownloadModal
+          voucherId={downloadVoucherId}
+          onClose={() => setDownloadVoucherId(null)}
+        />
+      )}
 
       {filteredVouchers.length === 0 && (
         <div className="text-center py-12">
