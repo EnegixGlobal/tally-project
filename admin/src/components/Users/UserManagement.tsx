@@ -254,9 +254,6 @@ const UserManagement: React.FC = () => {
       if (adminData?.role === 'super_admin') {
         const res = await api.get(`/api/ca-employees-with-companies?ca_id=${user.id}`);
         setCaEmployees(res.data.employees || []);
-      } else if (adminData?.role === 'ca_admin') {
-        const res = await api.get(`/api/ca-employee-companies?ca_employee_id=${user.id}`);
-        setEmployeeCompanies(res.data.companies || []);
       }
     } catch (err: any) {
       console.error('Failed to fetch details:', err);
@@ -580,7 +577,7 @@ const UserManagement: React.FC = () => {
                     <div className="w-10 h-10 border-4 border-primary/30 border-t-primary rounded-full animate-spin"></div>
                     <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Fetching details...</p>
                   </div>
-                ) : adminData?.role === 'super_admin' ? (
+                ) : (
                   caEmployees.length > 0 ? (
                     <div className={`rounded-xl border overflow-hidden ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
                       <table className="w-full text-sm">
@@ -617,26 +614,6 @@ const UserManagement: React.FC = () => {
                   ) : (
                     <div className="text-center py-20 bg-gray-50/10 rounded-2xl border-2 border-dashed border-gray-700/20">
                       <p className="text-gray-500 italic">No employees found for this CA admin.</p>
-                    </div>
-                  )
-                ) : (
-                  employeeCompanies.length > 0 ? (
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {employeeCompanies.map((comp) => (
-                        <div key={comp.id} className={`p-4 rounded-xl border flex items-center justify-between group ${theme === 'dark' ? 'bg-gray-700/30 border-gray-600 hover:bg-gray-700/50' : 'bg-gray-50 border-gray-200 hover:bg-gray-100'} transition-all`}>
-                          <div className="flex items-center gap-3">
-                            <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-blue-900/30' : 'bg-blue-100'}`}>
-                              <ExternalLink className={`w-4 h-4 ${theme === 'dark' ? 'text-blue-400' : 'text-blue-600'}`} />
-                            </div>
-                            <span className={`font-semibold ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>{comp.name}</span>
-                          </div>
-                          <span className="text-[10px] uppercase tracking-wider text-gray-500 font-bold opacity-0 group-hover:opacity-100 transition-opacity">Allotted</span>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <div className="text-center py-20 bg-gray-50/10 rounded-2xl border-2 border-dashed border-gray-700/20">
-                      <p className="text-gray-500 italic">No companies allotted to this employee yet.</p>
                     </div>
                   )
                 )}

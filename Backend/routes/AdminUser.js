@@ -60,20 +60,6 @@ router.get('/', async (req, res) => {
           fdterms_file AS terms_file
         FROM tbca
       `);
-    } else if (role === 'ca_admin') {
-      // CA sees their own employees
-      [users] = await db.query(`
-        SELECT
-          id,
-          name,
-          phone,
-          email,
-          'active' AS status, 
-          created_at AS last_login,
-          fdterms_file AS terms_file
-        FROM tbemployees
-        WHERE ca_id = ?
-      `, [id]);
     } else {
       return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -122,13 +108,6 @@ router.post('/', upload.single('terms_file'), async (req, res) => {
       `, [name, phone, email, hashedPassword, status || 'active', now, terms_file]);
 
       res.status(201).json({ id: result.insertId, name, phone, email, status: status || 'active', lastLogin: now, terms_file });
-    } else if (role === 'ca_admin') {
-      const [result] = await db.query(`
-        INSERT INTO tbemployees (ca_id, name, email, phone, password, fdterms_file)
-        VALUES (?, ?, ?, ?, ?, ?)
-      `, [id, name, email, phone, hashedPassword, terms_file]);
-
-      res.status(201).json({ id: result.insertId, name, phone, email, status: 'active', lastLogin: now, terms_file });
     } else {
       res.status(403).json({ error: 'Unauthorized' });
     }
@@ -171,21 +150,6 @@ router.put('/:userId', upload.single('terms_file'), async (req, res) => {
         params.push(userId);
       }
       await db.query(query, params);
-    } else if (role === 'ca_admin') {
-      let query, params;
-      if (password) {
-        const hashedPassword = await bcrypt.hash(password, 10);
-        query = 'UPDATE tbemployees SET name = ?, phone = ?, email = ?, password = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE id = ? AND ca_id = ?';
-        params = [name, phone, email, hashedPassword];
-        if (terms_file) params.push(terms_file);
-        params.push(userId, req.user.id);
-      } else {
-        query = 'UPDATE tbemployees SET name = ?, phone = ?, email = ?' + (terms_file ? ', fdterms_file = ?' : '') + ' WHERE id = ? AND ca_id = ?';
-        params = [name, phone, email];
-        if (terms_file) params.push(terms_file);
-        params.push(userId, req.user.id);
-      }
-      await db.query(query, params);
     } else {
       return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -211,8 +175,6 @@ router.patch('/:userId/status', async (req, res) => {
     let result;
     if (role === 'super_admin') {
       [result] = await db.query('UPDATE tbca SET fdstatus = ? WHERE fdSiNo = ?', [status, userId]);
-    } else if (role === 'ca_admin') {
-      [result] = await db.query('UPDATE tbemployees SET status = ? WHERE id = ? AND ca_id = ?', [status, userId, req.user.id]);
     } else {
       return res.status(403).json({ error: 'Unauthorized' });
     }
@@ -237,8 +199,6 @@ router.delete('/:userId', async (req, res) => {
 
     if (role === 'super_admin') {
       [result] = await db.query('DELETE FROM tbca WHERE fdSiNo = ?', [userId]);
-    } else if (role === 'ca_admin') {
-      [result] = await db.query('DELETE FROM tbemployees WHERE id = ? AND ca_id = ?', [userId, id]);
     } else {
       return res.status(403).json({ error: 'Unauthorized' });
     }
