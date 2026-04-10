@@ -369,7 +369,7 @@ ORDER BY vm.date ASC
          LEFT JOIN ledgers l_header ON l_header.id = sv.partyId
          WHERE ve.voucher_id IN (${placeholders})
            AND sv.mode = 'accounting-invoice'
-         ORDER BY sv.date ASC, sv.voucher_id ASC, ve.id ASC`,
+         ORDER BY sv.date ASC, ve.voucher_id ASC, ve.id ASC`,
         ids
       );
 
@@ -750,7 +750,7 @@ ORDER BY vm.date ASC
           balance += debit - credit;
 
           transactions.push({
-            id: `PUR-ACC-L-${sel.voucher_id}-${sel.entry_id}`,
+            id: `PUR-ACC-L-${sel.entry_id}-${sel.voucher_id}`,
             date: sel.date,
             voucherType: "Purchase",
             voucherNo: sel.voucher_number,
@@ -811,7 +811,7 @@ ORDER BY vm.date ASC
           balance += debit - credit;
 
           transactions.push({
-            id: `SAL-ACC-L-${sel.voucher_id}-${sel.entry_id}`,
+            id: `SAL-ACC-L-${sel.entry_id}-${sel.voucher_id}`,
             date: sel.date,
             voucherType: "Sales",
             voucherNo: sel.voucher_number,
