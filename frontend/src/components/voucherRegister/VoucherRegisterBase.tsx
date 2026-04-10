@@ -343,6 +343,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         cgstTotal: Number(p.cgstTotal || 0),
         sgstTotal: Number(p.sgstTotal || 0),
         igstTotal: Number(p.igstTotal || 0),
+        discountTotal: Number(p.discountTotal || 0),
+        discountAmount: Number(p.discountAmount || 0),
         total: Number(p.total || 0),
 
         entries: [
@@ -1481,6 +1483,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       Total GST
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                      Discount
+                    </th>
+                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Invoice Value
                     </th>
                   </>
@@ -1510,6 +1515,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   typeof voucher.sgstTotal === "number" ? voucher.sgstTotal : 0;
                 const igst =
                   typeof voucher.igstTotal === "number" ? voucher.igstTotal : 0;
+                const discountTotal =
+                  typeof voucher.discountTotal === "number" ? voucher.discountTotal : 0;
                 const total =
                   typeof voucher.total === "number" ? voucher.total : 0;
 
@@ -1617,6 +1624,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         {/* GST Total */}
                         <td className="px-6 py-4 text-sm text-gray-900 text-right">
                           {formatTableAmount(cgst + sgst + igst)}
+                        </td>
+
+                        {/* Discount */}
+                        <td className="px-6 py-4 text-sm text-red-600 text-right">
+                          {formatTableAmount(discountTotal)}
                         </td>
 
                         {/* Total */}

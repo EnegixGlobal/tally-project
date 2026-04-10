@@ -84,10 +84,18 @@ router.get("/:id", async (req, res) => {
             }
 
         } else if (id.startsWith("PUR-")) {
-            const voucherId = id.split("-")[1];
+            const voucherId = id.split("-").pop();
 
             // Check voucher mode first — if saved in accounting mode, return voucher_entries
-            const [pvRows] = await db.query(`SELECT id, mode, partyId, number, date, subtotal, cgstTotal, sgstTotal, igstTotal, tdsTotal, discountTotal, total FROM purchase_vouchers WHERE id = ? AND company_id = ?`, [voucherId, company_id]);
+            const [pvRows] = await db.query(`
+                SELECT pv.id, pv.mode, pv.partyId, l.name AS partyName, pv.number, pv.date, 
+                       pv.subtotal, pv.cgstTotal, pv.sgstTotal, pv.igstTotal, pv.tdsTotal, 
+                       pv.discountTotal, pv.total, pv.narration, pv.referenceNo, pv.supplierInvoiceDate
+                FROM purchase_vouchers pv
+                LEFT JOIN ledgers l ON l.id = pv.partyId
+                WHERE pv.id = ? AND pv.company_id = ?`,
+                [voucherId, company_id]
+            );
 
             if (pvRows.length === 0) {
                 return res.status(404).json({ error: "Voucher not found" });
@@ -116,6 +124,9 @@ router.get("/:id", async (req, res) => {
                     voucher_type: "purchase",
                     voucher_number: pv.number,
                     date: pv.date,
+                    narration: pv.narration,
+                    reference_no: pv.referenceNo,
+                    supplier_invoice_date: pv.supplierInvoiceDate,
                     subtotal: pv.subtotal,
                     cgstTotal: pv.cgstTotal,
                     sgstTotal: pv.sgstTotal,
@@ -124,7 +135,7 @@ router.get("/:id", async (req, res) => {
                     discountTotal: pv.discountTotal,
                     total: pv.total,
                     partyId: pv.partyId,
-                    partyName: undefined,
+                    partyName: pv.partyName,
                     entries: [],
                 };
 
@@ -275,9 +286,71 @@ router.get("/:id", async (req, res) => {
             }
 
         } else if (id.startsWith("SAL-")) {
-            const voucherId = id.split("-")[1];
-            const [rows] = await db.query(
-                `
+            const voucherId = id.split("-").pop();
+
+            // Check mode first
+            const [svHeaderRows] = await db.query(`
+                SELECT sv.id, sv.mode, sv.partyId, l.name AS partyName, sv.number, sv.date, 
+                       sv.subtotal, sv.cgstTotal, sv.sgstTotal, sv.igstTotal, sv.discountTotal, 
+                       sv.total, sv.narration, sv.referenceNo, sv.overallDiscountAmount, sv.overallDiscountLedgerId
+                FROM sales_vouchers sv
+                LEFT JOIN ledgers l ON l.id = sv.partyId
+                WHERE sv.id = ? AND sv.company_id = ?`,
+                [voucherId, company_id]
+            );
+
+            if (svHeaderRows.length === 0) {
+                return res.status(404).json({ error: "Voucher not found" });
+            }
+
+            const sv = svHeaderRows[0];
+
+            if (sv.mode && String(sv.mode).toLowerCase() === 'accounting-invoice') {
+                const [rows] = await db.query(`
+                    SELECT ve.id AS entry_id,
+                           ve.ledger_id,
+                           COALESCE(l.name, ve.ledger_name) AS ledger_name,
+                           ve.amount,
+                           ve.entry_type,
+                           ve.narration AS entry_narration
+                    FROM voucher_entries ve
+                    LEFT JOIN ledgers l ON l.id = ve.ledger_id
+                    WHERE ve.voucher_id = ?
+                    ORDER BY ve.id ASC
+                `, [voucherId]);
+
+                voucher = {
+                    id: id,
+                    voucher_type: "sales",
+                    voucher_number: sv.number,
+                    date: sv.date,
+                    narration: sv.narration,
+                    reference_no: sv.referenceNo,
+                    subtotal: sv.subtotal,
+                    cgstTotal: sv.cgstTotal,
+                    sgstTotal: sv.sgstTotal,
+                    igstTotal: sv.igstTotal,
+                    discountTotal: sv.discountTotal,
+                    total: sv.total,
+                    partyId: sv.partyId,
+                    partyName: sv.partyName,
+                    entries: [],
+                };
+
+                rows.forEach((r) => {
+                    voucher.entries.push({
+                        id: r.entry_id,
+                        ledger_id: r.ledger_id,
+                        ledger_name: r.ledger_name,
+                        amount: Number(r.amount),
+                        entry_type: r.entry_type,
+                        narration: r.entry_narration,
+                    });
+                });
+            } else {
+                // Item-invoice mode
+                const [rows] = await db.query(
+                    `
         SELECT
           sv.id AS voucher_id,
           sv.partyId,
@@ -290,6 +363,8 @@ router.get("/:id", async (req, res) => {
           sv.igstTotal,
           sv.discountTotal,
           sv.total,
+          sv.narration,
+          sv.referenceNo,
           si.salesLedgerId,
           si.discountLedgerId,
           l.name AS sales_ledger_name,
@@ -307,109 +382,111 @@ router.get("/:id", async (req, res) => {
         LEFT JOIN ledgers l_ov_disc ON l_ov_disc.id = sv.overallDiscountLedgerId
         WHERE sv.id = ? AND sv.company_id = ?
         `,
-                [voucherId, company_id]
-            );
+                    [voucherId, company_id]
+                );
 
-            if (rows.length > 0) {
-                const row = rows[0];
-                voucher = {
-                    id: id,
-                    voucher_type: "sales",
-                    voucher_number: row.voucher_number,
-                    date: row.voucher_date,
-                    subtotal: row.subtotal,
-                    cgstTotal: row.cgstTotal,
-                    sgstTotal: row.sgstTotal,
-                    igstTotal: row.igstTotal,
-                    discountTotal: row.discountTotal,
-                    overallDiscountAmount: row.overallDiscountAmount,
-                    total: row.total,
-                    partyName: row.party_name,
-                    overallDiscountLedgerId: row.overallDiscountLedgerId,
-                    overallDiscountLedgerName: row.overall_discount_ledger_name,
-                    entries: [],
-                };
+                if (rows.length > 0) {
+                    const row = rows[0];
+                    voucher = {
+                        id: id,
+                        voucher_type: "sales",
+                        voucher_number: row.voucher_number,
+                        date: row.voucher_date,
+                        narration: row.narration,
+                        reference_no: row.referenceNo,
+                        subtotal: row.subtotal,
+                        cgstTotal: row.cgstTotal,
+                        sgstTotal: row.sgstTotal,
+                        igstTotal: row.igstTotal,
+                        discountTotal: row.discountTotal,
+                        overallDiscountAmount: row.overallDiscountAmount,
+                        total: row.total,
+                        partyName: row.party_name,
+                        overallDiscountLedgerId: row.overallDiscountLedgerId,
+                        overallDiscountLedgerName: row.overall_discount_ledger_name,
+                        entries: [],
+                    };
 
-                voucher.entries.push({
-                    id: `SAL-P-${row.voucher_id}`,
-                    ledger_id: row.partyId,
-                    ledger_name: row.party_name,
-                    amount: Number(row.total),
-                    entry_type: "debit",
-                    narration: "Sales Party",
-                    isParty: true,
-                });
+                    voucher.entries.push({
+                        id: `SAL-P-${row.voucher_id}`,
+                        ledger_id: row.partyId,
+                        ledger_name: row.party_name,
+                        amount: Number(row.total),
+                        entry_type: "debit",
+                        narration: "Sales Party",
+                        isParty: true,
+                    });
 
-                rows.forEach((r) => {
-                    if (r.salesLedgerId) {
+                    rows.forEach((r) => {
+                        if (r.salesLedgerId) {
+                            voucher.entries.push({
+                                id: `SAL-L-${r.voucher_id}-${r.salesLedgerId}-${voucher.entries.length}`,
+                                ledger_id: r.salesLedgerId,
+                                ledger_name: r.sales_ledger_name,
+                                amount: Number(r.item_amount),
+                                entry_type: "credit",
+                                narration: r.sales_ledger_name,
+                                isParty: false,
+                                isChild: true,
+                            });
+                        }
+                    });
+
+                    // 1. ADD TAXES
+                    const subtotalVal = Number(voucher.subtotal || 1);
+                    if (Number(voucher.igstTotal) > 0) {
+                        const rate = ((voucher.igstTotal / subtotalVal) * 100).toFixed(2);
+                        voucher.entries.push({ id: `SAL-IGST-${voucherId}`, ledger_name: `IGST @ ${rate}%`, amount: Number(voucher.igstTotal), entry_type: 'credit', isChild: true });
+                    }
+                    if (Number(voucher.cgstTotal) > 0) {
+                        const rate = ((voucher.cgstTotal / subtotalVal) * 100).toFixed(2);
+                        voucher.entries.push({ id: `SAL-CGST-${voucherId}`, ledger_name: `CGST @ ${rate}%`, amount: Number(voucher.cgstTotal), entry_type: 'credit', isChild: true });
+                    }
+                    if (Number(voucher.sgstTotal) > 0) {
+                        const rate = ((voucher.sgstTotal / subtotalVal) * 100).toFixed(2);
+                        voucher.entries.push({ id: `SAL-SGST-${voucherId}`, ledger_name: `SGST @ ${rate}%`, amount: Number(voucher.sgstTotal), entry_type: 'credit', isChild: true });
+                    }
+
+                    // 2. ADD ITEM-WISE DISCOUNTS
+                    const itemDiscounts = {};
+                    rows.forEach(r => {
+                        if (r.discountLedgerId && Math.abs(Number(r.item_discount)) > 0.001) {
+                            if (!itemDiscounts[r.discountLedgerId]) {
+                                itemDiscounts[r.discountLedgerId] = {
+                                    name: r.discount_ledger_name,
+                                    amount: 0
+                                };
+                            }
+                            itemDiscounts[r.discountLedgerId].amount += Number(r.item_discount);
+                        }
+                    });
+
+                    Object.keys(itemDiscounts).forEach(ledgerId => {
+                        const amt = itemDiscounts[ledgerId].amount;
                         voucher.entries.push({
-                            id: `SAL-L-${r.voucher_id}-${r.salesLedgerId}-${voucher.entries.length}`,
-                            ledger_id: r.salesLedgerId,
-                            ledger_name: r.sales_ledger_name,
-                            amount: Number(r.item_amount),
-                            entry_type: "credit",
-                            narration: r.sales_ledger_name,
-                            isParty: false,
-                            isChild: true,
+                            id: `SAL-DISC-ITEM-${voucherId}-${ledgerId}`,
+                            ledger_name: itemDiscounts[ledgerId].name,
+                            ledger_id: ledgerId,
+                            amount: Math.abs(amt),
+                            entry_type: amt >= 0 ? 'debit' : 'credit',
+                            isChild: true
+                        });
+                    });
+
+                    // 3. ADD OVERALL DISCOUNT
+                    const overallDisc = Number(voucher.overallDiscountAmount || 0);
+                    if (Math.abs(overallDisc) > 0.001) {
+                        voucher.entries.push({
+                            id: `SAL-DISC-OV-${voucherId}`,
+                            ledger_name: voucher.overallDiscountLedgerName || "Discount",
+                            ledger_id: voucher.overallDiscountLedgerId,
+                            amount: Math.abs(overallDisc),
+                            entry_type: overallDisc >= 0 ? 'debit' : 'credit',
+                            isChild: true
                         });
                     }
-                });
-
-                // 1. ADD TAXES
-                const subtotalVal = Number(voucher.subtotal || 1);
-                if (Number(voucher.igstTotal) > 0) {
-                    const rate = ((voucher.igstTotal / subtotalVal) * 100).toFixed(2);
-                    voucher.entries.push({ id: `SAL-IGST-${voucherId}`, ledger_name: `IGST @ ${rate}%`, amount: Number(voucher.igstTotal), entry_type: 'credit', isChild: true });
-                }
-                if (Number(voucher.cgstTotal) > 0) {
-                    const rate = ((voucher.cgstTotal / subtotalVal) * 100).toFixed(2);
-                    voucher.entries.push({ id: `SAL-CGST-${voucherId}`, ledger_name: `CGST @ ${rate}%`, amount: Number(voucher.cgstTotal), entry_type: 'credit', isChild: true });
-                }
-                if (Number(voucher.sgstTotal) > 0) {
-                    const rate = ((voucher.sgstTotal / subtotalVal) * 100).toFixed(2);
-                    voucher.entries.push({ id: `SAL-SGST-${voucherId}`, ledger_name: `SGST @ ${rate}%`, amount: Number(voucher.sgstTotal), entry_type: 'credit', isChild: true });
-                }
-
-                // 2. ADD ITEM-WISE DISCOUNTS
-                const itemDiscounts = {};
-                rows.forEach(r => {
-                    if (r.discountLedgerId && Math.abs(Number(r.item_discount)) > 0.001) {
-                        if (!itemDiscounts[r.discountLedgerId]) {
-                            itemDiscounts[r.discountLedgerId] = {
-                                name: r.discount_ledger_name,
-                                amount: 0
-                            };
-                        }
-                        itemDiscounts[r.discountLedgerId].amount += Number(r.item_discount);
-                    }
-                });
-
-                Object.keys(itemDiscounts).forEach(ledgerId => {
-                    const amt = itemDiscounts[ledgerId].amount;
-                    voucher.entries.push({
-                        id: `SAL-DISC-ITEM-${voucherId}-${ledgerId}`,
-                        ledger_name: itemDiscounts[ledgerId].name,
-                        ledger_id: ledgerId,
-                        amount: Math.abs(amt),
-                        entry_type: amt >= 0 ? 'debit' : 'credit',
-                        isChild: true
-                    });
-                });
-
-                // 3. ADD OVERALL DISCOUNT
-                const overallDisc = Number(voucher.overallDiscountAmount || 0);
-                if (Math.abs(overallDisc) > 0.001) {
-                    voucher.entries.push({
-                        id: `SAL-DISC-OV-${voucherId}`,
-                        ledger_name: voucher.overallDiscountLedgerName || "Discount",
-                        ledger_id: voucher.overallDiscountLedgerId,
-                        amount: Math.abs(overallDisc),
-                        entry_type: overallDisc >= 0 ? 'debit' : 'credit',
-                        isChild: true
-                    });
                 }
             }
-
         } else if (id.startsWith("DN-")) {
             // Logic for Debit Note
             const voucherId = id.split("-")[1];

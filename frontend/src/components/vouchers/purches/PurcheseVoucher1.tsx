@@ -580,7 +580,7 @@ const PurchaseVoucher: React.FC = () => {
                 itemId: e.itemId || "",
                 quantity: Math.round(e.quantity || 0),
                 rate: Math.round(e.rate || 0),
-                amount: Math.round((e.quantity || 0) * (e.rate || 0)),
+                amount: Math.round(e.amount || (e.quantity || 0) * (e.rate || 0)),
 
                 // AUTO FILL: Prioritize saved data, fallback to Item Master if missing
                 hsnCode: e.hsnCode || stockItem?.hsnCode || "",
@@ -1661,24 +1661,47 @@ const PurchaseVoucher: React.FC = () => {
       };
     }
     else {
-      const debitTotal = formData.entries
-        .filter((e) => e.type === "debit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+      let debitTotal = 0;
+      let creditTotal = 0;
+      let cgstTotal = 0;
+      let sgstTotal = 0;
+      let igstTotal = 0;
+      let subtotal = 0;
 
-      const creditTotal = formData.entries
-        .filter((e) => e.type === "credit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+      formData.entries.forEach((e) => {
+        const amt = Number(e.amount || 0);
+        if (e.type === "debit") {
+          debitTotal += amt;
+          const ledger = ledgers.find((l) => String(l.id) === String(e.ledgerId));
+          const ledgerName = (ledger?.name || "").toLowerCase();
+          const groupName = (ledger?.groupName || "").toLowerCase();
 
-      const discountRatePercent = extractGstPercent(
-        getLedgerNameById(formData.discountLedgerId, ledgers)
-      );
+          // Identify if it's a tax ledger
+          const isTax = groupName.includes("duties") || groupName.includes("tax") ||
+            (ledgerName.includes("gst") && (ledgerName.includes("input") || ledgerName.includes("output") || ledgerName.includes("@")));
+
+          if (isTax) {
+            if (ledgerName.includes("cgst")) {
+              cgstTotal += amt;
+            } else if (ledgerName.includes("sgst")) {
+              sgstTotal += amt;
+            } else {
+              igstTotal += amt;
+            }
+          } else {
+            subtotal += amt;
+          }
+        } else {
+          creditTotal += amt;
+        }
+      });
 
       const tdsRatePercent = extractGstPercent(
         getLedgerNameById(formData.tdsLedgerId, ledgers)
       );
 
       const discountAmount = Number(formData.discountAmount || 0);
-      const tdsAmount = (debitTotal * tdsRatePercent) / 100;
+      const tdsAmount = (subtotal * tdsRatePercent) / 100;
 
       return {
         debitTotal,
@@ -1686,11 +1709,11 @@ const PurchaseVoucher: React.FC = () => {
         total: (visibleColumns.enableTdsCredit
           ? debitTotal - tdsAmount
           : debitTotal + tdsAmount) - discountAmount,
-        subtotal: debitTotal,
-        cgstTotal: 0,
-        sgstTotal: 0,
-        igstTotal: 0,
-        gstTotal: 0,
+        subtotal,
+        cgstTotal,
+        sgstTotal,
+        igstTotal,
+        gstTotal: cgstTotal + sgstTotal + igstTotal,
         discountTotal: discountAmount,
         discountAmount: discountAmount,
         tdsTotal: tdsAmount,
@@ -1759,15 +1782,14 @@ const PurchaseVoucher: React.FC = () => {
       setIsSubmitting(true);
       const totals = calculateTotals();
 
-      // Extract partyId from first ledger entry when in accounting mode
+      // Extract partyId from first credit entry when in accounting mode (In Purchase, Party is Credit)
       let finalPartyId = formData.partyId;
       if (formData.mode === "accounting-invoice" && formData.entries.length > 0) {
-        // Use first debit entry's ledgerId as partyId, or first entry if no debit found
-        const firstDebitEntry = formData.entries.find(
-          (e) => e.type === "debit" && e.ledgerId
+        const firstCreditEntry = formData.entries.find(
+          (e) => e.type === "credit" && e.ledgerId
         );
         finalPartyId =
-          firstDebitEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
+          firstCreditEntry?.ledgerId || formData.entries[0]?.ledgerId || "";
       }
 
       // 🔥 1. Voucher payload
@@ -3659,44 +3681,6 @@ const PurchaseVoucher: React.FC = () => {
                       <td className="px-4 py-2"></td>
                     </tr>
 
-                    {/* Discount Row (Accounting Mode) */}
-                    <tr
-                      className={`font-semibold ${theme === "dark"
-                        ? "border-t border-gray-600"
-                        : "border-t border-gray-300"
-                        }`}
-                    >
-                      <td className="px-4 py-2 text-right">
-                        <div className="flex items-center justify-end gap-3 pr-6">
-                          <span className="whitespace-nowrap">Discount:</span>
-                          <select
-                            name="discountLedgerId"
-                            value={formData.discountLedgerId}
-                            onChange={handleChange}
-                            className={`${TABLE_STYLES.select} !w-32 text-[11px] h-8 inline-block`}
-                          >
-                            <option value="">Select Discount</option>
-                            {discountLedgers.map((l) => (
-                              <option key={l.id} value={l.id}>
-                                {l.name}
-                              </option>
-                            ))}
-                          </select>
-                        </div>
-                      </td>
-                      <td className="px-4 py-2 text-right font-bold text-red-600">
-                        <input
-                          type="number"
-                          name="discountAmount"
-                          value={formData.discountAmount || ""}
-                          onChange={handleChange}
-                          placeholder="0"
-                          className="w-full p-1 text-right border rounded bg-transparent font-bold text-red-600 outline-none focus:border-blue-500"
-                        />
-                      </td>
-                      <td className="px-4 py-2"></td>
-                      <td className="px-4 py-2"></td>
-                    </tr>
 
                     {/* Grand Total (Accounting Mode) */}
                     <tr

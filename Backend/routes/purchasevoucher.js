@@ -626,6 +626,73 @@ router.get("/", async (req, res) => {
       [finalCompanyId, finalOwnerType, finalOwnerId]
     );
 
+    // 🏆 DYNAMIC TOTALS FIX FOR ACCOUNTING MODE (FOR REGISTER DISPLAY)
+    if (rows.length > 0) {
+      const accVoucherIds = rows
+        .filter((v) => v.mode === "accounting-invoice")
+        .map((v) => v.id);
+
+      if (accVoucherIds.length > 0) {
+        // Fetch ALL entries for these accounting vouchers in ONE go
+        const [entries] = await db.query(
+          `SELECT ve.voucher_id, ve.amount, ve.entry_type, l.name as ledger_name, g.name as group_name
+           FROM voucher_entries ve
+           LEFT JOIN ledgers l ON l.id = ve.ledger_id
+           LEFT JOIN ledger_groups g ON g.id = l.group_id
+           WHERE ve.voucher_id IN (?)`,
+          [accVoucherIds]
+        );
+
+        const entriesByVoucher = entries.reduce((acc, e) => {
+          if (!acc[e.voucher_id]) acc[e.voucher_id] = [];
+          acc[e.voucher_id].push(e);
+          return acc;
+        }, {});
+
+        rows.forEach((v) => {
+          if (v.mode === "accounting-invoice") {
+            const vEntries = entriesByVoucher[v.id] || [];
+            let subtotal = 0;
+            let cgst = 0;
+            let sgst = 0;
+            let igst = 0;
+            let discount = 0;
+
+            vEntries.forEach((e) => {
+              const amt = Number(e.amount || 0);
+              const lName = (e.ledger_name || "").toLowerCase();
+              const gName = (e.group_name || "").toLowerCase();
+
+              if (e.entry_type === "debit") {
+                const isTax = gName.includes("duties") || gName.includes("tax") || 
+                             (lName.includes("gst") && (lName.includes("input") || lName.includes("@")));
+
+                if (isTax) {
+                  if (lName.includes("cgst")) cgst += amt;
+                  else if (lName.includes("sgst")) sgst += amt;
+                  else igst += amt;
+                } else {
+                  subtotal += amt;
+                }
+              } else {
+                // Check for discount in credits for Purchase
+                const isDiscount = lName.includes("discount") || gName.includes("discount");
+                if (isDiscount) {
+                  discount += amt;
+                }
+              }
+            });
+
+            v.subtotal = subtotal;
+            v.cgstTotal = cgst;
+            v.sgstTotal = sgst;
+            v.igstTotal = igst;
+            v.discountTotal = discount;
+          }
+        });
+      }
+    }
+
     res.json({ success: true, data: rows });
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
@@ -659,7 +726,8 @@ router.get("/month-wise", async (req, res) => {
         discountTotal,
         total,
         purchaseLedgerId,
-        company_id
+        company_id,
+        mode
       FROM purchase_vouchers
       WHERE owner_type = ?
         AND owner_id = ?
@@ -711,6 +779,72 @@ router.get("/month-wise", async (req, res) => {
     sql += " ORDER BY date DESC";
 
     const [rows] = await db.execute(sql, params);
+
+    // 🏆 DYNAMIC TOTALS FIX FOR ACCOUNTING MODE (FOR REGISTER DISPLAY)
+    if (rows.length > 0) {
+      const accVoucherIds = rows
+        .filter((v) => v.mode === "accounting-invoice")
+        .map((v) => v.id);
+
+      if (accVoucherIds.length > 0) {
+        const [entries] = await db.query(
+          `SELECT ve.voucher_id, ve.amount, ve.entry_type, l.name as ledger_name, g.name as group_name
+           FROM voucher_entries ve
+           LEFT JOIN ledgers l ON l.id = ve.ledger_id
+           LEFT JOIN ledger_groups g ON g.id = l.group_id
+           WHERE ve.voucher_id IN (?)`,
+          [accVoucherIds]
+        );
+
+        const entriesByVoucher = entries.reduce((acc, e) => {
+          if (!acc[e.voucher_id]) acc[e.voucher_id] = [];
+          acc[e.voucher_id].push(e);
+          return acc;
+        }, {});
+
+        rows.forEach((v) => {
+          if (v.mode === "accounting-invoice") {
+            const vEntries = entriesByVoucher[v.id] || [];
+            let subtotal = 0;
+            let cgst = 0;
+            let sgst = 0;
+            let igst = 0;
+            let discount = 0;
+
+            vEntries.forEach((e) => {
+              const amt = Number(e.amount || 0);
+              const lName = (e.ledger_name || "").toLowerCase();
+              const gName = (e.group_name || "").toLowerCase();
+
+              if (e.entry_type === "debit") {
+                const isTax = gName.includes("duties") || gName.includes("tax") || 
+                             (lName.includes("gst") && (lName.includes("input") || lName.includes("@")));
+
+                if (isTax) {
+                  if (lName.includes("cgst")) cgst += amt;
+                  else if (lName.includes("sgst")) sgst += amt;
+                  else igst += amt;
+                } else {
+                  subtotal += amt;
+                }
+              } else {
+                // Check for discount in credits for Purchase
+                const isDiscount = lName.includes("discount") || gName.includes("discount");
+                if (isDiscount) {
+                  discount += amt;
+                }
+              }
+            });
+
+            v.subtotal = subtotal;
+            v.cgstTotal = cgst;
+            v.sgstTotal = sgst;
+            v.igstTotal = igst;
+            v.discountTotal = discount;
+          }
+        });
+      }
+    }
 
     return res.status(200).json({
       success: true,

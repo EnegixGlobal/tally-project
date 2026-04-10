@@ -320,11 +320,14 @@ ORDER BY vm.date ASC
 
       const [accRows] = await connection.execute(
         `SELECT ve.id AS entry_id, ve.voucher_id, ve.ledger_id, COALESCE(l.name, ve.ledger_name) AS ledger_name,
-                ve.amount, ve.entry_type, pv.number AS voucher_number, pv.date
+                ve.amount, ve.entry_type, pv.number AS voucher_number, pv.date,
+                pv.partyId, pv.mode, pv.total, l_header.name AS header_party_name
          FROM voucher_entries ve
          LEFT JOIN ledgers l ON l.id = ve.ledger_id
          LEFT JOIN purchase_vouchers pv ON pv.id = ve.voucher_id
+         LEFT JOIN ledgers l_header ON l_header.id = pv.partyId
          WHERE ve.voucher_id IN (${placeholders})
+           AND pv.mode = 'accounting-invoice'
          ORDER BY pv.date ASC, ve.voucher_id ASC, ve.id ASC`,
         ids
       );
@@ -358,11 +361,14 @@ ORDER BY vm.date ASC
 
       const [accRows] = await connection.execute(
         `SELECT ve.id AS entry_id, ve.voucher_id, ve.ledger_id, COALESCE(l.name, ve.ledger_name) AS ledger_name,
-                ve.amount, ve.entry_type, sv.number AS voucher_number, sv.date
+                ve.amount, ve.entry_type, sv.number AS voucher_number, sv.date,
+                sv.partyId, sv.mode, sv.total, l_header.name AS header_party_name
          FROM voucher_entries ve
          LEFT JOIN ledgers l ON l.id = ve.ledger_id
          LEFT JOIN sales_vouchers sv ON sv.id = ve.voucher_id
+         LEFT JOIN ledgers l_header ON l_header.id = sv.partyId
          WHERE ve.voucher_id IN (${placeholders})
+           AND sv.mode = 'accounting-invoice'
          ORDER BY sv.date ASC, ve.voucher_id ASC, ve.id ASC`,
         ids
       );
@@ -703,27 +709,57 @@ ORDER BY vm.date ASC
       Object.values(pvMap).forEach((entries) => {
         // Find the selected ledger's entry in this voucher
         const sel = entries.find((x) => String(x.ledger_id) === String(ledgerId));
-        if (!sel) return; // should not happen but be safe
+        if (!sel) return;
 
-        // For every other entry, push a row with that entry's amount/type
-        entries.forEach((other) => {
-          if (String(other.ledger_id) === String(ledgerId)) return; // skip selected ledger itself
+        const mainVoucher = entries[0]; // All entries have the same pv.total, pv.partyId, etc.
+        // For Purchase Accounting Invoices, the Party is the CREDIT entry. 
+        // For Sales Accounting Invoices, the Party is the DEBIT entry.
+        const partyEntry = entries.find(e => e.entry_type === "credit");
+        const partyId = partyEntry ? partyEntry.ledger_id : mainVoucher.partyId;
+        const partyName = partyEntry ? partyEntry.ledger_name : (mainVoucher.header_party_name || "Party");
 
-          const debit = other.entry_type === "debit" ? Number(other.amount) : 0;
-          const credit = other.entry_type === "credit" ? Number(other.amount) : 0;
+        const isSelectedParty = String(ledgerId) === String(partyId);
+
+        if (isSelectedParty) {
+          // If viewing Party ledger, show ONE row for the total, with main counterpart (highest debit)
+          const counterpartType = "debit"; // Party is Credit in Purchase, counterpart is Debit
+          const counterpart = entries
+            .filter(e => e.entry_type === counterpartType)
+            .sort((a, b) => Number(b.amount) - Number(a.amount))[0];
+
+          if (!counterpart) return;
+
+          const debit = 0;
+          const credit = Number(mainVoucher.total || 0); // Party in Purchase is Credit
           balance += debit - credit;
 
           transactions.push({
-            id: `PUR-ACC-${other.voucher_id}-${other.entry_id}`,
-            date: other.date || sel.date,
+            id: `PUR-ACC-P-${mainVoucher.voucher_id}`,
+            date: mainVoucher.date,
             voucherType: "Purchase",
-            voucherNo: other.voucher_number || sel.voucher_number,
-            particulars: other.ledger_name || String(other.ledger_id),
+            voucherNo: mainVoucher.voucher_number,
+            particulars: counterpart.ledger_name || String(counterpart.ledger_id),
             debit,
             credit,
             balance,
           });
-        });
+        } else {
+          // If viewing non-party ledger (Purchase/Tax), show its own amount, particulars = Party Name from identified party
+          const debit = sel.entry_type === "debit" ? Number(sel.amount) : 0;
+          const credit = sel.entry_type === "credit" ? Number(sel.amount) : 0;
+          balance += debit - credit;
+
+          transactions.push({
+            id: `PUR-ACC-L-${sel.entry_id}-${sel.voucher_id}`,
+            date: sel.date,
+            voucherType: "Purchase",
+            voucherNo: sel.voucher_number,
+            particulars: partyName,
+            debit,
+            credit,
+            balance,
+          });
+        }
       });
     }
 
@@ -739,24 +775,52 @@ ORDER BY vm.date ASC
         const sel = entries.find((x) => String(x.ledger_id) === String(ledgerId));
         if (!sel) return;
 
-        entries.forEach((other) => {
-          if (String(other.ledger_id) === String(ledgerId)) return;
+        const mainVoucher = entries[0];
+        const partyEntry = entries.find(e => e.entry_type === "debit");
+        const partyId = partyEntry ? partyEntry.ledger_id : mainVoucher.partyId;
+        const partyName = partyEntry ? partyEntry.ledger_name : (mainVoucher.header_party_name || "Party");
 
-          const debit = other.entry_type === "debit" ? Number(other.amount) : 0;
-          const credit = other.entry_type === "credit" ? Number(other.amount) : 0;
+        const isSelectedParty = String(ledgerId) === String(partyId);
+
+        if (isSelectedParty) {
+          // Party in Sales is Debit, counterpart is Credit
+          const counterpartType = "credit";
+          const counterpart = entries
+            .filter(e => e.entry_type === counterpartType)
+            .sort((a, b) => Number(b.amount) - Number(a.amount))[0];
+
+          if (!counterpart) return;
+
+          const debit = Number(mainVoucher.total || 0);
+          const credit = 0;
           balance += debit - credit;
 
           transactions.push({
-            id: `SAL-ACC-${other.voucher_id}-${other.entry_id}`,
-            date: other.date || sel.date,
+            id: `SAL-ACC-P-${mainVoucher.voucher_id}`,
+            date: mainVoucher.date,
             voucherType: "Sales",
-            voucherNo: other.voucher_number || sel.voucher_number,
-            particulars: other.ledger_name || String(other.ledger_id),
+            voucherNo: mainVoucher.voucher_number,
+            particulars: counterpart.ledger_name || String(counterpart.ledger_id),
             debit,
             credit,
             balance,
           });
-        });
+        } else {
+          const debit = sel.entry_type === "debit" ? Number(sel.amount) : 0;
+          const credit = sel.entry_type === "credit" ? Number(sel.amount) : 0;
+          balance += debit - credit;
+
+          transactions.push({
+            id: `SAL-ACC-L-${sel.entry_id}-${sel.voucher_id}`,
+            date: sel.date,
+            voucherType: "Sales",
+            voucherNo: sel.voucher_number,
+            particulars: partyName,
+            debit,
+            credit,
+            balance,
+          });
+        }
       });
     }
 

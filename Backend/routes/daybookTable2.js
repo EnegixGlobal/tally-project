@@ -210,7 +210,7 @@ router.get("/", async (req, res) => {
         const subtotal = Number(v.subtotal || 0);
         const vid = v.id.split("-")[1];
 
-        if (subtotal > 0) {
+        if (v.mode !== "accounting-invoice" && subtotal > 0) {
           // DISCOUNT
           if (Number(v.discountTotal) > 0) {
             v.entries.push({
@@ -488,7 +488,7 @@ router.get("/", async (req, res) => {
         const subtotal = Number(v.subtotal || 0);
         const vid = v.id.split("-")[1];
 
-        if (subtotal > 0) {
+        if (v.mode !== "accounting-invoice" && subtotal > 0) {
           // 🔴 OVERALL DISCOUNT (FROM HEADER)
           if (Number(v.overallDiscountAmount) > 0) {
             v.entries.push({

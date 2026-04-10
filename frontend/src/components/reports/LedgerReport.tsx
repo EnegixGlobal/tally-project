@@ -550,10 +550,13 @@ const LedgerReport: React.FC = () => {
     let id = txn.id;
     const type = txn.voucherType.toLowerCase();
 
-    if (type === "purchase") id = `PUR-${txn.id}`;
-    else if (type === "sales") id = `SAL-${txn.id}`;
-    else if (["payment", "receipt", "contra", "journal"].includes(type))
-      id = `ACC-${txn.id}`;
+    if (type === "purchase") {
+      id = txn.id.startsWith("PUR-") ? txn.id : `PUR-${txn.id}`;
+    } else if (type === "sales") {
+      id = txn.id.startsWith("SAL-") ? txn.id : `SAL-${txn.id}`;
+    } else if (["payment", "receipt", "contra", "journal"].includes(type)) {
+      id = txn.id.startsWith("ACC-") ? txn.id : `ACC-${txn.id}`;
+    }
 
     // DN and CN often have prefixes like DN-123-456, so we might need to handle it.
     // Based on backend logic:
