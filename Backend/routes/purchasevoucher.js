@@ -656,13 +656,14 @@ router.get("/", async (req, res) => {
             let cgst = 0;
             let sgst = 0;
             let igst = 0;
+            let discount = 0;
 
             vEntries.forEach((e) => {
-              if (e.entry_type === "debit") {
-                const amt = Number(e.amount || 0);
-                const lName = (e.ledger_name || "").toLowerCase();
-                const gName = (e.group_name || "").toLowerCase();
+              const amt = Number(e.amount || 0);
+              const lName = (e.ledger_name || "").toLowerCase();
+              const gName = (e.group_name || "").toLowerCase();
 
+              if (e.entry_type === "debit") {
                 const isTax = gName.includes("duties") || gName.includes("tax") || 
                              (lName.includes("gst") && (lName.includes("input") || lName.includes("@")));
 
@@ -673,6 +674,12 @@ router.get("/", async (req, res) => {
                 } else {
                   subtotal += amt;
                 }
+              } else {
+                // Check for discount in credits for Purchase
+                const isDiscount = lName.includes("discount") || gName.includes("discount");
+                if (isDiscount) {
+                  discount += amt;
+                }
               }
             });
 
@@ -680,6 +687,7 @@ router.get("/", async (req, res) => {
             v.cgstTotal = cgst;
             v.sgstTotal = sgst;
             v.igstTotal = igst;
+            v.discountTotal = discount;
           }
         });
       }
@@ -718,7 +726,8 @@ router.get("/month-wise", async (req, res) => {
         discountTotal,
         total,
         purchaseLedgerId,
-        company_id
+        company_id,
+        mode
       FROM purchase_vouchers
       WHERE owner_type = ?
         AND owner_id = ?
@@ -800,13 +809,14 @@ router.get("/month-wise", async (req, res) => {
             let cgst = 0;
             let sgst = 0;
             let igst = 0;
+            let discount = 0;
 
             vEntries.forEach((e) => {
-              if (e.entry_type === "debit") {
-                const amt = Number(e.amount || 0);
-                const lName = (e.ledger_name || "").toLowerCase();
-                const gName = (e.group_name || "").toLowerCase();
+              const amt = Number(e.amount || 0);
+              const lName = (e.ledger_name || "").toLowerCase();
+              const gName = (e.group_name || "").toLowerCase();
 
+              if (e.entry_type === "debit") {
                 const isTax = gName.includes("duties") || gName.includes("tax") || 
                              (lName.includes("gst") && (lName.includes("input") || lName.includes("@")));
 
@@ -817,6 +827,12 @@ router.get("/month-wise", async (req, res) => {
                 } else {
                   subtotal += amt;
                 }
+              } else {
+                // Check for discount in credits for Purchase
+                const isDiscount = lName.includes("discount") || gName.includes("discount");
+                if (isDiscount) {
+                  discount += amt;
+                }
               }
             });
 
@@ -824,6 +840,7 @@ router.get("/month-wise", async (req, res) => {
             v.cgstTotal = cgst;
             v.sgstTotal = sgst;
             v.igstTotal = igst;
+            v.discountTotal = discount;
           }
         });
       }
