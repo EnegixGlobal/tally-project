@@ -328,6 +328,17 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
   const totals = calculateTotals();
   const { subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total } =
     totals;
+
+  const activeTotalRows = [
+    { label: "Invoice Value", value: subtotal, condition: true },
+    { label: "CGST", value: cgstTotal, condition: cgstTotal > 0 },
+    { label: "SGST", value: sgstTotal, condition: sgstTotal > 0 },
+    { label: "IGST", value: igstTotal, condition: igstTotal > 0 },
+    { label: "Discount", value: discountTotal, condition: discountTotal > 0 },
+    { label: "Grand Total", value: total, condition: true, isBold: true },
+  ].filter((row) => row.condition);
+
+  const rowSpanCount = activeTotalRows.length;
   const grandTotal = total;
   const selectedItems = voucherData.entries.filter(
     (entry) => entry.itemId && entry.itemId !== "" && entry.itemId !== "select"
@@ -861,84 +872,44 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
 
               {/* Tax Summary */}
               <tfoot>
-                <tr>
-                  <td colSpan={7} className="border border-black p-2 text-xs align-top">
-                    <strong>Terms & Conditions:</strong>
-                    <br />
-                    <span className="text-xs">
-                      • Goods once sold will not be taken back.
-                      <br />
-                      • Interest @ 18% p.a. will be charged on delayed payments.
-                      <br />
-                      • Subject to {companyInfo.address || "Local"} Jurisdiction only.
-                      <br />
-                      • Our responsibility ceases as soon as goods leave our premises.
-                      <br />
-                      • Delivery charges extra as applicable.
-                    </span>
-                  </td>
-
-                  {/* RIGHT SIDE TOTALS */}
-                  <td colSpan={2} className="border border-black p-0">
-                    <table className="w-full border-collapse">
-                      <tbody>
-                        <tr>
-                          <td className="border border-black p-2 text-right">Subtotal</td>
-                          <td className="border border-black p-2 text-right">
-                            ₹{formatSmart(subtotal)}
-                          </td>
-                        </tr>
-
-                        {cgstTotal > 0 && (
-                          <tr>
-                            <td className="border border-black p-2 text-right">CGST</td>
-                            <td className="border border-black p-2 text-right">
-                              ₹{formatSmart(cgstTotal)}
-                            </td>
-                          </tr>
-                        )}
-
-                        {sgstTotal > 0 && (
-                          <tr>
-                            <td className="border border-black p-2 text-right">SGST</td>
-                            <td className="border border-black p-2 text-right">
-                              ₹{formatSmart(sgstTotal)}
-                            </td>
-                          </tr>
-                        )}
-
-                        {igstTotal > 0 && (
-                          <tr>
-                            <td className="border border-black p-2 text-right">IGST</td>
-                            <td className="border border-black p-2 text-right">
-                              ₹{formatSmart(igstTotal)}
-                            </td>
-                          </tr>
-                        )}
-
-                        {discountTotal > 0 && (
-                          <tr>
-                            <td className="border border-black p-2 text-right">
-                              Less: Discount
-                            </td>
-                            <td className="border border-black p-2 text-right">
-                              ₹{formatSmart(discountTotal)}
-                            </td>
-                          </tr>
-                        )}
-
-                        <tr>
-                          <td className="border border-black p-2 text-right font-bold">
-                            Grand Total
-                          </td>
-                          <td className="border border-black p-2 text-right font-bold">
-                            ₹{formatSmart(total)}
-                          </td>
-                        </tr>
-                      </tbody>
-                    </table>
-                  </td>
-                </tr>
+                {activeTotalRows.map((row, index) => (
+                  <tr key={row.label}>
+                    {index === 0 && (
+                      <td
+                        colSpan={7}
+                        rowSpan={rowSpanCount}
+                        className="border border-black p-2 text-xs align-top"
+                      >
+                        <strong>Terms & Conditions:</strong>
+                        <br />
+                        <span className="text-xs">
+                          • Goods once sold will not be taken back.
+                          <br />
+                          • Interest @ 18% p.a. will be charged on delayed payments.
+                          <br />
+                          • Subject to {companyInfo.address || "Local"} Jurisdiction only.
+                          <br />
+                          • Our responsibility ceases as soon as goods leave our premises.
+                          <br />
+                          • Delivery charges extra as applicable.
+                        </span>
+                      </td>
+                    )}
+                    <td
+                      colSpan={2}
+                      className={`border border-black p-2 text-left ${row.isBold ? "font-bold" : ""
+                        }`}
+                    >
+                      {row.label}
+                    </td>
+                    <td
+                      className={`border border-black p-2 text-right w-25 ${row.isBold ? "font-bold" : ""
+                        }`}
+                    >
+                      ₹{formatSmart(row.value)}
+                    </td>
+                  </tr>
+                ))}
               </tfoot>
             </table>
 
