@@ -398,7 +398,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       const cgst = Number(p.cgstTotal || p.cgst || 0);
       const sgst = Number(p.sgstTotal || p.sgst || 0);
       const igst = Number(p.igstTotal || p.igst || 0);
-      const total = subtotal + cgst + sgst + igst;
+      const discountTotal = Number(p.discountTotal || 0);
+      const total = subtotal + cgst + sgst + igst - discountTotal;
 
       return {
         id: String(p.id),
@@ -412,6 +413,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         cgstTotal: cgst,
         sgstTotal: sgst,
         igstTotal: igst,
+        discountTotal,
         total,
 
         entries: [
@@ -1243,8 +1245,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             <button
               onClick={() => setShowActions(!showActions)}
               className={`p-2 rounded-lg transition-colors ${showActions
-                  ? "bg-blue-100 text-blue-600"
-                  : "text-gray-500 hover:bg-gray-100"
+                ? "bg-blue-100 text-blue-600"
+                : "text-gray-500 hover:bg-gray-100"
                 }`}
               title="Toggle Action Mode"
             >
@@ -1530,18 +1532,12 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   (e) => e.type === "credit"
                 );
 
-                const subtotal =
-                  typeof voucher.subtotal === "number" ? voucher.subtotal : 0;
-                const cgst =
-                  typeof voucher.cgstTotal === "number" ? voucher.cgstTotal : 0;
-                const sgst =
-                  typeof voucher.sgstTotal === "number" ? voucher.sgstTotal : 0;
-                const igst =
-                  typeof voucher.igstTotal === "number" ? voucher.igstTotal : 0;
-                const discountTotal =
-                  typeof voucher.discountTotal === "number" ? voucher.discountTotal : 0;
-                const total =
-                  typeof voucher.total === "number" ? voucher.total : 0;
+                const subtotal = Number(voucher.subtotal) || 0;
+                const cgst = Number(voucher.cgstTotal) || 0;
+                const sgst = Number(voucher.sgstTotal) || 0;
+                const igst = Number(voucher.igstTotal) || 0;
+                const discountTotal = Number(voucher.discountTotal) || 0;
+                const total = Number(voucher.total) || 0;
 
                 return (
                   <tr key={voucher.id} className="hover:bg-gray-50">
@@ -1746,6 +1742,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
                       {/* Tax Total */}
                       {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.cgstTotal || 0) + Number(v.sgstTotal || 0) + Number(v.igstTotal || 0)), 0))}
+                    </td>
+                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                      {/* Discount Total */}
+                      {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.discountTotal) || 0), 0))}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600 text-right">
                       {formatTableAmount(

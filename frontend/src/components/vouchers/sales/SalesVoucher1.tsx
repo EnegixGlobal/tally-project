@@ -2016,36 +2016,34 @@ const SalesVoucher: React.FC = () => {
       let cgstTotal = 0;
       let sgstTotal = 0;
       let igstTotal = 0;
-      let discountTotal = 0;
+      let itemDiscountTotal = 0;
 
       formData.entries.forEach((entry) => {
-        const qty = entry.quantity || 0;
-        const rate = entry.rate || 0;
-        const discount = entry.discount || 0;
+        const qty = Number(entry.quantity || 0);
+        const rate = Number(entry.rate || 0);
+        const discount = Number(entry.discount || 0);
 
         const baseAmount = qty * rate;
-        const gstRate =
-          (entry.cgstRate || 0) + (entry.sgstRate || 0) + (entry.igstRate || 0);
-        // const gstAmount = (baseAmount * gstRate) / 100;
+        const netAmount = baseAmount - discount; // GST is calculated on net amount
 
-        subtotal += baseAmount;
-        discountTotal += discount;
-        cgstTotal += (baseAmount * (entry.cgstRate || 0)) / 100;
-        sgstTotal += (baseAmount * (entry.sgstRate || 0)) / 100;
-        igstTotal += (baseAmount * (entry.igstRate || 0)) / 100;
+        subtotal += netAmount; // Taxable Value should be net
+        itemDiscountTotal += discount;
+        cgstTotal += (netAmount * (entry.cgstRate || 0)) / 100;
+        sgstTotal += (netAmount * (entry.sgstRate || 0)) / 100;
+        igstTotal += (netAmount * (entry.igstRate || 0)) / 100;
       });
 
       const overallDiscount = Number(formData.discountAmount || 0);
-      const total = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal - overallDiscount;
+      const total = subtotal + cgstTotal + sgstTotal + igstTotal - overallDiscount;
 
       return {
         subtotal,
         cgstTotal,
         sgstTotal,
         igstTotal,
-        itemDiscountTotal: discountTotal,
+        itemDiscountTotal,
         overallDiscount,
-        discountTotal: overallDiscount, // Return manual for footer display or keep both
+        discountTotal: itemDiscountTotal + overallDiscount,
         total,
       };
     } else {
@@ -2067,27 +2065,34 @@ const SalesVoucher: React.FC = () => {
 
         if (e.ledgerId) {
           const ledgerName = getLedgerName(String(e.ledgerId)).toLowerCase();
+          const isTax = /cgst|sgst|igst/i.test(ledgerName);
+          const isDiscount = /discount|disc|rebate|allowance|less|deduction/i.test(ledgerName);
+
           if (ledgerName.includes("cgst")) {
             cgstTotal += amt;
           } else if (ledgerName.includes("sgst")) {
             sgstTotal += amt;
           } else if (ledgerName.includes("igst")) {
             igstTotal += amt;
-          } else if (ledgerName.includes("discount")) {
+          } else if (isDiscount) {
             discountTotal += amt;
-          } else if (ledgerName.includes("sales")) {
+          } else if (ledgerName.includes("sales") || (!isTax && !isDiscount && e.type === "credit")) {
             subtotal += amt;
           }
         }
       });
 
-      // If no ledger named 'sales' found, subtotal is credit total minus taxes
-      const finalSubtotal = subtotal || (creditTotal - cgstTotal - sgstTotal - igstTotal);
+      // Taxable Value is subtotal minus any credit-side discounts or plus debit-side discounts? 
+      // Usually, it's just the Sales ledger amount.
+      const finalSubtotal = subtotal;
 
-      return {
+      // Net Invoice Value = CreditTotal - DiscountTotal (assuming Discount is a deduction)
+      const total = creditTotal - discountTotal;
+
+      const result = {
         debitTotal,
         creditTotal,
-        total: debitTotal,
+        total: total > 0 ? total : creditTotal,
         subtotal: finalSubtotal,
         cgstTotal,
         sgstTotal,
@@ -3099,18 +3104,18 @@ const SalesVoucher: React.FC = () => {
                             {/* DISCOUNT */}
                             {columnSettings.showDiscount && (
                               <td className="px-1 py-2 min-w-[70px] align-top">
-                                <select
-                                  name="discountLedgerId"
-                                  value={entry.discountLedgerId || ""}
-                                  onChange={(e) => handleEntryChange(index, e)}
-                                  className={`${FORM_STYLES.tableSelect(theme)} text-xs min-w-[100px]`}
-                                >
-                                  <option value="">Select Discount</option>
-                                  {discount.map(l => (
-                                    <option key={l.id} value={l.id}>{l.name}</option>
-                                  ))
-                                  }
-                                </select>
+                                  <select
+                                    name="discountLedgerId"
+                                    value={entry.discountLedgerId || ""}
+                                    onChange={(e) => handleEntryChange(index, e)}
+                                    className={`${FORM_STYLES.tableSelect(theme)} text-xs min-w-[100px]`}
+                                  >
+                                    <option value="">Select Discount</option>
+                                    {discount.map(l => (
+                                      <option key={l.id} value={l.id}>{l.name}</option>
+                                    ))
+                                    }
+                                  </select>
                               </td>
                             )}
 
