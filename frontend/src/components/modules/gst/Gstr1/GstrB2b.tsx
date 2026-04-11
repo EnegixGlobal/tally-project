@@ -18,6 +18,7 @@ const Gstr2B2b = () => {
     ) || "";
 
   const [saleData, setSaleData] = useState<any[]>([]);
+  const [allSales, setAllSales] = useState<any[]>([]);
   const [ledger, setLedger] = useState<any[]>([]);
   const [matchedSales, setMatchedSales] = useState<any[]>([]);
 
@@ -41,6 +42,7 @@ const Gstr2B2b = () => {
         const json = await res.json();
         console.log("salesvoucher", json);
         const vouchers = json?.data || json || [];
+        setAllSales(vouchers);
 
         // Filter by date range if provided
         let filteredVouchers = vouchers;
@@ -191,17 +193,21 @@ const Gstr2B2b = () => {
     );
   };
 
-  const generateFullJSON = () => {
-    if (matchedSales.length === 0) return;
+  const generateFullJSON = (dataToExport?: any[], fromDate?: string, toDate?: string) => {
+    const list = dataToExport || matchedSales;
+    if (list.length === 0) return;
+
+    const fDate = fromDate || filters.fromDate;
+    const tDate = toDate || filters.toDate;
 
     const payload = {
       type: "GSTR-1",
       section: "B2B Cumulative",
       period: {
-        from: filters.fromDate,
-        to: filters.toDate,
+        from: fDate,
+        to: tDate,
       },
-      data: matchedSales.map((row: any) => {
+      data: list.map((row: any) => {
         const ledger = row.ledger;
         return {
           gstin: ledger?.gstNumber || "",
@@ -218,10 +224,10 @@ const Gstr2B2b = () => {
         };
       }),
       totals: {
-        taxableValue: totals.taxableValue,
-        igst: totals.igstAmount,
-        cgst: totals.cgstAmount,
-        sgst: totals.sgstAmount,
+        taxableValue: list.reduce((acc, row) => acc + (Number(row.subtotal) || 0), 0),
+        igst: list.reduce((acc, row) => acc + (Number(row.igstTotal) || 0), 0),
+        cgst: list.reduce((acc, row) => acc + (Number(row.cgstTotal) || 0), 0),
+        sgst: list.reduce((acc, row) => acc + (Number(row.sgstTotal) || 0), 0),
       },
       generatedAt: new Date().toISOString(),
     };
@@ -232,12 +238,47 @@ const Gstr2B2b = () => {
 
     const link = document.createElement("a");
     link.href = url;
-    link.download = `B2B_Report_${filters.fromDate}_to_${filters.toDate}.json`;
+    link.download = `B2B_Report_${fDate}_to_${tDate}.json`;
 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleMonthDownload = (monthIndex: number) => {
+    // Current FY start year
+    const startYear = new Date(filters.fromDate).getFullYear();
+    const isNextYear = monthIndex < 3; // Jan, Feb, Mar are index 0, 1, 2
+    const actualYear = isNextYear ? startYear + 1 : startYear;
+
+    // Adjust monthIndex for FY: April is 3, Jan is 0
+    // FY Months sequence: April(3), May(4)... Dec(11), Jan(0), Feb(1), Mar(2)
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    const startDate = new Date(actualYear, monthIndex, 1);
+    const endDate = new Date(actualYear, monthIndex + 1, 0);
+
+    const fromStr = startDate.toISOString().split("T")[0];
+    const toStr = endDate.toISOString().split("T")[0];
+
+    // Filter allSales for this month and only GST-enabled ledgers
+    const monthSales = allSales.filter((s: any) => {
+      const d = new Date(s.date);
+      return d >= startDate && d <= endDate;
+    });
+
+    const monthB2B = monthSales.map((s) => {
+      const l = ledger.find((gl) => gl.id === s.partyId && gl.gstNumber);
+      return l ? { ...s, ledger: l } : null;
+    }).filter(Boolean);
+
+    if (monthB2B.length === 0) {
+      alert(`No B2B data found for ${monthNames[monthIndex]} ${actualYear}`);
+      return;
+    }
+
+    generateFullJSON(monthB2B, fromStr, toStr);
   };
 
   const handlePrint = () => {
@@ -259,6 +300,28 @@ const Gstr2B2b = () => {
         </button>
         <h1 className="text-2xl font-bold">4A - B2B Supplies</h1>
         <div className="ml-auto flex space-x-2">
+          <div className="flex items-center no-print mr-2">
+            <select
+              title="Download JSON by Month"
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleMonthDownload(Number(e.target.value));
+                  e.target.value = ""; // Reset
+                }
+              }}
+              className={`text-xs p-1 rounded border outline-none ${theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "bg-white border-gray-300 text-gray-700"
+                }`}
+            >
+              <option value="">Download JSON (Month)</option>
+              {/* Fiscal Year April to March */}
+              {[3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2].map((m) => {
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                return <option key={m} value={m}>{monthNames[m]}</option>;
+              })}
+            </select>
+          </div>
           <button
             type="button"
             title="Filter"

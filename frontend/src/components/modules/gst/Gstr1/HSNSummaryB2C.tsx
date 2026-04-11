@@ -9,6 +9,7 @@ const HSNSummaryB2C = () => {
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [downloadLoading, setDownloadLoading] = useState(false);
   const [hsnData, setHsnData] = useState<any[]>([]);
 
   const companyId = localStorage.getItem("company_id") || "";
@@ -94,17 +95,21 @@ const HSNSummaryB2C = () => {
     XLSX.writeFile(wb, `HSN_Summary_B2C_${filters.fromDate}_to_${filters.toDate}.xlsx`);
   };
 
-  const generateFullJSON = () => {
-    if (hsnData.length === 0) return;
+  const generateFullJSON = (dataToExport?: any[], fromDate?: string, toDate?: string) => {
+    const list = dataToExport || hsnData;
+    if (list.length === 0) return;
+
+    const fDate = fromDate || filters.fromDate;
+    const tDate = toDate || filters.toDate;
 
     const payload = {
       type: "GSTR-1",
       section: "HSN Summary B2C Cumulative",
       period: {
-        from: filters.fromDate,
-        to: filters.toDate,
+        from: fDate,
+        to: tDate,
       },
-      data: hsnData.map((row) => {
+      data: list.map((row) => {
         const taxableValue = Number(row.taxableValue) || 0;
         const rate = Number(row.taxRate || 0);
 
@@ -131,12 +136,57 @@ const HSNSummaryB2C = () => {
 
     const link = document.createElement("a");
     link.href = url;
-    link.download = `HSN_Summary_B2C_${filters.fromDate}_to_${filters.toDate}.json`;
+    link.download = `HSN_Summary_B2C_${fDate}_to_${tDate}.json`;
 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handleMonthDownload = async (monthIndex: number) => {
+    setDownloadLoading(true);
+    try {
+      const startYear = new Date(filters.fromDate).getFullYear();
+      const isNextYear = monthIndex < 3;
+      const actualYear = isNextYear ? startYear + 1 : startYear;
+
+      const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+      const startDate = new Date(actualYear, monthIndex, 1);
+      const endDate = new Date(actualYear, monthIndex + 1, 0);
+
+      const fromStr = startDate.toISOString().split("T")[0];
+      const toStr = endDate.toISOString().split("T")[0];
+
+      const params = new URLSearchParams({
+        company_id: companyId,
+        owner_type: ownerType,
+        owner_id: ownerId,
+        fromDate: fromStr,
+        toDate: toStr,
+        type: 'b2c'
+      });
+
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/b2c/hsn-summary?${params}`
+      );
+
+      if (!response.ok) throw new Error("Failed to fetch data");
+      const json = await response.json();
+      const data = json.data || [];
+
+      if (!data || data.length === 0) {
+        alert(`No HSN data found for ${monthNames[monthIndex]} ${actualYear}`);
+        return;
+      }
+
+      generateFullJSON(data, fromStr, toStr);
+    } catch (err) {
+      console.error(err);
+      alert("Failed to download month report");
+    } finally {
+      setDownloadLoading(false);
+    }
   };
 
   const handlePrint = () => {
@@ -158,6 +208,30 @@ const HSNSummaryB2C = () => {
         </button>
         <h1 className="text-2xl font-bold">10 - HSN Summary (B2C)</h1>
         <div className="ml-auto flex space-x-2">
+          {downloadLoading && <span className="text-xs text-blue-600 animate-pulse self-center">Downloading...</span>}
+          <div className="flex items-center no-print mr-1">
+            <select
+              title="Download JSON by Month"
+              disabled={downloadLoading}
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleMonthDownload(Number(e.target.value));
+                  e.target.value = ""; // Reset
+                }
+              }}
+              className={`text-xs p-1 rounded border outline-none ${theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "bg-white border-gray-300 text-gray-700"
+                }`}
+            >
+              <option value="">Download JSON (Month)</option>
+              {/* Fiscal Year April to March */}
+              {[3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2].map((m) => {
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                return <option key={m} value={m}>{monthNames[m]}</option>;
+              })}
+            </select>
+          </div>
           <button
             type="button"
             title="Filter"
@@ -179,7 +253,7 @@ const HSNSummaryB2C = () => {
           <button
             title="Export to JSON"
             type="button"
-            onClick={generateFullJSON}
+            onClick={() => generateFullJSON()}
             className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
               }`}
           >
