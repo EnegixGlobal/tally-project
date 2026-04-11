@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCompany } from "../../context/CompanyContext";
 import type { VoucherEntry } from "../../types";
-import { ArrowLeft, Download } from "lucide-react";
+import { ArrowLeft, Download, Settings, Copy, Edit2, Trash2 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import PrintOptions from "../vouchers/sales/PrintOptions";
 import SalesInvoiceDownloadModal from "../vouchers/sales/SalesInvoiceDownloadModal";
@@ -131,6 +131,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   >("Daily");
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [showMonthList, setShowMonthList] = useState(false);
+  const [showActions, setShowActions] = useState(false);
+
   const { activeCompanyId } = useCompany();
   const companyId = activeCompanyId ?? localStorage.getItem("company_id") ?? "";
   const ownerType = localStorage.getItem("supplier") || "";
@@ -791,7 +793,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     0
   );
   const statusCounts = filteredVouchers.reduce((acc, voucher) => {
-    const status = getVoucherStatus(voucher);
     acc[status] = (acc[status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -1222,6 +1223,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       {/* Header */}
       <div className="mb-6">
         <div className="flex justify-between items-center">
+
+          {/* LEFT SIDE */}
           <div className="flex items-center">
             <button
               onClick={() => navigate("/app/voucher-register")}
@@ -1230,17 +1233,35 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             >
               <ArrowLeft size={24} />
             </button>
+
             <h1 className="text-2xl font-bold text-gray-900">{title}</h1>
           </div>
-          {hasPermission("add") && onAdd && (
+
+          {/* RIGHT SIDE */}
+          <div className="flex items-center gap-3">
+
             <button
-              onClick={onAdd}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
-              title={`Add new ${voucherType} voucher`}
+              onClick={() => setShowActions(!showActions)}
+              className={`p-2 rounded-lg transition-colors ${showActions
+                  ? "bg-blue-100 text-blue-600"
+                  : "text-gray-500 hover:bg-gray-100"
+                }`}
+              title="Toggle Action Mode"
             >
-              Add New
+              <Settings size={20} />
             </button>
-          )}
+
+            {hasPermission("add") && onAdd && (
+              <button
+                onClick={onAdd}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+                title={`Add new ${voucherType} voucher`}
+              >
+                Add New
+              </button>
+            )}
+
+          </div>
         </div>
       </div>
 
@@ -1490,9 +1511,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     </th>
                   </>
                 )}
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                {showActions && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
 
@@ -1638,45 +1661,51 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       </>
                     )}
 
-                    <td className="px-6 py-4 text-sm font-medium space-x-3">
-                      {onCopy && (
-                        <button
-                          onClick={() => onCopy(voucher)}
-                          className="text-blue-600 hover:text-blue-900"
-                        >
-                          Copy
-                        </button>
-                      )}
+                    {showActions && (
+                      <td className="px-6 py-4 text-sm font-medium space-x-3 min-w-[150px]">
+                        <div className="flex items-center space-x-3 animate-in fade-in slide-in-from-left-1">
+                          {onCopy && (
+                            <button
+                              onClick={() => onCopy(voucher)}
+                              className="text-blue-600 hover:text-blue-900"
+                              title="Copy"
+                            >
+                              <Copy size={16} />
+                            </button>
+                          )}
 
-                      {onEdit && (
-                        <button
-                          onClick={() => onEdit(voucher)}
-                          className="text-indigo-600 hover:text-indigo-900"
-                        >
-                          Edit
-                        </button>
-                      )}
+                          {onEdit && (
+                            <button
+                              onClick={() => onEdit(voucher)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Edit"
+                            >
+                              <Edit2 size={16} />
+                            </button>
+                          )}
 
-                      {onDelete && (
-                        <button
-                          onClick={() => onDelete(String(voucher.id))}
-                          className="text-red-600 hover:text-red-900"
-                        >
-                          Delete
-                        </button>
-                      )}
+                          {onDelete && (
+                            <button
+                              onClick={() => onDelete(String(voucher.id))}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete"
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          )}
 
-                      {/* Download Invoice — only for sales vouchers */}
-                      {voucherType === "sales" && (
-                        <button
-                          title="Download / Print Invoice"
-                          onClick={() => setDownloadVoucherId(String(voucher.id))}
-                          className="text-green-600 hover:text-green-900 transition-colors"
-                        >
-                          <Download className="w-4 h-4" />
-                        </button>
-                      )}
-                    </td>
+                          {voucherType === "sales" && (
+                            <button
+                              title="Download / Print Invoice"
+                              onClick={() => setDownloadVoucherId(String(voucher.id))}
+                              className="text-green-600 hover:text-green-900 transition-colors"
+                            >
+                              <Download className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -1722,9 +1751,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       {formatTableAmount(
                         filteredVouchers.reduce(
                           (sum: number, v: VoucherEntry) => {
-                             const { debit, credit } = calculateDebitCredit(v);
-                             if (["sales", "quotation", "credit_note"].includes(voucherType)) return sum + debit;
-                             return sum + credit;
+                            const { debit, credit } = calculateDebitCredit(v);
+                            if (["sales", "quotation", "credit_note"].includes(voucherType)) return sum + debit;
+                            return sum + credit;
                           },
                           0
                         )
@@ -1760,9 +1789,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             </tfoot>
           </table>
         </div>
+      </div>
 
-        {/* Pagination */}
-        {totalPages > 1 && (
+      {/* Pagination */}
+      {
+        totalPages > 1 && (
           <div className="bg-white px-4 py-3 flex items-center justify-between border-t border-gray-200 sm:px-6">
             <div className="flex-1 flex justify-between sm:hidden">
               <button
@@ -1809,8 +1840,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         key={page}
                         onClick={() => setCurrentPage(page)}
                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === currentPage
-                            ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
-                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                          ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
+                          : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
                           }`}
                       >
                         {page}
@@ -1830,9 +1861,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               </div>
             </div>
           </div>
-        )}
-      </div>
-
+        )
+      }
       {/* Print Options Modal */}
       <PrintOptions
         theme={theme}
@@ -1848,7 +1878,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       {/* Sales Invoice Download Modal */}
       {downloadVoucherId && (
         <SalesInvoiceDownloadModal
-          voucherId={downloadVoucherId}
+          voucherId={downloadVoucherId as any}
           onClose={() => setDownloadVoucherId(null)}
         />
       )}

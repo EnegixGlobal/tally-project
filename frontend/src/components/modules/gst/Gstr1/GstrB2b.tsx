@@ -137,14 +137,12 @@ const Gstr2B2b = () => {
         igstAmount: acc.igstAmount + (Number(item.igstTotal) || 0),
         cgstAmount: acc.cgstAmount + (Number(item.cgstTotal) || 0),
         sgstAmount: acc.sgstAmount + (Number(item.sgstTotal) || 0),
-        cessAmount: 0,
       }),
       {
         taxableValue: 0,
         igstAmount: 0,
         cgstAmount: 0,
         sgstAmount: 0,
-        cessAmount: 0,
       }
     );
   }, [matchedSales]);
@@ -171,8 +169,6 @@ const Gstr2B2b = () => {
         "CGST Amount": Number(row.cgstTotal) || 0,
         "SGST Rate": `${getTaxRate(row.sgstTotal, row.subtotal)}%`,
         "SGST Amount": Number(row.sgstTotal) || 0,
-        "Cess Rate": "0%",
-        "Cess Amount": 0,
       };
     });
 
@@ -185,7 +181,6 @@ const Gstr2B2b = () => {
       { Description: "Total IGST", Amount: totals.igstAmount },
       { Description: "Total CGST", Amount: totals.cgstAmount },
       { Description: "Total SGST", Amount: totals.sgstAmount },
-      { Description: "Total Cess", Amount: totals.cessAmount },
     ];
     const summaryWs = XLSX.utils.json_to_sheet(summaryData);
     XLSX.utils.book_append_sheet(wb, summaryWs, "Summary");
@@ -196,26 +191,37 @@ const Gstr2B2b = () => {
     );
   };
 
-  const generateRowJSON = (row: any) => {
-    const ledger = row.ledger;
+  const generateFullJSON = () => {
+    if (matchedSales.length === 0) return;
 
     const payload = {
       type: "GSTR-1",
-      section: "B2B",
-      invoice: {
-        gstin: ledger?.gstNumber || "",
-        receiverName: ledger?.name || "",
-        invoiceNumber: row.number,
-        invoiceDate: row.date,
-        placeOfSupply: ledger?.state || "",
-        invoiceValue: Number(row.total || 0),
+      section: "B2B Cumulative",
+      period: {
+        from: filters.fromDate,
+        to: filters.toDate,
       },
-      tax: {
-        taxableValue: Number(row.subtotal || 0),
-        igst: Number(row.igstTotal || 0),
-        cgst: Number(row.cgstTotal || 0),
-        sgst: Number(row.sgstTotal || 0),
-        cess: 0,
+      data: matchedSales.map((row: any) => {
+        const ledger = row.ledger;
+        return {
+          gstin: ledger?.gstNumber || "",
+          receiverName: ledger?.name || "",
+          invoiceNumber: row.number,
+          invoiceDate: row.date,
+          placeOfSupply: ledger?.state || "",
+          invoiceValue: Number(row.total || 0),
+          taxableValue: Number(row.subtotal || 0),
+          igst: Number(row.igstTotal || 0),
+          cgst: Number(row.cgstTotal || 0),
+          sgst: Number(row.sgstTotal || 0),
+          cess: 0,
+        };
+      }),
+      totals: {
+        taxableValue: totals.taxableValue,
+        igst: totals.igstAmount,
+        cgst: totals.cgstAmount,
+        sgst: totals.sgstAmount,
       },
       generatedAt: new Date().toISOString(),
     };
@@ -226,14 +232,13 @@ const Gstr2B2b = () => {
 
     const link = document.createElement("a");
     link.href = url;
-    link.download = `B2B_${row.number}.json`;
+    link.download = `B2B_Report_${filters.fromDate}_to_${filters.toDate}.json`;
 
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
   };
-
 
   const handlePrint = () => {
     window.print();
@@ -273,7 +278,16 @@ const Gstr2B2b = () => {
             <Printer size={18} />
           </button>
           <button
-            title="Export"
+            title="Export to JSON"
+            type="button"
+            onClick={generateFullJSON}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
+          >
+            <span className="text-xs font-bold px-1">JSON</span>
+          </button>
+          <button
+            title="Export to Excel"
             type="button"
             onClick={exportToExcel}
             className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
@@ -399,41 +413,30 @@ const Gstr2B2b = () => {
                     <th className="border border-gray-300 p-2 text-xs font-bold text-center">
                       Reverse Charge
                     </th>
+                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
+                      Application of Tax Rate
+                    </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Invoice Type
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       E-Commerce GSTIN
                     </th>
+                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
+                      Rate
+                    </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
                       Taxable Value
                     </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      IGST Rate
-                    </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      CGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      SGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Action
+                      Cess Amount
                     </th>
                   </tr>
                 </thead>
                 <tbody>
                   {matchedSales.map((row: any, index: number) => {
                     const ledger = row.ledger;
+                    const taxRate = getTaxRate(Number(row.igstTotal || 0) + Number(row.cgstTotal || 0) + Number(row.sgstTotal || 0), row.subtotal);
                     return (
                       <tr
                         key={index}
@@ -463,42 +466,23 @@ const Gstr2B2b = () => {
                         <td className="border border-gray-300 p-2 text-xs text-center">
                           N
                         </td>
+                        <td className="border border-gray-300 p-2 text-xs text-center">
+                          {/* {taxRate}% */}
+                        </td>
                         <td className="border border-gray-300 p-2 text-xs">
                           Regular
                         </td>
                         <td className="border border-gray-300 p-2 text-xs font-mono">
-                          -
+                          {/* - */}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs text-center">
+                          {taxRate}%
                         </td>
                         <td className="border border-gray-300 p-2 text-xs text-right font-mono">
                           ₹{Number(row.subtotal || 0).toLocaleString()}
                         </td>
-                        <td className="border border-gray-300 p-2 text-xs text-center">
-                          {getTaxRate(row.igstTotal, row.subtotal)}%
-                        </td>
                         <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                          ₹{Number(row.igstTotal || 0).toLocaleString()}
-                        </td>
-                        <td className="border border-gray-300 p-2 text-xs text-center">
-                          {getTaxRate(row.cgstTotal, row.subtotal)}%
-                        </td>
-                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                          ₹{Number(row.cgstTotal || 0).toLocaleString()}
-                        </td>
-                        <td className="border border-gray-300 p-2 text-xs text-center">
-                          {getTaxRate(row.sgstTotal, row.subtotal)}%
-                        </td>
-                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                          ₹{Number(row.sgstTotal || 0).toLocaleString()}
-                        </td>
-                        <td className="border border-gray-300 p-2 text-xs text-center">
-                          <button
-                            type="button"
-                            onClick={() => generateRowJSON(row)}
-                            className="px-2 py-1 text-xs rounded
-      bg-blue-600 text-white hover:bg-blue-700"
-                          >
-                             JSON 
-                          </button>
+                          ₹0
                         </td>
                       </tr>
                     );
@@ -511,7 +495,7 @@ const Gstr2B2b = () => {
                         }`}
                     >
                       <td
-                        colSpan={9}
+                        colSpan={11}
                         className="border border-gray-300 p-2 text-xs text-right"
                       >
                         Total:
@@ -519,19 +503,9 @@ const Gstr2B2b = () => {
                       <td className="border border-gray-300 p-2 text-xs text-right font-mono">
                         ₹{totals.taxableValue.toLocaleString()}
                       </td>
-                      <td className="border border-gray-300 p-2 text-xs"></td>
                       <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{totals.igstAmount.toLocaleString()}
+                        ₹0
                       </td>
-                      <td className="border border-gray-300 p-2 text-xs"></td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{totals.cgstAmount.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs"></td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{totals.sgstAmount.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs"></td>
                     </tr>
                   )}
                 </tbody>

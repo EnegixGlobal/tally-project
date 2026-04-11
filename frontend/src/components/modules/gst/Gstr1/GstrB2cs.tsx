@@ -151,20 +151,55 @@ const GstrB2cs = () => {
     );
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const generateFullJSON = () => {
+    if (b2csData.length === 0) return;
 
-  const handleGenerateJSON = (supply: B2CSSupply) => {
-    const jsonData = JSON.stringify(supply, null, 2);
-    const blob = new Blob([jsonData], { type: "application/json" });
+    const payload = {
+      type: "GSTR-1",
+      section: "B2C Small Cumulative",
+      period: {
+        from: filters.fromDate,
+        to: filters.toDate,
+      },
+      data: b2csData.map((supply) => {
+        const totalTax = Number(supply.igstAmount || 0) + Number(supply.cgstAmount || 0) + Number(supply.sgstAmount || 0);
+        const taxRate = supply.taxableValue ? Math.round((totalTax / supply.taxableValue) * 100) : 0;
+        return {
+          type: "OE",
+          placeOfSupply: supply.placeOfSupply,
+          taxRate: taxRate,
+          rate: taxRate,
+          taxableValue: supply.taxableValue,
+          cessAmount: supply.cessAmount,
+          ecommerceGstin: "-",
+        };
+      }),
+      totals: {
+        taxableValue: totals.taxableValue,
+        igst: totals.igstAmount,
+        cgst: totals.cgstAmount,
+        sgst: totals.sgstAmount,
+        cess: totals.cessAmount,
+      },
+      generatedAt: new Date().toISOString(),
+    };
+
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
     const url = URL.createObjectURL(blob);
+
     const link = document.createElement("a");
     link.href = url;
-    link.download = `B2CS_${supply.invoiceNumber || "supply"}.json`;
+    link.download = `B2CS_Report_${filters.fromDate}_to_${filters.toDate}.json`;
+
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
+  const handlePrint = () => {
+    window.print();
   };
 
   return (
@@ -201,7 +236,16 @@ const GstrB2cs = () => {
             <Printer size={18} />
           </button>
           <button
-            title="Export"
+            title="Export to JSON"
+            type="button"
+            onClick={generateFullJSON}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
+          >
+            <span className="text-xs font-bold px-1">JSON</span>
+          </button>
+          <button
+            title="Export to Excel"
             type="button"
             onClick={exportToExcel}
             className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
@@ -308,110 +352,63 @@ const GstrB2cs = () => {
                       }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Invoice Number
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Invoice Date
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Invoice Value
+                      Type
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Place of Supply
                     </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Applicable % of Tax Rate
+                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
+                      Tax Rate
+                    </th>
+                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
+                      Rate
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
                       Taxable Value
                     </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      IGST Rate
-                    </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
+                      Cess Amount
                     </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      CGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      SGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
-                    </th>
-
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Action
+                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
+                      E-Commerce GSTIN
                     </th>
                   </tr>
                 </thead>
                 <tbody>
-                  {b2csData.map((supply, index) => (
-                    <tr
-                      key={supply.voucherId || index}
-                      className={`${theme === "dark"
-                        ? "hover:bg-gray-700"
-                        : "hover:bg-gray-50"
-                        }`}
-                    >
-                      <td className="border border-gray-300 p-2 text-xs font-mono">
-                        {supply.invoiceNumber || "-"}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">
-                        {formatDate(supply.invoiceDate)}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{supply.invoiceValue?.toLocaleString() || "0"}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">
-                        {formatPlaceOfSupply(supply.placeOfSupply)}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">-</td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{supply.taxableValue?.toLocaleString() || "0"}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.igstRate || 0}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{supply.igstAmount?.toLocaleString() || "0"}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.cgstRate || 0}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{supply.cgstAmount?.toLocaleString() || "0"}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        {supply.sgstRate || 0}%
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{supply.sgstAmount?.toLocaleString() || "0"}
-                      </td>
-
-                      <td className="border border-gray-300 p-2 text-xs text-center">
-                        <button
-                          onClick={() => handleGenerateJSON(supply)}
-                          className="flex items-center justify-center space-x-1 bg-green-600 hover:bg-green-700 text-white px-2 py-1 rounded text-[10px]"
-                          title="Generate JSON"
-                        >
-                          <FileJson size={12} />
-                          <span>Generate JSON</span>
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
+                  {b2csData.map((supply, index) => {
+                    const totalTax = Number(supply.igstAmount || 0) + Number(supply.cgstAmount || 0) + Number(supply.sgstAmount || 0);
+                    const taxRate = supply.taxableValue ? Math.round((totalTax / supply.taxableValue) * 100) : 0;
+                    return (
+                      <tr
+                        key={supply.voucherId || index}
+                        className={`${theme === "dark"
+                          ? "hover:bg-gray-700"
+                          : "hover:bg-gray-50"
+                          }`}
+                      >
+                        <td className="border border-gray-300 p-2 text-xs">OE</td>
+                        <td className="border border-gray-300 p-2 text-xs">
+                          {formatPlaceOfSupply(supply.placeOfSupply)}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs text-center"></td>
+                        <td className="border border-gray-300 p-2 text-xs text-center">{taxRate}%</td>
+                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
+                          ₹{supply.taxableValue?.toLocaleString() || "0"}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
+                          ₹{supply.cessAmount?.toLocaleString() || "0"}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs font-mono"></td>
+                      </tr>
+                    );
+                  })}
                   {b2csData.length > 0 && (
                     <tr
                       className={`font-bold ${theme === "dark" ? "bg-gray-600" : "bg-gray-200"
                         }`}
                     >
                       <td
-                        colSpan={5}
+                        colSpan={4}
                         className="border border-gray-300 p-2 text-xs text-right"
                       >
                         Total:
@@ -419,20 +416,9 @@ const GstrB2cs = () => {
                       <td className="border border-gray-300 p-2 text-xs text-right font-mono">
                         ₹{totals.taxableValue.toLocaleString()}
                       </td>
-                      <td className="border border-gray-300 p-2 text-xs"></td>
                       <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{totals.igstAmount.toLocaleString()}
+                        ₹{totals.cessAmount.toLocaleString()}
                       </td>
-                      <td className="border border-gray-300 p-2 text-xs"></td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{totals.cgstAmount.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs"></td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{totals.sgstAmount.toLocaleString()}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs"></td>
-
                       <td className="border border-gray-300 p-2 text-xs"></td>
                     </tr>
                   )}
@@ -445,6 +431,7 @@ const GstrB2cs = () => {
     </div>
   );
 };
+
 
 export default GstrB2cs;
 
