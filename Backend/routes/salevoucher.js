@@ -85,7 +85,7 @@ async function ensureSalesLedgerColumn() {
     FROM INFORMATION_SCHEMA.COLUMNS
     WHERE TABLE_SCHEMA = DATABASE()
       AND TABLE_NAME = 'sales_voucher_items'
-      AND COLUMN_NAME = 'salesLedgerId'
+      AND COLUMN_NAME = 'salesLedgerId'      
     `
   );
 
