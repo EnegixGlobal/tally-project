@@ -250,9 +250,14 @@ router.post("/", async (req, res) => {
       sales_type_id,
       bill_no,
       mode,
-      discountLedgerId: overallDiscountLedgerId,
+      discountLedgerId: overallDiscountLedgerIdRaw,
       discountAmount: overallDiscountAmount,
     } = req.body;
+
+    // Helper to handle empty strings for integer/ID columns
+    const cleanId = (id) => (id === "" || id === undefined || id === "null" ? null : id);
+
+    const overallDiscountLedgerId = cleanId(overallDiscountLedgerIdRaw);
 
     // ================= AUTH =================
     if (!companyId || !ownerType || !ownerId) {
@@ -348,7 +353,7 @@ router.post("/", async (req, res) => {
       number ?? null,
       date ?? null,
       narration ?? "",
-      partyId ?? null,
+      cleanId(partyId),
       referenceNo ?? null,
 
       dispatchDocNo,
@@ -366,17 +371,17 @@ router.post("/", async (req, res) => {
 
       type || "sales",
       isQuotation ? 1 : 0,
-      salesLedgerId ?? null,
+      cleanId(salesLedgerId),
       supplierInvoiceDate ?? null,
 
       companyId,
       ownerType,
       ownerId,
 
-      sales_type_id ?? null,
+      cleanId(sales_type_id),
       bill_no ?? null,
       mode || 'item-invoice',
-      overallDiscountLedgerId ?? null,
+      cleanId(overallDiscountLedgerId),
       overallDiscountAmount ?? 0
     ];
 

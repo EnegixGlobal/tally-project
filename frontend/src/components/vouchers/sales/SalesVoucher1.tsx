@@ -211,6 +211,48 @@ const SalesVoucher: React.FC = () => {
   const safeStockItems = stockItems || [];
   const safeLedgers = ledgers || [];
 
+  // ✅ Hoisted Helper Functions
+  function getLedgerName(ledgerId: any) {
+    if (!ledgerId) return "-";
+    const ledger = safeLedgers.find((l) => String(l.id) === String(ledgerId));
+    return ledger ? ledger.name : "-";
+  }
+
+  function getLedgerNameById(ledgerId: any) {
+    if (!ledgerId) return "-";
+    const ledger = safeLedgers.find((l) => String(l.id) === String(ledgerId));
+    if (!ledger?.name) return "-";
+    const match = ledger.name.match(/(\d+(\.\d+)?)/);
+    return match ? `${Math.round(Number(match[1]))}%` : ledger.name;
+  }
+
+  function getPartyName(partyId: any) {
+    if (!safeLedgers || safeLedgers.length === 0) return "Unknown Party";
+    const party = safeLedgers.find((ledger) => String(ledger.id) === String(partyId));
+    return party ? party.name : "Unknown Party";
+  }
+
+  function getSalesLedgerByGst(gstPercent: any, isIntra: boolean = false) {
+    if (!gstPercent || gstPercent <= 0) return null;
+    const gstStr = String(Math.round(gstPercent));
+    return safeLedgers.find((l) => {
+      const name = (l.name || "").toLowerCase();
+      if (!name.includes("sales")) return false;
+      if (isIntra) {
+        if (!name.includes("intra")) return false;
+      } else {
+        if (!name.includes("inter")) return false;
+      }
+      return (
+        name.includes(`${gstStr}%`) ||
+        name.includes(`${gstStr} %`) ||
+        name.includes(`sales ${gstStr}`) ||
+        name.includes(`@${gstStr}%`) ||
+        name.match(new RegExp(`\\b${gstStr}\\b`))
+      );
+    });
+  }
+
 
 
   // Fetch company info if not available in context
@@ -2007,23 +2049,50 @@ const SalesVoucher: React.FC = () => {
         total,
       };
     } else {
-      const debitTotal = formData.entries
-        .filter((e) => e.type === "debit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+      let debitTotal = 0;
+      let creditTotal = 0;
+      let cgstTotal = 0;
+      let sgstTotal = 0;
+      let igstTotal = 0;
+      let discountTotal = 0;
+      let subtotal = 0;
 
-      const creditTotal = formData.entries
-        .filter((e) => e.type === "credit")
-        .reduce((sum, e) => sum + (e.amount ?? 0), 0);
+      formData.entries.forEach((e) => {
+        const amt = Number(e.amount || 0);
+        if (e.type === "debit") {
+          debitTotal += amt;
+        } else {
+          creditTotal += amt;
+        }
+
+        if (e.ledgerId) {
+          const ledgerName = getLedgerName(String(e.ledgerId)).toLowerCase();
+          if (ledgerName.includes("cgst")) {
+            cgstTotal += amt;
+          } else if (ledgerName.includes("sgst")) {
+            sgstTotal += amt;
+          } else if (ledgerName.includes("igst")) {
+            igstTotal += amt;
+          } else if (ledgerName.includes("discount")) {
+            discountTotal += amt;
+          } else if (ledgerName.includes("sales")) {
+            subtotal += amt;
+          }
+        }
+      });
+
+      // If no ledger named 'sales' found, subtotal is credit total minus taxes
+      const finalSubtotal = subtotal || (creditTotal - cgstTotal - sgstTotal - igstTotal);
 
       return {
         debitTotal,
         creditTotal,
         total: debitTotal,
-        subtotal: debitTotal, // Added for consistency
-        cgstTotal: 0,
-        sgstTotal: 0,
-        igstTotal: 0,
-        discountTotal: 0,
+        subtotal: finalSubtotal,
+        cgstTotal,
+        sgstTotal,
+        igstTotal,
+        discountTotal,
       };
     }
   };
@@ -2333,60 +2402,6 @@ const SalesVoucher: React.FC = () => {
     total: grandTotal = 0,
   } = calculateTotals();
 
-
-  // 🔥 Find Sales Ledger by GST % and Inter/Intra
-  const getSalesLedgerByGst = (gstPercent: any, isIntra: boolean = false) => {
-    if (!gstPercent || gstPercent <= 0) return null;
-
-    const gstStr = String(Math.round(gstPercent));
-
-    return safeLedgers.find((l) => {
-      const name = (l.name || "").toLowerCase();
-      if (!name.includes("sales")) return false;
-
-      // Check for Inter/Intra
-      if (isIntra) {
-        if (!name.includes("intra")) return false;
-      } else {
-        if (!name.includes("inter")) return false;
-      }
-
-      // Check for rate (e.g. "18%", "18 %", "@18%")
-      return (
-        name.includes(`${gstStr}%`) ||
-        name.includes(`${gstStr} %`) ||
-        name.includes(`sales ${gstStr}`) ||
-        name.includes(`@${gstStr}%`) ||
-        name.match(new RegExp(`\\b${gstStr}\\b`))
-      );
-    });
-  };
-
-
-  // ✅ Get Ledger Name by ID and extract GST %
-  const getLedgerNameById = (ledgerId: any) => {
-    if (!ledgerId) return "-";
-    const ledger = safeLedgers.find((l) => String(l.id) === String(ledgerId));
-    if (!ledger?.name) return "-";
-
-    // Extract number from ledger name (e.g., "IGST@12%" → "12")
-    const match = ledger.name.match(/(\d+(\.\d+)?)/);
-    return match ? `${Math.round(Number(match[1]))}%` : ledger.name;
-  };
-
-  const getPartyName = (partyId: string) => {
-    if (!safeLedgers || safeLedgers.length === 0) return "Unknown Party";
-
-    const party = safeLedgers.find((ledger) => ledger.id === partyId);
-
-    return party ? party.name : "Unknown Party";
-  };
-  const getLedgerName = (ledgerId: string) => {
-    if (!ledgerId) return "-";
-
-    const ledger = safeLedgers.find((l) => String(l.id) === String(ledgerId));
-    return ledger ? ledger.name : "-";
-  };
 
   // Function to get GST rate breakdown and count for invoice
   const getGstRateInfo = () => {
