@@ -28,124 +28,84 @@ const GSTR1: React.FC = () => {
   const companyData = companyDataStr ? JSON.parse(companyDataStr) : null;
 
   // Form data state matching the screenshot structure
+  // Form data state
   const [formData, setFormData] = useState({
-    gstin: "27AABCU9603R1ZX",
-    legalName: "ABC COMPANY PRIVATE LIMITED",
-    tradeName: "ABC COMPANY",
-    returnPeriod: "March 2024",
+    gstin: companyData?.gst_number || "",
+    legalName: companyData?.name || "",
+    tradeName: companyData?.name || "",
+    returnPeriod: `${selectedPeriod.month}/${selectedPeriod.year}`,
     dateOfFiling: "",
 
-    // B2B Supplies data
-    b2bSupplies: [
-      {
-        gstin: "27AABCU9603R1ZX",
-        receiverName: "XYZ PRIVATE LIMITED",
-        invoiceNumber: "INV001",
-        invoiceDate: "01/03/2024",
-        invoiceValue: 118000,
-        placeOfSupply: "27-Maharashtra",
-        reverseCharge: "N",
-        invoiceType: "Regular",
-        ecommerceGstin: "",
-        taxableValue: 100000,
-        igstRate: 0,
-        igstAmount: 0,
-        cgstRate: 9,
-        cgstAmount: 9000,
-        sgstRate: 9,
-        sgstAmount: 9000,
-        cessRate: 0,
-        cessAmount: 0,
-      },
-    ],
-
-    // B2C Large Supplies data
-    b2cLargeSupplies: [
-      {
-        invoiceNumber: "INV002",
-        invoiceDate: "02/03/2024",
-        invoiceValue: 265000,
-        placeOfSupply: "29-Karnataka",
-        taxableValue: 250000,
-        igstRate: 6,
-        igstAmount: 15000,
-        cgstRate: 0,
-        cgstAmount: 0,
-        sgstRate: 0,
-        sgstAmount: 0,
-        cessRate: 0,
-        cessAmount: 0,
-      },
-    ],
+    b2bSupplies: [],
+    b2cLargeSupplies: [],
   });
 
   // Simple print functionality - no complex dependencies needed
 
   // DRY Utility Functions
   const calculateTotals = () => {
-    const b2bTotals = formData.b2bSupplies.reduce(
-      (acc, item) => ({
-        taxableValue: acc.taxableValue + item.taxableValue,
-        igstAmount: acc.igstAmount + item.igstAmount,
-        cgstAmount: acc.cgstAmount + item.cgstAmount,
-        sgstAmount: acc.sgstAmount + item.sgstAmount,
-        cessAmount: acc.cessAmount + item.cessAmount,
-      }),
-      {
-        taxableValue: 0,
-        igstAmount: 0,
-        cgstAmount: 0,
-        sgstAmount: 0,
-        cessAmount: 0,
-      }
-    );
+    const data = processedData;
 
-    const b2cTotals = formData.b2cLargeSupplies.reduce(
-      (acc, item) => ({
-        taxableValue: acc.taxableValue + item.taxableValue,
-        igstAmount: acc.igstAmount + item.igstAmount,
-        cgstAmount: acc.cgstAmount + item.cgstAmount,
-        sgstAmount: acc.sgstAmount + item.sgstAmount,
-        cessAmount: acc.cessAmount + item.cessAmount,
-      }),
-      {
-        taxableValue: 0,
-        igstAmount: 0,
-        cgstAmount: 0,
-        sgstAmount: 0,
-        cessAmount: 0,
-      }
-    );
+    // Helper to sum a field across a supply list
+    const sumField = (list: any[], field: string) =>
+      list.reduce((acc, item) => acc + Number(item[field] || 0), 0);
+
+    const b2b = {
+      taxableValue: sumField(data.b2b, 'taxableValue'),
+      igstAmount: sumField(data.b2b, 'igstAmount'),
+      cgstAmount: sumField(data.b2b, 'cgstAmount'),
+      sgstAmount: sumField(data.b2b, 'sgstAmount'),
+      cessAmount: sumField(data.b2b, 'cessAmount'),
+    };
+
+    const b2cLarge = {
+      taxableValue: sumField(data.b2cLarge, 'taxableValue'),
+      igstAmount: sumField(data.b2cLarge, 'igstAmount'),
+      cgstAmount: sumField(data.b2cLarge, 'cgstAmount'),
+      sgstAmount: sumField(data.b2cLarge, 'sgstAmount'),
+      cessAmount: sumField(data.b2cLarge, 'cessAmount'),
+    };
+
+    const b2cSmall = {
+      taxableValue: sumField(data.b2cSmall, 'taxableValue'),
+      igstAmount: sumField(data.b2cSmall, 'igstAmount'),
+      cgstAmount: sumField(data.b2cSmall, 'cgstAmount'),
+      sgstAmount: sumField(data.b2cSmall, 'sgstAmount'),
+      cessAmount: sumField(data.b2cSmall, 'cessAmount'),
+    };
 
     return {
-      totalTaxableValue: b2bTotals.taxableValue + b2cTotals.taxableValue,
-      totalIgst: b2bTotals.igstAmount + b2cTotals.igstAmount,
-      totalCgst: b2bTotals.cgstAmount + b2cTotals.cgstAmount,
-      totalSgst: b2bTotals.sgstAmount + b2cTotals.sgstAmount,
-      totalCess: b2bTotals.cessAmount + b2cTotals.cessAmount,
+      totalTaxableValue: b2b.taxableValue + b2cLarge.taxableValue + b2cSmall.taxableValue,
+      totalIgst: b2b.igstAmount + b2cLarge.igstAmount + b2cSmall.igstAmount,
+      totalCgst: b2b.cgstAmount + b2cLarge.cgstAmount + b2cSmall.cgstAmount,
+      totalSgst: b2b.sgstAmount + b2cLarge.sgstAmount + b2cSmall.sgstAmount,
+      totalCess: b2b.cessAmount + b2cLarge.cessAmount + b2cSmall.cessAmount,
     };
   };
 
   const generateGSTR1JSON = () => {
+    const data = processedData;
+    const totals = calculateTotals();
+
     const gstr1Data = {
       gstin: formData.gstin,
       ret_period: selectedPeriod.month + selectedPeriod.year,
-      b2b: formData.b2bSupplies.map((supply) => ({
+      b2b: data.b2b.map((supply: any) => ({
         ctin: supply.gstin,
         inv: [
           {
             inum: supply.invoiceNumber,
             idt: supply.invoiceDate,
             val: supply.invoiceValue,
-            pos: supply.placeOfSupply.split("-")[0],
+            pos: (supply.placeOfSupply || "").split("-")[0],
             rchrg: supply.reverseCharge,
-            inv_typ: supply.invoiceType === "Regular" ? "R" : "SEZWP",
+            inv_typ: "R",
             itms: [
               {
                 num: 1,
                 itm_det: {
                   txval: supply.taxableValue,
-                  rt: supply.igstRate || supply.cgstRate + supply.sgstRate,
+                  rt: supply.igstRate || (supply.cgstRate + supply.sgstRate),
                   iamt: supply.igstAmount,
                   camt: supply.cgstAmount,
                   samt: supply.sgstAmount,
@@ -156,19 +116,19 @@ const GSTR1: React.FC = () => {
           },
         ],
       })),
-      b2cl: formData.b2cLargeSupplies.map((supply) => ({
+      b2cl: data.b2cLarge.map((supply: any) => ({
         inv: [
           {
             inum: supply.invoiceNumber,
             idt: supply.invoiceDate,
             val: supply.invoiceValue,
-            pos: supply.placeOfSupply.split("-")[0],
+            pos: (supply.placeOfSupply || "").split("-")[0],
             itms: [
               {
                 num: 1,
                 itm_det: {
                   txval: supply.taxableValue,
-                  rt: supply.igstRate || supply.cgstRate + supply.sgstRate,
+                  rt: supply.igstRate || (supply.cgstRate + supply.sgstRate),
                   iamt: supply.igstAmount,
                   camt: supply.cgstAmount,
                   samt: supply.sgstAmount,
@@ -180,34 +140,19 @@ const GSTR1: React.FC = () => {
         ],
       })),
       hsn: {
-        data: [
-          {
-            num: 1,
-            hsn_sc: "8471",
-            desc: "Automatic data processing machines",
-            uqc: "NOS",
-            qty: 1,
-            val: 118000,
-            txval: 100000,
-            iamt: 0,
-            camt: 9000,
-            samt: 9000,
-            csamt: 0,
-          },
-          {
-            num: 2,
-            hsn_sc: "8517",
-            desc: "Telephone sets and other apparatus",
-            uqc: "NOS",
-            qty: 1,
-            val: 265000,
-            txval: 250000,
-            iamt: 15000,
-            camt: 0,
-            samt: 0,
-            csamt: 0,
-          },
-        ],
+        data: data.hsn.map((h: any, idx: number) => ({
+          num: idx + 1,
+          hsn_sc: h.hsn,
+          desc: h.description,
+          uqc: h.uqc,
+          qty: h.qty,
+          val: h.val,
+          txval: h.txval,
+          iamt: h.iamt,
+          camt: h.camt,
+          samt: h.samt,
+          csamt: h.csamt,
+        })),
       },
       doc_issue: {
         doc_det: [
@@ -216,11 +161,11 @@ const GSTR1: React.FC = () => {
             docs: [
               {
                 num: 1,
-                from: "INV001",
-                to: "INV002",
-                totnum: 2,
-                cancel: 0,
-                net_issue: 2,
+                from: data.docs.from,
+                to: data.docs.to,
+                totnum: data.docs.total,
+                cancel: data.docs.cancel,
+                net_issue: data.docs.total - data.docs.cancel,
               },
             ],
           },
@@ -241,13 +186,14 @@ const GSTR1: React.FC = () => {
   };
 
   const exportToExcel = () => {
+    const data = processedData;
     const totals = calculateTotals();
 
     // Create workbook
     const wb = XLSX.utils.book_new();
 
     // B2B Supplies Sheet
-    const b2bData = formData.b2bSupplies.map((supply) => ({
+    const b2bData = data.b2b.map((supply: any) => ({
       "GSTIN of Recipient": supply.gstin,
       "Receiver Name": supply.receiverName,
       "Invoice Number": supply.invoiceNumber,
@@ -271,7 +217,7 @@ const GSTR1: React.FC = () => {
     XLSX.utils.book_append_sheet(wb, b2bWs, "B2B Supplies");
 
     // B2C Large Supplies Sheet
-    const b2cData = formData.b2cLargeSupplies.map((supply) => ({
+    const b2cData = data.b2cLarge.map((supply: any) => ({
       "Invoice Number": supply.invoiceNumber,
       "Invoice Date": supply.invoiceDate,
       "Invoice Value": supply.invoiceValue,
@@ -290,33 +236,19 @@ const GSTR1: React.FC = () => {
     XLSX.utils.book_append_sheet(wb, b2cWs, "B2C Large Supplies");
 
     // HSN Summary Sheet
-    const hsnData = [
-      {
-        HSN: "8471",
-        Description: "Automatic data processing machines",
-        UQC: "NOS",
-        "Total Quantity": 1,
-        "Total Value": 118000,
-        "Taxable Value": 100000,
-        "IGST Amount": 0,
-        "CGST Amount": 9000,
-        "SGST Amount": 9000,
-        "Cess Amount": 0,
-      },
-      {
-        HSN: "8517",
-        Description: "Telephone sets and other apparatus",
-        UQC: "NOS",
-        "Total Quantity": 1,
-        "Total Value": 265000,
-        "Taxable Value": 250000,
-        "IGST Amount": 15000,
-        "CGST Amount": 0,
-        "SGST Amount": 0,
-        "Cess Amount": 0,
-      },
-    ];
-    const hsnWs = XLSX.utils.json_to_sheet(hsnData);
+    const hsnExcelData = data.hsn.map((h: any) => ({
+      HSN: h.hsn,
+      Description: h.description,
+      UQC: h.uqc,
+      "Total Quantity": h.qty,
+      "Total Value": h.val,
+      "Taxable Value": h.txval,
+      "IGST Amount": h.iamt,
+      "CGST Amount": h.camt,
+      "SGST Amount": h.samt,
+      "Cess Amount": h.csamt,
+    }));
+    const hsnWs = XLSX.utils.json_to_sheet(hsnExcelData);
     XLSX.utils.book_append_sheet(wb, hsnWs, "HSN Summary");
 
     // Summary Sheet
@@ -603,6 +535,112 @@ const GSTR1: React.FC = () => {
   const intraUnregisteredNonGst = sumTotal(
     nonGstIntraState.filter((r) => r.ledger.name === "Non-gst")
   );
+
+  // ================= DYNAMIC DATA AGGREGATION =================
+  const processedData = React.useMemo(() => {
+    if (!saleData.length || !ledger.length) return {
+      b2b: [],
+      b2cLarge: [],
+      b2cSmall: [],
+      hsn: [],
+      docs: { from: "-", to: "-", total: 0, cancel: 0 }
+    };
+
+    const b2b: any[] = [];
+    const b2cLarge: any[] = [];
+    const b2cSmall: any[] = [];
+    const hsnMap: { [key: string]: any } = {};
+
+    let minInv = "";
+    let maxInv = "";
+
+    saleData.forEach((sale) => {
+      const party = ledger.find((l) => l.id === sale.partyId);
+      const hasGst = Boolean(party?.gstNumber && String(party.gstNumber).trim());
+      const gstin = hasGst ? party?.gstNumber : "";
+
+      const invValue = Number(sale.total || 0);
+      const taxValue = Number(sale.subtotal || 0);
+
+      const flatEntry = {
+        gstin: gstin,
+        receiverName: party?.name || "Cash/Unknown",
+        invoiceNumber: sale.number,
+        invoiceDate: new Date(sale.date).toLocaleDateString('en-GB'),
+        invoiceValue: invValue,
+        placeOfSupply: party?.state || "",
+        reverseCharge: "N",
+        invoiceType: "Regular",
+        ecommerceGstin: "",
+        taxableValue: taxValue,
+        igstRate: 0, // Simplified unless we explode items
+        igstAmount: Number(sale.igstTotal || 0),
+        cgstRate: 0,
+        cgstAmount: Number(sale.cgstTotal || 0),
+        sgstRate: 0,
+        sgstAmount: Number(sale.sgstTotal || 0),
+        cessRate: 0,
+        cessAmount: 0
+      };
+
+      // Categorization
+      if (hasGst) {
+        b2b.push(flatEntry);
+      } else if (invValue > 250000) {
+        b2cLarge.push(flatEntry);
+      } else {
+        b2cSmall.push(flatEntry);
+      }
+
+      // HSN Aggregation
+      const items = (typeof sale.items === 'string' ? JSON.parse(sale.items) : sale.items) || [];
+      items.forEach((item: any) => {
+        const hsn = item.hsnCode || "N/A";
+        if (!hsnMap[hsn]) {
+          hsnMap[hsn] = {
+            hsn,
+            description: item.itemName || "Goods/Services",
+            uqc: "NOS",
+            qty: 0,
+            val: 0,
+            txval: 0,
+            iamt: 0,
+            camt: 0,
+            samt: 0,
+            csamt: 0
+          };
+        }
+        const qty = Number(item.quantity || 0);
+        const rate = Number(item.rate || 0);
+        const txval = qty * rate;
+
+        hsnMap[hsn].qty += qty;
+        hsnMap[hsn].txval += txval;
+        hsnMap[hsn].val += (txval + Number(item.cgstAmount || 0) + Number(item.sgstAmount || 0) + Number(item.igstAmount || 0));
+        hsnMap[hsn].iamt += Number(item.igstAmount || 0);
+        hsnMap[hsn].camt += Number(item.cgstAmount || 0);
+        hsnMap[hsn].samt += Number(item.sgstAmount || 0);
+      });
+
+      // Doc Issue Tracking
+      const invNo = sale.number;
+      if (!minInv || invNo < minInv) minInv = invNo;
+      if (!maxInv || invNo > maxInv) maxInv = invNo;
+    });
+
+    return {
+      b2b,
+      b2cLarge,
+      b2cSmall,
+      hsn: Object.values(hsnMap),
+      docs: {
+        from: minInv || "-",
+        to: maxInv || "-",
+        total: saleData.length,
+        cancel: 0
+      }
+    };
+  }, [saleData, ledger]);
 
   return (
     <div className="pt-[56px] px-4 min-h-screen">
@@ -904,65 +942,6 @@ const GSTR1: React.FC = () => {
               Details of Outward Supplies made to SEZ/Exports
             </p>
           </div>
-          <div className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr
-                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                      }`}
-                  >
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Export Type
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Invoice Number
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Invoice Date
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Invoice Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Port Code
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Shipping Bill Number
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Shipping Bill Date
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Taxable Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      IGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Cess Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td
-                      colSpan={12}
-                      className="border border-gray-300 p-4 text-center text-sm text-gray-500"
-                    >
-                      No Export data available
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
         {/* 7 - Nil Rated, Exempted and Non GST Outward Supplies */}
         <div
@@ -1118,62 +1097,6 @@ const GSTR1: React.FC = () => {
             </button>
           </div>
 
-          <div className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr
-                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                      }`}
-                  >
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Place of Supply
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Applicable % of Tax Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Gross Advance Received
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      IGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      CGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      SGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Cess Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td
-                      colSpan={11}
-                      className="border border-gray-300 p-4 text-center text-sm text-gray-500"
-                    >
-                      No Advance data available
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
         {/* 8B - Tax Liability (Advances Adjusted) */}
         <div
@@ -1209,62 +1132,6 @@ const GSTR1: React.FC = () => {
             </button>
           </div>
 
-          <div className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr
-                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                      }`}
-                  >
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Place of Supply
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Applicable % of Tax Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Gross Advance Adjusted
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      IGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      CGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      SGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Cess Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td
-                      colSpan={11}
-                      className="border border-gray-300 p-4 text-center text-sm text-gray-500"
-                    >
-                      No Advance Adjusted data available
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
         {/* 9A - Credit/Debit Notes (Registered) */}
         <div
@@ -1299,87 +1166,8 @@ const GSTR1: React.FC = () => {
             </button>
           </div>
 
-          <div className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr
-                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                      }`}
-                  >
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      GSTIN of Recipient
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Receiver Name
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Note Number
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Note Date
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Note Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Note Type
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Place of Supply
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Reverse Charge
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Original Invoice Number
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Original Invoice Date
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Taxable Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      IGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      CGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      SGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Cess Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td
-                      colSpan={19}
-                      className="border border-gray-300 p-4 text-center text-sm text-gray-500"
-                    >
-                      No Credit/Debit Notes data available
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
-        </div>{" "}
+        </div>
+        {" "}
         {/* 9
 B - Credit/Debit Notes (Unregistered) */}
         <div
@@ -1414,77 +1202,6 @@ B - Credit/Debit Notes (Unregistered) */}
             </button>
           </div>
 
-          <div className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr
-                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                      }`}
-                  >
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Note Number
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Note Date
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Note Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Note Type
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Place of Supply
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Original Invoice Number
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Original Invoice Date
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Taxable Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      IGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      CGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      SGST Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Cess Rate
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td
-                      colSpan={16}
-                      className="border border-gray-300 p-4 text-center text-sm text-gray-500"
-                    >
-                      No Credit/Debit Notes data available
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
         {/* 10 - HSN Summary */}
         <div
@@ -1527,144 +1244,6 @@ B - Credit/Debit Notes (Unregistered) */}
 
           </div>
 
-          <div className="p-4">
-            <div className="overflow-x-auto">
-              <table className="w-full border-collapse border border-gray-300">
-                <thead>
-                  <tr
-                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                      }`}
-                  >
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      HSN
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Description
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      UQC
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Total Quantity
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Total Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Taxable Value
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
-                    </th>
-                    <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      Cess Amount
-                    </th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td className="border border-gray-300 p-2 text-xs font-mono">
-                      8471
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs">
-                      Automatic data processing machines
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs">NOS</td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      1
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      118,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      100,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      9,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      9,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0
-                    </td>
-                  </tr>
-                  <tr>
-                    <td className="border border-gray-300 p-2 text-xs font-mono">
-                      8517
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs">
-                      Telephone sets and other apparatus
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs">NOS</td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      1
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      265,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      250,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      15,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0
-                    </td>
-                  </tr>
-                  {/* Total Row */}
-                  <tr
-                    className={`font-bold ${theme === "dark" ? "bg-gray-600" : "bg-gray-200"
-                      }`}
-                  >
-                    <td
-                      colSpan={3}
-                      className="border border-gray-300 p-2 text-xs text-right"
-                    >
-                      Total:
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      2
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      383,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      350,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      15,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      9,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      9,000
-                    </td>
-                    <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </div>
         </div>
         {/* 11 - Documents Issued */}
         <div
@@ -1730,16 +1309,16 @@ B - Credit/Debit Notes (Unregistered) */}
                       Invoices for outward supply
                     </td>
                     <td className="border border-gray-300 p-2 text-xs font-mono">
-                      INV001
+                      {processedData.docs.from}
                     </td>
                     <td className="border border-gray-300 p-2 text-xs font-mono">
-                      INV002
+                      {processedData.docs.to}
                     </td>
                     <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      2
+                      {processedData.docs.total}
                     </td>
                     <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                      0
+                      {processedData.docs.cancel}
                     </td>
                   </tr>
                   <tr>
@@ -1747,10 +1326,10 @@ B - Credit/Debit Notes (Unregistered) */}
                       Invoices for inward supply from unregistered person
                     </td>
                     <td className="border border-gray-300 p-2 text-xs font-mono">
-                      -
+                      
                     </td>
                     <td className="border border-gray-300 p-2 text-xs font-mono">
-                      -
+                      
                     </td>
                     <td className="border border-gray-300 p-2 text-xs text-right font-mono">
                       0
@@ -1764,10 +1343,10 @@ B - Credit/Debit Notes (Unregistered) */}
                       Revised Invoice
                     </td>
                     <td className="border border-gray-300 p-2 text-xs font-mono">
-                      -
+                      
                     </td>
                     <td className="border border-gray-300 p-2 text-xs font-mono">
-                      -
+                      
                     </td>
                     <td className="border border-gray-300 p-2 text-xs text-right font-mono">
                       0
@@ -1781,10 +1360,10 @@ B - Credit/Debit Notes (Unregistered) */}
                       Debit Note
                     </td>
                     <td className="border border-gray-300 p-2 text-xs font-mono">
-                      -
+                      
                     </td>
                     <td className="border border-gray-300 p-2 text-xs font-mono">
-                      -
+                      
                     </td>
                     <td className="border border-gray-300 p-2 text-xs text-right font-mono">
                       0
@@ -1798,10 +1377,10 @@ B - Credit/Debit Notes (Unregistered) */}
                       Credit Note
                     </td>
                     <td className="border border-gray-300 p-2 text-xs font-mono">
-                      -
+                      
                     </td>
                     <td className="border border-gray-300 p-2 text-xs font-mono">
-                      -
+                      
                     </td>
                     <td className="border border-gray-300 p-2 text-xs text-right font-mono">
                       0
