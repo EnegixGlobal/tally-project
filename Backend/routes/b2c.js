@@ -198,7 +198,7 @@ router.get('/b2cl', async (req, res) => {
 
     const params = [company_id, owner_type, owner_id];
     let dateFilter = '';
-    
+
     if (fromDate && toDate) {
       dateFilter = ' AND sv.date BETWEEN ? AND ?';
       params.push(fromDate, toDate);
@@ -214,7 +214,7 @@ router.get('/b2cl', async (req, res) => {
         sv.cgstTotal AS cgstAmount,
         sv.sgstTotal AS sgstAmount,
         sv.igstTotal AS igstAmount,
-        COALESCE(sv.destination, '') AS placeOfSupply,
+        COALESCE(NULLIF(sv.destination, ''), l.state, '') AS placeOfSupply,
         CASE 
           WHEN sv.igstTotal > 0 THEN 
             COALESCE((SELECT MAX(igstRate) FROM sales_voucher_items WHERE voucherId = sv.id AND igstRate > 0), 0)
@@ -277,7 +277,7 @@ router.get('/b2c-small', async (req, res) => {
         sv.cgstTotal AS cgstAmount,
         sv.sgstTotal AS sgstAmount,
         sv.igstTotal AS igstAmount,
-        COALESCE(sv.destination, '') AS placeOfSupply,
+        COALESCE(NULLIF(sv.destination, ''), l.state, '') AS placeOfSupply,
         CASE 
           WHEN sv.igstTotal > 0 THEN 
             COALESCE((SELECT MAX(igstRate) FROM sales_voucher_items WHERE voucherId = sv.id AND igstRate > 0), 0)
@@ -327,150 +327,112 @@ router.get("/b2c/hsn-summary", async (req, res) => {
     }
 
     let dateFilter = '';
-    
+
     if (fromDate && toDate) {
       dateFilter = ' AND sv.date BETWEEN ? AND ?';
     }
 
-    // Get all sales vouchers with ledger information to categorize as B2B or B2C
-    const salesSql = `
+    // Get HSN grouped data by joining sales_voucher_items and stock_items
+    const hsnSql = `
+      -- Subquery/logic to extract Rate from rate columns (Handles both raw % and ledger IDs)
+      WITH item_rates AS (
+        SELECT 
+          svi.id as item_id,
+          svi.amount,
+          svi.quantity,
+          svi.hsnCode as svi_hsn,
+          si.hsnCode as si_hsn,
+          si.name as item_name,
+          u.name as unit_name,
+          si.unit as si_unit,
+          svi.voucherId,
+          -- Resolve IGST Rate (Check if > 40, then join ledger)
+          CASE 
+            WHEN COALESCE(svi.igstRate, 0) > 40 THEN (SELECT CAST(REGEXP_REPLACE(l1.name, '[^0-9.]', '') AS DECIMAL(10,2)) FROM ledgers l1 WHERE l1.id = svi.igstRate)
+            ELSE COALESCE(svi.igstRate, 0) 
+          END as resolvedIgstRate,
+          -- Resolve CGST Rate
+          CASE 
+            WHEN COALESCE(svi.cgstRate, 0) > 40 THEN (SELECT CAST(REGEXP_REPLACE(l2.name, '[^0-9.]', '') AS DECIMAL(10,2)) FROM ledgers l2 WHERE l2.id = svi.cgstRate)
+            ELSE COALESCE(svi.cgstRate, 0) 
+          END as resolvedCgstRate,
+          -- Resolve SGST Rate
+          CASE 
+            WHEN COALESCE(svi.sgstRate, 0) > 40 THEN (SELECT CAST(REGEXP_REPLACE(l3.name, '[^0-9.]', '') AS DECIMAL(10,2)) FROM ledgers l3 WHERE l3.id = svi.sgstRate)
+            ELSE COALESCE(svi.sgstRate, 0) 
+          END as resolvedSgstRate
+        FROM sales_voucher_items svi
+        JOIN stock_items si ON svi.itemId = si.id
+        LEFT JOIN stock_units u ON si.unit = u.id
+      )
       SELECT 
-        sv.number AS voucherNumber,
-        sv.total,
-        sv.subtotal,
-        sv.igstTotal,
-        sv.cgstTotal,
-        sv.sgstTotal,
-        CASE 
-          WHEN l.gst_number IS NOT NULL AND l.gst_number != '' THEN 'B2B'
-          ELSE 'B2C'
-        END AS saleType
-      FROM sales_vouchers sv
-      LEFT JOIN ledgers l ON sv.partyId = l.id 
-        AND l.company_id = ?
-        AND l.owner_type = ?
-        AND l.owner_id = ?
-      WHERE sv.company_id = ?
-        AND sv.owner_type = ?
-        AND sv.owner_id = ?
-        ${dateFilter}
+        COALESCE(ir.svi_hsn, ir.si_hsn, 'NA') as hsn,
+        ir.item_name as label,
+        COALESCE(ir.unit_name, ir.si_unit, 'NA') as uqc,
+        SUM(ir.quantity) as count,
+        SUM(ir.amount + 
+            (ir.amount * ir.resolvedCgstRate / 100) + 
+            (ir.amount * ir.resolvedSgstRate / 100) + 
+            (ir.amount * ir.resolvedIgstRate / 100)
+        ) as totalValue,
+        SUM(ir.amount) as taxableValue,
+        SUM(ir.amount * ir.resolvedIgstRate / 100) as igstAmount,
+        SUM(ir.amount * ir.resolvedCgstRate / 100) as cgstAmount,
+        SUM(ir.amount * ir.resolvedSgstRate / 100) as sgstAmount,
+        (ir.resolvedIgstRate + ir.resolvedCgstRate + ir.resolvedSgstRate) as taxRate,
+        0 as cessAmount
+      FROM item_rates ir
+      JOIN sales_vouchers sv ON ir.voucherId = sv.id
+      WHERE sv.company_id = ? AND sv.owner_type = ? AND sv.owner_id = ?
+        AND sv.date BETWEEN ? AND ?
+      GROUP BY COALESCE(ir.svi_hsn, ir.si_hsn, 'NA'), ir.item_name, COALESCE(ir.unit_name, ir.si_unit, 'NA'), 
+               ir.resolvedIgstRate, ir.resolvedCgstRate, ir.resolvedSgstRate
+      ORDER BY ir.item_name ASC
     `;
 
-    const [salesRows] = await pool.execute(salesSql, [
-      company_id, owner_type, owner_id, // For ledger join
-      company_id, owner_type, owner_id, // For sales_vouchers where
+    const [hsnRows] = await pool.execute(hsnSql, [
+      company_id, owner_type, owner_id,
       ...(fromDate && toDate ? [fromDate, toDate] : [])
     ]);
 
-    // Initialize totals
-    const totals = {
-      totalCount: 0,
-      totalValue: 0,
-      taxableValue: 0,
-      igstAmount: 0,
-      cgstAmount: 0,
-      sgstAmount: 0,
-      cessAmount: 0
-    };
-
-    const b2bTotals = {
-      totalCount: 0,
-      totalValue: 0,
-      taxableValue: 0,
-      igstAmount: 0,
-      cgstAmount: 0,
-      sgstAmount: 0,
-      cessAmount: 0
-    };
-
-    const b2cTotals = {
-      totalCount: 0,
-      totalValue: 0,
-      taxableValue: 0,
-      igstAmount: 0,
-      cgstAmount: 0,
-      sgstAmount: 0,
-      cessAmount: 0
-    };
-
-    // Calculate totals for each category
-    for (const row of salesRows) {
-      const total = parseFloat(row.total) || 0;
-      const subtotal = parseFloat(row.subtotal) || 0;
-      const igst = parseFloat(row.igstTotal) || 0;
-      const cgst = parseFloat(row.cgstTotal) || 0;
-      const sgst = parseFloat(row.sgstTotal) || 0;
-      const cess = 0; // Cess not stored in sales_vouchers table
-
-      // Add to overall totals
-      totals.totalCount += 1;
-      totals.totalValue += total;
-      totals.taxableValue += subtotal;
-      totals.igstAmount += igst;
-      totals.cgstAmount += cgst;
-      totals.sgstAmount += sgst;
-      totals.cessAmount += cess;
-
-      // Add to B2B or B2C totals
-      if (row.saleType === 'B2B') {
-        b2bTotals.totalCount += 1;
-        b2bTotals.totalValue += total;
-        b2bTotals.taxableValue += subtotal;
-        b2bTotals.igstAmount += igst;
-        b2bTotals.cgstAmount += cgst;
-        b2bTotals.sgstAmount += sgst;
-        b2bTotals.cessAmount += cess;
-      } else {
-        b2cTotals.totalCount += 1;
-        b2cTotals.totalValue += total;
-        b2cTotals.taxableValue += subtotal;
-        b2cTotals.igstAmount += igst;
-        b2cTotals.cgstAmount += cgst;
-        b2cTotals.sgstAmount += sgst;
-        b2cTotals.cessAmount += cess;
-      }
-    }
-
     // Round values to 2 decimal places
-    const roundValue = (val) => Math.round(val * 100) / 100;
+    const roundValue = (val) => Math.round(Number(val) * 100) / 100;
 
-    // Build result array with Total, B2B Total, and B2C Total
+    // Calculate overall totals for the "Total" row
+    const totals = hsnRows.reduce((acc, row) => ({
+      count: acc.count + (Number(row.count) || 0),
+      totalValue: acc.totalValue + (Number(row.totalValue) || 0),
+      taxableValue: acc.taxableValue + (Number(row.taxableValue) || 0),
+      igstAmount: acc.igstAmount + (Number(row.igstAmount) || 0),
+      cgstAmount: acc.cgstAmount + (Number(row.cgstAmount) || 0),
+      sgstAmount: acc.sgstAmount + (Number(row.sgstAmount) || 0),
+      cessAmount: acc.cessAmount + (Number(row.cessAmount) || 0)
+    }), {
+      count: 0, totalValue: 0, taxableValue: 0, igstAmount: 0, cgstAmount: 0, sgstAmount: 0, cessAmount: 0
+    });
+
     const result = [
+      ...hsnRows.map(row => ({
+        ...row,
+        count: roundValue(row.count),
+        totalValue: roundValue(row.totalValue),
+        taxableValue: roundValue(row.taxableValue),
+        igstAmount: roundValue(row.igstAmount),
+        cgstAmount: roundValue(row.cgstAmount),
+        sgstAmount: roundValue(row.sgstAmount),
+        cessAmount: roundValue(row.cessAmount)
+      })),
       {
         label: 'Total',
-        count: totals.totalCount,
-        hsn: 'NA',
+        hsn: 'Total',
         uqc: 'NA',
+        count: roundValue(totals.count),
         totalValue: roundValue(totals.totalValue),
         taxableValue: roundValue(totals.taxableValue),
         igstAmount: roundValue(totals.igstAmount),
         cgstAmount: roundValue(totals.cgstAmount),
         sgstAmount: roundValue(totals.sgstAmount),
         cessAmount: roundValue(totals.cessAmount)
-      },
-      {
-        label: 'B2B Total',
-        count: b2bTotals.totalCount,
-        hsn: 'NA',
-        uqc: 'NA',
-        totalValue: roundValue(b2bTotals.totalValue),
-        taxableValue: roundValue(b2bTotals.taxableValue),
-        igstAmount: roundValue(b2bTotals.igstAmount),
-        cgstAmount: roundValue(b2bTotals.cgstAmount),
-        sgstAmount: roundValue(b2bTotals.sgstAmount),
-        cessAmount: roundValue(b2bTotals.cessAmount)
-      },
-      {
-        label: 'B2C Total',
-        count: b2cTotals.totalCount,
-        hsn: 'NA',
-        uqc: 'NA',
-        totalValue: roundValue(b2cTotals.totalValue),
-        taxableValue: roundValue(b2cTotals.taxableValue),
-        igstAmount: roundValue(b2cTotals.igstAmount),
-        cgstAmount: roundValue(b2cTotals.cgstAmount),
-        sgstAmount: roundValue(b2cTotals.sgstAmount),
-        cessAmount: roundValue(b2cTotals.cessAmount)
       }
     ];
 

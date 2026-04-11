@@ -33,7 +33,7 @@ router.get('/b2b-transactions', async (req, res) => {
         sv.igstTotal,
         sv.total as netAmount,
         sv.createdAt,
-        sv.destination,
+        COALESCE(NULLIF(sv.destination, ''), l.state, '') AS placeOfSupply,
         sv.dispatchThrough,
         sv.dispatchDocNo,
         sv.type as paymentMethod,

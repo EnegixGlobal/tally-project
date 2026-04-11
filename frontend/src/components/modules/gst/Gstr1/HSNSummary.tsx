@@ -44,14 +44,13 @@ const HSNSummary = () => {
         toDate: filters.toDate,
       });
 
-      const url = `${
-        import.meta.env.VITE_API_URL
-      }/api/b2c/hsn-summary?${params}`;
+      const url = `${import.meta.env.VITE_API_URL
+        }/api/b2c/hsn-summary?${params}`;
 
       const res = await fetch(url);
       const json = await res.json();
       console.log("Data", json);
-      
+
       if (json.success) {
         setHsnData(json.data || []);
       } else {
@@ -94,6 +93,51 @@ const HSNSummary = () => {
     XLSX.writeFile(wb, `HSN_Summary_${filters.fromDate}_to_${filters.toDate}.xlsx`);
   };
 
+  const generateFullJSON = () => {
+    if (hsnData.length === 0) return;
+
+    const payload = {
+      type: "GSTR-1",
+      section: "HSN Summary Cumulative",
+      period: {
+        from: filters.fromDate,
+        to: filters.toDate,
+      },
+      data: hsnData.map((row) => {
+        const taxableValue = Number(row.taxableValue) || 0;
+        const rate = Number(row.taxRate || 0);
+
+        return {
+          hsn: row.hsn || "NA",
+          description: row.label || "-",
+          uqc: row.uqc || "NA",
+          totalQuantity: Number(row.count) || 0,
+          totalValue: Number(row.totalValue) || 0,
+          rate: rate,
+          taxableValue: taxableValue,
+          integratedTaxAmount: Number(row.igstAmount) || 0,
+          centralTaxAmount: Number(row.cgstAmount) || 0,
+          stateUtTaxAmount: Number(row.sgstAmount) || 0,
+          cessAmount: Number(row.cessAmount) || 0,
+        };
+      }),
+      generatedAt: new Date().toISOString(),
+    };
+
+    const jsonStr = JSON.stringify(payload, null, 2);
+    const blob = new Blob([jsonStr], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `HSN_Summary_${filters.fromDate}_to_${filters.toDate}.json`;
+
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -106,9 +150,8 @@ const HSNSummary = () => {
           title="Back to GSTR-1"
           type="button"
           onClick={() => navigate("/app/gst/gstr-1")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -118,9 +161,8 @@ const HSNSummary = () => {
             type="button"
             title="Filter"
             onClick={() => setShowFilterPanel(!showFilterPanel)}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Filter size={18} />
           </button>
@@ -128,19 +170,26 @@ const HSNSummary = () => {
             title="Print Report"
             type="button"
             onClick={handlePrint}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
           <button
-            title="Export"
+            title="Export to JSON"
+            type="button"
+            onClick={generateFullJSON}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
+          >
+            <span className="text-xs font-bold px-1">JSON</span>
+          </button>
+          <button
+            title="Export to Excel"
             type="button"
             onClick={exportToExcel}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Download size={18} />
           </button>
@@ -150,9 +199,8 @@ const HSNSummary = () => {
       {/* Filter Panel */}
       {showFilterPanel && (
         <div
-          className={`p-4 mb-6 rounded-lg no-print ${
-            theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-          }`}
+          className={`p-4 mb-6 rounded-lg no-print ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+            }`}
         >
           <h3 className="font-semibold mb-4">Date Range Filter</h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
@@ -166,11 +214,10 @@ const HSNSummary = () => {
                 onChange={(e) =>
                   setFilters({ ...filters, fromDate: e.target.value })
                 }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               />
             </div>
             <div>
@@ -181,22 +228,20 @@ const HSNSummary = () => {
                 onChange={(e) =>
                   setFilters({ ...filters, toDate: e.target.value })
                 }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                }`}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
               />
             </div>
             <div className="flex items-end">
               <button
                 type="button"
                 onClick={loadHSNSummary}
-                className={`px-4 py-2 rounded ${
-                  theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
-                }`}
+                className={`px-4 py-2 rounded ${theme === "dark"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+                  }`}
               >
                 Apply Filter
               </button>
@@ -207,18 +252,16 @@ const HSNSummary = () => {
 
       {/* Main Content */}
       <div
-        className={`mb-6 rounded-lg border-2 ${
-          theme === "dark"
-            ? "bg-gray-800 border-gray-600"
-            : "bg-white border-gray-300"
-        }`}
+        className={`mb-6 rounded-lg border-2 ${theme === "dark"
+          ? "bg-gray-800 border-gray-600"
+          : "bg-white border-gray-300"
+          }`}
       >
         <div
-          className={`p-3 border-b-2 ${
-            theme === "dark"
-              ? "bg-blue-900 border-gray-600 text-white"
-              : "bg-blue-800 border-gray-300 text-white"
-          }`}
+          className={`p-3 border-b-2 ${theme === "dark"
+            ? "bg-blue-900 border-gray-600 text-white"
+            : "bg-blue-800 border-gray-300 text-white"
+            }`}
         >
           <h3 className="text-lg font-bold">HSN-wise Summary of Outward Supplies</h3>
         </div>
@@ -237,13 +280,12 @@ const HSNSummary = () => {
               <table className="w-full border-collapse border border-gray-300">
                 <thead>
                   <tr
-                    className={`${
-                      theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-                    }`}
+                    className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                      }`}
                   >
-                    {/* <th className="border border-gray-300 p-2 text-xs font-bold text-left">
+                    <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       HSN
-                    </th> */}
+                    </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Description
                     </th>
@@ -256,17 +298,20 @@ const HSNSummary = () => {
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
                       Total Value
                     </th>
+                    <th className="border border-gray-300 p-2 text-xs font-bold text-center">
+                      Rate
+                    </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
                       Taxable Value
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      IGST Amount
+                      Integrated Tax Amount
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      CGST Amount
+                      Central Tax Amount
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
-                      SGST Amount
+                      State/UT Tax Amount
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
                       Cess Amount
@@ -274,43 +319,49 @@ const HSNSummary = () => {
                   </tr>
                 </thead>
                 <tbody>
-                  {hsnData.map((row, index) => (
-                    <tr 
-                      key={index}
-                      className={row.label === 'Total' ? `font-bold ${theme === "dark" ? "bg-gray-600" : "bg-gray-200"}` : ''}
-                    >
-                      {/* <td className="border border-gray-300 p-2 text-xs font-mono">
-                        {row.hsn || "NA"}
-                      </td> */}
-                      <td className="border border-gray-300 p-2 text-xs font-semibold">
-                        {row.label || "-"}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs">
-                        {row.uqc || "NA"}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        {formatNumber(Number(row.count) || 0)}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{formatNumber(Number(row.totalValue) || 0)}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{formatNumber(Number(row.taxableValue) || 0)}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{formatNumber(Number(row.igstAmount) || 0)}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{formatNumber(Number(row.cgstAmount) || 0)}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{formatNumber(Number(row.sgstAmount) || 0)}
-                      </td>
-                      <td className="border border-gray-300 p-2 text-xs text-right font-mono">
-                        ₹{formatNumber(Number(row.cessAmount) || 0)}
-                      </td>
-                    </tr>
-                  ))}
+                  {hsnData.map((row, index) => {
+                    const taxableValue = Number(row.taxableValue) || 0;
+                    const rate = Number(row.taxRate || 0);
+
+                    return (
+                      <tr
+                        key={index}
+                        className={row.label === 'Total' ? `font-bold ${theme === "dark" ? "bg-gray-600" : "bg-gray-200"}` : ''}
+                      >
+                        <td className="border border-gray-300 p-2 text-xs font-mono">
+                          {row.hsn || "NA"}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs font-semibold">
+                          {row.label || "-"}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs">
+                          {row.uqc || "NA"}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
+                          {formatNumber(Number(row.count) || 0)}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
+                          ₹{formatNumber(Number(row.totalValue) || 0)}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs text-center">{rate}%</td>
+                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
+                          ₹{formatNumber(Number(row.taxableValue) || 0)}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
+                          ₹{formatNumber(Number(row.igstAmount) || 0)}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
+                          ₹{formatNumber(Number(row.cgstAmount) || 0)}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
+                          ₹{formatNumber(Number(row.sgstAmount) || 0)}
+                        </td>
+                        <td className="border border-gray-300 p-2 text-xs text-right font-mono">
+                          ₹{formatNumber(Number(row.cessAmount) || 0)}
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -322,4 +373,5 @@ const HSNSummary = () => {
 };
 
 export default HSNSummary;
+
 

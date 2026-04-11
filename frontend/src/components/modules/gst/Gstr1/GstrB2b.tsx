@@ -414,7 +414,7 @@ const Gstr2B2b = () => {
                       Reverse Charge
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Tax Rate
+                      Application of Tax Rate
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Invoice Type
@@ -467,13 +467,13 @@ const Gstr2B2b = () => {
                           N
                         </td>
                         <td className="border border-gray-300 p-2 text-xs text-center">
-                          {taxRate}%
+                          {/* {taxRate}% */}
                         </td>
                         <td className="border border-gray-300 p-2 text-xs">
                           Regular
                         </td>
                         <td className="border border-gray-300 p-2 text-xs font-mono">
-                          -
+                          {/* - */}
                         </td>
                         <td className="border border-gray-300 p-2 text-xs text-center">
                           {taxRate}%
