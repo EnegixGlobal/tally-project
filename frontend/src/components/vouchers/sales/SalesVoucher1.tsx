@@ -2089,7 +2089,7 @@ const SalesVoucher: React.FC = () => {
       // Net Invoice Value = CreditTotal - DiscountTotal (assuming Discount is a deduction)
       const total = creditTotal - discountTotal;
 
-      const result = {
+      return {
         debitTotal,
         creditTotal,
         total: total > 0 ? total : creditTotal,
@@ -3104,18 +3104,18 @@ const SalesVoucher: React.FC = () => {
                             {/* DISCOUNT */}
                             {columnSettings.showDiscount && (
                               <td className="px-1 py-2 min-w-[70px] align-top">
-                                  <select
-                                    name="discountLedgerId"
-                                    value={entry.discountLedgerId || ""}
-                                    onChange={(e) => handleEntryChange(index, e)}
-                                    className={`${FORM_STYLES.tableSelect(theme)} text-xs min-w-[100px]`}
-                                  >
-                                    <option value="">Select Discount</option>
-                                    {discount.map(l => (
-                                      <option key={l.id} value={l.id}>{l.name}</option>
-                                    ))
-                                    }
-                                  </select>
+                                <select
+                                  name="discountLedgerId"
+                                  value={entry.discountLedgerId || ""}
+                                  onChange={(e) => handleEntryChange(index, e)}
+                                  className={`${FORM_STYLES.tableSelect(theme)} text-xs min-w-[100px]`}
+                                >
+                                  <option value="">Select Discount</option>
+                                  {discount.map(l => (
+                                    <option key={l.id} value={l.id}>{l.name}</option>
+                                  ))
+                                  }
+                                </select>
                               </td>
                             )}
 

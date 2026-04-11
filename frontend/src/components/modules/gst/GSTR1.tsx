@@ -674,8 +674,8 @@ const GSTR1: React.FC = () => {
                   })
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
                   }`}
               >
                 <option value="01">January</option>
@@ -701,8 +701,8 @@ const GSTR1: React.FC = () => {
                   setSelectedPeriod({ ...selectedPeriod, year: e.target.value })
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
                   }`}
               >
                 <option value="2024">2024</option>
@@ -714,8 +714,8 @@ const GSTR1: React.FC = () => {
               <button
                 type="button"
                 className={`px-4 py-2 rounded ${theme === "dark"
-                    ? "bg-blue-600 hover:bg-blue-700 text-white"
-                    : "bg-blue-600 hover:bg-blue-700 text-white"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
                   }`}
               >
                 Apply Filter
@@ -730,15 +730,15 @@ const GSTR1: React.FC = () => {
         {/* GSTR-1 Form Header - Exact as per screenshot */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           {/* Form Title Header */}
           <div
             className={`p-4 text-center border-b-2 ${theme === "dark"
-                ? "bg-gray-700 border-gray-600"
-                : "bg-gray-100 border-gray-300"
+              ? "bg-gray-700 border-gray-600"
+              : "bg-gray-100 border-gray-300"
               }`}
           >
             <h2 className="text-xl font-bold">GSTR-1</h2>
@@ -788,15 +788,15 @@ const GSTR1: React.FC = () => {
         {/* 4A - B2B Supplies Section */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           {/* Section Header */}
           <div
             className={`p-3 border-b-2 flex items-center justify-between ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             {/* LEFT SIDE */}
@@ -822,15 +822,15 @@ const GSTR1: React.FC = () => {
         {/* 5A - B2C Large Supplies Section */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           {/* Section Header */}
           <div
             className={`p-3 border-b-2 flex items-center justify-between ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             {/* LEFT */}
@@ -857,14 +857,14 @@ const GSTR1: React.FC = () => {
         {/* 5B - B2C Small Supplies Section */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           <div
             className={`p-3 border-b-2 flex items-center justify-between ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             {/* LEFT */}
@@ -889,14 +889,14 @@ const GSTR1: React.FC = () => {
         {/* 6A - Exports Section */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           <div
             className={`p-3 border-b-2 ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             <h3 className="text-lg font-bold">6A - Exports</h3>
@@ -967,14 +967,14 @@ const GSTR1: React.FC = () => {
         {/* 7 - Nil Rated, Exempted and Non GST Outward Supplies */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           <div
             className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             {/* LEFT */}
@@ -1087,14 +1087,14 @@ const GSTR1: React.FC = () => {
         {/* 8A - Tax Liability (Advances Received) */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           <div
             className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             {/* LEFT */}
@@ -1178,14 +1178,14 @@ const GSTR1: React.FC = () => {
         {/* 8B - Tax Liability (Advances Adjusted) */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           <div
             className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             {/* LEFT */}
@@ -1269,14 +1269,14 @@ const GSTR1: React.FC = () => {
         {/* 9A - Credit/Debit Notes (Registered) */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           <div
             className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             {/* LEFT */}
@@ -1384,14 +1384,14 @@ const GSTR1: React.FC = () => {
 B - Credit/Debit Notes (Unregistered) */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           <div
             className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             {/* LEFT */}
@@ -1489,14 +1489,14 @@ B - Credit/Debit Notes (Unregistered) */}
         {/* 10 - HSN Summary */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           <div
             className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             {/* LEFT */}
@@ -1508,13 +1508,23 @@ B - Credit/Debit Notes (Unregistered) */}
             </div>
 
             {/* RIGHT */}
-            <button
-              type="button"
-              onClick={() => navigate("/app/gst/gstr-1/hsn-summary")}
-              className="self-start sm:self-auto text-xs px-3 py-1 rounded bg-white text-blue-800 font-semibold hover:bg-gray-100 transition whitespace-nowrap"
-            >
-              View More →
-            </button>
+            <div className="flex space-x-2">
+              <button
+                type="button"
+                onClick={() => navigate("/app/gst/gstr-1/hsn-summary")}
+                className="self-start sm:self-auto text-xs px-3 py-1 rounded bg-blue-700 text-white font-semibold hover:bg-blue-800 transition whitespace-nowrap"
+              >
+                B2B HSN Summary
+              </button>
+              <button
+                type="button"
+                onClick={() => navigate("/app/gst/gstr-1/hsn-summary-b2c")}
+                className="self-start sm:self-auto text-xs px-3 py-1 rounded bg-purple-700 text-white font-semibold hover:bg-purple-800 transition whitespace-nowrap"
+              >
+                B2C HSN Summary
+              </button>
+            </div>
+
           </div>
 
           <div className="p-4">
@@ -1659,14 +1669,14 @@ B - Credit/Debit Notes (Unregistered) */}
         {/* 11 - Documents Issued */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           <div
             className={`p-3 border-b-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 ${theme === "dark"
-                ? "bg-blue-900 border-gray-600 text-white"
-                : "bg-blue-800 border-gray-300 text-white"
+              ? "bg-blue-900 border-gray-600 text-white"
+              : "bg-blue-800 border-gray-300 text-white"
               }`}
           >
             {/* LEFT */}
@@ -1808,14 +1818,14 @@ B - Credit/Debit Notes (Unregistered) */}
         {/* Summary Section */}
         <div
           className={`mb-6 rounded-lg border-2 ${theme === "dark"
-              ? "bg-gray-800 border-gray-600"
-              : "bg-white border-gray-300"
+            ? "bg-gray-800 border-gray-600"
+            : "bg-white border-gray-300"
             }`}
         >
           <div
             className={`p-3 border-b-2 ${theme === "dark"
-                ? "bg-green-900 border-gray-600 text-white"
-                : "bg-green-800 border-gray-300 text-white"
+              ? "bg-green-900 border-gray-600 text-white"
+              : "bg-green-800 border-gray-300 text-white"
               }`}
           >
             <h3 className="text-lg font-bold">GSTR-1 Summary</h3>
@@ -2000,8 +2010,8 @@ B - Credit/Debit Notes (Unregistered) */}
       {/* Footer Note */}
       <div
         className={`p-4 rounded-lg border-l-4 no-print ${theme === "dark"
-            ? "bg-yellow-900/20 border-yellow-500 text-yellow-200"
-            : "bg-yellow-50 border-yellow-400 text-yellow-700"
+          ? "bg-yellow-900/20 border-yellow-500 text-yellow-200"
+          : "bg-yellow-50 border-yellow-400 text-yellow-700"
           }`}
       >
         <h4 className="font-semibold text-sm mb-2">📋 Important Notes:</h4>
