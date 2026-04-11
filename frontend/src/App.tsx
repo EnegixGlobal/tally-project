@@ -242,6 +242,7 @@ import Gstr2B2b from "./components/modules/gst/Gstr1/GstrB2b";
 import GstrB2cl from "./components/modules/gst/Gstr1/GstrB2cl";
 import GstrB2cs from "./components/modules/gst/Gstr1/GstrB2cs";
 import HSNSummary from "./components/modules/gst/Gstr1/HSNSummary";
+import HSNSummaryB2C from "./components/modules/gst/Gstr1/HSNSummaryB2C";
 import PurchaseOrderRegister from "./components/voucherRegister/PurchaseOrderRegister";
 import DebitNoteRegiser from "./components/voucherRegister/DebitNoteRegiser";
 import AllSaleHsn from "./components/reports/AllSaleHsn";
@@ -1574,6 +1575,14 @@ function App() {
                   element={
                     <RequireCompany>
                       <HSNSummary />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="gst/gstr-1/hsn-summary-b2c"
+                  element={
+                    <RequireCompany>
+                      <HSNSummaryB2C />
                     </RequireCompany>
                   }
                 />

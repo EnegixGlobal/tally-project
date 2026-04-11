@@ -317,7 +317,7 @@ router.get('/b2c-small', async (req, res) => {
 // GET HSN Summary - Aggregated data from sale_history and sales_vouchers
 router.get("/b2c/hsn-summary", async (req, res) => {
   try {
-    const { company_id, owner_type, owner_id, fromDate, toDate } = req.query;
+    const { company_id, owner_type, owner_id, fromDate, toDate, type } = req.query;
 
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
@@ -327,14 +327,19 @@ router.get("/b2c/hsn-summary", async (req, res) => {
     }
 
     let dateFilter = '';
-
     if (fromDate && toDate) {
       dateFilter = ' AND sv.date BETWEEN ? AND ?';
     }
 
+    let typeFilter = '';
+    if (type === 'b2b') {
+      typeFilter = " AND (l.gst_number IS NOT NULL AND l.gst_number <> '')";
+    } else if (type === 'b2c') {
+      typeFilter = " AND (l.gst_number IS NULL OR l.gst_number = '')";
+    }
+
     // Get HSN grouped data by joining sales_voucher_items and stock_items
     const hsnSql = `
-      -- Subquery/logic to extract Rate from rate columns (Handles both raw % and ledger IDs)
       WITH item_rates AS (
         SELECT 
           svi.id as item_id,
@@ -346,17 +351,14 @@ router.get("/b2c/hsn-summary", async (req, res) => {
           u.name as unit_name,
           si.unit as si_unit,
           svi.voucherId,
-          -- Resolve IGST Rate (Check if > 40, then join ledger)
           CASE 
             WHEN COALESCE(svi.igstRate, 0) > 40 THEN (SELECT CAST(REGEXP_REPLACE(l1.name, '[^0-9.]', '') AS DECIMAL(10,2)) FROM ledgers l1 WHERE l1.id = svi.igstRate)
             ELSE COALESCE(svi.igstRate, 0) 
           END as resolvedIgstRate,
-          -- Resolve CGST Rate
           CASE 
             WHEN COALESCE(svi.cgstRate, 0) > 40 THEN (SELECT CAST(REGEXP_REPLACE(l2.name, '[^0-9.]', '') AS DECIMAL(10,2)) FROM ledgers l2 WHERE l2.id = svi.cgstRate)
             ELSE COALESCE(svi.cgstRate, 0) 
           END as resolvedCgstRate,
-          -- Resolve SGST Rate
           CASE 
             WHEN COALESCE(svi.sgstRate, 0) > 40 THEN (SELECT CAST(REGEXP_REPLACE(l3.name, '[^0-9.]', '') AS DECIMAL(10,2)) FROM ledgers l3 WHERE l3.id = svi.sgstRate)
             ELSE COALESCE(svi.sgstRate, 0) 
@@ -379,12 +381,14 @@ router.get("/b2c/hsn-summary", async (req, res) => {
         SUM(ir.amount * ir.resolvedIgstRate / 100) as igstAmount,
         SUM(ir.amount * ir.resolvedCgstRate / 100) as cgstAmount,
         SUM(ir.amount * ir.resolvedSgstRate / 100) as sgstAmount,
-        (ir.resolvedIgstRate + ir.resolvedCgstRate + ir.resolvedSgstRate) as taxRate,
+        (MAX(ir.resolvedIgstRate) + MAX(ir.resolvedCgstRate) + MAX(ir.resolvedSgstRate)) as taxRate,
         0 as cessAmount
       FROM item_rates ir
       JOIN sales_vouchers sv ON ir.voucherId = sv.id
+      JOIN ledgers l ON sv.partyId = l.id
       WHERE sv.company_id = ? AND sv.owner_type = ? AND sv.owner_id = ?
         AND sv.date BETWEEN ? AND ?
+        ${typeFilter}
       GROUP BY COALESCE(ir.svi_hsn, ir.si_hsn, 'NA'), ir.item_name, COALESCE(ir.unit_name, ir.si_unit, 'NA'), 
                ir.resolvedIgstRate, ir.resolvedCgstRate, ir.resolvedSgstRate
       ORDER BY ir.item_name ASC
@@ -395,10 +399,8 @@ router.get("/b2c/hsn-summary", async (req, res) => {
       ...(fromDate && toDate ? [fromDate, toDate] : [])
     ]);
 
-    // Round values to 2 decimal places
     const roundValue = (val) => Math.round(Number(val) * 100) / 100;
 
-    // Calculate overall totals for the "Total" row
     const totals = hsnRows.reduce((acc, row) => ({
       count: acc.count + (Number(row.count) || 0),
       totalValue: acc.totalValue + (Number(row.totalValue) || 0),
@@ -436,17 +438,18 @@ router.get("/b2c/hsn-summary", async (req, res) => {
       }
     ];
 
-    return res.status(200).json({
+    res.status(200).json({
       success: true,
       data: result,
     });
   } catch (error) {
     console.error("🔥 HSN Summary Fetch Error:", error);
-    return res.status(500).json({
+    res.status(500).json({
       success: false,
       error: error.message,
     });
   }
 });
+
 
 module.exports = router;

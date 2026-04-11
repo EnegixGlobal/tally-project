@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Filter, Download, Printer } from "lucide-react";
 import * as XLSX from "xlsx";
 
-const HSNSummary = () => {
+const HSNSummaryB2C = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -42,7 +42,7 @@ const HSNSummary = () => {
         owner_id: ownerId,
         fromDate: filters.fromDate,
         toDate: filters.toDate,
-        type: 'b2b' // Explicitly fetch B2B data
+        type: 'b2c' // Explicitly fetch B2C data
       });
 
       const url = `${import.meta.env.VITE_API_URL
@@ -89,9 +89,9 @@ const HSNSummary = () => {
     }));
 
     const ws = XLSX.utils.json_to_sheet(hsnDataForExcel);
-    XLSX.utils.book_append_sheet(wb, ws, "HSN Summary B2B");
+    XLSX.utils.book_append_sheet(wb, ws, "HSN Summary B2C");
 
-    XLSX.writeFile(wb, `HSN_Summary_B2B_${filters.fromDate}_to_${filters.toDate}.xlsx`);
+    XLSX.writeFile(wb, `HSN_Summary_B2C_${filters.fromDate}_to_${filters.toDate}.xlsx`);
   };
 
   const generateFullJSON = () => {
@@ -99,7 +99,7 @@ const HSNSummary = () => {
 
     const payload = {
       type: "GSTR-1",
-      section: "HSN Summary B2B Cumulative",
+      section: "HSN Summary B2C Cumulative",
       period: {
         from: filters.fromDate,
         to: filters.toDate,
@@ -131,7 +131,7 @@ const HSNSummary = () => {
 
     const link = document.createElement("a");
     link.href = url;
-    link.download = `HSN_Summary_B2B_${filters.fromDate}_to_${filters.toDate}.json`;
+    link.download = `HSN_Summary_B2C_${filters.fromDate}_to_${filters.toDate}.json`;
 
     document.body.appendChild(link);
     link.click();
@@ -156,7 +156,7 @@ const HSNSummary = () => {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold">10 - HSN Summary (B2B)</h1>
+        <h1 className="text-2xl font-bold">10 - HSN Summary (B2C)</h1>
         <div className="ml-auto flex space-x-2">
           <button
             type="button"
@@ -264,7 +264,7 @@ const HSNSummary = () => {
             : "bg-blue-800 border-gray-300 text-white"
             }`}
         >
-          <h3 className="text-lg font-bold">HSN-wise Summary of Outward Supplies (B2B)</h3>
+          <h3 className="text-lg font-bold">HSN-wise Summary of Outward Supplies (B2C)</h3>
         </div>
 
         <div className="p-4">
@@ -274,7 +274,7 @@ const HSNSummary = () => {
             </div>
           ) : hsnData.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-gray-500">No HSN data available for B2B</p>
+              <p className="text-gray-500">No HSN data available for B2C</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -372,6 +372,7 @@ const HSNSummary = () => {
   );
 };
 
-export default HSNSummary;
+export default HSNSummaryB2C;
+
 
 
