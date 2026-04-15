@@ -328,10 +328,23 @@
 
 
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import type { ReactNode } from 'react';
 import type { CompanyInfo, Ledger, LedgerGroup, VoucherEntry, StockItem, UnitOfMeasurement, Godown, StockGroup, GstClassification, CapitalGain, TDSEntry } from '../types';
 import { defaultLedgerGroups, defaultLedgers } from '../data/defaultData';
 import { useCompany } from './CompanyContext';
+import { allSystemGroups } from '../constants/ledgerGroups';
+import type { ReactNode } from 'react';
+
+const systemMapped: LedgerGroup[] = allSystemGroups.map(g => ({
+  id: g.id as any,
+  name: g.name,
+  parent: g.parent as any,
+  type: (g.nature?.toLowerCase().replace(' ', '-') || 'current-assets') as any,
+  behavesLikeSubLedger: false,
+  nettBalancesForReporting: true,
+  usedForCalculation: false
+}));
+
+const initialLedgerGroups = [...systemMapped, ...defaultLedgerGroups];
 
 type ThemeMode = 'light' | 'dark';
 
@@ -376,7 +389,7 @@ const AppProviderInner: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [theme, setTheme] = useState<ThemeMode>('light');
   const { companyInfo: contextCompanyInfo } = useCompany();
   const [localCompanyInfo, setLocalCompanyInfo] = useState<CompanyInfo | null>(null);
-  
+
   // Sync with CompanyContext - companyInfo from context takes precedence
   useEffect(() => {
     if (contextCompanyInfo) {
@@ -385,15 +398,15 @@ const AppProviderInner: React.FC<{ children: ReactNode }> = ({ children }) => {
       setLocalCompanyInfo(null);
     }
   }, [contextCompanyInfo]);
-  
+
   // Use context companyInfo if available, otherwise use local state
   const companyInfo = contextCompanyInfo || localCompanyInfo;
-  
+
   const setCompanyInfo = (info: CompanyInfo) => {
     setLocalCompanyInfo(info);
     // Note: For proper company switching, use useCompany().switchCompany()
   };
-  const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>(defaultLedgerGroups);
+  const [ledgerGroups, setLedgerGroups] = useState<LedgerGroup[]>(initialLedgerGroups);
   const [ledgers, setLedgers] = useState<Ledger[]>(defaultLedgers);
   const [vouchers, setVouchers] = useState<VoucherEntry[]>([
     {

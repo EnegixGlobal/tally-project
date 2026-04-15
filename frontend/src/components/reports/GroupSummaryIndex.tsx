@@ -2,6 +2,7 @@ import React, { useEffect, useState, type ReactNode } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Building } from "lucide-react";
+import { allSystemGroups as baseGroups } from "../../constants/ledgerGroups";
 interface GroupType {
   id: number;
   name: string;
@@ -9,6 +10,7 @@ interface GroupType {
   description: string;
   icon: ReactNode;
   color: string;
+  parent_id?: number | null;
 }
 
 const GroupSummaryIndex: React.FC = () => {
@@ -27,25 +29,6 @@ const GroupSummaryIndex: React.FC = () => {
       ownerType === "employee" ? "employee_id" : "user_id"
     ) || "";
 
-  const baseGroups = [
-    { id: -3, name: "Branch/Division", nature: "Assets" },
-    { id: -4, name: "Capital Account", nature: "Liabilities" },
-    { id: -5, name: "Current Assets", nature: "Assets" },
-    { id: -6, name: "Current Liabilities", nature: "Liabilities" },
-    { id: -7, name: "Direct Expenses", nature: "Expenses" },
-    { id: -8, name: "Direct Income", nature: "Income" },
-    { id: -9, name: "Fixed Assets", nature: "Assets" },
-    { id: -10, name: "Indirect Expenses", nature: "Expenses" },
-    { id: -11, name: "Indirect Income", nature: "Income" },
-    { id: -12, name: "Investments", nature: "Assets" },
-    { id: -13, name: "Loan(Liability)", nature: "Liabilities" },
-    { id: -14, name: "Misc expenses (Assets)", nature: "Assets" },
-    { id: -15, name: "Purchase Accounts", nature: "Expenses" },
-    { id: -16, name: "Sales Accounts", nature: "Income" },
-    { id: -17, name: "Suspense A/C", nature: "Assets" },
-    { id: -18, name: "Profit & Loss A/c", nature: "Liabilities" },
-    { id: -19, name: "TDS Payables", nature: "Liabilities" },
-  ];
 
   //fixed ui
 
@@ -102,7 +85,7 @@ const GroupSummaryIndex: React.FC = () => {
           color: "bg-blue-500",
         }));
 
-        const baseGroupMapped = baseGroups.map((g) => ({
+        const baseGroupMapped = baseGroups.map((g: any) => ({
           id: g.id,
           // type: `base-${Math.abs(g.id)}`,
           type: g.id,
@@ -220,9 +203,6 @@ const GroupSummaryIndex: React.FC = () => {
     }
   };
 
-  const handleGroupClick = (groupType: string) => {
-    navigate(`/app/reports/group-summary/${groupType}`);
-  };
 
   const handleBackClick = () => {
     navigate("/app/reports");

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import Swal from "sweetalert2";
+import { allSystemGroups as baseGroups } from "../../constants/ledgerGroups";
 
 interface SalesData {
   id: string;
@@ -81,11 +82,6 @@ interface FilterState {
 
 //base group
 
-const baseGroups = [
-  { id: -15, name: "Purchase Accounts", nature: "Expenses" },
-  { id: -6, name: "Current Liabilities", nature: "Liabilities" },
-  { id: -11, name: "Indirect Income", nature: "Income" },
-];
 
 const GROUP_NAMES: Record<number, string> = {
   [-16]: "Purchase Account",

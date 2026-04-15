@@ -158,8 +158,8 @@ const ConsolidatedFinancialReport: React.FC = () => {
   const calculateGroupTotalByCompany = (groupId: number, companyId: number): number => {
     const findSubGroups = (id: number): number[] => {
       let results = [id];
-      ledgerGroups.filter(g => g.parent === id).forEach(c => {
-        results = [...results, ...findSubGroups(c.id)];
+      ledgerGroups.filter(g => Number(g.parent) === Number(id)).forEach(c => {
+        results = [...results, ...findSubGroups(Number(c.id))];
       });
       return results;
     };
@@ -336,8 +336,8 @@ const ConsolidatedFinancialReport: React.FC = () => {
   const getLedgersForGroup = (groupId: number, companyId: number) => {
     const findSubGroups = (id: number): number[] => {
       let results = [id];
-      ledgerGroups.filter(g => g.parent === id).forEach(c => {
-        results = [...results, ...findSubGroups(c.id)];
+      ledgerGroups.filter(g => Number(g.parent) === Number(id)).forEach(c => {
+        results = [...results, ...findSubGroups(Number(c.id))];
       });
       return results;
     };
@@ -347,8 +347,8 @@ const ConsolidatedFinancialReport: React.FC = () => {
 
   const findSubGroups = (id: number): number[] => {
     let results = [id];
-    ledgerGroups.filter((g) => g.parent === id).forEach((child) => {
-      results = [...results, ...findSubGroups(child.id)];
+    ledgerGroups.filter((g) => Number(g.parent) === Number(id)).forEach((child) => {
+      results = [...results, ...findSubGroups(Number(child.id))];
     });
     return results;
   };
@@ -490,7 +490,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
                             (s, p) =>
                               s +
                               Number(p.purchaseQuantity) *
-                                Number(p.rate || p.purchaseRate || 0),
+                              Number(p.rate || p.purchaseRate || 0),
                             0
                           );
                         const itemOutwardQty = sHistory
@@ -558,7 +558,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
                             (s, p) =>
                               s +
                               Number(p.purchaseQuantity) *
-                                Number(p.rate || p.purchaseRate || 0),
+                              Number(p.rate || p.purchaseRate || 0),
                             0
                           );
                         const itemOutwardQty = sHistory
@@ -578,7 +578,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
                           Math.max(
                             0,
                             (totalInQty - itemOutwardQty) *
-                              (totalInQty > 0 ? totalInVal / totalInQty : 0)
+                            (totalInQty > 0 ? totalInVal / totalInQty : 0)
                           )
                         );
                       }, 0)
@@ -773,7 +773,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
                 <td colSpan={companies.length + 2} className={tdClass}>Liabilities</td>
               </tr>
               {liabilityGroups.map(group => renderRowWithLedgers(group.name, group.id, (cid) => calculateGroupTotalByCompany(group.id, cid), getTotalForGroup(group.id)))}
-              
+
               {renderRowWithLedgers('Profit & Loss A/c', 'pl_ac', getCompanyProfitLoss, getTotalPL())}
 
               <tr className={`${totalRowClass} border-t-2`}>

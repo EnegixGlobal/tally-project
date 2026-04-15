@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { ArrowLeft, Printer, Download, Settings } from "lucide-react";
 import { useProfitLossSync } from "../../hooks/useProfitLossSync";
+import { allSystemGroups } from "../../constants/ledgerGroups";
 
 // Interfaces copied from your structure
 interface Ledger {
@@ -63,12 +64,12 @@ const BalanceSheet: React.FC = () => {
         const normalizedLedgers = data.ledgers.map((l: any) => ({
           id: l.id,
           name: l.name,
-          groupId: l.group_id,
-          openingBalance: parseFloat(l.opening_balance) || 0,
-          balanceType: l.balance_type,
-          closingBalance: parseFloat(l.closing_balance) || 0,
-          groupName: l.group_name,
-          groupType: l.group_type,
+          groupId: Number(l.group_id || l.groupId),
+          openingBalance: parseFloat(l.opening_balance || l.openingBalance) || 0,
+          balanceType: l.balance_type || l.balanceType,
+          closingBalance: parseFloat(l.closing_balance || l.closingBalance) || 0,
+          groupName: l.group_name || l.groupName,
+          groupType: l.group_type || l.groupType,
         }));
         setLedgers(normalizedLedgers);
 
@@ -76,7 +77,16 @@ const BalanceSheet: React.FC = () => {
           ...g,
           parent: g.parent ? Number(g.parent) : null
         }));
-        setLedgerGroups(normalizedGroups);
+
+        // Merge with system groups for hierarchical resolution
+        const systemGroupsMapped = allSystemGroups.map(g => ({
+          id: g.id,
+          name: g.name,
+          parent: g.parent || null,
+          type: g.nature?.toLowerCase().replace(' ', '-') || null
+        }));
+
+        setLedgerGroups([...systemGroupsMapped, ...normalizedGroups]);
         setTransferredProfit(data.transferredProfit || 0);
         setTransferredLoss(data.transferredLoss || 0);
       } catch (err: any) {
@@ -218,9 +228,9 @@ const BalanceSheet: React.FC = () => {
     const findSubGroups = (id: number): number[] => {
       let results = [id];
       ledgerGroups
-        .filter((g) => g.parent === id)
+        .filter((g) => Number(g.parent) === Number(id))
         .forEach((c) => {
-          results = [...results, ...findSubGroups(c.id)];
+          results = [...results, ...findSubGroups(Number(c.id))];
         });
       return results;
     };
@@ -242,7 +252,7 @@ const BalanceSheet: React.FC = () => {
   };
 
   const renderDetailedGroupItems = (parentGroupId: number, level: number = 1) => {
-    const subGroups = ledgerGroups.filter(g => g.parent === parentGroupId);
+    const subGroups = ledgerGroups.filter(g => Number(g.parent) === Number(parentGroupId));
     const directLedgers = ledgers.filter(l => Number(l.groupId) === parentGroupId);
 
     return (

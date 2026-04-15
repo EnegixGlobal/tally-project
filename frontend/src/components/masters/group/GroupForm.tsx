@@ -9,6 +9,7 @@ import type {
   LedgerType,
 } from "../../../types";
 import Swal from "sweetalert2";
+import { allSystemGroups as baseGroups } from "../../../constants/ledgerGroups";
 
 interface FormData {
   name: string;
@@ -17,25 +18,6 @@ interface FormData {
   nature: "Assets" | "Liabilities" | "Income" | "Expenses" | "";
 }
 
-const baseGroups = [
-  { id: -3, name: "Branch/Division", nature: "Assets" },
-  { id: -4, name: "Capital Account", nature: "Liabilities" },
-  { id: -5, name: "Current Assets", nature: "Assets" },
-  { id: -6, name: "Current Liabilities", nature: "Liabilities" },
-  { id: -7, name: "Direct Expenses", nature: "Expenses" },
-  { id: -8, name: "Direct Income", nature: "Income" },
-  { id: -9, name: "Fixed Assets", nature: "Assets" },
-  { id: -10, name: "Indirect Expenses", nature: "Expenses" },
-  { id: -11, name: "Indirect Income", nature: "Income" },
-  { id: -12, name: "Investments", nature: "Assets" },
-  { id: -13, name: "Loan(Liability)", nature: "Liabilities" },
-  { id: -14, name: "Misc expenses (Assets)", nature: "Assets" },
-  { id: -15, name: "Purchase Accounts", nature: "Expenses" },
-  { id: -16, name: "Sales Accounts", nature: "Income" },
-  { id: -17, name: "Suspense A/C", nature: "Assets" },
-  { id: -18, name: "Profit & Loss A/c", nature: "Liabilities" },
-  { id: -19, name: "TDS Payables", nature: "Liabilities" },
-];
 
 const GroupForm: React.FC = () => {
   const { theme } = useAppContext();

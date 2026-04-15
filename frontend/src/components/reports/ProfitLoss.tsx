@@ -148,18 +148,27 @@ const ProfitLoss: React.FC = () => {
       .then((data) => {
         const ledgers = data.ledgers || [];
 
-        // Purchase → group_id = -15
+        // Helper to check if a group is a descendant of another
+        const allGroups = [...(ledgerGroups || [])];
+        const isDescendant = (childId: number | string, targetParentId: number | string): boolean => {
+          if (String(childId) === String(targetParentId)) return true;
+          const group = allGroups.find(g => String(g.id) === String(childId));
+          if (group && group.parent_id) return isDescendant(group.parent_id, targetParentId);
+          return false;
+        };
+
+        // Purchase → group_id = -15 or descendant
         const purchases: SimpleLedger[] = ledgers
-          .filter((l: any) => String(l.group_id) === "-15")
+          .filter((l: any) => isDescendant(l.group_id, -15))
           .map((l: any) => ({
             id: Number(l.id),
             name: l.name,
             opening_balance: l.opening_balance,
           }));
 
-        // Sales → group_id = -16
+        // Sales → group_id = -16 or descendant
         const sales: SimpleLedger[] = ledgers
-          .filter((l: any) => String(l.group_id) === "-16")
+          .filter((l: any) => isDescendant(l.group_id, -16))
           .map((l: any) => ({
             id: Number(l.id),
             name: l.name,
@@ -173,7 +182,7 @@ const ProfitLoss: React.FC = () => {
             const gtype = (l.group_type || "").toLowerCase();
             const pgtype = (l.parent_group_type || "").toLowerCase();
 
-            if (gid === "-7") return true;
+            if (isDescendant(gid, -7)) return true;
             if (gtype === "direct-expenses" || pgtype === "direct-expenses" || gtype === "direct-expense" || pgtype === "direct-expense") return true;
 
             const group = (ledgerGroups || []).find(g => String(g.id) === gid);
@@ -192,7 +201,7 @@ const ProfitLoss: React.FC = () => {
             const gtype = (l.group_type || "").toLowerCase();
             const pgtype = (l.parent_group_type || "").toLowerCase();
 
-            if (gid === "-10") return true;
+            if (isDescendant(gid, -10)) return true;
             if (gtype === "indirect-expenses" || pgtype === "indirect-expenses" || gtype === "indirect-expense" || pgtype === "indirect-expense") return true;
 
             const group = (ledgerGroups || []).find(g => String(g.id) === gid);
@@ -211,7 +220,7 @@ const ProfitLoss: React.FC = () => {
             const gtype = (l.group_type || "").toLowerCase();
             const pgtype = (l.parent_group_type || "").toLowerCase();
 
-            if (gid === "-8") return true;
+            if (isDescendant(gid, -8)) return true;
             if (gtype === "direct-income" || pgtype === "direct-income" || gtype === "direct-incomes" || pgtype === "direct-incomes") return true;
 
             const group = (ledgerGroups || []).find(g => String(g.id) === gid);
@@ -230,7 +239,7 @@ const ProfitLoss: React.FC = () => {
             const gtype = (l.group_type || "").toLowerCase();
             const pgtype = (l.parent_group_type || "").toLowerCase();
 
-            if (gid === "-11") return true;
+            if (isDescendant(gid, -11)) return true;
             if (gtype === "indirect-income" || pgtype === "indirect-income" || gtype === "indirect-incomes" || pgtype === "indirect-incomes") return true;
 
             const group = (ledgerGroups || []).find(g => String(g.id) === gid);
@@ -584,7 +593,7 @@ const ProfitLoss: React.FC = () => {
       const group = ledgerGroups.find((g) => String(g.id) === gid);
       const gtype = (group?.type || l.groupType || l.group_type || "").toLowerCase();
       const pgtype = (l.parent_group_type || "").toLowerCase();
-      
+
       return gid === "-11" || gtype === "indirect-income" || gtype === "indirect-incomes" || pgtype === "indirect-income" || pgtype === "indirect-incomes";
     });
   };
