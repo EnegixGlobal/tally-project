@@ -1,6 +1,7 @@
 import { Filter, X } from "lucide-react";
 import { useEffect, useState, Fragment, useRef } from "react";
 import { useParams, useNavigate } from "react-router-dom";
+import { allSystemGroups as baseGroups } from "../../../constants/ledgerGroups";
 
 
 const SalesRepostDetails = () => {
@@ -47,9 +48,8 @@ const SalesRepostDetails = () => {
     setLoading(true);
 
     // Build URL with date filters if provided
-    let url = `${
-      import.meta.env.VITE_API_URL
-    }/api/sales-report/month-wise?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&month=${month}&year=${year}`;
+    let url = `${import.meta.env.VITE_API_URL
+      }/api/sales-report/month-wise?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&month=${month}&year=${year}`;
 
     // Add date filters if provided (these will override month/year on backend)
     if (filters.fromDate && filters.toDate) {
@@ -137,25 +137,6 @@ const SalesRepostDetails = () => {
   };
 
   // group name
-  const baseGroups = [
-    { id: -3, name: "Branch/Division", nature: "Assets" },
-    { id: -4, name: "Capital Account", nature: "Liabilities" },
-    { id: -5, name: "Current Assets", nature: "Assets" },
-    { id: -6, name: "Current Liabilities", nature: "Liabilities" },
-    { id: -7, name: "Direct Expenses", nature: "Expenses" },
-    { id: -8, name: "Direct Income", nature: "Income" },
-    { id: -9, name: "Fixed Assets", nature: "Assets" },
-    { id: -10, name: "Indirect Expenses", nature: "Expenses" },
-    { id: -11, name: "Indirect Income", nature: "Income" },
-    { id: -12, name: "Investments", nature: "Assets" },
-    { id: -13, name: "Loan(Liability)", nature: "Liabilities" },
-    { id: -14, name: "Misc expenses (Assets)", nature: "Assets" },
-    { id: -15, name: "Purchase Accounts", nature: "Expenses" },
-    { id: -16, name: "Sales Accounts", nature: "Income" },
-    { id: -17, name: "Suspense A/C", nature: "Assets" },
-    { id: -18, name: "Profit & Loss A/c", nature: "Liabilities" },
-    { id: -19, name: "TDS Payables", nature: "Liabilities" },
-  ];
 
   useEffect(() => {
     const fetchData = async () => {
@@ -176,8 +157,7 @@ const SalesRepostDetails = () => {
 
         // 🔹 Ledgers
         const ledgerRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const ledgerData = await ledgerRes.json();
@@ -185,8 +165,7 @@ const SalesRepostDetails = () => {
 
         // 🔹 Ledger Groups
         const groupRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const groupData = await groupRes.json();
@@ -288,11 +267,10 @@ const SalesRepostDetails = () => {
           <div className="relative" ref={filterPanelRef}>
             <button
               onClick={() => setShowFilterPanel(!showFilterPanel)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${
-                hasActiveFilters()
-                  ? "bg-blue-50 border-blue-500 text-blue-700 hover:bg-blue-100"
-                  : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
-              }`}
+              className={`flex items-center gap-2 px-4 py-2 rounded-lg border transition-colors ${hasActiveFilters()
+                ? "bg-blue-50 border-blue-500 text-blue-700 hover:bg-blue-100"
+                : "bg-white border-gray-300 text-gray-700 hover:bg-gray-50"
+                }`}
             >
               <Filter className="w-4 h-4" />
               Filter
@@ -369,27 +347,27 @@ const SalesRepostDetails = () => {
 
           {/* 🔘 RADIO CONTROLS */}
           <div className="flex items-center gap-6">
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="salesView"
-              checked={!showDetail}
-              onChange={() => setShowDetail(false)}
-              className="accent-blue-600"
-            />
-            Summary
-          </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="salesView"
+                checked={!showDetail}
+                onChange={() => setShowDetail(false)}
+                className="accent-blue-600"
+              />
+              Summary
+            </label>
 
-          <label className="flex items-center gap-2 cursor-pointer">
-            <input
-              type="radio"
-              name="salesView"
-              checked={showDetail}
-              onChange={() => setShowDetail(true)}
-              className="accent-blue-600"
-            />
-            Detail
-          </label>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="radio"
+                name="salesView"
+                checked={showDetail}
+                onChange={() => setShowDetail(true)}
+                className="accent-blue-600"
+              />
+              Detail
+            </label>
           </div>
         </div>
       </div>

@@ -3,6 +3,7 @@ import { useLocation, useNavigate, useParams } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
 import { ArrowLeft } from "lucide-react";
 import { useProfitLossSync } from "../../hooks/useProfitLossSync";
+import { allSystemGroups as baseGroups } from "../../constants/ledgerGroups";
 
 
 
@@ -35,25 +36,6 @@ interface BaseGroup {
 
 
 // group name
-const baseGroups = [
-  { id: -3, name: "Branch/Division", nature: "Assets" },
-  { id: -4, name: "Capital Account", nature: "Liabilities" },
-  { id: -5, name: "Current Assets", nature: "Assets" },
-  { id: -6, name: "Current Liabilities", nature: "Liabilities" },
-  { id: -7, name: "Direct Expenses", nature: "Expenses" },
-  { id: -8, name: "Direct Income", nature: "Income" },
-  { id: -9, name: "Fixed Assets", nature: "Assets" },
-  { id: -10, name: "Indirect Expenses", nature: "Expenses" },
-  { id: -11, name: "Indirect Income", nature: "Income" },
-  { id: -12, name: "Investments", nature: "Assets" },
-  { id: -13, name: "Loan(Liability)", nature: "Liabilities" },
-  { id: -14, name: "Misc expenses (Assets)", nature: "Assets" },
-  { id: -15, name: "Purchase Accounts", nature: "Expenses" },
-  { id: -16, name: "Sales Accounts", nature: "Income" },
-  { id: -17, name: "Suspense A/C", nature: "Assets" },
-  { id: -18, name: "Profit & Loss A/c", nature: "Liabilities" },
-  { id: -19, name: "TDS Payables", nature: "Liabilities" },
-];
 
 const SubGroupSummary: React.FC = () => {
   const { theme } = useAppContext();
@@ -65,14 +47,13 @@ const SubGroupSummary: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const { closingStock } = useProfitLossSync();
   const [subGroups, setSubGroups] = useState<Group[]>([]);
+  const [allFetchedGroups, setAllFetchedGroups] = useState<Group[]>([]);
+  const groupIds = [Number(groupId)];
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [debitCreditData, setDebitCreditData] = useState<DebitCreditData>({});
   const [groupName, setGroupName] = useState<string>(
     location.state?.groupName || `Group ${groupId}`
   );
-
-
-  const [groupIds, setGroupIds] = useState<number[]>([Number(groupId)]);
 
 
   const companyId = localStorage.getItem("company_id") || "";
@@ -82,54 +63,77 @@ const SubGroupSummary: React.FC = () => {
       ownerType === "employee" ? "employee_id" : "user_id"
     ) || "";
 
-  useEffect(() => {
-    // Reset groupIds when URL groupId changes
-    if (groupId) {
-      // If no groupIds in state, use just the current groupId
-      if (location.state?.groupIds && Array.isArray(location.state.groupIds)) {
-        setGroupIds(location.state.groupIds);
-      } else {
-        setGroupIds([Number(groupId)]);
-      }
-    }
-  }, [groupId, location.state]);
 
   useEffect(() => {
-    const fetchGroupData = async () => {
+    const fetchGroupDataRecursive = async () => {
       setLoading(true);
       setError(null);
       try {
         let allSubGroups: Group[] = [];
         let allLedgers: Ledger[] = [];
+        const fetchedIds = new Set<number>();
+        const queue: number[] = [Number(groupId)];
 
-        // Fetch data for each group ID
-        for (const gId of groupIds) {
-          const url = `${import.meta.env.VITE_API_URL
-            }/api/balance-sheet/group?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&id=${gId}`;
+        while (queue.length > 0) {
+          const gId = queue.shift()!;
+          if (fetchedIds.has(gId)) continue;
+          fetchedIds.add(gId);
+
+          const url = `${import.meta.env.VITE_API_URL}/api/balance-sheet/group?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&id=${gId}`;
 
           const res = await fetch(url);
-          if (!res.ok) throw new Error("Failed to load group data");
+          if (!res.ok) throw new Error(`Failed to load data for group ${gId}`);
           const data = await res.json();
 
           if (data.success) {
-            allSubGroups = [...allSubGroups, ...(data.groups || [])];
+            // Normalize groups
+            const normalizedFetchedGroups = (data.groups || []).map((g: any) => ({
+              id: Number(g.id),
+              name: g.name,
+              parent: g.parent ? Number(g.parent) : null
+            }));
 
-            // Normalize ledgers
+            // Normalize ledgers - CRITICAL to check both group_id and groupId
             const rawLedgers = data.ledgers || [];
             const normalizedLedgers = rawLedgers.map((l: any) => ({
               id: l.id,
               name: l.name,
-              group_id: l.group_id,
-              openingBalance: parseFloat(l.opening_balance) || 0,
-              balanceType: l.balance_type,
-              closingBalance: parseFloat(l.closing_balance) || 0,
-              groupName: l.group_name,
+              group_id: Number(l.group_id || l.groupId), // Handle inconsistent backend field names
+              openingBalance: parseFloat(l.opening_balance || l.openingBalance) || 0,
+              balanceType: l.balance_type || l.balanceType,
+              closingBalance: parseFloat(l.closing_balance || l.closingBalance) || 0,
+              groupName: l.group_name || l.groupName,
             }));
+
             allLedgers = [...allLedgers, ...normalizedLedgers];
+            allSubGroups = [...allSubGroups, ...normalizedFetchedGroups];
+
+            // Add new database subgroups to queue
+            normalizedFetchedGroups.forEach((g: Group) => {
+              if (!fetchedIds.has(g.id)) {
+                queue.push(g.id);
+              }
+            });
+
+            // Add system subgroups matching this parent to queue
+            const systemChildren = baseGroups.filter(bg => Number(bg.parent) === gId);
+            systemChildren.forEach(sc => {
+              if (!fetchedIds.has(sc.id)) {
+                queue.push(sc.id);
+                // Also add to allSubGroups if not present
+                if (!allSubGroups.some(ug => ug.id === sc.id)) {
+                  allSubGroups.push({ id: sc.id, name: sc.name, parent: sc.parent });
+                }
+              }
+            });
           }
         }
 
-        setSubGroups(allSubGroups);
+        const currentUrlGroupId = Number(groupId);
+        const filteredGroups = allSubGroups.filter(g => Number(g.parent) === currentUrlGroupId);
+
+        setSubGroups(filteredGroups);
+        setAllFetchedGroups(allSubGroups);
         setLedgers(allLedgers);
       } catch (err: any) {
         setError(err.message || "Unknown error");
@@ -138,10 +142,10 @@ const SubGroupSummary: React.FC = () => {
       }
     };
 
-    if (groupIds.length > 0) {
-      fetchGroupData();
+    if (groupId) {
+      fetchGroupDataRecursive();
     }
-  }, [groupIds, companyId, ownerType, ownerId]);
+  }, [groupId, companyId, ownerType, ownerId]);
 
   // Fetch debit/credit data for all ledgers
   useEffect(() => {
@@ -208,7 +212,7 @@ const SubGroupSummary: React.FC = () => {
     ledgersByGroup[ledger.group_id].push(ledger);
   });
 
-  // Get direct ledgers (ledgers directly under any of the parent groups)
+  // Get direct ledgers (ledgers directly under the CURRENT group)
   const directLedgers = ledgers.filter((l) =>
     groupIds.includes(Number(l.group_id))
   );
@@ -284,15 +288,27 @@ const SubGroupSummary: React.FC = () => {
     return { opening, debit, credit, closing };
   };
 
-  const getGroupTotals = (groupId: number) => {
-    const groupLedgers = ledgersByGroup[groupId] || [];
+  const getGroupTotals = (targetGroupId: number, allGroups: Group[]) => {
+    // Find all recursive child groups in the current data
+    const findAllChildren = (id: number): number[] => {
+      let results = [id];
+      allGroups.filter(g => Number(g.parent) === Number(id)).forEach(child => {
+        results = [...results, ...findAllChildren(Number(child.id))];
+      });
+      return results;
+    };
+
+    const targetGroupIds = findAllChildren(targetGroupId);
+
+    // Ledgers belonging to any of these IDs
+    const relevantLedgers = ledgers.filter(l => targetGroupIds.includes(Number(l.group_id)));
 
     let opening = 0;
     let debit = 0;
     let credit = 0;
     let closing = 0;
 
-    groupLedgers.forEach((ledger) => {
+    relevantLedgers.forEach((ledger) => {
       const b = getLedgerBalances(ledger);
       opening += b.openingSigned;
       debit += b.debit;
@@ -463,7 +479,8 @@ const SubGroupSummary: React.FC = () => {
                   <tbody>
                     {subGroups.map((group) => {
                       const totals = getGroupTotals(
-                        group.id
+                        group.id,
+                        allFetchedGroups
                       );
                       const groupLedgers = ledgersByGroup[group.id] || [];
 

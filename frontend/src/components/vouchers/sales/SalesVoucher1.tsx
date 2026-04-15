@@ -432,7 +432,7 @@ const SalesVoucher: React.FC = () => {
   useEffect(() => {
     // Skip if in Edit Mode or Copy Mode
     if (isEditMode || copyId) {
-      setIsReadyToSave(true);
+      // Don't set ready to save yet; wait for load effects to finish and set it
       return;
     }
 
@@ -481,33 +481,40 @@ const SalesVoucher: React.FC = () => {
           const v = data;
 
           // Map entries precisely as loadSingleVoucher does
-          const mappedEntries = (v.entries || []).map((e: any, idx: number) => ({
-            id: `e${idx + 1}`,
-            itemId: e.itemId || e.item_id || "",
-            quantity: Number(e.quantity) || 0,
-            rate: Number(e.rate) || 0,
-            amount: Number(e.amount) || 0,
-            type: e.type || "debit",
-            // The component logic expects ledger IDs in these fields, 
-            // which are then hydrated into rates by a separate useEffect.
-            cgstLedgerId: e.cgstRate ? String(Math.round(Number(e.cgstRate))) : "",
-            sgstLedgerId: e.sgstRate ? String(Math.round(Number(e.sgstRate))) : "",
-            igstLedgerId: e.igstRate ? String(Math.round(Number(e.igstRate))) : "",
-            cgstRate: 0,
-            sgstRate: 0,
-            igstRate: 0,
-            godownId: e.godownId || e.godown_id || "",
-            salesLedgerId: e.salesLedgerId?.toString() || e.sales_ledger_id?.toString() || "",
-            discount: Number(e.discount) || 0,
-            discountLedgerId: e.discountLedgerId || e.discount_ledger_id || "",
-            hsnCode: e.hsnCode || e.hsn_code || "",
-            batchNumber: e.batchNumber || e.batch_number || "",
-          }));
+          const mappedEntries = (v.entries || []).map((e: any, idx: number) => {
+            const qty = Number(e.quantity) || 0;
+            const rate = Number(e.rate) || 0;
+            return {
+              id: `e${idx + 1}`,
+              itemId: e.itemId || e.item_id || "",
+              quantity: qty,
+              rate: rate,
+              amount: qty * rate, // ✅ Use GROSS amount
+              type: e.type || "debit",
+              // The component logic expects ledger IDs in these fields, 
+              // which are then hydrated into rates by a separate useEffect.
+              cgstLedgerId: e.cgstRate ? String(Math.round(Number(e.cgstRate))) : "",
+              sgstLedgerId: e.sgstRate ? String(Math.round(Number(e.sgstRate))) : "",
+              igstLedgerId: e.igstRate ? String(Math.round(Number(e.igstRate))) : "",
+              cgstRate: 0,
+              sgstRate: 0,
+              igstRate: 0,
+              godownId: e.godownId || e.godown_id || "",
+              salesLedgerId: e.salesLedgerId?.toString() || e.sales_ledger_id?.toString() || "",
+              discount: Number(e.discount) || 0,
+              discountLedgerId: e.discountLedgerId || e.discount_ledger_id || "",
+              hsnCode: e.hsnCode || e.hsn_code || "",
+              batchNumber: e.batchNumber || e.batch_number || "",
+            };
+          });
+
+          const isVoucherQuotation = v.isQuotation === 1 || v.type === "quotation";
+          setIsQuotation(isVoucherQuotation);
 
           setFormData({
             date: defaultDate,
-            type: v.type || "sales",
-            number: "", // Clear number for copy
+            type: isVoucherQuotation ? "quotation" : "sales",
+            number: "", // Clear number for copy (will be auto-filled by useEffect)
             narration: v.narration || "",
             referenceNo: v.referenceNo || v.reference_no || "",
             partyId: String(v.partyId || v.party_id || ""),
@@ -526,6 +533,12 @@ const SalesVoucher: React.FC = () => {
           if (v.sales_type_id) {
             setSelectedSalesTypeId(String(v.sales_type_id));
           }
+
+          // ✅ PREVENT OVERWRITE BY DRAFT SAVER
+          // Set ready to save only after state has settled
+          setTimeout(() => {
+            setIsReadyToSave(true);
+          }, 500);
         }
       } catch (err) {
         console.error("Failed to fetch voucher for copy:", err);
@@ -533,7 +546,7 @@ const SalesVoucher: React.FC = () => {
     };
 
     fetchVoucherForCopy();
-  }, [copyId, isEditMode, defaultDate]);
+  }, [copyId, isEditMode]); // Removed defaultDate to prevent re-runs
 
   // --- DRAFT PERSISTENCE (SAVE) ---
   useEffect(() => {
@@ -695,14 +708,14 @@ const SalesVoucher: React.FC = () => {
 
   // Regenerate voucher number when quotation mode changes
   useEffect(() => {
-    if (!isEditMode) {
+    if (!isEditMode && !copyId) {
       setFormData((prev) => ({
         ...prev,
         number: "",
         type: isQuotation ? "quotation" : "sales",
       }));
     }
-  }, [isQuotation, isEditMode]);
+  }, [isQuotation, isEditMode, copyId]);
 
   // Load voucher in edit mode
   // ================= EDIT MODE LOAD (BACKEND DRIVEN) =================
@@ -760,7 +773,7 @@ const SalesVoucher: React.FC = () => {
 
             discount: Math.round(Number(e.discount || 0)),
 
-            amount: Math.round(Number(e.amount || 0)),
+            amount: Math.round(Number(e.quantity || 0)) * Math.round(Number(e.rate || 0)),
 
             // Map Backend IDs to LedgerId fields (Convert float string "115.00" to int 115)
             cgstLedgerId: e.cgstRate ? String(Math.round(Number(e.cgstRate))) : "",
@@ -800,6 +813,9 @@ const SalesVoucher: React.FC = () => {
 
         setIsQuotation(data.isQuotation === 1);
         setSelectedSalesTypeId(data.sales_type_id?.toString() || "");
+
+        // ✅ SET READY TO SAVE AFTER FULL LOAD
+        setIsReadyToSave(true);
 
       } catch (err) {
         console.error("Single voucher load error:", err);
@@ -950,12 +966,6 @@ const SalesVoucher: React.FC = () => {
         partyAny?.gstNumber || partyAny?.gst_number || partyAny?.gstin || "";
       setSelectedPartyGst(partyGst);
 
-      // Debug logging for state matching
-      const companyState = safeCompanyInfo?.state || "";
-      const statesMatch =
-        companyState &&
-        partyState &&
-        companyState.toLowerCase().trim() === partyState.toLowerCase().trim();
     } else {
       setSelectedPartyState("");
       setSelectedPartyGst("");
@@ -1255,9 +1265,8 @@ const SalesVoucher: React.FC = () => {
     const recalcAmount = (ent: any) => {
       const qty = Number(ent.quantity || 0);
       const rate = Number(ent.rate || 0);
-      const discount = Number(ent.discount || 0);
 
-      // ✅ Only base amount (NO GST here)
+      // ✅ GROSS amount (Qty * Rate) - per user request
       return qty * rate;
     };
 
@@ -2024,17 +2033,17 @@ const SalesVoucher: React.FC = () => {
         const discount = Number(entry.discount || 0);
 
         const baseAmount = qty * rate;
-        const netAmount = baseAmount - discount; // GST is calculated on net amount
+        // const netAmount = baseAmount - discount; // GST is calculated on gross amount per user req
 
-        subtotal += netAmount; // Taxable Value should be net
+        subtotal += baseAmount; // Taxable Value should be GROSS per user request
         itemDiscountTotal += discount;
-        cgstTotal += (netAmount * (entry.cgstRate || 0)) / 100;
-        sgstTotal += (netAmount * (entry.sgstRate || 0)) / 100;
-        igstTotal += (netAmount * (entry.igstRate || 0)) / 100;
+        cgstTotal += (baseAmount * (entry.cgstRate || 0)) / 100;
+        sgstTotal += (baseAmount * (entry.sgstRate || 0)) / 100;
+        igstTotal += (baseAmount * (entry.igstRate || 0)) / 100;
       });
 
       const overallDiscount = Number(formData.discountAmount || 0);
-      const total = subtotal + cgstTotal + sgstTotal + igstTotal - overallDiscount;
+      const total = subtotal + cgstTotal + sgstTotal + igstTotal - overallDiscount - itemDiscountTotal;
 
       return {
         subtotal,
@@ -2519,6 +2528,18 @@ const SalesVoucher: React.FC = () => {
                   return;
                 }
                 setSelectedSalesTypeId(v);
+
+                // ✅ AUTO-UPDATE VOUCHER NUMBER (Even in Edit Mode if user explicitly changes type)
+                if (v !== "custom" && v !== "") {
+                  const newType = salesTypes.find((st) => String(st.id) === String(v));
+                  if (newType) {
+                    const prefix = (newType.prefix || "").trim();
+                    const suffix = (newType.suffix || "").trim();
+                    const nextNo = Number(newType.current_no || 1);
+                    const voucherNo = (!prefix && !suffix) ? String(nextNo) : `${prefix}${suffix}/${nextNo}`;
+                    setFormData((prev) => ({ ...prev, number: voucherNo }));
+                  }
+                }
               }}
               className={`${FORM_STYLES.select(theme)} min-w-[120px] text-sm`}
               title="Sales Voucher Type"

@@ -498,62 +498,62 @@ const StockSummary: React.FC = () => {
 
       // 4️⃣ CLOSING (TALLY LOGIC) & BACK-CALCULATION FIX
       // 4️⃣ CLOSING (TALLY LOGIC) – FIXED (NO NEGATIVE OPENING)
-Object.values(itemMap).forEach((item: any) => {
-  Object.values(item.batches).forEach((b: any) => {
-    /*
-      b.opening.qty at this point can be:
-      - real opening (from master)
-      - OR current closing (if coming from back-calculated master)
-    */
+      Object.values(itemMap).forEach((item: any) => {
+        Object.values(item.batches).forEach((b: any) => {
+          /*
+            b.opening.qty at this point can be:
+            - real opening (from master)
+            - OR current closing (if coming from back-calculated master)
+          */
 
-    // 🔹 Detect if REAL opening exists
-    const hasOpening =
-      (b.opening?.qty ?? 0) > 0 || (b.opening?.value ?? 0) > 0;
+          // 🔹 Detect if REAL opening exists
+          const hasOpening =
+            (b.opening?.qty ?? 0) > 0 || (b.opening?.value ?? 0) > 0;
 
-    let openingQty = 0;
-    let openingValue = 0;
+          let openingQty = 0;
+          let openingValue = 0;
 
-    if (hasOpening) {
-      // ✅ Opening exists → Back-calc allowed
-      const currentClosingQty = b.opening.qty;
+          if (hasOpening) {
+            // ✅ Opening exists → Back-calc allowed
+            const currentClosingQty = b.opening.qty;
 
-      openingQty =
-        currentClosingQty - b.inward.qty + b.outward.qty;
+            openingQty =
+              currentClosingQty - b.inward.qty + b.outward.qty;
 
-      if (openingQty < 0) openingQty = 0;
+            if (openingQty < 0) openingQty = 0;
 
-      openingValue = openingQty * (b.opening.rate || 0);
-    } else {
-      // ❌ No opening → DO NOT back-calc
-      openingQty = 0;
-      openingValue = 0;
-    }
+            openingValue = openingQty * (b.opening.rate || 0);
+          } else {
+            // ❌ No opening → DO NOT back-calc
+            openingQty = 0;
+            openingValue = 0;
+          }
 
-    // ✅ Assign opening
-    b.opening.qty = openingQty;
-    b.opening.value = openingValue;
-    b.opening.rate =
-      openingQty > 0 ? openingValue / openingQty : 0;
+          // ✅ Assign opening
+          b.opening.qty = openingQty;
+          b.opening.value = openingValue;
+          b.opening.rate =
+            openingQty > 0 ? openingValue / openingQty : 0;
 
-    // ✅ Closing is ALWAYS forward calculated
-    b.closing.qty =
-      b.opening.qty + b.inward.qty - b.outward.qty;
+          // ✅ Closing is ALWAYS forward calculated
+          b.closing.qty =
+            b.opening.qty + b.inward.qty - b.outward.qty;
 
-    const totalInQty = b.opening.qty + b.inward.qty;
-    const totalInValue = b.opening.value + b.inward.value;
+          const totalInQty = b.opening.qty + b.inward.qty;
+          const totalInValue = b.opening.value + b.inward.value;
 
-    b.closing.rate =
-      totalInQty > 0 ? totalInValue / totalInQty : 0;
+          b.closing.rate =
+            totalInQty > 0 ? totalInValue / totalInQty : 0;
 
-    b.closing.value = b.closing.qty * b.closing.rate;
+          b.closing.value = b.closing.qty * b.closing.rate;
 
-    // 🔹 Safety (precision)
-    if (Math.abs(b.opening.qty) < 0.001) b.opening.qty = 0;
-    if (Math.abs(b.opening.value) < 0.01) b.opening.value = 0;
-    if (Math.abs(b.closing.qty) < 0.001) b.closing.qty = 0;
-    if (Math.abs(b.closing.value) < 0.01) b.closing.value = 0;
-  });
-});
+          // 🔹 Safety (precision)
+          if (Math.abs(b.opening.qty) < 0.001) b.opening.qty = 0;
+          if (Math.abs(b.opening.value) < 0.01) b.opening.value = 0;
+          if (Math.abs(b.closing.qty) < 0.001) b.closing.qty = 0;
+          if (Math.abs(b.closing.value) < 0.01) b.closing.value = 0;
+        });
+      });
 
       // 5️⃣ FINAL ARRAY
       const finalData = Object.values(itemMap).map((item: any) => ({
@@ -1461,7 +1461,7 @@ Object.values(itemMap).forEach((item: any) => {
                             </tr>
 
                             {/* 🔽 BATCH ROWS - Hide if only one batch and it's Default */}
-                            {isExpanded && (batches.length > 1 || (batches[0].batchName !== "Default")) &&
+                            {isExpanded && batches.length > 0 && (batches.length > 1 || (batches[0]?.batchName !== "Default")) &&
                               batches.map((b: any, bIdx: number) => {
                                 // Optional: Hide completely empty Default batches if desired, 
                                 // but usually we want to see them if they have data.

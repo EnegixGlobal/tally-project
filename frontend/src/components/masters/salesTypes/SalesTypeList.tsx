@@ -44,7 +44,7 @@ const SalesTypeList: React.FC = () => {
       const json = await res.json();
 
       const apiData = Array.isArray(json?.data) ? json.data : [];
-      setSalesTypes(apiData); // ✅ ONLY DB DATA
+      setSalesTypes(apiData);
     } catch (error) {
       console.error("Failed to fetch sales types:", error);
       setSalesTypes([]);
@@ -110,9 +110,8 @@ const SalesTypeList: React.FC = () => {
           <button
             title="Back to Masters"
             onClick={() => navigate("/app/masters")}
-            className={`mr-4 p-2 rounded-full ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <ArrowLeft size={20} />
           </button>
@@ -122,11 +121,10 @@ const SalesTypeList: React.FC = () => {
         <button
           title="Create Sales Type"
           onClick={() => navigate("/app/masters/sales-types/create")}
-          className={`flex items-center px-4 py-2 rounded ${
-            theme === "dark"
+          className={`flex items-center px-4 py-2 rounded ${theme === "dark"
               ? "bg-blue-600 hover:bg-blue-700"
               : "bg-blue-600 hover:bg-blue-700 text-white"
-          }`}
+            }`}
         >
           <Plus size={18} className="mr-1" />
           Create
@@ -134,15 +132,13 @@ const SalesTypeList: React.FC = () => {
       </div>
 
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <div className="flex items-center mb-4">
           <div
-            className={`flex items-center w-full max-w-md px-3 py-2 rounded-md ${
-              theme === "dark" ? "bg-gray-700" : "bg-gray-100"
-            }`}
+            className={`flex items-center w-full max-w-md px-3 py-2 rounded-md ${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+              }`}
           >
             <Search size={18} className="mr-2 opacity-70" />
             <input
@@ -150,11 +146,10 @@ const SalesTypeList: React.FC = () => {
               placeholder="Search sales types..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className={`w-full bg-transparent border-none outline-none ${
-                theme === "dark"
+              className={`w-full bg-transparent border-none outline-none ${theme === "dark"
                   ? "placeholder-gray-500"
                   : "placeholder-gray-400"
-              }`}
+                }`}
             />
           </div>
         </div>
@@ -163,36 +158,32 @@ const SalesTypeList: React.FC = () => {
           <table className="w-full">
             <thead>
               <tr
-                className={`${
-                  theme === "dark"
+                className={`${theme === "dark"
                     ? "border-b border-gray-700"
                     : "border-b border-gray-200"
-                }`}
+                  }`}
               >
                 <th className="px-4 py-3 text-left">Sales Type</th>
                 <th className="px-4 py-3 text-left">Type</th>
                 <th className="px-4 py-3 text-left">Prefix</th>
                 <th className="px-4 py-3 text-left">Suffix</th>
-                <th className="px-4 py-3 text-right">Current No</th>
                 <th className="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
             <tbody>
               {/* 🔒 STATIC SYSTEM ROW */}
               <tr
-                className={`${
-                  theme === "dark"
+                className={`${theme === "dark"
                     ? "border-b border-gray-700"
                     : "border-b border-gray-200"
-                } `}
+                  } `}
               >
                 <td className="px-4 py-3 font-medium">Sales</td>
                 <td className="px-4 py-3">Sales</td>
                 <td className="px-4 py-3 font-mono">—</td>
                 <td className="px-4 py-3 font-mono">—</td>
-                <td className="px-4 py-3 text-right font-mono">—</td>
                 <td className="px-4 py-3 text-center opacity-50">
-                  {/* ❌ No Actions */}
+                  {/* ❌ No Actions for system row */}
                 </td>
               </tr>
 
@@ -200,19 +191,15 @@ const SalesTypeList: React.FC = () => {
               {filtered.map((s) => (
                 <tr
                   key={String(s.id)}
-                  className={`${
-                    theme === "dark"
+                  className={`${theme === "dark"
                       ? "border-b border-gray-700"
                       : "border-b border-gray-200"
-                  } hover:bg-opacity-10 hover:bg-blue-500`}
+                    } hover:bg-opacity-10 hover:bg-blue-500`}
                 >
                   <td className="px-4 py-3">{s.sales_type}</td>
                   <td className="px-4 py-3">{s.type}</td>
                   <td className="px-4 py-3 font-mono">{s.prefix || "—"}</td>
                   <td className="px-4 py-3 font-mono">{s.suffix || "—"}</td>
-                  <td className="px-4 py-3 text-right font-mono">
-                    {Number(s.current_no ?? 0)}
-                  </td>
                   <td className="px-4 py-3">
                     <div className="flex justify-center space-x-2">
                       <button
@@ -220,11 +207,10 @@ const SalesTypeList: React.FC = () => {
                         onClick={() =>
                           navigate(`/app/masters/sales-types/edit/${s.id}`)
                         }
-                        className={`p-1 rounded ${
-                          theme === "dark"
+                        className={`p-1 rounded ${theme === "dark"
                             ? "hover:bg-gray-700"
                             : "hover:bg-gray-100"
-                        }`}
+                          }`}
                       >
                         <Edit size={16} />
                       </button>
@@ -232,11 +218,10 @@ const SalesTypeList: React.FC = () => {
                       <button
                         title="Delete"
                         onClick={() => handleDelete(s.id)}
-                        className={`p-1 rounded ${
-                          theme === "dark"
+                        className={`p-1 rounded ${theme === "dark"
                             ? "hover:bg-gray-700"
                             : "hover:bg-gray-100"
-                        }`}
+                          }`}
                       >
                         <Trash2 size={16} />
                       </button>

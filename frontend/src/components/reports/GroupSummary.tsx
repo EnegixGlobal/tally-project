@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { ArrowLeft, Printer, Download, Filter, Settings } from "lucide-react";
+import { allSystemGroups as baseGroups } from "../../constants/ledgerGroups";
 
 interface Ledger {
   id: number;
@@ -53,25 +54,6 @@ const GroupSummary: React.FC = () => {
     ) || "";
 
   // Base groups as per original logic
-  const baseGroups = [
-    { id: -3, name: "Branch/Division", nature: "Assets" },
-    { id: -4, name: "Capital Account", nature: "Liabilities" },
-    { id: -5, name: "Current Assets", nature: "Assets" },
-    { id: -6, name: "Current Liabilities", nature: "Liabilities" },
-    { id: -7, name: "Direct Expenses", nature: "Expenses" },
-    { id: -8, name: "Direct Income", nature: "Income" },
-    { id: -9, name: "Fixed Assets", nature: "Assets" },
-    { id: -10, name: "Indirect Expenses", nature: "Expenses" },
-    { id: -11, name: "Indirect Income", nature: "Income" },
-    { id: -12, name: "Investments", nature: "Assets" },
-    { id: -13, name: "Loan(Liability)", nature: "Liabilities" },
-    { id: -14, name: "Misc expenses (Assets)", nature: "Assets" },
-    { id: -15, name: "Purchase Accounts", nature: "Expenses" },
-    { id: -16, name: "Sales Accounts", nature: "Income" },
-    { id: -17, name: "Suspense A/C", nature: "Assets" },
-    { id: -18, name: "Profit & Loss A/c", nature: "Liabilities" },
-    { id: -19, name: "TDS Payables", nature: "Liabilities" },
-  ];
 
   // Fetch ledger groups and ledgers filtered by groupType (optional)
   const [resolvedGroupName, setResolvedGroupName] = useState<string>("");
@@ -165,9 +147,19 @@ const GroupSummary: React.FC = () => {
           .map(g => Number(g.id));
 
         // Child groups: they point to the negative ID OR the real DB ID
-        const childGroups = groups.filter((g) =>
-          Number(g.parent) === groupIdFromUrl ||
-          (realGroupIds.length > 0 && realGroupIds.includes(Number(g.parent)))
+        const childGroups = [
+          ...groups.filter((g) =>
+            Number(g.parent) === groupIdFromUrl ||
+            (realGroupIds.length > 0 && realGroupIds.includes(Number(g.parent)))
+          ).map(g => ({ ...g, isGroup: true })),
+          ...baseGroups.filter(bg =>
+            Number(bg.parent) === groupIdFromUrl
+          ).map(bg => ({ ...bg, isGroup: true, id: bg.id }))
+        ];
+
+        // Deduplicate by name or ID to avoid showing same system/custom group twice if somehow duplicated
+        const uniqueChildGroups = childGroups.filter((v, i, a) =>
+          a.findIndex(t => (t.id === v.id || t.name === v.name)) === i
         );
 
         // Direct ledgers: they point to the negative ID OR the real DB ID OR match the type
@@ -183,7 +175,7 @@ const GroupSummary: React.FC = () => {
         // We'll calculate balances later after taxData is loaded
         // For now, let's just combine them as placeholders
         const combined = [
-          ...childGroups.map(g => ({ ...g, isGroup: true })),
+          ...uniqueChildGroups,
           ...directLedgers.map(l => ({ ...l, isGroup: false }))
         ];
 
@@ -361,11 +353,11 @@ const GroupSummary: React.FC = () => {
   // Recursive Balance Calculation
   const calculateRecursiveBalance = (groupId: number) => {
     const getGroupLedgers = (gid: number): any[] => {
-      const direct = allLedgers.filter((l) => Number(l.groupId) === Number(gid));
+      const direct = allLedgers.filter((l) => Number(l.groupId || l.group_id) === Number(gid));
       const children = groups.filter((g) => Number(g.parent) === Number(gid));
       let total = [...direct];
       children.forEach((c) => {
-        total = [...total, ...getGroupLedgers(c.id)];
+        total = [...total, ...getGroupLedgers(Number(c.id))];
       });
       return total;
     };

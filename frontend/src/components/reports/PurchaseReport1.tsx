@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import Swal from "sweetalert2";
+import { allSystemGroups as baseGroups } from "../../constants/ledgerGroups";
 
 interface SalesData {
   id: string;
@@ -81,11 +82,6 @@ interface FilterState {
 
 //base group
 
-const baseGroups = [
-  { id: -15, name: "Purchase Accounts", nature: "Expenses" },
-  { id: -6, name: "Current Liabilities", nature: "Liabilities" },
-  { id: -11, name: "Indirect Income", nature: "Income" },
-];
 
 const GROUP_NAMES: Record<number, string> = {
   [-16]: "Purchase Account",
@@ -169,7 +165,7 @@ const PurchaseReport1: React.FC = () => {
   const [sortConfig, setSortConfig] = useState<{
     key: keyof SalesData;
     direction: "asc" | "desc";
-  }>({ key: "date", direction: "desc" });
+  }>({ key: "date", direction: "asc" });
 
   const filteredVouchers = useMemo(() => {
     let data = [...salesVouchers];
@@ -191,7 +187,8 @@ const PurchaseReport1: React.FC = () => {
         const bValue = b[sortConfig.key] ?? "";
         if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
-        return 0;
+        // Tie-breaker: sort by ID ascendingly
+        return Number(a.id) - Number(b.id);
       });
     }
     return data;
@@ -745,7 +742,7 @@ const PurchaseReport1: React.FC = () => {
     if (selectedView === "extract" && !ledgerReportData && companyId && ownerType && ownerId) {
       const url = `${import.meta.env.VITE_API_URL
         }/api/purchase-report/ledger-report?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
-
+  
       fetch(url)
         .then((res) => res.json())
         .then((data) => {
