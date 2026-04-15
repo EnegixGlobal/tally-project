@@ -760,7 +760,7 @@ const SalesVoucher: React.FC = () => {
 
             discount: Math.round(Number(e.discount || 0)),
 
-            amount: Math.round(Number(e.amount || 0)),
+            amount: Math.round(Number(e.quantity || 0)) * Math.round(Number(e.rate || 0)),
 
             // Map Backend IDs to LedgerId fields (Convert float string "115.00" to int 115)
             cgstLedgerId: e.cgstRate ? String(Math.round(Number(e.cgstRate))) : "",
@@ -1255,9 +1255,8 @@ const SalesVoucher: React.FC = () => {
     const recalcAmount = (ent: any) => {
       const qty = Number(ent.quantity || 0);
       const rate = Number(ent.rate || 0);
-      const discount = Number(ent.discount || 0);
 
-      // ✅ Only base amount (NO GST here)
+      // ✅ GROSS amount (Qty * Rate) - per user request
       return qty * rate;
     };
 
@@ -2026,15 +2025,15 @@ const SalesVoucher: React.FC = () => {
         const baseAmount = qty * rate;
         const netAmount = baseAmount - discount; // GST is calculated on net amount
 
-        subtotal += netAmount; // Taxable Value should be net
+        subtotal += baseAmount; // Taxable Value should be GROSS per user request
         itemDiscountTotal += discount;
-        cgstTotal += (netAmount * (entry.cgstRate || 0)) / 100;
-        sgstTotal += (netAmount * (entry.sgstRate || 0)) / 100;
-        igstTotal += (netAmount * (entry.igstRate || 0)) / 100;
+        cgstTotal += (baseAmount * (entry.cgstRate || 0)) / 100;
+        sgstTotal += (baseAmount * (entry.sgstRate || 0)) / 100;
+        igstTotal += (baseAmount * (entry.igstRate || 0)) / 100;
       });
 
       const overallDiscount = Number(formData.discountAmount || 0);
-      const total = subtotal + cgstTotal + sgstTotal + igstTotal - overallDiscount;
+      const total = subtotal + cgstTotal + sgstTotal + igstTotal - overallDiscount - itemDiscountTotal;
 
       return {
         subtotal,
