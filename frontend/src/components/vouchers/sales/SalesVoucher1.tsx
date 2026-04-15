@@ -2518,6 +2518,18 @@ const SalesVoucher: React.FC = () => {
                   return;
                 }
                 setSelectedSalesTypeId(v);
+
+                // ✅ AUTO-UPDATE VOUCHER NUMBER (Even in Edit Mode if user explicitly changes type)
+                if (v !== "custom" && v !== "") {
+                  const newType = salesTypes.find((st) => String(st.id) === String(v));
+                  if (newType) {
+                    const prefix = (newType.prefix || "").trim();
+                    const suffix = (newType.suffix || "").trim();
+                    const nextNo = Number(newType.current_no || 1);
+                    const voucherNo = (!prefix && !suffix) ? String(nextNo) : `${prefix}${suffix}/${nextNo}`;
+                    setFormData((prev) => ({ ...prev, number: voucherNo }));
+                  }
+                }
               }}
               className={`${FORM_STYLES.select(theme)} min-w-[120px] text-sm`}
               title="Sales Voucher Type"
