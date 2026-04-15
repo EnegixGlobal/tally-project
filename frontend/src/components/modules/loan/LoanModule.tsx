@@ -13,8 +13,33 @@ const LoanModule: React.FC = () => {
             items: [
                 { icon: <Activity size={20} />, name: 'CMA Data', path: '/app/loan/cma' },
             ]
+        },
+        {
+            title: 'Loan Documents',
+            items: [
+                {
+                    icon: <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" alt="PDF" className="w-12 h-12 object-contain" />,
+                    name: 'Cash Budget',
+                    path: '/loans/CASH BUDGET.pdf',
+                    isPublic: true
+                },
+                {
+                    icon: <img src="https://cdn-icons-png.flaticon.com/512/337/337946.png" alt="PDF" className="w-12 h-12 object-contain" />,
+                    name: 'Turnover Certificate',
+                    path: '/loans/Turnover Certificate-1.pdf',
+                    isPublic: true
+                },
+            ]
         }
     ];
+
+    const handleNavigation = (item: any) => {
+        if (item.isPublic) {
+            window.open(item.path, '_blank');
+        } else {
+            navigate(item.path);
+        }
+    };
 
     return (
         <div className='pt-[56px] px-4 '>
@@ -31,7 +56,7 @@ const LoanModule: React.FC = () => {
                             {category.items.map((item, itemIndex) => (
                                 <button
                                     key={itemIndex}
-                                    onClick={() => navigate(item.path)}
+                                    onClick={() => handleNavigation(item)}
                                     className={`p-4 rounded-lg flex flex-col items-center text-center transition-colors ${theme === 'dark'
                                         ? 'bg-gray-700 hover:bg-gray-600'
                                         : 'bg-gray-50 hover:bg-gray-100'
