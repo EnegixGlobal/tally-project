@@ -80,6 +80,7 @@ const menuItems = [
   { title: 'TDS', path: '/app/tds', permissionId: 'tds' },
   { title: 'Income Tax', path: '/app/income-tax', permissionId: 'income-tax' },
   { title: 'Audit', path: '/app/audit', permissionId: 'audit' },
+  { title: 'Loan', path: '/app/loan', permissionId: 'loan' },
   { title: 'Config', path: '/app/config' },
 ];
 

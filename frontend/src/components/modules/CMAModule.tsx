@@ -11,7 +11,7 @@ const CMAModule: React.FC = () => {
       title: 'CMA Data Report',
       description: 'Complete Credit Monitoring Arrangement report with all financial forms',
       icon: FileText,
-      path: '/app/audit/cma-report',
+      path: '/app/loan/cma-report',
       color: 'bg-blue-50 border-blue-200 hover:bg-blue-100'
     },
     {
@@ -19,7 +19,7 @@ const CMAModule: React.FC = () => {
       title: 'Ratio Analysis',
       description: 'Financial ratios and performance indicators analysis',
       icon: BarChart,
-      path: '/app/audit/cma-report',
+      path: '/app/loan/cma-report',
       color: 'bg-green-50 border-green-200 hover:bg-green-100'
     },
     {
@@ -27,7 +27,7 @@ const CMAModule: React.FC = () => {
       title: 'Cash Flow Statement',
       description: 'Funds flow and cash flow analysis',
       icon: TrendingUp,
-      path: '/app/audit/cma-report',
+      path: '/app/loan/cma-report',
       color: 'bg-purple-50 border-purple-200 hover:bg-purple-100'
     },
     {
@@ -35,7 +35,7 @@ const CMAModule: React.FC = () => {
       title: 'MPBF Calculation',
       description: 'Maximum Permissible Bank Finance computation',
       icon: Calculator,
-      path: '/app/audit/cma-report',
+      path: '/app/loan/cma-report',
       color: 'bg-orange-50 border-orange-200 hover:bg-orange-100'
     },
     {
@@ -43,7 +43,7 @@ const CMAModule: React.FC = () => {
       title: 'Working Capital Analysis',
       description: 'Current assets and liabilities analysis',
       icon: DollarSign,
-      path: '/app/audit/cma-report',
+      path: '/app/loan/cma-report',
       color: 'bg-indigo-50 border-indigo-200 hover:bg-indigo-100'
     }
   ];
@@ -71,10 +71,10 @@ const CMAModule: React.FC = () => {
             <h2 className="text-xl font-bold text-gray-900">CMA Data Reporting</h2>
           </div>
           <p className="text-gray-600 mb-4">
-            Generate comprehensive Credit Monitoring Arrangement reports for bank lending requirements. 
+            Generate comprehensive Credit Monitoring Arrangement reports for bank lending requirements.
             Includes operating statements, balance sheet analysis, ratio calculations, and MPBF computations.
           </p>
-          
+
           {/* Quick Stats */}
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="bg-blue-50 p-4 rounded-lg text-center">
@@ -177,7 +177,7 @@ const CMAModule: React.FC = () => {
         {/* Action Buttons */}
         <div className="flex justify-center mt-8">
           <button
-            onClick={() => navigate('/app/audit/cma-report')}
+            onClick={() => navigate('/app/loan/cma-report')}
             className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium"
           >
             <FileText size={20} />

@@ -173,6 +173,7 @@ import DPRReport from "./components/audit/DPRReport";
 import ExceptionReports from "./components/audit/ExceptionReports";
 import PeriodAnalysis from "./components/audit/PeriodAnalysis";
 import UserReports from "./components/audit/UserReports";
+import LoanModule from "./components/modules/loan/LoanModule";
 
 // Income Tax Modules
 import IncomeTaxIndex from "./components/incometax/IncomeTaxIndex";
@@ -1805,6 +1806,30 @@ function App() {
                   }
                 />
                 <Route
+                  path="loan"
+                  element={
+                    <RequireCompany>
+                      <LoanModule />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="loan/cma"
+                  element={
+                    <RequireCompany>
+                      <CMAModule />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="loan/cma-report"
+                  element={
+                    <RequireCompany>
+                      <CMAReport />
+                    </RequireCompany>
+                  }
+                />
+                <Route
                   path="audit/summary"
                   element={
                     <RequireCompany>
@@ -1897,22 +1922,6 @@ function App() {
                   element={
                     <RequireCompany>
                       <UserReports />
-                    </RequireCompany>
-                  }
-                />
-                <Route
-                  path="audit/cma"
-                  element={
-                    <RequireCompany>
-                      <CMAModule />
-                    </RequireCompany>
-                  }
-                />
-                <Route
-                  path="audit/cma-report"
-                  element={
-                    <RequireCompany>
-                      <CMAReport />
                     </RequireCompany>
                   }
                 />

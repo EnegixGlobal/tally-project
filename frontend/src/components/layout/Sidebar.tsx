@@ -15,6 +15,7 @@ import {
   Wallet,
   LogOut,
   Lock,
+  Landmark,
 } from "lucide-react";
 
 interface SidebarProps {
@@ -37,6 +38,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
     { icon: <Truck size={18} />, title: "TDS", path: "/app/tds", permissionId: 'tds' },
     { icon: <Wallet size={18} />, title: "Income Tax", path: "/app/income-tax", permissionId: 'income-tax' },
     { icon: <BookOpen size={18} />, title: "Audit", path: "/app/audit", permissionId: 'audit' },
+    { icon: <Landmark size={18} />, title: "Loan", path: "/app/loan", permissionId: 'loan' },
     { icon: <Settings size={18} />, title: "Configuration", path: "/app/config" },
   ];
 
