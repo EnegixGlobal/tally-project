@@ -760,7 +760,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       finalList.sort((a, b) => {
         const da = a.safeDate ? a.safeDate.getTime() : 0;
         const db = b.safeDate ? b.safeDate.getTime() : 0;
-        return da - db; // ascending order
+        if (da !== db) return da - db;
+        return Number(a.id) - Number(b.id);
       });
 
       return finalList;
