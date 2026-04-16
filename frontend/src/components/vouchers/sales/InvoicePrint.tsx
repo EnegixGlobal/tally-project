@@ -20,7 +20,7 @@ const getLedgerNameById = (id: any, ledgers: any[]) => {
 // Print styles for invoice layout
 const PRINT_STYLES = {
   container:
-    "fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4",
+    "fixed inset-0 bg-white/70 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all duration-300",
   modal: "w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-lg",
   printContainer: "w-[210mm] min-h-[297mm]",
   printArea: "font-arial text-xs leading-tight p-4 bg-white text-black",
