@@ -1325,13 +1325,19 @@ const PurchaseVoucher: React.FC = () => {
         return;
       }
 
-      // 3️⃣ QUANTITY / RATE CHANGE
-      if (["quantity", "rate"].includes(name)) {
+      // 3️⃣ QUANTITY / RATE / AMOUNT CHANGE
+      if (["quantity", "rate", "amount"].includes(name)) {
         const newVal = Number(value || 0);
 
         // Prepare inputs for calc
         let newQty = name === "quantity" ? newVal : Number(entry.quantity || 0);
         let newRate = name === "rate" ? newVal : Number(entry.rate || 0);
+        let newAmount = name === "amount" ? newVal : Number(entry.amount || 0);
+
+        // Logic: if user enters amount but not rate, calculate rate
+        if (name === "amount" && newQty > 0) {
+          newRate = newAmount / newQty;
+        }
 
         const gst = Number(entry.gstRate || 0);
 
@@ -1345,8 +1351,9 @@ const PurchaseVoucher: React.FC = () => {
 
         updatedEntries[index] = {
           ...entry,
-          [name]: newVal,
-          amount: calculated.amount,
+          quantity: newQty,
+          rate: calculated.rate,
+          amount: name === "amount" ? newAmount : calculated.amount,
         };
 
         setFormData((prev) => ({ ...prev, entries: updatedEntries }));
@@ -3234,9 +3241,16 @@ const PurchaseVoucher: React.FC = () => {
 
 
 
-                          {/* AMOUNT */}
-                          <td className="px-1 py-2 min-w-[75px] text-right text-xs font-medium align-top">
-                            {Number(entry.amount ?? 0).toLocaleString()}
+                          {/* AMOUNT (TAXABLE) */}
+                          <td className="px-1 py-2 min-w-[75px] align-top">
+                            <input
+                              type="number"
+                              name="amount"
+                              value={entry.amount ?? ""}
+                              onChange={(e) => handleEntryChange(index, e)}
+                              className={`${TABLE_STYLES.input} text-right text-xs font-medium`}
+                              placeholder="Taxable"
+                            />
                           </td>
 
                           {/* GODOWN (Show only if Enabled) */}
