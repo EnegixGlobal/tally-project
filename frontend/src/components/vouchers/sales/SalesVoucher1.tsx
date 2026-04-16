@@ -696,6 +696,7 @@ const SalesVoucher: React.FC = () => {
           );
           setStatusColor("text-green-600 font-semibold");
         } else {
+          setPricingRule({ customerType: "", method: "", value: 0 });
           setStatusMsg("Not Set");
           setStatusColor("text-red-600 font-semibold");
         }
@@ -1183,8 +1184,9 @@ const SalesVoucher: React.FC = () => {
       return mrp > 0 ? mrp : baseRate;
     }
 
-    // 2️⃣ Profit Percentage (Saved Rule)
+    // 2️⃣ Profit Percentage (Saved Rule) - Only if method matches
     if (
+      profitConfig.method === "profit_percentage" &&
       pricingRule.method === "profit_percentage" &&
       Number(pricingRule.value) > 0
     ) {
@@ -1194,6 +1196,15 @@ const SalesVoucher: React.FC = () => {
     }
 
     return baseRate;
+  };
+
+  const recalcAmount = (ent: any) => {
+    const qty = Number(ent.quantity || 0);
+    const rate = Number(ent.rate || 0);
+    const profit = Number(ent.profit || 0);
+
+    // ✅ GROSS amount (Qty * Rate) + Profit
+    return (qty * rate) + profit;
   };
 
   useEffect(() => {
@@ -1211,14 +1222,10 @@ const SalesVoucher: React.FC = () => {
 
     setFormData((prev) => {
       const updatedEntries = prev.entries.map((entry) => {
-        // ❌ empty rows skip
         if (!entry.itemId) return entry;
 
-        // Fetch MRP from Item or Batch
         const details = getItemDetails(entry.itemId);
         let mrp = details.mrp || 0;
-
-        // If batch selected, try to get batch-specific MRP
         if (entry.batchNumber && entry.batches) {
           const batch = entry.batches.find(b => b.batchName === entry.batchNumber);
           if (batch && (batch.mrp || batch.MRP)) {
@@ -1226,22 +1233,16 @@ const SalesVoucher: React.FC = () => {
           }
         }
 
-        // 🟢 original/base rate nikalo
-        // We use the current rate as baseRate if we are just switching rules,
-        // BUT for 'On MRP', we really just want the MRP.
-        // If we switch BACK to profit %, we need a base rate. 
-        // Ideally we should store 'baseRate' separately, but for now we rely on existing logic.
-        const baseRate = Number(entry.rate || 0);
-
+        // 🟢 ALWAYS use standard rate as base to prevent compounding
+        const baseRate = details.rate || 0;
         const newRate = applyProfit(baseRate, mrp);
 
-        // ❌ agar same hai to re-render avoid karo
         if (newRate === entry.rate) return entry;
 
         return {
           ...entry,
           rate: newRate,
-          amount: (entry.quantity || 0) * newRate - (entry.discount || 0),
+          amount: recalcAmount({ ...entry, rate: newRate }),
         };
       });
 
@@ -1262,13 +1263,6 @@ const SalesVoucher: React.FC = () => {
     const updatedEntries = [...formData.entries];
     const entry = updatedEntries[index];
 
-    const recalcAmount = (ent: any) => {
-      const qty = Number(ent.quantity || 0);
-      const rate = Number(ent.rate || 0);
-
-      // ✅ GROSS amount (Qty * Rate) - per user request
-      return qty * rate;
-    };
 
 
     if (formData.mode === "item-invoice") {
@@ -1543,10 +1537,10 @@ const SalesVoucher: React.FC = () => {
         return;
       }
 
-      // 4️⃣ Rate / Discount
-      if (["rate", "discount"].includes(name)) {
-        // Discount: apply immediately
-        if (name === "discount") {
+      // 4️⃣ Rate / Discount / Profit
+      if (["rate", "discount", "profit"].includes(name)) {
+        // Discount/Profit: apply immediately
+        if (name === "discount" || name === "profit") {
           updatedEntries[index][name] = Number(value) || 0;
           updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
           setFormData((p) => ({ ...p, entries: updatedEntries }));
@@ -2031,8 +2025,9 @@ const SalesVoucher: React.FC = () => {
         const qty = Number(entry.quantity || 0);
         const rate = Number(entry.rate || 0);
         const discount = Number(entry.discount || 0);
+        const profit = Number(entry.profit || 0);
 
-        const baseAmount = qty * rate;
+        const baseAmount = (qty * rate) + profit;
         // const netAmount = baseAmount - discount; // GST is calculated on gross amount per user req
 
         subtotal += baseAmount; // Taxable Value should be GROSS per user request
@@ -2747,7 +2742,14 @@ const SalesVoucher: React.FC = () => {
                             name="customerType"
                             value="wholesale"
                             checked={profitConfig.customerType === "wholesale"}
-                            onChange={(e) => setProfitConfig({ customerType: e.target.value, method: "", value: "" })}
+                            onChange={(e) => {
+                              setProfitConfig((prev) => ({
+                                ...prev,
+                                customerType: e.target.value,
+                                method: prev.method === "on_mrp" ? "" : prev.method
+                              }));
+                              setPricingRule({ customerType: "", method: "", value: 0 }); // Clear old rule
+                            }}
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                           />
                           <span className="text-sm font-medium group-hover:text-blue-500 transition-colors">Wholesale</span>
@@ -2759,7 +2761,10 @@ const SalesVoucher: React.FC = () => {
                             name="customerType"
                             value="retailer"
                             checked={profitConfig.customerType === "retailer"}
-                            onChange={(e) => setProfitConfig({ customerType: e.target.value, method: "", value: "" })}
+                            onChange={(e) => {
+                              setProfitConfig((prev) => ({ ...prev, customerType: e.target.value }));
+                              setPricingRule({ customerType: "", method: "", value: 0 }); // Clear old rule
+                            }}
                             className="h-4 w-4 text-blue-600 focus:ring-blue-500"
                           />
                           <span className="text-sm font-medium group-hover:text-blue-500 transition-colors">Retailer</span>
@@ -2788,7 +2793,7 @@ const SalesVoucher: React.FC = () => {
                                 name="pricingMethod"
                                 value="on_mrp"
                                 checked={profitConfig.method === "on_mrp"}
-                                onChange={(e) => setProfitConfig({ ...profitConfig, method: e.target.value, value: "0" })}
+                                onChange={(e) => setProfitConfig({ ...profitConfig, method: e.target.value })}
                                 className="h-3 w-3"
                               />
                               <span className="text-xs">On MRP</span>
@@ -2880,6 +2885,9 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-right">Quantity</th>
                         <th className="px-4 py-2 text-left">Unit</th>
                         <th className="px-4 py-2 text-right">Rate</th>
+                        {profitConfig.customerType === "retailer" && profitConfig.method === "on_mrp" && (
+                          <th className="px-4 py-2 text-right">Profit</th>
+                        )}
                         {columnSettings.showGST &&
                           (() => {
                             const hasParty = !!formData.partyId;
@@ -3086,6 +3094,25 @@ const SalesVoucher: React.FC = () => {
                                 )} text-right text-xs`}
                               />
                             </td>
+
+                            {/* PROFIT */}
+                            {profitConfig.customerType === "retailer" && profitConfig.method === "on_mrp" && (
+                              <td className="px-1 py-2 min-w-[70px] align-top">
+                                <input
+                                  type="number"
+                                  name="profit"
+                                  value={entry.profit ?? ""}
+                                  onChange={(e) => handleEntryChange(index, e)}
+                                  onKeyDown={(e) => {
+                                    if (e.key === "Enter") e.preventDefault();
+                                  }}
+                                  className={`${FORM_STYLES.tableInput(
+                                    theme
+                                  )} text-right text-xs`}
+                                  placeholder="Profit"
+                                />
+                              </td>
+                            )}
 
                             {/* GST */}
                             {columnSettings.showGST &&
