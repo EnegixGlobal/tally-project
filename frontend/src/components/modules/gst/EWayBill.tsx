@@ -705,7 +705,7 @@ const EWayBill: React.FC = () => {
 
       {/* supplier profile */}
       {showEWayForm && selectedSale && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 backdrop-blur-sm">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/70 backdrop-blur-md p-4 transition-all duration-300">
           <div className="bg-white w-full max-w-5xl max-h-[90vh] overflow-y-auto rounded-lg shadow-xl relative p-6 animate-in fade-in zoom-in duration-200">
             <button
               onClick={() => setShowEWayForm(false)}

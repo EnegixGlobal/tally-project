@@ -1,6 +1,6 @@
 import React, { useState, useRef } from 'react';
 import { useReactToPrint } from 'react-to-print';
-import {  Printer, Save, X } from 'lucide-react'; //ArrowLeft,
+import { Printer, Save, X } from 'lucide-react'; //ArrowLeft,
 import type { VoucherEntry } from '../../../types';
 
 interface ItemDetails {
@@ -84,10 +84,10 @@ const EWayBillGeneration: React.FC<EWayBillGenerationProps> = ({
       alert('Please fill all required fields!');
       return;
     }
-    
+
     const eWayBillNo = generateEWayBillNumber();
     setEWayBillData(prev => ({ ...prev, eWayBillNo }));
-    
+
     // Auto print after generation
     setTimeout(() => {
       handlePrint();
@@ -103,7 +103,7 @@ const EWayBillGeneration: React.FC<EWayBillGenerationProps> = ({
   const selectedItems = voucherData.entries.filter(entry => entry.itemId && entry.itemId !== '' && entry.itemId !== 'select');
 
   return (
-    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+    <div className="fixed inset-0 bg-white/70 backdrop-blur-md flex items-center justify-center z-50 p-4 transition-all duration-300">
       <div className={`w-full max-w-4xl max-h-[90vh] overflow-y-auto rounded-lg ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-900'}`}>
         {/* Header */}
         <div className={`p-6 border-b ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
@@ -114,9 +114,8 @@ const EWayBillGeneration: React.FC<EWayBillGenerationProps> = ({
             <button
               title='Close'
               onClick={onClose}
-              className={`p-2 rounded-full transition-colors ${
-                theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-              }`}
+              className={`p-2 rounded-full transition-colors ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+                }`}
             >
               <X size={20} />
             </button>
@@ -340,7 +339,7 @@ const EWayBillGeneration: React.FC<EWayBillGenerationProps> = ({
                 }
               `}
             </style>
-            
+
             <div className="print-area">
               {/* Header */}
               <div className="text-center mb-6">
