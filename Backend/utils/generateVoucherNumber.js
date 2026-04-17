@@ -53,10 +53,11 @@ async function generateVoucherNumber({
     params.push(voucherType);
   }
 
-  sql += ` ORDER BY id DESC LIMIT 1`;
-
+  sql += ` ORDER BY ${column} DESC LIMIT 1`;
+  
   try {
     const [rows] = await db.execute(sql, params);
+    console.log(`[generateVoucherNumber] last row for ${voucherType}:`, rows[0]);
 
     let nextNo = 1;
     if (rows.length > 0) {

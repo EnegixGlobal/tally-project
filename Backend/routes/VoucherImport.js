@@ -1444,13 +1444,28 @@ router.post("/purchase_summary_import", async (req, res) => {
         }
 
         // DATE FORMATTING
-        let date = invoiceDateStr;
-        if (typeof invoiceDateStr === 'string' && invoiceDateStr.includes('-')) {
-            const parts = invoiceDateStr.split('-');
-            if (parts[0].length === 2) {
-                date = `${parts[2]}-${parts[1]}-${parts[0]}`;
+        let rawDate = voucher["Invoice Date"] || voucher["Date"] || voucher["Invoice date"] || voucher["invoice_date"] || voucher["date"];
+        let date = rawDate;
+        
+        if (typeof date === 'string') {
+            // Normalize DD/MM/YYYY or DD-MM-YYYY to YYYY-MM-DD
+            const dmyMatch = date.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (dmyMatch) {
+                date = `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
+            } else {
+                // Check if it's already YYYY-MM-DD
+                const ymdMatch = date.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                if (ymdMatch) {
+                    date = `${ymdMatch[1]}-${ymdMatch[2].padStart(2, '0')}-${ymdMatch[3].padStart(2, '0')}`;
+                }
             }
         }
+        
+        if (!date || date === 'undefined' || date === 'null' || isNaN(new Date(date).getTime())) {
+            date = new Date().toISOString().split('T')[0];
+        }
+
+        console.log(`[purchase_summary_import] Processed date: ${date} (from raw: ${rawDate})`);
 
         // PARTY MATCH
         const importMode = voucher.importMode || 'item';
@@ -1483,6 +1498,7 @@ router.post("/purchase_summary_import", async (req, res) => {
         let cgstTotal = 0;
         let sgstTotal = 0;
         let igstTotal = 0;
+        let discountTotal = 0;
 
         const processedItems = [];
         const processedAccountingEntries = [];
@@ -1531,10 +1547,24 @@ router.post("/purchase_summary_import", async (req, res) => {
                 const type = ae["Type"] || "debit";
 
                 if (type === 'debit') {
-                    subtotal += amount;
-                    cgstTotal += cgst;
-                    sgstTotal += sgst;
-                    igstTotal += igst;
+                    const lName = String(particulars || "").toLowerCase();
+                    if (lName.includes("cgst")) {
+                        cgstTotal += amount;
+                    } else if (lName.includes("sgst") || lName.includes("utgst")) {
+                        sgstTotal += amount;
+                    } else if (lName.includes("igst")) {
+                        igstTotal += amount;
+                    } else if (lName.includes("discount")) {
+                        // Usually discount in purchase is a credit, but handle if debited
+                        discountTotal -= amount; 
+                    } else {
+                        subtotal += amount;
+                    }
+                } else if (type === 'credit' && particulars) {
+                    const lName = String(particulars || "").toLowerCase();
+                    if (lName.includes("discount")) {
+                        discountTotal += amount;
+                    }
                 }
 
                 let finalLedgerId = 0;
@@ -1570,12 +1600,12 @@ router.post("/purchase_summary_import", async (req, res) => {
         const [mainResult] = await db.execute(
             `INSERT INTO purchase_vouchers (
                 number, date, supplierInvoiceDate, narration, partyId, referenceNo, 
-                subtotal, cgstTotal, sgstTotal, igstTotal, total, 
+                subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total, 
                 company_id, owner_type, owner_id, mode, purchaseLedgerId
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [
-                voucherNumber, date, date, `Imported ${importMode === 'item' ? 'Multi-item' : 'Accounting'}`, partyId, invoiceNo,
-                subtotal, cgstTotal, sgstTotal, igstTotal, totalVal,
+                voucherNumber, date, date, voucher.narration || `Imported ${importMode === 'item' ? 'Multi-item' : 'Accounting'}`, partyId, invoiceNo,
+                subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, totalVal,
                 companyId, ownerType, ownerId, importMode === 'item' ? 'item-invoice' : 'accounting-invoice', purchaseLedgerId
             ]
         );
