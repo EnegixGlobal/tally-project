@@ -250,9 +250,11 @@ const PurchaseImport: React.FC = () => {
                     return dateValue.replace(/\//g, "-");
                 }
             }
-            return new Date(dateValue).toISOString().split("T")[0];
+            const d = new Date(dateValue);
+            if (isNaN(d.getTime())) return new Date().toISOString().split("T")[0];
+            return d.toISOString().split("T")[0];
         } catch {
-            return String(dateValue);
+            return new Date().toISOString().split("T")[0];
         }
     };
 
@@ -286,13 +288,13 @@ const PurchaseImport: React.FC = () => {
 
             jsonData.forEach((row, index) => {
                 // Forward-filling logic: if header is missing, use last known header
-                const invoiceNo = String(row["Invoice number"] || (lastHeader ? lastHeader["Invoice number"] : "")).trim();
-                const invoiceDate = formatDate(row["Invoice Date"] || (lastHeader ? lastHeader["Invoice Date"] : ""));
-                const rawGstin = String(row["GSTIN of supplier"] || (lastHeader ? lastHeader["GSTIN of supplier"] : ""));
-                const rawPartyName = String(row["Trade/Legal name of the Supplier"] || (lastHeader ? lastHeader["Trade/Legal name of the Supplier"] : ""));
-                const rawPlaceOfSupply = String(row["Place of supply"] || (lastHeader ? lastHeader["Place of supply"] : ""));
-                const rawPurchaseLedger = String(row["Purchase Ledger"] || (lastHeader ? lastHeader["Purchase Ledger"] : ""));
-                const rawInvoiceValue = row["Invoice Value (₹)"] !== undefined ? row["Invoice Value (₹)"] : (lastHeader ? lastHeader["Invoice Value (₹)"] : 0);
+                const invoiceNo = String(row["Invoice number"] || row["Invoice No"] || row["Voucher No"] || row["Reference No"] || row["Ref No"] || row["invoice_no"] || row["bill_no"] || (lastHeader ? lastHeader["Invoice number"] : "")).trim();
+                const invoiceDate = formatDate(row["Invoice Date"] || row["Date"] || row["Invoice date"] || row["date"] || row["invoice_date"] || (lastHeader ? lastHeader["Invoice Date"] : ""));
+                const rawGstin = String(row["GSTIN of supplier"] || row["GSTIN"] || row["gstin"] || (lastHeader ? lastHeader["GSTIN of supplier"] : ""));
+                const rawPartyName = String(row["Trade/Legal name of the Supplier"] || row["Supplier Name"] || row["Party Name"] || row["party_name"] || (lastHeader ? lastHeader["Trade/Legal name of the Supplier"] : ""));
+                const rawPlaceOfSupply = String(row["Place of supply"] || row["POS"] || row["Place Of Supply"] || row["pos"] || (lastHeader ? lastHeader["Place of supply"] : ""));
+                const rawPurchaseLedger = String(row["Purchase Ledger"] || row["purchase_ledger"] || (lastHeader ? lastHeader["Purchase Ledger"] : ""));
+                const rawInvoiceValue = row["Invoice Value (₹)"] !== undefined ? row["Invoice Value (₹)"] : (row["Invoice Value"] || row["Total Amount"] || (lastHeader ? lastHeader["Invoice Value (₹)"] : 0));
 
                 const gstin = rawGstin.toUpperCase().replace(/\s+/g, "").trim();
                 const partyName = rawPartyName.replace(/\s+/g, " ").trim();
@@ -507,21 +509,33 @@ const PurchaseImport: React.FC = () => {
                         });
 
                         // 1. --- Debit: Purchase Ledger ---
-                        const matchedPL = purchaseLedger
-                            ? ledgers.find(l => String(l.name).toLowerCase().trim() === purchaseLedger.toLowerCase().trim())
-                            : null;
-
                         voucherGroups[groupKey].accountingEntries!.push({
                             "Particulars (Ledger Name)": purchaseLedger || "Purchase Account",
-                            "Amount (₹)": taxableVal - discount,
+                            "Amount (₹)": taxableVal,
                             "Type": "debit",
                             "Rate (%)": gstRate,
                             "Integrated Tax (₹)": 0,
                             "Central Tax (₹)": 0,
                             "State/UT tax (₹)": 0,
                             calculationWarning: "",
-                            _matchedLedgerId: matchedPL?.id
+                            _matchedLedgerId: purchaseLedger ? ledgers.find(l => String(l.name).toLowerCase().trim() === purchaseLedger.toLowerCase().trim())?.id : null
                         });
+
+                        // 1.5 --- Credit: Discount Ledger (if any) ---
+                        if (discount !== 0) {
+                            const discountLedger = ledgers.find(l => /discount/i.test(String(l.name)));
+                            voucherGroups[groupKey].accountingEntries!.push({
+                                "Particulars (Ledger Name)": discountLedger?.name || "Discount",
+                                "Amount (₹)": Math.abs(discount),
+                                "Type": discount > 0 ? "credit" : "debit",
+                                "Rate (%)": 0,
+                                "Integrated Tax (₹)": 0,
+                                "Central Tax (₹)": 0,
+                                "State/UT tax (₹)": 0,
+                                calculationWarning: "",
+                                _matchedLedgerId: discountLedger?.id
+                            });
+                        }
 
                         // 2. --- Debit: Tax Ledgers ---
                         if (igst > 0) {

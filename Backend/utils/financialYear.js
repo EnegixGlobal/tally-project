@@ -1,5 +1,8 @@
 function getFinancialYear(date) {
-  const d = new Date(date);
+  let d = new Date(date);
+  if (isNaN(d.getTime())) {
+    d = new Date(); // Fallback to current date if invalid
+  }
   const year = d.getFullYear();
   const month = d.getMonth() + 1;
 

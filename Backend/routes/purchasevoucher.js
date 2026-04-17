@@ -664,19 +664,20 @@ router.get("/", async (req, res) => {
               const gName = (e.group_name || "").toLowerCase();
 
               if (e.entry_type === "debit") {
-                const isTax = gName.includes("duties") || gName.includes("tax") || 
-                             (lName.includes("gst") && (lName.includes("input") || lName.includes("@")));
+                const isTax = (gName && (gName.includes("duties") || gName.includes("tax") || gName.includes("gst"))) || 
+                             (lName.includes("gst") || lName.includes("tax") || lName.includes("igst") || lName.includes("cgst") || lName.includes("sgst") || lName.includes("@"));
 
                 if (isTax) {
                   if (lName.includes("cgst")) cgst += amt;
-                  else if (lName.includes("sgst")) sgst += amt;
-                  else igst += amt;
+                  else if (lName.includes("sgst") || lName.includes("utgst")) sgst += amt;
+                  else if (lName.includes("igst")) igst += amt;
+                  else cgst += amt;
                 } else {
                   subtotal += amt;
                 }
               } else {
                 // Check for discount in credits for Purchase
-                const isDiscount = lName.includes("discount") || gName.includes("discount");
+                const isDiscount = lName.includes("discount") || (gName && gName.includes("discount"));
                 if (isDiscount) {
                   discount += amt;
                 }
@@ -817,19 +818,20 @@ router.get("/month-wise", async (req, res) => {
               const gName = (e.group_name || "").toLowerCase();
 
               if (e.entry_type === "debit") {
-                const isTax = gName.includes("duties") || gName.includes("tax") || 
-                             (lName.includes("gst") && (lName.includes("input") || lName.includes("@")));
+                const isTax = (gName && (gName.includes("duties") || gName.includes("tax") || gName.includes("gst"))) || 
+                             (lName.includes("gst") || lName.includes("tax") || lName.includes("igst") || lName.includes("cgst") || lName.includes("sgst") || lName.includes("@"));
 
                 if (isTax) {
                   if (lName.includes("cgst")) cgst += amt;
-                  else if (lName.includes("sgst")) sgst += amt;
-                  else igst += amt;
+                  else if (lName.includes("sgst") || lName.includes("utgst")) sgst += amt;
+                  else if (lName.includes("igst")) igst += amt;
+                  else cgst += amt;
                 } else {
                   subtotal += amt;
                 }
               } else {
                 // Check for discount in credits for Purchase
-                const isDiscount = lName.includes("discount") || gName.includes("discount");
+                const isDiscount = lName.includes("discount") || (gName && gName.includes("discount"));
                 if (isDiscount) {
                   discount += amt;
                 }
