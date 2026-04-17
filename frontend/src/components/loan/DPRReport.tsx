@@ -48,10 +48,10 @@ interface TableRowData {
 }
 
 // Reusable Components
-const SectionCard: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({ 
-  title, 
-  children, 
-  className = '' 
+const SectionCard: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({
+  title,
+  children,
+  className = ''
 }) => (
   <div className={`bg-white border border-gray-200 rounded-lg p-6 shadow-sm ${className}`}>
     <h3 className="text-lg font-semibold text-gray-900 mb-4 border-b border-gray-200 pb-2">{title}</h3>
@@ -84,7 +84,7 @@ const ProjectionTable: React.FC<{
           <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
             <td className="border border-gray-300 px-2 py-1 text-center">{row.srNo}</td>
             <td className="border border-gray-300 px-2 py-1 font-medium">{row.particulars}</td>
-            {(['year1','year2','year3','year4','year5'] as YearField[]).map((field) => (
+            {(['year1', 'year2', 'year3', 'year4', 'year5'] as YearField[]).map((field) => (
               <td key={field} className="border border-gray-300 px-2 py-1 text-right">
                 {editable ? (
                   <div className="flex items-center justify-end gap-1">
@@ -110,9 +110,9 @@ const ProjectionTable: React.FC<{
                 ) : (
                   <span>
                     {row.format === 'currency' ? `₹${row[field]?.toLocaleString() || '0'}` :
-                     row.format === 'percentage' ? `${row[field] ?? '0'}%` :
-                     row.unit ? `${row[field]?.toLocaleString() || '0'} ${row.unit}` :
-                     row[field]?.toLocaleString() || '0'}
+                      row.format === 'percentage' ? `${row[field] ?? '0'}%` :
+                        row.unit ? `${row[field]?.toLocaleString() || '0'} ${row.unit}` :
+                          row[field]?.toLocaleString() || '0'}
                   </span>
                 )}
               </td>
@@ -142,7 +142,7 @@ const DPRReport: React.FC = () => {
         riskAnalysis,
         generatedDate: new Date().toISOString()
       };
-      
+
       localStorage.setItem('dpr_report_data', JSON.stringify(reportData));
       alert('DPR Report saved successfully!');
     } catch (error) {
@@ -264,12 +264,12 @@ const DPRReport: React.FC = () => {
       printWindow.document.write(printHTML);
       printWindow.document.close();
       printWindow.focus();
-      
+
       setTimeout(() => {
         printWindow.print();
         printWindow.close();
       }, 1000);
-      
+
     } catch (error) {
       console.error('Error printing report:', error);
       alert('Error printing report. Please try again.');
@@ -412,9 +412,9 @@ const DPRReport: React.FC = () => {
         <div className="flex items-center justify-between mb-6">
           <div className="flex items-center gap-2">
             <button
-              title='Back to Audit Module'
+              title='Back to Loan Module'
               type='button'
-              onClick={() => navigate('/app/audit')}
+              onClick={() => navigate('/app/loan')}
               className="mr-4 p-2 rounded-full hover:bg-gray-200"
             >
               <ArrowLeft size={20} />
@@ -422,21 +422,21 @@ const DPRReport: React.FC = () => {
             <h1 className="text-2xl font-bold">Detailed Project Report (DPR)</h1>
           </div>
           <div className="flex gap-2">
-            <button 
+            <button
               onClick={handleSaveReport}
               className="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
             >
               <Save size={16} />
               Save Report
             </button>
-            <button 
+            <button
               onClick={handleDownloadReport}
               className="inline-flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
             >
               <Download size={16} />
               Download
             </button>
-            <button 
+            <button
               onClick={handlePrintReport}
               className="inline-flex items-center gap-2 px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700 transition-colors"
             >
@@ -461,7 +461,7 @@ const DPRReport: React.FC = () => {
               </div>
             </div>
           </div>
-          
+
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
             <div>
               <span className="font-medium">Promoter:</span>
@@ -484,11 +484,10 @@ const DPRReport: React.FC = () => {
             {tabs.map((tab) => (
               <button
                 key={tab.id}
-                className={`flex items-center gap-2 py-3 px-4 font-medium text-sm whitespace-nowrap ${
-                  activeTab === tab.id 
-                    ? 'text-blue-600 border-b-2 border-blue-600' 
+                className={`flex items-center gap-2 py-3 px-4 font-medium text-sm whitespace-nowrap ${activeTab === tab.id
+                    ? 'text-blue-600 border-b-2 border-blue-600'
                     : 'text-gray-500 hover:text-gray-700'
-                }`}
+                  }`}
                 onClick={() => setActiveTab(tab.id as 'overview' | 'financial' | 'projections' | 'ratios' | 'implementation' | 'risk' | 'conclusion')}
               >
                 <tab.icon size={16} />
@@ -532,7 +531,7 @@ const DPRReport: React.FC = () => {
                       </div>
                     </div>
                   </div>
-                  
+
                   <div>
                     <h4 className="font-medium text-gray-800 mb-3">Financial Summary</h4>
                     <div className="bg-gray-50 p-4 rounded-lg">
@@ -733,25 +732,25 @@ const DPRReport: React.FC = () => {
           )}
 
           {/* Ratio Analysis */}
-      {activeTab === 'ratios' && (
+          {activeTab === 'ratios' && (
             <SectionCard title="Financial Ratio Analysis">
               <ProjectionTable
                 title="Key Financial Ratios"
-        data={ratioAnalysis}
-        editable
-        onChange={(rowIdx, field, value) => handleRowChange(setRatioAnalysis, rowIdx, field, value)}
+                data={ratioAnalysis}
+                editable
+                onChange={(rowIdx, field, value) => handleRowChange(setRatioAnalysis, rowIdx, field, value)}
               />
             </SectionCard>
           )}
 
           {/* Implementation Schedule */}
-      {activeTab === 'implementation' && (
+          {activeTab === 'implementation' && (
             <SectionCard title="Implementation Schedule & Timeline">
               <ProjectionTable
                 title="Project Implementation Timeline"
-        data={implementationSchedule}
-        editable
-        onChange={(rowIdx, field, value) => handleRowChange(setImplementationSchedule, rowIdx, field, value)}
+                data={implementationSchedule}
+                editable
+                onChange={(rowIdx, field, value) => handleRowChange(setImplementationSchedule, rowIdx, field, value)}
               />
               <div className="mt-6">
                 <h4 className="font-medium text-gray-800 mb-3">Critical Milestones</h4>
@@ -774,13 +773,13 @@ const DPRReport: React.FC = () => {
           )}
 
           {/* Risk Analysis */}
-      {activeTab === 'risk' && (
+          {activeTab === 'risk' && (
             <SectionCard title="Risk Analysis & Mitigation">
               <ProjectionTable
                 title="Risk Assessment (Probability %)"
-        data={riskAnalysis}
-        editable
-        onChange={(rowIdx, field, value) => handleRowChange(setRiskAnalysis, rowIdx, field, value)}
+                data={riskAnalysis}
+                editable
+                onChange={(rowIdx, field, value) => handleRowChange(setRiskAnalysis, rowIdx, field, value)}
               />
               <div className="mt-6">
                 <h4 className="font-medium text-gray-800 mb-3">Risk Mitigation Strategies</h4>

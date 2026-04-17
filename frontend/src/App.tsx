@@ -169,7 +169,7 @@ import SecuritySettings from "./components/audit/SecuritySettings";
 import RiskAssessment from "./components/audit/RiskAssessment";
 import CMAModule from "./components/modules/CMAModule";
 import CMAReport from "./components/audit/CMAReport";
-import DPRReport from "./components/audit/DPRReport";
+import DPRReport from "./components/loan/DPRReport";
 import ExceptionReports from "./components/audit/ExceptionReports";
 import PeriodAnalysis from "./components/audit/PeriodAnalysis";
 import UserReports from "./components/audit/UserReports";
@@ -1926,7 +1926,7 @@ function App() {
                   }
                 />
                 <Route
-                  path="audit/dpr"
+                  path="loan/dpr"
                   element={
                     <RequireCompany>
                       <DPRReport />

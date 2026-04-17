@@ -139,27 +139,32 @@ const StockSummary: React.FC = () => {
           hsnCode: item.hsnCode || "",
           gstRate: Number(item.gstRate || 0),
           taxType: item.taxType || "",
-          batches:
-            item.batches?.map((b: any) => ({
-              batchName: b.batchName || "Default",
-              opening: {
-                qty: Number(b.batchQuantity || item.openingBalance || 0),
-                rate: Number(b.openingRate || 0),
-                value:
-                  Number(b.batchQuantity || item.openingBalance || 0) *
-                  Number(b.openingRate || 0),
-              },
-            })) ||
-            [
-              {
-                batchName: "Default",
+          batches: (() => {
+            const openingByBatches = (item.batches?.filter((b: any) => b.mode === "opening" || !b.mode) || []);
+            if (openingByBatches.length > 0) {
+              return openingByBatches.map((b: any) => ({
+                batchName: b.batchName || "Default",
                 opening: {
-                  qty: Number(item.openingBalance || 0),
-                  rate: 0,
-                  value: 0,
+                  qty: Number(b.batchQuantity || 0),
+                  rate: Number(b.openingRate || 0),
+                  value: Number(b.batchQuantity || 0) * Number(b.openingRate || 0),
                 },
-              },
-            ],
+              }));
+            }
+            if (Number(item.openingBalance || 0) > 0) {
+              return [
+                {
+                  batchName: "Default",
+                  opening: {
+                    qty: Number(item.openingBalance || 0),
+                    rate: Number(item.openingValue && item.openingBalance ? item.openingValue / item.openingBalance : item.rate || 0),
+                    value: Number(item.openingValue || 0),
+                  },
+                },
+              ];
+            }
+            return [];
+          })(),
         }))
         : [];
 
@@ -397,6 +402,9 @@ const StockSummary: React.FC = () => {
 
         if (item.batches && item.batches.length > 0) {
           item.batches.forEach((b: any) => {
+            // ✅ Only include "opening" mode or legacy (no mode) batches in opening stock
+            if (b.mode && b.mode !== "opening") return;
+
             const batchName = b.batchName || "Default";
 
             if (!itemMap[itemName].batches[batchName]) {
@@ -1104,12 +1112,12 @@ const StockSummary: React.FC = () => {
                           <React.Fragment key={idx}>
                             {/* ITEM ROW */}
                             <tr
-                              className={`cursor-pointer font-semibold ${theme === "dark" ? "bg-gray-800 text-white" : "bg-gray-50"
+                              className={`font-semibold ${batches.length > 0 ? "cursor-pointer" : "cursor-default"} ${theme === "dark" ? "bg-gray-800 text-white" : "bg-gray-50"
                                 }`}
-                              onClick={() => toggleItem(item.itemName)}
+                              onClick={() => batches.length > 0 && toggleItem(item.itemName)}
                             >
                               <td className="border p-2">
-                                {isExpanded ? "▼" : "▶"} {item.itemName}
+                                {batches.length > 0 && (isExpanded ? "▼ " : "▶ ")}{item.itemName}
                               </td>
                               <td className="border p-2 text-center">{item.unitName}</td>
                               <td className="border p-2 text-center">{item.hsnCode}</td>

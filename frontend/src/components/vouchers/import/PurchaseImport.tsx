@@ -79,6 +79,75 @@ interface GroupedVoucher {
     accSummaryRows?: AccSummaryRow[];
 }
 
+const stateNameToCode: { [key: string]: string } = {
+    'jammu & kashmir': '01', 'jammu and kashmir': '01',
+    'himachal pradesh': '02',
+    'punjab': '03',
+    'chandigarh': '04',
+    'uttarakhand': '05',
+    'haryana': '06',
+    'delhi': '07',
+    'rajasthan': '08',
+    'uttar pradesh': '09',
+    'bihar': '10',
+    'sikkim': '11',
+    'arunachal pradesh': '12',
+    'nagaland': '13',
+    'manipur': '14',
+    'mizoram': '15',
+    'tripura': '16',
+    'meghalaya': '17',
+    'assam': '18',
+    'west bengal': '19',
+    'jharkhand': '20',
+    'odisha': '21',
+    'chhattisgarh': '22',
+    'madhya pradesh': '23',
+    'gujarat': '24',
+    'daman and diu': '25',
+    'dadra and nagar haveli': '26',
+    'maharashtra': '27',
+    'andhra pradesh': '28',
+    'karnataka': '29',
+    'goa': '30',
+    'lakshadweep': '31',
+    'kerala': '32',
+    'tamil nadu': '33',
+    'puducherry': '34',
+    'andaman and nicobar islands': '35',
+    'telangana': '36',
+    'andhra pradesh (new)': '37',
+    'ladakh': '38'
+};
+
+const extractStateCode = (pos: string): string => {
+    if (!pos) return "";
+    const cleanPos = pos.toLowerCase().trim();
+
+    // 1. Try format like Jharkhand(20) or State (20)
+    const matchParens = cleanPos.match(/\((\d{2})\)/);
+    if (matchParens) return matchParens[1];
+
+    // 2. Try digits at start like 20-Jharkhand or 20 Jharkhand
+    const matchStart = cleanPos.match(/^(\d{2})/);
+    if (matchStart) return matchStart[1];
+
+    // 3. Try digits at end like Jharkhand 20
+    const matchEnd = cleanPos.match(/(\d{2})$/);
+    if (matchEnd) return matchEnd[1];
+
+    // 4. Try name lookup
+    const nameOnly = cleanPos.replace(/[0-9\(\)\-]+/g, "").trim();
+    if (stateNameToCode[nameOnly]) return stateNameToCode[nameOnly];
+
+    // 5. Try name lookup for sub-strings (e.g. "POS: Jharkhand")
+    for (const [name, code] of Object.entries(stateNameToCode)) {
+        if (nameOnly.includes(name) || name.includes(nameOnly)) return code;
+    }
+
+    return "";
+};
+
 const PurchaseImport: React.FC = () => {
     const navigate = useNavigate();
     const fileInputRef = useRef<HTMLInputElement>(null);
@@ -260,8 +329,13 @@ const PurchaseImport: React.FC = () => {
                             const lGst = matchedLedgerByName.gstNumber ? String(matchedLedgerByName.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
                             const lState = matchedLedgerByName.state ? String(matchedLedgerByName.state).toLowerCase().replace(/\s+/g, " ").trim() : "";
                             gstMatch = lGst === gstin;
-                            const cleanExcelState = placeOfSupply.replace(/^[0-9]+[\-\s]*/, '').trim();
-                            stateMatch = lState === cleanExcelState || lState === placeOfSupply;
+
+                            const excelStateCode = extractStateCode(placeOfSupply);
+                            const ledgerStateCode = extractStateCode(lState);
+                            stateMatch = (excelStateCode && ledgerStateCode && excelStateCode === ledgerStateCode) ||
+                                lState === placeOfSupply ||
+                                lState.includes(placeOfSupply) ||
+                                placeOfSupply.includes(lState);
 
                             if (!gstMatch && !stateMatch) errorMessage = "GSTIN and State mismatch";
                             else if (!gstMatch) errorMessage = `GSTIN mismatch (Ledger has: ${lGst || 'Empty'})`;
@@ -338,18 +412,11 @@ const PurchaseImport: React.FC = () => {
 
                     // Auto-calculate taxes if they are zero or missing, or if rate is provided
                     if (totalRate > 0 && igst === 0 && cgst === 0 && sgst === 0) {
-                        const excelPos = placeOfSupply.toLowerCase().trim();
-                        const excelPosCode = excelPos.match(/^[0-9]+/)?.[0] || excelPos.match(/\(([0-9]+)\)/)?.[1] || "";
-                        const excelPosName = excelPos.replace(/[0-9\(\)\-]+/g, "").trim();
-
                         const supplierGstin = String(row["GSTIN of supplier"] || "").trim();
                         const supplierGstinCode = supplierGstin.slice(0, 2);
+                        const excelPosCode = extractStateCode(placeOfSupply);
 
-                        const matchedLedger = ledgers.find(l => l.id === voucherGroups[groupKey]._matchedLedgerId);
-                        const ledgerState = matchedLedger?.state ? String(matchedLedger.state).toLowerCase().trim() : "";
-
-                        const isIntra = (supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode) ||
-                            (ledgerState && (excelPosName.includes(ledgerState) || ledgerState.includes(excelPosName)));
+                        const isIntra = (supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode);
 
                         if (isIntra) {
                             cgst = (taxableVal * (totalRate / 2)) / 100;
@@ -401,15 +468,15 @@ const PurchaseImport: React.FC = () => {
                 } else if (currentImportMode === "accounting") {
                     if (isAccSummaryImport) {
                         // ── NEW ACCOUNTING SUMMARY FORMAT (Multi-Row Support) ──
-                        const taxableVal     = Number(row["Taxable Value (₹)"]  || 0);
-                        const igst           = Number(row["Integrated Tax (₹)"] || 0);
-                        const cgst           = Number(row["Central Tax (₹)"]     || 0);
-                        const sgst           = Number(row["State/UT tax (₹)"]    || 0);
-                        const gstRate        = Number(row["GST Rate (%)"]         || 0);
-                        const purchaseLedger = String(row["Purchase Ledger"]   || "").trim();
-                        const discount       = Number(row["Discount (₹)"]         || 0);
-                        const totalTax       = igst + cgst + sgst;
-                        const rowTotal       = taxableVal + totalTax - discount;
+                        const taxableVal = Number(row["Taxable Value (₹)"] || 0);
+                        const igst = Number(row["Integrated Tax (₹)"] || 0);
+                        const cgst = Number(row["Central Tax (₹)"] || 0);
+                        const sgst = Number(row["State/UT tax (₹)"] || 0);
+                        const gstRate = Number(row["GST Rate (%)"] || 0);
+                        const purchaseLedger = String(row["Purchase Ledger"] || "").trim();
+                        const discount = Number(row["Discount (₹)"] || 0);
+                        const totalTax = igst + cgst + sgst;
+                        const rowTotal = taxableVal + totalTax - discount;
 
                         // Initialize if first row for this voucher group
                         if (!voucherGroups[groupKey].accSummaryRows) {
@@ -420,7 +487,7 @@ const PurchaseImport: React.FC = () => {
 
                         // Accumulate overall invoice value
                         voucherGroups[groupKey]["Invoice Value (₹)"] += rowTotal;
-                        
+
                         // --- Calculation Validation ---
                         let calculationWarning = "";
                         const totalTaxRow = igst + cgst + sgst;
@@ -443,7 +510,7 @@ const PurchaseImport: React.FC = () => {
                         const matchedPL = purchaseLedger
                             ? ledgers.find(l => String(l.name).toLowerCase().trim() === purchaseLedger.toLowerCase().trim())
                             : null;
-                        
+
                         voucherGroups[groupKey].accountingEntries!.push({
                             "Particulars (Ledger Name)": purchaseLedger || "Purchase Account",
                             "Amount (₹)": taxableVal - discount,
@@ -528,9 +595,8 @@ const PurchaseImport: React.FC = () => {
                         let calculationWarning = "";
 
                         if (gstRate > 0 && igst === 0 && cgst === 0 && sgst === 0) {
-                            const excelPos = placeOfSupply.toLowerCase().trim();
-                            const excelPosCode = excelPos.match(/^[0-9]+/)?.[0] || excelPos.match(/\(([0-9]+)\)/)?.[1] || "";
                             const supplierGstinCode = gstin.slice(0, 2);
+                            const excelPosCode = extractStateCode(placeOfSupply);
                             const isIntra = supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode;
                             if (isIntra) {
                                 cgst = (amount * (gstRate / 2)) / 100;
@@ -682,18 +748,11 @@ const PurchaseImport: React.FC = () => {
                     const newTaxable = qty * rate;
 
                     // Determine Intra/Inter
-                    const excelPos = voucher["Place of supply"].toLowerCase().trim();
-                    const excelPosCode = excelPos.match(/^[0-9]+/)?.[0] || excelPos.match(/\(([0-9]+)\)/)?.[1] || "";
-                    const excelPosName = excelPos.replace(/[0-9\(\)\-]+/g, "").trim();
-
                     const supplierGstin = String(voucher["GSTIN of supplier"] || "").trim();
                     const supplierGstinCode = supplierGstin.slice(0, 2);
+                    const excelPosCode = extractStateCode(voucher["Place of supply"]);
 
-                    const matchedLedger = ledgers.find(l => l.id === voucher._matchedLedgerId);
-                    const ledgerState = matchedLedger?.state ? String(matchedLedger.state).toLowerCase().trim() : "";
-
-                    const isIntra = (supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode) ||
-                        (ledgerState && (excelPosName.includes(ledgerState) || ledgerState.includes(excelPosName)));
+                    const isIntra = (supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode);
 
                     let newIgst = 0, newCgst = 0, newSgst = 0;
                     if (isIntra) {
@@ -731,11 +790,9 @@ const PurchaseImport: React.FC = () => {
                         const amount = row.taxableValue;
                         const rate = row.gstRate;
 
-                        const excelPos = voucher["Place of supply"].toLowerCase().trim();
-                        const excelPosCode = excelPos.match(/^[0-9]+/)?.[0] || excelPos.match(/\(([0-9]+)\)/)?.[1] || "";
-                        
                         const supplierGstin = String(voucher["GSTIN of supplier"] || "").trim();
                         const supplierGstinCode = supplierGstin.slice(0, 2);
+                        const excelPosCode = extractStateCode(voucher["Place of supply"]);
 
                         const isIntra = (supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode);
 
@@ -763,72 +820,70 @@ const PurchaseImport: React.FC = () => {
                     // Rebuild accounting entries from fixed rows
                     const newEntries: AccountingEntry[] = [];
                     voucher.accSummaryRows.forEach(row => {
-                         // Debit Purchase
-                         const matchedPL = row.purchaseLedger ? ledgers.find(l => String(l.name).toLowerCase().trim() === row.purchaseLedger.toLowerCase().trim()) : null;
-                         newEntries.push({
-                             "Particulars (Ledger Name)": row.purchaseLedger || "Purchase Account",
-                             "Amount (₹)": row.taxableValue - row.discount,
-                             "Type": "debit", "Rate (%)": row.gstRate, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: matchedPL?.id
-                         });
-                         // Debit Taxes
-                         if (row.igst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /igst/i.test(l.name))?.name || "IGST", "Amount (₹)": row.igst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /igst/i.test(l.name))?.id });
-                         if (row.cgst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /cgst/i.test(l.name))?.name || "CGST", "Amount (₹)": row.cgst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /cgst/i.test(l.name))?.id });
-                         if (row.sgst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /sgst|utgst/i.test(l.name))?.name || "SGST/UTGST", "Amount (₹)": row.sgst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /sgst|utgst/i.test(l.name))?.id });
+                        // Debit Purchase
+                        const matchedPL = row.purchaseLedger ? ledgers.find(l => String(l.name).toLowerCase().trim() === row.purchaseLedger.toLowerCase().trim()) : null;
+                        newEntries.push({
+                            "Particulars (Ledger Name)": row.purchaseLedger || "Purchase Account",
+                            "Amount (₹)": row.taxableValue - row.discount,
+                            "Type": "debit", "Rate (%)": row.gstRate, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: matchedPL?.id
+                        });
+                        // Debit Taxes
+                        if (row.igst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /igst/i.test(l.name))?.name || "IGST", "Amount (₹)": row.igst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /igst/i.test(l.name))?.id });
+                        if (row.cgst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /cgst/i.test(l.name))?.name || "CGST", "Amount (₹)": row.cgst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /cgst/i.test(l.name))?.id });
+                        if (row.sgst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /sgst|utgst/i.test(l.name))?.name || "SGST/UTGST", "Amount (₹)": row.sgst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /sgst|utgst/i.test(l.name))?.id });
                     });
 
                     const totalInvoiceValue = voucher.accSummaryRows.reduce((s, r) => s + r.rowTotal, 0);
                     // Add Credit Entry
                     const partyLedgerMatch = ledgers.find(l => String(l.name).toLowerCase().trim() === voucher["Trade/Legal name of the Supplier"].toLowerCase().trim());
                     newEntries.push({
-                         "Particulars (Ledger Name)": voucher["Trade/Legal name of the Supplier"] || "Supplier",
-                         "Amount (₹)": totalInvoiceValue,
-                         "Type": "credit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: partyLedgerMatch?.id
+                        "Particulars (Ledger Name)": voucher["Trade/Legal name of the Supplier"] || "Supplier",
+                        "Amount (₹)": totalInvoiceValue,
+                        "Type": "credit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: partyLedgerMatch?.id
                     });
 
                     return { ...voucher, accSummaryRows: voucher.accSummaryRows, accountingEntries: newEntries, "Invoice Value (₹)": totalInvoiceValue };
 
                 } else {
                     const updatedAccountingEntries = voucher.accountingEntries?.map(ae => {
-                    const amount = ae["Amount (₹)"];
-                    const gstRate = ae["Rate (%)"];
+                        const amount = ae["Amount (₹)"];
+                        const gstRate = ae["Rate (%)"];
 
-                    const excelPos = voucher["Place of supply"].toLowerCase().trim();
-                    const excelPosCode = excelPos.match(/^[0-9]+/)?.[0] || excelPos.match(/\(([0-9]+)\)/)?.[1] || "";
+                        const supplierGstin = String(voucher["GSTIN of supplier"] || "").trim();
+                        const supplierGstinCode = supplierGstin.slice(0, 2);
+                        const excelPosCode = extractStateCode(voucher["Place of supply"]);
 
-                    const supplierGstin = String(voucher["GSTIN of supplier"] || "").trim();
-                    const supplierGstinCode = supplierGstin.slice(0, 2);
+                        const isIntra = (supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode);
 
-                    const isIntra = (supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode);
+                        let newIgst = 0, newCgst = 0, newSgst = 0;
+                        if (isIntra) {
+                            newCgst = (amount * (gstRate / 2)) / 100;
+                            newSgst = (amount * (gstRate / 2)) / 100;
+                            newIgst = 0;
+                        } else {
+                            newIgst = (amount * gstRate) / 100;
+                            newCgst = 0;
+                            newSgst = 0;
+                        }
 
-                    let newIgst = 0, newCgst = 0, newSgst = 0;
-                    if (isIntra) {
-                        newCgst = (amount * (gstRate / 2)) / 100;
-                        newSgst = (amount * (gstRate / 2)) / 100;
-                        newIgst = 0;
-                    } else {
-                        newIgst = (amount * gstRate) / 100;
-                        newCgst = 0;
-                        newSgst = 0;
-                    }
+                        return {
+                            ...ae,
+                            "Integrated Tax (₹)": newIgst,
+                            "Central Tax (₹)": newCgst,
+                            "State/UT tax (₹)": newSgst,
+                            calculationWarning: ""
+                        };
+                    });
+
+                    const totalCredit = updatedAccountingEntries?.reduce((sum, ae) => ae.Type === 'credit' ? sum + ae["Amount (₹)"] : sum, 0) || 0;
 
                     return {
-                        ...ae,
-                        "Integrated Tax (₹)": newIgst,
-                        "Central Tax (₹)": newCgst,
-                        "State/UT tax (₹)": newSgst,
-                        calculationWarning: ""
+                        ...voucher,
+                        accountingEntries: updatedAccountingEntries,
+                        "Invoice Value (₹)": totalCredit,
+                        // If summary rows exist, we should ideally update them too, but 
+                        // for now, we ensure the entries used for saving are correct.
                     };
-                });
-
-                const totalCredit = updatedAccountingEntries?.reduce((sum, ae) => ae.Type === 'credit' ? sum + ae["Amount (₹)"] : sum, 0) || 0;
-
-                return {
-                    ...voucher,
-                    accountingEntries: updatedAccountingEntries,
-                    "Invoice Value (₹)": totalCredit,
-                    // If summary rows exist, we should ideally update them too, but 
-                    // for now, we ensure the entries used for saving are correct.
-                };
                 }
             }
         });
@@ -939,19 +994,19 @@ const PurchaseImport: React.FC = () => {
                                         Saving: {saveProgress.done}/{saveProgress.total}
                                     </div>
                                 )}
-                                {groupedVouchers.some(v => 
-                                    v.items.some(it => it.calculationWarning) || 
-                                    v.accountingEntries?.some(ae => ae.calculationWarning) || 
+                                {groupedVouchers.some(v =>
+                                    v.items.some(it => it.calculationWarning) ||
+                                    v.accountingEntries?.some(ae => ae.calculationWarning) ||
                                     v.accSummaryRows?.some(r => r.calculationWarning)
                                 ) && (
-                                    <button
-                                        onClick={fixAllCalculations}
-                                        className="px-4 py-2 bg-amber-100 text-amber-700 font-bold rounded-lg hover:bg-amber-200 transition-colors flex items-center border border-amber-200"
-                                    >
-                                        <RefreshCw size={18} className="mr-2" />
-                                        Auto-Fix Errors
-                                    </button>
-                                )}
+                                        <button
+                                            onClick={fixAllCalculations}
+                                            className="px-4 py-2 bg-amber-100 text-amber-700 font-bold rounded-lg hover:bg-amber-200 transition-colors flex items-center border border-amber-200"
+                                        >
+                                            <RefreshCw size={18} className="mr-2" />
+                                            Auto-Fix Errors
+                                        </button>
+                                    )}
                                 <button
                                     onClick={() => { setGroupedVouchers([]); setActiveTab("import"); }}
                                     className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg transition-colors"
@@ -969,21 +1024,21 @@ const PurchaseImport: React.FC = () => {
                             </div>
                         </div>
 
-                        {groupedVouchers.some(v => 
-                            v.items.some(it => it.calculationWarning) || 
+                        {groupedVouchers.some(v =>
+                            v.items.some(it => it.calculationWarning) ||
                             v.accountingEntries?.some(ae => ae.calculationWarning) ||
                             v.accSummaryRows?.some(r => r.calculationWarning)
                         ) && (
-                            <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl flex items-center justify-between">
-                                <div className="flex items-center">
-                                    <AlertTriangle className="text-red-500 mr-3" size={24} />
-                                    <div>
-                                        <h4 className="text-red-800 font-bold text-sm">Calculation Mismatches Detected</h4>
-                                        <p className="text-red-700 text-xs">Some items have discrepancies between Qty/Rate and Taxable/Tax values. Click "Auto-Fix Errors" to correct them.</p>
+                                <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-xl flex items-center justify-between">
+                                    <div className="flex items-center">
+                                        <AlertTriangle className="text-red-500 mr-3" size={24} />
+                                        <div>
+                                            <h4 className="text-red-800 font-bold text-sm">Calculation Mismatches Detected</h4>
+                                            <p className="text-red-700 text-xs">Some items have discrepancies between Qty/Rate and Taxable/Tax values. Click "Auto-Fix Errors" to correct them.</p>
+                                        </div>
                                     </div>
                                 </div>
-                            </div>
-                        )}
+                            )}
 
                         <div className="space-y-4">
                             {groupedVouchers.map((voucher, vi) => (
@@ -1023,7 +1078,7 @@ const PurchaseImport: React.FC = () => {
                                             <div>
                                                 <p className="text-xs font-bold text-gray-400 uppercase">
                                                     {(importMode === 'accounting' && !voucher.accSummaryRows)
-                                                        ? `Totals (${voucher.accountingEntries?.filter(ae => ae.Type === 'credit').length} Cr / ${voucher.accountingEntries?.filter(ae => ae.Type === 'debit').length} Dr)` 
+                                                        ? `Totals (${voucher.accountingEntries?.filter(ae => ae.Type === 'credit').length} Cr / ${voucher.accountingEntries?.filter(ae => ae.Type === 'debit').length} Dr)`
                                                         : 'Invoice Value'
                                                     }
                                                 </p>
@@ -1039,7 +1094,7 @@ const PurchaseImport: React.FC = () => {
                                                                 <span className="text-[10px] text-gray-400 font-bold uppercase">Dr:</span>
                                                                 <span className="text-red-600">₹{voucher.accountingEntries?.reduce((s, ae) => ae.Type === 'debit' ? s + ae["Amount (₹)"] : s, 0).toLocaleString()}</span>
                                                             </span>
-                                                          </>
+                                                        </>
                                                         : `₹${voucher["Invoice Value (₹)"].toLocaleString()}`
                                                     }
                                                 </p>
