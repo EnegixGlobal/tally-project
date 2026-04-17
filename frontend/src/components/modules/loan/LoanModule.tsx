@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
-import { Landmark, FileText, CreditCard, PieChart, Activity } from 'lucide-react';
+import { Activity } from 'lucide-react';
 
 const LoanModule: React.FC = () => {
     const { theme } = useAppContext();
@@ -12,6 +12,7 @@ const LoanModule: React.FC = () => {
             title: 'Loan Management',
             items: [
                 { icon: <Activity size={20} />, name: 'CMA Data', path: '/app/loan/cma' },
+                { icon: <Activity size={20} />, name: 'DPR Report', path: '/app/loan/dpr' },
             ]
         },
         {

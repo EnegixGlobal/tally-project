@@ -12,7 +12,6 @@ const AuditModule: React.FC = () => {
     {
       title: 'Audit Trail',
       items: [
-        { icon: <Activity size={20} />, name: 'DPR', path: '/app/audit/dpr' },
         { icon: <Activity size={20} />, name: '3CB', path: '/app/audit/3-Cb' },
         { icon: <Activity size={20} />, name: '3CD', path: '/app/audit/3-cd' },
         { icon: <Activity size={20} />, name: '3CA', path: '/app/audit/3-ca' },
@@ -60,13 +59,13 @@ const AuditModule: React.FC = () => {
                   key={itemIndex}
                   onClick={() => navigate(item.path)}
                   className={`p-4 rounded-lg flex flex-col items-center text-center transition-colors ${theme === 'dark'
-                      ? 'bg-gray-700 hover:bg-gray-600'
-                      : 'bg-gray-50 hover:bg-gray-100'
+                    ? 'bg-gray-700 hover:bg-gray-600'
+                    : 'bg-gray-50 hover:bg-gray-100'
                     }`}
                 >
                   <div className={`p-2 rounded-full mb-2 ${theme === 'dark'
-                      ? 'bg-gray-600'
-                      : 'bg-red-50'
+                    ? 'bg-gray-600'
+                    : 'bg-red-50'
                     }`}>
                     {item.icon}
                   </div>
