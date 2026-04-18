@@ -42,25 +42,48 @@ router.get('/dashboard-data', async (req, res) => {
       ledgers = ledgerRows;
       vouchers = voucherRows;
 
-      // Calculate monthly stats from sales_vouchers and purchase_vouchers
-      const currentMonth = new Date().getMonth() + 1;
-      const currentYear = new Date().getFullYear();
+      // Calculate stats based on financialYear
+      const { financialYear } = req.query; // e.g. "2025-26" or ""
 
-      const [salesStats] = await db.query(`
+      let salesQuery = `
         SELECT 
           SUM(total) as totalSales,
           SUM(cgstTotal + sgstTotal + igstTotal) as totalOutputTax
         FROM sales_vouchers 
-        WHERE company_id = ? AND MONTH(date) = ? AND YEAR(date) = ?
-      `, [activeCompanyId, currentMonth, currentYear]);
-
-      const [purchaseStats] = await db.query(`
+        WHERE company_id = ?
+      `;
+      let purchaseQuery = `
         SELECT 
           SUM(total) as totalPurchases,
           SUM(cgstTotal + sgstTotal + igstTotal) as totalInputTax
         FROM purchase_vouchers 
-        WHERE company_id = ? AND MONTH(date) = ? AND YEAR(date) = ?
-      `, [activeCompanyId, currentMonth, currentYear]);
+        WHERE company_id = ?
+      `;
+      let queryParams = [activeCompanyId];
+
+      if (financialYear) {
+        // Filter by financial year range
+        const match = financialYear.match(/\d{4}/);
+        const year = match ? parseInt(match[0], 10) : new Date().getFullYear();
+        const startDate = `${year}-04-01`;
+        const endDate = `${year + 1}-03-31`;
+
+        salesQuery += ' AND date >= ? AND date <= ?';
+        purchaseQuery += ' AND date >= ? AND date <= ?';
+        queryParams.push(startDate, endDate);
+      } else if (financialYear === undefined) {
+        // Default: Current Month (original behavior)
+        const currentMonth = new Date().getMonth() + 1;
+        const currentYear = new Date().getFullYear();
+        salesQuery += ' AND MONTH(date) = ? AND YEAR(date) = ?';
+        purchaseQuery += ' AND MONTH(date) = ? AND YEAR(date) = ?';
+        queryParams.push(currentMonth, currentYear);
+      } else {
+        // financialYear === "" (Clear) -> All time, no more filters needed
+      }
+
+      const [salesStats] = await db.query(salesQuery, queryParams);
+      const [purchaseStats] = await db.query(purchaseQuery, queryParams);
 
       stats = {
         salesMonthly: salesStats[0]?.totalSales || 0,

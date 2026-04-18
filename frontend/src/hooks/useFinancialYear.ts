@@ -74,10 +74,11 @@ export const useFinancialYear = () => {
     });
 
     useEffect(() => {
-        if (!localStorage.getItem("selectedFinYear") && companyInfo?.financialYear) {
+        const storedFinYear = localStorage.getItem("selectedFinYear");
+        if (storedFinYear === null && companyInfo?.financialYear) {
             setFinYear(companyInfo.financialYear);
             localStorage.setItem("selectedFinYear", companyInfo.financialYear);
-        } else if (!localStorage.getItem("selectedFinYear")) {
+        } else if (storedFinYear === null) {
             const currentYear = new Date().getFullYear();
             const isPastMarch = new Date().getMonth() >= 3;
             const y = isPastMarch ? currentYear : currentYear - 1;
