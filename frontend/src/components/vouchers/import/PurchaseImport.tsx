@@ -230,28 +230,40 @@ const PurchaseImport: React.FC = () => {
     const formatDate = (dateValue: any): string => {
         if (!dateValue) return "";
         try {
+            // 1. Handle Excel Serial Number
             if (typeof dateValue === "number") {
                 const date = new Date((dateValue - 25569) * 86400 * 1000);
                 return date.toISOString().split("T")[0];
             }
+
             if (typeof dateValue === "string") {
-                if (dateValue.includes("-")) {
-                    const parts = dateValue.split("-");
-                    if (parts[0].length === 2) {
-                        return `${parts[2]}-${parts[1]}-${parts[0]}`;
-                    }
-                    return dateValue;
+                const cleanDate = dateValue.trim();
+
+                // 2. Handle DD-MM-YYYY or DD/MM/YYYY (with 1 or 2 digit day/month)
+                const dmyMatch = cleanDate.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+                if (dmyMatch) {
+                    const day = dmyMatch[1].padStart(2, '0');
+                    const month = dmyMatch[2].padStart(2, '0');
+                    const year = dmyMatch[3];
+                    return `${year}-${month}-${day}`;
                 }
-                if (dateValue.includes("/")) {
-                    const parts = dateValue.split("/");
-                    if (parts[0].length === 2) {
-                        return `${parts[2]}-${parts[1]}-${parts[0]}`;
-                    }
-                    return dateValue.replace(/\//g, "-");
+
+                // 3. Handle YYYY-MM-DD or YYYY/MM/DD
+                const ymdMatch = cleanDate.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                if (ymdMatch) {
+                    const year = ymdMatch[1];
+                    const month = ymdMatch[2].padStart(2, '0');
+                    const day = ymdMatch[3].padStart(2, '0');
+                    return `${year}-${month}-${day}`;
                 }
             }
+
+            // 4. Default JS Date parsing fallback
             const d = new Date(dateValue);
-            if (isNaN(d.getTime())) return new Date().toISOString().split("T")[0];
+            if (isNaN(d.getTime())) {
+                // Return today's date in YYYY-MM-DD format as last resort
+                return new Date().toISOString().split("T")[0];
+            }
             return d.toISOString().split("T")[0];
         } catch {
             return new Date().toISOString().split("T")[0];
