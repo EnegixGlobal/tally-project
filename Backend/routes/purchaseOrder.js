@@ -144,6 +144,9 @@ router.get("/", async (req, res) => {
     toDate,
     page = 1,
     limit = 50,
+    companyId,
+    ownerType,
+    ownerId,
   } = req.query;
 
   try {
@@ -168,13 +171,27 @@ router.get("/", async (req, res) => {
       whereClause += " AND po.date >= ?";
       params.push(fromDate);
     }
-
     if (toDate) {
       whereClause += " AND po.date <= ?";
       params.push(toDate);
     }
 
-    const offset = (Number(page) - 1) * Number(limit);
+    if (companyId) {
+      whereClause += " AND po.company_id = ?";
+      params.push(companyId);
+    }
+    if (ownerType) {
+      whereClause += " AND po.owner_type = ?";
+      params.push(ownerType);
+    }
+    if (ownerId) {
+      whereClause += " AND po.owner_id = ?";
+      params.push(ownerId);
+    }
+
+    const pageInt = Math.max(1, parseInt(page, 10) || 1);
+    const limitInt = Math.max(1, parseInt(limit, 10) || 50);
+    const offset = (pageInt - 1) * limitInt;
 
     /* ===============================
        MAIN DATA QUERY
@@ -219,7 +236,7 @@ router.get("/", async (req, res) => {
       ORDER BY po.date DESC, po.id DESC
       LIMIT ? OFFSET ?
       `,
-      [...params, Number(limit), offset]
+      [...params, limitInt, offset]
     );
 
     /* ===============================
@@ -242,9 +259,9 @@ router.get("/", async (req, res) => {
       data: rows,
       pagination: {
         total: countRows[0].total,
-        page: Number(page),
-        limit: Number(limit),
-        totalPages: Math.ceil(countRows[0].total / Number(limit)),
+        page: pageInt,
+        limit: limitInt,
+        totalPages: Math.ceil(countRows[0].total / limitInt),
       },
     });
   } catch (err) {
