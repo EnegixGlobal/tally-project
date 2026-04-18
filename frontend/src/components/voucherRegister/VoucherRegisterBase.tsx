@@ -10,6 +10,7 @@ import {
   useFinancialYear,
   filterByFinancialYear,
 } from "../../hooks/useFinancialYear";
+import Swal from "sweetalert2";
 
 interface VoucherRegisterBaseProps {
   title: string;
@@ -115,6 +116,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   const [statusFilter, setStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+  const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
   const [showPrintOptions, setShowPrintOptions] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherEntry | null>(
     null
@@ -187,6 +189,138 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
     return () => window.removeEventListener("voucher-deleted", handler);
   }, []);
+
+  const toggleSelect = (id: string) => {
+    setSelectedVoucherIds((prev: Set<string>) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedVoucherIds.size === filteredVouchers.length) {
+      setSelectedVoucherIds(new Set());
+    } else {
+      setSelectedVoucherIds(new Set(filteredVouchers.map((v) => v.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedVoucherIds.size === 0) return;
+
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: `Do you really want to delete ${selectedVoucherIds.size} selected vouchers?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete them",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/vouchers/bulk-delete`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ids: Array.from(selectedVoucherIds),
+            ownerType,
+            ownerId,
+            companyId,
+            voucherType,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Bulk delete request failed");
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        text: `${selectedVoucherIds.size} vouchers have been deleted successfully.`,
+      });
+
+      const deletedIds = new Set(selectedVoucherIds);
+      setVouchers((prev) => prev.filter((v) => !deletedIds.has(String(v.id))));
+      setSelectedVoucherIds(new Set());
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete vouchers.",
+      });
+      console.error("Bulk delete error:", error);
+    }
+  };
+
+  const handleDeleteAll = async () => {
+    if (filteredVouchers.length === 0) return;
+
+    const result = await Swal.fire({
+      title: "Delete ALL matching vouchers?",
+      text: `This will delete ALL ${filteredVouchers.length} vouchers matching your current filters. This action cannot be undone!`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete ALL",
+      cancelButtonText: "Cancel",
+      confirmButtonColor: "#d33",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const idsToDelete = filteredVouchers.map(v => v.id);
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/vouchers/bulk-delete`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ids: idsToDelete,
+            ownerType,
+            ownerId,
+            companyId,
+            voucherType,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Bulk delete request failed");
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        text: `All matching ${idsToDelete.length} vouchers have been deleted successfully.`,
+      });
+
+      const deletedIdsSet = new Set(idsToDelete);
+      setVouchers((prev) => prev.filter((v) => !deletedIdsSet.has(String(v.id))));
+      setSelectedVoucherIds(new Set());
+    } catch (error) {
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete vouchers.",
+      });
+      console.error("Bulk delete error:", error);
+    }
+  };
 
   // Helper function to calculate debit and credit amounts from entries
   const calculateDebitCredit = (
@@ -1242,6 +1376,27 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
           {/* RIGHT SIDE */}
           <div className="flex items-center gap-3">
+            {filteredVouchers.length > 0 && selectedVoucherIds.size === 0 && (
+              <button
+                onClick={handleDeleteAll}
+                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center shadow-md text-sm font-semibold"
+                title="Delete all vouchers matching the current filters"
+              >
+                <Trash2 className="mr-2" size={18} />
+                Delete All matching ({filteredVouchers.length})
+              </button>
+            )}
+
+            {selectedVoucherIds.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center shadow-md text-sm font-semibold"
+                title="Delete selected vouchers"
+              >
+                <Trash2 className="mr-2" size={18} />
+                Bulk Delete Selected ({selectedVoucherIds.size})
+              </button>
+            )}
 
             <button
               onClick={() => setShowActions(!showActions)}
@@ -1257,7 +1412,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             {hasPermission("add") && onAdd && (
               <button
                 onClick={onAdd}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors text-sm font-semibold shadow-md"
                 title={`Add new ${voucherType} voucher`}
               >
                 Add New
@@ -1453,6 +1608,17 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                <th className="px-4 py-3 text-left">
+                  <input
+                    type="checkbox"
+                    checked={
+                      filteredVouchers.length > 0 &&
+                      selectedVoucherIds.size === filteredVouchers.length
+                    }
+                    onChange={toggleSelectAll}
+                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
@@ -1525,7 +1691,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             <tbody className="bg-white divide-y divide-gray-200">
               {(filteredVouchers as VoucherEntry[]).map((voucher) => {
                 if (!voucher || !voucher.entries) return null; // Safety
-
+                const isSelected = selectedVoucherIds.has(voucher.id);
                 const debitEntry = voucher.entries.find(
                   (e) => e.type === "debit"
                 );
@@ -1541,7 +1707,19 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 const total = Number(voucher.total) || 0;
 
                 return (
-                  <tr key={voucher.id} className="hover:bg-gray-50">
+                  <tr
+                    key={voucher.id}
+                    className={`hover:bg-gray-50 transition-colors ${isSelected ? "bg-blue-50" : ""
+                      }`}
+                  >
+                    <td className="px-4 py-3 text-left">
+                      <input
+                        type="checkbox"
+                        checked={isSelected}
+                        onChange={() => toggleSelect(voucher.id)}
+                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                      />
+                    </td>
                     {/* Date */}
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {voucher.date ? formatDate(voucher.date) : "-"}
@@ -1600,13 +1778,13 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         {/* Party */}
                         <td className="px-6 py-4 text-sm text-gray-500">
                           {voucherType === "debit_note"
-                            ? getLedgerNameById(
+                            ? getLedgerName(
                               voucher.entries.find((e) => e.type === "credit")
                                 ?.ledgerId
                             )
                             : voucherType === "sales"
-                              ? getLedgerNameById(debitEntry?.ledgerId)
-                              : getLedgerNameById(creditEntry?.ledgerId)}
+                              ? getLedgerName(debitEntry?.ledgerId)
+                              : getLedgerName(creditEntry?.ledgerId)}
                         </td>
 
                         {/* Supplier Invoice Date */}
