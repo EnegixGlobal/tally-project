@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, CreditCard, Download, Printer } from "lucide-react";
 import Swal from "sweetalert2";
+import { useFinancialYear, filterByFinancialYear } from "../../hooks/useFinancialYear";
 
 // Types - keeping everything in this file as requested
 interface VoucherEntryLine {
@@ -34,6 +35,8 @@ const PaymentRegister: React.FC = () => {
   const [statusFilter, setStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
+
+  const { selectedFinYear } = useFinancialYear();
 
   // New state for Change View functionality
   const [viewType, setViewType] = useState<
@@ -300,7 +303,11 @@ const PaymentRegister: React.FC = () => {
 
   // Filter vouchers based on search, filters, and view type
   const filteredVouchers = (() => {
-    const viewFilteredVouchers = filterVouchersByView(vouchers);
+    // 1. Apply Financial Year filter
+    const yearFilteredVouchers = filterByFinancialYear(vouchers, "date", selectedFinYear);
+
+    // 2. Apply View View filter (Daily, Weekly, etc)
+    const viewFilteredVouchers = filterVouchersByView(yearFilteredVouchers);
 
     return viewFilteredVouchers.filter((voucher) => {
       const matchesSearch =
@@ -946,8 +953,8 @@ const PaymentRegister: React.FC = () => {
                         key={page}
                         onClick={() => setCurrentPage(page)}
                         className={`relative inline-flex items-center px-4 py-2 border text-sm font-medium ${page === currentPage
-                            ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
-                            : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
+                          ? "z-10 bg-blue-50 border-blue-500 text-blue-600"
+                          : "bg-white border-gray-300 text-gray-500 hover:bg-gray-50"
                           }`}
                       >
                         {page}

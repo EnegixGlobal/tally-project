@@ -135,8 +135,8 @@ const Dashboard: React.FC = () => {
     if (suppl === "employee") {
       await switchCompany(id);
       setSelectedCompany(id);
-       localStorage.setItem("company_id", id);
-       window.location.reload();
+      localStorage.setItem("company_id", id);
+      window.location.reload();
     } else {
       localStorage.setItem("company_id", id);
       setSelectedCaCompany(id);
@@ -204,6 +204,10 @@ const Dashboard: React.FC = () => {
           url += `&company_id=${restrictedId}`;
         }
 
+        if (selectedFinYear !== undefined) {
+          url += `&financialYear=${selectedFinYear}`;
+        }
+
         const res = await fetch(url, {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -226,7 +230,7 @@ const Dashboard: React.FC = () => {
 
           setLedgers(data.ledgers || []);
           setVouchers(data.vouchers || []);
-          
+
           if (data.stats) {
             setRealStats(data.stats);
           }
@@ -246,7 +250,7 @@ const Dashboard: React.FC = () => {
       setLoading(false);
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [employeeId]); // Removed setCompanyInfo from dependencies to prevent infinite loop
+  }, [employeeId, selectedFinYear]);
 
   useEffect(() => {
     const employeeId = localStorage.getItem("employee_id");
@@ -479,9 +483,9 @@ const Dashboard: React.FC = () => {
                   </div>
                   <div>
                     <div className={`font-semibold ${isActive ? 'text-green-800' : 'text-red-800'}`}>
-                        {isActive 
-                          ? (isFreeTrial ? 'Free Trial — Active' : 'Subscription — Active') 
-                          : (isFreeTrial ? 'Free Trial — Ended' : 'Subscription — Ended')}
+                      {isActive
+                        ? (isFreeTrial ? 'Free Trial — Active' : 'Subscription — Active')
+                        : (isFreeTrial ? 'Free Trial — Ended' : 'Subscription — Ended')}
                     </div>
                     {isActive ? (
                       <div>
@@ -612,7 +616,7 @@ const Dashboard: React.FC = () => {
                     onChange={(e) => setSelectedFinYear(e.target.value)}
                     className="border border-gray-300 rounded px-2 py-0.5 text-xs bg-white text-gray-800 outline-none w-auto"
                   >
-                    <option value="">Clear</option>
+                    <option value="">All Years</option>
                     {availableFinYears.map((fy) => (
                       <option key={fy} value={fy}>{fy}</option>
                     ))}
@@ -680,7 +684,9 @@ const Dashboard: React.FC = () => {
                       <p className="text-2xl font-bold text-green-700">
                         ₹ {Number(realStats.salesMonthly || 0).toLocaleString()}
                       </p>
-                      <p className="text-sm text-gray-500">This Month</p>
+                      <p className="text-sm text-gray-500">
+                        {selectedFinYear ? `FY ${selectedFinYear}` : "All Time"}
+                      </p>
                     </div>
 
                     {/* Purchase Report */}
@@ -691,7 +697,9 @@ const Dashboard: React.FC = () => {
                       <p className="text-2xl font-bold text-blue-700">
                         ₹ {Number(realStats.purchaseMonthly || 0).toLocaleString()}
                       </p>
-                      <p className="text-sm text-gray-500">This Month</p>
+                      <p className="text-sm text-gray-500">
+                        {selectedFinYear ? `FY ${selectedFinYear}` : "All Time"}
+                      </p>
                     </div>
 
                     {/* Input Tax */}
@@ -703,7 +711,9 @@ const Dashboard: React.FC = () => {
                         <p className="text-2xl font-bold text-purple-700">
                           ₹ {Number(realStats.inputTaxMonthly || 0).toLocaleString()}
                         </p>
-                        <p className="text-sm text-gray-500">This Month</p>
+                        <p className="text-sm text-gray-500">
+                          {selectedFinYear ? `FY ${selectedFinYear}` : "All Time"}
+                        </p>
                       </div>
                     )}
 
@@ -716,7 +726,9 @@ const Dashboard: React.FC = () => {
                         <p className="text-2xl font-bold text-orange-700">
                           ₹ {Number(realStats.outputTaxMonthly || 0).toLocaleString()}
                         </p>
-                        <p className="text-sm text-gray-500">This Month</p>
+                        <p className="text-sm text-gray-500">
+                          {selectedFinYear ? `FY ${selectedFinYear}` : "All Time"}
+                        </p>
                       </div>
                     )}
                   </div>
@@ -865,7 +877,7 @@ const Dashboard: React.FC = () => {
             employeeName={selectedEmployeeName}
             onClose={closeAssignModal}
             onAssigned={() => {
-              fetchEmployees(); 
+              fetchEmployees();
             }}
           />
         )
