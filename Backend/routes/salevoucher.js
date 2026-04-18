@@ -429,10 +429,11 @@ router.post("/", async (req, res) => {
           Number(e.amount) || 0,
           e.type || "debit",
           e.narration || null,
+          'sales'
         ]);
 
         await db.query(
-          `INSERT INTO voucher_entries (voucher_id, ledger_id, amount, entry_type, narration) VALUES ?`,
+          `INSERT INTO voucher_entries (voucher_id, ledger_id, amount, entry_type, narration, voucher_type) VALUES ?`,
           [ledgerValues]
         );
       }
