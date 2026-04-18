@@ -558,23 +558,15 @@ router.post("/", async (req, res) => {
       // accounting-invoice
       const ledgerEntries = entries.filter(e => e.ledgerId);
       if (ledgerEntries.length > 0) {
-        const insertEntrySql = `
-          INSERT INTO voucher_entries (
-            voucher_id,
-            ledger_id,
-            amount,
-            entry_type,
-            narration
-          ) VALUES ?
-        `;
         const entryValues = ledgerEntries.map(e => [
           voucherId,
           e.ledgerId,
           Number(e.amount || 0),
           e.type || "debit",
-          e.narration || null
+          e.narration || null,
+          'purchase'
         ]);
-        await db.query(insertEntrySql, [entryValues]);
+        await db.query(`INSERT INTO voucher_entries (voucher_id, ledger_id, amount, entry_type, narration, voucher_type) VALUES ?`, [entryValues]);
       }
     }
 
@@ -618,11 +610,11 @@ router.get("/", async (req, res) => {
 
     const [rows] = await db.execute(
       `SELECT *
-       FROM purchase_vouchers
+          FROM purchase_vouchers
        WHERE company_id = ?
-         AND owner_type = ?
-         AND owner_id = ?
-       ORDER BY date DESC`,
+          AND owner_type = ?
+            AND owner_id = ?
+              ORDER BY date DESC`,
       [finalCompanyId, finalOwnerType, finalOwnerId]
     );
 
@@ -639,7 +631,7 @@ router.get("/", async (req, res) => {
            FROM voucher_entries ve
            LEFT JOIN ledgers l ON l.id = ve.ledger_id
            LEFT JOIN ledger_groups g ON g.id = l.group_id
-           WHERE ve.voucher_id IN (?)`,
+           WHERE ve.voucher_id IN(?)`,
           [accVoucherIds]
         );
 
@@ -713,26 +705,26 @@ router.get("/month-wise", async (req, res) => {
 
   try {
     let sql = `
-      SELECT 
+        SELECT
         id,
-        number,
-        date,
-        partyId,
-        referenceNo,
-        supplierInvoiceDate,
-        subtotal,
-        cgstTotal,
-        sgstTotal,
-        igstTotal,
-        discountTotal,
-        total,
-        purchaseLedgerId,
-        company_id,
-        mode
+          number,
+          date,
+          partyId,
+          referenceNo,
+          supplierInvoiceDate,
+          subtotal,
+          cgstTotal,
+          sgstTotal,
+          igstTotal,
+          discountTotal,
+          total,
+          purchaseLedgerId,
+          company_id,
+          mode
       FROM purchase_vouchers
       WHERE owner_type = ?
-        AND owner_id = ?
-    `;
+          AND owner_id = ?
+            `;
 
     const params = [owner_type, owner_id];
 
@@ -793,7 +785,7 @@ router.get("/month-wise", async (req, res) => {
            FROM voucher_entries ve
            LEFT JOIN ledgers l ON l.id = ve.ledger_id
            LEFT JOIN ledger_groups g ON g.id = l.group_id
-           WHERE ve.voucher_id IN (?)`,
+           WHERE ve.voucher_id IN(?)`,
           [accVoucherIds]
         );
 
@@ -893,7 +885,7 @@ router.delete("/:id", async (req, res) => {
     const parts = deletedNumber.split("/");
     if (parts.length < 3) {
       // If number format is unexpected, just do a normal delete
-      await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
+      await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ? AND voucher_type = 'purchase'", [id]);
       await conn.execute("DELETE FROM purchase_voucher_items WHERE voucherId = ?", [id]);
       await conn.execute("DELETE FROM purchase_history WHERE voucherNumber = ?", [deletedNumber]);
       await conn.execute("DELETE FROM purchase_vouchers WHERE id = ?", [id]);
@@ -906,7 +898,7 @@ router.delete("/:id", async (req, res) => {
     const deletedSeq = parseInt(parts[2]);
 
     // 2️⃣ Delete voucher and related entries
-    await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
+    await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ? AND voucher_type = 'purchase'", [id]);
     await conn.execute("DELETE FROM purchase_voucher_items WHERE voucherId = ?", [id]);
     await conn.execute("DELETE FROM purchase_history WHERE voucherNumber = ?", [deletedNumber]);
     await conn.execute("DELETE FROM purchase_vouchers WHERE id = ?", [id]);
@@ -915,10 +907,10 @@ router.delete("/:id", async (req, res) => {
     // We look for numbers like "PRV/25-26/%"
     const [subsequentVouchers] = await conn.execute(
       `SELECT id, number FROM purchase_vouchers 
-       WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
-       AND number LIKE ? 
-       ORDER BY id ASC`,
-      [company_id, owner_type, owner_id, `${prefix}/${fy}/%`]
+       WHERE company_id = ? AND owner_type = ? AND owner_id = ?
+          AND number LIKE ?
+            ORDER BY id ASC`,
+      [company_id, owner_type, owner_id, `${prefix} /${fy}/ % `]
     );
 
     for (const voucher of subsequentVouchers) {
@@ -927,7 +919,7 @@ router.delete("/:id", async (req, res) => {
         const vSeq = parseInt(vParts[2]);
         if (vSeq > deletedSeq) {
           const newSeq = vSeq - 1;
-          const newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
+          const newNumber = `${prefix} /${fy}/${String(newSeq).padStart(6, "0")} `;
 
           // Update main table
           await conn.execute(
@@ -975,7 +967,7 @@ router.get("/:id", async (req, res) => {
     ====================== */
 
     const [voucherRows] = await db.execute(
-      `SELECT * FROM purchase_vouchers WHERE id = ?`,
+      `SELECT * FROM purchase_vouchers WHERE id = ? `,
       [voucherId]
     );
 
@@ -997,9 +989,9 @@ router.get("/:id", async (req, res) => {
       const [items] = await db.execute(
         `
         SELECT *
-        FROM purchase_voucher_items
+          FROM purchase_voucher_items
         WHERE voucherId = ?
-        `,
+          `,
         [voucherId]
       );
 
@@ -1010,9 +1002,9 @@ router.get("/:id", async (req, res) => {
       const [history] = await db.execute(
         `
         SELECT *
-        FROM purchase_history
+          FROM purchase_history
         WHERE voucherNumber = ?
-        `,
+          `,
         [voucher.number]
       );
 
@@ -1070,7 +1062,7 @@ router.get("/:id", async (req, res) => {
       const [ledgerRows] = await db.execute(
         `SELECT id, ledger_id as ledgerId, amount, entry_type as type, narration 
          FROM voucher_entries 
-         WHERE voucher_id = ?`,
+         WHERE voucher_id = ? `,
         [voucherId]
       );
       entries = ledgerRows;
@@ -1209,7 +1201,7 @@ router.put("/:id", async (req, res) => {
       if (duplicateRows.length > 0) {
         return res.status(400).json({
           success: false,
-          message: `Voucher number "${number}" already exists in another voucher. Duplicate voucher numbers are not allowed.`,
+          message: `Voucher number "${number}" already exists in another voucher.Duplicate voucher numbers are not allowed.`,
         });
       }
     }
@@ -1302,28 +1294,28 @@ router.put("/:id", async (req, res) => {
     const updateSql = `
       UPDATE purchase_vouchers SET
         number = ?,
-        date = ?,
-        supplierInvoiceDate = ?,
-        narration = ?,
-        partyId = ?,
-        referenceNo = ?,
-        dispatchDocNo = ?,
-        dispatchThrough = ?,
-        destination = ?,
-        purchaseLedgerId = ?,
-        subtotal = ?,
-        cgstTotal = ?,
-        sgstTotal = ?,
-        igstTotal = ?,
-        discountTotal = ?,
-        tdsTotal = ?,
-        total = ?,
-        company_id = ?,
-        owner_type = ?,
-        owner_id = ?,
-        mode = ?
-      WHERE id = ?
-    `;
+          date = ?,
+          supplierInvoiceDate = ?,
+          narration = ?,
+          partyId = ?,
+          referenceNo = ?,
+          dispatchDocNo = ?,
+          dispatchThrough = ?,
+          destination = ?,
+          purchaseLedgerId = ?,
+          subtotal = ?,
+          cgstTotal = ?,
+          sgstTotal = ?,
+          igstTotal = ?,
+          discountTotal = ?,
+          tdsTotal = ?,
+          total = ?,
+          company_id = ?,
+          owner_type = ?,
+          owner_id = ?,
+          mode = ?
+            WHERE id = ?
+              `;
 
     await db.execute(updateSql, [
       number || null,
@@ -1356,7 +1348,7 @@ router.put("/:id", async (req, res) => {
     await db.execute("DELETE FROM purchase_voucher_items WHERE voucherId = ?", [
       voucherId,
     ]);
-    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [
+    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ? AND voucher_type = 'purchase'", [
       voucherId,
     ]);
     if (existing && existing.number) {
@@ -1372,22 +1364,22 @@ router.put("/:id", async (req, res) => {
 
       if (validItems.length > 0) {
         const insertItemSql = `
-          INSERT INTO purchase_voucher_items (
-            voucherId,
-            itemId,
-            quantity,
-            rate,
-            discount,
-            cgstRate,
-            sgstRate,
-            igstRate,
-            amount,
-            tdsRate,
-            godownId,
-            purchaseLedgerId,
-            discountLedgerId
-          ) VALUES ?
-        `;
+          INSERT INTO purchase_voucher_items(
+                voucherId,
+                itemId,
+                quantity,
+                rate,
+                discount,
+                cgstRate,
+                sgstRate,
+                igstRate,
+                amount,
+                tdsRate,
+                godownId,
+                purchaseLedgerId,
+                discountLedgerId
+              ) VALUES ?
+                `;
 
         const itemValues = validItems.map((e) => {
           if (isIntra) {
@@ -1432,14 +1424,14 @@ router.put("/:id", async (req, res) => {
       const ledgerEntries = entries.filter((e) => e.ledgerId);
       if (ledgerEntries.length > 0) {
         const insertEntrySql = `
-          INSERT INTO voucher_entries (
-            voucher_id,
-            ledger_id,
-            amount,
-            entry_type,
-            narration
-          ) VALUES ?
-        `;
+          INSERT INTO voucher_entries(
+                  voucher_id,
+                  ledger_id,
+                  amount,
+                  entry_type,
+                  narration
+                ) VALUES ?
+                  `;
         const entryValues = ledgerEntries.map((e) => [
           voucherId,
           e.ledgerId,
@@ -1477,7 +1469,7 @@ router.post("/purchase-history", async (req, res) => {
       FROM INFORMATION_SCHEMA.COLUMNS
       WHERE TABLE_SCHEMA = DATABASE()
         AND TABLE_NAME = 'purchase_history'
-    `);
+          `);
 
     const existingCols = colsRows.map((r) => r.COLUMN_NAME);
 
@@ -1505,22 +1497,22 @@ router.post("/purchase-history", async (req, res) => {
     ================================= */
     if (existingCols.length === 0) {
       await db.execute(`
-        CREATE TABLE purchase_history (
-          id INT AUTO_INCREMENT PRIMARY KEY,
-          itemName VARCHAR(255),
-          hsnCode VARCHAR(50),
-          batchNumber VARCHAR(255),
-          purchaseQuantity INT,
-          rate DECIMAL(10,2),
-          purchaseDate DATE,
-          voucherNumber VARCHAR(100),
-          companyId VARCHAR(100),
-          ownerType VARCHAR(50),
-          ownerId VARCHAR(100),
-          type VARCHAR(50) DEFAULT 'purchase',
-          godownId INT
-        )
-      `);
+        CREATE TABLE purchase_history(
+            id INT AUTO_INCREMENT PRIMARY KEY,
+            itemName VARCHAR(255),
+            hsnCode VARCHAR(50),
+            batchNumber VARCHAR(255),
+            purchaseQuantity INT,
+            rate DECIMAL(10, 2),
+            purchaseDate DATE,
+            voucherNumber VARCHAR(100),
+            companyId VARCHAR(100),
+            ownerType VARCHAR(50),
+            ownerId VARCHAR(100),
+            type VARCHAR(50) DEFAULT 'purchase',
+            godownId INT
+          )
+          `);
     } else {
       /* ================================
          5️⃣ ADD MISSING COLUMNS (AUTO)
@@ -1530,7 +1522,7 @@ router.post("/purchase-history", async (req, res) => {
           await db.execute(`
             ALTER TABLE purchase_history
             ADD COLUMN ${col} ${def}
-          `);
+        `);
         }
       }
     }
@@ -1540,22 +1532,22 @@ router.post("/purchase-history", async (req, res) => {
     ================================= */
     const insertSql = `
       INSERT INTO purchase_history
-      (
-        itemName,
-        hsnCode,
-        batchNumber,
-        purchaseQuantity,
-        rate,
-        purchaseDate,
-        voucherNumber,
-        companyId,
-        ownerType,
-        ownerId,
-        type,
-        godownId
-      )
-      VALUES ?
-    `;
+          (
+            itemName,
+            hsnCode,
+            batchNumber,
+            purchaseQuantity,
+            rate,
+            purchaseDate,
+            voucherNumber,
+            companyId,
+            ownerType,
+            ownerId,
+            type,
+            godownId
+          )
+        VALUES ?
+          `;
 
     const values = historyData.map((e) => [
       e.itemName || null,

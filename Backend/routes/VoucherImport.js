@@ -1671,12 +1671,12 @@ router.post("/purchase_summary_import", async (req, res) => {
         } else {
             // accounting-mode
             const entryValues = processedAccountingEntries.map(ae => [
-                voucherId, ae.ledgerId, ae.ledgerName, ae.amount, ae.type, null, null, null, null
+                voucherId, ae.ledgerId, ae.ledgerName, ae.amount, ae.type, null, null, null, null, 'purchase'
             ]);
 
             if (entryValues.length > 0) {
                 await db.query(
-                    `INSERT INTO voucher_entries (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id) VALUES ?`,
+                    `INSERT INTO voucher_entries (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id, voucher_type) VALUES ?`,
                     [entryValues]
                 );
             }
