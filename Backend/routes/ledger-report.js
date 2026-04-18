@@ -273,16 +273,14 @@ SELECT
   other.ledger_id AS opposite_ledger,
   l2.name AS opposite_ledger_name
 
-FROM voucher_main vm
+FROM voucher_entries ve
 
-JOIN voucher_entries ve
+JOIN voucher_main vm
   ON vm.id = ve.voucher_id
-  AND ve.voucher_type = 'main'
 
 JOIN voucher_entries other
   ON other.voucher_id = ve.voucher_id
-  AND other.voucher_type = 'main'
-  AND other.ledger_id != ve.ledger_id
+ AND other.ledger_id != ve.ledger_id
 
 LEFT JOIN ledgers l2
   ON l2.id = other.ledger_id
@@ -307,12 +305,11 @@ ORDER BY vm.date ASC
     const [pvIdRows] = await connection.execute(
       `SELECT DISTINCT pv.id AS voucher_id
        FROM purchase_vouchers pv
-       JOIN voucher_entries ve ON ve.voucher_id = pv.id AND ve.voucher_type = 'purchase'
+       JOIN voucher_entries ve ON ve.voucher_id = pv.id
        WHERE ve.ledger_id = ?
          AND pv.company_id = ?
          AND pv.owner_type = ?
-         AND pv.owner_id = ?
-`,
+         AND pv.owner_id = ?`,
       [ledgerId, ledger.company_id, ledger.owner_type, ledger.owner_id]
     );
 
@@ -330,7 +327,6 @@ ORDER BY vm.date ASC
          LEFT JOIN purchase_vouchers pv ON pv.id = ve.voucher_id
          LEFT JOIN ledgers l_header ON l_header.id = pv.partyId
          WHERE ve.voucher_id IN (${placeholders})
-           AND ve.voucher_type = 'purchase'
            AND pv.mode = 'accounting-invoice'
          ORDER BY pv.date ASC, ve.voucher_id ASC, ve.id ASC`,
         ids
@@ -350,7 +346,7 @@ ORDER BY vm.date ASC
     const [svIdRows] = await connection.execute(
       `SELECT DISTINCT sv.id AS voucher_id
        FROM sales_vouchers sv
-       JOIN voucher_entries ve ON ve.voucher_id = sv.id AND ve.voucher_type = 'sales'
+       JOIN voucher_entries ve ON ve.voucher_id = sv.id
        WHERE ve.ledger_id = ?
          AND sv.company_id = ?
          AND sv.owner_type = ?
@@ -372,7 +368,6 @@ ORDER BY vm.date ASC
          LEFT JOIN sales_vouchers sv ON sv.id = ve.voucher_id
          LEFT JOIN ledgers l_header ON l_header.id = sv.partyId
          WHERE ve.voucher_id IN (${placeholders})
-           AND ve.voucher_type = 'sales'
            AND sv.mode = 'accounting-invoice'
          ORDER BY sv.date ASC, ve.voucher_id ASC, ve.id ASC`,
         ids

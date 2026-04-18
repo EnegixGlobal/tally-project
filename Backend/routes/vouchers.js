@@ -225,7 +225,7 @@ router.get("/", async (req, res) => {
           e.cheque_number,
           e.cost_centre_id
         FROM voucher_entries e
-        WHERE e.voucher_id IN (${placeholders}) AND e.voucher_type = 'main'
+        WHERE e.voucher_id IN (${placeholders})
         ORDER BY e.id
         `,
         voucherIds
@@ -285,7 +285,7 @@ router.delete("/:id", async (req, res) => {
     const parts = deletedNumber.split("/");
     if (parts.length < 3) {
       // Normal delete if format is unexpected
-      await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ? AND voucher_type = 'main'", [id]);
+      await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
       await conn.execute("DELETE FROM voucher_main WHERE id = ?", [id]);
       await conn.commit();
       return res.json({ success: true, message: "Voucher deleted successfully" });
@@ -421,7 +421,7 @@ router.put("/:id", async (req, res) => {
     // ---------------------------------------
     // 2️⃣ DELETE old entries
     // ---------------------------------------
-    await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ? AND voucher_type = 'main'", [
+    await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [
       id,
     ]);
 
@@ -525,7 +525,7 @@ router.get("/:id", async (req, res) => {
         e.cheque_number,
         e.cost_centre_id
       FROM voucher_entries e
-      WHERE e.voucher_id = ? AND e.voucher_type = 'main'
+      WHERE e.voucher_id = ?
       ORDER BY e.id ASC
       `,
       [id]

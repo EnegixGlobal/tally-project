@@ -38,7 +38,7 @@ router.get("/:id", async (req, res) => {
           ve.item_id
 
         FROM voucher_main vm
-        LEFT JOIN voucher_entries ve ON vm.id = ve.voucher_id AND ve.voucher_type = 'main'
+        LEFT JOIN voucher_entries ve ON vm.id = ve.voucher_id
         LEFT JOIN ledgers l ON l.id = ve.ledger_id
         WHERE vm.id = ? 
           AND vm.company_id = ?
@@ -115,7 +115,7 @@ router.get("/:id", async (req, res) => {
                            ve.item_id
                     FROM voucher_entries ve
                     LEFT JOIN ledgers l ON l.id = ve.ledger_id
-                    WHERE ve.voucher_id = ? AND ve.voucher_type = 'purchase'
+                    WHERE ve.voucher_id = ?
                     ORDER BY ve.id ASC
                 `, [voucherId]);
 
@@ -315,7 +315,7 @@ router.get("/:id", async (req, res) => {
                            ve.narration AS entry_narration
                     FROM voucher_entries ve
                     LEFT JOIN ledgers l ON l.id = ve.ledger_id
-                    WHERE ve.voucher_id = ? AND ve.voucher_type = 'sales'
+                    WHERE ve.voucher_id = ?
                     ORDER BY ve.id ASC
                 `, [voucherId]);
 

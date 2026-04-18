@@ -429,11 +429,10 @@ router.post("/", async (req, res) => {
           Number(e.amount) || 0,
           e.type || "debit",
           e.narration || null,
-          'sales'
         ]);
 
         await db.query(
-          `INSERT INTO voucher_entries (voucher_id, ledger_id, amount, entry_type, narration, voucher_type) VALUES ?`,
+          `INSERT INTO voucher_entries (voucher_id, ledger_id, amount, entry_type, narration) VALUES ?`,
           [ledgerValues]
         );
       }
@@ -744,7 +743,7 @@ router.delete("/:id", async (req, res) => {
     // Delete current voucher and related data
     await conn.execute("DELETE FROM sale_history WHERE voucherNumber = ?", [deletedNumber]);
     await conn.execute("DELETE FROM sales_voucher_items WHERE voucherId = ?", [voucherId]);
-    await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ? AND voucher_type = 'sales'", [voucherId]);
+    await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [voucherId]);
     await conn.execute("DELETE FROM sales_vouchers WHERE id = ?", [voucherId]);
 
     // 2️⃣ Renumber subsequent vouchers if format matches
@@ -1061,7 +1060,7 @@ router.put("/:id", async (req, res) => {
 
     // ---- 4) CLEAR OLD ROWS ----
     await db.execute(`DELETE FROM sales_voucher_items WHERE voucherId = ?`, [voucherId]);
-    await db.execute("DELETE FROM voucher_entries WHERE voucher_id = ? AND voucher_type = 'sales'", [voucherId]);
+    await db.execute(`DELETE FROM voucher_entries WHERE voucher_id = ?`, [voucherId]);
 
     // ---- 5) INSERT NEW ROWS (BASED ON MODE) ----
     if (mode === "accounting-invoice") {
