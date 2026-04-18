@@ -564,7 +564,8 @@ router.post("/", async (req, res) => {
             ledger_id,
             amount,
             entry_type,
-            narration
+            narration,
+            voucher_type
           ) VALUES ?
         `;
         const entryValues = ledgerEntries.map(e => [
@@ -572,7 +573,8 @@ router.post("/", async (req, res) => {
           e.ledgerId,
           Number(e.amount || 0),
           e.type || "debit",
-          e.narration || null
+          e.narration || null,
+          'purchase'
         ]);
         await db.query(insertEntrySql, [entryValues]);
       }
@@ -639,7 +641,7 @@ router.get("/", async (req, res) => {
            FROM voucher_entries ve
            LEFT JOIN ledgers l ON l.id = ve.ledger_id
            LEFT JOIN ledger_groups g ON g.id = l.group_id
-           WHERE ve.voucher_id IN (?)`,
+           WHERE ve.voucher_id IN (?) AND ve.voucher_type = 'purchase'`,
           [accVoucherIds]
         );
 
@@ -664,8 +666,8 @@ router.get("/", async (req, res) => {
               const gName = (e.group_name || "").toLowerCase();
 
               if (e.entry_type === "debit") {
-                const isTax = (gName && (gName.includes("duties") || gName.includes("tax") || gName.includes("gst"))) || 
-                             (lName.includes("gst") || lName.includes("tax") || lName.includes("igst") || lName.includes("cgst") || lName.includes("sgst") || lName.includes("@"));
+                const isTax = (gName && (gName.includes("duties") || gName.includes("tax") || gName.includes("gst"))) ||
+                  (lName.includes("gst") || lName.includes("tax") || lName.includes("igst") || lName.includes("cgst") || lName.includes("sgst") || lName.includes("@"));
 
                 if (isTax) {
                   if (lName.includes("cgst")) cgst += amt;
@@ -793,7 +795,7 @@ router.get("/month-wise", async (req, res) => {
            FROM voucher_entries ve
            LEFT JOIN ledgers l ON l.id = ve.ledger_id
            LEFT JOIN ledger_groups g ON g.id = l.group_id
-           WHERE ve.voucher_id IN (?)`,
+           WHERE ve.voucher_id IN (?) AND ve.voucher_type = 'purchase'`,
           [accVoucherIds]
         );
 
@@ -818,8 +820,8 @@ router.get("/month-wise", async (req, res) => {
               const gName = (e.group_name || "").toLowerCase();
 
               if (e.entry_type === "debit") {
-                const isTax = (gName && (gName.includes("duties") || gName.includes("tax") || gName.includes("gst"))) || 
-                             (lName.includes("gst") || lName.includes("tax") || lName.includes("igst") || lName.includes("cgst") || lName.includes("sgst") || lName.includes("@"));
+                const isTax = (gName && (gName.includes("duties") || gName.includes("tax") || gName.includes("gst"))) ||
+                  (lName.includes("gst") || lName.includes("tax") || lName.includes("igst") || lName.includes("cgst") || lName.includes("sgst") || lName.includes("@"));
 
                 if (isTax) {
                   if (lName.includes("cgst")) cgst += amt;

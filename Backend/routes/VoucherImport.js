@@ -1446,7 +1446,7 @@ router.post("/purchase_summary_import", async (req, res) => {
         // DATE FORMATTING
         let rawDate = voucher["Invoice Date"] || voucher["Date"] || voucher["Invoice date"] || voucher["invoice_date"] || voucher["date"];
         let date = rawDate;
-        
+
         if (typeof date === 'string') {
             // Normalize DD/MM/YYYY or DD-MM-YYYY to YYYY-MM-DD
             const dmyMatch = date.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
@@ -1460,7 +1460,7 @@ router.post("/purchase_summary_import", async (req, res) => {
                 }
             }
         }
-        
+
         if (!date || date === 'undefined' || date === 'null' || isNaN(new Date(date).getTime())) {
             date = new Date().toISOString().split('T')[0];
         }
@@ -1556,7 +1556,7 @@ router.post("/purchase_summary_import", async (req, res) => {
                         igstTotal += amount;
                     } else if (lName.includes("discount")) {
                         // Usually discount in purchase is a credit, but handle if debited
-                        discountTotal -= amount; 
+                        discountTotal -= amount;
                     } else {
                         subtotal += amount;
                     }
@@ -1671,12 +1671,12 @@ router.post("/purchase_summary_import", async (req, res) => {
         } else {
             // accounting-mode
             const entryValues = processedAccountingEntries.map(ae => [
-                voucherId, ae.ledgerId, ae.ledgerName, ae.amount, ae.type, null, null, null, null
+                voucherId, ae.ledgerId, ae.ledgerName, ae.amount, ae.type, null, null, null, null, 'purchase'
             ]);
 
             if (entryValues.length > 0) {
                 await db.query(
-                    `INSERT INTO voucher_entries (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id) VALUES ?`,
+                    `INSERT INTO voucher_entries (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id, voucher_type) VALUES ?`,
                     [entryValues]
                 );
             }
