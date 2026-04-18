@@ -566,14 +566,7 @@ const PurchaseVoucher: React.FC = () => {
           },
 
           entries:
-            // In accounting-invoice mode, backend returns ledger rows (voucher_entries).
-            // Filter out empty/placeholder rows so server-side "Select Ledger" lines never appear.
-            (data.mode === "accounting-invoice"
-              ? (data.entries || []).filter(
-                (e: any) => e.ledgerId && Number(e.amount || 0) > 0
-              )
-              : (data.entries || [])
-            )?.map((e: any, idx: number) => {
+            data.entries?.map((e: any, idx: number) => {
               const stockItem = stockItems.find(
                 (item) => String(item.id) === String(e.itemId)
               );
