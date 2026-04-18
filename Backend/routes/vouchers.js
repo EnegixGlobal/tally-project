@@ -352,44 +352,93 @@ router.post("/bulk-delete", async (req, res) => {
   try {
     await conn.beginTransaction();
 
+    let mainTable, entriesTable, itemsTable, historyTable, numField;
+
+    if (voucherType === "sales") {
+      mainTable = "sales_vouchers";
+      entriesTable = "voucher_entries";
+      itemsTable = "sales_voucher_items";
+      historyTable = "sale_history";
+      numField = "number";
+    } else if (voucherType === "purchase") {
+      mainTable = "purchase_vouchers";
+      entriesTable = "voucher_entries";
+      itemsTable = "purchase_voucher_items";
+      historyTable = "purchase_history";
+      numField = "number";
+    } else {
+      mainTable = "voucher_main";
+      entriesTable = "voucher_entries";
+      itemsTable = null;
+      historyTable = null;
+      numField = "voucher_number";
+    }
+
     // 1️⃣ Identify affected groups (prefix/FY) for renumbering
     const [vouchers] = await conn.query(
-      `SELECT id, voucher_number FROM voucher_main WHERE id IN (?)`,
+      `SELECT id, ${numField} AS voucher_number FROM ${mainTable} WHERE id IN (?)`,
       [ids]
     );
 
     const affectedGroups = new Set();
     vouchers.forEach(v => {
-      const parts = v.voucher_number.split("/");
-      if (parts.length === 3) {
-        affectedGroups.add(`${parts[0]}/${parts[1]}`);
+      if (v.voucher_number && v.voucher_number.includes("/")) {
+        const parts = v.voucher_number.split("/");
+        if (parts.length >= 3) {
+          affectedGroups.add(`${parts[0]}/${parts[1]}`);
+        }
       }
     });
 
-    // 2️⃣ Delete vouchers and entries
-    await conn.query("DELETE FROM voucher_entries WHERE voucher_id IN (?)", [ids]);
-    await conn.query("DELETE FROM voucher_main WHERE id IN (?)", [ids]);
+    // 2️⃣ Delete vouchers and related data
+    if (voucherType === "sales" || voucherType === "purchase") {
+      await conn.query(`DELETE FROM ${entriesTable} WHERE voucher_id IN (?)`, [ids]);
+      if (itemsTable) await conn.query(`DELETE FROM ${itemsTable} WHERE voucherId IN (?)`, [ids]);
+      if (historyTable) {
+        const numbers = vouchers.map(v => v.voucher_number);
+        await conn.query(`DELETE FROM ${historyTable} WHERE voucherNumber IN (?)`, [numbers]);
+      }
+      await conn.query(`DELETE FROM ${mainTable} WHERE id IN (?)`, [ids]);
+    } else {
+      await conn.query(`DELETE FROM voucher_entries WHERE voucher_id IN (?)`, [ids]);
+      await conn.query(`DELETE FROM voucher_main WHERE id IN (?)`, [ids]);
+    }
 
     // 3️⃣ Renumber for each affected group
     for (const groupKey of affectedGroups) {
-      const [prefix, fy] = groupKey.split("/");
+      const parts = groupKey.split("/");
+      const prefix = parts[0];
+      const fy = parts[1];
 
       const [remainingVouchers] = await conn.execute(
-        `SELECT id, voucher_number FROM voucher_main 
+        `SELECT id, ${numField} AS voucher_number FROM ${mainTable} 
          WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
-         AND voucher_type = ? AND voucher_number LIKE ? 
+         ${voucherType !== "sales" && voucherType !== "purchase" ? "AND voucher_type = ?" : ""}
+         AND ${numField} LIKE ? 
          ORDER BY id ASC`,
-        [companyId, ownerType, ownerId, voucherType, `${prefix}/${fy}/%`]
+        voucherType === "sales" || voucherType === "purchase"
+          ? [companyId, ownerType, ownerId, `${prefix}/${fy}/%`]
+          : [companyId, ownerType, ownerId, voucherType, `${prefix}/${fy}/%`]
       );
 
       let seq = 1;
       for (const voucher of remainingVouchers) {
-        const newNumber = `${prefix}/${fy}/${String(seq).padStart(6, "0")}`;
+        const vParts = voucher.voucher_number.split("/");
+        const padding = vParts[2] ? vParts[2].length : 6;
+        const newNumber = `${prefix}/${fy}/${String(seq).padStart(padding, "0")}`;
+
         if (voucher.voucher_number !== newNumber) {
           await conn.execute(
-            "UPDATE voucher_main SET voucher_number = ? WHERE id = ?",
+            `UPDATE ${mainTable} SET ${numField} = ? WHERE id = ?`,
             [newNumber, voucher.id]
           );
+
+          if (historyTable) {
+            await conn.execute(
+              `UPDATE ${historyTable} SET voucherNumber = ? WHERE voucherNumber = ? AND companyId = ?`,
+              [newNumber, voucher.voucher_number, companyId]
+            );
+          }
         }
         seq++;
       }
@@ -401,7 +450,7 @@ router.post("/bulk-delete", async (req, res) => {
       message: `${ids.length} vouchers deleted and renumbered successfully`,
     });
   } catch (error) {
-    await conn.rollback();
+    if (conn) await conn.rollback();
     console.error("Error bulk deleting vouchers:", error);
     res.status(500).json({
       success: false,
@@ -409,7 +458,7 @@ router.post("/bulk-delete", async (req, res) => {
       error: error.message
     });
   } finally {
-    conn.release();
+    if (conn) conn.release();
   }
 });
 
