@@ -556,7 +556,10 @@ router.post("/", async (req, res) => {
       }
     } else {
       // accounting-invoice
-      const ledgerEntries = entries.filter(e => e.ledgerId);
+      // Only persist meaningful ledger lines (prevents placeholder rows like "Select Ledger")
+      const ledgerEntries = entries.filter(
+        (e) => e.ledgerId && Number(e.amount || 0) > 0
+      );
       if (ledgerEntries.length > 0) {
         const insertEntrySql = `
           INSERT INTO voucher_entries (
@@ -1429,7 +1432,10 @@ router.put("/:id", async (req, res) => {
       }
     } else {
       // accounting-invoice
-      const ledgerEntries = entries.filter((e) => e.ledgerId);
+      // Only persist meaningful ledger lines (prevents placeholder rows like "Select Ledger")
+      const ledgerEntries = entries.filter(
+        (e) => e.ledgerId && Number(e.amount || 0) > 0
+      );
       if (ledgerEntries.length > 0) {
         const insertEntrySql = `
           INSERT INTO voucher_entries (
