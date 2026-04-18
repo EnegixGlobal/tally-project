@@ -714,21 +714,9 @@ ORDER BY vm.date ASC
         const mainVoucher = entries[0]; // All entries have the same pv.total, pv.partyId, etc.
         // For Purchase Accounting Invoices, the Party is the CREDIT entry. 
         // For Sales Accounting Invoices, the Party is the DEBIT entry.
-        const creditEntries = entries.filter((e) =>
-          String(e.entry_type || "").toLowerCase() === "credit"
-        );
-        const partyEntry = creditEntries.sort(
-          (a, b) => Number(b.amount) - Number(a.amount)
-        )[0];
-        const partyIdFromEntry =
-          partyEntry && Number(partyEntry.ledger_id) > 0
-            ? partyEntry.ledger_id
-            : null;
-        const partyId = partyIdFromEntry || mainVoucher.partyId;
-        const partyName =
-          (partyEntry && partyEntry.ledger_name) ||
-          mainVoucher.header_party_name ||
-          "Party";
+        const partyEntry = entries.find(e => e.entry_type === "credit");
+        const partyId = partyEntry ? partyEntry.ledger_id : mainVoucher.partyId;
+        const partyName = partyEntry ? partyEntry.ledger_name : (mainVoucher.header_party_name || "Party");
 
         const isSelectedParty = String(ledgerId) === String(partyId);
 
@@ -736,7 +724,7 @@ ORDER BY vm.date ASC
           // If viewing Party ledger, show ONE row for the total, with main counterpart (highest debit)
           const counterpartType = "debit"; // Party is Credit in Purchase, counterpart is Debit
           const counterpart = entries
-            .filter((e) => String(e.entry_type || "").toLowerCase() === counterpartType)
+            .filter(e => e.entry_type === counterpartType)
             .sort((a, b) => Number(b.amount) - Number(a.amount))[0];
 
           if (!counterpart) return;
@@ -788,21 +776,9 @@ ORDER BY vm.date ASC
         if (!sel) return;
 
         const mainVoucher = entries[0];
-        const debitEntries = entries.filter(
-          (e) => String(e.entry_type || "").toLowerCase() === "debit"
-        );
-        const partyEntry = debitEntries.sort(
-          (a, b) => Number(b.amount) - Number(a.amount)
-        )[0];
-        const partyIdFromEntry =
-          partyEntry && Number(partyEntry.ledger_id) > 0
-            ? partyEntry.ledger_id
-            : null;
-        const partyId = partyIdFromEntry || mainVoucher.partyId;
-        const partyName =
-          (partyEntry && partyEntry.ledger_name) ||
-          mainVoucher.header_party_name ||
-          "Party";
+        const partyEntry = entries.find(e => e.entry_type === "debit");
+        const partyId = partyEntry ? partyEntry.ledger_id : mainVoucher.partyId;
+        const partyName = partyEntry ? partyEntry.ledger_name : (mainVoucher.header_party_name || "Party");
 
         const isSelectedParty = String(ledgerId) === String(partyId);
 
@@ -810,7 +786,7 @@ ORDER BY vm.date ASC
           // Party in Sales is Debit, counterpart is Credit
           const counterpartType = "credit";
           const counterpart = entries
-            .filter((e) => String(e.entry_type || "").toLowerCase() === counterpartType)
+            .filter(e => e.entry_type === counterpartType)
             .sort((a, b) => Number(b.amount) - Number(a.amount))[0];
 
           if (!counterpart) return;
