@@ -564,8 +564,7 @@ router.post("/", async (req, res) => {
             ledger_id,
             amount,
             entry_type,
-            narration,
-            voucher_type
+            narration
           ) VALUES ?
         `;
         const entryValues = ledgerEntries.map(e => [
@@ -573,8 +572,7 @@ router.post("/", async (req, res) => {
           e.ledgerId,
           Number(e.amount || 0),
           e.type || "debit",
-          e.narration || null,
-          'purchase'
+          e.narration || null
         ]);
         await db.query(insertEntrySql, [entryValues]);
       }
@@ -641,7 +639,7 @@ router.get("/", async (req, res) => {
            FROM voucher_entries ve
            LEFT JOIN ledgers l ON l.id = ve.ledger_id
            LEFT JOIN ledger_groups g ON g.id = l.group_id
-           WHERE ve.voucher_id IN (?) AND ve.voucher_type = 'purchase'`,
+           WHERE ve.voucher_id IN (?)`,
           [accVoucherIds]
         );
 
@@ -795,7 +793,7 @@ router.get("/month-wise", async (req, res) => {
            FROM voucher_entries ve
            LEFT JOIN ledgers l ON l.id = ve.ledger_id
            LEFT JOIN ledger_groups g ON g.id = l.group_id
-           WHERE ve.voucher_id IN (?) AND ve.voucher_type = 'purchase'`,
+           WHERE ve.voucher_id IN (?)`,
           [accVoucherIds]
         );
 
