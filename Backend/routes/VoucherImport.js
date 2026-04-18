@@ -1430,16 +1430,50 @@ router.post("/purchase_summary_import", async (req, res) => {
         const defaultPLedger = ledgers.find(l => l.name.toLowerCase().includes("purchase"));
         const defaultPurchaseLedgerId = defaultPLedger ? defaultPLedger.id : null;
 
+        const normLedgerName = (s) => String(s || "").toLowerCase().replace(/\s+/g, " ").trim();
+
+        const findLedgerFlexible = (rawName) => {
+            const n = normLedgerName(rawName);
+            if (!n) return null;
+            let l = ledgers.find((ld) => normLedgerName(ld.name) === n);
+            if (l) return l;
+            l = ledgers.find((ld) => normLedgerName(ld.name).includes(n));
+            if (l) return l;
+            if (n.length >= 4) {
+                l = ledgers.find((ld) => {
+                    const ln = normLedgerName(ld.name);
+                    return ln.length >= 4 && n.includes(ln);
+                });
+            }
+            return l || null;
+        };
+
+        const resolveLedgerIdFromAe = (ae, particulars) => {
+            const fid = ae._matchedLedgerId ?? ae.matchedLedgerId;
+            if (fid != null && fid !== "" && String(fid) !== "0") {
+                const idNum = Number(fid);
+                if (!Number.isNaN(idNum) && ledgers.some((x) => Number(x.id) === idNum)) {
+                    return idNum;
+                }
+            }
+            const pl = findLedgerFlexible(particulars);
+            return pl ? pl.id : 0;
+        };
+
         // Header Fields
         const partyName = voucher["Trade/Legal name of the Supplier"] ? String(voucher["Trade/Legal name of the Supplier"]).toLowerCase().trim() : "";
         const invoiceNo = voucher["Invoice number"] || null;
         const invoiceDateStr = voucher["Invoice Date"];
 
-        // Determine Purchase Ledger for the whole voucher
+        // Determine Purchase Ledger for the whole voucher (match frontend: prefer exact name, avoid loose includes on short strings)
         let purchaseLedgerId = defaultPurchaseLedgerId;
-        const firstRowPurchaseLedgerName = voucher["Purchase Ledger"] ? String(voucher["Purchase Ledger"]).toLowerCase().trim() : null;
-        if (firstRowPurchaseLedgerName) {
-            const pLedger = ledgers.find(l => l.name.toLowerCase().includes(firstRowPurchaseLedgerName));
+        const headerPurchaseRaw = voucher["Purchase Ledger"] ? String(voucher["Purchase Ledger"]).trim() : "";
+        const nHeaderPl = normLedgerName(headerPurchaseRaw);
+        if (nHeaderPl) {
+            const exact = ledgers.find((l) => normLedgerName(l.name) === nHeaderPl);
+            const pLedger = exact || (nHeaderPl.length >= 3
+                ? ledgers.find((l) => normLedgerName(l.name).includes(nHeaderPl))
+                : null);
             if (pLedger) purchaseLedgerId = pLedger.id;
         }
 
@@ -1480,12 +1514,20 @@ router.post("/purchase_summary_import", async (req, res) => {
         if (matchedLedgerByName) {
             partyId = matchedLedgerByName.id;
         } else if (importMode === 'accounting') {
-            // Try to find supplier from accounting entries (the one with type 'credit')
-            const creditEntry = (voucher.accountingEntries || []).find(ae => String(ae.Type || ae.type).toLowerCase().trim() === 'credit');
+            // Supplier is the credit line with the largest amount (avoids picking a small bank/adjustment line first)
+            const creditLines = (voucher.accountingEntries || []).filter((ae) =>
+                String(ae.Type || ae.type || "").toLowerCase().trim() === "credit"
+            ).sort((a, b) => Number(b["Amount (₹)"] || 0) - Number(a["Amount (₹)"] || 0));
+            const creditEntry = creditLines[0];
             if (creditEntry) {
-                const sName = String(creditEntry["Particulars (Ledger Name)"] || creditEntry.ledgerName || "").toLowerCase().trim();
-                const sLedger = ledgers.find(l => (l.name || "").toLowerCase().trim() === sName);
-                if (sLedger) partyId = sLedger.id;
+                const sName = String(creditEntry["Particulars (Ledger Name)"] || creditEntry.ledgerName || "");
+                const fromId = resolveLedgerIdFromAe(creditEntry, sName);
+                if (Number(fromId) > 0) {
+                    partyId = fromId;
+                } else {
+                    const sLedger = findLedgerFlexible(sName);
+                    if (sLedger) partyId = sLedger.id;
+                }
             }
         }
 
@@ -1544,9 +1586,9 @@ router.post("/purchase_summary_import", async (req, res) => {
                 const sgst = Number(ae["State/UT tax (₹)"] || 0);
                 const igst = Number(ae["Integrated Tax (₹)"] || 0);
                 const particulars = ae["Particulars (Ledger Name)"];
-                const type = ae["Type"] || "debit";
+                const type = String(ae["Type"] || ae.type || "debit").toLowerCase().trim();
 
-                if (type === 'debit') {
+                if (type === "debit") {
                     const lName = String(particulars || "").toLowerCase();
                     if (lName.includes("cgst")) {
                         cgstTotal += amount;
@@ -1560,18 +1602,14 @@ router.post("/purchase_summary_import", async (req, res) => {
                     } else {
                         subtotal += amount;
                     }
-                } else if (type === 'credit' && particulars) {
+                } else if (type === "credit" && particulars) {
                     const lName = String(particulars || "").toLowerCase();
                     if (lName.includes("discount")) {
                         discountTotal += amount;
                     }
                 }
 
-                let finalLedgerId = 0;
-                if (particulars) {
-                    const l = ledgers.find(ld => ld.name.toLowerCase().trim() === particulars.toLowerCase().trim());
-                    if (l) finalLedgerId = l.id;
-                }
+                const finalLedgerId = resolveLedgerIdFromAe(ae, particulars);
 
                 processedAccountingEntries.push({
                     ledgerId: finalLedgerId,
