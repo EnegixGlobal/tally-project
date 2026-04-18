@@ -341,6 +341,78 @@ router.delete("/:id", async (req, res) => {
   }
 });
 
+router.post("/bulk-delete", async (req, res) => {
+  const { ids, ownerType, ownerId, companyId, voucherType } = req.body;
+
+  if (!ids || !Array.isArray(ids) || ids.length === 0) {
+    return res.status(400).json({ message: "ids array is required" });
+  }
+
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
+
+    // 1️⃣ Identify affected groups (prefix/FY) for renumbering
+    const [vouchers] = await conn.query(
+      `SELECT id, voucher_number FROM voucher_main WHERE id IN (?)`,
+      [ids]
+    );
+
+    const affectedGroups = new Set();
+    vouchers.forEach(v => {
+      const parts = v.voucher_number.split("/");
+      if (parts.length === 3) {
+        affectedGroups.add(`${parts[0]}/${parts[1]}`);
+      }
+    });
+
+    // 2️⃣ Delete vouchers and entries
+    await conn.query("DELETE FROM voucher_entries WHERE voucher_id IN (?)", [ids]);
+    await conn.query("DELETE FROM voucher_main WHERE id IN (?)", [ids]);
+
+    // 3️⃣ Renumber for each affected group
+    for (const groupKey of affectedGroups) {
+      const [prefix, fy] = groupKey.split("/");
+
+      const [remainingVouchers] = await conn.execute(
+        `SELECT id, voucher_number FROM voucher_main 
+         WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
+         AND voucher_type = ? AND voucher_number LIKE ? 
+         ORDER BY id ASC`,
+        [companyId, ownerType, ownerId, voucherType, `${prefix}/${fy}/%`]
+      );
+
+      let seq = 1;
+      for (const voucher of remainingVouchers) {
+        const newNumber = `${prefix}/${fy}/${String(seq).padStart(6, "0")}`;
+        if (voucher.voucher_number !== newNumber) {
+          await conn.execute(
+            "UPDATE voucher_main SET voucher_number = ? WHERE id = ?",
+            [newNumber, voucher.id]
+          );
+        }
+        seq++;
+      }
+    }
+
+    await conn.commit();
+    res.status(200).json({
+      success: true,
+      message: `${ids.length} vouchers deleted and renumbered successfully`,
+    });
+  } catch (error) {
+    await conn.rollback();
+    console.error("Error bulk deleting vouchers:", error);
+    res.status(500).json({
+      success: false,
+      message: "Failed to bulk delete vouchers",
+      error: error.message
+    });
+  } finally {
+    conn.release();
+  }
+});
+
 router.put("/:id", async (req, res) => {
   const { id } = req.params;
 
