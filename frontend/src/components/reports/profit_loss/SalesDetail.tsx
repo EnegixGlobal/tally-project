@@ -4,7 +4,7 @@ import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Printer, Download } from "lucide-react";
 
 const SalesDetail: React.FC = () => {
-  const { theme } = useAppContext();
+  const { theme, ledgerGroups } = useAppContext();
   const navigate = useNavigate();
 
   const companyId = localStorage.getItem("company_id");
@@ -28,8 +28,17 @@ const SalesDetail: React.FC = () => {
       .then((data) => {
         const ledgers = data.ledgers || [];
 
+        // Helper to check if a group is a descendant of another
+        const allGroups = [...(ledgerGroups || [])];
+        const isDescendant = (childId: number | string, targetParentId: number | string): boolean => {
+          if (String(childId) === String(targetParentId)) return true;
+          const group = allGroups.find(g => String(g.id) === String(childId));
+          if (group && group.parent_id) return isDescendant(group.parent_id, targetParentId);
+          return false;
+        };
+
         const sales = ledgers
-          .filter((l: any) => String(l.group_id) === "-16")
+          .filter((l: any) => isDescendant(l.group_id, -16))
           .map((l: any) => ({
             id: l.id,
             name: l.name,
@@ -75,12 +84,15 @@ const SalesDetail: React.FC = () => {
       const apiAmount = salesTotals[l.id as number];
       const amount = apiAmount ? Number(apiAmount) : 0;
 
+      const debitVal = amount < 0 ? Math.abs(amount) : (l.balance_type === "debit" ? amount : "");
+      const creditVal = amount >= 0 ? (l.balance_type === "debit" ? "" : amount) : (l.balance_type === "debit" ? "" : "");
+
+      // Simplified for Sales (usually Credit)
       return {
         name: l.name,
         groupId: Number(l.group_id),
-        // Sales is Income, so it should be in Credit
-        debit: "",
-        credit: amount,
+        debit: amount < 0 ? Math.abs(amount) : "",
+        credit: amount >= 0 ? amount : "",
       };
     });
   };

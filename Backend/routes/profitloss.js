@@ -22,21 +22,40 @@ router.get("/api/purchase", async (req, res) => {
     const [rows] = await pool.query(
       `
       SELECT 
-        pvi.purchaseLedgerId,
-        SUM(pv.subtotal) AS totalSubtotal
-      FROM purchase_voucher_items pvi
+        purchaseLedgerId,
+        SUM(amount) AS totalSubtotal
+      FROM (
+        -- Item Wise Purchases
+        SELECT 
+          pvi.purchaseLedgerId,
+          SUM(pvi.amount) AS amount
+        FROM purchase_voucher_items pvi
+        JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
+        WHERE pvi.purchaseLedgerId IN (?)
+          AND pv.company_id = ?
+          AND pv.owner_type = ?
+          AND pv.owner_id = ?
+          AND pv.mode = 'item-invoice'
+        GROUP BY pvi.purchaseLedgerId
 
-      JOIN purchase_vouchers pv
-        ON pvi.voucherId = pv.id
+        UNION ALL
 
-      WHERE pvi.purchaseLedgerId IN (?)
-        AND pv.company_id = ?
-        AND pv.owner_type = ?
-        AND pv.owner_id = ?
-
-      GROUP BY pvi.purchaseLedgerId
+        -- Accounting Invoice Purchases
+        SELECT 
+          ve.ledger_id AS purchaseLedgerId,
+          SUM(CASE WHEN ve.entry_type = 'debit' THEN ve.amount ELSE -ve.amount END) AS amount
+        FROM voucher_entries ve
+        JOIN purchase_vouchers pv ON ve.voucher_id = pv.id
+        WHERE ve.ledger_id IN (?)
+          AND pv.company_id = ?
+          AND pv.owner_type = ?
+          AND pv.owner_id = ?
+          AND pv.mode = 'accounting-invoice'
+        GROUP BY ve.ledger_id
+      ) AS combined
+      GROUP BY purchaseLedgerId
       `,
-      [idArray, company_id, owner_type, owner_id]
+      [idArray, company_id, owner_type, owner_id, idArray, company_id, owner_type, owner_id]
     );
 
     // 3️⃣ Result ko map me convert karo
@@ -82,21 +101,40 @@ router.get("/api/sales", async (req, res) => {
     const [rows] = await pool.query(
       `
       SELECT 
-        svi.salesLedgerId,
-        SUM(sv.subtotal) AS totalSubtotal
-      FROM sales_voucher_items svi
+        salesLedgerId,
+        SUM(amount) AS totalSubtotal
+      FROM (
+        -- Item Wise Sales
+        SELECT 
+          svi.salesLedgerId,
+          SUM(svi.amount) AS amount
+        FROM sales_voucher_items svi
+        JOIN sales_vouchers sv ON svi.voucherId = sv.id
+        WHERE svi.salesLedgerId IN (?)
+          AND sv.company_id = ?
+          AND sv.owner_type = ?
+          AND sv.owner_id = ?
+          AND sv.mode = 'item-invoice'
+        GROUP BY svi.salesLedgerId
 
-      JOIN sales_vouchers sv
-        ON svi.voucherId = sv.id
+        UNION ALL
 
-      WHERE svi.salesLedgerId IN (?)
-        AND sv.company_id = ?
-        AND sv.owner_type = ?
-        AND sv.owner_id = ?
-
-      GROUP BY svi.salesLedgerId
+        -- Accounting Invoice Sales
+        SELECT 
+          ve.ledger_id AS salesLedgerId,
+          SUM(CASE WHEN ve.entry_type = 'credit' THEN ve.amount ELSE -ve.amount END) AS amount
+        FROM voucher_entries ve
+        JOIN sales_vouchers sv ON ve.voucher_id = sv.id
+        WHERE ve.ledger_id IN (?)
+          AND sv.company_id = ?
+          AND sv.owner_type = ?
+          AND sv.owner_id = ?
+          AND sv.mode = 'accounting-invoice'
+        GROUP BY ve.ledger_id
+      ) AS combined
+      GROUP BY salesLedgerId
       `,
-      [idArray, company_id, owner_type, owner_id]
+      [idArray, company_id, owner_type, owner_id, idArray, company_id, owner_type, owner_id]
     );
 
     const result = {};
@@ -139,24 +177,41 @@ router.get("/api/purchase/:id", async (req, res) => {
     const [rows] = await pool.query(
       `
       SELECT 
-        MONTH(pv.date) AS monthNo,
-        SUM(pv.subtotal) AS total
+        monthNo,
+        SUM(total) AS total
+      FROM (
+        -- Item Wise
+        SELECT 
+          MONTH(pv.date) AS monthNo,
+          SUM(pvi.amount) AS total
+        FROM purchase_voucher_items pvi
+        JOIN purchase_vouchers pv ON pvi.voucherId = pv.id
+        WHERE pvi.purchaseLedgerId IN (?)
+          AND pv.company_id = ?
+          AND pv.owner_type = ?
+          AND pv.owner_id = ?
+          AND pv.mode = 'item-invoice'
+        GROUP BY MONTH(pv.date)
 
-      FROM purchase_voucher_items pvi
+        UNION ALL
 
-      JOIN purchase_vouchers pv
-        ON pvi.voucherId = pv.id
-
-      WHERE pvi.purchaseLedgerId IN (?)
-        AND pv.company_id = ?
-        AND pv.owner_type = ?
-        AND pv.owner_id = ?
-
-      GROUP BY MONTH(pv.date)
-
-      ORDER BY MONTH(pv.date)
+        -- Accounting Invoice
+        SELECT 
+          MONTH(pv.date) AS monthNo,
+          SUM(CASE WHEN ve.entry_type = 'debit' THEN ve.amount ELSE -ve.amount END) AS total
+        FROM voucher_entries ve
+        JOIN purchase_vouchers pv ON ve.voucher_id = pv.id
+        WHERE ve.ledger_id IN (?)
+          AND pv.company_id = ?
+          AND pv.owner_type = ?
+          AND pv.owner_id = ?
+          AND pv.mode = 'accounting-invoice'
+        GROUP BY MONTH(pv.date)
+      ) AS combined
+      GROUP BY monthNo
+      ORDER BY monthNo
       `,
-      [idArray, company_id, owner_type, owner_id]
+      [idArray, company_id, owner_type, owner_id, idArray, company_id, owner_type, owner_id]
     );
 
     res.json({
@@ -195,24 +250,41 @@ router.get("/api/sales/:id", async (req, res) => {
     const [rows] = await pool.query(
       `
       SELECT 
-        MONTH(sv.date) AS monthNo,
-        SUM(sv.subtotal) AS total
+        monthNo,
+        SUM(total) AS total
+      FROM (
+        -- Item Wise
+        SELECT 
+          MONTH(sv.date) AS monthNo,
+          SUM(svi.amount) AS total
+        FROM sales_voucher_items svi
+        JOIN sales_vouchers sv ON svi.voucherId = sv.id
+        WHERE svi.salesLedgerId IN (?)
+          AND sv.company_id = ?
+          AND sv.owner_type = ?
+          AND sv.owner_id = ?
+          AND sv.mode = 'item-invoice'
+        GROUP BY MONTH(sv.date)
 
-      FROM sales_voucher_items svi
+        UNION ALL
 
-      JOIN sales_vouchers sv
-        ON svi.voucherId = sv.id
-
-      WHERE svi.salesLedgerId IN (?)
-        AND sv.company_id = ?
-        AND sv.owner_type = ?
-        AND sv.owner_id = ?
-
-      GROUP BY MONTH(sv.date)
-
-      ORDER BY MONTH(sv.date)
+        -- Accounting Invoice
+        SELECT 
+          MONTH(sv.date) AS monthNo,
+          SUM(CASE WHEN ve.entry_type = 'credit' THEN ve.amount ELSE -ve.amount END) AS total
+        FROM voucher_entries ve
+        JOIN sales_vouchers sv ON ve.voucher_id = sv.id
+        WHERE ve.ledger_id IN (?)
+          AND sv.company_id = ?
+          AND sv.owner_type = ?
+          AND sv.owner_id = ?
+          AND sv.mode = 'accounting-invoice'
+        GROUP BY MONTH(sv.date)
+      ) AS combined
+      GROUP BY monthNo
+      ORDER BY monthNo
       `,
-      [idArray, company_id, owner_type, owner_id]
+      [idArray, company_id, owner_type, owner_id, idArray, company_id, owner_type, owner_id]
     );
 
     res.json({
