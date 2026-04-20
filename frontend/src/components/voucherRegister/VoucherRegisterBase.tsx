@@ -930,6 +930,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     0
   );
   const statusCounts = filteredVouchers.reduce((acc, voucher) => {
+    const status = getVoucherStatus(voucher);
     acc[status] = (acc[status] || 0) + 1;
     return acc;
   }, {} as Record<string, number>);
@@ -1887,46 +1888,40 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             </tbody>
 
             {/* Summary Row */}
-            <tfoot className="bg-gray-100">
+            <tfoot className="bg-gray-100 font-bold">
               <tr>
-                <td
-                  colSpan={
-                    ["receipt", "contra", "journal"].includes(voucherType)
-                      ? 5
-                      : 4
-                  }
-                  className="px-6 py-4 text-sm font-semibold text-gray-900"
-                >
-                  Total ({filteredVouchers.length} vouchers)
-                </td>
                 {["sales", "purchase", "quotation", "debit_note", "credit_note"].includes(voucherType) ? (
                   <>
-                    <td className="px-6 py-4"></td> {/* Blank for Reference No column */}
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
-                      {/* Subtotal Total */}
+                    <td colSpan={4} className="px-6 py-4 text-sm text-gray-900">
+                      Total ({filteredVouchers.length} vouchers)
+                    </td>
+                    <td className="px-6 py-4"></td> {/* Blank for Supplier Invoice Date */}
+                    <td className="px-6 py-4"></td> {/* Blank for Reference No */}
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                      {/* Subtotal Total (Taxable Value) */}
                       {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.subtotal) || 0), 0))}
                     </td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right">
                       {/* IGST Total */}
                       {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.igstTotal) || 0), 0))}
                     </td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right">
                       {/* CGST Total */}
                       {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.cgstTotal) || 0), 0))}
                     </td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right">
                       {/* SGST Total */}
                       {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.sgstTotal) || 0), 0))}
                     </td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right">
                       {/* Tax Total */}
                       {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.cgstTotal || 0) + Number(v.sgstTotal || 0) + Number(v.igstTotal || 0)), 0))}
                     </td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right">
                       {/* Discount Total */}
                       {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.discountTotal) || 0), 0))}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600 text-right">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right">
                       {formatTableAmount(
                         filteredVouchers.reduce(
                           (sum: number, v: VoucherEntry) => {
@@ -1938,11 +1933,15 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         )
                       )}
                     </td>
-                    <td className="px-6 py-4"></td> {/* Blank for Actions column */}
+                    {showActions && <td className="px-6 py-4"></td>}
                   </>
                 ) : (
                   <>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                    <td colSpan={5} className="px-6 py-4 text-sm text-gray-900">
+                      Total ({filteredVouchers.length} vouchers)
+                    </td>
+                    <td className="px-6 py-4"></td> {/* Blank for Particulars */}
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right">
                       {formatCurrency(
                         filteredVouchers.reduce(
                           (sum: number, v: VoucherEntry) =>
@@ -1951,7 +1950,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         )
                       )}
                     </td>
-                    <td className="px-6 py-4 text-sm font-bold text-gray-900 text-right">
+                    <td className="px-6 py-4 text-sm text-gray-900 text-right">
                       {formatCurrency(
                         filteredVouchers.reduce(
                           (sum: number, v: VoucherEntry) =>
@@ -1960,10 +1959,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                         )
                       )}
                     </td>
-                    <td colSpan={2}></td>
+                    <td className="px-6 py-4"></td> {/* Blank for Status */}
+                    {showActions && <td className="px-6 py-4"></td>}
                   </>
                 )}
-                <td colSpan={2}></td>
               </tr>
             </tfoot>
           </table>
