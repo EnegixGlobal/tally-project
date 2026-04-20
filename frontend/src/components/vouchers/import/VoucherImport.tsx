@@ -53,117 +53,12 @@ const VoucherImport: React.FC = () => {
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState("sales");
+  const [selectedTemplate, setSelectedTemplate] = useState("payment");
   const [activeTab, setActiveTab] = useState<
     "import" | "preview" | "templates"
   >("import");
 
   const voucherTemplates: VoucherTemplate[] = [
-    {
-      name: "Sales Voucher Template",
-      type: "sales",
-      description: "Import sales invoices with item details",
-      fields: [
-        "Date",
-        "Party Name",
-        "Reference No",
-        "Item Name",
-        "Batch No",
-        "Quantity",
-        "Quantity",
-        "Rate",
-        "Amount",
-        "HSN Code",
-
-        // GST (Fill Either One)
-        "CGST Rate",
-        "SGST Rate",
-        "IGST Rate",
-
-        // Ledger Mapping
-        "Sales Ledger",
-        "CGST Ledger",
-        "SGST Ledger",
-        "IGST Ledger",
-      ],
-      sampleData: [
-        {
-          Date: "15/01/2024",
-          "Party Name": "ABC Electronics",
-          "Reference No": "REF001",
-          "Item Name": "Laptop HP",
-          Quantity: 2,
-          Rate: 45000,
-          Amount: 90000,
-          "HSN Code": "8471",
-          "CGST Rate": 9,
-          "SGST Rate": 9,
-          "IGST Rate": 0,
-          "Sales Ledger": "Sales @ 18%",
-          "CGST Ledger": "CGST 9%",
-          "SGST Ledger": "SGST 9%",
-          "IGST Ledger": "",
-          "Batch No": "BATCH-001",
-        },
-      ],
-    },
-    {
-      name: "Purchase Voucher Template",
-      type: "purchase",
-      description: "Import purchase invoices with auto voucher & GST handling",
-
-      fields: [
-        "Date",
-
-        "Supplier Name",
-        "Reference No", // Added Reference No
-
-        "Item Name",
-        "Batch No",
-        "Quantity",
-        "Quantity",
-        "Rate",
-        "Amount",
-        "HSN Code",
-
-        // GST (Fill Either One)
-        "CGST Rate",
-        "SGST Rate",
-        "IGST Rate",
-
-        // Ledger Mapping
-        "Purchase Ledger",
-        "CGST Ledger",
-        "SGST Ledger",
-        "IGST Ledger",
-      ],
-
-      sampleData: [
-        {
-          Date: "2024-01-15",
-
-          "Supplier Name": "Mohan Kumar",
-
-          "Item Name": "Mobile Phone",
-          Quantity: 5,
-          Rate: 25000,
-          Amount: 125000,
-          "HSN Code": "8517",
-
-          "CGST Rate": 9,
-          "SGST Rate": 9,
-          "IGST Rate": 0,
-
-          "Purchase Ledger": "18% inter Purchase",
-          "CGST Ledger": "CGST 9%",
-          "SGST Ledger": "SGST 9%",
-          "IGST Ledger": "",
-
-          "Reference No": "REF123",
-          "Batch No": "BATCH-002",
-        },
-      ],
-    },
 
     {
       name: "Payment Voucher (No Narration)",
@@ -218,29 +113,6 @@ const VoucherImport: React.FC = () => {
           "Paid To": "Office Rent",
           "Payment Mode": "HDFC Bank",
           Amount: 25000,
-        },
-      ],
-    },
-    {
-      name: "Bank Voucher Template",
-      type: "bank",
-      description: "Import bank vouchers (Receipt mode)",
-      fields: [
-        "Date",
-        "Mode",
-        "Reference No",
-        "Paid To",
-        "Payment Mode",
-        "Amount",
-      ],
-      sampleData: [
-        {
-          Date: "2024-01-15",
-          Mode: "single-entry",
-          "Reference No": "BNK001",
-          "Paid To": "Customer Payment",
-          "Payment Mode": "HDFC Bank",
-          Amount: 50000,
         },
       ],
     },
@@ -374,20 +246,11 @@ const VoucherImport: React.FC = () => {
 
       let endpoint = "";
       switch (selectedTemplate) {
-        case "sales":
-          endpoint = `${import.meta.env.VITE_API_URL}/api/sales_import`;
-          break;
-        case "purchase":
-          endpoint = `${import.meta.env.VITE_API_URL}/api/purchase_import`;
-          break;
         case "payment":
           endpoint = `${import.meta.env.VITE_API_URL}/api/payment_import`;
           break;
         case "receipt":
           endpoint = `${import.meta.env.VITE_API_URL}/api/receipt_import`;
-          break;
-        case "bank":
-          endpoint = `${import.meta.env.VITE_API_URL}/api/bank_import`;
           break;
         default:
           alert("Invalid template selected");
@@ -511,11 +374,8 @@ const VoucherImport: React.FC = () => {
               onChange={(e) => setSelectedTemplate(e.target.value)}
               className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
             >
-              <option value="sales">Sales Voucher</option>
-              <option value="purchase">Purchase Voucher</option>
               <option value="payment">Payment Voucher</option>
               <option value="receipt">Receipt Voucher</option>
-              <option value="bank">Bank Voucher</option>
             </select>
           </div>
 
