@@ -172,12 +172,12 @@ router.get("/", async (req, res) => {
     const [rows] = await pool.execute(query, queryParams);
 
     // =========================================================
-    // 🔹 FETCH ITEMS FOR THESE VOUCHERS
+    // 🔹 FETCH ITEMS & ENTRIES FOR THESE VOUCHERS
     // =========================================================
     if (rows.length > 0) {
       const voucherIds = rows.map(row => row.id);
 
-      // Use .query for array expansion support
+      // 1. Fetch Item Invoice Items
       const [items] = await pool.query(
         `SELECT 
             pvi.id, pvi.voucherId, pvi.itemId, 
@@ -187,6 +187,10 @@ router.get("/", async (req, res) => {
             pvi.purchaseLedgerId,
             pvi.discountLedgerId,
             
+            i.name AS itemName,
+            i.hsnCode,
+            i.gstRate,
+
             pl.name AS purchaseLedgerName, 
             pl.group_id AS purchaseLedgerGroupId,
             lg.name AS purchaseLedgerGroupName,
@@ -198,7 +202,7 @@ router.get("/", async (req, res) => {
             dl.name AS discountLedgerName
 
          FROM purchase_voucher_items pvi
-         
+         LEFT JOIN items i ON pvi.itemId = i.id
          LEFT JOIN ledgers pl ON pvi.purchaseLedgerId = pl.id
          LEFT JOIN ledger_groups lg ON pl.group_id = lg.id
          LEFT JOIN ledgers dl ON pvi.discountLedgerId = dl.id
@@ -212,32 +216,121 @@ router.get("/", async (req, res) => {
         [voucherIds]
       );
 
+      // 2. Fetch Accounting Voucher Entries
+      const [accEntries] = await pool.query(
+        `SELECT 
+            ve.id, ve.voucher_id as voucherId, ve.ledger_id as ledgerId,
+            ve.amount, ve.entry_type, ve.narration,
+            l.name AS ledgerName,
+            lg.name AS groupName,
+            lg.id AS groupId
+         FROM voucher_entries ve
+         LEFT JOIN ledgers l ON ve.ledger_id = l.id
+         LEFT JOIN ledger_groups lg ON l.group_id = lg.id
+         WHERE ve.voucher_id IN (?)`,
+        [voucherIds]
+      );
+
       // Attach items to their respective vouchers with numeric conversion
       const itemsMap = {};
+      
+      // Process regular items
       items.forEach(item => {
         if (!itemsMap[item.voucherId]) {
           itemsMap[item.voucherId] = [];
         }
 
-        // Convert rates/amounts to numbers
         itemsMap[item.voucherId].push({
           ...item,
           quantity: Number(item.quantity) || 0,
           rate: Number(item.rate) || 0,
           amount: Number(item.amount) || 0,
           discount: Number(item.discount) || 0,
-          cgstRate: Number(item.cgstRate) || 0,
-          sgstRate: Number(item.sgstRate) || 0,
-          igstRate: Number(item.igstRate) || 0,
-          tdsRate: Number(item.tdsRate) || 0,
+          gstRate: Number(item.gstRate) || 0,
           discountLedgerName: item.discountLedgerName || null,
         });
       });
 
-      rows.forEach(row => {
-        row.items = itemsMap[row.id] || [];
+      // Process accounting entries and map them to "pseudo-items"
+      const accEntriesMap = {};
+      accEntries.forEach(entry => {
+        if (!accEntriesMap[entry.voucherId]) accEntriesMap[entry.voucherId] = [];
+        accEntriesMap[entry.voucherId].push(entry);
+      });
 
-        // Ensure voucher level totals are numbers
+      rows.forEach(row => {
+        if (!row.items) row.items = itemsMap[row.id] || [];
+
+        // For accounting vouchers, we populate pseudo-items
+        const vEntries = accEntriesMap[row.id] || [];
+        if (vEntries.length > 0) {
+          let purchaseEntries = [];
+          let taxEntries = { cgst: [], sgst: [], igst: [], tds: [], discount: [] };
+
+          vEntries.forEach(e => {
+            const amt = Number(e.amount || 0);
+            const lName = (e.ledgerName || "").toLowerCase();
+            const gName = (e.groupName || "").toLowerCase();
+
+            if (e.entry_type === "debit") {
+              const isTax = (gName && (gName.includes("duties") || gName.includes("tax") || gName.includes("gst"))) ||
+                            (lName.includes("gst") || lName.includes("tax") || lName.includes("igst") || lName.includes("cgst") || lName.includes("sgst") || lName.includes("@"));
+
+              if (isTax) {
+                if (lName.includes("cgst")) taxEntries.cgst.push(e);
+                else if (lName.includes("sgst") || lName.includes("utgst")) taxEntries.sgst.push(e);
+                else if (lName.includes("igst")) taxEntries.igst.push(e);
+                else taxEntries.cgst.push(e);
+              } else {
+                purchaseEntries.push(e);
+              }
+            } else {
+              const isDiscount = lName.includes("discount") || (gName && gName.includes("discount"));
+              const isTds = lName.includes("tds") || (gName && gName.includes("tds"));
+              
+              if (isDiscount) taxEntries.discount.push(e);
+              else if (isTds) taxEntries.tds.push(e);
+            }
+          });
+
+          purchaseEntries.forEach((pe, idx) => {
+            const pseudoItem = {
+              id: `acc-${pe.id}`,
+              voucherId: pe.voucherId,
+              amount: Number(pe.amount) || 0,
+              purchaseLedgerName: pe.ledgerName,
+              purchaseLedgerGroupName: pe.groupName,
+              purchaseLedgerGroupId: pe.groupId,
+              itemName: pe.ledgerName, 
+              quantity: 0,
+              rate: 0
+            };
+
+            if (idx === 0) {
+              if (taxEntries.cgst.length > 0) pseudoItem.cgstLedgerName = taxEntries.cgst[0].ledgerName;
+              if (taxEntries.sgst.length > 0) pseudoItem.sgstLedgerName = taxEntries.sgst[0].ledgerName;
+              if (taxEntries.igst.length > 0) pseudoItem.igstLedgerName = taxEntries.igst[0].ledgerName;
+              if (taxEntries.tds.length > 0) pseudoItem.tdsLedgerName = taxEntries.tds[0].ledgerName;
+              if (taxEntries.discount.length > 0) pseudoItem.discountLedgerName = taxEntries.discount[0].ledgerName;
+            }
+            row.items.push(pseudoItem);
+          });
+          
+          if (purchaseEntries.length === 0 && (taxEntries.cgst.length > 0 || taxEntries.sgst.length > 0 || taxEntries.igst.length > 0)) {
+             row.items.push({
+               id: `acc-tax-${row.id}`,
+               voucherId: row.id,
+               amount: 0,
+               purchaseLedgerName: "Purchase (Accounting)",
+               cgstLedgerName: taxEntries.cgst[0]?.ledgerName,
+               sgstLedgerName: taxEntries.sgst[0]?.ledgerName,
+               igstLedgerName: taxEntries.igst[0]?.ledgerName,
+               tdsLedgerName: taxEntries.tds[0]?.ledgerName,
+               discountLedgerName: taxEntries.discount[0]?.ledgerName
+             });
+          }
+        }
+
         row.netAmount = Number(row.netAmount) || 0;
         row.total = Number(row.total) || 0;
         row.discountTotal = Number(row.discountTotal) || 0;
@@ -245,6 +338,7 @@ router.get("/", async (req, res) => {
         row.cgstAmount = Number(row.cgstAmount) || 0;
         row.sgstAmount = Number(row.sgstAmount) || 0;
         row.igstAmount = Number(row.igstAmount) || 0;
+        row.tdsAmount = Number(row.tdsAmount) || 0;
       });
     }
 

@@ -291,9 +291,29 @@ const PurchaseReport1: React.FC = () => {
 
       if (voucher.items) {
         voucher.items.forEach((i: any) => {
-          if (i.cgstLedgerName) cgstLedgers.add(i.cgstLedgerName);
-          if (i.sgstLedgerName) sgstLedgers.add(i.sgstLedgerName);
-          if (i.igstLedgerName) igstLedgers.add(i.igstLedgerName);
+          let cgstName = i.cgstLedgerName;
+          let sgstName = i.sgstLedgerName;
+          let igstName = i.igstLedgerName;
+
+          // 🔹 ENHANCEMENT: If gstRate is available but not in name, append it for better clarity
+          if (i.gstRate && Number(i.gstRate) > 0) {
+            const totalRate = Number(i.gstRate);
+            const halfRate = totalRate / 2;
+            
+            if (cgstName && !cgstName.includes("%") && !cgstName.includes("@")) {
+              cgstName = `${cgstName} ${halfRate}%`;
+            }
+            if (sgstName && !sgstName.includes("%") && !sgstName.includes("@")) {
+              sgstName = `${sgstName} ${halfRate}%`;
+            }
+            if (igstName && !igstName.includes("%") && !igstName.includes("@")) {
+              igstName = `${igstName} ${totalRate}%`;
+            }
+          }
+
+          if (cgstName) cgstLedgers.add(cgstName);
+          if (sgstName) sgstLedgers.add(sgstName);
+          if (igstName) igstLedgers.add(igstName);
         });
       }
 
@@ -480,9 +500,23 @@ const PurchaseReport1: React.FC = () => {
       if (voucher.items) {
         voucher.items.forEach(item => {
           if (item.purchaseLedgerName) purchaseColumns.add(item.purchaseLedgerName);
-          if (item.cgstLedgerName) taxColumns.add(item.cgstLedgerName);
-          if (item.sgstLedgerName) taxColumns.add(item.sgstLedgerName);
-          if (item.igstLedgerName) taxColumns.add(item.igstLedgerName);
+
+          let cgstName = item.cgstLedgerName;
+          let sgstName = item.sgstLedgerName;
+          let igstName = item.igstLedgerName;
+
+          if (item.gstRate && Number(item.gstRate) > 0) {
+            const totalRate = Number(item.gstRate);
+            const halfRate = totalRate / 2;
+            if (cgstName && !cgstName.includes("%") && !cgstName.includes("@")) cgstName = `${cgstName} ${halfRate}%`;
+            if (sgstName && !sgstName.includes("%") && !sgstName.includes("@")) sgstName = `${sgstName} ${halfRate}%`;
+            if (igstName && !igstName.includes("%") && !igstName.includes("@")) igstName = `${igstName} ${totalRate}%`;
+          }
+
+          if (cgstName) taxColumns.add(cgstName);
+          if (sgstName) taxColumns.add(sgstName);
+          if (igstName) taxColumns.add(igstName);
+
           if (item.tdsLedgerName) tdsColumns.add(item.tdsLedgerName);
           if (Number(item.discount) > 0) {
             discountColumns.add(item.discountLedgerName || "Rebate & Discount 20%");
@@ -559,9 +593,21 @@ const PurchaseReport1: React.FC = () => {
         const vTdsLedgers = new Set<string>();
 
         voucher.items.forEach((item: any) => {
-          if (item.cgstLedgerName) vCgstLedgers.add(item.cgstLedgerName);
-          if (item.sgstLedgerName) vSgstLedgers.add(item.sgstLedgerName);
-          if (item.igstLedgerName) vIgstLedgers.add(item.igstLedgerName);
+          let cgstName = item.cgstLedgerName;
+          let sgstName = item.sgstLedgerName;
+          let igstName = item.igstLedgerName;
+
+          if (item.gstRate && Number(item.gstRate) > 0) {
+            const totalRate = Number(item.gstRate);
+            const halfRate = totalRate / 2;
+            if (cgstName && !cgstName.includes("%") && !cgstName.includes("@")) cgstName = `${cgstName} ${halfRate}%`;
+            if (sgstName && !sgstName.includes("%") && !sgstName.includes("@")) sgstName = `${sgstName} ${halfRate}%`;
+            if (igstName && !igstName.includes("%") && !igstName.includes("@")) igstName = `${igstName} ${totalRate}%`;
+          }
+
+          if (cgstName) vCgstLedgers.add(cgstName);
+          if (sgstName) vSgstLedgers.add(sgstName);
+          if (igstName) vIgstLedgers.add(igstName);
           if (item.tdsLedgerName) vTdsLedgers.add(item.tdsLedgerName);
         });
 
