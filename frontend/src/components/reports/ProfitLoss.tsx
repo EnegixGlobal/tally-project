@@ -425,11 +425,10 @@ const ProfitLoss: React.FC = () => {
 
   // Income calculations
   const getSalesTotal = () => {
-    return salesData.reduce((sum, p) => {
-      const qty = Math.abs(Number(p.qtyChange || 0));
-      const rate = Number(p.rate || 0);
-      return sum + qty * rate;
-    }, 0);
+    return salesLedgers.reduce(
+      (sum, item) => sum + ((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)),
+      0
+    );
   };
 
   // Sales + Closing Stock (Final Sales)
@@ -454,11 +453,10 @@ const ProfitLoss: React.FC = () => {
 
   // Expense calculations
   const getPurchaseTotal = () => {
-    return purchaseData.reduce((sum, p) => {
-      const qty = Number(p.purchaseQuantity || 0);
-      const rate = Number(p.rate || 0);
-      return sum + qty * rate;
-    }, 0);
+    return purchaseLedgers.reduce(
+      (sum, item) => sum + ((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)),
+      0
+    );
   };
 
 
@@ -536,7 +534,7 @@ const ProfitLoss: React.FC = () => {
   };
 
   const getPurchaseByItems = () => {
-    return inventoryCalculations.items
+    const items = inventoryCalculations.items
       .filter(item => item.inwardValue > 0)
       .map(item => ({
         id: item.id,
@@ -545,6 +543,23 @@ const ProfitLoss: React.FC = () => {
         rate: item.inwardQty > 0 ? item.inwardValue / item.inwardQty : 0,
         value: item.inwardValue
       }));
+
+    // Add virtual row for Accounting Vouchers / Non-Inventory Purchases
+    const totalPurchase = getPurchaseTotal();
+    const itemTotal = items.reduce((sum, i) => sum + i.value, 0);
+    const diff = totalPurchase - itemTotal;
+
+    if (Math.abs(diff) > 0.01) {
+      items.push({
+        id: "non-inv-purchase",
+        name: "Ledger-based (Accounting) Purchases",
+        qty: 0,
+        rate: 0,
+        value: diff
+      });
+    }
+
+    return items;
   };
 
   const getSalesByItems = () => {
@@ -560,10 +575,27 @@ const ProfitLoss: React.FC = () => {
       revenueMap[name].value += v;
     });
 
-    return Object.values(revenueMap).map(item => ({
+    const items = Object.values(revenueMap).map(item => ({
       ...item,
       rate: item.qty > 0 ? item.value / item.qty : 0
     })).filter(item => item.value > 0);
+
+    // Add virtual row for Accounting Vouchers / Non-Inventory Sales
+    const totalSales = getSalesTotal();
+    const itemTotal = items.reduce((sum, i) => sum + i.value, 0);
+    const diff = totalSales - itemTotal;
+
+    if (Math.abs(diff) > 0.01) {
+      items.push({
+        id: "non-inv-sales",
+        name: "Ledger-based (Accounting) Sales",
+        qty: 0,
+        rate: 0,
+        value: diff
+      });
+    }
+
+    return items;
   };
 
   // Unified Closing Stock Value Accessor

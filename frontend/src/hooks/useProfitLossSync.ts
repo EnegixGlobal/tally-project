@@ -16,6 +16,8 @@ export const useProfitLossSync = () => {
     const [indirectIncome, setIndirectIncome] = useState<any[]>([]);
     const [indirectExpenses, setIndirectExpenses] = useState<any[]>([]);
     const [directexpense, setDirectexpense] = useState<any[]>([]);
+    const [purchaseLedgers, setPurchaseLedgers] = useState<any[]>([]);
+    const [salesLedgers, setSalesLedgers] = useState<any[]>([]);
     const [stockLedgers, setStockLedgers] = useState<any[]>([]);
 
     useEffect(() => {
@@ -28,12 +30,12 @@ export const useProfitLossSync = () => {
                 const stockJson = await stockRes.json();
                 setStockItems(stockJson.data || []);
 
-                // 2. Fetch Purchase Data
+                // 2. Fetch Purchase Data (for inventory breakup)
                 const purRes = await fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
                 const purJson = await purRes.json();
                 setPurchaseData(purJson.data || []);
 
-                // 3. Fetch Sales Data
+                // 3. Fetch Sales Data (for inventory breakup)
                 const saleRes = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers/sale-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
                 const saleJson = await saleRes.json();
                 setSalesData(saleJson.data || []);
@@ -43,30 +45,21 @@ export const useProfitLossSync = () => {
                 const groupSummaryJson = await groupSummaryRes.json();
                 const ledgers = groupSummaryJson.ledgers || [];
 
+                // Helper to check if a group is a descendant of another
+                const allGroups = [...(ledgerGroups || [])];
+                const isDescendant = (childId: number | string, targetParentId: number | string): boolean => {
+                    if (String(childId) === String(targetParentId)) return true;
+                    const group = allGroups.find(g => String(g.id) === String(childId));
+                    if (group && group.parent_id) return isDescendant(group.parent_id, targetParentId);
+                    return false;
+                };
+
                 // Filter ledgers by group
-                const directExp = ledgers.filter((l: any) => {
-                    const gid = String(l.group_id);
-                    if (gid === "-7") return true;
-                    const group = (ledgerGroups || []).find(g => String(g.id) === gid);
-                    return group?.type === "direct-expenses";
-                });
-                setDirectexpense(directExp);
-
-                const indExp = ledgers.filter((l: any) => {
-                    const gid = String(l.group_id);
-                    if (gid === "-10") return true;
-                    const group = (ledgerGroups || []).find(g => String(g.id) === gid);
-                    return group?.type === "indirect-expenses";
-                });
-                setIndirectExpenses(indExp);
-
-                const indInc = ledgers.filter((l: any) => {
-                    const gid = String(l.group_id);
-                    if (gid === "-11") return true;
-                    const group = (ledgerGroups || []).find(g => String(g.id) === gid);
-                    return group?.type === "indirect-income";
-                });
-                setIndirectIncome(indInc);
+                setDirectexpense(ledgers.filter((l: any) => isDescendant(l.group_id, -7)));
+                setIndirectExpenses(ledgers.filter((l: any) => isDescendant(l.group_id, -10)));
+                setIndirectIncome(ledgers.filter((l: any) => isDescendant(l.group_id, -11)));
+                setPurchaseLedgers(ledgers.filter((l: any) => isDescendant(l.group_id, -15)));
+                setSalesLedgers(ledgers.filter((l: any) => isDescendant(l.group_id, -16)));
 
                 const normalizeStr = (s: string) => (s || "").toLowerCase().replace(/[^a-z0-9]/g, '');
                 const stockInHandGroup = (ledgerGroups || []).find(g => {
@@ -102,7 +95,7 @@ export const useProfitLossSync = () => {
         fetchData();
     }, [companyId, ownerType, ownerId, ledgerGroups]);
 
-    // Calculations (Simplified version of what's in ProfitLoss.tsx)
+    // Calculations (Unified with ProfitLoss.tsx)
     const inventoryCalculations = useMemo(() => {
         const itemMap: Record<string, any> = {};
         stockItems.forEach((item: any) => {
@@ -164,20 +157,30 @@ export const useProfitLossSync = () => {
         return stockLedgers.reduce((sum, l) => sum + Number(l.opening_balance || 0), 0);
     }, [showItemWise, stockItems, inventoryCalculations, stockLedgers]);
 
+    const salesTotal = useMemo(() => {
+        return salesLedgers.reduce(
+            (sum, item) => sum + ((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)),
+            0
+        );
+    }, [salesLedgers, ledgerBalances]);
+
+    const purchaseTotal = useMemo(() => {
+        return purchaseLedgers.reduce(
+            (sum, item) => sum + ((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)),
+            0
+        );
+    }, [purchaseLedgers, ledgerBalances]);
+
     const closingStockValue = useMemo(() => {
         if (showItemWise && stockItems.length > 0) return inventoryCalculations.totalClosingValue;
-        const opening = stockLedgers.reduce((sum, l) => sum + Number(l.opening_balance || 0), 0);
-        const purchaseTotal = purchaseData.reduce((sum, p) => sum + (Number(p.purchaseQuantity || 0) * Number(p.rate || 0)), 0);
-        const salesTotal = salesData.reduce((sum, p) => sum + (Math.abs(Number(p.qtyChange || 0)) * Number(p.rate || 0)), 0);
+        const opening = openingStockValue;
         if (opening === 0 && purchaseTotal === 0 && salesTotal === 0) return 0;
         return stockLedgers.reduce((sum, l) => sum + Number(l.closing_balance || 0), 0);
-    }, [showItemWise, stockItems, inventoryCalculations, stockLedgers, purchaseData, salesData]);
+    }, [showItemWise, stockItems, inventoryCalculations, stockLedgers, purchaseTotal, salesTotal, openingStockValue]);
 
-    const salesTotal = useMemo(() => salesData.reduce((sum, p) => sum + (Math.abs(Number(p.qtyChange || 0)) * Number(p.rate || 0)), 0), [salesData]);
-    const purchaseTotal = useMemo(() => purchaseData.reduce((sum, p) => sum + (Number(p.purchaseQuantity || 0) * Number(p.rate || 0)), 0), [purchaseData]);
-    const directExpensesTotal = useMemo(() => directexpense.reduce((sum, item) => sum + (ledgerBalances[item.id]?.debit || 0), 0), [directexpense, ledgerBalances]);
-    const indirectExpensesTotal = useMemo(() => indirectExpenses.reduce((sum, item) => sum + (ledgerBalances[item.id]?.debit || 0), 0), [indirectExpenses, ledgerBalances]);
-    const indirectIncomeTotal = useMemo(() => indirectIncome.reduce((sum, item) => sum + (ledgerBalances[item.id]?.credit || 0), 0), [indirectIncome, ledgerBalances]);
+    const directExpensesTotal = useMemo(() => directexpense.reduce((sum, item) => sum + ((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)), 0), [directexpense, ledgerBalances]);
+    const indirectExpensesTotal = useMemo(() => indirectExpenses.reduce((sum, item) => sum + ((ledgerBalances[item.id]?.debit || 0) - (ledgerBalances[item.id]?.credit || 0)), 0), [indirectExpenses, ledgerBalances]);
+    const indirectIncomeTotal = useMemo(() => indirectIncome.reduce((sum, item) => sum + ((ledgerBalances[item.id]?.credit || 0) - (ledgerBalances[item.id]?.debit || 0)), 0), [indirectIncome, ledgerBalances]);
 
     const netProfitValue = useMemo(() => {
         const tradingDebit = openingStockValue + purchaseTotal + directExpensesTotal;
@@ -216,4 +219,4 @@ export const useProfitLossSync = () => {
         closingStock: closingStockValue,
         openingStock: openingStockValue
     };
-}
+};
