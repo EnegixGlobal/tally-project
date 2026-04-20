@@ -93,6 +93,7 @@ const B2BPurchase: React.FC = () => {
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [selectedView, setSelectedView] = useState<ViewType>("summary");
+  const [columnarDrillDown, setColumnarDrillDown] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     dateRange: "this-month",
     fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
@@ -391,7 +392,25 @@ const B2BPurchase: React.FC = () => {
 
   // 🔹 COLUMNAR DATA LOGIC
   const columnarData = useMemo(() => {
-    if (!matchedSales.length) return { headers: [], rows: [] };
+    let vouchersToProcess = matchedSales;
+    if (columnarDrillDown) {
+      vouchersToProcess = matchedSales.filter(v => {
+        const partyName = v.partyName || ledgerMap.get(v.partyId)?.name;
+        if (partyName === columnarDrillDown) return true;
+        if (v.items) {
+          return v.items.some((item: any) =>
+            item.purchaseLedgerName === columnarDrillDown ||
+            item.cgstLedgerName === columnarDrillDown ||
+            item.sgstLedgerName === columnarDrillDown ||
+            item.igstLedgerName === columnarDrillDown ||
+            item.tdsLedgerName === columnarDrillDown
+          );
+        }
+        return false;
+      });
+    }
+
+    if (!vouchersToProcess.length) return { headers: [], rows: [] };
 
     const purchaseColumns = new Set<string>();
     const taxColumns = new Set<string>();
@@ -415,7 +434,7 @@ const B2BPurchase: React.FC = () => {
     const allDynamicCols = [...sortedPurchaseCols, ...sortedTaxCols];
 
     // 2. Prepare Rows
-    const rows = matchedSales.map((voucher: any) => {
+    const rows = vouchersToProcess.map((voucher: any) => {
       const row: any = {
         id: voucher.id,
         date: voucher.date,
@@ -490,7 +509,7 @@ const B2BPurchase: React.FC = () => {
     });
 
     return { headers: allDynamicCols, rows };
-  }, [matchedSales, ledgerMap]);
+  }, [matchedSales, ledgerMap, columnarDrillDown]);
 
   // 🔹 MONTHLY DATA LOGIC
   const MONTHS = [
@@ -586,11 +605,7 @@ const B2BPurchase: React.FC = () => {
       }
     > = {};
 
-    matchedSales.forEach((voucher: any) => {
-      // 1️⃣ PARTY SIDE (Credit / Liability - Sundry Creditors)
-      const groupName = voucher.groupName || "Sundry Creditors";
-      const partyAmount = Number(voucher.netAmount || voucher.total || 0);
-
+    const addToGroup = (groupName: string, name: string, debit: number, credit: number) => {
       if (!groups[groupName]) {
         groups[groupName] = {
           totalDebit: 0,
@@ -599,34 +614,34 @@ const B2BPurchase: React.FC = () => {
         };
       }
 
-      groups[groupName].totalCredit += partyAmount;
-      groups[groupName].transactions.push({
-        name: voucher.partyName || "Unknown Party",
-        debit: 0,
-        credit: partyAmount,
-      });
+      groups[groupName].totalDebit += debit;
+      groups[groupName].totalCredit += credit;
+
+      const existing = groups[groupName].transactions.find((t) => t.name === name);
+      if (existing) {
+        existing.debit += debit;
+        existing.credit += credit;
+      } else {
+        groups[groupName].transactions.push({
+          name: name,
+          debit: debit,
+          credit: credit,
+        });
+      }
+    };
+
+    matchedSales.forEach((voucher: any) => {
+      // 1️⃣ PARTY SIDE (Credit / Liability - Sundry Creditors)
+      const groupName = voucher.groupName || "Sundry Creditors";
+      const partyAmount = Number(voucher.netAmount || voucher.total || 0);
+      addToGroup(groupName, voucher.partyName || "Unknown Party", 0, partyAmount);
 
       // 2️⃣ PURCHASE SIDE (Debit / Expense) via Items
       if (voucher.items && voucher.items.length > 0) {
         voucher.items.forEach((item: any) => {
           const itemGroupName = "Purchase Account";
-
-          if (!groups[itemGroupName]) {
-            groups[itemGroupName] = {
-              totalDebit: 0,
-              totalCredit: 0,
-              transactions: [],
-            };
-          }
-
           const itemAmount = Number(item.amount || 0);
-
-          groups[itemGroupName].totalDebit += itemAmount;
-          groups[itemGroupName].transactions.push({
-            name: item.purchaseLedgerName || "Unknown Purchase Ledger",
-            debit: itemAmount,
-            credit: 0,
-          });
+          addToGroup(itemGroupName, item.purchaseLedgerName || "Unknown Purchase Ledger", itemAmount, 0);
         });
       }
 
@@ -653,47 +668,17 @@ const B2BPurchase: React.FC = () => {
       const igst = Number(voucher.igstTotal || 0);
       const tds = Number(voucher.tdsAmount || 0);
 
-      if (cgst > 0 || sgst > 0 || igst > 0 || tds > 0) {
-        if (!groups[taxGroupName]) {
-          groups[taxGroupName] = {
-            totalDebit: 0,
-            totalCredit: 0,
-            transactions: [],
-          };
-        }
-
-        if (cgst > 0) {
-          groups[taxGroupName].totalDebit += cgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(cgstLedgers).join(", ") || "Input CGST",
-            debit: cgst,
-            credit: 0,
-          });
-        }
-        if (sgst > 0) {
-          groups[taxGroupName].totalDebit += sgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(sgstLedgers).join(", ") || "Input SGST",
-            debit: sgst,
-            credit: 0,
-          });
-        }
-        if (igst > 0) {
-          groups[taxGroupName].totalDebit += igst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(igstLedgers).join(", ") || "Input IGST",
-            debit: igst,
-            credit: 0,
-          });
-        }
-        if (tds > 0) {
-          groups[taxGroupName].totalCredit += tds; // TDS Payable is Credit
-          groups[taxGroupName].transactions.push({
-            name: Array.from(tdsLedgers).join(", ") || "TDS Payable",
-            debit: 0,
-            credit: tds,
-          });
-        }
+      if (cgst > 0) {
+        addToGroup(taxGroupName, Array.from(cgstLedgers).join(", ") || "Input CGST", cgst, 0);
+      }
+      if (sgst > 0) {
+        addToGroup(taxGroupName, Array.from(sgstLedgers).join(", ") || "Input SGST", sgst, 0);
+      }
+      if (igst > 0) {
+        addToGroup(taxGroupName, Array.from(igstLedgers).join(", ") || "Input IGST", igst, 0);
+      }
+      if (tds > 0) {
+        addToGroup(taxGroupName, Array.from(tdsLedgers).join(", ") || "TDS Payable", 0, tds);
       }
     });
 
@@ -1128,7 +1113,13 @@ const B2BPurchase: React.FC = () => {
                               : "hover:bg-gray-50"
                               }`}
                           >
-                            <td className="px-4 py-2 pl-8 text-sm italic">
+                            <td
+                              className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
+                              onClick={() => {
+                                setColumnarDrillDown(txn.name);
+                                setSelectedView("columnar");
+                              }}
+                            >
                               {txn.name}
                             </td>
 
@@ -1202,6 +1193,19 @@ const B2BPurchase: React.FC = () => {
               }`}
           >
             <h3 className="text-lg font-semibold mb-4">Columnar Report</h3>
+            {columnarDrillDown && (
+              <div className="p-2 mb-4 bg-blue-50 dark:bg-blue-900/20 rounded flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Filtered by: <span className="font-bold">{columnarDrillDown}</span>
+                </span>
+                <button
+                  onClick={() => setColumnarDrillDown(null)}
+                  className={`text-xs px-2 py-1 border rounded hover:bg-opacity-80 ${theme === 'dark' ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'}`}
+                >
+                  Clear Filter
+                </button>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead
