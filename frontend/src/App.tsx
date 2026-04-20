@@ -60,6 +60,7 @@ import ReceiptVoucher from "./components/vouchers/receipt/ReceiptVoucher";
 import VoucherImport from "./components/vouchers/import/VoucherImport";
 import BankStatementImport from "./components/vouchers/import/BankStatementImport";
 import PurchaseImport from "./components/vouchers/import/PurchaseImport";
+import SalesImport from "./components/vouchers/import/SalesImport";
 import QuotationList from "./components/vouchers/quotation/QuotationList";
 import QuotationCreate from "./components/vouchers/quotation/QuotationCreate";
 
@@ -959,6 +960,14 @@ function App() {
                   element={
                     <RequireCompany>
                       <PurchaseImport />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="vouchers/sales-import"
+                  element={
+                    <RequireCompany>
+                      <SalesImport />
                     </RequireCompany>
                   }
                 />

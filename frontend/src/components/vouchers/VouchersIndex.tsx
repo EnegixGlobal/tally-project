@@ -279,6 +279,16 @@ const VouchersIndex: React.FC = () => {
           iconBg: theme === 'dark' ? 'bg-blue-800/70' : 'bg-blue-100',
           description: 'Import Purchase GST Summary',
           category: 'import'
+        },
+        {
+          id: 'sales-import',
+          icon: <ShoppingCart size={20} />,
+          name: 'Sales Import',
+          path: '/app/vouchers/sales-import',
+          color: theme === 'dark' ? 'bg-sky-900/50 hover:bg-sky-800/50' : 'bg-sky-50 hover:bg-sky-100',
+          iconBg: theme === 'dark' ? 'bg-sky-800/70' : 'bg-sky-100',
+          description: 'Import Sales GST Summary',
+          category: 'import'
         }
       ]
     },

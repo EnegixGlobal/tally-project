@@ -56,6 +56,7 @@ router.get("/api/group", async (req, res) => {
         WHERE pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
+          AND pv.mode != 'accounting-invoice'
 
         UNION ALL
 
@@ -73,6 +74,7 @@ router.get("/api/group", async (req, res) => {
         WHERE pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
+          AND pv.mode != 'accounting-invoice'
 
         UNION ALL
 
@@ -90,6 +92,7 @@ router.get("/api/group", async (req, res) => {
         WHERE pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
+          AND pv.mode != 'accounting-invoice'
 
         UNION ALL
 
@@ -104,14 +107,15 @@ router.get("/api/group", async (req, res) => {
           AND pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
+          AND pv.mode != 'accounting-invoice'
 
         UNION ALL
 
         /* TDS - one row per voucher */
         SELECT
           CAST(pvi_agg.tdsRate AS UNSIGNED) AS ledgerId,
-          pv.tdsTotal AS debit,
-          0 AS credit
+          0 AS debit,
+          pv.tdsTotal AS credit
         FROM purchase_vouchers pv
         JOIN (
           SELECT DISTINCT voucherId, tdsRate
@@ -121,6 +125,7 @@ router.get("/api/group", async (req, res) => {
         WHERE pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
+          AND pv.mode != 'accounting-invoice'
 
         /* ================= PURCHASE DISCOUNT (GLOBAL) ================= */
         UNION ALL
@@ -138,7 +143,9 @@ router.get("/api/group", async (req, res) => {
         WHERE pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
+          AND pv.mode != 'accounting-invoice'
           AND pv.discountTotal > 0
+          AND pv.mode != 'accounting-invoice'
 
 
         /* ================= SALES (ITEM-INVOICE MODE) ================= */
@@ -159,6 +166,7 @@ router.get("/api/group", async (req, res) => {
         WHERE sv.company_id = ?
           AND sv.owner_type = ?
           AND sv.owner_id = ?
+          AND sv.mode != 'accounting-invoice'
 
         UNION ALL
 
@@ -176,6 +184,7 @@ router.get("/api/group", async (req, res) => {
         WHERE sv.company_id = ?
           AND sv.owner_type = ?
           AND sv.owner_id = ?
+          AND sv.mode != 'accounting-invoice'
 
         UNION ALL
 
@@ -193,6 +202,7 @@ router.get("/api/group", async (req, res) => {
         WHERE sv.company_id = ?
           AND sv.owner_type = ?
           AND sv.owner_id = ?
+          AND sv.mode != 'accounting-invoice'
 
         UNION ALL
 
@@ -207,6 +217,7 @@ router.get("/api/group", async (req, res) => {
           AND sv.company_id = ?
           AND sv.owner_type = ?
           AND sv.owner_id = ?
+          AND sv.mode != 'accounting-invoice'
 
         /* ================= SALES DISCOUNT (ITEM-WISE) ================= */
 
@@ -223,6 +234,7 @@ router.get("/api/group", async (req, res) => {
           AND sv.owner_type = ?
           AND sv.owner_id = ?
           AND svi.discount > 0
+          AND sv.mode != 'accounting-invoice'
         GROUP BY svi.discountLedgerId
 
 
@@ -240,6 +252,7 @@ router.get("/api/group", async (req, res) => {
           AND sv.owner_type = ?
           AND sv.owner_id = ?
           AND sv.overallDiscountAmount > 0
+          AND sv.mode != 'accounting-invoice'
 
 
         /* ================= PARTY ================= */
@@ -255,6 +268,7 @@ router.get("/api/group", async (req, res) => {
           AND pv.company_id = ?
           AND pv.owner_type = ?
           AND pv.owner_id = ?
+          AND pv.mode != 'accounting-invoice'
 
         UNION ALL
 
@@ -267,6 +281,7 @@ router.get("/api/group", async (req, res) => {
           AND sv.company_id = ?
           AND sv.owner_type = ?
           AND sv.owner_id = ?
+          AND sv.mode != 'accounting-invoice'
 
 
         /* ================= JOURNAL / CONTRA / PAYMENT / RECEIPT ================= */
@@ -353,7 +368,6 @@ router.get("/api/group", async (req, res) => {
       `,
 
       [
-
         // Purchase item-invoice mode
         idArray, company_id, owner_type, owner_id,   // CGST
         idArray, company_id, owner_type, owner_id,   // SGST
@@ -385,6 +399,45 @@ router.get("/api/group", async (req, res) => {
       ]
     );
 
+    /* =====================================================
+       5️⃣ INCLUDE DEBIT / CREDIT NOTES (JSON PARSING)
+    ===================================================== */
+    // Fetch Debit Notes
+    const [dnRows] = await pool.query(
+      `SELECT narration FROM debit_note_vouchers 
+       WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
+      [company_id, owner_type, owner_id]
+    );
+
+    // Fetch Credit Notes
+    const [cnRows] = await pool.query(
+      `SELECT narration FROM credit_vouchers 
+       WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
+      [company_id, owner_type, owner_id]
+    );
+
+    const noteRows = [...dnRows, ...cnRows];
+    const notesData = {};
+
+    noteRows.forEach(row => {
+      if (!row.narration) return;
+      try {
+        const parsed = JSON.parse(row.narration);
+        if (Array.isArray(parsed.accountingEntries)) {
+          parsed.accountingEntries.forEach(entry => {
+            const lid = Number(entry.ledgerId);
+            if (!lid || !idArray.includes(lid)) return;
+
+            if (!notesData[lid]) notesData[lid] = { debit: 0, credit: 0 };
+            if (entry.type === 'debit') notesData[lid].debit += Number(entry.amount || 0);
+            else if (entry.type === 'credit') notesData[lid].credit += Number(entry.amount || 0);
+          });
+        }
+      } catch (e) {
+        // Not a JSON narration, skip
+      }
+    });
+
 
     const result = {};
 
@@ -393,10 +446,10 @@ router.get("/api/group", async (req, res) => {
       const id = Number(row.ledgerId);
 
       if (!isNaN(id)) {
-        result[id] = {
-          debit: Number(row.debit || 0),
-          credit: Number(row.credit || 0),
-        };
+        const debit = Number(row.debit || 0) + (notesData[id]?.debit || 0);
+        const credit = Number(row.credit || 0) + (notesData[id]?.credit || 0);
+
+        result[id] = { debit, credit };
       }
 
     });

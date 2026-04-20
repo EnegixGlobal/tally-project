@@ -1697,5 +1697,266 @@ router.post("/purchase_summary_import", async (req, res) => {
 
 
 
+// =========================================
+// SALES SUMMARY IMPORT (GST TEMPLATE)
+// =========================================
+
+router.post("/sales_summary_import", async (req, res) => {
+    try {
+        const { voucher, companyId, ownerType, ownerId } = req.body;
+
+        console.log("Received Grouped Sales Import Request:", {
+            invoiceNo: voucher?.["Invoice number"],
+            itemsCount: voucher?.items?.length,
+            companyId
+        });
+
+        if (!voucher) {
+            return res.status(400).json({ success: false, message: "No voucher data received" });
+        }
+        if (!companyId || !ownerType || !ownerId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        // LOAD LEDGERS & ITEMS
+        const [ledgers] = await db.execute(
+            "SELECT id, name, gst_number, state, group_id FROM ledgers WHERE company_id=?",
+            [companyId]
+        );
+
+        const [stockItems] = await db.execute(
+            "SELECT id, name, batches, openingBalance FROM stock_items WHERE company_id=?",
+            [companyId]
+        );
+
+        const defaultSLedger = ledgers.find(l => l.name.toLowerCase().includes("sales"));
+        const defaultSalesLedgerId = defaultSLedger ? defaultSLedger.id : null;
+
+        // Header Fields
+        const partyName = voucher["Trade/Legal name of the Supplier"] ? String(voucher["Trade/Legal name of the Supplier"]).toLowerCase().trim() : "";
+        const invoiceNo = voucher["Invoice number"] || null;
+
+        // DATE FORMATTING
+        let rawDate = voucher["Invoice Date"] || voucher["Date"] || voucher["Invoice date"] || voucher["invoice_date"] || voucher["date"];
+        let date = rawDate;
+
+        if (typeof date === 'string') {
+            const dmyMatch = date.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+            if (dmyMatch) {
+                date = `${dmyMatch[3]}-${dmyMatch[2].padStart(2, '0')}-${dmyMatch[1].padStart(2, '0')}`;
+            } else {
+                const ymdMatch = date.match(/^(\d{4})[\/\-](\d{1,2})[\/\-](\d{1,2})/);
+                if (ymdMatch) {
+                    date = `${ymdMatch[1]}-${ymdMatch[2].padStart(2, '0')}-${ymdMatch[3].padStart(2, '0')}`;
+                }
+            }
+        }
+
+        if (!date || date === 'undefined' || date === 'null' || isNaN(new Date(date).getTime())) {
+            date = new Date().toISOString().split('T')[0];
+        }
+
+        // Determine Sales Ledger
+        let salesLedgerId = defaultSalesLedgerId;
+        const firstRowSalesLedgerName = voucher["Purchase Ledger"] ? String(voucher["Purchase Ledger"]).toLowerCase().trim() : null;
+        if (firstRowSalesLedgerName) {
+            const sLedger = ledgers.find(l => l.name.toLowerCase().includes(firstRowSalesLedgerName));
+            if (sLedger) salesLedgerId = sLedger.id;
+        }
+
+        // PARTY MATCH
+        const importMode = voucher.importMode || 'item';
+        let partyId = null;
+
+        const matchedLedgerByName = ledgers.find(l => {
+            const lName = l.name ? String(l.name).toLowerCase().replace(/\s+/g, " ").trim() : "";
+            const pName = partyName.replace(/\s+/g, " ").trim();
+            return partyName && lName === pName;
+        });
+
+        if (matchedLedgerByName) {
+            partyId = matchedLedgerByName.id;
+        } else if (importMode === 'accounting') {
+            const debitEntry = (voucher.accountingEntries || []).find(ae => String(ae.Type || ae.type).toLowerCase().trim() === 'debit');
+            if (debitEntry) {
+                const sName = String(debitEntry["Particulars (Ledger Name)"] || debitEntry.ledgerName || "").toLowerCase().trim();
+                const sLedger = ledgers.find(l => (l.name || "").toLowerCase().trim() === sName);
+                if (sLedger) partyId = sLedger.id;
+            }
+        }
+
+        if (!partyId) {
+            return res.json({ success: false, errors: [`Customer '${partyName || 'in entries'}' not found in ledgers`] });
+        }
+
+        // AGGREGATE TOTALS
+        let subtotal = 0;
+        let cgstTotal = 0;
+        let sgstTotal = 0;
+        let igstTotal = 0;
+        let discountTotal = 0;
+
+        const processedItems = [];
+        const processedAccountingEntries = [];
+
+        if (importMode === 'item') {
+            for (const item of (voucher.items || [])) {
+                const taxable = Number(item["Taxable Value (₹)"] || 0);
+                const cgst = Number(item["Central Tax (₹)"] || 0);
+                const sgst = Number(item["State/UT tax (₹)"] || 0);
+                const igst = Number(item["Integrated Tax (₹)"] || 0);
+                const rate = Number(item["Rate (%)"] || 0);
+
+                subtotal += taxable;
+                cgstTotal += cgst;
+                sgstTotal += sgst;
+                igstTotal += igst;
+
+                let finalItemId = 0;
+                const itemName = item["Item Name"];
+                if (itemName) {
+                    const si = stockItems.find(it => it.name.toLowerCase().trim() === itemName.toLowerCase().trim());
+                    if (si) finalItemId = si.id;
+                }
+
+                processedItems.push({
+                    itemId: finalItemId,
+                    itemName: itemName,
+                    quantity: parseFloat(item["Quantity"]) || 1,
+                    rate: parseFloat(item["Item Rate (₹)"]) || taxable,
+                    amount: taxable,
+                    cgstRate: cgst > 0 ? (rate / 2) : 0,
+                    sgstRate: sgst > 0 ? (rate / 2) : 0,
+                    igstRate: igst > 0 ? rate : 0,
+                    hsnCode: item["HSN Code"] || "",
+                    batchNo: item["Batch No"] || ""
+                });
+            }
+        } else {
+            for (const ae of (voucher.accountingEntries || [])) {
+                const amount = Number(ae["Amount (₹)"] || 0);
+                const particulars = ae["Particulars (Ledger Name)"];
+                const type = ae["Type"] || "credit";
+
+                if (type === 'credit') {
+                    const lName = String(particulars || "").toLowerCase();
+                    if (lName.includes("cgst")) cgstTotal += amount;
+                    else if (lName.includes("sgst") || lName.includes("utgst")) sgstTotal += amount;
+                    else if (lName.includes("igst")) igstTotal += amount;
+                    else if (lName.includes("discount")) discountTotal -= amount;
+                    else subtotal += amount;
+                } else if (type === 'debit' && particulars) {
+                    const lName = String(particulars || "").toLowerCase();
+                    if (lName.includes("discount")) discountTotal += amount;
+                }
+
+                let finalLedgerId = 0;
+                if (particulars) {
+                    const l = ledgers.find(ld => ld.name.toLowerCase().trim() === particulars.toLowerCase().trim());
+                    if (l) finalLedgerId = l.id;
+                }
+
+                processedAccountingEntries.push({
+                    ledgerId: finalLedgerId,
+                    ledgerName: particulars,
+                    amount: amount,
+                    type: type
+                });
+            }
+        }
+
+        const totalVal = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
+
+        // GENERATE VOUCHER NUMBER
+        const voucherNumber = await generateVoucherNumber({
+            companyId, ownerType, ownerId, voucherType: "sales", date
+        });
+
+        // INSERT MAIN
+        const [mainResult] = await db.execute(
+            `INSERT INTO sales_vouchers (
+                number, date, narration, partyId, referenceNo, 
+                subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total, 
+                company_id, owner_type, owner_id, mode, salesLedgerId, type, isQuotation
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+            [
+                voucherNumber, date, voucher.narration || `Imported Sales ${importMode === 'item' ? 'Multi-item' : 'Accounting'}`, partyId, invoiceNo,
+                subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, totalVal,
+                companyId, ownerType, ownerId, importMode === 'item' ? 'item-invoice' : 'accounting-invoice', salesLedgerId, 'sales', 0
+            ]
+        );
+
+        const voucherId = mainResult.insertId;
+
+        if (importMode === 'item') {
+            for (const pi of processedItems) {
+                await db.execute(
+                    `INSERT INTO sales_voucher_items (
+                        voucherId, itemId, quantity, rate, amount, 
+                        cgstRate, sgstRate, igstRate, salesLedgerId, hsnCode, batchNumber
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                    [
+                        voucherId, pi.itemId, pi.quantity, pi.rate, pi.amount,
+                        pi.cgstRate, pi.sgstRate, pi.igstRate, salesLedgerId, pi.hsnCode, pi.batchNo
+                    ]
+                );
+
+                if (pi.itemId) {
+                    const stockItem = stockItems.find(si => si.id === pi.itemId);
+                    if (stockItem) {
+                        let dbBatches = [];
+                        try {
+                            dbBatches = stockItem.batches ? (typeof stockItem.batches === 'string' ? JSON.parse(stockItem.batches) : stockItem.batches) : [];
+                            if (!Array.isArray(dbBatches)) dbBatches = [];
+                        } catch (e) { dbBatches = []; }
+
+                        const batchNameLower = pi.batchNo ? String(pi.batchNo).trim().toLowerCase() : "";
+                        const existingBatchIndex = dbBatches.findIndex(b => {
+                            const dbName = b.batchName ? String(b.batchName).trim().toLowerCase() : "";
+                            return dbName === batchNameLower;
+                        });
+
+                        if (existingBatchIndex > -1) {
+                            dbBatches[existingBatchIndex].batchQuantity = (Number(dbBatches[existingBatchIndex].batchQuantity) || 0) - pi.quantity;
+                        }
+
+                        const newTotalBalance = (Number(stockItem.openingBalance) || 0) - pi.quantity;
+                        await db.execute("UPDATE stock_items SET batches = ?, openingBalance = ? WHERE id = ?", [JSON.stringify(dbBatches), newTotalBalance, pi.itemId]);
+                    }
+                }
+
+                if (pi.batchNo && pi.itemId) {
+                    const historyValues = [[
+                        pi.itemName, pi.hsnCode, pi.batchNo, pi.quantity, pi.rate, date,
+                        null, voucherNumber, companyId, ownerType, ownerId
+                    ]];
+                    await db.query(`INSERT INTO sale_history (itemName, hsnCode, batchNumber, qtyChange, rate, movementDate, godownId, voucherNumber, companyId, ownerType, ownerId) VALUES ?`, [historyValues]);
+                }
+            }
+        } else {
+            const entryValues = processedAccountingEntries.map(ae => [
+                voucherId, ae.ledgerId, ae.ledgerName, ae.amount, ae.type, null, null, null, null
+            ]);
+
+            if (entryValues.length > 0) {
+                await db.query(
+                    `INSERT INTO voucher_entries (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id) VALUES ?`,
+                    [entryValues]
+                );
+            }
+        }
+
+        return res.json({
+            success: true,
+            imported: 1,
+            vouchers: [voucherNumber]
+        });
+
+    } catch (error) {
+        console.error("❌ Sales Summary Import Error:", error);
+        return res.status(500).json({ success: false, message: "Import failed: " + error.message });
+    }
+});
+
 module.exports = router;
 
