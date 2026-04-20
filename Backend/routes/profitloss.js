@@ -216,7 +216,7 @@ router.get("/api/purchase/:id", async (req, res) => {
 
     res.json({
       success: true,
-      data: rows, 
+      data: rows,
     });
 
   } catch (error) {
