@@ -9,6 +9,7 @@ import {
     RefreshCw,
     FileSpreadsheet,
     ShoppingCart,
+    X,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
@@ -135,6 +136,10 @@ const extractStateCode = (pos: string): string => {
         if (nameOnly.includes(name) || name.includes(nameOnly)) return code;
     }
     return "";
+};
+
+const isValidGSTIN = (gstin: string): boolean => {
+    return /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(gstin);
 };
 
 const SalesImport: React.FC = () => {
@@ -269,14 +274,14 @@ const SalesImport: React.FC = () => {
                         const excelName = partyName.toLowerCase();
                         matchedLedgerByName = ledgers.find(l => (l.name ? String(l.name).toLowerCase().replace(/\s+/g, " ").trim() : "") === excelName);
                         if (matchedLedgerByName) {
-                            const lGst = matchedLedgerByName.gstNumber ? String(matchedLedgerByName.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
+                            const lGst = (matchedLedgerByName.gstNumber || matchedLedgerByName.gst_number) ? String(matchedLedgerByName.gstNumber || matchedLedgerByName.gst_number).toUpperCase().replace(/\s+/g, "").trim() : "";
                             const lState = matchedLedgerByName.state ? String(matchedLedgerByName.state).toLowerCase().replace(/\s+/g, " ").trim() : "";
                             gstMatch = lGst === gstin;
                             const excelStateCode = extractStateCode(placeOfSupply);
                             const ledgerStateCode = extractStateCode(lState);
                             stateMatch = (excelStateCode && ledgerStateCode && excelStateCode === ledgerStateCode) || lState === placeOfSupply || lState.includes(placeOfSupply) || placeOfSupply.includes(lState);
                             if (!gstMatch && !stateMatch) errorMessage = "GSTIN and State mismatch";
-                            else if (!gstMatch) errorMessage = `GSTIN mismatch (Ledger has: ${lGst || 'Empty'})`;
+                            else if (!gstMatch && gstin) errorMessage = `GSTIN mismatch (Ledger has: ${lGst || 'Empty'})`;
                             else if (!stateMatch) errorMessage = `State mismatch (Ledger has: ${lState || 'Empty'})`;
                         } else errorMessage = "Customer Name not found in ledgers";
                     } else if (currentImportMode === "item") errorMessage = "Customer Name is required for item-wise import";
@@ -327,7 +332,7 @@ const SalesImport: React.FC = () => {
                     }
                 } else if (currentImportMode === "accounting") {
                     if (isAccSummaryImport) {
-                        const taxableVal = Number(row["Taxable Value (₹)"] || 0), igst = Number(row["Integrated Tax (₹)"] || 0), cgst = Number(row["Central Tax (₹)"] || 0), sgst = Number(row["State/UT tax (₹)"] || 0), gstRate = Number(row["GST Rate (%)"] || 0), salesLedger = String(row["Sales Ledger"] || row["Sales Account"] || "").trim(), discount = Number(row["Discount (₹)"] || 0), totalTax = igst + cgst + sgst, rowTotal = taxableVal + totalTax - discount;
+                        const taxableVal = Number(row["Taxable Value (₹)"] || 0), igst = Number(row["Integrated Tax (₹)"] || 0), cgst = Number(row["Central Tax (₹)"] || 0), sgst = Number(row["State/UT tax (₹)"] || 0), gstRate = Number(row["GST Rate (%)"] || 0), salesLedger = String(row["Sales Ledger"] || row["Sales Account"] || row["Purchase Ledger"] || row["Purchase Account"] || "").trim(), discount = Number(row["Discount (₹)"] || 0), totalTax = igst + cgst + sgst, rowTotal = taxableVal + totalTax - discount;
                         if (!voucherGroups[groupKey].accSummaryRows) { voucherGroups[groupKey].accSummaryRows = []; voucherGroups[groupKey]["Invoice Value (₹)"] = 0; voucherGroups[groupKey].accountingEntries = []; }
                         voucherGroups[groupKey]["Invoice Value (₹)"] += rowTotal;
                         let calculationWarning = "";
@@ -411,25 +416,6 @@ const SalesImport: React.FC = () => {
         } catch (err) { console.error("Save Error:", err); Swal.fire({ icon: "error", title: "Error", text: "Something went wrong while saving." }); } finally { setIsProcessing(false); }
     };
 
-    const fixAllCalculations = () => {
-        const fixedVouchers = groupedVouchers.map(voucher => {
-            if (voucher.importMode === "item") {
-                const updatedItems = voucher.items.map(item => {
-                    const qty = item["Quantity"], rate = item["Item Rate (₹)"], totalRate = item["Rate (%)"], newTaxable = qty * rate;
-                    const supplierGstin = String(voucher["GSTIN of Customer"] || "").trim(), supplierGstinCode = supplierGstin.slice(0, 2), excelPosCode = extractStateCode(voucher["Place of supply"]);
-                    const isIntra = (supplierGstinCode && excelPosCode && supplierGstinCode === excelPosCode);
-                    let newIgst = 0, newCgst = 0, newSgst = 0;
-                    if (isIntra) { newCgst = (newTaxable * (totalRate / 2)) / 100; newSgst = (newTaxable * (totalRate / 2)) / 100; newIgst = 0; }
-                    else { newIgst = (newTaxable * totalRate) / 100; newCgst = 0; newSgst = 0; }
-                    return { ...item, "Taxable Value (₹)": newTaxable, "Integrated Tax (₹)": newIgst, "Central Tax (₹)": newCgst, "State/UT tax (₹)": newSgst, calculationWarning: "" };
-                });
-                const newInvoiceVal = updatedItems.reduce((sum, it) => sum + it["Taxable Value (₹)"] + it["Integrated Tax (₹)"] + it["Central Tax (₹)"] + it["State/UT tax (₹)"], 0);
-                return { ...voucher, items: updatedItems, "Invoice Value (₹)": newInvoiceVal };
-            }
-            return voucher;
-        });
-        setGroupedVouchers(fixedVouchers);
-    };
 
     const downloadTemplate = (mode: "item" | "accounting") => {
         const data = mode === 'item' ? [{ "Invoice number": "INV-001", "Invoice Date": "01-04-2024", "GSTIN of Customer": "09AAAAA0000A1Z5", "Trade/Legal name of the Customer": "ABC Corp", "Place of supply": "Uttar Pradesh (09)", "Sales Ledger": "Sales A/c", "Item Name": "Laptop", "HSN Code": "8471", "Batch No": "B001", "Quantity": 10, "Item Rate (₹)": 50000, "Rate (%)": 18, "Taxable Value (₹)": 500000, "Integrated Tax (₹)": 0, "Central Tax (₹)": 45000, "State/UT tax (₹)": 45000, "Invoice Value (₹)": 590000 }] : [{ "Invoice number": "INV-002", "Invoice Date": "01-04-2024", "GSTIN of Customer": "09AAAAA0000A1Z5", "Trade/Legal name of the Customer": "XYZ Ltd", "Place of supply": "Uttar Pradesh (09)", "Particulars (Ledger Name)": "Sales Account", "Amount (₹)": 100000, "Type": "credit", "Rate (%)": 18, "Integrated Tax (₹)": 0, "Central Tax (₹)": 9000, "State/UT tax (₹)": 9000, "Invoice Value (₹)": 118000 }];
@@ -507,10 +493,15 @@ const SalesImport: React.FC = () => {
                                 </div>
                             </div>
                             <div className="flex items-center gap-3 ml-auto">
-                                <button onClick={fixAllCalculations} className="px-6 py-3 bg-amber-50 text-amber-700 rounded-xl hover:bg-amber-100 font-bold transition-all flex items-center space-x-2">
-                                    <RefreshCw size={18} />
-                                    <span>Fix Calculations</span>
-                                </button>
+                                {errorCount > 0 && (
+                                    <button 
+                                        onClick={() => setGroupedVouchers(prev => prev.filter(v => v.status !== "error"))} 
+                                        className="px-6 py-3 bg-red-50 text-red-700 rounded-xl hover:bg-red-100 font-bold transition-all flex items-center space-x-2 border border-red-100"
+                                    >
+                                        <X size={18} />
+                                        <span>Cancel All Errors</span>
+                                    </button>
+                                )}
                                 <button disabled={pendingCount === 0 || isProcessing} onClick={saveImportedVouchers} className="px-10 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed font-bold transition-all shadow-lg shadow-blue-200 flex items-center space-x-2">
                                     {isProcessing ? <RefreshCw size={18} className="animate-spin" /> : <Upload size={18} />}
                                     <span>{isProcessing ? `Importing... (${saveProgress.done}/${saveProgress.total})` : `Start Import (${pendingCount})`}</span>
@@ -540,7 +531,11 @@ const SalesImport: React.FC = () => {
                                             </div>
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] text-gray-400 font-bold uppercase">GSTIN</span>
-                                                <span className="text-sm text-gray-500 font-mono tracking-tighter">{voucher["GSTIN of Customer"]}</span>
+                                                <div className="flex items-center gap-1">
+                                                    <span className="text-sm text-gray-500 font-mono tracking-tighter">{voucher["GSTIN of Customer"]}</span>
+                                                    {voucher["GSTIN of Customer"] && /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/.test(voucher["GSTIN of Customer"]) && <CheckCircle size={12} className="text-green-500" title="Valid GSTIN Format" />}
+                                                    {voucher._matchedGstinId && <CheckCircle size={12} className="text-blue-500" title="Matched with Ledger" />}
+                                                </div>
                                             </div>
                                         </div>
                                         <div className="flex items-center gap-4">
@@ -581,7 +576,18 @@ const SalesImport: React.FC = () => {
                                                             <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">CGST</th>
                                                             <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">SGST</th>
                                                             <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">Total</th>
-                                                            <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Sales Ledger</th>
+                                                            <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Ledger Account</th>
+                                                        </>
+                                                    ) : voucher.accSummaryRows ? (
+                                                        <>
+                                                            <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">Taxable Value</th>
+                                                            <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">IGST</th>
+                                                            <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">CGST</th>
+                                                            <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">SGST</th>
+                                                            <th className="px-6 py-3 text-center text-[10px] font-bold text-gray-400 uppercase">GST %</th>
+                                                            <th className="px-6 py-3 text-left text-[10px] font-bold text-gray-400 uppercase">Ledger</th>
+                                                            <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">Discount</th>
+                                                            <th className="px-6 py-3 text-right text-[10px] font-bold text-gray-400 uppercase">Total</th>
                                                         </>
                                                     ) : (
                                                         <>
@@ -649,8 +655,8 @@ const SalesImport: React.FC = () => {
                                             </tbody>
                                             <tfoot className="bg-gray-50/50 border-t border-gray-100">
                                                 <tr className="font-bold">
-                                                    <td colSpan={importMode === 'item' ? 6 : 3} className="px-6 py-2 text-[10px] text-gray-500 uppercase text-right">Totals</td>
-                                                    <td className="px-4 py-2 text-[11px] text-gray-900 text-right">
+                                                    <td colSpan={importMode === 'item' ? 6 : (voucher.accSummaryRows ? 1 : 3)} className="px-6 py-2 text-[10px] text-gray-500 uppercase text-right">Totals</td>
+                                                    <td colSpan={importMode === 'item' ? 7 : (voucher.accSummaryRows ? 8 : 1)} className="px-4 py-2 text-[11px] text-gray-900 text-right">
                                                         {importMode === 'item' ? (`₹${voucher.items.reduce((s, it) => s + it["Taxable Value (₹)"], 0).toLocaleString()}`) : (
                                                             <div className="flex items-center justify-end gap-6 py-1">
                                                                 <div className="flex items-center gap-1.5"><span className="text-[9px] text-gray-400 uppercase font-bold">Total Cr ({voucher.accountingEntries?.filter(ae => ae.Type === 'credit').length}):</span><span className="text-green-700">₹{voucher.accountingEntries?.reduce((s, ae) => ae.Type === 'credit' ? s + ae["Amount (₹)"] : s, 0).toLocaleString()}</span></div>

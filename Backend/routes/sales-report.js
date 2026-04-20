@@ -58,13 +58,12 @@ router.get("/", async (req, res) => {
 
     const [rows] = await pool.execute(query, queryParams);
 
-    // =========================================================
-    // 🔹 FETCH ITEMS FOR THESE VOUCHERS
-    // =========================================================
     if (rows.length > 0) {
       const voucherIds = rows.map(row => row.id);
 
-      // Use .query for array expansion support
+      // =========================================================
+      // 🔹 FETCH ITEMS FOR THESE VOUCHERS
+      // =========================================================
       const [items] = await pool.query(
         `SELECT 
             svi.id, svi.voucherId, svi.itemId, 
@@ -99,14 +98,28 @@ router.get("/", async (req, res) => {
         [voucherIds]
       );
 
+      // =========================================================
+      // 🔹 FETCH VOUCHER ENTRIES (For Accounting Summary Vouchers)
+      // =========================================================
+      const [voucherEntries] = await pool.query(
+        `SELECT 
+            ve.id, ve.voucher_id AS voucherId, ve.ledger_id AS ledgerId,
+            ve.amount, ve.entry_type AS type, ve.narration,
+            l.name AS ledgerName, l.group_id AS groupId,
+            lg.name AS groupName
+         FROM voucher_entries ve
+         LEFT JOIN ledgers l ON ve.ledger_id = l.id
+         LEFT JOIN ledger_groups lg ON l.group_id = lg.id
+         WHERE ve.voucher_id IN (?)`,
+        [voucherIds]
+      );
+
       // Attach items to their respective vouchers with numeric conversion
       const itemsMap = {};
+      
+      // Process items from sales_voucher_items (Item-wise)
       items.forEach(item => {
-        if (!itemsMap[item.voucherId]) {
-          itemsMap[item.voucherId] = [];
-        }
-
-        // Convert rates/amounts to numbers
+        if (!itemsMap[item.voucherId]) itemsMap[item.voucherId] = [];
         itemsMap[item.voucherId].push({
           ...item,
           quantity: Number(item.quantity) || 0,
@@ -116,7 +129,39 @@ router.get("/", async (req, res) => {
           cgstRate: Number(item.cgstRate) || 0,
           sgstRate: Number(item.sgstRate) || 0,
           igstRate: Number(item.igstRate) || 0,
-          discountLedgerName: item.discountLedgerName || null,
+        });
+      });
+
+      // Process entries from voucher_entries (Accounting-wise)
+      voucherEntries.forEach(entry => {
+        if (!itemsMap[entry.voucherId]) itemsMap[entry.voucherId] = [];
+        
+        // Find the voucher for this entry
+        const voucher = rows.find(r => r.id === entry.voucherId);
+        
+        // Skip the party entry (as it is already the main partyName in rows)
+        // Usually, the party is a debit entry in a sales voucher
+        if (voucher && String(voucher.ledgerId) === String(entry.ledgerId)) return;
+
+        const lName = (entry.ledgerName || "").toLowerCase();
+        const gName = (entry.groupName || "").toLowerCase();
+        
+        const isTax = gName.includes("duties") || gName.includes("tax");
+        const isSales = gName.includes("sales account");
+        const isDiscount = lName.includes("discount") || gName.includes("discount");
+
+        itemsMap[entry.voucherId].push({
+          id: entry.id,
+          voucherId: entry.voucherId,
+          amount: Number(entry.amount) || 0,
+          salesLedgerName: entry.ledgerName,
+          salesLedgerGroupName: entry.groupName,
+          // Map GST ledgers if they are in the tax group
+          cgstLedgerName: (isTax && lName.includes("cgst")) ? entry.ledgerName : null,
+          sgstLedgerName: (isTax && (lName.includes("sgst") || lName.includes("utgst"))) ? entry.ledgerName : null,
+          igstLedgerName: (isTax && lName.includes("igst")) ? entry.ledgerName : null,
+          discountLedgerName: isDiscount ? entry.ledgerName : null,
+          type: entry.type
         });
       });
 

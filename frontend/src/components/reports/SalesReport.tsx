@@ -240,10 +240,26 @@ const SalesReport: React.FC = () => {
         });
       }
 
-      // 2️⃣ SALES SIDE (Credit / Income) via Items
+      // 2️⃣ SALES & TAXES SIDE (Credit / Income) via Items
+      const seenTaxInItems = { cgst: false, sgst: false, igst: false };
+
       if (voucher.items && voucher.items.length > 0) {
         voucher.items.forEach((item: any) => {
-          const itemGroupName = "Sales Account"; // Or item.salesLedgerGroupName
+          const lName = (item.salesLedgerName || "").toLowerCase();
+          const gName = (item.salesLedgerGroupName || "").toLowerCase();
+          
+          // Determine the correct group for this item
+          let itemGroupName = item.salesLedgerGroupName || "Sales Account";
+          
+          const isTax = gName.includes("duties") || gName.includes("tax") || 
+                        lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
+          
+          if (isTax) {
+            itemGroupName = "Duties & Taxes";
+            if (lName.includes("cgst")) seenTaxInItems.cgst = true;
+            if (lName.includes("sgst") || lName.includes("utgst")) seenTaxInItems.sgst = true;
+            if (lName.includes("igst")) seenTaxInItems.igst = true;
+          }
 
           if (!groups[itemGroupName]) {
             groups[itemGroupName] = {
@@ -254,7 +270,6 @@ const SalesReport: React.FC = () => {
           }
 
           const itemAmount = Number(item.amount || 0);
-
           groups[itemGroupName].totalCredit += itemAmount;
 
           const ledgerName = item.salesLedgerName || "Unknown Sales Ledger";
@@ -274,25 +289,12 @@ const SalesReport: React.FC = () => {
         });
       }
 
-      // 3️⃣ DUTIES & TAXES (Credit / Liability - Output Tax)
+      // 3️⃣ ADDITIONAL TAXES (Only if not already in items)
       const taxGroupName = "Duties & Taxes";
 
-      // Extract Unique Tax Ledger Names from Items
-      const cgstLedgers = new Set<string>();
-      const sgstLedgers = new Set<string>();
-      const igstLedgers = new Set<string>();
-
-      if (voucher.items) {
-        voucher.items.forEach((i: any) => {
-          if (i.cgstLedgerName) cgstLedgers.add(i.cgstLedgerName);
-          if (i.sgstLedgerName) sgstLedgers.add(i.sgstLedgerName);
-          if (i.igstLedgerName) igstLedgers.add(i.igstLedgerName);
-        });
-      }
-
-      const cgst = Number(voucher.cgstAmount || 0);
-      const sgst = Number(voucher.sgstAmount || 0);
-      const igst = Number(voucher.igstAmount || 0);
+      const cgst = seenTaxInItems.cgst ? 0 : Number(voucher.cgstAmount || 0);
+      const sgst = seenTaxInItems.sgst ? 0 : Number(voucher.sgstAmount || 0);
+      const igst = seenTaxInItems.igst ? 0 : Number(voucher.igstAmount || 0);
 
       if (cgst > 0 || sgst > 0 || igst > 0) {
         if (!groups[taxGroupName]) {
@@ -305,22 +307,20 @@ const SalesReport: React.FC = () => {
 
         const addTaxTransaction = (
           amount: number,
-          ledgers: Set<string>,
           defaultName: string
         ) => {
           if (amount > 0) {
-            const name = Array.from(ledgers).sort().join(", ") || defaultName;
             groups[taxGroupName].totalCredit += amount;
 
             const existingTax = groups[taxGroupName].transactions.find(
-              (t) => t.name === name
+              (t) => t.name === defaultName
             );
 
             if (existingTax) {
               existingTax.credit += amount;
             } else {
               groups[taxGroupName].transactions.push({
-                name: name,
+                name: defaultName,
                 debit: 0,
                 credit: amount,
               });
@@ -328,9 +328,9 @@ const SalesReport: React.FC = () => {
           }
         };
 
-        addTaxTransaction(cgst, cgstLedgers, "Output CGST");
-        addTaxTransaction(sgst, sgstLedgers, "Output SGST");
-        addTaxTransaction(igst, igstLedgers, "Output IGST");
+        addTaxTransaction(cgst, "Output CGST");
+        addTaxTransaction(sgst, "Output SGST");
+        addTaxTransaction(igst, "Output IGST");
       }
 
       // 4️⃣ INDIRECT EXPENSES (Debit / Expense - Discount Allowed)
@@ -1209,15 +1209,15 @@ const SalesReport: React.FC = () => {
                                 : "hover:bg-gray-50"
                                 }`}
                             >
-                              <td
-                                className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
-                                onClick={() => {
-                                  setColumnarDrillDown(txn.name);
-                                  setSelectedView("columnar");
-                                }}
-                              >
-                                {txn.name}
-                              </td>
+                            <td
+                              className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
+                              onClick={() => {
+                                setColumnarDrillDown(txn.name);
+                                setSelectedView("columnar");
+                              }}
+                            >
+                              {txn.name}
+                            </td>
 
                               <td className="px-4 py-2 text-right text-sm font-mono">
                                 {txn.debit > 0

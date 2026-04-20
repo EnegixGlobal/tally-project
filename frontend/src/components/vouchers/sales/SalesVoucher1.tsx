@@ -774,7 +774,9 @@ const SalesVoucher: React.FC = () => {
 
             discount: Math.round(Number(e.discount || 0)),
 
-            amount: Math.round(Number(e.quantity || 0)) * Math.round(Number(e.rate || 0)),
+            amount: data.mode === "accounting-invoice" 
+              ? Number(e.amount || 0) 
+              : Math.round(Number(e.quantity || 0)) * Math.round(Number(e.rate || 0)),
 
             // Map Backend IDs to LedgerId fields (Convert float string "115.00" to int 115)
             cgstLedgerId: e.cgstRate ? String(Math.round(Number(e.cgstRate))) : "",
@@ -3515,7 +3517,7 @@ const SalesVoucher: React.FC = () => {
                               title="Enter Amount"
                               type="number"
                               name="amount"
-                              value={Math.round(entry.amount ?? 0) || ""}
+                              value={entry.amount ?? ""}
                               onChange={(e) => handleEntryChange(index, e)}
                               onKeyDown={(e) => {
                                 if (e.key === "Enter") e.preventDefault();
@@ -3584,17 +3586,17 @@ const SalesVoucher: React.FC = () => {
                           <>
                             <tr className={`font-semibold ${theme === "dark" ? "border-t border-gray-600" : "border-t border-gray-300"}`}>
                               <td colSpan={2} className="px-4 py-2 text-right">Debit Total:</td>
-                              <td className="px-4 py-2 text-right">₹{Math.round(debitTotal).toLocaleString()}</td>
+                              <td className="px-4 py-2 text-right">₹{Number(debitTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               <td colSpan={3}></td>
                             </tr>
                             <tr className={`font-semibold ${theme === "dark" ? "border-t border-gray-600" : "border-t border-gray-300"}`}>
                               <td colSpan={2} className="px-4 py-2 text-right">Credit Total:</td>
-                              <td className="px-4 py-2 text-right">₹{Math.round(creditTotal).toLocaleString()}</td>
+                              <td className="px-4 py-2 text-right">₹{Number(creditTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               <td colSpan={3}></td>
                             </tr>
                             <tr className={`font-bold text-lg ${theme === "dark" ? "border-t-2 border-gray-500" : "border-t-2 border-black"}`}>
                               <td colSpan={2} className="px-4 py-2 text-right">Grand Total:</td>
-                              <td className="px-4 py-2 text-right text-green-600">₹{Math.round(debitTotal).toLocaleString()}</td>
+                              <td className="px-4 py-2 text-right text-green-600">₹{Number(debitTotal).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</td>
                               <td colSpan={3}></td>
                             </tr>
                           </>

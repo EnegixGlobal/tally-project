@@ -75,46 +75,81 @@ router.get('/', async (req, res) => {
       }
     };
 
-    purchaseVouchers.forEach(voucher => {
-      // Sundry Creditors - group by party
-      if (voucher.partyId && voucher.partyName) {
-        if (!extractData.sundryCreditors[voucher.partyName]) {
-          extractData.sundryCreditors[voucher.partyName] = {
-            partyName: voucher.partyName,
-            partyGSTIN: voucher.partyGSTIN || null,
-            debit: 0,
-            credit: 0
-          };
-        }
-        extractData.sundryCreditors[voucher.partyName].debit += parseFloat(voucher.total) || 0;
-        extractData.sundryCreditors[voucher.partyName].credit += parseFloat(voucher.total) || 0;
-      }
+    if (purchaseVouchers.length > 0) {
+      const voucherIds = purchaseVouchers.map(v => v.id);
 
-      // Purchase Accounts - group by purchase ledger
-      if (voucher.purchaseLedgerId && voucher.purchaseLedgerName) {
-        if (!extractData.purchaseAccounts[voucher.purchaseLedgerName]) {
-          extractData.purchaseAccounts[voucher.purchaseLedgerName] = {
-            ledgerName: voucher.purchaseLedgerName,
-            debit: 0,
-            credit: 0
-          };
-        }
-        extractData.purchaseAccounts[voucher.purchaseLedgerName].debit += parseFloat(voucher.subtotal) || 0;
-      }
+      // Fetch all entries for these vouchers
+      const [entries] = await db.query(
+        `SELECT 
+            ve.voucher_id, ve.ledger_id, ve.amount, ve.entry_type,
+            l.name AS ledgerName, l.gst_number AS partyGSTIN,
+            lg.name AS groupName
+         FROM voucher_entries ve
+         LEFT JOIN ledgers l ON ve.ledger_id = l.id
+         LEFT JOIN ledger_groups lg ON l.group_id = lg.id
+         WHERE ve.voucher_id IN (?)`,
+        [voucherIds]
+      );
 
-      // Current Assets - Duties & Taxes (Input Tax Credit)
-      extractData.currentAssets.cgst += parseFloat(voucher.cgstTotal) || 0;
-      extractData.currentAssets.sgst += parseFloat(voucher.sgstTotal) || 0;
-      extractData.currentAssets.igst += parseFloat(voucher.igstTotal) || 0;
-    });
+      entries.forEach(entry => {
+        const amount = parseFloat(entry.amount) || 0;
+        const lName = (entry.ledgerName || "").toLowerCase();
+        const gName = (entry.groupName || "").toLowerCase();
+
+        const isTax = gName.includes("duties") || gName.includes("tax") || 
+                      lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
+        const isPurchase = gName.includes("purchase account") || lName.includes("purchase");
+
+        // 1. Duties & Taxes (Prioritize)
+        if (isTax) {
+          if (lName.includes("cgst")) extractData.currentAssets.cgst += amount;
+          else if (lName.includes("sgst") || lName.includes("utgst")) extractData.currentAssets.sgst += amount;
+          else if (lName.includes("igst")) extractData.currentAssets.igst += amount;
+          else {
+            extractData.currentAssets.cgst += amount; 
+          }
+        }
+        // 2. Sundry Creditors (Usually Credit in Purchase)
+        else if (gName.includes("sundry creditors") || gName.includes("suppliers")) {
+          if (!extractData.sundryCreditors[entry.ledgerName]) {
+            extractData.sundryCreditors[entry.ledgerName] = {
+              partyName: entry.ledgerName,
+              partyGSTIN: entry.partyGSTIN || null,
+              debit: 0,
+              credit: 0
+            };
+          }
+          if (entry.entry_type === "credit") {
+            extractData.sundryCreditors[entry.ledgerName].credit += amount;
+          } else {
+            extractData.sundryCreditors[entry.ledgerName].debit += amount;
+          }
+        }
+        // 3. Purchase Accounts (Usually Debit in Purchase)
+        else if (isPurchase) {
+          if (!extractData.purchaseAccounts[entry.ledgerName]) {
+            extractData.purchaseAccounts[entry.ledgerName] = {
+              ledgerName: entry.ledgerName,
+              debit: 0,
+              credit: 0
+            };
+          }
+          if (entry.entry_type === "debit") {
+            extractData.purchaseAccounts[entry.ledgerName].debit += amount;
+          } else {
+            extractData.purchaseAccounts[entry.ledgerName].credit += amount;
+          }
+        }
+      });
+    }
 
     // Calculate grand totals
     const sundryCreditorsTotal = Object.values(extractData.sundryCreditors).reduce(
-      (sum, party) => sum + party.credit, 0
+      (sum, party) => sum + (party.credit - party.debit), 0
     );
 
     const purchaseAccountsTotal = Object.values(extractData.purchaseAccounts).reduce(
-      (sum, account) => sum + account.debit, 0
+      (sum, account) => sum + (account.debit - account.credit), 0
     );
 
     const taxesTotal = extractData.currentAssets.cgst +

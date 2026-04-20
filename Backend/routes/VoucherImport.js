@@ -1758,7 +1758,7 @@ router.post("/sales_summary_import", async (req, res) => {
 
         // Determine Sales Ledger
         let salesLedgerId = defaultSalesLedgerId;
-        const firstRowSalesLedgerName = voucher["Purchase Ledger"] ? String(voucher["Purchase Ledger"]).toLowerCase().trim() : null;
+        const firstRowSalesLedgerName = (voucher["Sales Ledger"] || voucher["Purchase Ledger"]) ? String(voucher["Sales Ledger"] || voucher["Purchase Ledger"]).toLowerCase().trim() : null;
         if (firstRowSalesLedgerName) {
             const sLedger = ledgers.find(l => l.name.toLowerCase().includes(firstRowSalesLedgerName));
             if (sLedger) salesLedgerId = sLedger.id;

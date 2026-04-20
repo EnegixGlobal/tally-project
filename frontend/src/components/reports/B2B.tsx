@@ -245,6 +245,7 @@ const B2B: React.FC = () => {
   const [matchedLedgers, setMatchedLedgers] = useState<any[]>([]);
 
   const [matchedSales, setMatchedSales] = useState<any[]>([]);
+  const [columnarDrillDown, setColumnarDrillDown] = useState<string | null>(null);
 
   useEffect(() => {
     if (!companyId || !ownerType || !ownerId) return;
@@ -397,11 +398,29 @@ const B2B: React.FC = () => {
   const columnarData = useMemo(() => {
     if (!matchedSales.length) return { headers: [], rows: [] };
 
+    let vouchersToProcess = matchedSales;
+    if (columnarDrillDown) {
+      vouchersToProcess = matchedSales.filter(v => {
+        const partyName = v.partyName || ledgerMap.get(v.partyId)?.name;
+        if (partyName === columnarDrillDown) return true;
+        
+        if (v.items) {
+          return v.items.some((item: any) => 
+            item.salesLedgerName === columnarDrillDown ||
+            item.cgstLedgerName === columnarDrillDown ||
+            item.sgstLedgerName === columnarDrillDown ||
+            item.igstLedgerName === columnarDrillDown
+          );
+        }
+        return false;
+      });
+    }
+
     const salesColumns = new Set<string>();
     const taxColumns = new Set<string>();
 
     // 1. Collect Columns
-    matchedSales.forEach((voucher: any) => {
+    vouchersToProcess.forEach((voucher: any) => {
       if (voucher.items) {
         voucher.items.forEach((item: any) => {
           if (item.salesLedgerName) salesColumns.add(item.salesLedgerName);
@@ -417,7 +436,7 @@ const B2B: React.FC = () => {
     const allDynamicCols = [...sortedSalesCols, ...sortedTaxCols];
 
     // 2. Prepare Rows
-    const rows = matchedSales.map((voucher: any) => {
+    const rows = vouchersToProcess.map((voucher: any) => {
       const row: any = {
         id: voucher.id,
         date: voucher.date,
@@ -483,7 +502,7 @@ const B2B: React.FC = () => {
     });
 
     return { headers: allDynamicCols, rows };
-  }, [matchedSales, ledgerMap]);
+  }, [matchedSales, ledgerMap, columnarDrillDown]);
 
   // 🔹 MONTHLY DATA LOGIC
   const MONTHS = [
@@ -571,18 +590,18 @@ const B2B: React.FC = () => {
       {
         totalDebit: number;
         totalCredit: number;
-        transactions: {
+        transactions: Record<string, {
           name: string;
           debit: number;
           credit: number;
-        }[];
+          type: 'party' | 'ledger';
+          id: number;
+        }>;
       }
     > = {};
 
     matchedSales.forEach((voucher: any) => {
       // 1️⃣ PARTY SIDE (Debit / Asset - Sundry Debtors)
-      // Check if groupName exists, otherwise default to Sundry Debtors. 
-      // Note: B2B might not have groupName populated on voucher, so default is important.
       const groupName = voucher.groupName || "Sundry Debtors";
       const partyAmount = Number(voucher.netAmount || voucher.total || 0);
 
@@ -590,99 +609,102 @@ const B2B: React.FC = () => {
         groups[groupName] = {
           totalDebit: 0,
           totalCredit: 0,
-          transactions: [],
+          transactions: {},
         };
       }
 
       groups[groupName].totalDebit += partyAmount;
-      groups[groupName].transactions.push({
-        name: voucher.partyName || "Unknown Party",
-        debit: partyAmount,
-        credit: 0,
-      });
+      const partyName = voucher.partyName || "Unknown Party";
+      if (!groups[groupName].transactions[partyName]) {
+        groups[groupName].transactions[partyName] = {
+          name: partyName,
+          debit: 0,
+          credit: 0,
+          type: 'party',
+          id: voucher.partyId
+        };
+      }
+      groups[groupName].transactions[partyName].debit += partyAmount;
 
-      // 2️⃣ SALES SIDE (Credit / Income) via Items
+      // 2️⃣ SALES & TAXES SIDE (Credit / Income) via Items
+      const seenTaxInItems = { cgst: false, sgst: false, igst: false };
+
       if (voucher.items && voucher.items.length > 0) {
         voucher.items.forEach((item: any) => {
-          const itemGroupName = "Sales Account";
+          const lName = (item.salesLedgerName || "").toLowerCase();
+          const gName = (item.salesLedgerGroupName || "").toLowerCase();
+          
+          let itemGroupName = item.salesLedgerGroupName || "Sales Account";
+          
+          const isTax = gName.includes("duties") || gName.includes("tax") || 
+                        lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
+          
+          if (isTax) {
+            itemGroupName = "Duties & Taxes";
+            if (lName.includes("cgst")) seenTaxInItems.cgst = true;
+            if (lName.includes("sgst") || lName.includes("utgst")) seenTaxInItems.sgst = true;
+            if (lName.includes("igst")) seenTaxInItems.igst = true;
+          }
 
           if (!groups[itemGroupName]) {
             groups[itemGroupName] = {
               totalDebit: 0,
               totalCredit: 0,
-              transactions: [],
+              transactions: {},
             };
           }
 
           const itemAmount = Number(item.amount || 0);
-
           groups[itemGroupName].totalCredit += itemAmount;
-          groups[itemGroupName].transactions.push({
-            name: item.salesLedgerName || "Unknown Sales Ledger",
-            debit: 0,
-            credit: itemAmount,
-          });
+
+          const ledgerName = item.salesLedgerName || "Unknown Sales Ledger";
+          if (!groups[itemGroupName].transactions[ledgerName]) {
+            groups[itemGroupName].transactions[ledgerName] = {
+              name: ledgerName,
+              debit: 0,
+              credit: 0,
+              type: 'ledger',
+              id: item.salesLedgerId
+            };
+          }
+          groups[itemGroupName].transactions[ledgerName].credit += itemAmount;
         });
       }
 
-      // 3️⃣ DUTIES & TAXES (Credit / Liability - Output Tax)
+      // 3️⃣ ADDITIONAL TAXES (Summary fallback)
       const taxGroupName = "Duties & Taxes";
-
-      // Extract Unique Tax Ledger Names from Items
-      const cgstLedgers = new Set<string>();
-      const sgstLedgers = new Set<string>();
-      const igstLedgers = new Set<string>();
-
-      if (voucher.items) {
-        voucher.items.forEach((i: any) => {
-          if (i.cgstLedgerName) cgstLedgers.add(i.cgstLedgerName);
-          if (i.sgstLedgerName) sgstLedgers.add(i.sgstLedgerName);
-          if (i.igstLedgerName) igstLedgers.add(i.igstLedgerName);
-        });
-      }
-
-      // In B2B, voucher has cgstTotal etc. mapped from cgstAmount. 
-      // Use the mapped fields if consistent, or check item sums? 
-      // SalesReport checks voucher.cgstAmount. 
-      // In B2B loadSalesVouchers: cgstTotal: v.cgstAmount || v.cgstTotal
-      // So use voucher.cgstTotal
-      const cgst = Number(voucher.cgstTotal || 0);
-      const sgst = Number(voucher.sgstTotal || 0);
-      const igst = Number(voucher.igstTotal || 0);
+      const cgst = seenTaxInItems.cgst ? 0 : Number(voucher.cgstTotal || 0);
+      const sgst = seenTaxInItems.sgst ? 0 : Number(voucher.sgstTotal || 0);
+      const igst = seenTaxInItems.igst ? 0 : Number(voucher.igstTotal || 0);
 
       if (cgst > 0 || sgst > 0 || igst > 0) {
         if (!groups[taxGroupName]) {
           groups[taxGroupName] = {
             totalDebit: 0,
             totalCredit: 0,
-            transactions: [],
+            transactions: {},
           };
         }
 
-        if (cgst > 0) {
-          groups[taxGroupName].totalCredit += cgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(cgstLedgers).join(", ") || "Output CGST",
-            debit: 0,
-            credit: cgst,
-          });
-        }
-        if (sgst > 0) {
-          groups[taxGroupName].totalCredit += sgst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(sgstLedgers).join(", ") || "Output SGST",
-            debit: 0,
-            credit: sgst,
-          });
-        }
-        if (igst > 0) {
-          groups[taxGroupName].totalCredit += igst;
-          groups[taxGroupName].transactions.push({
-            name: Array.from(igstLedgers).join(", ") || "Output IGST",
-            debit: 0,
-            credit: igst,
-          });
-        }
+        const addTax = (amount: number, name: string) => {
+          if (amount > 0) {
+            groups[taxGroupName].totalCredit += amount;
+            if (!groups[taxGroupName].transactions[name]) {
+              groups[taxGroupName].transactions[name] = {
+                name: name,
+                debit: 0,
+                credit: 0,
+                type: 'ledger',
+                id: 0
+              };
+            }
+            groups[taxGroupName].transactions[name].credit += amount;
+          }
+        };
+
+        addTax(cgst, "Output CGST");
+        addTax(sgst, "Output SGST");
+        addTax(igst, "Output IGST");
       }
     });
 
@@ -1062,6 +1084,19 @@ const B2B: React.FC = () => {
               }`}
           >
             <h3 className="text-lg font-semibold mb-4">Columnar Report</h3>
+            {columnarDrillDown && (
+              <div className="p-2 mb-4 bg-blue-50 dark:bg-blue-900/20 rounded flex items-center justify-between">
+                <span className="text-sm font-medium">
+                  Filtered by: <span className="font-bold">{columnarDrillDown}</span>
+                </span>
+                <button
+                  onClick={() => setColumnarDrillDown(null)}
+                  className="text-xs px-2 py-1 bg-white dark:bg-gray-800 border rounded hover:bg-gray-50 dark:hover:bg-gray-700"
+                >
+                  Clear Filter
+                </button>
+              </div>
+            )}
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead
@@ -1197,15 +1232,21 @@ const B2B: React.FC = () => {
                         </tr>
 
                         {/* 🔹 Transactions Under Group */}
-                        {group.transactions.map((txn, index) => (
+                        {Object.values(group.transactions).map((txn, index) => (
                           <tr
                             key={`${groupName}-${index}`}
-                            className={`hover:bg-opacity-50 ${theme === "dark"
+                            className={`hover:bg-opacity-50 transition-colors ${theme === "dark"
                               ? "hover:bg-gray-700"
                               : "hover:bg-gray-50"
-                              }`}
+                              } group`}
                           >
-                            <td className="px-4 py-2 pl-8 text-sm italic">
+                            <td 
+                              className="px-4 py-2 pl-8 text-sm italic cursor-pointer group-hover:text-blue-500 underline-offset-4 hover:underline"
+                              onClick={() => {
+                                setColumnarDrillDown(txn.name);
+                                setSelectedView("columnar");
+                              }}
+                            >
                               {txn.name}
                             </td>
 
@@ -1247,23 +1288,21 @@ const B2B: React.FC = () => {
                   className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
                     }`}
                 >
-                  <tr className="font-semibold">
+                  <tr className="font-semibold text-blue-600">
                     <td className="px-4 py-3">Grand Total</td>
 
                     <td className="px-4 py-3 text-right font-mono">
-                      {Object.values(extractData)
-                        .reduce((sum, group) => sum + group.totalDebit, 0)
-                        .toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                        })}
+                      {Math.max(
+                        Object.values(extractData).reduce((sum, group) => sum + group.totalDebit, 0),
+                        Object.values(extractData).reduce((sum, group) => sum + group.totalCredit, 0)
+                      ).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </td>
 
                     <td className="px-4 py-3 text-right font-mono">
-                      {Object.values(extractData)
-                        .reduce((sum, group) => sum + group.totalCredit, 0)
-                        .toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                        })}
+                      {Math.max(
+                        Object.values(extractData).reduce((sum, group) => sum + group.totalDebit, 0),
+                        Object.values(extractData).reduce((sum, group) => sum + group.totalCredit, 0)
+                      ).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </td>
                   </tr>
                 </tfoot>
