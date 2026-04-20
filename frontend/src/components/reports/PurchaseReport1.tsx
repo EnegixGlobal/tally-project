@@ -299,7 +299,7 @@ const PurchaseReport1: React.FC = () => {
           if (i.gstRate && Number(i.gstRate) > 0) {
             const totalRate = Number(i.gstRate);
             const halfRate = totalRate / 2;
-            
+
             if (cgstName && !cgstName.includes("%") && !cgstName.includes("@")) {
               cgstName = `${cgstName} ${halfRate}%`;
             }
