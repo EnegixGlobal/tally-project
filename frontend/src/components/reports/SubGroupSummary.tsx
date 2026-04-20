@@ -129,12 +129,27 @@ const SubGroupSummary: React.FC = () => {
           }
         }
 
+        // Deduplicate ledgers and subgroups by ID
+        const uniqueLedgers = allLedgers.reduce((acc: Ledger[], current) => {
+          if (!acc.find(l => l.id === current.id)) {
+            acc.push(current);
+          }
+          return acc;
+        }, []);
+
+        const uniqueSubGroups = allSubGroups.reduce((acc: Group[], current) => {
+          if (!acc.find(g => g.id === current.id)) {
+            acc.push(current);
+          }
+          return acc;
+        }, []);
+
         const currentUrlGroupId = Number(groupId);
-        const filteredGroups = allSubGroups.filter(g => Number(g.parent) === currentUrlGroupId);
+        const filteredGroups = uniqueSubGroups.filter(g => Number(g.parent) === currentUrlGroupId);
 
         setSubGroups(filteredGroups);
-        setAllFetchedGroups(allSubGroups);
-        setLedgers(allLedgers);
+        setAllFetchedGroups(uniqueSubGroups);
+        setLedgers(uniqueLedgers);
       } catch (err: any) {
         setError(err.message || "Unknown error");
       } finally {
