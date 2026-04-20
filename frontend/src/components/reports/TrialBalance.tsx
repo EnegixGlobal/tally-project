@@ -78,7 +78,6 @@ const TrialBalance: React.FC = () => {
           parent: g.parent ? Number(g.parent) : null
         }));
 
-        // Merge with system groups for hierarchical resolution
         const systemGroupsMapped = allSystemGroups.map(g => ({
           id: g.id,
           name: g.name,
@@ -86,7 +85,15 @@ const TrialBalance: React.FC = () => {
           type: g.nature?.toLowerCase().replace(' ', '-') || null
         }));
 
-        setLedgerGroups([...systemGroupsMapped, ...normalizedGroups]);
+        const combinedGroups = [...systemGroupsMapped, ...normalizedGroups];
+        const uniqueGroups = combinedGroups.reduce((acc: LedgerGroup[], current) => {
+          if (!acc.find(g => g.id === current.id)) {
+            acc.push(current);
+          }
+          return acc;
+        }, []);
+
+        setLedgerGroups(uniqueGroups);
       } catch (err: any) {
         setError(err.message || "Unknown error occurred");
       } finally {

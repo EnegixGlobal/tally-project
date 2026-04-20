@@ -381,8 +381,9 @@ ORDER BY vm.date ASC
     =============================== */
     const [dcNotes] = await connection.execute(
       `
-      SELECT id, date, number, party_id, narration
-      FROM debit_note_vouchers
+      SELECT dnv.id, dnv.date, dnv.number, dnv.party_id, dnv.narration, l.name AS partyName
+      FROM debit_note_vouchers dnv
+      LEFT JOIN ledgers l ON l.id = dnv.party_id
       WHERE narration IS NOT NULL
       ORDER BY date ASC, id ASC
       `
@@ -393,12 +394,13 @@ ORDER BY vm.date ASC
     =============================== */
     const [creditNotes] = await connection.execute(
       `
-      SELECT id, date, number, mode, narration
-      FROM credit_vouchers
+      SELECT cv.id, cv.date, cv.number, cv.mode, cv.narration, l.name AS partyName
+      FROM credit_vouchers cv
+      LEFT JOIN ledgers l ON l.id = cv.partyId
       WHERE narration IS NOT NULL
-        AND company_id = ?
-        AND owner_type = ?
-        AND owner_id = ?
+        AND cv.company_id = ?
+        AND cv.owner_type = ?
+        AND cv.owner_id = ?
       ORDER BY date ASC, id ASC
       `,
       [ledger.company_id, ledger.owner_type, ledger.owner_id]
@@ -477,7 +479,7 @@ ORDER BY vm.date ASC
           date: note.date,
           voucherType: "Debit Note",
           voucherNo: note.number,
-          particulars: String(entry.ledgerId),
+          particulars: note.partyName || "Party",
           debit,
           credit,
           balance,
@@ -511,7 +513,7 @@ ORDER BY vm.date ASC
           voucherType: "Credit Note",
           voucherNo: note.number,
           referenceNo: note.mode,
-          particulars: String(entry.ledgerId),
+          particulars: note.partyName || "Party",
           debit,
           credit,
           balance,
