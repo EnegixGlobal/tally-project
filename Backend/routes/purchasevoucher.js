@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db");
-const { generateVoucherNumber } = require('../utils/generateVoucherNumber')
+const { generateVoucherNumber, renumberVouchers } = require('../utils/generateVoucherNumber')
 const { getFinancialYear } = require("../utils/financialYear");
 
 
@@ -580,6 +580,15 @@ router.post("/", async (req, res) => {
 
     // ================= SUCCESS =================
 
+    // ================= CHRONOLOGICAL RENUMBERING =================
+    await renumberVouchers({
+      companyId: finalCompanyId,
+      ownerType: finalOwnerType,
+      ownerId: finalOwnerId,
+      voucherType: "purchase",
+      date,
+    });
+
     return res.status(200).json({
       success: true,
       voucherId,
@@ -911,43 +920,19 @@ router.delete("/:id", async (req, res) => {
     await conn.execute("DELETE FROM purchase_history WHERE voucherNumber = ?", [deletedNumber]);
     await conn.execute("DELETE FROM purchase_vouchers WHERE id = ?", [id]);
 
-    // 3️⃣ Find subsequent vouchers to renumber
-    // We look for numbers like "PRV/25-26/%"
-    const [subsequentVouchers] = await conn.execute(
-      `SELECT id, number FROM purchase_vouchers 
-       WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
-       AND number LIKE ? 
-       ORDER BY id ASC`,
-      [company_id, owner_type, owner_id, `${prefix}/${fy}/%`]
-    );
-
-    for (const voucher of subsequentVouchers) {
-      const vParts = voucher.number.split("/");
-      if (vParts.length === 3) {
-        const vSeq = parseInt(vParts[2]);
-        if (vSeq > deletedSeq) {
-          const newSeq = vSeq - 1;
-          const newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
-
-          // Update main table
-          await conn.execute(
-            "UPDATE purchase_vouchers SET number = ? WHERE id = ?",
-            [newNumber, voucher.id]
-          );
-
-          // Update history table
-          await conn.execute(
-            "UPDATE purchase_history SET voucherNumber = ? WHERE voucherNumber = ? AND companyId = ?",
-            [newNumber, voucher.number, company_id]
-          );
-        }
-      }
-    }
+    // 3️⃣ Renumber subsequent vouchers using shared utility
+    await renumberVouchers({
+      companyId,
+      ownerType,
+      ownerId,
+      voucherType: "purchase",
+      date: rows[0].date || new Date(), // Using date from deleted voucher to identify FY
+    }, conn);
 
     await conn.commit();
     return res.json({
       success: true,
-      message: "Purchase voucher deleted and subsequent vouchers renumbered successfully",
+      message: "Purchase voucher deleted and vouchers renumbered chronologically",
     });
   } catch (err) {
     await conn.rollback();
@@ -1450,6 +1435,15 @@ router.put("/:id", async (req, res) => {
         await db.query(insertEntrySql, [entryValues]);
       }
     }
+
+    // ================= CHRONOLOGICAL RENUMBERING =================
+    await renumberVouchers({
+      companyId: finalCompanyId,
+      ownerType: finalOwnerType,
+      ownerId: finalOwnerId,
+      voucherType: "purchase",
+      date,
+    });
 
     return res.json({
       success: true,
