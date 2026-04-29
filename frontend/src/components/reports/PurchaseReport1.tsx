@@ -349,9 +349,24 @@ const PurchaseReport1: React.FC = () => {
           }
         };
 
-        addTaxTransaction(cgst, cgstLedgers, "Input CGST");
-        addTaxTransaction(sgst, sgstLedgers, "Input SGST");
-        addTaxTransaction(igst, igstLedgers, "Input IGST");
+        let cgstName = "Input CGST";
+        let sgstName = "Input SGST";
+        let igstName = "Input IGST";
+
+        if (voucher.items && voucher.items.length > 0) {
+          const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
+          if (cItem) cgstName = cItem.cgstLedgerName;
+          
+          const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
+          if (sItem) sgstName = sItem.sgstLedgerName;
+          
+          const iItem = voucher.items.find((i: any) => i.igstLedgerName);
+          if (iItem) igstName = iItem.igstLedgerName;
+        }
+
+        addTaxTransaction(cgst, cgstLedgers, cgstName);
+        addTaxTransaction(sgst, sgstLedgers, sgstName);
+        addTaxTransaction(igst, igstLedgers, igstName);
       }
 
       // 4️⃣ TDS (Credit / Liability)

@@ -328,9 +328,24 @@ const SalesReport: React.FC = () => {
           }
         };
 
-        addTaxTransaction(cgst, "Output CGST");
-        addTaxTransaction(sgst, "Output SGST");
-        addTaxTransaction(igst, "Output IGST");
+        let cgstName = "Output CGST";
+        let sgstName = "Output SGST";
+        let igstName = "Output IGST";
+
+        if (voucher.items && voucher.items.length > 0) {
+          const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
+          if (cItem) cgstName = cItem.cgstLedgerName;
+          
+          const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
+          if (sItem) sgstName = sItem.sgstLedgerName;
+          
+          const iItem = voucher.items.find((i: any) => i.igstLedgerName);
+          if (iItem) igstName = iItem.igstLedgerName;
+        }
+
+        addTaxTransaction(cgst, cgstName);
+        addTaxTransaction(sgst, sgstName);
+        addTaxTransaction(igst, igstName);
       }
 
       // 4️⃣ INDIRECT EXPENSES (Debit / Expense - Discount Allowed)

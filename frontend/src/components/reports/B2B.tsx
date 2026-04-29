@@ -702,9 +702,30 @@ const B2B: React.FC = () => {
           }
         };
 
-        addTax(cgst, "Output CGST");
-        addTax(sgst, "Output SGST");
-        addTax(igst, "Output IGST");
+        let cgstName = "Output CGST";
+        let sgstName = "Output SGST";
+        let igstName = "Output IGST";
+
+        if (voucher.items && voucher.items.length > 0) {
+          const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
+          if (cItem) cgstName = cItem.cgstLedgerName;
+          
+          const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
+          if (sItem) sgstName = sItem.sgstLedgerName;
+          
+          const iItem = voucher.items.find((i: any) => i.igstLedgerName);
+          if (iItem) igstName = iItem.igstLedgerName;
+        }
+
+        // If cgstLedgers (from items loop) has elements, we could also use that as fallback if not found in find, 
+        // but cgstLedgerName is populated on items. If there are multiple, joining them is fine.
+        const finalCgstName = cgstLedgers.size > 0 ? Array.from(cgstLedgers).join(", ") : cgstName;
+        const finalSgstName = sgstLedgers.size > 0 ? Array.from(sgstLedgers).join(", ") : sgstName;
+        const finalIgstName = igstLedgers.size > 0 ? Array.from(igstLedgers).join(", ") : igstName;
+
+        addTax(cgst, finalCgstName);
+        addTax(sgst, finalSgstName);
+        addTax(igst, finalIgstName);
       }
     });
 

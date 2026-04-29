@@ -632,10 +632,29 @@ const B2CPurchase: React.FC = () => {
           };
         }
 
+        let cgstName = "Input CGST";
+        let sgstName = "Input SGST";
+        let igstName = "Input IGST";
+
+        if (voucher.items && voucher.items.length > 0) {
+          const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
+          if (cItem) cgstName = cItem.cgstLedgerName;
+          
+          const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
+          if (sItem) sgstName = sItem.sgstLedgerName;
+          
+          const iItem = voucher.items.find((i: any) => i.igstLedgerName);
+          if (iItem) igstName = iItem.igstLedgerName;
+        }
+
+        const finalCgstName = cgstLedgers.size > 0 ? Array.from(cgstLedgers).join(", ") : cgstName;
+        const finalSgstName = sgstLedgers.size > 0 ? Array.from(sgstLedgers).join(", ") : sgstName;
+        const finalIgstName = igstLedgers.size > 0 ? Array.from(igstLedgers).join(", ") : igstName;
+
         if (cgst > 0) {
           groups[taxGroupName].totalDebit += cgst;
           groups[taxGroupName].transactions.push({
-            name: Array.from(cgstLedgers).join(", ") || "Input CGST",
+            name: finalCgstName,
             debit: cgst,
             credit: 0,
           });
@@ -643,7 +662,7 @@ const B2CPurchase: React.FC = () => {
         if (sgst > 0) {
           groups[taxGroupName].totalDebit += sgst;
           groups[taxGroupName].transactions.push({
-            name: Array.from(sgstLedgers).join(", ") || "Input SGST",
+            name: finalSgstName,
             debit: sgst,
             credit: 0,
           });
@@ -651,7 +670,7 @@ const B2CPurchase: React.FC = () => {
         if (igst > 0) {
           groups[taxGroupName].totalDebit += igst;
           groups[taxGroupName].transactions.push({
-            name: Array.from(igstLedgers).join(", ") || "Input IGST",
+            name: finalIgstName,
             debit: igst,
             credit: 0,
           });
