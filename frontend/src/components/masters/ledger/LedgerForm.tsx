@@ -38,6 +38,7 @@ const LedgerForm: React.FC = () => {
     panNumber: "",
     state: "",
     district: "",
+    pinCode: "",
   });
 
 
@@ -126,6 +127,7 @@ const LedgerForm: React.FC = () => {
             panNumber: data.pan_number || "",
             state: data.state || "",
             district: data.district || "",
+            pinCode: data.pinCode || data.pin_code || "",
           });
 
           if (data.groupName) {
@@ -172,6 +174,7 @@ const LedgerForm: React.FC = () => {
             panNumber: data.panNumber || "",
             state: data.state || "",
             district: data.district || "",
+            pinCode: data.pinCode || data.pin_code || "",
           });
 
           if (data.groupName) {
@@ -596,7 +599,7 @@ const LedgerForm: React.FC = () => {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
               <div>
                 <label
                   className="block text-sm font-medium mb-1"
@@ -637,6 +640,27 @@ const LedgerForm: React.FC = () => {
                   value={formData.district}
                   onChange={handleChange}
                   placeholder="Enter district name"
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+                    : "bg-white border-gray-300 focus:border-blue-500"
+                    } outline-none transition-colors`}
+                />
+              </div>
+
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="pinCode"
+                >
+                  PIN Code
+                </label>
+                <input
+                  type="text"
+                  id="pinCode"
+                  name="pinCode"
+                  value={formData.pinCode}
+                  onChange={handleChange}
+                  placeholder="Enter PIN code"
                   className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500"
                     : "bg-white border-gray-300 focus:border-blue-500"

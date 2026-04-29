@@ -98,6 +98,7 @@ export type Ledger = {
   state?: string;
   district?: string;
   closingBalance?: number;
+  pinCode?: string;
 };
 export interface LedgerWithGroup extends Ledger {
   groupName?: string;
