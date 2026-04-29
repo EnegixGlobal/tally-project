@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // Your DB connection file
-const { generateVoucherNumber } = require("../utils/generateVoucherNumber");
+const { generateVoucherNumber, renumberVouchers } = require("../utils/generateVoucherNumber");
 const { getFinancialYear } = require("../utils/financialYear");
 
 router.post("/", async (req, res) => {
@@ -108,7 +108,17 @@ router.post("/", async (req, res) => {
       );
     }
 
+    // ================= CHRONOLOGICAL RENUMBERING =================
+    await renumberVouchers({
+      companyId: Number(companyId),
+      ownerType: String(ownerType),
+      ownerId: Number(ownerId),
+      voucherType: "sales_order",
+      date,
+    }, connection);
+
     await connection.commit();
+
     res.json({ success: true, message: "Sales Order saved successfully" });
   } catch (error) {
     await connection.rollback();
@@ -326,7 +336,17 @@ router.put("/:id", async (req, res) => {
       );
     }
 
+    // ================= CHRONOLOGICAL RENUMBERING =================
+    await renumberVouchers({
+      companyId: Number(companyId),
+      ownerType: String(ownerType),
+      ownerId: Number(ownerId),
+      voucherType: "sales_order",
+      date,
+    }, conn);
+
     await conn.commit();
+
     res.json({ success: true, message: "Order updated successfully" });
   } catch (err) {
     await conn.rollback();
@@ -376,30 +396,14 @@ router.delete("/:id", async (req, res) => {
     await conn.query(`DELETE FROM sales_order_items WHERE salesOrderId=?`, [id]);
     await conn.query(`DELETE FROM sales_orders WHERE id=?`, [id]);
 
-    // 3️⃣ Renumber subsequent orders of the same FY
-    const [subsequentOrders] = await conn.execute(
-      `SELECT id, number FROM sales_orders 
-       WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
-       AND number LIKE ? 
-       ORDER BY id ASC`,
-      [company_id, owner_type, owner_id, `${prefix}/${fy}/%`]
-    );
-
-    for (const order of subsequentOrders) {
-      const oParts = order.number.split("/");
-      if (oParts.length === 3) {
-        const oSeq = parseInt(oParts[2]);
-        if (oSeq > deletedSeq) {
-          const newSeq = oSeq - 1;
-          const newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
-
-          await conn.execute(
-            "UPDATE sales_orders SET number = ? WHERE id = ?",
-            [newNumber, order.id]
-          );
-        }
-      }
-    }
+    // 3️⃣ Renumber using utility
+    await renumberVouchers({
+      companyId: Number(company_id),
+      ownerType: String(owner_type),
+      ownerId: Number(owner_id),
+      voucherType: "sales_order",
+      date: orderRows[0].date || new Date(),
+    }, conn);
 
     await conn.commit();
     res.json({ success: true, message: "Order deleted and subsequent orders renumbered successfully" });

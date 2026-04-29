@@ -1,7 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const db = require("../db"); // Make sure db is using mysql2.promise()
-const { generateVoucherNumber } = require("../utils/generateVoucherNumber");
+const { generateVoucherNumber, renumberVouchers } = require("../utils/generateVoucherNumber");
 const { getFinancialYear } = require("../utils/financialYear");
 
 // GET Ledgers
@@ -512,6 +512,15 @@ router.post("/", async (req, res) => {
     }
 
     // ================= DONE =================
+    // ================= CHRONOLOGICAL RENUMBERING =================
+    await renumberVouchers({
+      companyId,
+      ownerType,
+      ownerId,
+      voucherType: "sales",
+      date,
+    });
+
     return res.status(200).json({
       success: true,
       message: "Sales voucher saved successfully",
@@ -746,52 +755,14 @@ router.delete("/:id", async (req, res) => {
     await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [voucherId]);
     await conn.execute("DELETE FROM sales_vouchers WHERE id = ?", [voucherId]);
 
-    // 2️⃣ Renumber subsequent vouchers if format matches
-    if (deletedNumber && deletedNumber.includes("/")) {
-      const lastSlashIndex = deletedNumber.lastIndexOf("/");
-      const prefix = deletedNumber.substring(0, lastSlashIndex);
-      const suffixStr = deletedNumber.substring(lastSlashIndex + 1);
-      const deletedSeq = parseInt(suffixStr);
-
-      if (!isNaN(deletedSeq)) {
-        const padding = suffixStr.length;
-
-        // Fetch subsequent vouchers with the same prefix
-        const [subsequentVouchers] = await conn.execute(
-          `SELECT id, number FROM sales_vouchers 
-           WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
-           AND number LIKE ? 
-           ORDER BY id ASC`,
-          [company_id, owner_type, owner_id, `${prefix}/%`]
-        );
-
-        for (const voucher of subsequentVouchers) {
-          const vLastSlash = voucher.number.lastIndexOf("/");
-          if (vLastSlash !== -1) {
-            const vPrefix = voucher.number.substring(0, vLastSlash);
-            const vSuffixStr = voucher.number.substring(vLastSlash + 1);
-            const vSeq = parseInt(vSuffixStr);
-
-            if (vPrefix === prefix && !isNaN(vSeq) && vSeq > deletedSeq) {
-              const newSeq = vSeq - 1;
-              const newNumber = `${prefix}/${String(newSeq).padStart(padding, "0")}`;
-
-              // Update main voucher
-              await conn.execute(
-                "UPDATE sales_vouchers SET number = ? WHERE id = ?",
-                [newNumber, voucher.id]
-              );
-
-              // Update history table
-              await conn.execute(
-                "UPDATE sale_history SET voucherNumber = ? WHERE voucherNumber = ? AND companyId = ?",
-                [newNumber, voucher.number, company_id]
-              );
-            }
-          }
-        }
-      }
-    }
+    // 2️⃣ Renumber vouchers using shared utility
+    await renumberVouchers({
+      companyId: company_id,
+      ownerType: owner_type,
+      ownerId: owner_id,
+      voucherType: "sales",
+      date: rows[0].date || new Date(),
+    }, conn);
 
     // 3️⃣ Decrement current_no in sales_types
     if (sales_type_id && sales_type_id !== "custom") {
@@ -1108,6 +1079,15 @@ router.put("/:id", async (req, res) => {
 
     // ---- 6) CLEAR OLD HISTORY (The frontend will POST new history) ----
     await db.execute(`DELETE FROM sale_history WHERE voucherNumber = ?`, [number]);
+
+    // ---- 7) CHRONOLOGICAL RENUMBERING ----
+    await renumberVouchers({
+      companyId: req.body.companyId || req.query.company_id,
+      ownerType: req.body.ownerType || req.query.owner_type,
+      ownerId: req.body.ownerId || req.query.owner_id,
+      voucherType: "sales",
+      date,
+    });
 
     return res.json({ success: true, message: "Voucher updated successfully" });
   } catch (err) {

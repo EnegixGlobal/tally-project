@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require("../db"); // mysql2/promise pool
 
 const { getFinancialYear } = require("../utils/financialYear");
-const { generateVoucherNumber } = require("../utils/generateVoucherNumber");
+const { generateVoucherNumber, renumberVouchers } = require("../utils/generateVoucherNumber");
 
 router.post("/", async (req, res) => {
   let {
@@ -111,6 +111,15 @@ router.post("/", async (req, res) => {
 
     await conn.commit();
     conn.release();
+
+    // ================= CHRONOLOGICAL RENUMBERING =================
+    await renumberVouchers({
+      companyId: Number(companyId),
+      ownerType: String(owner_type),
+      ownerId: Number(owner_id),
+      voucherType: type,
+      date,
+    });
 
     return res.status(200).json({
       success: true,
@@ -299,35 +308,20 @@ router.delete("/:id", async (req, res) => {
     await conn.execute("DELETE FROM voucher_entries WHERE voucher_id = ?", [id]);
     await conn.execute("DELETE FROM voucher_main WHERE id = ?", [id]);
 
-    // 3️⃣ Renumber subsequent vouchers of the SAME TYPE and FY
-    const [subsequentVouchers] = await conn.execute(
-      `SELECT id, voucher_number FROM voucher_main 
-       WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
-       AND voucher_type = ? AND voucher_number LIKE ? 
-       ORDER BY id ASC`,
-      [company_id, owner_type, owner_id, voucher_type, `${prefix}/${fy}/%`]
-    );
-
-    for (const voucher of subsequentVouchers) {
-      const vParts = voucher.voucher_number.split("/");
-      if (vParts.length === 3) {
-        const vSeq = parseInt(vParts[2]);
-        if (vSeq > deletedSeq) {
-          const newSeq = vSeq - 1;
-          const newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
-
-          await conn.execute(
-            "UPDATE voucher_main SET voucher_number = ? WHERE id = ?",
-            [newNumber, voucher.id]
-          );
-        }
-      }
-    }
+    // 3️⃣ Renumber all vouchers of this type and FY chronologically
+    await renumberVouchers({
+      companyId,
+      ownerType: owner_type,
+      ownerId: owner_id,
+      voucherType: voucher_type,
+      date: rows[0].date || new Date(),
+    }, conn);
 
     await conn.commit();
+
     res.status(200).json({
       success: true,
-      message: "Voucher deleted and subsequent vouchers renumbered successfully",
+      message: "Voucher deleted and vouchers renumbered chronologically",
     });
   } catch (error) {
     await conn.rollback();
@@ -376,7 +370,7 @@ router.post("/bulk-delete", async (req, res) => {
 
     // 1️⃣ Identify affected groups (prefix/FY) for renumbering
     const [vouchers] = await conn.query(
-      `SELECT id, ${numField} AS voucher_number FROM ${mainTable} WHERE id IN (?)`,
+      `SELECT id, date, ${numField} AS voucher_number FROM ${mainTable} WHERE id IN (?)`,
       [ids]
     );
 
@@ -410,38 +404,17 @@ router.post("/bulk-delete", async (req, res) => {
       const prefix = parts[0];
       const fy = parts[1];
 
-      const [remainingVouchers] = await conn.execute(
-        `SELECT id, ${numField} AS voucher_number FROM ${mainTable} 
-         WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
-         ${voucherType !== "sales" && voucherType !== "purchase" ? "AND voucher_type = ?" : ""}
-         AND ${numField} LIKE ? 
-         ORDER BY id ASC`,
-        voucherType === "sales" || voucherType === "purchase"
-          ? [companyId, ownerType, ownerId, `${prefix}/${fy}/%`]
-          : [companyId, ownerType, ownerId, voucherType, `${prefix}/${fy}/%`]
-      );
+      // Find a voucher date for this FY to pass to renumberVouchers
+      const sampleVoucher = vouchers.find(v => v.voucher_number.startsWith(`${prefix}/${fy}/`));
+      const sampleDate = sampleVoucher?.date || new Date();
 
-      let seq = 1;
-      for (const voucher of remainingVouchers) {
-        const vParts = voucher.voucher_number.split("/");
-        const padding = vParts[2] ? vParts[2].length : 6;
-        const newNumber = `${prefix}/${fy}/${String(seq).padStart(padding, "0")}`;
-
-        if (voucher.voucher_number !== newNumber) {
-          await conn.execute(
-            `UPDATE ${mainTable} SET ${numField} = ? WHERE id = ?`,
-            [newNumber, voucher.id]
-          );
-
-          if (historyTable) {
-            await conn.execute(
-              `UPDATE ${historyTable} SET voucherNumber = ? WHERE voucherNumber = ? AND companyId = ?`,
-              [newNumber, voucher.voucher_number, companyId]
-            );
-          }
-        }
-        seq++;
-      }
+      await renumberVouchers({
+        companyId,
+        ownerType,
+        ownerId,
+        voucherType: voucherType === "sales" || voucherType === "purchase" ? voucherType : voucherType,
+        date: sampleDate,
+      }, conn);
     }
 
     await conn.commit();
@@ -572,6 +545,20 @@ router.put("/:id", async (req, res) => {
     await conn.commit();
     conn.release();
 
+    // ================= CHRONOLOGICAL RENUMBERING =================
+    // We need companyId here, but it might not be in req.body.
+    // Try to get it from query if missing.
+    const company_id = req.body.companyId || req.query.company_id;
+    if (company_id) {
+      await renumberVouchers({
+        companyId: Number(company_id),
+        ownerType: finalOwnerType,
+        ownerId: Number(finalOwnerId),
+        voucherType: type,
+        date,
+      });
+    }
+
     res.status(200).json({
       success: true,
       message: "Voucher updated successfully",
@@ -668,6 +655,28 @@ router.get("/:id", async (req, res) => {
       message: "Failed to fetch voucher",
       error: error.message,
     });
+  }
+});
+
+router.post("/renumber-manual", async (req, res) => {
+  const { companyId, ownerType, ownerId, voucherType, date } = req.body;
+  
+  if (!companyId || !ownerType || !ownerId || !voucherType || !date) {
+    return res.status(400).json({ success: false, message: "Missing required fields" });
+  }
+
+  try {
+    await renumberVouchers({
+      companyId,
+      ownerType,
+      ownerId,
+      voucherType,
+      date
+    });
+    res.json({ success: true, message: "Manual renumbering completed successfully" });
+  } catch (error) {
+    console.error("Manual renumbering error:", error);
+    res.status(500).json({ success: false, message: error.message });
   }
 });
 
