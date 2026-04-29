@@ -668,14 +668,33 @@ const B2BPurchase: React.FC = () => {
       const igst = Number(voucher.igstTotal || 0);
       const tds = Number(voucher.tdsAmount || 0);
 
+      let cgstName = "Input CGST";
+      let sgstName = "Input SGST";
+      let igstName = "Input IGST";
+
+      if (voucher.items && voucher.items.length > 0) {
+        const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
+        if (cItem) cgstName = cItem.cgstLedgerName;
+        
+        const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
+        if (sItem) sgstName = sItem.sgstLedgerName;
+        
+        const iItem = voucher.items.find((i: any) => i.igstLedgerName);
+        if (iItem) igstName = iItem.igstLedgerName;
+      }
+
+      const finalCgstName = cgstLedgers.size > 0 ? Array.from(cgstLedgers).join(", ") : cgstName;
+      const finalSgstName = sgstLedgers.size > 0 ? Array.from(sgstLedgers).join(", ") : sgstName;
+      const finalIgstName = igstLedgers.size > 0 ? Array.from(igstLedgers).join(", ") : igstName;
+
       if (cgst > 0) {
-        addToGroup(taxGroupName, Array.from(cgstLedgers).join(", ") || "Input CGST", cgst, 0);
+        addToGroup(taxGroupName, finalCgstName, cgst, 0);
       }
       if (sgst > 0) {
-        addToGroup(taxGroupName, Array.from(sgstLedgers).join(", ") || "Input SGST", sgst, 0);
+        addToGroup(taxGroupName, finalSgstName, sgst, 0);
       }
       if (igst > 0) {
-        addToGroup(taxGroupName, Array.from(igstLedgers).join(", ") || "Input IGST", igst, 0);
+        addToGroup(taxGroupName, finalIgstName, igst, 0);
       }
       if (tds > 0) {
         addToGroup(taxGroupName, Array.from(tdsLedgers).join(", ") || "TDS Payable", 0, tds);
