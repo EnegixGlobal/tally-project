@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useCompany } from "../context/CompanyContext";
 
 export const getFinancialYearRange = (yearStr: string) => {
@@ -103,4 +103,47 @@ export const useFinancialYear = () => {
     }, []);
 
     return { selectedFinYear, setSelectedFinYear };
+};
+
+export const useVoucherDateConfig = (selectedFinYear: string) => {
+    const { companyInfo } = useCompany();
+    const defaults = getFinancialYearDefaults(selectedFinYear);
+    
+    const config = useMemo(() => {
+        // Default to false if undefined (based on user request: "bydefault unchek rahe ga")
+        const backDateAllowed = companyInfo?.backDateAllowed === true;
+        
+        let minDate = defaults.minDate;
+        let defaultDate = defaults.defaultDate;
+        const isDateReadOnly = !backDateAllowed;
+        
+        const today = new Date();
+        const yyyy = today.getFullYear();
+        const mm = String(today.getMonth() + 1).padStart(2, '0');
+        const dd = String(today.getDate()).padStart(2, '0');
+        const todayStr = `${yyyy}-${mm}-${dd}`;
+
+        if (!backDateAllowed) {
+            // If today is within financial year, restrict to today
+            if (todayStr >= defaults.minDate && todayStr <= defaults.maxDate) {
+                minDate = todayStr;
+                defaultDate = todayStr; // Force today
+            } else {
+                // If today is outside FY, we might have to stick to defaults 
+                // but usually backdating disabled means "today" is the only option
+                // if they are in the wrong FY, they can't enter at all?
+                minDate = defaults.maxDate; 
+            }
+        }
+        
+        return {
+            ...defaults,
+            minDate,
+            defaultDate,
+            backDateAllowed,
+            isDateReadOnly
+        };
+    }, [defaults, companyInfo?.backDateAllowed]);
+
+    return config;
 };

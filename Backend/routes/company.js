@@ -92,9 +92,10 @@ router.post('/company', async (req, res) => {
         employee_id,
         vault_password,
         fdAccountType,
-        fdAccountantName
+        fdAccountantName,
+        back_date_allowed
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       name,
       financialYear,
@@ -113,7 +114,8 @@ router.post('/company', async (req, res) => {
       employeeId,
       hashedVaultPassword || null,
       maintainBy || null,
-      accountantName || null
+      accountantName || null,
+      req.body.backDateAllowed !== undefined ? (req.body.backDateAllowed ? 1 : 0) : 1
     ]);
 
     const companyId = companyResult.insertId;
@@ -251,6 +253,12 @@ router.put('/company/:companyId', async (req, res) => {
       console.log("✅ tan_number column created");
     }
 
+    const [bdCols] = await connection.query(`SHOW COLUMNS FROM tbcompanies LIKE 'back_date_allowed'`);
+    if (bdCols.length === 0) {
+      await connection.query(`ALTER TABLE tbcompanies ADD COLUMN back_date_allowed TINYINT(1) DEFAULT 0`);
+      console.log("✅ back_date_allowed column created");
+    }
+
     let hashedVaultPassword = null;
 
     if (vaultPassword) {
@@ -276,7 +284,8 @@ router.put('/company/:companyId', async (req, res) => {
         employee_id = ?,
         vault_password = COALESCE(?, vault_password),
         fdAccountType = ?,
-        fdAccountantName = ?
+        fdAccountantName = ?,
+        back_date_allowed = ?
       WHERE id = ?
     `, [
       name,
@@ -297,6 +306,7 @@ router.put('/company/:companyId', async (req, res) => {
       hashedVaultPassword,
       maintainBy || null,
       accountantName || null,
+      req.body.backDateAllowed !== undefined ? (req.body.backDateAllowed ? 1 : 0) : 1,
       companyId
     ]);
 
@@ -394,6 +404,18 @@ router.get('/company/:companyId', async (req, res) => {
       console.log("✅ tan_number column auto created (GET)");
     }
 
+    const [backDateColumns] = await connection.query(`
+      SHOW COLUMNS FROM tbcompanies LIKE 'back_date_allowed'
+    `);
+
+    if (backDateColumns.length === 0) {
+      await connection.query(`
+        ALTER TABLE tbcompanies
+        ADD COLUMN back_date_allowed TINYINT(1) DEFAULT 0
+      `);
+      console.log("✅ back_date_allowed column created");
+    }
+
     const [rows] = await connection.query(`
       SELECT 
         c.id,
@@ -414,6 +436,7 @@ router.get('/company/:companyId', async (req, res) => {
         c.fdAccountType AS maintainBy,
         c.fdAccountantName AS accountantName,
         c.vault_password IS NOT NULL as vaultEnabled,
+        c.back_date_allowed as backDateAllowed,
         u.username,
         (u.id IS NOT NULL) as accessControlEnabled
       FROM tbcompanies c

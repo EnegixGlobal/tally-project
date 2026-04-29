@@ -33,6 +33,7 @@ export type CompanyInfo = {
   maintainBy?: "self" | "accountant";
   accountantName?: string;
   godowns?: Godown[];
+  backDateAllowed?: boolean;
 };
 
 export type LedgerType =

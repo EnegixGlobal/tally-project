@@ -21,7 +21,7 @@ import EWayBillGeneration from "./EWayBillGeneration";
 import InvoicePrint from "./InvoicePrint";
 import PrintOptions from "./PrintOptions";
 import type { StockItem } from "../../../types";
-import { useFinancialYear, getFinancialYearDefaults } from "../../../hooks/useFinancialYear";
+import { useFinancialYear, getFinancialYearDefaults, useVoucherDateConfig } from "../../../hooks/useFinancialYear";
 
 // DRY Constants for Tailwind Classes
 const FORM_STYLES = {
@@ -88,7 +88,7 @@ const SalesVoucher: React.FC = () => {
   });
 
   const { selectedFinYear } = useFinancialYear();
-  const { defaultDate, minDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
+  const { defaultDate, minDate, maxDate, isDateReadOnly } = useVoucherDateConfig(selectedFinYear);
 
   // Robust detection for party ledgers — backend may return different field names
 
@@ -2583,7 +2583,9 @@ const SalesVoucher: React.FC = () => {
                     onChange={handleChange}
                     required
                     max={maxDate}
-                    className={`${FORM_STYLES.input(theme, !!errors.date)}`}
+                    min={minDate}
+                    readOnly={isDateReadOnly}
+                    className={`${FORM_STYLES.input(theme, !!errors.date)} ${isDateReadOnly ? 'bg-gray-100 cursor-not-allowed opacity-75' : ''}`}
                   />
                   {errors.date && <p className="text-red-500 text-xs mt-1">{errors.date}</p>}
                 </div>

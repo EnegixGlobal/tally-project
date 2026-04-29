@@ -4,7 +4,7 @@ import Swal from "sweetalert2";
 import { useAppContext } from "../../../context/AppContext";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 import type { VoucherEntry, Ledger } from "../../../types";
-import { useFinancialYear, getFinancialYearDefaults } from "../../../hooks/useFinancialYear";
+import { useFinancialYear, getFinancialYearDefaults, useVoucherDateConfig } from "../../../hooks/useFinancialYear";
 
 const ReceiptVoucher: React.FC = () => {
   const { theme, companyInfo } = useAppContext();
@@ -25,7 +25,7 @@ const ReceiptVoucher: React.FC = () => {
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const { selectedFinYear } = useFinancialYear();
-  const { defaultDate, minDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
+  const { defaultDate, minDate, maxDate, isDateReadOnly } = useVoucherDateConfig(selectedFinYear);
 
   const initialFormData: Omit<VoucherEntry, "id"> = {
     date: defaultDate,
@@ -703,10 +703,12 @@ const ReceiptVoucher: React.FC = () => {
                 required
                 title="Receipt Date"
                 max={maxDate}
+                min={minDate}
+                readOnly={isDateReadOnly}
                 className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 text-gray-100"
                   : "bg-white border-gray-300 text-gray-900"
-                  } focus:border-blue-500 focus:ring-blue-500`}
+                  } focus:border-blue-500 focus:ring-blue-500 ${isDateReadOnly ? 'bg-gray-100 cursor-not-allowed opacity-75' : ''}`}
               />
               {errors.date && (
                 <p className="text-red-500 text-sm mt-1">{errors.date}</p>

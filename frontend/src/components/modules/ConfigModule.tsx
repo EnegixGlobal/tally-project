@@ -21,7 +21,7 @@ const ConfigModule: React.FC = () => {
           name: "Set Profit",
           path: "/app/config/set-profit",
         },
-        // { icon: <Settings size={20} />, name: 'General Settings', path: '/app/config/general' },
+        { icon: <Settings size={20} />, name: 'General Settings', path: '/app/config/general' },
         // { icon: <Database size={20} />, name: 'Database Settings', path: '/app/config/database' },
         // { icon: <RefreshCcw size={20} />, name: 'Backup & Restore', path: '/app/config/backup' },
         // { icon: <Monitor size={20} />, name: 'Display Settings', path: '/app/config/display' }
