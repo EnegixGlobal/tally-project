@@ -44,8 +44,7 @@ const SalesTypeForm: React.FC = () => {
     const fetchOne = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/sales-types/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const json = await res.json();
@@ -141,9 +140,8 @@ const SalesTypeForm: React.FC = () => {
         <button
           title="Back to Sales Types"
           onClick={() => navigate("/app/masters/sales-types")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
@@ -153,9 +151,8 @@ const SalesTypeForm: React.FC = () => {
       </div>
 
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <form onSubmit={handleSubmit} className="space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -173,11 +170,10 @@ const SalesTypeForm: React.FC = () => {
                 onChange={handleChange}
                 required
                 placeholder="e.g., Retail Sale"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
                     : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
+                  } outline-none transition-colors`}
               />
             </div>
 
@@ -192,11 +188,10 @@ const SalesTypeForm: React.FC = () => {
                 required
                 readOnly
                 placeholder="e.g., sales"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
                     : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
+                  } outline-none transition-colors`}
               />
             </div>
           </div>
@@ -215,11 +210,10 @@ const SalesTypeForm: React.FC = () => {
                 value={formData.prefix}
                 onChange={handleChange}
                 placeholder="e.g., SLS"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
                     : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
+                  } outline-none transition-colors`}
               />
             </div>
 
@@ -236,56 +230,54 @@ const SalesTypeForm: React.FC = () => {
                 value={formData.suffix}
                 onChange={handleChange}
                 placeholder="e.g., /24-25"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
                     : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
+                  } outline-none transition-colors`}
               />
             </div>
 
-            <div>
-              <label
-                className="block text-sm font-medium mb-1"
-                htmlFor="current_no"
-              >
-                Current No
-              </label>
-              <input
-                type="number"
-                id="current_no"
-                name="current_no"
-                value={formData.current_no}
-                onChange={handleChange}
-                min={1}
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
-                    ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
-                    : "bg-white border-gray-300 focus:border-blue-500"
-                } outline-none transition-colors`}
-              />
-            </div>
+            {!isEditMode && (
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="current_no"
+                >
+                  Current No
+                </label>
+                <input
+                  type="number"
+                  id="current_no"
+                  name="current_no"
+                  value={formData.current_no}
+                  onChange={handleChange}
+                  min={1}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                      ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
+                      : "bg-white border-gray-300 focus:border-blue-500"
+                    } outline-none transition-colors`}
+                />
+              </div>
+            )}
           </div>
 
           <div className="flex justify-end space-x-4 pt-2">
             <button
               type="button"
               onClick={() => navigate("/app/masters/sales-types")}
-              className={`px-4 py-2 rounded ${
-                theme === "dark"
+              className={`px-4 py-2 rounded ${theme === "dark"
                   ? "bg-gray-700 hover:bg-gray-600"
                   : "bg-gray-200 hover:bg-gray-300"
-              } transition-colors`}
+                } transition-colors`}
             >
               Cancel
             </button>
             <button
               type="submit"
-              className={`flex items-center px-4 py-2 rounded ${
-                theme === "dark"
+              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
                   : "bg-blue-600 hover:bg-blue-700 text-white"
-              } transition-colors`}
+                } transition-colors`}
             >
               <Save size={18} className="mr-1" />
               {isEditMode ? "Update" : "Save"}
