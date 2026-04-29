@@ -250,10 +250,24 @@ const PurchaseReport1: React.FC = () => {
       }
 
       // 2️⃣ PURCHASE SIDE (Debit / Expense) via Items
+      const seenTaxInItems = { cgst: false, sgst: false, igst: false };
+
       if (voucher.items && voucher.items.length > 0) {
         voucher.items.forEach((item) => {
-          // Use hardcoded "Purchase Account" as requested, or derive if needed
-          const itemGroupName = "Purchase Account";
+          const lName = (item.purchaseLedgerName || "").toLowerCase();
+          const gName = (item.purchaseLedgerGroupName || "").toLowerCase();
+          
+          let itemGroupName = item.purchaseLedgerGroupName || "Purchase Account";
+          
+          const isTax = gName.includes("duties") || gName.includes("tax") || 
+                        lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
+          
+          if (isTax) {
+            itemGroupName = "Duties & Taxes";
+            if (lName.includes("cgst")) seenTaxInItems.cgst = true;
+            if (lName.includes("sgst") || lName.includes("utgst")) seenTaxInItems.sgst = true;
+            if (lName.includes("igst")) seenTaxInItems.igst = true;
+          }
 
           if (!groups[itemGroupName]) {
             groups[itemGroupName] = {
@@ -317,9 +331,9 @@ const PurchaseReport1: React.FC = () => {
         });
       }
 
-      const cgst = Number(voucher.cgstAmount || 0);
-      const sgst = Number(voucher.sgstAmount || 0);
-      const igst = Number(voucher.igstAmount || 0);
+      const cgst = seenTaxInItems.cgst ? 0 : Number(voucher.cgstAmount || 0);
+      const sgst = seenTaxInItems.sgst ? 0 : Number(voucher.sgstAmount || 0);
+      const igst = seenTaxInItems.igst ? 0 : Number(voucher.igstAmount || 0);
 
       if (cgst > 0 || sgst > 0 || igst > 0) {
         if (!groups[taxGroupName]) {
