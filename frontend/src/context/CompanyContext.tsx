@@ -121,7 +121,7 @@ async function fetchCompanyFromAPI(companyId: string | number): Promise<CompanyI
     }
 
     const token = safeGetItem('token');
-    const response = await fetch(`${apiUrl}/api/company/${companyId}`, {
+    const response = await fetch(`${apiUrl}/api/company/company/${companyId}`, {
       headers: {
         'Content-Type': 'application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {}),

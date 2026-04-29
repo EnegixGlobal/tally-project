@@ -7,7 +7,7 @@ import type { LedgerWithGroup, VoucherEntry } from "../../../types";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
 import Swal from "sweetalert2";
 import type { StockItem } from "../../../types";
-import { useFinancialYear, getFinancialYearDefaults } from "../../../hooks/useFinancialYear";
+import { useFinancialYear, getFinancialYearDefaults, useVoucherDateConfig } from "../../../hooks/useFinancialYear";
 
 // DRY Principle - Reusable constants and styles
 const TABLE_STYLES = {
@@ -841,7 +841,7 @@ const PurchaseVoucher: React.FC = () => {
   };
 
   const { selectedFinYear } = useFinancialYear();
-  const { defaultDate, minDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
+  const { defaultDate, minDate, maxDate, isDateReadOnly } = useVoucherDateConfig(selectedFinYear);
 
   const [formData, setFormData] = useState<Omit<VoucherEntry, "id">>({
     date: defaultDate,
@@ -2569,7 +2569,9 @@ const PurchaseVoucher: React.FC = () => {
                   onChange={handleChange}
                   required
                   max={maxDate}
-                  className={`${getInputClasses(theme, !!errors.date)}`}
+                  min={minDate}
+                  readOnly={isDateReadOnly}
+                  className={`${getInputClasses(theme, !!errors.date)} ${isDateReadOnly ? 'bg-gray-100 cursor-not-allowed opacity-75' : ''}`}
                 />
                 {errors.date && (
                   <p className="text-red-500 text-xs mt-1">{errors.date}</p>
