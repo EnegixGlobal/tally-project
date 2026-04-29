@@ -109,7 +109,7 @@ const LedgerForm: React.FC = () => {
       try {
         const res = await fetch(
           `${import.meta.env.VITE_API_URL
-          }/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          }/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&_t=${Date.now()}`
         );
         const data = await res.json();
 
@@ -156,7 +156,7 @@ const LedgerForm: React.FC = () => {
     const fetchLedgerById = async () => {
       try {
         const res = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+          `${import.meta.env.VITE_API_URL}/api/ledger/${id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&_t=${Date.now()}`
         );
         const data = await res.json();
 

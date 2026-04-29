@@ -29,6 +29,7 @@ router.get("/", async (req, res) => {
         l.pan_number AS panNumber,
         l.state,
         l.district,
+        l.pin_code AS pinCode,
         l.created_at AS createdAt,
         g.name AS groupName,
         g.type AS groupType,
@@ -64,6 +65,7 @@ router.post("/", async (req, res) => {
     panNumber,
     state,
     district,
+    pinCode,
     companyId,
     ownerType,
     ownerId,
@@ -121,14 +123,29 @@ router.post("/", async (req, res) => {
     `);
     }
 
+    // Check for pin_code column
+    const [colPinCode] = await db.execute(`
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'ledgers'
+    AND COLUMN_NAME = 'pin_code';
+  `);
+
+    if (colPinCode.length === 0) {
+      await db.execute(`
+      ALTER TABLE ledgers
+      ADD COLUMN pin_code VARCHAR(20) DEFAULT '';
+    `);
+    }
+
     // 🔁 Auto handle missing closingBalance
     const finalClosingBalance =
       closingBalance !== undefined ? closingBalance : openingBalance || 0;
 
     const sql = `
     INSERT INTO ledgers 
-    (name, group_id, opening_balance, closing_balance, balance_type, address, email, phone, gst_number, pan_number, state, district, company_id, owner_type, owner_id)
-    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    (name, group_id, opening_balance, closing_balance, balance_type, address, email, phone, gst_number, pan_number, state, district, pin_code, company_id, owner_type, owner_id)
+    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
     await db.execute(sql, [
@@ -144,6 +161,7 @@ router.post("/", async (req, res) => {
       panNumber || "",
       state || "",
       district || "",
+      pinCode || "",
       companyId,
       ownerType,
       ownerId,
@@ -247,10 +265,24 @@ router.post("/bulk", async (req, res) => {
     `);
     }
 
+    const [colPinCode] = await connection.execute(`
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'ledgers'
+    AND COLUMN_NAME = 'pin_code';
+  `);
+
+    if (colPinCode.length === 0) {
+      await connection.execute(`
+      ALTER TABLE ledgers
+      ADD COLUMN pin_code VARCHAR(20) DEFAULT '';
+    `);
+    }
+
     const sql = `
       INSERT INTO ledgers 
-      (name, group_id, opening_balance, balance_type, address, email, phone, gst_number, pan_number, state, district, company_id, owner_type, owner_id)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      (name, group_id, opening_balance, balance_type, address, email, phone, gst_number, pan_number, state, district, pin_code, company_id, owner_type, owner_id)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `;
 
     const results = [];
@@ -268,6 +300,7 @@ router.post("/bulk", async (req, res) => {
         panNumber,
         state,
         district,
+        pinCode,
       } = ledger;
 
       //  Validate required fields
@@ -289,6 +322,7 @@ router.post("/bulk", async (req, res) => {
         panNumber || "",
         state || "",
         district || "",
+        pinCode || "",
         companyId,
         ownerType,
         ownerId,
@@ -366,6 +400,7 @@ router.get("/:id", async (req, res) => {
       panNumber: ledger.pan_number,
       state: ledger.state || "",
       district: ledger.district || "",
+      pinCode: ledger.pin_code || "",
       createdAt: ledger.created_at,
       groupName: ledger.groupName,
     });
@@ -392,6 +427,7 @@ router.put("/:id", async (req, res) => {
     panNumber,
     state,
     district,
+    pinCode,
     closingBalance,
   } = req.body;
 
@@ -436,6 +472,20 @@ router.put("/:id", async (req, res) => {
     `);
     }
 
+    const [colPinCode] = await db.execute(`
+    SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
+    WHERE TABLE_SCHEMA = DATABASE()
+    AND TABLE_NAME = 'ledgers'
+    AND COLUMN_NAME = 'pin_code';
+  `);
+
+    if (colPinCode.length === 0) {
+      await db.execute(`
+      ALTER TABLE ledgers
+      ADD COLUMN pin_code VARCHAR(20) DEFAULT '';
+    `);
+    }
+
     const sql = `
       UPDATE ledgers
       SET name = ?, 
@@ -449,6 +499,7 @@ router.put("/:id", async (req, res) => {
           pan_number = ?,
           state = ?,
           district = ?,
+          pin_code = ?,
           closing_balance = ?
       WHERE id = ? 
       AND owner_type = ?
@@ -468,6 +519,7 @@ router.put("/:id", async (req, res) => {
       panNumber || "",
       state || "",
       district || "",
+      pinCode || "",
       closingBalance !== undefined ? closingBalance : openingBalance || 0,
       ledgerId,
       owner_type,
