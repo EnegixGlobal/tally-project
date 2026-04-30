@@ -317,6 +317,18 @@ app.listen(PORT, async () => {
     
     console.log("🛠️ Starting automatic chronological repair...");
     
+    // 🏢 REPAIR: Link companies to employees via email match if employee_id is NULL
+    const [unlinked] = await db.execute("SELECT id, name, email FROM tbcompanies WHERE employee_id IS NULL");
+    for (const company of unlinked) {
+      if (company.email) {
+        const [emps] = await db.execute("SELECT id FROM tbemployees WHERE email = ? LIMIT 1", [company.email]);
+        if (emps.length > 0) {
+          console.log(`🛠️ Auto-linking company "${company.name}" (ID: ${company.id}) to employee ID: ${emps[0].id}`);
+          await db.execute("UPDATE tbcompanies SET employee_id = ? WHERE id = ?", [emps[0].id, company.id]);
+        }
+      }
+    }
+
     const [combos] = await db.execute("SELECT DISTINCT company_id, owner_type, owner_id FROM purchase_vouchers");
     for (const combo of combos) {
       // Renumber for current and previous FY

@@ -505,7 +505,7 @@ const CompanyForm: React.FC = () => {
         accessControlEnabled,
         username: accessControlEnabled ? username : null,
         password: accessControlEnabled ? password : null,
-        employeeId: localStorage.getItem("employee_id"), // ✅ this key must match
+        employeeId: localStorage.getItem("employee_id") || user?.id, // ✅ Fallback to context user.id if storage is empty
       };
 
       // Step 4: Submit to backend

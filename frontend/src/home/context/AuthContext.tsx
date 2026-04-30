@@ -101,6 +101,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         setCompanyId(savedCompanyId);
         // If company_id exists but company flag wasn't set, ensure hasCompany is true
         setHasCompany(true);
+      } else if (savedUser && savedCompany !== "true") {
+        // 🔄 Background check if user is logged in but company info is missing in storage
+        const parsedUser = JSON.parse(savedUser);
+        const email = parsedUser.email;
+        if (email) {
+          fetch(`${import.meta.env.VITE_API_URL}/api/login/check-company?email=${email}`)
+            .then(res => res.json())
+            .then(data => {
+              if (data.hasCompany) {
+                setHasCompany(true);
+                localStorage.setItem("company", "true");
+                if (data.companyId) {
+                  setCompanyId(String(data.companyId));
+                  localStorage.setItem("company_id", String(data.companyId));
+                }
+              }
+            })
+            .catch(err => console.warn("Background company check failed:", err));
+        }
       }
     } catch (error) {
       console.error("Error loading user from localStorage:", error);
