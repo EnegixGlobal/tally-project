@@ -20,7 +20,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
   useEffect(() => {
     const storedCompanyId = localStorage.getItem("company_id");
 
-    if (!storedCompanyId) return;
+    if (!storedCompanyId || storedCompanyId === "null") return;
 
     fetch(`${import.meta.env.VITE_API_URL}/api/header/${storedCompanyId}`)
   .then(res => res.json())

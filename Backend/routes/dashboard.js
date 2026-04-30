@@ -8,11 +8,11 @@ router.get('/dashboard-data', async (req, res) => {
   if (!employee_id) return res.status(400).json({ success: false, error: 'employee_id required' });
 
   try {
-    let companyInfoQuery = 'SELECT * FROM tbcompanies WHERE employee_id = ?';
+    let companyInfoQuery = 'SELECT * FROM tbcompanies WHERE employee_id = ? OR id = ?';
     let companiesQuery = `SELECT c.*, 
        (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = c.id) > 0 as isLocked 
-       FROM tbcompanies c WHERE c.employee_id = ?`;
-    let queryParams = [employee_id];
+       FROM tbcompanies c WHERE c.employee_id = ? OR c.id = ?`;
+    let queryParams = [employee_id, employee_id];
 
     if (company_id) {
       companyInfoQuery += ' AND id = ?';
@@ -120,8 +120,8 @@ router.get('/companies-by-employee', async (req, res) => {
     const [companies] = await db.query(
       `SELECT c.id, c.name, 
        (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = c.id) > 0 as isLocked 
-       FROM tbcompanies c WHERE c.employee_id = ?`,
-      [employee_id]
+       FROM tbcompanies c WHERE c.employee_id = ? OR c.id = ?`,
+      [employee_id, employee_id]
     );
 
     res.json({ success: true, companies });
