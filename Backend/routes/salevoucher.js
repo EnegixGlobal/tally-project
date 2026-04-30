@@ -394,6 +394,7 @@ router.post("/", async (req, res) => {
         ownerId,
         voucherType: "sales",
         date,
+        salesTypeId: sales_type_id,
       });
     }
 
@@ -406,18 +407,6 @@ router.post("/", async (req, res) => {
     );
 
     const voucherId = voucherResult.insertId;
-
-    // ================= INCREMENT SALES TYPE CURRENT NO =================
-    if (sales_type_id && sales_type_id !== "custom") {
-      try {
-        await db.execute(
-          `UPDATE sales_types SET current_no = current_no + 1 WHERE id = ?`,
-          [sales_type_id]
-        );
-      } catch (err) {
-        console.error("Failed to increment sales type current_no:", err);
-      }
-    }
 
     // ================= INSERT ENTRIES (BASED ON MODE) =================
     if (mode === "accounting-invoice") {
@@ -519,6 +508,7 @@ router.post("/", async (req, res) => {
       ownerId,
       voucherType: "sales",
       date,
+      salesTypeId: sales_type_id,
     });
 
     return res.status(200).json({
@@ -762,15 +752,8 @@ router.delete("/:id", async (req, res) => {
       ownerId: owner_id,
       voucherType: "sales",
       date: rows[0].date || new Date(),
+      salesTypeId: sales_type_id,
     }, conn);
-
-    // 3️⃣ Decrement current_no in sales_types
-    if (sales_type_id && sales_type_id !== "custom") {
-      await conn.execute(
-        `UPDATE sales_types SET current_no = GREATEST(1, current_no - 1) WHERE id = ?`,
-        [sales_type_id]
-      );
-    }
 
     await conn.commit();
     return res.json({
@@ -1087,6 +1070,7 @@ router.put("/:id", async (req, res) => {
       ownerId: req.body.ownerId || req.query.owner_id,
       voucherType: "sales",
       date,
+      salesTypeId: sales_type_id,
     });
 
     return res.json({ success: true, message: "Voucher updated successfully" });

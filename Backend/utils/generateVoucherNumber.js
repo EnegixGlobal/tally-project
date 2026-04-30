@@ -27,24 +27,53 @@ async function generateVoucherNumber({
   ownerId,
   voucherType,
   date,
+  salesTypeId, // Added salesTypeId
 }) {
   const config = CONFIG_MAP[voucherType];
   if (!config) {
     throw new Error(`Unsupported voucher type: ${voucherType}`);
   }
 
-  const { prefix, table, column, typeCol } = config;
+  const { table, column, typeCol } = config;
+  let prefix = config.prefix;
+  let suffix = "";
+  let useTypeFilter = false;
+
+  // 🔹 Fetch custom prefix/suffix if salesTypeId is provided
+  if (voucherType === "sales" && salesTypeId && salesTypeId !== "custom") {
+    try {
+      const [stRows] = await db.execute(
+        "SELECT prefix, suffix FROM sales_types WHERE id = ?",
+        [salesTypeId]
+      );
+      if (stRows.length > 0) {
+        prefix = stRows[0].prefix || "";
+        suffix = stRows[0].suffix || "";
+        useTypeFilter = true;
+      }
+    } catch (err) {
+      console.error("Error fetching sales type for numbering:", err);
+    }
+  }
+
   const fy = getFinancialYear(date);
-  const searchPattern = `${prefix}/${fy}/%`;
+  const searchPattern = useTypeFilter ? null : `${prefix}/${fy}/%`;
 
   let sql = `
     SELECT ${column} as lastNumber
     FROM ${table}
     WHERE company_id = ? AND owner_type = ? AND owner_id = ?
-    AND ${column} LIKE ?
   `;
 
-  const params = [companyId, ownerType, ownerId, searchPattern];
+  const params = [companyId, ownerType, ownerId];
+
+  if (useTypeFilter) {
+    sql += ` AND sales_type_id = ?`;
+    params.push(salesTypeId);
+  } else {
+    sql += ` AND ${column} LIKE ?`;
+    params.push(searchPattern);
+  }
 
   if (typeCol) {
     sql += ` AND ${typeCol} = ?`;
@@ -52,7 +81,7 @@ async function generateVoucherNumber({
   }
 
   sql += ` ORDER BY ${column} DESC LIMIT 1`;
-  
+
   try {
     const [rows] = await db.execute(sql, params);
     let nextNo = 1;
@@ -65,6 +94,11 @@ async function generateVoucherNumber({
       }
     }
 
+    if (useTypeFilter) {
+      // Follow frontend format: prefix + suffix + "/" + nextNo
+      return `${prefix}${suffix}/${nextNo}`;
+    }
+
     return `${prefix}/${fy}/${String(nextNo).padStart(6, "0")}`;
   } catch (err) {
     console.error("Error generating voucher number:", err);
@@ -75,24 +109,57 @@ async function generateVoucherNumber({
 /**
  * 🔹 Chronological Renumbering Logic
  */
-async function renumberVouchers({ companyId, ownerType, ownerId, voucherType, date }, connection = null) {
+async function renumberVouchers(
+  { companyId, ownerType, ownerId, voucherType, date, salesTypeId },
+  connection = null
+) {
   const config = CONFIG_MAP[voucherType];
   if (!config) return;
 
   const executor = connection || db;
-  const { prefix, table, column, typeCol } = config;
-  const fy = getFinancialYear(date);
-  const searchPattern = `${prefix}/${fy}/%`;
+  const { table, column, typeCol } = config;
+  let prefix = config.prefix;
+  let suffix = "";
+  let useTypeFilter = false;
 
-  console.log(`[renumberVouchers] Starting for ${voucherType} in FY ${fy}`);
+  // 🔹 Fetch custom prefix/suffix if salesTypeId is provided
+  if (voucherType === "sales" && salesTypeId && salesTypeId !== "custom") {
+    try {
+      const [stRows] = await executor.execute(
+        "SELECT prefix, suffix FROM sales_types WHERE id = ?",
+        [salesTypeId]
+      );
+      if (stRows.length > 0) {
+        prefix = stRows[0].prefix || "";
+        suffix = stRows[0].suffix || "";
+        useTypeFilter = true;
+      }
+    } catch (err) {
+      console.error("Error fetching sales type for renumbering:", err);
+    }
+  }
+
+  const fy = getFinancialYear(date);
+  const searchPattern = useTypeFilter ? null : `${prefix}/${fy}/%`;
+
+  console.log(
+    `[renumberVouchers] Starting for ${voucherType} (TypeID: ${salesTypeId}) in FY ${fy}`
+  );
 
   let sql = `
     SELECT id, date, ${column} as oldNumber 
     FROM ${table} 
     WHERE company_id = ? AND owner_type = ? AND owner_id = ? 
-    AND ${column} LIKE ?
   `;
-  const params = [companyId, ownerType, ownerId, searchPattern];
+  const params = [companyId, ownerType, ownerId];
+
+  if (useTypeFilter) {
+    sql += ` AND sales_type_id = ?`;
+    params.push(salesTypeId);
+  } else {
+    sql += ` AND ${column} LIKE ?`;
+    params.push(searchPattern);
+  }
 
   if (typeCol) {
     sql += ` AND ${typeCol} = ?`;
@@ -103,10 +170,22 @@ async function renumberVouchers({ companyId, ownerType, ownerId, voucherType, da
 
   try {
     const [vouchers] = await executor.execute(sql, params);
+
+    // 🔹 Sync current_no in sales_types (Always do this if salesTypeId is provided to keep sequences in sync)
+    if (useTypeFilter) {
+      const nextNo = vouchers.length + 1;
+      console.log(
+        `[renumberVouchers] Syncing sales_types TypeID ${salesTypeId} current_no to ${nextNo}`
+      );
+      await executor.execute(
+        "UPDATE sales_types SET current_no = ? WHERE id = ?",
+        [nextNo, salesTypeId]
+      );
+    }
+
     if (vouchers.length === 0) return;
 
     // 1. Temporarily move all to a non-conflicting sequence to avoid UNIQUE constraint errors
-    // We append '_TEMP' to each number
     for (const v of vouchers) {
       await executor.execute(
         `UPDATE ${table} SET ${column} = CONCAT(${column}, '_TEMP') WHERE id = ?`,
@@ -117,15 +196,24 @@ async function renumberVouchers({ companyId, ownerType, ownerId, voucherType, da
     // 2. Now re-assign correctly in order
     for (let i = 0; i < vouchers.length; i++) {
       const newSeq = i + 1;
-      const newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
+      let newNumber;
+
+      if (useTypeFilter) {
+        newNumber = `${prefix}${suffix}/${newSeq}`;
+      } else {
+        newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
+      }
+
       const oldNumber = vouchers[i].oldNumber;
 
-      console.log(`[renumberVouchers] Updating voucher ${vouchers[i].id}: ${oldNumber} -> ${newNumber}`);
-      
-      await executor.execute(
-        `UPDATE ${table} SET ${column} = ? WHERE id = ?`,
-        [newNumber, vouchers[i].id]
+      console.log(
+        `[renumberVouchers] Updating voucher ${vouchers[i].id}: ${oldNumber} -> ${newNumber}`
       );
+
+      await executor.execute(`UPDATE ${table} SET ${column} = ? WHERE id = ?`, [
+        newNumber,
+        vouchers[i].id,
+      ]);
 
       // Update related history
       if (table === "purchase_vouchers") {
@@ -140,12 +228,15 @@ async function renumberVouchers({ companyId, ownerType, ownerId, voucherType, da
         );
       }
     }
-    
-    console.log(`[renumberVouchers] Successfully renumbered ${vouchers.length} vouchers.`);
+
+    console.log(
+      `[renumberVouchers] Successfully renumbered ${vouchers.length} vouchers.`
+    );
   } catch (err) {
     console.error(`[renumberVouchers] ERROR:`, err);
     throw err;
   }
 }
+
 
 module.exports = { generateVoucherNumber, renumberVouchers };

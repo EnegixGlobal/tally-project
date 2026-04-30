@@ -368,15 +368,22 @@ router.post("/bulk-delete", async (req, res) => {
       numField = "voucher_number";
     }
 
-    // 1️⃣ Identify affected groups (prefix/FY) for renumbering
+    // 1️⃣ Identify affected groups (prefix/FY or sales_type_id) for renumbering
+    let selectCols = `id, date, ${numField} AS voucher_number`;
+    if (voucherType === "sales") selectCols += ", sales_type_id";
+
     const [vouchers] = await conn.query(
-      `SELECT id, date, ${numField} AS voucher_number FROM ${mainTable} WHERE id IN (?)`,
+      `SELECT ${selectCols} FROM ${mainTable} WHERE id IN (?)`,
       [ids]
     );
 
     const affectedGroups = new Set();
-    vouchers.forEach(v => {
-      if (v.voucher_number && v.voucher_number.includes("/")) {
+    const affectedSalesTypes = new Set();
+
+    vouchers.forEach((v) => {
+      if (voucherType === "sales" && v.sales_type_id) {
+        affectedSalesTypes.add(v.sales_type_id);
+      } else if (v.voucher_number && v.voucher_number.includes("/")) {
         const parts = v.voucher_number.split("/");
         if (parts.length >= 3) {
           affectedGroups.add(`${parts[0]}/${parts[1]}`);
@@ -386,35 +393,69 @@ router.post("/bulk-delete", async (req, res) => {
 
     // 2️⃣ Delete vouchers and related data
     if (voucherType === "sales" || voucherType === "purchase") {
-      await conn.query(`DELETE FROM ${entriesTable} WHERE voucher_id IN (?)`, [ids]);
-      if (itemsTable) await conn.query(`DELETE FROM ${itemsTable} WHERE voucherId IN (?)`, [ids]);
+      await conn.query(`DELETE FROM ${entriesTable} WHERE voucher_id IN (?)`, [
+        ids,
+      ]);
+      if (itemsTable)
+        await conn.query(`DELETE FROM ${itemsTable} WHERE voucherId IN (?)`, [
+          ids,
+        ]);
       if (historyTable) {
-        const numbers = vouchers.map(v => v.voucher_number);
-        await conn.query(`DELETE FROM ${historyTable} WHERE voucherNumber IN (?)`, [numbers]);
+        const numbers = vouchers.map((v) => v.voucher_number);
+        await conn.query(`DELETE FROM ${historyTable} WHERE voucherNumber IN (?)`, [
+          numbers,
+        ]);
       }
       await conn.query(`DELETE FROM ${mainTable} WHERE id IN (?)`, [ids]);
     } else {
-      await conn.query(`DELETE FROM voucher_entries WHERE voucher_id IN (?)`, [ids]);
+      await conn.query(`DELETE FROM voucher_entries WHERE voucher_id IN (?)`, [
+        ids,
+      ]);
       await conn.query(`DELETE FROM voucher_main WHERE id IN (?)`, [ids]);
     }
 
     // 3️⃣ Renumber for each affected group
+    // Case A: Custom Sales Types
+    for (const salesTypeId of affectedSalesTypes) {
+      const sampleVoucher = vouchers.find((v) => v.sales_type_id === salesTypeId);
+      await renumberVouchers(
+        {
+          companyId,
+          ownerType,
+          ownerId,
+          voucherType: "sales",
+          date: sampleVoucher?.date || new Date(),
+          salesTypeId,
+        },
+        conn
+      );
+    }
+
+    // Case B: Standard groups (PV, RV, etc.)
     for (const groupKey of affectedGroups) {
       const parts = groupKey.split("/");
       const prefix = parts[0];
       const fy = parts[1];
 
       // Find a voucher date for this FY to pass to renumberVouchers
-      const sampleVoucher = vouchers.find(v => v.voucher_number.startsWith(`${prefix}/${fy}/`));
+      const sampleVoucher = vouchers.find((v) =>
+        v.voucher_number.startsWith(`${prefix}/${fy}/`)
+      );
       const sampleDate = sampleVoucher?.date || new Date();
 
-      await renumberVouchers({
-        companyId,
-        ownerType,
-        ownerId,
-        voucherType: voucherType === "sales" || voucherType === "purchase" ? voucherType : voucherType,
-        date: sampleDate,
-      }, conn);
+      await renumberVouchers(
+        {
+          companyId,
+          ownerType,
+          ownerId,
+          voucherType:
+            voucherType === "sales" || voucherType === "purchase"
+              ? voucherType
+              : voucherType,
+          date: sampleDate,
+        },
+        conn
+      );
     }
 
     await conn.commit();
