@@ -216,9 +216,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
         if (data.role) localStorage.setItem("userType", data.role);
         if (data.hasCompany !== undefined)
           localStorage.setItem("company", String(data.hasCompany));
-        if (data.companyId !== undefined) {
+        if (data.companyId) {
           localStorage.setItem("company_id", String(data.companyId));
           localStorage.setItem("active_company_id", String(data.companyId));
+        } else {
+          localStorage.removeItem("company_id");
+          localStorage.removeItem("active_company_id");
         }
         if (data.companyInfo)
           localStorage.setItem("companyInfo", JSON.stringify(data.companyInfo));
@@ -236,9 +239,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
 
       // Ensure React state reflects backend-provided company info immediately
       if (data.hasCompany !== undefined) setHasCompany(Boolean(data.hasCompany));
-      if (data.companyId !== undefined) setCompanyId(String(data.companyId));
+      if (data.companyId !== undefined) setCompanyId(data.companyId ? String(data.companyId) : null);
       if ((data as any).company_id !== undefined) {
-        setCompanyId(String((data as any).company_id));
+        setCompanyId((data as any).company_id ? String((data as any).company_id) : null);
         setHasCompany(true);
       }
 
@@ -348,9 +351,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({
   const updateCompany = (newCompanyId: string, companyInfo?: any) => {
     try {
       console.log("updateCompany called with:", { newCompanyId, companyInfo });
-      setCompanyId(String(newCompanyId));
+      setCompanyId(newCompanyId ? String(newCompanyId) : null);
       setHasCompany(true);
-      localStorage.setItem("company_id", String(newCompanyId));
+      if (newCompanyId) {
+        localStorage.setItem("company_id", String(newCompanyId));
+      } else {
+        localStorage.removeItem("company_id");
+      }
       localStorage.setItem("company", "true");
       if (companyInfo)
         localStorage.setItem("companyInfo", JSON.stringify(companyInfo));

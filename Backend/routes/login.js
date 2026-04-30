@@ -69,8 +69,11 @@ router.post('/', async (req, res) => {
 
       if (role === 'employee') {
         employeeId = user[idField];
-        const [[company]] = await db.query('SELECT * FROM tbcompanies WHERE employee_id = ?', [user[idField]]);
-        companyRow = company || null;
+        const [companies] = await db.query('SELECT * FROM tbcompanies WHERE employee_id = ? OR id = ?', [user[idField], user[idField]]);
+        companyRow = companies.length > 0 ? companies[0] : null;
+        if (companies.length > 0) {
+          user.assignedCompanies = companies;
+        }
       } else if (role === 'ca') {
         const [[company]] = await db.query(
           'SELECT * FROM tbcompanies WHERE fdAccountantName = ?',
