@@ -90,10 +90,9 @@ router.get('/:id', authMiddleware, async (req, res) => {
             FROM tbcompanies c
             LEFT JOIN tbusers u ON c.id = u.company_id
             LEFT JOIN company_subscriptions s ON c.id = s.company_id
-            WHERE c.employee_id = ? 
-               OR (c.employee_id IS NULL AND c.email = (SELECT email FROM tbemployees WHERE id = ?))
+            WHERE c.employee_id = ?
             ORDER BY c.created_at DESC
-        `, [id, id]);
+        `, [id]);
 
         res.json({
             info: trader[0],
