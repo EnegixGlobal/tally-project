@@ -382,7 +382,7 @@ router.post("/", async (req, res) => {
       bill_no ?? null,
       mode || 'item-invoice',
       cleanId(overallDiscountLedgerId),
-      overallDiscountAmount ?? 0
+      Number(overallDiscountAmount || 0)
     ];
 
     // ================= GENERATE NUMBER =================
@@ -952,6 +952,9 @@ router.put("/:id", async (req, res) => {
     discountAmount: overallDiscountAmount
   } = req.body;
 
+  // Helper to handle empty strings for integer/ID columns
+  const cleanId = (id) => (id === "" || id === undefined || id === "null" ? null : id);
+
   try {
     await ensureSalesLedgerColumn();
     await ensureDiscountLedgerColumn();
@@ -990,7 +993,7 @@ router.put("/:id", async (req, res) => {
         number,
         narration,
         referenceNo,
-        partyId,
+        cleanId(partyId),
         dispatchDetails?.docNo || null,
         dispatchDetails?.through || null,
         dispatchDetails?.destination || null,
@@ -1002,12 +1005,12 @@ router.put("/:id", async (req, res) => {
         discountTotal,
         total,
         isQuotation ? 1 : 0,
-        salesLedgerId,
-        sales_type_id ?? null,
+        cleanId(salesLedgerId),
+        cleanId(sales_type_id),
         bill_no ?? null,
         mode || 'item-invoice',
-        overallDiscountLedgerId ?? null,
-        overallDiscountAmount ?? 0,
+        cleanId(overallDiscountLedgerId),
+        Number(overallDiscountAmount || 0),
         voucherId,
       ]
     );
