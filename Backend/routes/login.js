@@ -69,8 +69,20 @@ router.post('/', async (req, res) => {
 
       if (role === 'employee') {
         employeeId = user[idField];
-        const [[company]] = await db.query('SELECT * FROM tbcompanies WHERE employee_id = ?', [user[idField]]);
-        companyRow = company || null;
+        // 🔍 Primary search by employee_id
+        let [companyRows] = await db.query('SELECT * FROM tbcompanies WHERE employee_id = ?', [user[idField]]);
+        
+        // 🔍 Fallback search by email if no company linked yet
+        if (companyRows.length === 0) {
+          const [emailMatch] = await db.query('SELECT * FROM tbcompanies WHERE email = ? AND employee_id IS NULL', [user.email]);
+          if (emailMatch.length > 0) {
+            console.log(`🛠️ Auto-linking company ${emailMatch[0].id} to employee ${user[idField]} via email match`);
+            await db.query('UPDATE tbcompanies SET employee_id = ? WHERE id = ?', [user[idField], emailMatch[0].id]);
+            companyRows = emailMatch;
+          }
+        }
+        
+        companyRow = companyRows[0] || null;
       } else if (role === 'ca') {
         const [[company]] = await db.query(
           'SELECT * FROM tbcompanies WHERE fdAccountantName = ?',
@@ -323,6 +335,25 @@ router.post('/verify-company-access', async (req, res) => {
   } catch (err) {
     console.error('Error verifying company access:', err);
     res.status(500).json({ success: false, message: 'Internal server error' });
+  }
+});
+
+router.get('/check-company', async (req, res) => {
+  const { email } = req.query;
+  if (!email) return res.status(400).json({ message: 'Email required' });
+
+  try {
+    const [[company]] = await db.query(
+      'SELECT id FROM tbcompanies WHERE email = ? OR employee_id = (SELECT id FROM tbemployees WHERE email = ? LIMIT 1) LIMIT 1',
+      [email, email]
+    );
+
+    res.json({
+      hasCompany: !!company,
+      companyId: company?.id || null
+    });
+  } catch (err) {
+    res.status(500).json({ error: err.message });
   }
 });
 
