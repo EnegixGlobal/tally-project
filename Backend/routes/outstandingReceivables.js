@@ -169,43 +169,74 @@ function toInt(v, def = 0) {
 
 router.get("/api/outstanding-receivables", async (req, res) => {
   try {
-    const { company_id, owner_type, owner_id, customerGroup } = req.query;
+    const { company_id, owner_type, owner_id } = req.query;
 
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({ error: "Missing tenant info" });
     }
 
-    /* =========================
-       1️⃣ LEDGERS (FILTER BY GROUP)
-    ========================== */
-    let ledgerSql = `
-      SELECT
-        l.id    AS ledger_id,
-        l.name  AS ledger_name,
+    // 1. Fetch subgroups and calculate their total balance from underlying ledgers
+    const groupSql = `
+      SELECT 
+        lg.id, 
+        lg.name, 
+        'group' AS entry_type,
+        lg.parent,
+        COALESCE(SUM(
+          (CASE WHEN l.balance_type = 'debit' THEN CAST(COALESCE(l.opening_balance, 0) AS DECIMAL(15,2)) 
+                ELSE -CAST(COALESCE(l.opening_balance, 0) AS DECIMAL(15,2)) END) +
+          COALESCE((SELECT SUM(total) FROM sales_vouchers WHERE partyId = l.id AND isQuotation = 0 AND (mode IS NULL OR mode != 'accounting-invoice')), 0) -
+          COALESCE((SELECT SUM(total) FROM purchase_vouchers WHERE partyId = l.id AND (mode IS NULL OR mode != 'accounting-invoice')), 0) +
+          COALESCE((SELECT SUM(amount) FROM voucher_entries WHERE ledger_id = l.id AND entry_type = 'debit'), 0) -
+          COALESCE((SELECT SUM(amount) FROM voucher_entries WHERE ledger_id = l.id AND entry_type = 'credit'), 0)
+        ), 0) AS net_balance
+      FROM ledger_groups lg
+      LEFT JOIN ledgers l ON l.group_id = lg.id
+      WHERE lg.parent = -110 
+        AND lg.company_id = ? 
+        AND lg.owner_type = ? 
+        AND lg.owner_id = ?
+      GROUP BY lg.id
+    `;
+
+    // 2. Fetch ledgers (both direct and inside subgroups)
+    const ledgerSql = `
+      SELECT 
+        l.id, 
+        l.name, 
+        'ledger' AS entry_type,
         l.group_id,
-        l.opening_balance,
-        l.balance_type,
-        lg.name AS ledger_group_name
+        (
+          (CASE WHEN l.balance_type = 'debit' THEN CAST(COALESCE(l.opening_balance, 0) AS DECIMAL(15,2)) 
+                ELSE -CAST(COALESCE(l.opening_balance, 0) AS DECIMAL(15,2)) END) +
+          COALESCE((SELECT SUM(total) FROM sales_vouchers WHERE partyId = l.id AND isQuotation = 0 AND (mode IS NULL OR mode != 'accounting-invoice')), 0) -
+          COALESCE((SELECT SUM(total) FROM purchase_vouchers WHERE partyId = l.id AND (mode IS NULL OR mode != 'accounting-invoice')), 0) +
+          COALESCE((SELECT SUM(amount) FROM voucher_entries WHERE ledger_id = l.id AND entry_type = 'debit'), 0) -
+          COALESCE((SELECT SUM(amount) FROM voucher_entries WHERE ledger_id = l.id AND entry_type = 'credit'), 0)
+        ) AS net_balance
       FROM ledgers l
-      LEFT JOIN ledger_groups lg ON lg.id = l.group_id
-      WHERE l.company_id = ?
-        AND l.owner_type = ?
+      WHERE (l.group_id = -110 OR l.group_id IN (SELECT id FROM ledger_groups WHERE parent = -110))
+        AND l.company_id = ? 
+        AND l.owner_type = ? 
         AND l.owner_id = ?
     `;
 
-    const params = [company_id, owner_type, owner_id];
+    const [groups] = await pool.query(groupSql, [company_id, owner_type, owner_id]);
+    const [ledgers] = await pool.query(ledgerSql, [company_id, owner_type, owner_id]);
 
-    if (customerGroup) {
-      ledgerSql += ` AND l.group_id = ?`;
-      params.push(customerGroup);
-    }
+    // Format results to use positive closing_balance and 'debit'/'credit' type
+    const formatItem = (item) => ({
+      ...item,
+      closing_balance: Math.abs(Number(item.net_balance || 0)),
+      balance_type: Number(item.net_balance || 0) >= 0 ? 'debit' : 'credit'
+    });
 
-    const [ledgers] = await pool.query(ledgerSql, params);
+    const result = [
+      ...groups.map(formatItem),
+      ...ledgers.map(formatItem)
+    ];
 
-    /* =========================
-       2️⃣ RESPONSE (ONLY LEDGERS)
-    ========================== */
-    res.json(ledgers);
+    res.json(result);
   } catch (err) {
     console.error("Outstanding receivables error:", err);
     res.status(500).json({ error: "Internal server error" });
