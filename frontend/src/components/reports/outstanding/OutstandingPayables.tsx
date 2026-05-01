@@ -1,35 +1,32 @@
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAppContext } from "../../../context/AppContext";
-import { Search, Eye } from "lucide-react";
+import { Search, Folder, User } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 
-interface LedgerOutstanding {
-  ledger_id: number;
-  ledger_name: string;
-  ledger_group_name: string;
-  opening_balance: string;
-  balance_type: "debit" | "credit";
-
-  vouchers: {
-    source: "sales" | "purchase";
-    voucher_id: number;
-    date: string;
-    total: number;
-  }[];
+interface ReportItem {
+  id: number;
+  name: string;
+  entry_type: "group" | "ledger";
+  closing_balance: string | number;
+  balance_type: string;
+  parent?: number;
+  group_id?: number;
 }
 
 const OutstandingPayables: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
 
-  // Filters & search state
   const [searchTerm, setSearchTerm] = useState("");
-  const [selectedGroup, setSelectedGroup] = useState("");
-  const [selectedRisk, setSelectedRisk] = useState("");
-  const [groups, setGroups] = useState<any[]>([]);
+  const [data, setData] = useState<ReportItem[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    const fetchLedgerGroups = async () => {
+    const fetchOutstandingData = async () => {
+      setLoading(true);
+      setError(null);
+
       const companyId = localStorage.getItem("company_id");
       const ownerType = localStorage.getItem("supplier");
       const ownerId = localStorage.getItem(
@@ -37,356 +34,149 @@ const OutstandingPayables: React.FC = () => {
       );
 
       if (!companyId || !ownerType || !ownerId) {
-        setGroups([]);
-        return;
-      }
-
-      try {
-        const response = await fetch(
-          `${import.meta.env.VITE_API_URL
-          }/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-        );
-
-        if (!response.ok) {
-          throw new Error("Failed to fetch ledger groups");
-        }
-
-        const data = await response.json();
-
-        if (!Array.isArray(data)) {
-          setGroups([]);
-          return;
-        }
-
-        const sundryDebtorsGroup = data.filter((g) => {
-          if (!g?.name) return false;
-
-          const normalizedName = g.name.toLowerCase().replace(/\s+/g, ""); // remove spaces
-
-          return normalizedName.includes("sundrycreditor");
-        });
-
-        // ✅ ONLY Sundry creditors saved
-        setGroups(sundryDebtorsGroup);
-        if (sundryDebtorsGroup.length > 0) {
-          setSelectedGroup(String(sundryDebtorsGroup[0].id));
-        }
-      } catch (err) {
-        console.error("Failed to load ledger groups", err);
-        setGroups([]);
-      }
-    };
-
-    fetchLedgerGroups();
-  }, []);
-
-  // Data, loading, error states
-  const [customersData, setCustomersData] = useState<LedgerOutstanding[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-
-  // Fetch data from backend API whenever dependencies change
-  useEffect(() => {
-    async function fetchOutstandingData() {
-      setLoading(true);
-      setError(null);
-
-      const company_id = localStorage.getItem("company_id") || "";
-      const owner_type = localStorage.getItem("supplier") || "";
-      const owner_id =
-        localStorage.getItem(
-          owner_type === "employee" ? "employee_id" : "user_id"
-        ) || "";
-
-      if (!company_id || !owner_type || !owner_id) {
         setError("Missing tenant information.");
         setLoading(false);
         return;
       }
 
       try {
-        const params = new URLSearchParams();
-        params.append("company_id", company_id);
-        params.append("owner_type", owner_type);
-        params.append("owner_id", owner_id);
-
-        if (searchTerm) params.append("searchTerm", searchTerm);
-        if (selectedGroup) params.append("customerGroup", selectedGroup);
-        if (selectedRisk) params.append("riskCategory", selectedRisk);
-
-        const url = `${import.meta.env.VITE_API_URL
-          }/api/outstanding-receivables?${params.toString()}`;
+        const apiUrl = import.meta.env.VITE_API_URL || "";
+        const url = `${apiUrl}/api/outstanding-payables?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         const response = await fetch(url);
 
         if (!response.ok) {
-          const errorText = await response.text();
-          throw new Error(errorText || `Error: ${response.status}`);
+          throw new Error(`Error: ${response.status}`);
         }
 
-        const data: LedgerOutstanding[] = await response.json();
-
-        // Fetch precise closing balances using the /api/group endpoint
-        if (data.length > 0) {
-          const ledgerIds = data.map((l) => l.ledger_id).join(",");
-          const groupUrl = `${import.meta.env.VITE_API_URL}/api/group?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}&ledgerIds=${ledgerIds}`;
-          
-          try {
-            const groupRes = await fetch(groupUrl);
-            if (groupRes.ok) {
-              const groupData = await groupRes.json();
-              if (groupData.success && groupData.data) {
-                data.forEach((ledger) => {
-                  const txns = groupData.data[ledger.ledger_id];
-                  const totalDebit = txns ? txns.debit : 0;
-                  const totalCredit = txns ? txns.credit : 0;
-                  
-                  let opening = Number(ledger.opening_balance) || 0;
-                  let closing = opening;
-                  
-                  if (ledger.balance_type === "debit") {
-                    closing += (totalDebit - totalCredit);
-                  } else {
-                    closing += (totalCredit - totalDebit);
-                  }
-                  
-                  (ledger as any).calculated_closing_balance = closing;
-                });
-              }
-            }
-          } catch (err) {
-            console.error("Failed to fetch group closing balances", err);
-          }
-        }
-
-        setCustomersData(data);
-      } catch (e: any) {
-        setError(e.message || "Failed to load data");
-        setCustomersData([]);
+        const jsonData = await response.json();
+        setData(Array.isArray(jsonData) ? jsonData : []);
+      } catch (err: any) {
+        setError(err.message || "Failed to load data");
       } finally {
         setLoading(false);
       }
-    }
+    };
 
     fetchOutstandingData();
-  }, [searchTerm, selectedGroup, selectedRisk]);
+  }, []);
 
-  // Filter & sort data client-side
   const filteredData = useMemo(() => {
-    let filtered = customersData;
+    if (!searchTerm) return data;
+    const lc = searchTerm.toLowerCase();
+    return data.filter((item) => item.name.toLowerCase().includes(lc));
+  }, [data, searchTerm]);
 
-    // Strict filter to ensure only Sundry Creditors are shown
-    filtered = filtered.filter((c) => {
-      if (!c.ledger_group_name) return false;
-      const normalizedName = c.ledger_group_name.toLowerCase().replace(/\s+/g, "");
-      return normalizedName.includes("sundrycreditor");
-    });
-
-    if (searchTerm) {
-      const lc = searchTerm.toLowerCase();
-      filtered = filtered.filter((c) =>
-        c.ledger_name.toLowerCase().includes(lc)
-      );
-    }
-
-    return filtered;
-  }, [customersData, searchTerm]);
-
-  // Formatter for currency
-  const formatCurrency = (amount: number) =>
+  const formatCurrency = (amount: string | number) =>
     new Intl.NumberFormat("en-IN", {
       style: "currency",
       currency: "INR",
-    }).format(amount);
-
-  const calculateTotals = (ledger: LedgerOutstanding) => {
-    // Return dynamically calculated closing balance if available
-    if (typeof (ledger as any).calculated_closing_balance === "number") {
-      return { closingBalance: (ledger as any).calculated_closing_balance };
-    }
-
-    const vouchers = Array.isArray(ledger.vouchers) ? ledger.vouchers : [];
-    const totalVoucherAmount = vouchers.reduce((sum, v) => sum + Number(v.total), 0);
-
-    let closingBalance = 0;
-
-    if (ledger.balance_type === "credit") {
-      closingBalance = Number(ledger.opening_balance) + totalVoucherAmount;
-    } else {
-      closingBalance = Number(ledger.opening_balance) - totalVoucherAmount;
-    }
-
-    return { closingBalance };
-  };
+    }).format(Number(amount));
 
   return (
     <div className="space-y-6">
-      {/* Header */}
       <div
-        className={`rounded-xl border p-6 ${theme === "dark"
-          ? "bg-gray-800 border-gray-700"
-          : "bg-white border-gray-200"
-          }`}
+        className={`rounded-xl border p-6 ${
+          theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"
+        }`}
       >
         <div className="flex items-center justify-between mb-6">
           <div>
-            <h2
-              className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"
-                }`}
-            >
+            <h2 className={`text-2xl font-bold ${theme === "dark" ? "text-white" : "text-gray-900"}`}>
               Payables Outstanding
             </h2>
-            <p
-              className={`mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"
-                }`}
-            >
-              Party-wise outstanding payables summary - Tally Style
+            <p className={`mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
+              Subgroups and Ledgers under Sundry Creditors (-109)
             </p>
-
           </div>
         </div>
+
+        <div className="relative mb-6">
+          <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
+          <input
+            type="text"
+            placeholder="Search by name..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className={`pl-10 pr-4 py-2 border rounded-lg w-full max-w-md ${
+              theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "bg-white border-gray-300 text-gray-900"
+            }`}
+          />
+        </div>
+
         {loading && (
-          <div className="mt-4 p-3 text-center text-sm text-gray-500">
-            Loading outstanding payables...
-          </div>
+          <div className="text-center py-8 text-gray-500">Loading data...</div>
         )}
+
         {error && (
-          <div className="mt-4 p-3 text-center text-sm text-red-500">
+          <div className="text-center py-8 text-red-500 bg-red-50 dark:bg-red-900/20 rounded-lg">
             {error}
           </div>
-        )}{" "}
-      </div>
-      {/* Filters */}
-      <div
-        className={`rounded-xl border p-6 ${theme === "dark"
-          ? "bg-gray-800 border-gray-700"
-          : "bg-white border-gray-200"
-          }`}
-      >
-        <h3
-          className={`text-lg font-semibold mb-4 ${theme === "dark" ? "text-white" : "text-gray-900"
-            }`}
-        >
-          Filters & Search
-        </h3>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
-          <div className="relative">
-            <Search
-              className={`absolute left-3 top-2.5 w-4 h-4 ${theme === "dark" ? "text-gray-400" : "text-gray-500"
-                }`}
-            />
-            <input
-              type="text"
-              placeholder="Search customers, GSTIN..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`pl-10 pr-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full ${theme === "dark"
-                ? "border-gray-600 bg-gray-700 text-white placeholder-gray-400"
-                : "border-gray-300 bg-white text-gray-900 placeholder-gray-500"
-                }`}
-            />
-          </div>
-          <select
-            value={selectedGroup}
-            onChange={(e) => setSelectedGroup(e.target.value)}
-            aria-label="Filter by customer group"
-            disabled={groups.length === 1}
-            className={`px-3 py-2 border rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${theme === "dark"
-              ? "border-gray-600 bg-gray-700 text-white"
-              : "border-gray-300 bg-white text-gray-900"
-              }`}
-          >
-            {/* Removed All Groups option */}
+        )}
 
-            {groups.map((group) => (
-              <option key={group.id} value={group.id}>
-                {group.name}
-              </option>
-            ))}
-          </select>
-        </div>
-      </div>
-      {/* Customer-wise Data Table */}
-      <div
-        className={`rounded-xl border ${theme === "dark"
-          ? "bg-gray-800 border-gray-700"
-          : "bg-white border-gray-200"
-          }`}
-      >
-        <div
-          className={`px-6 py-4 border-b ${theme === "dark" ? "border-gray-700" : "border-gray-200"
-            }`}
-        >
-          <h3
-            className={`text-lg font-semibold ${theme === "dark" ? "text-white" : "text-gray-900"
-              }`}
-          >
-            Supplier-wise Outstanding Details
-          </h3>
-        </div>
-        <div className="overflow-x-auto rounded-xl border dark:border-gray-700 border-gray-200">
-          <table className="min-w-[800px] w-full border-collapse">
-            {/* ================= THEAD ================= */}
-            <thead className={theme === "dark" ? "bg-gray-800" : "bg-gray-100"}>
-              <tr>
-                <th className="px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider w-[70%]">
-                  Supplier
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold uppercase tracking-wider w-[30%]">
-                  Closing Balance
-                </th>
-              </tr>
-            </thead>
-
-            {/* ================= TBODY ================= */}
-            <tbody
-              className={
-                theme === "dark"
-                  ? "divide-y divide-gray-700"
-                  : "divide-y divide-gray-200"
-              }
-            >
-              {filteredData.map((ledger) => {
-                const { closingBalance } = calculateTotals(ledger);
-
-                return (
-                  <tr
-                    key={ledger.ledger_id}
-                    className={`cursor-pointer ${theme === "dark"
-                      ? "hover:bg-gray-800"
-                      : "hover:bg-gray-50"
-                      }`}
-                    onClick={() =>
-                      navigate(
-                        `/app/reports/ledger/${ledger.ledger_id}`
-                      )
-                    }
-                  >
-                    {/* CUSTOMER NAME */}
-                    <td className="px-4 py-4 align-top">
-                      <div className="font-medium text-sm text-blue-600 dark:text-blue-400 hover:underline">
-                        {ledger.ledger_name}
-                      </div>
-                    </td>
-
-                    {/* CLOSING BALANCE */}
-                    <td className="px-4 py-4 text-right">
-                      <div className="font-semibold">
-                        {formatCurrency(Math.abs(closingBalance))}
-                        <span className="text-xs ml-1 font-normal text-gray-500">
-                          {closingBalance > 0
-                            ? ledger.balance_type === "debit" ? "Dr" : "Cr"
-                            : closingBalance < 0
-                              ? ledger.balance_type === "debit" ? "Cr" : "Dr"
-                              : ""}
+        {!loading && !error && (
+          <div className="overflow-x-auto rounded-lg border border-gray-200 dark:border-gray-700">
+            <table className="w-full text-left">
+              <thead className={`${theme === "dark" ? "bg-gray-900" : "bg-gray-50"}`}>
+                <tr>
+                  <th className="px-6 py-4 text-sm font-semibold">Name</th>
+                  <th className="px-6 py-4 text-sm font-semibold">Type</th>
+                  <th className="px-6 py-4 text-sm font-semibold text-right">Closing Balance</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                {filteredData.length > 0 ? (
+                  filteredData.map((item) => (
+                    <tr
+                      key={`${item.entry_type}-${item.id}`}
+                      className={`hover:bg-gray-50 dark:hover:bg-gray-700 transition cursor-pointer`}
+                      onClick={() => {
+                        if (item.entry_type === "ledger") {
+                          navigate(`/app/reports/ledger/${item.id}`);
+                        }
+                      }}
+                    >
+                      <td className="px-6 py-4 flex items-center gap-3">
+                        {item.entry_type === "group" ? (
+                          <Folder className="w-5 h-5 text-amber-500 fill-amber-500" />
+                        ) : (
+                          <User className="w-5 h-5 text-blue-500" />
+                        )}
+                        <span className="font-medium">{item.name}</span>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            item.entry_type === "group"
+                              ? "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-400"
+                              : "bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400"
+                          }`}
+                        >
+                          {item.entry_type.toUpperCase()}
                         </span>
-                      </div>
+                      </td>
+                      <td className="px-6 py-4 text-right">
+                        <div className="font-semibold text-red-600 dark:text-red-400">
+                          {formatCurrency(item.closing_balance || 0)}
+                          <span className="ml-1 text-xs font-normal text-gray-500 uppercase">
+                            {item.balance_type === "debit" ? "Dr" : "Cr"}
+                          </span>
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={3} className="px-6 py-8 text-center text-gray-500 italic">
+                      No data found under Sundry Creditors.
                     </td>
                   </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                )}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
