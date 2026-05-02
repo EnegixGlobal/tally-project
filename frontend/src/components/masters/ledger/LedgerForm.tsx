@@ -222,13 +222,13 @@ const LedgerForm: React.FC = () => {
     }
   };
 
-  const handleNameBlur = async () => {
-    if (!formData.name.trim()) return;
+  const handleGstBlur = async () => {
+    if (!formData.gstNumber.trim()) return;
 
     try {
       const res = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/ledger/check-duplicate?name=${encodeURIComponent(
-          formData.name.trim()
+        `${import.meta.env.VITE_API_URL}/api/ledger/check-duplicate?gst_number=${encodeURIComponent(
+          formData.gstNumber.trim()
         )}&company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}${
           isEditMode ? `&exclude_id=${id}` : ""
         }`
@@ -238,11 +238,11 @@ const LedgerForm: React.FC = () => {
       if (data.exists) {
         setErrors((prev) => ({
           ...prev,
-          name: "A ledger with this name already exists",
+          gstNumber: `GSTIN already exists for ledger: ${data.ledgerName}`,
         }));
       }
     } catch (err) {
-      console.error("Duplicate check failed:", err);
+      console.error("Duplicate GST check failed:", err);
     }
   };
 
@@ -254,6 +254,9 @@ const LedgerForm: React.FC = () => {
     if (formData.gstNumber && !validateGSTIN(formData.gstNumber)) {
       newErrors.gstNumber = "Invalid GSTIN/UIN format";
     }
+    if (errors.name) newErrors.name = errors.name;
+    if (errors.gstNumber) newErrors.gstNumber = errors.gstNumber;
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
@@ -365,7 +368,14 @@ const LedgerForm: React.FC = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
-                onBlur={handleNameBlur}
+                onBlur={async () => {
+                  if (!formData.name.trim()) return;
+                  try {
+                    const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger/check-duplicate?name=${encodeURIComponent(formData.name.trim())}&company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}${isEditMode ? `&exclude_id=${id}` : ""}`);
+                    const data = await res.json();
+                    if (data.exists) setErrors(prev => ({ ...prev, name: "A ledger with this name already exists" }));
+                  } catch (err) { console.error(err); }
+                }}
                 required
                 className={`w-full p-2 rounded border ${errors.name
                   ? "border-red-500 focus:border-red-500"
@@ -583,6 +593,7 @@ const LedgerForm: React.FC = () => {
                   name="gstNumber"
                   value={formData.gstNumber}
                   onChange={handleChange}
+                  onBlur={handleGstBlur}
                   placeholder="22AAAAA0000A1Z5 or UIN Number"
                   maxLength={15}
                   className={`w-full p-2 rounded border ${errors.gstNumber
