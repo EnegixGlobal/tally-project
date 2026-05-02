@@ -78,6 +78,7 @@ interface GroupedVoucher {
     importMode: "item" | "accounting";
     accSummaryRows?: AccSummaryRow[];
     _suggestedLedger?: any;
+    _missingLedger?: boolean;
 }
 
 const stateNameToCode: { [key: string]: string } = {
@@ -119,6 +120,17 @@ const stateNameToCode: { [key: string]: string } = {
     'telangana': '36',
     'andhra pradesh (new)': '37',
     'ladakh': '38'
+};
+
+const codeToStateName: { [key: string]: string } = {
+    "01": "Jammu and Kashmir(01)", "02": "Himachal Pradesh(02)", "03": "Punjab(03)", "04": "Chandigarh(04)",
+    "05": "Uttarakhand(05)", "06": "Haryana(06)", "07": "Delhi(07)", "08": "Rajasthan(08)", "09": "Uttar Pradesh(09)",
+    "10": "Bihar(10)", "11": "Sikkim(11)", "12": "Arunachal Pradesh(12)", "13": "Nagaland(13)", "14": "Manipur(14)",
+    "15": "Mizoram(15)", "16": "Tripura(16)", "17": "Meghalaya(17)", "18": "Assam(18)", "19": "West Bengal(19)",
+    "20": "Jharkhand(20)", "21": "Odisha(21)", "22": "Chhattisgarh(22)", "23": "Madhya Pradesh(23)", "24": "Gujarat(24)",
+    "25": "Daman and Diu(25)", "26": "Dadra and Nagar Haveli(26)", "27": "Maharashtra(27)", "29": "Karnataka(29)",
+    "30": "Goa(30)", "31": "Lakshadweep(31)", "32": "Kerala(32)", "33": "Tamil Nadu(33)", "34": "Puducherry(34)",
+    "35": "Andaman and Nicobar Islands(35)", "36": "Telangana(36)", "37": "Andhra Pradesh(37)", "38": "Ladakh(38)"
 };
 
 const extractStateCode = (pos: string): string => {
@@ -366,6 +378,9 @@ const PurchaseImport: React.FC = () => {
 
                             if (gstinMatch) {
                                 suggestedLedger = gstinMatch;
+                            } else {
+                                // Neither name nor GSTIN matched
+                                errorMessage = "Supplier Ledger does not exist";
                             }
                         }
                     } else if (currentImportMode === "item") {
@@ -397,6 +412,7 @@ const PurchaseImport: React.FC = () => {
                         accountingEntries: [],
                         importMode: currentImportMode,
                         _suggestedLedger: suggestedLedger,
+                        _missingLedger: !!(!matchedLedgerByName && !suggestedLedger && partyName),
                     };
                 }
 
@@ -774,6 +790,173 @@ const PurchaseImport: React.FC = () => {
         }
     };
 
+    const createMissingLedgers = async () => {
+        const missingVouchers = groupedVouchers.filter(v => v._missingLedger);
+        if (missingVouchers.length === 0) return;
+
+        // Get unique ledgers to create
+        const toCreateMap = new Map();
+        missingVouchers.forEach(v => {
+            const gstin = v["GSTIN of supplier"] ? String(v["GSTIN of supplier"]).toUpperCase().replace(/\s+/g, "").trim() : "";
+            const name = v["Trade/Legal name of the Supplier"] ? String(v["Trade/Legal name of the Supplier"]).trim() : "";
+            
+            // Use GSTIN as primary key to prevent duplicate GSTIN creation, fallback to Name
+            const key = gstin ? `GSTIN-${gstin}` : `NAME-${name.toLowerCase()}`;
+            
+            if (!toCreateMap.has(key)) {
+                // Double check against existing ledgers in DB (already fetched)
+                const alreadyExists = gstin && ledgers.some(l => {
+                    const lGst = (l.gst_number || l.gstNumber) ? String(l.gst_number || l.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
+                    return lGst === gstin;
+                });
+
+                if (!alreadyExists) {
+                    let detectedState = "";
+                    if (gstin && gstin.length >= 2) {
+                        detectedState = codeToStateName[gstin.substring(0, 2)] || "";
+                    }
+                    if (!detectedState && v["Place of supply"]) {
+                        // Try to normalize Excel state
+                        const excelCode = extractStateCode(v["Place of supply"]);
+                        if (excelCode) detectedState = codeToStateName[excelCode] || v["Place of supply"];
+                        else detectedState = v["Place of supply"];
+                    }
+
+                    toCreateMap.set(key, {
+                        name: name,
+                        gstNumber: gstin,
+                        state: detectedState,
+                        groupId: -109, // Sundry Creditors
+                        balanceType: "credit",
+                        openingBalance: 0
+                    });
+                }
+            }
+        });
+        const toCreate = Array.from(toCreateMap.values());
+
+        // Warning for missing states
+        const missingStateLedgers = toCreate.filter(l => !l.state);
+        if (missingStateLedgers.length > 0) {
+            const warnResult = await Swal.fire({
+                title: 'Missing State Information',
+                text: `${missingStateLedgers.length} ledgers don't have a detected state. This might cause issues with GST calculations. Do you want to continue?`,
+                icon: 'warning',
+                showCancelButton: true,
+                confirmButtonText: 'Yes, Continue',
+                cancelButtonText: 'Go Back'
+            });
+            if (!warnResult.isConfirmed) return;
+        }
+
+        const result = await Swal.fire({
+            title: `${toCreate.length} Ledgers do not exist`,
+            html: `<div style="text-align: left;">
+                    <p>The following suppliers will be created under <b>Sundry Creditors</b>:</p>
+                    <ul style="font-size: 0.85em; max-height: 200px; overflow-y: auto; background: #f9f9f9; padding: 10px 25px; border-radius: 8px; border: 1px solid #eee;">
+                        ${toCreate.map(l => `
+                            <li style="margin-bottom: 6px; border-bottom: 1px solid #eee; padding-bottom: 4px;">
+                                <b>${l.name}</b><br/>
+                                <span style="font-size: 0.9em; color: #666;">
+                                    ${l.gstNumber ? `GST: ${l.gstNumber}` : '<i>No GST</i>'} | 
+                                    State: <span style="color: #2563eb; font-weight: 500;">${l.state || 'Not Detected'}</span>
+                                </span>
+                            </li>
+                        `).join('')}
+                    </ul>
+                   </div>`,
+            icon: 'info',
+            showCancelButton: true,
+            confirmButtonText: 'Create All',
+            cancelButtonText: 'Cancel',
+            confirmButtonColor: '#2563eb',
+        });
+
+        if (result.isConfirmed) {
+            setIsProcessing(true);
+            let created = 0;
+            let failed = 0;
+
+            for (const ledger of toCreate) {
+                try {
+                    await axios.post(`${import.meta.env.VITE_API_URL}/api/ledger`, {
+                        ...ledger,
+                        companyId,
+                        ownerType,
+                        ownerId
+                    });
+                    created++;
+                } catch (err) {
+                    console.error("Failed to create ledger", ledger.name, err);
+                    failed++;
+                }
+            }
+
+            // Important: Refetch ledgers from DB
+            try {
+                const ledgerRes = await axios.get(`${import.meta.env.VITE_API_URL}/api/ledger`, {
+                    params: { company_id: companyId, owner_type: ownerType, owner_id: ownerId }
+                });
+                const updatedLedgers = Array.isArray(ledgerRes.data) ? ledgerRes.data : [];
+                setLedgers(updatedLedgers);
+
+                // Re-match the current vouchers with the newly fetched ledgers
+                setGroupedVouchers(prev => prev.map(v => {
+                    if (!v._missingLedger) return v;
+
+                    const excelName = v["Trade/Legal name of the Supplier"].toLowerCase();
+                    const excelGst = v["GSTIN of supplier"].toUpperCase().replace(/\s+/g, "").trim();
+
+                    const matchedLedger = updatedLedgers.find(l => {
+                        const lName = l.name ? String(l.name).toLowerCase().replace(/\s+/g, " ").trim() : "";
+                        const lGst = (l.gst_number || l.gstNumber) ? String(l.gst_number || l.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
+                        return lName === excelName || (excelGst && lGst === excelGst);
+                    });
+
+                    if (matchedLedger) {
+                        const lGst = (matchedLedger.gst_number || matchedLedger.gstNumber) ? String(matchedLedger.gst_number || matchedLedger.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
+                        const lState = matchedLedger.state ? String(matchedLedger.state).toLowerCase().replace(/\s+/g, " ").trim() : "";
+                        
+                        const gstMatch = lGst === excelGst;
+                        const excelStateCode = extractStateCode(v["Place of supply"]);
+                        const ledgerStateCode = extractStateCode(lState);
+                        const stateMatch = (excelStateCode && ledgerStateCode && excelStateCode === ledgerStateCode) || lState === v["Place of supply"].toLowerCase();
+
+                        // Update accounting entries if needed
+                        let updatedEntries = v.accountingEntries ? [...v.accountingEntries] : [];
+                        if (updatedEntries.length > 0) {
+                            updatedEntries = updatedEntries.map(ae => {
+                                if (ae["Particulars (Ledger Name)"].toLowerCase().trim() === v["Trade/Legal name of the Supplier"].toLowerCase().trim() || (v.accSummaryRows && ae.Type === 'credit')) {
+                                    return { ...ae, "Particulars (Ledger Name)": matchedLedger.name, _matchedLedgerId: matchedLedger.id };
+                                }
+                                return ae;
+                            });
+                        }
+
+                        return {
+                            ...v,
+                            _matchedLedgerId: matchedLedger.id,
+                            _matchedGstinId: gstMatch ? matchedLedger.id : null,
+                            _matchedStateId: stateMatch ? matchedLedger.id : null,
+                            partyMatch: true,
+                            errorMessage: "",
+                            status: "pending",
+                            accountingEntries: updatedEntries,
+                            _missingLedger: false,
+                            _suggestedLedger: undefined
+                        };
+                    }
+                    return v;
+                }));
+            } catch (err) {
+                console.error("Error refreshing ledgers:", err);
+            }
+
+            Swal.fire('Success', `Successfully created ${created} ledgers and matched them with your vouchers.`, 'success');
+            setIsProcessing(false);
+        }
+    };
+
     const fixAllLedgerNames = () => {
         let count = 0;
         setGroupedVouchers(prev => prev.map(v => {
@@ -1146,6 +1329,15 @@ const PurchaseImport: React.FC = () => {
                                     >
                                         <RefreshCw size={18} className="mr-2" />
                                         Autofix Ledger Names
+                                    </button>
+                                )}
+                                {groupedVouchers.some(v => v._missingLedger) && (
+                                    <button
+                                        onClick={createMissingLedgers}
+                                        className="px-4 py-2 bg-indigo-600 text-white font-bold rounded-lg hover:bg-indigo-700 shadow-md transition-all flex items-center"
+                                    >
+                                        <CheckCircle size={18} className="mr-2" />
+                                        Create {groupedVouchers.filter(v => v._missingLedger).length} Missing Ledgers
                                     </button>
                                 )}
                                 <button

@@ -5,15 +5,23 @@ const db = require("../db"); // your MySQL pool
 
 // Check for duplicate ledger name
 router.get("/check-duplicate", async (req, res) => {
-  const { name, company_id, owner_type, owner_id, exclude_id } = req.query;
+  const { name, gst_number, company_id, owner_type, owner_id, exclude_id } = req.query;
 
-  if (!name || !company_id || !owner_type || !owner_id) {
+  if ((!name && !gst_number) || !company_id || !owner_type || !owner_id) {
     return res.status(400).json({ message: "Missing required parameters" });
   }
 
   try {
-    let sql = `SELECT id FROM ledgers WHERE name = ? AND company_id = ? AND owner_type = ? AND owner_id = ?`;
-    const params = [name, company_id, owner_type, owner_id];
+    let sql = `SELECT id, name FROM ledgers WHERE company_id = ? AND owner_type = ? AND owner_id = ?`;
+    const params = [company_id, owner_type, owner_id];
+
+    if (name) {
+      sql += ` AND name = ?`;
+      params.push(name);
+    } else if (gst_number) {
+      sql += ` AND gst_number = ?`;
+      params.push(gst_number);
+    }
 
     if (exclude_id) {
       sql += ` AND id != ?`;
@@ -21,7 +29,7 @@ router.get("/check-duplicate", async (req, res) => {
     }
 
     const [rows] = await db.execute(sql, params);
-    res.json({ exists: rows.length > 0 });
+    res.json({ exists: rows.length > 0, ledgerName: rows.length > 0 ? rows[0].name : null });
   } catch (err) {
     console.error("Error checking duplicate ledger:", err);
     res.status(500).json({ message: "Internal server error" });
