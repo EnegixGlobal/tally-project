@@ -253,13 +253,13 @@ const SalesReport: React.FC = () => {
         voucher.items.forEach((item: any) => {
           const lName = (item.salesLedgerName || "").toLowerCase();
           const gName = (item.salesLedgerGroupName || "").toLowerCase();
-          
+
           // Determine the correct group for this item
           let itemGroupName = item.salesLedgerGroupName || "Sales Account";
-          
-          const isTax = gName.includes("duties") || gName.includes("tax") || 
-                        lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
-          
+
+          const isTax = gName.includes("duties") || gName.includes("tax") ||
+            lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
+
           if (isTax) {
             itemGroupName = "Duties & Taxes";
             if (lName.includes("cgst")) seenTaxInItems.cgst = true;
@@ -341,10 +341,10 @@ const SalesReport: React.FC = () => {
         if (voucher.items && voucher.items.length > 0) {
           const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
           if (cItem) cgstName = cItem.cgstLedgerName;
-          
+
           const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
           if (sItem) sgstName = sItem.sgstLedgerName;
-          
+
           const iItem = voucher.items.find((i: any) => i.igstLedgerName);
           if (iItem) igstName = iItem.igstLedgerName;
         }
@@ -450,7 +450,7 @@ const SalesReport: React.FC = () => {
 
     // 1. Collect all unique Ledger Names for Headers
     vouchersToProcess.forEach((voucher) => {
-      
+
       if (voucher.items) {
         voucher.items.forEach((item: any) => {
           if (item.salesLedgerName) salesColumns.add(item.salesLedgerName);
@@ -1268,15 +1268,15 @@ const SalesReport: React.FC = () => {
                                 : "hover:bg-gray-50"
                                 }`}
                             >
-                            <td
-                              className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
-                              onClick={() => {
-                                setColumnarDrillDown(txn.name);
-                                setSelectedView("columnar");
-                              }}
-                            >
-                              {txn.name}
-                            </td>
+                              <td
+                                className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
+                                onClick={() => {
+                                  setColumnarDrillDown(txn.name);
+                                  setSelectedView("columnar");
+                                }}
+                              >
+                                {txn.name}
+                              </td>
 
                               <td className="px-4 py-2 text-right text-sm font-mono">
                                 {txn.debit > 0
@@ -1495,92 +1495,75 @@ const SalesReport: React.FC = () => {
                     }`}
                 >
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">
-                      Party Name
-                    </th>
+                    <th className="px-4 py-3 text-left font-medium">Party Name</th>
                     <th className="px-4 py-3 text-left font-medium">GSTIN</th>
-                    <th className="px-4 py-3 text-right font-medium">
-                      Total Amount
-                    </th>
-                    <th className="px-4 py-3 text-right font-medium">
-                      Total Tax
-                    </th>
-                    <th className="px-4 py-3 text-center font-medium">
-                      Transactions
-                    </th>
-                    <th className="px-4 py-3 text-center font-medium">
-                      Actions
-                    </th>
+                    <th className="px-4 py-3 text-center font-medium">Transactions</th>
+                    <th className="px-4 py-3 text-right font-medium">Total Amount</th>
                   </tr>
                 </thead>
+
                 <tbody>
                   {partyWiseData.map((party, index) => (
                     <tr
                       key={index}
                       className={`hover:bg-opacity-50 ${theme === "dark"
-                        ? "hover:bg-gray-700"
-                        : "hover:bg-gray-50"
+                          ? "hover:bg-gray-700"
+                          : "hover:bg-gray-50"
                         }`}
                     >
                       <td
                         className="px-4 py-3 text-sm font-medium text-blue-600 cursor-pointer hover:underline"
                         onClick={() => {
-                          setSelectedParty(party.partyName);
-                          setSelectedView("detailed");
+                          setColumnarDrillDown(party.partyName);
+                          setSelectedView("columnar");
                         }}
                       >
                         {party.partyName}
                       </td>
+
                       <td className="px-4 py-3 text-sm">{party.gstin}</td>
+
+                      <td className="px-4 py-3 text-sm text-center">
+                        {party.count}
+                      </td>
+
                       <td className="px-4 py-3 text-sm text-right font-mono">
                         {party.totalAmount.toLocaleString("en-IN", {
                           minimumFractionDigits: 2,
                         })}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right font-mono">
-                        {party.totalTax.toLocaleString("en-IN", {
-                          minimumFractionDigits: 2,
-                        })}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-center">{party.count}</td>
-                      <td className="px-4 py-3 text-sm text-center">
-                        <button
-                          onClick={() => {
-                            setSelectedParty(party.partyName);
-                            setSelectedView("detailed");
-                          }}
-                          className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                        >
-                          View Details
-                        </button>
-                      </td>
                     </tr>
                   ))}
+
                   {partyWiseData.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center opacity-50">
+                      <td colSpan={4} className="px-4 py-8 text-center opacity-50">
                         No party data found.
                       </td>
                     </tr>
                   )}
                 </tbody>
-                <tfoot className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+
+                <tfoot
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                    }`}
+                >
                   <tr className="font-bold">
-                    <td colSpan={2} className="px-4 py-3 text-right">Grand Total</td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      {partyWiseData.reduce((sum, p) => sum + p.totalAmount, 0).toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
+                    <td colSpan={2} className="px-4 py-3 text-right">
+                      Grand Total
                     </td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      {partyWiseData.reduce((sum, p) => sum + p.totalTax, 0).toLocaleString("en-IN", {
-                        minimumFractionDigits: 2,
-                      })}
-                    </td>
+
                     <td className="px-4 py-3 text-center">
                       {partyWiseData.reduce((sum, p) => sum + p.count, 0)}
                     </td>
-                    <td></td>
+
+                    <td className="px-4 py-3 text-right font-mono">
+                      {partyWiseData
+                        .reduce((sum, p) => sum + p.totalAmount, 0)
+                        .toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                    </td>
                   </tr>
                 </tfoot>
               </table>

@@ -1597,8 +1597,8 @@ const PurchaseReport1: React.FC = () => {
                         <td
                           className="px-4 py-3 text-sm font-medium text-blue-600 cursor-pointer hover:underline"
                           onClick={() => {
-                            setSelectedParty(party.partyName);
-                            setSelectedView("detailed");
+                            setColumnarDrillDown(party.partyName);
+                            setSelectedView("columnar");
                           }}
                         >
                           {party.partyName}
