@@ -1656,7 +1656,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       Supplier Invoice Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Reference No
+                      Invoice No
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Taxable Value
@@ -1795,7 +1795,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                             : "-"}
                         </td>
 
-                        {/* Reference No */}
+                        {/* Invoice No */}
                         <td className="px-6 py-4 text-sm text-gray-500">
                           {voucher.referenceNo ?? "-"}
                         </td>
