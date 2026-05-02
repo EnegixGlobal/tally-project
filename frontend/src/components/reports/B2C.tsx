@@ -1568,10 +1568,8 @@ const B2C: React.FC = () => {
                   <tr>
                     <th className="px-4 py-3 text-left font-medium">Party Name</th>
                     <th className="px-4 py-3 text-left font-medium">GSTIN</th>
+                    <th className="px-4 py-3 text-center font-medium">Transaction</th>
                     <th className="px-4 py-3 text-right font-medium">Total Sales</th>
-                    <th className="px-4 py-3 text-right font-medium">Total Tax</th>
-                    <th className="px-4 py-3 text-center font-medium">Count</th>
-                    <th className="px-4 py-3 text-center font-medium">Action</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
@@ -1590,23 +1588,9 @@ const B2C: React.FC = () => {
                         {party.partyName}
                       </td>
                       <td className="px-4 py-3 text-sm text-gray-500 italic">{party.gstin}</td>
+                      <td className="px-4 py-3 text-sm text-center">{party.count}</td>
                       <td className="px-4 py-3 text-sm text-right font-mono">
                         {party.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-right font-mono">
-                        {party.totalTax.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                      </td>
-                      <td className="px-4 py-3 text-sm text-center">{party.count}</td>
-                      <td className="px-4 py-3 text-sm text-center">
-                        <button
-                          onClick={() => {
-                            setSelectedParty(party.partyName);
-                            setSelectedView("detailed");
-                          }}
-                          className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                        >
-                          View Details
-                        </button>
                       </td>
                     </tr>
                   ))}
@@ -1621,16 +1605,11 @@ const B2C: React.FC = () => {
                 <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                   <tr className="font-bold">
                     <td colSpan={2} className="px-4 py-3 text-right">Grand Total</td>
+                    <td className="px-4 py-3 text-center font-mono">
+                    </td>
                     <td className="px-4 py-3 text-right font-mono">
                       {partyWiseData.reduce((sum, p) => sum + p.totalAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
                     </td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      {partyWiseData.reduce((sum, p) => sum + p.totalTax, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {partyWiseData.reduce((sum, p) => sum + p.count, 0)}
-                    </td>
-                    <td></td>
                   </tr>
                 </tfoot>
               </table>

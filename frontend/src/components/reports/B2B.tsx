@@ -405,9 +405,9 @@ const B2B: React.FC = () => {
       vouchersToProcess = matchedSales.filter(v => {
         const partyName = v.partyName || ledgerMap.get(v.partyId)?.name;
         if (partyName === columnarDrillDown) return true;
-        
+
         if (v.items) {
-          return v.items.some((item: any) => 
+          return v.items.some((item: any) =>
             item.salesLedgerName === columnarDrillDown ||
             item.cgstLedgerName === columnarDrillDown ||
             item.sgstLedgerName === columnarDrillDown ||
@@ -666,17 +666,24 @@ const B2B: React.FC = () => {
 
       // 2️⃣ SALES & TAXES SIDE (Credit / Income) via Items
       const seenTaxInItems = { cgst: false, sgst: false, igst: false };
+      const cgstLedgers = new Set<string>();
+      const sgstLedgers = new Set<string>();
+      const igstLedgers = new Set<string>();
 
       if (voucher.items && voucher.items.length > 0) {
         voucher.items.forEach((item: any) => {
+          if (item.cgstLedgerName) cgstLedgers.add(item.cgstLedgerName);
+          if (item.sgstLedgerName) sgstLedgers.add(item.sgstLedgerName);
+          if (item.igstLedgerName) igstLedgers.add(item.igstLedgerName);
+
           const lName = (item.salesLedgerName || "").toLowerCase();
           const gName = (item.salesLedgerGroupName || "").toLowerCase();
-          
+
           let itemGroupName = item.salesLedgerGroupName || "Sales Account";
-          
-          const isTax = gName.includes("duties") || gName.includes("tax") || 
-                        lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
-          
+
+          const isTax = gName.includes("duties") || gName.includes("tax") ||
+            lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
+
           if (isTax) {
             itemGroupName = "Duties & Taxes";
             if (lName.includes("cgst")) seenTaxInItems.cgst = true;
@@ -747,10 +754,10 @@ const B2B: React.FC = () => {
         if (voucher.items && voucher.items.length > 0) {
           const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
           if (cItem) cgstName = cItem.cgstLedgerName;
-          
+
           const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
           if (sItem) sgstName = sItem.sgstLedgerName;
-          
+
           const iItem = voucher.items.find((i: any) => i.igstLedgerName);
           if (iItem) igstName = iItem.igstLedgerName;
         }
@@ -948,14 +955,14 @@ const B2B: React.FC = () => {
               }
             }}
             className={`flex items-center space-x-2 px-4 py-2 rounded-t-lg border-t border-l border-r transition-all duration-200 ${selectedView === view.key
-                ? theme === "dark"
-                  ? "bg-gray-800 border-gray-700 text-blue-400"
-                  : "bg-white border-gray-200 text-blue-600 font-bold"
-                : isTabDisabled(view.key as ViewType)
-                  ? "opacity-30 cursor-not-allowed"
-                  : theme === "dark"
-                    ? "bg-gray-900 border-transparent text-gray-400 hover:bg-gray-800"
-                    : "bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100"
+              ? theme === "dark"
+                ? "bg-gray-800 border-gray-700 text-blue-400"
+                : "bg-white border-gray-200 text-blue-600 font-bold"
+              : isTabDisabled(view.key as ViewType)
+                ? "opacity-30 cursor-not-allowed"
+                : theme === "dark"
+                  ? "bg-gray-900 border-transparent text-gray-400 hover:bg-gray-800"
+                  : "bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100"
               }`}
           >
             {view.icon}
@@ -1049,8 +1056,8 @@ const B2B: React.FC = () => {
                 {selectedParty && (
                   <div
                     className={`px-2 py-1 rounded text-sm flex items-center ${theme === "dark"
-                        ? "bg-blue-900/40 text-blue-200"
-                        : "bg-blue-50 text-blue-700 border border-blue-100"
+                      ? "bg-blue-900/40 text-blue-200"
+                      : "bg-blue-50 text-blue-700 border border-blue-100"
                       }`}
                   >
                     <span className="font-medium">Party: {selectedParty}</span>
@@ -1250,28 +1257,43 @@ const B2B: React.FC = () => {
 
         {/* Party Wise View */}
         {selectedView === "partywise" && (
-          <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
-            <h3 className="text-lg font-semibold mb-4">Party-wise Sales Summary</h3>
+          <div
+            className={`p-6 rounded-xl border ${theme === "dark"
+                ? "bg-gray-800 border-gray-700"
+                : "bg-white shadow border-gray-200"
+              }`}
+          >
+            <h3 className="text-lg font-semibold mb-4">
+              Party-wise Sales Summary
+            </h3>
+
             <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+              <table className="w-full text-sm">
+                {/* HEADER */}
+                <thead
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                    } text-gray-600`}
+                >
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">Party Name</th>
-                    <th className="px-4 py-3 text-left font-medium">GSTIN</th>
-                    <th className="px-4 py-3 text-right font-medium">Total Sales</th>
-                    <th className="px-4 py-3 text-right font-medium">Total Tax</th>
-                    <th className="px-4 py-3 text-center font-medium">Count</th>
-                    <th className="px-4 py-3 text-center font-medium">Action</th>
+                    <th className="px-4 py-3 text-left">Party Name</th>
+                    <th className="px-4 py-3 text-left">GSTIN</th>
+                    <th className="px-4 py-3 text-center">Transaction</th>
+                    <th className="px-4 py-3 text-right">Total Sales (₹)</th>
                   </tr>
                 </thead>
+
+                {/* BODY */}
                 <tbody className="divide-y divide-gray-200">
                   {partyWiseData.map((party, index) => (
                     <tr
                       key={index}
-                      className={`hover:bg-opacity-50 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"}`}
+                      className={`transition ${theme === "dark"
+                          ? "hover:bg-gray-700"
+                          : "hover:bg-gray-50"
+                        }`}
                     >
                       <td
-                        className="px-4 py-3 text-sm font-medium text-blue-600 cursor-pointer hover:underline"
+                        className="px-4 py-3 font-medium text-blue-600 cursor-pointer hover:underline"
                         onClick={() => {
                           setSelectedParty(party.partyName);
                           setSelectedView("detailed");
@@ -1279,48 +1301,55 @@ const B2B: React.FC = () => {
                       >
                         {party.partyName}
                       </td>
-                      <td className="px-4 py-3 text-sm">{party.gstin}</td>
-                      <td className="px-4 py-3 text-sm text-right font-mono">
-                        {party.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+
+                      <td className="px-4 py-3 text-gray-500">
+                        {party.gstin || "-"}
                       </td>
-                      <td className="px-4 py-3 text-sm text-right font-mono">
-                        {party.totalTax.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+
+                      <td className="px-4 py-3 text-center font-mono">
+                        {party.count}
                       </td>
-                      <td className="px-4 py-3 text-sm text-center">{party.count}</td>
-                      <td className="px-4 py-3 text-sm text-center">
-                        <button
-                          onClick={() => {
-                            setSelectedParty(party.partyName);
-                            setSelectedView("detailed");
-                          }}
-                          className="text-blue-600 hover:text-blue-800 text-xs font-medium"
-                        >
-                          View Details
-                        </button>
+
+                      <td className="px-4 py-3 text-right font-mono">
+                        ₹{" "}
+                        {party.totalAmount.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
                       </td>
                     </tr>
                   ))}
+
                   {partyWiseData.length === 0 && (
                     <tr>
-                      <td colSpan={6} className="px-4 py-8 text-center opacity-50">
+                      <td
+                        colSpan={4}
+                        className="px-4 py-8 text-center text-gray-400"
+                      >
                         No party data found.
                       </td>
                     </tr>
                   )}
                 </tbody>
-                <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
-                  <tr className="font-bold">
-                    <td colSpan={2} className="px-4 py-3 text-right">Grand Total</td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      {partyWiseData.reduce((sum, p) => sum + p.totalAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+
+                {/* FOOTER */}
+                <tfoot
+                  className={`font-semibold ${theme === "dark"
+                      ? "bg-gray-700"
+                      : "bg-gray-100"
+                    }`}
+                >
+                  <tr>
+                    <td colSpan={3} className="px-4 py-3 text-right">
+                      Grand Total
                     </td>
                     <td className="px-4 py-3 text-right font-mono">
-                      {partyWiseData.reduce((sum, p) => sum + p.totalTax, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      ₹{" "}
+                      {partyWiseData
+                        .reduce((sum, p) => sum + p.totalAmount, 0)
+                        .toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
                     </td>
-                    <td className="px-4 py-3 text-center">
-                      {partyWiseData.reduce((sum, p) => sum + p.count, 0)}
-                    </td>
-                    <td></td>
                   </tr>
                 </tfoot>
               </table>
@@ -1390,7 +1419,7 @@ const B2B: React.FC = () => {
                               : "hover:bg-gray-50"
                               } group`}
                           >
-                            <td 
+                            <td
                               className="px-4 py-2 pl-8 text-sm italic cursor-pointer group-hover:text-blue-500 underline-offset-4 hover:underline"
                               onClick={() => {
                                 setColumnarDrillDown(txn.name);
