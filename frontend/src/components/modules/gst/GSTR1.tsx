@@ -798,7 +798,7 @@ const GSTR1: React.FC = () => {
                 <div className="flex">
                   <span className="w-32 text-sm font-medium ">Legal Name:</span>
                   <span className="text-sm uppercase">
-                    {companyData.name} PRIVATE LIMETED
+                    {companyData.name}
                   </span>
                 </div>
                 <div className="flex">

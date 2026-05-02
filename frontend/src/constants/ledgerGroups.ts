@@ -7,8 +7,6 @@ export interface SystemGroup {
 }
 
 export const systemPrimaryGroups: SystemGroup[] = [
-    { id: -1, name: "Bank Accounts", nature: "Assets", isSystem: true },
-    { id: -2, name: "Bank OD A/c", nature: "Liabilities", isSystem: true },
     { id: -3, name: "Branch/Division", nature: "Assets", isSystem: true },
     { id: -4, name: "Capital Account", nature: "Liabilities", isSystem: true },
     { id: -5, name: "Current Assets", nature: "Assets", isSystem: true },
@@ -42,6 +40,8 @@ export const systemSubGroups: SystemGroup[] = [
     { id: -110, name: "Sundry Debtors", parent: -5, nature: "Assets", isSystem: true },
     { id: -111, name: "Unsecured Loans", parent: -13, nature: "Liabilities", isSystem: true },
     { id: -112, name: "Cash-in-Hand", parent: -5, nature: "Assets", isSystem: true },
+    { id: -113, name: "Bank Accounts", parent: -5, nature: "Assets", isSystem: true },
+    { id: -114, name: "Bank OD A/c", parent: -13, nature: "Liabilities", isSystem: true },
 ];
 
 export const allSystemGroups: SystemGroup[] = [...systemPrimaryGroups, ...systemSubGroups];
