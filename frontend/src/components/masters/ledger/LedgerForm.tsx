@@ -222,6 +222,30 @@ const LedgerForm: React.FC = () => {
     }
   };
 
+  const handleNameBlur = async () => {
+    if (!formData.name.trim()) return;
+
+    try {
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/ledger/check-duplicate?name=${encodeURIComponent(
+          formData.name.trim()
+        )}&company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}${
+          isEditMode ? `&exclude_id=${id}` : ""
+        }`
+      );
+      const data = await res.json();
+
+      if (data.exists) {
+        setErrors((prev) => ({
+          ...prev,
+          name: "A ledger with this name already exists",
+        }));
+      }
+    } catch (err) {
+      console.error("Duplicate check failed:", err);
+    }
+  };
+
   // Validate before submit
   const validateForm = () => {
     const newErrors: { [key: string]: string } = {};
@@ -341,6 +365,7 @@ const LedgerForm: React.FC = () => {
                 name="name"
                 value={formData.name}
                 onChange={handleChange}
+                onBlur={handleNameBlur}
                 required
                 className={`w-full p-2 rounded border ${errors.name
                   ? "border-red-500 focus:border-red-500"
