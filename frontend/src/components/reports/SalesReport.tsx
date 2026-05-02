@@ -161,6 +161,7 @@ const SalesReport: React.FC = () => {
   };
 
   const [selectedMonth, setSelectedMonth] = useState<string | null>(null);
+  const [selectedParty, setSelectedParty] = useState<string | null>(null);
   const [columnarDrillDown, setColumnarDrillDown] = useState<string | null>(null); // New state for drill-down
 
   const filteredVouchers = useMemo(() => {
@@ -184,6 +185,11 @@ const SalesReport: React.FC = () => {
       }
     }
 
+    // Filter by Selected Party (Drill-down)
+    if (selectedParty) {
+      data = data.filter((item) => (item.partyName || "Unknown Party") === selectedParty);
+    }
+
     // Sort
     if (sortConfig.key) {
       data.sort((a, b) => {
@@ -195,7 +201,7 @@ const SalesReport: React.FC = () => {
       });
     }
     return data;
-  }, [salesVouchers, selectedMonth, sortConfig, filters.fromDate, filters.toDate]);
+  }, [salesVouchers, selectedMonth, selectedParty, sortConfig, filters.fromDate, filters.toDate]);
 
   const groupedExtractData = useMemo(() => {
     const groups: Record<
@@ -247,13 +253,13 @@ const SalesReport: React.FC = () => {
         voucher.items.forEach((item: any) => {
           const lName = (item.salesLedgerName || "").toLowerCase();
           const gName = (item.salesLedgerGroupName || "").toLowerCase();
-          
+
           // Determine the correct group for this item
           let itemGroupName = item.salesLedgerGroupName || "Sales Account";
-          
-          const isTax = gName.includes("duties") || gName.includes("tax") || 
-                        lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
-          
+
+          const isTax = gName.includes("duties") || gName.includes("tax") ||
+            lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
+
           if (isTax) {
             itemGroupName = "Duties & Taxes";
             if (lName.includes("cgst")) seenTaxInItems.cgst = true;
@@ -335,10 +341,10 @@ const SalesReport: React.FC = () => {
         if (voucher.items && voucher.items.length > 0) {
           const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
           if (cItem) cgstName = cItem.cgstLedgerName;
-          
+
           const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
           if (sItem) sgstName = sItem.sgstLedgerName;
-          
+
           const iItem = voucher.items.find((i: any) => i.igstLedgerName);
           if (iItem) igstName = iItem.igstLedgerName;
         }
@@ -444,7 +450,7 @@ const SalesReport: React.FC = () => {
 
     // 1. Collect all unique Ledger Names for Headers
     vouchersToProcess.forEach((voucher) => {
-      
+
       if (voucher.items) {
         voucher.items.forEach((item: any) => {
           if (item.salesLedgerName) salesColumns.add(item.salesLedgerName);
@@ -692,6 +698,35 @@ const SalesReport: React.FC = () => {
     }, 0);
   }, [salesVouchers]);
 
+  // 🔹 PARTY WISE DATA PREPARATION
+  const partyWiseData = useMemo(() => {
+    const parties: Record<string, {
+      partyName: string;
+      gstin: string;
+      totalAmount: number;
+      totalTax: number;
+      count: number;
+    }> = {};
+
+    salesVouchers.forEach(v => {
+      const partyName = v.partyName || "Unknown Party";
+      if (!parties[partyName]) {
+        parties[partyName] = {
+          partyName: partyName,
+          gstin: v.partyGSTIN || "N/A",
+          totalAmount: 0,
+          totalTax: 0,
+          count: 0
+        };
+      }
+      parties[partyName].totalAmount += Number(v.netAmount || v.total || 0);
+      parties[partyName].totalTax += Number(v.totalTaxAmount || 0);
+      parties[partyName].count += 1;
+    });
+
+    return Object.values(parties).sort((a, b) => a.partyName.localeCompare(b.partyName));
+  }, [salesVouchers]);
+
   return (
     <div
       className={`min-h-screen pt-[56px] ${theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-50 text-gray-900"
@@ -799,12 +834,9 @@ const SalesReport: React.FC = () => {
                   | "billwise"
                   | "billwiseprofit"
                 );
-                if (
-                  view.key !== "detailed" &&
-                  view.key !== "extract" &&
-                  view.key !== "columnar"
-                ) {
+                if (view.key !== "detailed") {
                   setSelectedMonth(null);
+                  setSelectedParty(null);
                 }
                 // Clear drill-down filter when manually switching tabs
                 setColumnarDrillDown(null);
@@ -1010,9 +1042,9 @@ const SalesReport: React.FC = () => {
             {selectedView === "detailed" && (
               <>
                 <div className="p-2 flex justify-between items-center bg-blue-50 dark:bg-blue-900/20 mb-2 rounded">
-                  <div className="flex items-center space-x-2">
-                    <span className="font-medium px-2">
-                      Showing transactions for:
+                  <div className="flex flex-wrap items-center gap-2 px-2">
+                    <span className="font-medium mr-2">
+                      Filtered by:
                     </span>
                     <select
                       value={selectedMonth || ""}
@@ -1031,13 +1063,25 @@ const SalesReport: React.FC = () => {
                         </option>
                       ))}
                     </select>
+
+                    {selectedParty && (
+                      <div className={`px-2 py-1 rounded text-sm flex items-center ${theme === 'dark' ? 'bg-blue-900/60 text-blue-200' : 'bg-white text-blue-700 border border-blue-200'}`}>
+                        <span className="font-medium">Party: {selectedParty}</span>
+                        <button onClick={() => setSelectedParty(null)} className="ml-2 hover:text-red-500 font-bold">×</button>
+                      </div>
+                    )}
                   </div>
-                  <button
-                    onClick={() => setSelectedMonth(null)}
-                    className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 px-3 py-1 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
-                  >
-                    Clear Filter
-                  </button>
+                  {(selectedMonth || selectedParty) && (
+                    <button
+                      onClick={() => {
+                        setSelectedMonth(null);
+                        setSelectedParty(null);
+                      }}
+                      className="text-sm text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 px-3 py-1 border border-blue-200 rounded hover:bg-blue-100 transition-colors"
+                    >
+                      Clear All Filters
+                    </button>
+                  )}
                 </div>
 
                 <table className="w-full">
@@ -1224,15 +1268,15 @@ const SalesReport: React.FC = () => {
                                 : "hover:bg-gray-50"
                                 }`}
                             >
-                            <td
-                              className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
-                              onClick={() => {
-                                setColumnarDrillDown(txn.name);
-                                setSelectedView("columnar");
-                              }}
-                            >
-                              {txn.name}
-                            </td>
+                              <td
+                                className="px-4 py-2 pl-8 text-sm italic cursor-pointer text-blue-600 hover:underline"
+                                onClick={() => {
+                                  setColumnarDrillDown(txn.name);
+                                  setSelectedView("columnar");
+                                }}
+                              >
+                                {txn.name}
+                              </td>
 
                               <td className="px-4 py-2 text-right text-sm font-mono">
                                 {txn.debit > 0
@@ -1451,25 +1495,77 @@ const SalesReport: React.FC = () => {
                     }`}
                 >
                   <tr>
-                    <th className="px-4 py-3 text-left font-medium">
-                      Party Name
-                    </th>
+                    <th className="px-4 py-3 text-left font-medium">Party Name</th>
                     <th className="px-4 py-3 text-left font-medium">GSTIN</th>
-                    <th className="px-4 py-3 text-right font-medium">
-                      Total Amount
-                    </th>
-                    <th className="px-4 py-3 text-right font-medium">
-                      Total Tax
-                    </th>
-                    <th className="px-4 py-3 text-center font-medium">
-                      Transactions
-                    </th>
-                    <th className="px-4 py-3 text-center font-medium">
-                      Actions
-                    </th>
+                    <th className="px-4 py-3 text-center font-medium">Transactions</th>
+                    <th className="px-4 py-3 text-right font-medium">Total Amount</th>
                   </tr>
                 </thead>
-                <tbody></tbody>
+
+                <tbody>
+                  {partyWiseData.map((party, index) => (
+                    <tr
+                      key={index}
+                      className={`hover:bg-opacity-50 ${theme === "dark"
+                          ? "hover:bg-gray-700"
+                          : "hover:bg-gray-50"
+                        }`}
+                    >
+                      <td
+                        className="px-4 py-3 text-sm font-medium text-blue-600 cursor-pointer hover:underline"
+                        onClick={() => {
+                          setColumnarDrillDown(party.partyName);
+                          setSelectedView("columnar");
+                        }}
+                      >
+                        {party.partyName}
+                      </td>
+
+                      <td className="px-4 py-3 text-sm">{party.gstin}</td>
+
+                      <td className="px-4 py-3 text-sm text-center">
+                        {party.count}
+                      </td>
+
+                      <td className="px-4 py-3 text-sm text-right font-mono">
+                        {party.totalAmount.toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                      </td>
+                    </tr>
+                  ))}
+
+                  {partyWiseData.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center opacity-50">
+                        No party data found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+
+                <tfoot
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                    }`}
+                >
+                  <tr className="font-bold">
+                    <td colSpan={2} className="px-4 py-3 text-right">
+                      Grand Total
+                    </td>
+
+                    <td className="px-4 py-3 text-center">
+                      {partyWiseData.reduce((sum, p) => sum + p.count, 0)}
+                    </td>
+
+                    <td className="px-4 py-3 text-right font-mono">
+                      {partyWiseData
+                        .reduce((sum, p) => sum + p.totalAmount, 0)
+                        .toLocaleString("en-IN", {
+                          minimumFractionDigits: 2,
+                        })}
+                    </td>
+                  </tr>
+                </tfoot>
               </table>
             )}
 

@@ -93,6 +93,7 @@ const B2BPurchase: React.FC = () => {
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [selectedView, setSelectedView] = useState<ViewType>("summary");
+  const [selectedParty, setSelectedParty] = useState<string | null>(null);
   const [columnarDrillDown, setColumnarDrillDown] = useState<string | null>(null);
   const [filters, setFilters] = useState<FilterState>({
     dateRange: "this-month",
@@ -236,7 +237,13 @@ const B2BPurchase: React.FC = () => {
 
   //disabled block
   const isTabDisabled = (view: ViewType) => {
-    return   view !== "columnar" && view !== "extract" && view !== "summary" && view !== "detailed";
+    return (
+      view !== "columnar" &&
+      view !== "extract" &&
+      view !== "summary" &&
+      view !== "detailed" &&
+      view !== "partywise"
+    );
   };
 
   const [saleData, setSaleData] = useState<any[]>([]);
@@ -556,8 +563,15 @@ const B2BPurchase: React.FC = () => {
       });
     }
 
+    if (selectedParty) {
+      data = data.filter((item) => {
+        const partyName = item.partyName || ledgerMap.get(item.partyId)?.name;
+        return partyName === selectedParty;
+      });
+    }
+
     return data;
-  }, [matchedSales, selectedMonth]);
+  }, [matchedSales, selectedMonth, selectedParty, ledgerMap]);
 
   const summaryData = useMemo(() => {
     const map: Record<string, { debit: number; closingBalance: number }> = {};
@@ -643,11 +657,11 @@ const B2BPurchase: React.FC = () => {
         voucher.items.forEach((item: any) => {
           const lName = (item.purchaseLedgerName || "").toLowerCase();
           const gName = (item.purchaseLedgerGroupName || "").toLowerCase();
-          
+
           let itemGroupName = "Purchase Account";
-          const isTax = gName.includes("duties") || gName.includes("tax") || 
-                        lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
-          
+          const isTax = gName.includes("duties") || gName.includes("tax") ||
+            lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
+
           if (isTax) {
             itemGroupName = "Duties & Taxes";
             if (lName.includes("cgst")) seenTaxInItems.cgst = true;
@@ -690,10 +704,10 @@ const B2BPurchase: React.FC = () => {
       if (voucher.items && voucher.items.length > 0) {
         const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
         if (cItem) cgstName = cItem.cgstLedgerName;
-        
+
         const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
         if (sItem) sgstName = sItem.sgstLedgerName;
-        
+
         const iItem = voucher.items.find((i: any) => i.igstLedgerName);
         if (iItem) igstName = iItem.igstLedgerName;
       }
@@ -718,6 +732,32 @@ const B2BPurchase: React.FC = () => {
 
     return groups;
   }, [matchedSales]);
+
+  // 🔹 PARTY WISE DATA LOGIC
+  const partyWiseData = useMemo(() => {
+    const parties: Record<string, {
+      partyName: string;
+      gstin: string;
+      totalAmount: number;
+      count: number;
+    }> = {};
+
+    matchedSales.forEach(v => {
+      const partyName = v.partyName || ledgerMap.get(v.partyId)?.name || "Unknown Party";
+      if (!parties[partyName]) {
+        parties[partyName] = {
+          partyName: partyName,
+          gstin: ledgerMap.get(v.partyId)?.gstNumber || "N/A",
+          totalAmount: 0,
+          count: 0
+        };
+      }
+      parties[partyName].totalAmount += Number(v.netAmount || v.total || 0);
+      parties[partyName].count += 1;
+    });
+
+    return Object.values(parties).sort((a, b) => a.partyName.localeCompare(b.partyName));
+  }, [matchedSales, ledgerMap]);
 
   return (
     <div className="pt-[56px] px-4">
@@ -886,6 +926,7 @@ const B2BPurchase: React.FC = () => {
             "detailed",
             "extract",
             "columnar",
+            "partywise",
             "partners",
             "analytics",
             "contracts",
@@ -900,7 +941,13 @@ const B2BPurchase: React.FC = () => {
               onClick={() => {
                 if (!disabled) {
                   setSelectedView(view);
-                  if (view !== 'detailed') setSelectedMonth(null);
+                  if (view !== 'detailed') {
+                    setSelectedMonth(null);
+                    setSelectedParty(null);
+                  }
+                  if (view !== 'detailed' && view !== 'columnar') {
+                    setColumnarDrillDown(null);
+                  }
                 }
               }}
               className={`px-4 py-2 rounded-lg capitalize whitespace-nowrap
@@ -1003,13 +1050,26 @@ const B2BPurchase: React.FC = () => {
           <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
             }`}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Detailed Transactions {selectedMonth ? `(${selectedMonth})` : ''}</h3>
-              {selectedMonth && (
+              <div className="flex flex-wrap items-center gap-4">
+                <h3 className="text-lg font-semibold">
+                  Detailed Transactions {selectedMonth ? `(${selectedMonth})` : ''}
+                </h3>
+                {selectedParty && (
+                  <div className={`px-2 py-1 rounded text-sm flex items-center ${theme === 'dark' ? 'bg-blue-900/40 text-blue-200' : 'bg-blue-50 text-blue-700 border border-blue-100'}`}>
+                    <span className="font-medium">Party: {selectedParty}</span>
+                    <button onClick={() => setSelectedParty(null)} className="ml-2 hover:text-red-500 font-bold">×</button>
+                  </div>
+                )}
+              </div>
+              {(selectedMonth || selectedParty) && (
                 <button
-                  onClick={() => setSelectedMonth(null)}
+                  onClick={() => {
+                    setSelectedMonth(null);
+                    setSelectedParty(null);
+                  }}
                   className="text-sm text-blue-500 hover:text-blue-700 underline"
                 >
-                  Clear Filter
+                  Clear All Filters
                 </button>
               )}
             </div>
@@ -1083,7 +1143,7 @@ const B2BPurchase: React.FC = () => {
             </div>
           </div>
         )}
-        
+
 
         {/* Extract View */}
         {selectedView === "extract" && (
@@ -1323,6 +1383,58 @@ const B2BPurchase: React.FC = () => {
 
 
         {/* Transactions View */}
+
+        {/* Party-wise View */}
+        {selectedView === "partywise" && (
+          <div className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"}`}>
+            <h3 className="text-lg font-semibold mb-4">Party-wise Summary</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium">Party Name</th>
+                    <th className="px-4 py-3 text-left font-medium">GSTIN</th>
+                    <th className="px-4 py-3 text-right font-medium">Transactions</th>
+                    <th className="px-4 py-3 text-right font-medium">Total Amount</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {partyWiseData.map((party, index) => (
+                    <tr key={index} className={`hover:bg-opacity-50 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"}`}>
+                      <td
+                        className="px-4 py-3 font-medium text-blue-600 cursor-pointer hover:underline"
+                        onClick={() => {
+                          setSelectedParty(party.partyName);
+                          setSelectedView("detailed");
+                        }}
+                      >
+                        {party.partyName}
+                      </td>
+                      <td className="px-4 py-3">{party.gstin}</td>
+                      <td className="px-4 py-3 text-right">{party.count}</td>
+                      <td className="px-4 py-3 text-right font-mono font-semibold">
+                        ₹{party.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                    </tr>
+                  ))}
+                  {partyWiseData.length === 0 && (
+                    <tr>
+                      <td colSpan={4} className="px-4 py-8 text-center opacity-50">No party data available.</td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                  <tr className="font-bold">
+                    <td colSpan={3} className="px-4 py-3 text-right">Grand Total</td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      ₹{partyWiseData.reduce((sum, p) => sum + p.totalAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                  </tr>
+                </tfoot>
+              </table>
+            </div>
+          </div>
+        )}
 
         {/* Partners View */}
         {selectedView === "partners" && <></>}

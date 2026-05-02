@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CreditCard, Download, Printer } from "lucide-react";
+import { ArrowLeft, CreditCard, Download, Printer, Trash2, Settings } from "lucide-react";
 import Swal from "sweetalert2";
 
 // Types - keeping everything in this file as requested
@@ -41,7 +41,10 @@ const CreditNoteRegister: React.FC = () => {
     "Daily" | "Weekly" | "Fortnightly" | "Monthly" | "Quarterly" | "Half-yearly"
   >("Daily");
   const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
+  const [showActions, setShowActions] = useState(false);
   const [showMonthList, setShowMonthList] = useState(false);
+  const [error, setError] = useState<string | null>(null);
   const companyId = localStorage.getItem("company_id") || "";
   const ownerType = localStorage.getItem("supplier") || "";
   const ownerId =
@@ -416,6 +419,81 @@ const CreditNoteRegister: React.FC = () => {
 
   };
 
+  const toggleSelect = (id: string) => {
+    setSelectedVoucherIds((prev: Set<string>) => {
+      const next = new Set(prev);
+      if (next.has(id)) {
+        next.delete(id);
+      } else {
+        next.add(id);
+      }
+      return next;
+    });
+  };
+
+  const toggleSelectAll = () => {
+    if (selectedVoucherIds.size === filteredVouchers.length) {
+      setSelectedVoucherIds(new Set());
+    } else {
+      setSelectedVoucherIds(new Set(filteredVouchers.map((v) => v.id)));
+    }
+  };
+
+  const handleBulkDelete = async () => {
+    if (selectedVoucherIds.size === 0) return;
+
+    const result = await Swal.fire({
+      title: "Are you sure?",
+      text: `Do you really want to delete ${selectedVoucherIds.size} selected Credit Notes?`,
+      icon: "warning",
+      showCancelButton: true,
+      confirmButtonText: "Yes, delete them",
+      cancelButtonText: "Cancel",
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/vouchers/bulk-delete`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({
+            ids: Array.from(selectedVoucherIds),
+            ownerType,
+            ownerId,
+            companyId,
+            voucherType: "credit_note",
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error("Bulk delete request failed");
+      }
+
+      Swal.fire({
+        icon: "success",
+        title: "Deleted!",
+        text: `${selectedVoucherIds.size} Credit Notes deleted successfully.`,
+      });
+
+      const deletedIds = new Set(selectedVoucherIds);
+      setVouchers((prev) => prev.filter((v) => !deletedIds.has(v.id)));
+      setSelectedVoucherIds(new Set());
+    } catch (error) {
+      console.error("Bulk delete error:", error);
+      Swal.fire({
+        icon: "error",
+        title: "Error",
+        text: "Failed to delete Credit Notes.",
+      });
+    }
+  };
+
   const statusCounts = filteredVouchers.reduce((acc, voucher) => {
     const status = getVoucherStatus(voucher);
     acc[status] = (acc[status] || 0) + 1;
@@ -573,15 +651,38 @@ const CreditNoteRegister: React.FC = () => {
               Credit Note Register
             </h1>
           </div>
-          {hasPermission("add") && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => navigate("/app/vouchers/payment")}
-              className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
-              title="Add new payment voucher"
+              onClick={() => setShowActions(!showActions)}
+              className={`p-2 rounded-lg transition-colors ${
+                showActions
+                  ? "bg-blue-100 text-blue-600"
+                  : "text-gray-500 hover:bg-gray-100"
+              }`}
+              title={showActions ? "Disable Action Mode" : "Enable Action Mode"}
             >
-              Add New Payment
+              <Settings size={24} className={showActions ? "animate-spin-slow" : ""} />
             </button>
-          )}
+            {showActions && selectedVoucherIds.size > 0 && (
+              <button
+                onClick={handleBulkDelete}
+                className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center shadow-md text-sm font-semibold"
+                title="Delete selected vouchers"
+              >
+                <Trash2 className="mr-2" size={18} />
+                Delete Selected ({selectedVoucherIds.size})
+              </button>
+            )}
+            {hasPermission("add") && (
+              <button
+                onClick={() => navigate("/app/vouchers/payment")}
+                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
+                title="Add new payment voucher"
+              >
+                Add New Payment
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
@@ -757,6 +858,19 @@ const CreditNoteRegister: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
+                {showActions && (
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={
+                        filteredVouchers.length > 0 &&
+                        selectedVoucherIds.size === filteredVouchers.length
+                      }
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
@@ -790,7 +904,22 @@ const CreditNoteRegister: React.FC = () => {
                 const { debit, credit } = calculateDebitCredit(voucher);
                 const particulars = getParticulars(voucher);
                 return (
-                  <tr key={voucher.id} className="hover:bg-gray-50">
+                  <tr
+                    key={voucher.id}
+                    className={`${
+                      selectedVoucherIds.has(voucher.id) ? "bg-blue-50" : ""
+                    } hover:bg-gray-50`}
+                  >
+                    {showActions && (
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={selectedVoucherIds.has(voucher.id)}
+                          onChange={() => toggleSelect(voucher.id)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(voucher.date)}
                     </td>
@@ -850,13 +979,10 @@ const CreditNoteRegister: React.FC = () => {
                 );
               })}
             </tbody>
-            {/* Summary Row - Tally Style */}
-            <tfoot className="bg-gray-100">
+            {/* Summary Row */}
+            <tfoot className="bg-gray-50 font-bold">
               <tr>
-                <td
-                  colSpan={4}
-                  className="px-6 py-4 text-sm font-semibold text-gray-900"
-                >
+                <td colSpan={showActions ? 5 : 4} className="px-6 py-4 text-right text-sm text-gray-900">
                   Total ({filteredVouchers.length} vouchers)
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">

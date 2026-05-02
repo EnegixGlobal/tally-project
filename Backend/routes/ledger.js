@@ -3,6 +3,31 @@ const router = express.Router();
 const db = require("../db"); // your MySQL pool
 // const checkPermission = require('../middlewares/checkPermission');
 
+// Check for duplicate ledger name
+router.get("/check-duplicate", async (req, res) => {
+  const { name, company_id, owner_type, owner_id, exclude_id } = req.query;
+
+  if (!name || !company_id || !owner_type || !owner_id) {
+    return res.status(400).json({ message: "Missing required parameters" });
+  }
+
+  try {
+    let sql = `SELECT id FROM ledgers WHERE name = ? AND company_id = ? AND owner_type = ? AND owner_id = ?`;
+    const params = [name, company_id, owner_type, owner_id];
+
+    if (exclude_id) {
+      sql += ` AND id != ?`;
+      params.push(exclude_id);
+    }
+
+    const [rows] = await db.execute(sql, params);
+    res.json({ exists: rows.length > 0 });
+  } catch (err) {
+    console.error("Error checking duplicate ledger:", err);
+    res.status(500).json({ message: "Internal server error" });
+  }
+});
+
 // Get Ledgers scoped by company and owner
 router.get("/", async (req, res) => {
   const { company_id, owner_type, owner_id } = req.query;
@@ -78,6 +103,22 @@ router.post("/", async (req, res) => {
   }
 
   try {
+    // 🔍 Check if ledger name already exists for this company/owner
+    const [existingLedger] = await db.execute(
+      `SELECT id FROM ledgers 
+       WHERE name = ? 
+       AND company_id = ? 
+       AND owner_type = ? 
+       AND owner_id = ?`,
+      [name, companyId, ownerType, ownerId]
+    );
+
+    if (existingLedger.length > 0) {
+      return res.status(400).json({
+        message: `Ledger with name "${name}" already exists.`,
+      });
+    }
+
     // 🔍 Check if columns exist and add if missing
     const [colClosing] = await db.execute(`
     SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS
@@ -443,6 +484,23 @@ router.put("/:id", async (req, res) => {
   }
 
   try {
+    // 🔍 Check if ledger name already exists for this company/owner (excluding current ledger)
+    const [existingLedger] = await db.execute(
+      `SELECT id FROM ledgers 
+       WHERE name = ? 
+       AND company_id = ? 
+       AND owner_type = ? 
+       AND owner_id = ?
+       AND id != ?`,
+      [name, company_id, owner_type, owner_id, ledgerId]
+    );
+
+    if (existingLedger.length > 0) {
+      return res.status(400).json({
+        message: `Ledger with name "${name}" already exists.`,
+      });
+    }
+
     // Check if state and district columns exist, add if missing
     const [colState] = await db.execute(`
     SELECT 1 FROM INFORMATION_SCHEMA.COLUMNS

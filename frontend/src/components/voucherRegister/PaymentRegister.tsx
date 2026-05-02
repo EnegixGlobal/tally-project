@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CreditCard, Download, Printer, Trash2 } from "lucide-react";
+import { ArrowLeft, CreditCard, Download, Printer, Trash2, Settings } from "lucide-react";
 import Swal from "sweetalert2";
 import { useFinancialYear, filterByFinancialYear } from "../../hooks/useFinancialYear";
 
@@ -37,6 +37,7 @@ const PaymentRegister: React.FC = () => {
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
+  const [showActions, setShowActions] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const { selectedFinYear } = useFinancialYear();
@@ -425,62 +426,7 @@ const PaymentRegister: React.FC = () => {
     }
   };
 
-  const handleDeleteAll = async () => {
-    if (filteredVouchers.length === 0) return;
 
-    const result = await Swal.fire({
-      title: "Delete ALL matching vouchers?",
-      text: `This will delete ALL ${filteredVouchers.length} vouchers matching your current filters. This action cannot be undone!`,
-      icon: "warning",
-      showCancelButton: true,
-      confirmButtonText: "Yes, delete ALL",
-      cancelButtonText: "Cancel",
-      confirmButtonColor: "#d33",
-    });
-
-    if (!result.isConfirmed) return;
-
-    try {
-      const idsToDelete = filteredVouchers.map(v => v.id);
-      const response = await fetch(
-        `${import.meta.env.VITE_API_URL}/api/vouchers/bulk-delete`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            ids: idsToDelete,
-            ownerType,
-            ownerId,
-            companyId,
-            voucherType: "payment",
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error("Bulk delete request failed");
-      }
-
-      Swal.fire({
-        icon: "success",
-        title: "Deleted!",
-        text: `All matching ${idsToDelete.length} vouchers have been deleted successfully.`,
-      });
-
-      const deletedIdsSet = new Set(idsToDelete);
-      setVouchers((prev) => prev.filter((v) => !deletedIdsSet.has(v.id)));
-      setSelectedVoucherIds(new Set());
-    } catch (error) {
-      Swal.fire({
-        icon: "error",
-        title: "Error",
-        text: "Failed to delete vouchers.",
-      });
-      console.error("Bulk delete error:", error);
-    }
-  };
 
   const handleBulkDelete = async () => {
     if (selectedVoucherIds.size === 0) return;
@@ -711,24 +657,25 @@ const PaymentRegister: React.FC = () => {
             </h1>
           </div>
           <div className="flex items-center gap-2">
-            {filteredVouchers.length > 0 && selectedVoucherIds.size === 0 && (
-              <button
-                onClick={handleDeleteAll}
-                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center shadow-md text-sm font-semibold"
-                title="Delete all vouchers matching the current filters"
-              >
-                <Trash2 className="mr-2" size={18} />
-                Delete All matching ({filteredVouchers.length})
-              </button>
-            )}
-            {selectedVoucherIds.size > 0 && (
+            <button
+              onClick={() => setShowActions(!showActions)}
+              className={`p-2 rounded-lg transition-colors ${
+                showActions
+                  ? "bg-blue-100 text-blue-600"
+                  : "text-gray-500 hover:bg-gray-100"
+              }`}
+              title={showActions ? "Disable Action Mode" : "Enable Action Mode"}
+            >
+              <Settings size={24} className={showActions ? "animate-spin-slow" : ""} />
+            </button>
+            {showActions && selectedVoucherIds.size > 0 && (
               <button
                 onClick={handleBulkDelete}
                 className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center shadow-md text-sm font-semibold"
                 title="Delete selected vouchers"
               >
                 <Trash2 className="mr-2" size={18} />
-                Bulk Delete Selected ({selectedVoucherIds.size})
+                Delete Selected ({selectedVoucherIds.size})
               </button>
             )}
             {hasPermission("add") && (
@@ -916,17 +863,19 @@ const PaymentRegister: React.FC = () => {
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={
-                      filteredVouchers.length > 0 &&
-                      selectedVoucherIds.size === filteredVouchers.length
-                    }
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                </th>
+                {showActions && (
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={
+                        filteredVouchers.length > 0 &&
+                        selectedVoucherIds.size === filteredVouchers.length
+                      }
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
@@ -966,17 +915,20 @@ const PaymentRegister: React.FC = () => {
                 return (
                   <tr
                     key={voucher.id}
-                    className={`hover:bg-gray-50 transition-colors ${isSelected ? "bg-blue-50" : ""
-                      }`}
+                    className={`${
+                      isSelected ? "bg-blue-50" : ""
+                    } hover:bg-gray-50 transition-colors`}
                   >
-                    <td className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(voucher.id)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                    </td>
+                    {showActions && (
+                      <td className="px-4 py-4 whitespace-nowrap">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(voucher.id)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {formatDate(voucher.date)}
                     </td>
@@ -1053,11 +1005,8 @@ const PaymentRegister: React.FC = () => {
             </tbody>
             {/* Summary Row - Tally Style */}
             <tfoot className="bg-gray-100">
-              <tr>
-                <td
-                  colSpan={4}
-                  className="px-6 py-4 text-sm font-semibold text-gray-900"
-                >
+              <tr className="bg-gray-50 font-bold">
+                <td colSpan={showActions ? 6 : 5} className="px-6 py-4 text-right text-sm text-gray-900">
                   Total ({filteredVouchers.length} vouchers)
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
