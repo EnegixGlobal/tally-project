@@ -77,6 +77,7 @@ interface GroupedVoucher {
     accountingEntries?: AccountingEntry[];
     importMode: "item" | "accounting";
     accSummaryRows?: AccSummaryRow[];
+    _suggestedLedger?: any;
 }
 
 const stateNameToCode: { [key: string]: string } = {
@@ -331,6 +332,7 @@ const PurchaseImport: React.FC = () => {
                     let stateMatch = false;
                     let gstMatch = false;
                     let errorMessage = "";
+                    let suggestedLedger = null;
 
                     if (partyName) {
                         const excelName = partyName.toLowerCase();
@@ -340,7 +342,7 @@ const PurchaseImport: React.FC = () => {
                         });
 
                         if (matchedLedgerByName) {
-                            const lGst = matchedLedgerByName.gstNumber ? String(matchedLedgerByName.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
+                            const lGst = (matchedLedgerByName.gst_number || matchedLedgerByName.gstNumber) ? String(matchedLedgerByName.gst_number || matchedLedgerByName.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
                             const lState = matchedLedgerByName.state ? String(matchedLedgerByName.state).toLowerCase().replace(/\s+/g, " ").trim() : "";
                             gstMatch = lGst === gstin;
 
@@ -356,6 +358,15 @@ const PurchaseImport: React.FC = () => {
                             else if (!stateMatch) errorMessage = `State mismatch (Ledger has: ${lState || 'Empty'})`;
                         } else {
                             errorMessage = "Supplier Name not found in ledgers";
+                            // Autofix logic: find by GSTIN
+                            const gstinMatch = gstin ? ledgers.find(l => {
+                                const lGst = (l.gst_number || l.gstNumber) ? String(l.gst_number || l.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
+                                return lGst === gstin;
+                            }) : null;
+
+                            if (gstinMatch) {
+                                suggestedLedger = gstinMatch;
+                            }
                         }
                     } else if (currentImportMode === "item") {
                         errorMessage = "Supplier Name is required for item-wise import";
@@ -385,6 +396,7 @@ const PurchaseImport: React.FC = () => {
                         items: [],
                         accountingEntries: [],
                         importMode: currentImportMode,
+                        _suggestedLedger: suggestedLedger,
                     };
                 }
 
@@ -762,6 +774,100 @@ const PurchaseImport: React.FC = () => {
         }
     };
 
+    const fixAllLedgerNames = () => {
+        let count = 0;
+        setGroupedVouchers(prev => prev.map(v => {
+            if (v._suggestedLedger) {
+                count++;
+                const sl = v._suggestedLedger;
+                const newPartyName = sl.name;
+                const newPartyId = sl.id;
+                
+                let updatedEntries = v.accountingEntries ? [...v.accountingEntries] : [];
+                if (updatedEntries.length > 0) {
+                    updatedEntries = updatedEntries.map(ae => {
+                        if (ae["Particulars (Ledger Name)"] === v["Trade/Legal name of the Supplier"] || (v.accSummaryRows && ae.Type === 'credit')) {
+                            return { ...ae, "Particulars (Ledger Name)": newPartyName, _matchedLedgerId: newPartyId };
+                        }
+                        return ae;
+                    });
+                }
+
+                return {
+                    ...v,
+                    "Trade/Legal name of the Supplier": newPartyName,
+                    _matchedLedgerId: newPartyId,
+                    "GSTIN of supplier": sl.gst_number || sl.gstNumber || "",
+                    "Place of supply": sl.state || "",
+                    partyMatch: true,
+                    _matchedGstinId: newPartyId,
+                    _matchedStateId: newPartyId,
+                    errorMessage: "",
+                    status: "pending",
+                    accountingEntries: updatedEntries,
+                    _suggestedLedger: undefined
+                };
+            }
+            return v;
+        }));
+        
+        if (count > 0) {
+            Swal.fire({ icon: 'success', title: 'Party Names Fixed', text: `Successfully updated ${count} vouchers with correct ledger names from database.` });
+        }
+    };
+
+    const fixVoucherParty = (voucherId: string) => {
+        setGroupedVouchers(prev => prev.map(v => {
+            if (v.id === voucherId && v._suggestedLedger) {
+                const sl = v._suggestedLedger;
+                const newPartyName = sl.name;
+                const newPartyId = sl.id;
+                const newGstin = sl.gst_number || sl.gstNumber || "";
+                const newState = sl.state || "";
+
+                // Update Accounting Entries if it's accounting mode or if we have matching party name in entries
+                let updatedEntries = v.accountingEntries ? [...v.accountingEntries] : [];
+                if (updatedEntries.length > 0) {
+                    updatedEntries = updatedEntries.map(ae => {
+                        // If this entry matches the old party name or is the credit entry in a summary import
+                        if (ae["Particulars (Ledger Name)"] === v["Trade/Legal name of the Supplier"] || 
+                            (v.accSummaryRows && ae.Type === 'credit')) {
+                            return {
+                                ...ae,
+                                "Particulars (Ledger Name)": newPartyName,
+                                _matchedLedgerId: newPartyId
+                            };
+                        }
+                        return ae;
+                    });
+                }
+
+                return {
+                    ...v,
+                    "Trade/Legal name of the Supplier": newPartyName,
+                    _matchedLedgerId: newPartyId,
+                    "GSTIN of supplier": newGstin,
+                    "Place of supply": newState,
+                    partyMatch: true,
+                    _matchedGstinId: newPartyId,
+                    _matchedStateId: newPartyId,
+                    errorMessage: "",
+                    status: "pending",
+                    accountingEntries: updatedEntries,
+                    _suggestedLedger: undefined // Clear it after fixing
+                };
+            }
+            return v;
+        }));
+        Swal.fire({
+            icon: 'success',
+            title: 'Party Name Fixed',
+            text: 'The supplier name has been updated to match your ledger records.',
+            timer: 1500,
+            showConfirmButton: false
+        });
+    };
+
     const fixAllCalculations = () => {
         const fixedVouchers = groupedVouchers.map(voucher => {
             if (voucher.importMode === "item") {
@@ -1033,6 +1139,15 @@ const PurchaseImport: React.FC = () => {
                                             Auto-Fix Errors
                                         </button>
                                     )}
+                                {groupedVouchers.some(v => v._suggestedLedger) && (
+                                    <button
+                                        onClick={fixAllLedgerNames}
+                                        className="px-4 py-2 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 shadow-md transition-all flex items-center"
+                                    >
+                                        <RefreshCw size={18} className="mr-2" />
+                                        Autofix Ledger Names
+                                    </button>
+                                )}
                                 <button
                                     onClick={() => { setGroupedVouchers([]); setActiveTab("import"); }}
                                     className="px-4 py-2 text-gray-700 font-medium hover:bg-gray-100 rounded-lg transition-colors"
@@ -1143,7 +1258,20 @@ const PurchaseImport: React.FC = () => {
                                                         Ready
                                                     </span>
                                                 )}
-                                                {voucher.errorMessage && <p className="text-[10px] text-red-500 mt-1 max-w-[200px] text-right">{voucher.errorMessage}</p>}
+                                                {voucher.errorMessage && (
+                                                    <div className="flex flex-col items-end">
+                                                        <p className="text-[10px] text-red-500 mt-1 max-w-[200px] text-right">{voucher.errorMessage}</p>
+                                                        {voucher._suggestedLedger && (
+                                                            <button
+                                                                onClick={() => fixVoucherParty(voucher.id)}
+                                                                className="mt-1 px-2 py-1 bg-blue-100 text-blue-700 text-[9px] font-bold rounded border border-blue-200 hover:bg-blue-200 transition-colors flex items-center gap-1 shadow-sm"
+                                                            >
+                                                                <RefreshCw size={10} className="text-blue-600" />
+                                                                Autofix: Use "{voucher._suggestedLedger.name}"
+                                                            </button>
+                                                        )}
+                                                    </div>
+                                                )}
                                             </div>
                                         </div>
                                     </div>
