@@ -1377,25 +1377,14 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
           {/* RIGHT SIDE */}
           <div className="flex items-center gap-3">
-            {filteredVouchers.length > 0 && selectedVoucherIds.size === 0 && (
-              <button
-                onClick={handleDeleteAll}
-                className="bg-orange-500 hover:bg-orange-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center shadow-md text-sm font-semibold"
-                title="Delete all vouchers matching the current filters"
-              >
-                <Trash2 className="mr-2" size={18} />
-                Delete All matching ({filteredVouchers.length})
-              </button>
-            )}
-
-            {selectedVoucherIds.size > 0 && (
+            {showActions && selectedVoucherIds.size > 0 && (
               <button
                 onClick={handleBulkDelete}
                 className="bg-red-500 hover:bg-red-600 text-white px-4 py-2 rounded-lg transition-colors flex items-center shadow-md text-sm font-semibold"
                 title="Delete selected vouchers"
               >
                 <Trash2 className="mr-2" size={18} />
-                Bulk Delete Selected ({selectedVoucherIds.size})
+                Delete Selected ({selectedVoucherIds.size})
               </button>
             )}
 
@@ -1609,17 +1598,19 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
               <tr>
-                <th className="px-4 py-3 text-left">
-                  <input
-                    type="checkbox"
-                    checked={
-                      filteredVouchers.length > 0 &&
-                      selectedVoucherIds.size === filteredVouchers.length
-                    }
-                    onChange={toggleSelectAll}
-                    className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                  />
-                </th>
+                {showActions && (
+                  <th className="px-4 py-3 text-left">
+                    <input
+                      type="checkbox"
+                      checked={
+                        filteredVouchers.length > 0 &&
+                        selectedVoucherIds.size === filteredVouchers.length
+                      }
+                      onChange={toggleSelectAll}
+                      className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                    />
+                  </th>
+                )}
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Date
                 </th>
@@ -1713,14 +1704,16 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     className={`hover:bg-gray-50 transition-colors ${isSelected ? "bg-blue-50" : ""
                       }`}
                   >
-                    <td className="px-4 py-3 text-left">
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSelect(voucher.id)}
-                        className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                      />
-                    </td>
+                    {showActions && (
+                      <td className="px-4 py-3 text-left">
+                        <input
+                          type="checkbox"
+                          checked={isSelected}
+                          onChange={() => toggleSelect(voucher.id)}
+                          className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                        />
+                      </td>
+                    )}
                     {/* Date */}
                     <td className="px-6 py-4 text-sm text-gray-500">
                       {voucher.date ? formatDate(voucher.date) : "-"}
@@ -1892,7 +1885,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               <tr>
                 {["sales", "purchase", "quotation", "debit_note", "credit_note"].includes(voucherType) ? (
                   <>
-                    <td colSpan={4} className="px-6 py-4 text-sm text-gray-900">
+                    <td colSpan={showActions ? 4 : 3} className="px-6 py-4 text-sm text-gray-900">
                       Total ({filteredVouchers.length} vouchers)
                     </td>
                     <td className="px-6 py-4"></td> {/* Blank for Supplier Invoice Date */}
@@ -1937,7 +1930,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   </>
                 ) : (
                   <>
-                    <td colSpan={5} className="px-6 py-4 text-sm text-gray-900">
+                    <td colSpan={showActions ? 5 : 4} className="px-6 py-4 text-sm text-gray-900">
                       Total ({filteredVouchers.length} vouchers)
                     </td>
                     <td className="px-6 py-4"></td> {/* Blank for Particulars */}
