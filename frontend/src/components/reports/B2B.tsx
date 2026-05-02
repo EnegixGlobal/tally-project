@@ -1,7 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, Download, Filter, Building2, ListFilter } from "lucide-react";
+import { ArrowLeft, Download, Filter, Building2, ListFilter, User } from "lucide-react";
 import * as XLSX from "xlsx";
 import "./reports.css";
 interface B2BTransactionLine {
@@ -70,6 +70,7 @@ type ViewType =
   | "detailed"
   | "columnar"
   | "extract"
+  | "partywise"
   | "partners"
   | "analytics"
   | "contracts";
@@ -235,7 +236,7 @@ const B2B: React.FC = () => {
 
   //disabled block
   const isTabDisabled = (view: ViewType) => {
-    return view !== "columnar" && view !== "extract" && view !== "summary" && view !== "detailed";
+    return view !== "columnar" && view !== "extract" && view !== "summary" && view !== "detailed" && view !== "partywise";
   };
 
   const [saleData, setSaleData] = useState<any[]>([]);
@@ -245,6 +246,7 @@ const B2B: React.FC = () => {
   const [matchedLedgers, setMatchedLedgers] = useState<any[]>([]);
 
   const [matchedSales, setMatchedSales] = useState<any[]>([]);
+  const [selectedParty, setSelectedParty] = useState<string | null>(null);
   const [columnarDrillDown, setColumnarDrillDown] = useState<string | null>(null);
 
   useEffect(() => {
@@ -549,8 +551,15 @@ const B2B: React.FC = () => {
       });
     }
 
+    if (selectedParty) {
+      data = data.filter((item) => {
+        const partyName = item.partyName || ledgerMap.get(item.partyId)?.name;
+        return partyName === selectedParty;
+      });
+    }
+
     return data;
-  }, [matchedSales, selectedMonth]);
+  }, [matchedSales, selectedMonth, selectedParty]);
 
   const summaryData = useMemo(() => {
     const map: Record<string, { debit: number; closingBalance: number }> = {};
@@ -578,6 +587,35 @@ const B2B: React.FC = () => {
 
     return map;
   }, [matchedSales]);
+
+  // 🔹 PARTY WISE DATA PREPARATION
+  const partyWiseData = useMemo(() => {
+    const parties: Record<string, {
+      partyName: string;
+      gstin: string;
+      totalAmount: number;
+      totalTax: number;
+      count: number;
+    }> = {};
+
+    matchedSales.forEach(v => {
+      const partyName = v.partyName || ledgerMap.get(v.partyId)?.name || "Unknown Party";
+      if (!parties[partyName]) {
+        parties[partyName] = {
+          partyName: partyName,
+          gstin: ledgerMap.get(v.partyId)?.gstNumber || "N/A",
+          totalAmount: 0,
+          totalTax: 0,
+          count: 0
+        };
+      }
+      parties[partyName].totalAmount += Number(v.total || 0);
+      parties[partyName].totalTax += Number(v.cgstTotal || 0) + Number(v.sgstTotal || 0) + Number(v.igstTotal || 0);
+      parties[partyName].count += 1;
+    });
+
+    return Object.values(parties).sort((a, b) => a.partyName.localeCompare(b.partyName));
+  }, [matchedSales, ledgerMap]);
 
   const totalSalesValue = useMemo(() => {
     return matchedSales.reduce((sum, row) => sum + (Number(row.total) || 0), 0);
@@ -891,51 +929,39 @@ const B2B: React.FC = () => {
         </div>
       )}
 
-      {/* View Selector */}
-      <div className="flex space-x-2 mb-6 overflow-x-auto">
-        {(
-          [
-            "summary",
-            "detailed",
-            "extract",
-            "columnar",
-            "partners",
-            "analytics",
-            "contracts",
-          ] as ViewType[]
-        ).map((view) => {
-          const disabled = isTabDisabled(view);
-
-          return (
-            <button
-              key={view}
-              disabled={disabled}
-              onClick={() => {
-                if (!disabled) {
-                  setSelectedView(view);
-                  if (view !== 'detailed') setSelectedMonth(null);
-                }
-              }}
-              className={`px-4 py-2 rounded-lg capitalize whitespace-nowrap
-          ${selectedView === view
-                  ? theme === "dark"
-                    ? "bg-blue-600 text-white"
-                    : "bg-blue-500 text-white"
+      <div className="flex space-x-1 mt-4">
+        {[
+          { key: "summary", label: "Summary", icon: <ArrowLeft size={16} /> },
+          { key: "detailed", label: "Detailed", icon: <ListFilter size={16} /> },
+          { key: "columnar", label: "Columnar", icon: <ListFilter size={16} /> },
+          { key: "extract", label: "Extract", icon: <ListFilter size={16} /> },
+          { key: "partywise", label: "Party-wise", icon: <User size={16} /> },
+        ].map((view) => (
+          <button
+            key={view.key}
+            disabled={isTabDisabled(view.key as ViewType)}
+            onClick={() => {
+              setSelectedView(view.key as ViewType);
+              if (view.key !== "detailed") {
+                setSelectedMonth(null);
+                setSelectedParty(null);
+              }
+            }}
+            className={`flex items-center space-x-2 px-4 py-2 rounded-t-lg border-t border-l border-r transition-all duration-200 ${selectedView === view.key
+                ? theme === "dark"
+                  ? "bg-gray-800 border-gray-700 text-blue-400"
+                  : "bg-white border-gray-200 text-blue-600 font-bold"
+                : isTabDisabled(view.key as ViewType)
+                  ? "opacity-30 cursor-not-allowed"
                   : theme === "dark"
-                    ? "bg-gray-700"
-                    : "bg-gray-200"
-                }
-          ${disabled
-                  ? "opacity-50 cursor-not-allowed"
-                  : "hover:bg-blue-400 hover:text-white"
-                }
-        `}
-              title={disabled ? "Coming soon" : view}
-            >
-              {view}
-            </button>
-          );
-        })}
+                    ? "bg-gray-900 border-transparent text-gray-400 hover:bg-gray-800"
+                    : "bg-gray-50 border-transparent text-gray-500 hover:bg-gray-100"
+              }`}
+          >
+            {view.icon}
+            <span className="text-sm">{view.label}</span>
+          </button>
+        ))}
       </div>
 
       <div ref={printRef}>
@@ -1016,13 +1042,36 @@ const B2B: React.FC = () => {
           <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
             }`}>
             <div className="flex justify-between items-center mb-4">
-              <h3 className="text-lg font-semibold">Detailed Transactions {selectedMonth ? `(${selectedMonth})` : ''}</h3>
-              {selectedMonth && (
+              <div className="flex flex-wrap items-center gap-4">
+                <h3 className="text-lg font-semibold">
+                  Detailed Transactions {selectedMonth ? `(${selectedMonth})` : ""}
+                </h3>
+                {selectedParty && (
+                  <div
+                    className={`px-2 py-1 rounded text-sm flex items-center ${theme === "dark"
+                        ? "bg-blue-900/40 text-blue-200"
+                        : "bg-blue-50 text-blue-700 border border-blue-100"
+                      }`}
+                  >
+                    <span className="font-medium">Party: {selectedParty}</span>
+                    <button
+                      onClick={() => setSelectedParty(null)}
+                      className="ml-2 hover:text-red-500 font-bold"
+                    >
+                      ×
+                    </button>
+                  </div>
+                )}
+              </div>
+              {(selectedMonth || selectedParty) && (
                 <button
-                  onClick={() => setSelectedMonth(null)}
+                  onClick={() => {
+                    setSelectedMonth(null);
+                    setSelectedParty(null);
+                  }}
                   className="text-sm text-blue-500 hover:text-blue-700 underline"
                 >
-                  Clear Filter
+                  Clear All Filters
                 </button>
               )}
             </div>
@@ -1194,6 +1243,86 @@ const B2B: React.FC = () => {
                     </tr>
                   )}
                 </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Party Wise View */}
+        {selectedView === "partywise" && (
+          <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
+            <h3 className="text-lg font-semibold mb-4">Party-wise Sales Summary</h3>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
+                  <tr>
+                    <th className="px-4 py-3 text-left font-medium">Party Name</th>
+                    <th className="px-4 py-3 text-left font-medium">GSTIN</th>
+                    <th className="px-4 py-3 text-right font-medium">Total Sales</th>
+                    <th className="px-4 py-3 text-right font-medium">Total Tax</th>
+                    <th className="px-4 py-3 text-center font-medium">Count</th>
+                    <th className="px-4 py-3 text-center font-medium">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200">
+                  {partyWiseData.map((party, index) => (
+                    <tr
+                      key={index}
+                      className={`hover:bg-opacity-50 ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"}`}
+                    >
+                      <td
+                        className="px-4 py-3 text-sm font-medium text-blue-600 cursor-pointer hover:underline"
+                        onClick={() => {
+                          setSelectedParty(party.partyName);
+                          setSelectedView("detailed");
+                        }}
+                      >
+                        {party.partyName}
+                      </td>
+                      <td className="px-4 py-3 text-sm">{party.gstin}</td>
+                      <td className="px-4 py-3 text-sm text-right font-mono">
+                        {party.totalAmount.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-right font-mono">
+                        {party.totalTax.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                      </td>
+                      <td className="px-4 py-3 text-sm text-center">{party.count}</td>
+                      <td className="px-4 py-3 text-sm text-center">
+                        <button
+                          onClick={() => {
+                            setSelectedParty(party.partyName);
+                            setSelectedView("detailed");
+                          }}
+                          className="text-blue-600 hover:text-blue-800 text-xs font-medium"
+                        >
+                          View Details
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                  {partyWiseData.length === 0 && (
+                    <tr>
+                      <td colSpan={6} className="px-4 py-8 text-center opacity-50">
+                        No party data found.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+                <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                  <tr className="font-bold">
+                    <td colSpan={2} className="px-4 py-3 text-right">Grand Total</td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      {partyWiseData.reduce((sum, p) => sum + p.totalAmount, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-right font-mono">
+                      {partyWiseData.reduce((sum, p) => sum + p.totalTax, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                    <td className="px-4 py-3 text-center">
+                      {partyWiseData.reduce((sum, p) => sum + p.count, 0)}
+                    </td>
+                    <td></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
