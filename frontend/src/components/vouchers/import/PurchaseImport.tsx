@@ -53,6 +53,8 @@ interface AccSummaryRow {
     gstRate: number;
     purchaseLedger: string;
     discount: number;
+    tdsAmount: number;
+    tdsRate: string;
     rowTotal: number;
     calculationWarning?: string;
 }
@@ -516,6 +518,28 @@ const PurchaseImport: React.FC = () => {
                         const gstRate = Number(row["GST Rate (%)"] || 0);
                         const purchaseLedger = String(row["Purchase Ledger"] || "").trim();
                         const discount = Number(row["Discount (₹)"] || 0);
+                        const rawTds = row["TDS"];
+                        let tdsRateNum = 0;
+                        let tdsRateStr = "";
+
+                        if (typeof rawTds === "number") {
+                            // If it's a small decimal (like 0.01 for 1%), treat it as percentage
+                            if (rawTds > 0 && rawTds < 1) {
+                                tdsRateNum = rawTds * 100;
+                                tdsRateStr = `${tdsRateNum}%`;
+                            } else {
+                                tdsRateNum = rawTds;
+                                tdsRateStr = `${rawTds}%`;
+                            }
+                        } else {
+                            tdsRateStr = String(rawTds || "").trim();
+                            tdsRateNum = parseFloat(tdsRateStr.replace(/%/g, "")) || 0;
+                            if (!tdsRateStr.includes("%") && tdsRateStr !== "") {
+                                tdsRateStr = `${tdsRateStr}%`;
+                            }
+                        }
+
+                        const tdsAmount = (taxableVal * tdsRateNum) / 100;
 
                         // --- Calculation Validation & Automation ---
                         let calculationWarning = "";
@@ -552,7 +576,7 @@ const PurchaseImport: React.FC = () => {
                         }
 
                         const totalTax = igst + cgst + sgst;
-                        const rowTotal = taxableVal + totalTax - discount;
+                        const rowTotal = taxableVal + totalTax - discount + tdsAmount;
 
                         // Initialize if first row for this voucher group
                         if (!voucherGroups[groupKey].accSummaryRows) {
@@ -570,6 +594,8 @@ const PurchaseImport: React.FC = () => {
                             igst, cgst, sgst, gstRate,
                             purchaseLedger: currentPL,
                             discount,
+                            tdsAmount,
+                            tdsRate: tdsRateStr,
                             rowTotal,
                             calculationWarning
                         });
@@ -643,6 +669,25 @@ const PurchaseImport: React.FC = () => {
                                 "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0,
                                 calculationWarning: "",
                                 _matchedLedgerId: sgstLedger?.id
+                            });
+                        }
+
+                        if (tdsAmount > 0) {
+                            const tdsRateClean = tdsRateStr.replace(/%/g, "").trim();
+                            const tdsLedger = ledgers.find(l => {
+                                const lName = String(l.name).toLowerCase().replace(/\s+/g, "");
+                                return (lName.includes("tds") && lName.includes(tdsRateClean)) && !lName.includes("purchase") && !lName.includes("sale");
+                            });
+                            
+                            const tdsLedgerName = tdsLedger?.name || `TDS ${tdsRateStr}`;
+                            
+                            voucherGroups[groupKey].accountingEntries!.push({
+                                "Particulars (Ledger Name)": tdsLedgerName,
+                                "Amount (₹)": tdsAmount,
+                                "Type": "debit", // Changed to debit to match additive total
+                                "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0,
+                                calculationWarning: "",
+                                _matchedLedgerId: tdsLedger?.id
                             });
                         }
 
@@ -1144,13 +1189,18 @@ const PurchaseImport: React.FC = () => {
                             newSgst = 0;
                         }
 
+                        const rawTds = String(row.tdsRate || "").trim();
+                        const tdsRateNum = parseFloat(rawTds.replace(/%/g, "")) || 0;
+                        const newTdsAmount = (amount * tdsRateNum) / 100;
+
                         return {
                             ...row,
                             igst: newIgst,
                             cgst: newCgst,
                             sgst: newSgst,
+                            tdsAmount: newTdsAmount,
                             calculationWarning: "",
-                            rowTotal: amount + newIgst + newCgst + newSgst - row.discount
+                            rowTotal: amount + newIgst + newCgst + newSgst - row.discount + newTdsAmount
                         };
                     });
 
@@ -1168,6 +1218,21 @@ const PurchaseImport: React.FC = () => {
                         if (row.igst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /igst/i.test(l.name))?.name || "IGST", "Amount (₹)": row.igst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /igst/i.test(l.name))?.id });
                         if (row.cgst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /cgst/i.test(l.name))?.name || "CGST", "Amount (₹)": row.cgst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /cgst/i.test(l.name))?.id });
                         if (row.sgst > 0) newEntries.push({ "Particulars (Ledger Name)": ledgers.find(l => /sgst|utgst/i.test(l.name))?.name || "SGST/UTGST", "Amount (₹)": row.sgst, "Type": "debit", "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, calculationWarning: "", _matchedLedgerId: ledgers.find(l => /sgst|utgst/i.test(l.name))?.id });
+                        if (row.tdsAmount > 0) {
+                            const tdsRateClean = String(row.tdsRate || "").replace(/%/g, "").trim();
+                            const tdsL = ledgers.find(l => {
+                                const lName = String(l.name).toLowerCase().replace(/\s+/g, "");
+                                return (lName.includes("tds") && lName.includes(tdsRateClean)) && !lName.includes("purchase") && !lName.includes("sale");
+                            });
+                            newEntries.push({ 
+                                "Particulars (Ledger Name)": tdsL?.name || `TDS ${row.tdsRate}`, 
+                                "Amount (₹)": row.tdsAmount, 
+                                "Type": "debit", // Additive TDS
+                                "Rate (%)": 0, "Integrated Tax (₹)": 0, "Central Tax (₹)": 0, "State/UT tax (₹)": 0, 
+                                calculationWarning: "", 
+                                _matchedLedgerId: tdsL?.id
+                            });
+                        }
                     });
 
                     const totalInvoiceValue = voucher.accSummaryRows.reduce((s, r) => s + r.rowTotal, 0);
@@ -1228,13 +1293,13 @@ const PurchaseImport: React.FC = () => {
 
     const downloadTemplate = (mode: 'item' | 'accounting') => {
         const itemH = ["GSTIN of supplier", "Trade/Legal name of the Supplier", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Purchase Ledger", "Item Name", "HSN Code", "Batch No", "Quantity", "Item Rate (₹)", "Rate (%)", "Taxable Value (₹)"];
-        const accH = ["GSTIN of supplier", "Trade/Legal name of the Supplier", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Taxable Value (₹)", "GST Rate (%)", "Purchase Ledger", "Discount (₹)"];
+        const accH = ["GSTIN of supplier", "Trade/Legal name of the Supplier", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Taxable Value (₹)", "GST Rate (%)", "Purchase Ledger", "Discount (₹)", "TDS"];
 
         const itemData = [
             ["20AABCM4621M1ZR", "MONGIA STEEL LIMITED", "MSL/25-26/14420", "16-02-2026", 472000, "Jharkhand(20)", "18% Inter State Purchase", "Biscute", "5555", "B-001", 100, 4000, 18, 400000],
         ];
         const accData = [
-            ["20BDAPP6208H2ZY", "nuvoico trader", "123", "30/03/2026", 11800, "jharkhand", 10000, 18, "18% intra state", 0],
+            ["20BDAPP6208H2ZY", "nuvoico trader", "123", "30/03/2026", 11800, "jharkhand", 10000, 18, "18% intra state", 0, "1%"],
         ];
 
         const worksheet = XLSX.utils.aoa_to_sheet([mode === 'item' ? itemH : accH, ...(mode === 'item' ? itemData : accData)]);
@@ -1500,6 +1565,7 @@ const PurchaseImport: React.FC = () => {
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-center">GST Rate</th>
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Purchase Ledger</th>
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Discount (₹)</th>
+                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">TDS</th>
                                                             <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Invoice Total</th>
                                                         </>
                                                     ) : importMode === 'item' ? (
@@ -1600,6 +1666,12 @@ const PurchaseImport: React.FC = () => {
                                                                 </div>
                                                             </td>
                                                             <td className="px-6 py-3 text-sm text-gray-700 text-right">₹{row.discount.toLocaleString()}</td>
+                                                            <td className="px-6 py-3 text-sm text-gray-600 text-right">
+                                                                <div className="flex flex-col items-end">
+                                                                    <span className="text-red-500 font-bold">₹{row.tdsAmount.toLocaleString()}</span>
+                                                                    <span className="text-[10px] text-gray-400">({row.tdsRate})</span>
+                                                                </div>
+                                                            </td>
                                                             <td className="px-6 py-3 text-sm text-blue-600 text-right font-bold relative">
                                                                 ₹{row.rowTotal.toLocaleString()}
                                                                 {row.calculationWarning && <AlertTriangle size={12} className="text-amber-500 absolute -top-1 right-1" title={row.calculationWarning} />}
