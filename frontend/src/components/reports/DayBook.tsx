@@ -79,7 +79,8 @@ const DayBook: React.FC = () => {
   });
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [selectedDate, setSelectedDate] = useState("");
-  const [selectedDateRange, setSelectedDateRange] = useState("financial-year");
+  const [selectedDateRange, setSelectedDateRange] = useState("Daily");
+  const [selectedMonth, setSelectedMonth] = useState("Select Month");
   const [selectedVoucherType, setSelectedVoucherType] = useState("");
   const [viewMode, setViewMode] = useState<"detailed" | "grouped">("grouped");
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherGroup | null>(
@@ -353,39 +354,114 @@ const DayBook: React.FC = () => {
   };
 
   useEffect(() => {
-    /* ===== CLEAR DATE → SHOW ALL ===== */
-    if (!selectedDate) {
-      setGroupedVouchers(allGroupedVouchers);
-      setProcessedEntries(allProcessedEntries);
+    const months = [
+      "January", "February", "March", "April", "May", "June",
+      "July", "August", "September", "October", "November", "December"
+    ];
 
-      const totalDebit = allGroupedVouchers.reduce(
-        (sum, v) => sum + v.totalDebit,
-        0
+    let filteredGrouped = [...allGroupedVouchers];
+    let filteredEntries = [...allProcessedEntries];
+
+    // 1. Filter by Voucher Type
+    if (selectedVoucherType) {
+      filteredGrouped = filteredGrouped.filter(
+        (v) => v.voucherType.toLowerCase() === selectedVoucherType.toLowerCase()
       );
-
-      const totalCredit = allGroupedVouchers.reduce(
-        (sum, v) => sum + v.totalCredit,
-        0
+      filteredEntries = filteredEntries.filter(
+        (e) => e.voucherType.toLowerCase() === selectedVoucherType.toLowerCase()
       );
-
-      setTotals({
-        totalDebit,
-        totalCredit,
-        netDifference: totalDebit - totalCredit,
-        vouchersCount: allGroupedVouchers.length,
-      });
-
-      return;
     }
 
-    /* ===== FILTER BY DATE ===== */
-    const filteredGrouped = allGroupedVouchers.filter(
-      (voucher) => getLocalDate(voucher.date) === selectedDate
-    );
+    // 2. Filter by Date Range or Specific Month
+    const referenceDate = selectedDate ? new Date(selectedDate) : new Date();
+    let startDate: Date | null = null;
+    let endDate: Date | null = null;
 
-    const filteredEntries = allProcessedEntries.filter(
-      (entry) => getLocalDate(entry.date) === selectedDate
-    );
+    if (selectedMonth !== "Select Month") {
+      const year = referenceDate.getFullYear();
+      let monthIndex = -1;
+
+      if (selectedMonth === "Current") {
+        monthIndex = new Date().getMonth();
+      } else {
+        monthIndex = months.indexOf(selectedMonth);
+      }
+
+      if (monthIndex !== -1) {
+        startDate = new Date(year, monthIndex, 1);
+        endDate = new Date(year, monthIndex + 1, 0, 23, 59, 59, 999);
+      }
+    } else {
+      switch (selectedDateRange) {
+        case "Daily":
+          if (selectedDate) {
+            startDate = new Date(selectedDate);
+            startDate.setHours(0, 0, 0, 0);
+            endDate = new Date(selectedDate);
+            endDate.setHours(23, 59, 59, 999);
+          } else {
+            // If no date selected for Daily, maybe show all or just today
+            // For now, let's keep it as is (show all if no date)
+          }
+          break;
+        case "Weekly":
+          // Start of week (Sunday)
+          startDate = new Date(referenceDate);
+          startDate.setDate(referenceDate.getDate() - referenceDate.getDay());
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 6);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case "Fortnightly":
+          // 14 days starting from reference date
+          startDate = new Date(referenceDate);
+          startDate.setHours(0, 0, 0, 0);
+          endDate = new Date(startDate);
+          endDate.setDate(startDate.getDate() + 13);
+          endDate.setHours(23, 59, 59, 999);
+          break;
+        case "Monthly":
+          startDate = new Date(referenceDate.getFullYear(), referenceDate.getMonth(), 1);
+          endDate = new Date(referenceDate.getFullYear(), referenceDate.getMonth() + 1, 0, 23, 59, 59, 999);
+          break;
+        case "Quarterly":
+          const quarter = Math.floor(referenceDate.getMonth() / 3);
+          startDate = new Date(referenceDate.getFullYear(), quarter * 3, 1);
+          endDate = new Date(referenceDate.getFullYear(), (quarter + 1) * 3, 0, 23, 59, 59, 999);
+          break;
+        case "Half-Yearly":
+          const half = referenceDate.getMonth() < 6 ? 0 : 6;
+          startDate = new Date(referenceDate.getFullYear(), half, 1);
+          endDate = new Date(referenceDate.getFullYear(), half + 6, 0, 23, 59, 59, 999);
+          break;
+        default:
+          break;
+      }
+    }
+
+    if (startDate && endDate) {
+      const startTime = startDate.getTime();
+      const endTime = endDate.getTime();
+
+      filteredGrouped = filteredGrouped.filter((v) => {
+        const d = new Date(v.date).getTime();
+        return d >= startTime && d <= endTime;
+      });
+
+      filteredEntries = filteredEntries.filter((e) => {
+        const d = new Date(e.date).getTime();
+        return d >= startTime && d <= endTime;
+      });
+    } else if (selectedDate && selectedDateRange === "Daily") {
+       // Handled above, but if somehow fell through
+       filteredGrouped = filteredGrouped.filter(
+        (voucher) => getLocalDate(voucher.date) === selectedDate
+      );
+      filteredEntries = filteredEntries.filter(
+        (entry) => getLocalDate(entry.date) === selectedDate
+      );
+    }
 
     setGroupedVouchers(filteredGrouped);
     setProcessedEntries(filteredEntries);
@@ -406,7 +482,7 @@ const DayBook: React.FC = () => {
       netDifference: totalDebit - totalCredit,
       vouchersCount: filteredGrouped.length,
     });
-  }, [selectedDate]);
+  }, [selectedDate, selectedDateRange, selectedMonth, selectedVoucherType, allGroupedVouchers, allProcessedEntries]);
 
   const getGroupedAmounts = (voucher: VoucherGroup) => {
     const type = voucher.voucherType.toLowerCase();
@@ -472,9 +548,7 @@ const DayBook: React.FC = () => {
 
   const handleDateRangeChange = (range: string) => {
     setSelectedDateRange(range);
-    if (range === "custom") {
-      // Custom date will be handled by the date input
-    }
+    setSelectedMonth("Select Month");
   };
 
   return (
@@ -538,12 +612,41 @@ const DayBook: React.FC = () => {
                   : "bg-white border-gray-300"
                   }`}
               >
-                <option value="financial-year">Financial Year</option>
-                <option value="today">Today</option>
-                <option value="yesterday">Yesterday</option>
-                <option value="this-week">This Week</option>
-                <option value="this-month">This Month</option>
-                <option value="custom">Custom Date</option>
+                <option value="Daily">Daily</option>
+                <option value="Weekly">Weekly</option>
+                <option value="Fortnightly">Fortnightly</option>
+                <option value="Monthly">Monthly</option>
+                <option value="Quarterly">Quarterly</option>
+                <option value="Half-Yearly">Half-Yearly</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">
+                Select Month
+              </label>
+              <select
+                title="Select Month"
+                value={selectedMonth}
+                onChange={(e) => setSelectedMonth(e.target.value)}
+                className={`w-full p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
+              >
+                <option value="Select Month">Select Month</option>
+                <option value="Current">Current</option>
+                <option value="January">January</option>
+                <option value="February">February</option>
+                <option value="March">March</option>
+                <option value="April">April</option>
+                <option value="May">May</option>
+                <option value="June">June</option>
+                <option value="July">July</option>
+                <option value="August">August</option>
+                <option value="September">September</option>
+                <option value="October">October</option>
+                <option value="November">November</option>
+                <option value="December">December</option>
               </select>
             </div>
             <div>
@@ -586,23 +689,21 @@ const DayBook: React.FC = () => {
                 <option value="detailed">Detailed Entries</option>
               </select>
             </div>
-            {selectedDateRange === "custom" && (
-              <div>
-                <label className="block text-sm font-medium mb-1">
-                  Select Date
-                </label>
-                <input
-                  type="date"
-                  title="Select Date"
-                  value={selectedDate}
-                  onChange={(e) => setSelectedDate(e.target.value)}
-                  className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600"
-                    : "bg-white border-gray-300"
-                    }`}
-                />
-              </div>
-            )}
+          </div>
+          <div className="mt-4">
+             <label className="block text-sm font-medium mb-1">
+                Select Date
+              </label>
+              <input
+                type="date"
+                title="Select Date"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                className={`w-full md:w-1/4 p-2 rounded border ${theme === "dark"
+                  ? "bg-gray-700 border-gray-600"
+                  : "bg-white border-gray-300"
+                  }`}
+              />
           </div>
         </div>
       )}
@@ -681,11 +782,11 @@ const DayBook: React.FC = () => {
           <div>
             <h2 className="text-xl font-bold">Day Book</h2>
             <p className="text-sm opacity-75">
-              {selectedDateRange === "custom"
-                ? `For ${formatDate(selectedDate)}`
-                : selectedDateRange === "today"
-                  ? `For ${formatDate(new Date().toISOString().split("T")[0])}`
-                  : `For ${selectedDateRange.replace("-", " ")}`}
+              {selectedMonth !== "Select Month"
+                ? `For ${selectedMonth === "Current" ? "Current Month" : selectedMonth}`
+                : selectedDateRange === "Daily" && selectedDate
+                  ? `For ${formatDate(selectedDate)}`
+                  : `For ${selectedDateRange}`}
             </p>
           </div>
           <div className="flex items-center space-x-2">
@@ -696,7 +797,8 @@ const DayBook: React.FC = () => {
               value={selectedDate}
               onChange={(e) => {
                 setSelectedDate(e.target.value);
-                setSelectedDateRange("custom");
+                setSelectedDateRange("Daily");
+                setSelectedMonth("Select Month");
               }}
               className={`text-sm px-2 py-1 rounded border outline-none ${theme === "dark"
                 ? "bg-gray-700 border-gray-600 text-white"
@@ -704,11 +806,12 @@ const DayBook: React.FC = () => {
                 }`}
             />
 
-            {selectedDate && (
+            {(selectedDate || selectedMonth !== "Select Month") && (
               <button
                 onClick={() => {
                   setSelectedDate("");
-                  setSelectedDateRange("financial-year");
+                  setSelectedDateRange("Daily");
+                  setSelectedMonth("Select Month");
                 }}
                 className="text-xs px-2 py-1 rounded bg-red-100 text-red-600 hover:bg-red-200"
               >
