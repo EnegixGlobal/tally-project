@@ -214,12 +214,13 @@ const AllHsnPurachase: React.FC = () => {
         const historyItem = purchaseHistoryMap.get(voucherNo);
         // Check both potential property names based on B2B/B2C findings
         const qty = historyItem?.purchaseQuantity || historyItem?.qtyChange;
-        return qty ? Math.abs(qty) : "";
+        return qty ? Math.abs(qty) : 0;
     };
 
     const getRateByVoucher = (voucherNo: string) => {
-        return purchaseHistoryMap.get(voucherNo)?.rate || "";
+        return purchaseHistoryMap.get(voucherNo)?.rate || 0;
     };
+
 
     // 5. Final Filtered Data based on UI controls
     const filteredAndSortedPurchases = useMemo(() => {
@@ -257,6 +258,19 @@ const AllHsnPurachase: React.FC = () => {
             return true;
         });
     }, [matchedPurchases, filters, hsnSearch, ledgerMap, purchaseHistoryMap]);
+
+    const dashboardTotals = useMemo(() => {
+        return filteredAndSortedPurchases.reduce((acc: any, purchase: any) => {
+            acc.qty += Number(getQtyByVoucher(purchase.number)) || 0;
+            acc.amount += Number(purchase.subtotal || 0);
+            acc.taxValue += (Number(purchase.igstTotal || 0) + Number(purchase.cgstTotal || 0) + Number(purchase.sgstTotal || 0));
+            acc.igst += Number(purchase.igstTotal || 0);
+            acc.cgst += Number(purchase.cgstTotal || 0);
+            acc.sgst += Number(purchase.sgstTotal || 0);
+            acc.total += Number(purchase.total || 0);
+            return acc;
+        }, { qty: 0, amount: 0, taxValue: 0, igst: 0, cgst: 0, sgst: 0, total: 0 });
+    }, [filteredAndSortedPurchases, purchaseHistoryMap]);
 
     const handleExport = () => {
         const exportData = filteredAndSortedPurchases.map((purchase: any) => {
@@ -573,6 +587,20 @@ const AllHsnPurachase: React.FC = () => {
                                             })
                                     )}
                                 </tbody>
+                                <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                    <tr className="font-bold border-t border-gray-400">
+                                        <td className="p-3" colSpan={5}>Grand Total</td>
+                                        <td className="p-3">{dashboardTotals.qty}</td>
+                                        <td className="p-3"></td>
+                                        <td className="p-3">₹{dashboardTotals.amount.toFixed(2)}</td>
+                                        <td className="p-3">₹{dashboardTotals.taxValue.toFixed(2)}</td>
+                                        <td className="p-3">{dashboardTotals.igst}</td>
+                                        <td className="p-3">{dashboardTotals.cgst}</td>
+                                        <td className="p-3">{dashboardTotals.sgst}</td>
+                                        <td className="p-3 font-semibold">₹{dashboardTotals.total.toFixed(2)}</td>
+                                        <td className="p-3"></td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>

@@ -786,12 +786,38 @@ const B2C: React.FC = () => {
 
   const getQtyByVoucher = (voucherNo: string) => {
     const qty = salesHistoryMap.get(voucherNo)?.qtyChange;
-    return qty ? Math.abs(qty) : "";
+    return qty ? Math.abs(qty) : 0;
   };
 
   const getRateByVoucher = (voucherNo: string) => {
-    return salesHistoryMap.get(voucherNo)?.rate || "";
+    return salesHistoryMap.get(voucherNo)?.rate || 0;
   };
+
+  const detailedTotals = useMemo(() => {
+    return filteredDetailedData.reduce((acc, sale) => {
+      acc.qty += Number(getQtyByVoucher(sale.number)) || 0;
+      acc.subtotal += Number(sale.subtotal || 0);
+      acc.igst += Number(sale.igstTotal || 0);
+      acc.cgst += Number(sale.cgstTotal || 0);
+      acc.sgst += Number(sale.sgstTotal || 0);
+      acc.total += Number(sale.total || 0);
+      return acc;
+    }, { qty: 0, subtotal: 0, igst: 0, cgst: 0, sgst: 0, total: 0 });
+  }, [filteredDetailedData, salesHistoryMap]);
+
+  const columnarTotals = useMemo(() => {
+    const totals: any = { quantity: 0, total: 0 };
+    columnarData.headers.forEach(h => totals[h] = 0);
+
+    columnarData.rows.forEach(row => {
+      totals.quantity += Number(row.quantity || 0);
+      totals.total += Number(row.total || 0);
+      columnarData.headers.forEach(h => {
+        totals[h] += Number(row[h] || 0);
+      });
+    });
+    return totals;
+  }, [columnarData]);
 
   const filteredTransactions = useMemo(() => {
     if (!orders || orders.length === 0) {
@@ -1465,6 +1491,20 @@ const B2C: React.FC = () => {
                     );
                   })}
                 </tbody>
+                <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                  <tr className="font-bold border-t border-gray-400">
+                    <td className="p-3">Grand Total</td>
+                    <td className="p-3"></td>
+                    <td className="p-3">{detailedTotals.qty || 0}</td>
+                    <td className="p-3"></td>
+                    <td className="p-3">₹{detailedTotals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                    <td className="p-3">{detailedTotals.igst || 0}</td>
+                    <td className="p-3">{detailedTotals.cgst || 0}</td>
+                    <td className="p-3">{detailedTotals.sgst || 0}</td>
+                    <td className="p-3 font-semibold">₹{detailedTotals.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
+                    <td className="p-3"></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -1553,6 +1593,21 @@ const B2C: React.FC = () => {
                     </tr>
                   )}
                 </tbody>
+                <tfoot className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
+                  <tr className="font-bold border-t border-gray-400">
+                    <td className="px-2 py-3" colSpan={3}>Grand Total</td>
+                    <td className="px-2 py-3 text-right">{columnarTotals.quantity}</td>
+                    <td className="px-2 py-3 text-right"></td>
+                    <td className="px-2 py-3 text-right font-semibold">
+                      {columnarTotals.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
+                    </td>
+                    {columnarData.headers.map((h) => (
+                      <td key={h} className="px-2 py-3 text-right">
+                        {columnarTotals[h] ? columnarTotals[h].toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "-"}
+                      </td>
+                    ))}
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
