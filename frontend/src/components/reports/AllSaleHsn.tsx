@@ -213,11 +213,11 @@ const AllSaleHsn: React.FC = () => {
 
     const getQtyByVoucher = (voucherNo: string) => {
         const qty = salesHistoryMap.get(voucherNo)?.qtyChange;
-        return qty ? Math.abs(qty) : "";
+        return qty ? Math.abs(qty) : 0;
     };
 
     const getRateByVoucher = (voucherNo: string) => {
-        return salesHistoryMap.get(voucherNo)?.rate || "";
+        return salesHistoryMap.get(voucherNo)?.rate || 0;
     };
 
     // 5. Final Filtered Data based on UI controls
@@ -256,6 +256,19 @@ const AllSaleHsn: React.FC = () => {
             return true;
         });
     }, [matchedSales, filters, hsnSearch, ledgerMap, salesHistoryMap]);
+
+    const dashboardTotals = useMemo(() => {
+        return filteredAndSortedSales.reduce((acc: any, sale: any) => {
+            acc.qty += Number(getQtyByVoucher(sale.number)) || 0;
+            acc.amount += Number(sale.subtotal || 0);
+            acc.taxValue += (Number(sale.igstTotal || 0) + Number(sale.cgstTotal || 0) + Number(sale.sgstTotal || 0));
+            acc.igst += Number(sale.igstTotal || 0);
+            acc.cgst += Number(sale.cgstTotal || 0);
+            acc.sgst += Number(sale.sgstTotal || 0);
+            acc.total += Number(sale.total || 0);
+            return acc;
+        }, { qty: 0, amount: 0, taxValue: 0, igst: 0, cgst: 0, sgst: 0, total: 0 });
+    }, [filteredAndSortedSales, salesHistoryMap]);
 
     const handleExport = () => {
         const exportData = filteredAndSortedSales.map((sale: any) => {
@@ -572,6 +585,20 @@ const AllSaleHsn: React.FC = () => {
                                             })
                                     )}
                                 </tbody>
+                                <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                                    <tr className="font-bold border-t border-gray-400">
+                                        <td className="p-3" colSpan={5}>Grand Total</td>
+                                        <td className="p-3">{dashboardTotals.qty}</td>
+                                        <td className="p-3"></td>
+                                        <td className="p-3">₹{dashboardTotals.amount.toFixed(2)}</td>
+                                        <td className="p-3">₹{dashboardTotals.taxValue.toFixed(2)}</td>
+                                        <td className="p-3">{dashboardTotals.igst}</td>
+                                        <td className="p-3">{dashboardTotals.cgst}</td>
+                                        <td className="p-3">{dashboardTotals.sgst}</td>
+                                        <td className="p-3 font-semibold">₹{dashboardTotals.total.toFixed(2)}</td>
+                                        <td className="p-3"></td>
+                                    </tr>
+                                </tfoot>
                             </table>
                         </div>
                     </div>

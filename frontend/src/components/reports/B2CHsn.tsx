@@ -2,10 +2,10 @@ import React, { useState, useMemo, useRef, useEffect, type Key, type ReactNode }
 import { useAppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
-import { 
-  ArrowLeft, 
-  Download, 
-  Filter, 
+import {
+  ArrowLeft,
+  Download,
+  Filter,
   Eye,
   User
 } from 'lucide-react';
@@ -67,7 +67,7 @@ const B2CHsn: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [orders, setOrders] = useState<Order[]>([]);
   const [error, setError] = useState<string | null>(null);
-  
+
   // For HSN display (similar to B2BHsn)
   const [saleData, setSaleData] = useState<any[]>([]);
   const [partyIds, setPartyIds] = useState<number[]>([]);
@@ -103,13 +103,13 @@ const B2CHsn: React.FC = () => {
       setLoading(false);
       return;
     }
-    
+
     if (!owner_type) {
       setError('User type is missing. Please log in again.');
       setLoading(false);
       return;
     }
-    
+
     if (!owner_id) {
       setError('Owner ID is missing. Please log in again.');
       setLoading(false);
@@ -136,7 +136,7 @@ const B2CHsn: React.FC = () => {
         setLoading(false);
       });
   }, [company_id, owner_type, owner_id]);
-  
+
   useEffect(() => {
     if (!company_id || !owner_type || !owner_id) {
       setLoading(false);
@@ -145,7 +145,7 @@ const B2CHsn: React.FC = () => {
 
     setLoading(true);
     setError(null);
-    
+
     // Fetch B2C orders (sales without GST numbers)
     // Backend filters: WHERE (l.gst_number IS NULL OR l.gst_number = '')
     axios
@@ -160,35 +160,35 @@ const B2CHsn: React.FC = () => {
       })
       .then(res => {
         console.log('B2C Orders API Response:', res.data);
-        
+
         // Backend returns item-level rows, need to group by order
         const rawData = res.data as any[];
-        
+
         if (!Array.isArray(rawData)) {
           console.error('Expected array but got:', typeof rawData);
           setOrders([]);
           setLoading(false);
           return;
         }
-        
+
         if (rawData.length === 0) {
           console.log('No B2C orders found for the selected date range');
           setOrders([]);
           setLoading(false);
           return;
         }
-        
+
         // Group items by orderId to create order objects with items arrays
         const orderMap = new Map<number, Order>();
-        
+
         rawData.forEach((row: any) => {
           const orderId = row.orderId;
-          
+
           if (!orderId) {
             console.warn('Row missing orderId:', row);
             return;
           }
-          
+
           if (!orderMap.has(orderId)) {
             // Create new order object
             orderMap.set(orderId, {
@@ -211,7 +211,7 @@ const B2CHsn: React.FC = () => {
               gstNumber: row.gstNumber || null, // Should be null/empty for B2C
             });
           }
-          
+
           // Add item to order
           const order = orderMap.get(orderId)!;
           if (row.itemId && row.itemName) {
@@ -229,14 +229,14 @@ const B2CHsn: React.FC = () => {
             });
           }
         });
-        
+
         // Convert map to array - Backend already filters by GST number
         // Only filter out if GST number exists and is not empty (safety check)
         const ordersArray = Array.from(orderMap.values()).filter(order => {
           // Keep orders that have no GST number or empty GST number
           return !order.gstNumber || String(order.gstNumber).trim() === '';
         });
-        
+
         console.log(`Processed ${ordersArray.length} B2C orders from ${rawData.length} item rows`);
         setOrders(ordersArray);
         setLoading(false);
@@ -255,9 +255,8 @@ const B2CHsn: React.FC = () => {
 
     const loadSalesVouchers = async () => {
       try {
-        const url = `${
-          import.meta.env.VITE_API_URL
-        }/api/sales-vouchers?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`;
+        const url = `${import.meta.env.VITE_API_URL
+          }/api/sales-vouchers?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`;
 
         const res = await fetch(url);
         const json = await res.json();
@@ -285,8 +284,7 @@ const B2CHsn: React.FC = () => {
     const fetchLedger = async () => {
       try {
         const ledgerRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
         );
         const ledgerData = await ledgerRes.json();
@@ -309,7 +307,7 @@ const B2CHsn: React.FC = () => {
     // Filter ledgers to only those WITHOUT GST numbers (B2C)
     const filteredLedgers = ledger.filter((l: any) => {
       return (
-        partyIds.includes(l.id) && 
+        partyIds.includes(l.id) &&
         (!l.gstNumber || String(l.gstNumber).trim() === "")
       );
     });
@@ -340,16 +338,15 @@ const B2CHsn: React.FC = () => {
     const fetchSalesHistory = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/sales-vouchers/sale-history?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}`
         );
         const resJson = await res.json();
         const rows = Array.isArray(resJson?.data)
           ? resJson.data
           : Array.isArray(resJson)
-          ? resJson
-          : [];
+            ? resJson
+            : [];
 
         setSalesHistory(rows);
       } catch (err) {
@@ -374,29 +371,48 @@ const B2CHsn: React.FC = () => {
 
   const getQtyByVoucher = (voucherNo: string) => {
     const qty = salesHistoryMap.get(voucherNo)?.qtyChange;
-    return qty ? Math.abs(qty) : "";
+    return qty ? Math.abs(qty) : 0;
   };
 
   const getRateByVoucher = (voucherNo: string) => {
-    return salesHistoryMap.get(voucherNo)?.rate || "";
+    return salesHistoryMap.get(voucherNo)?.rate || 0;
   };
+
+  const dashboardTotals = useMemo(() => {
+    const filtered = matchedSales.filter((sale: any) => {
+      if (!hsnSearch.trim()) return true;
+      const hsn = getHsnByVoucher(sale.number);
+      return hsn?.toString().trim() === hsnSearch.trim();
+    });
+
+    return filtered.reduce((acc, sale) => {
+      acc.qty += Number(getQtyByVoucher(sale.number)) || 0;
+      acc.amount += Number(sale.subtotal || 0);
+      acc.taxValue += (Number(sale.igstTotal || 0) + Number(sale.cgstTotal || 0) + Number(sale.sgstTotal || 0));
+      acc.igst += Number(sale.igstTotal || 0);
+      acc.cgst += Number(sale.cgstTotal || 0);
+      acc.sgst += Number(sale.sgstTotal || 0);
+      acc.total += Number(sale.total || 0);
+      return acc;
+    }, { qty: 0, amount: 0, taxValue: 0, igst: 0, cgst: 0, sgst: 0, total: 0 });
+  }, [matchedSales, hsnSearch, salesHistoryMap]);
 
   const filteredTransactions = useMemo(() => {
     return orders.filter(transaction => {
       // Safety filter: Ensure no GST numbers (backend already filters, but double-check)
       const noGstNumber = !transaction.gstNumber || String(transaction.gstNumber).trim() === '';
-      
+
       const transactionDate = new Date(transaction.orderDate);
       const fromDate = new Date(filters.fromDate);
       const toDate = new Date(filters.toDate);
-      
+
       const dateInRange = transactionDate >= fromDate && transactionDate <= toDate;
-      const customerMatch = !filters.customerFilter || 
+      const customerMatch = !filters.customerFilter ||
         transaction.customerName.toLowerCase().includes(filters.customerFilter.toLowerCase());
       const paymentMatch = !filters.paymentMethod || transaction.paymentMethod === filters.paymentMethod;
       const statusMatch = !filters.orderStatus || transaction.orderStatus === filters.orderStatus;
       const sourceMatch = !filters.source || transaction.source === filters.source;
-      
+
       return noGstNumber && dateInRange && customerMatch && paymentMatch && statusMatch && sourceMatch;
     });
   }, [orders, filters]);
@@ -408,9 +424,9 @@ const B2CHsn: React.FC = () => {
     const avgOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
     const totalCustomers = customers.length;
     const activeCustomers = customers.filter(c => c.status === 'active').length;
-    const customerLifetimeValue = totalCustomers > 0 ? 
+    const customerLifetimeValue = totalCustomers > 0 ?
       customers.reduce((sum, c) => sum + c.totalSpent, 0) / totalCustomers : 0;
-    
+
     const orderStatusCounts = {
       placed: filteredTransactions.filter(t => t.orderStatus === 'placed').length,
       confirmed: filteredTransactions.filter(t => t.orderStatus === 'confirmed').length,
@@ -580,11 +596,10 @@ const B2CHsn: React.FC = () => {
           <button
             onClick={() => navigate('/app/reports')}
             title="Back to Reports"
-            className={`p-2 rounded-lg mr-3 ${
-              theme === 'dark' 
-                ? 'bg-gray-700 hover:bg-gray-600 text-white' 
+            className={`p-2 rounded-lg mr-3 ${theme === 'dark'
+                ? 'bg-gray-700 hover:bg-gray-600 text-white'
                 : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-            }`}
+              }`}
           >
             <ArrowLeft size={20} />
           </button>
@@ -595,7 +610,7 @@ const B2CHsn: React.FC = () => {
             </h1>
             <p className="text-sm text-gray-600 mt-1">Business-to-Consumer sales and customer management</p>
             <p className="text-xs text-purple-600 mt-1">
-              📊 <strong>Showing sales transactions from customers WITHOUT GST numbers</strong> | 
+              📊 <strong>Showing sales transactions from customers WITHOUT GST numbers</strong> |
               <span className="ml-2">B2B transactions (with GST numbers) are shown in the B2B module</span>
             </p>
           </div>
@@ -604,20 +619,18 @@ const B2CHsn: React.FC = () => {
           <button
             onClick={() => setShowFilterPanel(!showFilterPanel)}
             title="Toggle Filters"
-            className={`p-2 rounded-lg ${
-              showFilterPanel
+            className={`p-2 rounded-lg ${showFilterPanel
                 ? (theme === 'dark' ? 'bg-purple-600' : 'bg-purple-500 text-white')
                 : (theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200')
-            }`}
+              }`}
           >
             <Filter size={16} />
           </button>
           <button
             onClick={handleExport}
             title="Export to Excel"
-            className={`p-2 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
-            }`}
+            className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-gray-700 hover:bg-gray-600' : 'bg-gray-100 hover:bg-gray-200'
+              }`}
           >
             <Download size={16} />
           </button>
@@ -626,9 +639,8 @@ const B2CHsn: React.FC = () => {
 
       {/* Error Message */}
       {error && (
-        <div className={`mb-4 p-4 rounded-lg ${
-          theme === 'dark' ? 'bg-red-900 text-red-100' : 'bg-red-50 text-red-800'
-        }`}>
+        <div className={`mb-4 p-4 rounded-lg ${theme === 'dark' ? 'bg-red-900 text-red-100' : 'bg-red-50 text-red-800'
+          }`}>
           <p className="font-semibold">Error:</p>
           <p className="text-sm">{error}</p>
         </div>
@@ -636,9 +648,8 @@ const B2CHsn: React.FC = () => {
 
       {/* Loading Message */}
       {loading && (
-        <div className={`mb-4 p-4 rounded-lg text-center ${
-          theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
-        }`}>
+        <div className={`mb-4 p-4 rounded-lg text-center ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+          }`}>
           <p>Loading B2C orders...</p>
         </div>
       )}
@@ -655,9 +666,8 @@ const B2CHsn: React.FC = () => {
 
       {/* Filter Panel */}
       {showFilterPanel && (
-        <div className={`p-4 rounded-lg mb-6 ${
-          theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
-        }`}>
+        <div className={`p-4 rounded-lg mb-6 ${theme === 'dark' ? 'bg-gray-800' : 'bg-gray-50'
+          }`}>
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-sm font-medium mb-1">Date Range</label>
@@ -665,11 +675,10 @@ const B2CHsn: React.FC = () => {
                 value={filters.dateRange}
                 onChange={(e) => handleDateRangeChange(e.target.value)}
                 title="Select date range"
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                    ? 'bg-gray-700 border-gray-600 text-white'
                     : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                  } outline-none`}
               >
                 <option value="today">Today</option>
                 <option value="this-week">This Week</option>
@@ -687,11 +696,10 @@ const B2CHsn: React.FC = () => {
                 placeholder="Search customer..."
                 value={filters.customerFilter}
                 onChange={(e) => handleFilterChange('customerFilter', e.target.value)}
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                    ? 'bg-gray-700 border-gray-600 text-white'
                     : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                  } outline-none`}
               />
             </div>
 
@@ -701,11 +709,10 @@ const B2CHsn: React.FC = () => {
                 value={filters.paymentMethod}
                 onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
                 title="Select payment method"
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                    ? 'bg-gray-700 border-gray-600 text-white'
                     : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                  } outline-none`}
               >
                 <option value="">All Methods</option>
                 <option value="card">Card</option>
@@ -723,11 +730,10 @@ const B2CHsn: React.FC = () => {
                 value={filters.orderStatus}
                 onChange={(e) => handleFilterChange('orderStatus', e.target.value)}
                 title="Select order status"
-                className={`w-full p-2 rounded border ${
-                  theme === 'dark' 
-                    ? 'bg-gray-700 border-gray-600 text-white' 
+                className={`w-full p-2 rounded border ${theme === 'dark'
+                    ? 'bg-gray-700 border-gray-600 text-white'
                     : 'bg-white border-gray-300 text-black'
-                } outline-none`}
+                  } outline-none`}
               >
                 <option value="">All Status</option>
                 <option value="placed">Placed</option>
@@ -756,20 +762,18 @@ const B2CHsn: React.FC = () => {
                 if (!disabled) setSelectedView(view);
               }}
               className={`px-4 py-2 rounded-lg capitalize whitespace-nowrap
-          ${
-            selectedView === view
-              ? theme === 'dark'
-                ? 'bg-purple-600 text-white'
-                : 'bg-purple-500 text-white'
-              : theme === 'dark'
-              ? 'bg-gray-700'
-              : 'bg-gray-200'
-          }
-          ${
-            disabled
-              ? 'opacity-50 cursor-not-allowed'
-              : 'hover:bg-purple-400 hover:text-white'
-          }
+          ${selectedView === view
+                  ? theme === 'dark'
+                    ? 'bg-purple-600 text-white'
+                    : 'bg-purple-500 text-white'
+                  : theme === 'dark'
+                    ? 'bg-gray-700'
+                    : 'bg-gray-200'
+                }
+          ${disabled
+                  ? 'opacity-50 cursor-not-allowed'
+                  : 'hover:bg-purple-400 hover:text-white'
+                }
         `}
               title={disabled ? 'Coming soon' : view}
             >
@@ -783,9 +787,8 @@ const B2CHsn: React.FC = () => {
         {/* Dashboard View */}
         {selectedView === 'dashboard' && (
           <div
-            className={`p-6 rounded-lg ${
-              theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-            }`}
+            className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+              }`}
           >
             {/* Header + Search */}
             <div className="flex items-center justify-between mb-4">
@@ -798,11 +801,10 @@ const B2CHsn: React.FC = () => {
                 value={hsnSearch}
                 onChange={(e) => setHsnSearch(e.target.value)}
                 className={`px-3 py-2 text-sm rounded border w-56
-          ${
-            theme === "dark"
-              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-              : "bg-white border-gray-300 text-black"
-          } outline-none`}
+          ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-black"
+                  } outline-none`}
               />
             </div>
 
@@ -810,9 +812,8 @@ const B2CHsn: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead
-                  className={`${
-                    theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                  }`}
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                    }`}
                 >
                   <tr>
                     <th className="text-left p-3">HSN</th>
@@ -849,11 +850,10 @@ const B2CHsn: React.FC = () => {
                       return (
                         <tr
                           key={sale.id || index}
-                          className={`border-b ${
-                            theme === "dark"
+                          className={`border-b ${theme === "dark"
                               ? "border-gray-700"
                               : "border-gray-200"
-                          }`}
+                            }`}
                         >
                           {/* HSN */}
                           <td className="p-3">
@@ -934,6 +934,20 @@ const B2CHsn: React.FC = () => {
                       </tr>
                     )}
                 </tbody>
+                <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                  <tr className="font-bold border-t border-gray-400">
+                    <td className="p-3" colSpan={3}>Grand Total</td>
+                    <td className="p-3">{dashboardTotals.qty}</td>
+                    <td className="p-3"></td>
+                    <td className="p-3">₹{dashboardTotals.amount.toFixed(2)}</td>
+                    <td className="p-3">₹{dashboardTotals.taxValue.toFixed(2)}</td>
+                    <td className="p-3">{dashboardTotals.igst.toFixed(2)}</td>
+                    <td className="p-3">{dashboardTotals.cgst.toFixed(2)}</td>
+                    <td className="p-3">{dashboardTotals.sgst.toFixed(2)}</td>
+                    <td className="p-3 font-semibold">₹{dashboardTotals.total.toFixed(2)}</td>
+                    <td className="p-3"></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -941,17 +955,15 @@ const B2CHsn: React.FC = () => {
 
         {/* Customers View */}
         {selectedView === 'customers' && (
-          <div className={`rounded-lg overflow-hidden ${
-            theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-          }`}>
+          <div className={`rounded-lg overflow-hidden ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+            }`}>
             <div className="p-4 border-b">
               <h3 className="text-lg font-semibold">Customer Database</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className={`${
-                  theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                }`}>
+                <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
+                  }`}>
                   <tr>
                     <th className="text-left p-3">Customer</th>
                     <th className="text-left p-3">Segment</th>
@@ -1008,17 +1020,15 @@ const B2CHsn: React.FC = () => {
 
         {/* Orders View */}
         {selectedView === 'orders' && (
-          <div className={`rounded-lg overflow-hidden ${
-            theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-          }`}>
+          <div className={`rounded-lg overflow-hidden ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+            }`}>
             <div className="p-4 border-b">
               <h3 className="text-lg font-semibold">Order Management</h3>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
-                <thead className={`${
-                  theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
-                }`}>
+                <thead className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'
+                  }`}>
                   <tr>
                     <th className="text-left p-3">Order Number</th>
                     <th className="text-left p-3">Customer</th>
@@ -1032,9 +1042,8 @@ const B2CHsn: React.FC = () => {
                 </thead>
                 <tbody>
                   {filteredTransactions.map((transaction, index) => (
-                    <tr key={transaction.id || transaction.orderId || `order-${index}`} className={`border-b ${
-                      theme === 'dark' ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'
-                    }`}>
+                    <tr key={transaction.id || transaction.orderId || `order-${index}`} className={`border-b ${theme === 'dark' ? 'border-gray-700 hover:bg-gray-750' : 'border-gray-200 hover:bg-gray-50'
+                      }`}>
                       <td className="p-3 font-medium">{transaction.orderNumber}</td>
                       <td className="p-3">
                         <div>
@@ -1069,9 +1078,8 @@ const B2CHsn: React.FC = () => {
                       <td className="p-3 text-center">
                         <button
                           title="View Order"
-                          className={`p-1 rounded ${
-                            theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
-                          }`}
+                          className={`p-1 rounded ${theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
+                            }`}
                         >
                           <Eye size={16} />
                         </button>
@@ -1089,9 +1097,8 @@ const B2CHsn: React.FC = () => {
           <div className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* Order Status Distribution */}
-              <div className={`p-6 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
+              <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+                }`}>
                 <h3 className="text-lg font-semibold mb-4">Order Status Distribution</h3>
                 <div className="space-y-3">
                   {Object.entries(analytics.orderStatusCounts).map(([status, count]) => {
@@ -1101,12 +1108,11 @@ const B2CHsn: React.FC = () => {
                         <span className="capitalize">{status}</span>
                         <div className="flex items-center space-x-2">
                           <div className="w-24 bg-gray-200 rounded-full h-2 relative">
-                            <div 
-                              className={`h-2 rounded-full absolute left-0 top-0 progress-bar ${
-                                status === 'delivered' ? 'bg-green-500' :
-                                status === 'shipped' ? 'bg-blue-500' :
-                                status === 'cancelled' || status === 'returned' ? 'bg-red-500' : 'bg-yellow-500'
-                              }`}
+                            <div
+                              className={`h-2 rounded-full absolute left-0 top-0 progress-bar ${status === 'delivered' ? 'bg-green-500' :
+                                  status === 'shipped' ? 'bg-blue-500' :
+                                    status === 'cancelled' || status === 'returned' ? 'bg-red-500' : 'bg-yellow-500'
+                                }`}
                               data-percentage={percentage}
                             />
                           </div>
@@ -1119,9 +1125,8 @@ const B2CHsn: React.FC = () => {
               </div>
 
               {/* Payment Method Distribution */}
-              <div className={`p-6 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
+              <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+                }`}>
                 <h3 className="text-lg font-semibold mb-4">Payment Method Distribution</h3>
                 <div className="space-y-3">
                   {Object.entries(analytics.paymentMethodCounts).map(([method, count]) => {
@@ -1131,7 +1136,7 @@ const B2CHsn: React.FC = () => {
                         <span className="capitalize">{method.replace('_', ' ')}</span>
                         <div className="flex items-center space-x-2">
                           <div className="w-24 bg-gray-200 rounded-full h-2 relative">
-                            <div 
+                            <div
                               className="bg-purple-500 h-2 rounded-full absolute left-0 top-0 progress-bar"
                               data-percentage={percentage}
                             />
@@ -1145,9 +1150,8 @@ const B2CHsn: React.FC = () => {
               </div>
 
               {/* Traffic Source Distribution */}
-              <div className={`p-6 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
+              <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+                }`}>
                 <h3 className="text-lg font-semibold mb-4">Traffic Source Distribution</h3>
                 <div className="space-y-3">
                   {Object.entries(analytics.sourceCounts).map(([source, count]) => {
@@ -1157,7 +1161,7 @@ const B2CHsn: React.FC = () => {
                         <span className="capitalize">{source.replace('_', ' ')}</span>
                         <div className="flex items-center space-x-2">
                           <div className="w-24 bg-gray-200 rounded-full h-2 relative">
-                            <div 
+                            <div
                               className="bg-orange-500 h-2 rounded-full absolute left-0 top-0 progress-bar"
                               data-percentage={percentage}
                             />
@@ -1171,9 +1175,8 @@ const B2CHsn: React.FC = () => {
               </div>
 
               {/* Customer Metrics */}
-              <div className={`p-6 rounded-lg ${
-                theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-              }`}>
+              <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+                }`}>
                 <h3 className="text-lg font-semibold mb-4">Customer Metrics</h3>
                 <div className="space-y-4">
                   <div className="flex justify-between">
@@ -1201,9 +1204,8 @@ const B2CHsn: React.FC = () => {
             {/* Campaign performance data should be fetched from backend if needed */}
 
             {/* Customer Segments */}
-            <div className={`p-6 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
+            <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+              }`}>
               <h3 className="text-lg font-semibold mb-4">Customer Segments</h3>
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {['new', 'regular', 'premium', 'vip'].map(segment => {
@@ -1211,11 +1213,10 @@ const B2CHsn: React.FC = () => {
                   const totalValue = customers
                     .filter(c => c.customerSegment === segment)
                     .reduce((sum, c) => sum + c.totalSpent, 0);
-                  
+
                   return (
-                    <div key={segment} className={`p-4 rounded border text-center ${
-                      theme === 'dark' ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'
-                    }`}>
+                    <div key={segment} className={`p-4 rounded border text-center ${theme === 'dark' ? 'border-gray-700 bg-gray-750' : 'border-gray-200 bg-gray-50'
+                      }`}>
                       <h4 className={`font-medium mb-2 capitalize ${getSegmentColor(segment)}`}>
                         {segment} Customers
                       </h4>
@@ -1228,9 +1229,8 @@ const B2CHsn: React.FC = () => {
             </div>
 
             {/* Loyalty Program */}
-            <div className={`p-6 rounded-lg ${
-              theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
-            }`}>
+            <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'
+              }`}>
               <h3 className="text-lg font-semibold mb-4">Loyalty Program Performance</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div className="text-center">
@@ -1254,11 +1254,10 @@ const B2CHsn: React.FC = () => {
       </div>
 
       {/* Pro Tip */}
-      <div className={`mt-6 p-4 rounded-lg ${
-        theme === 'dark' ? 'bg-gray-800' : 'bg-purple-50'
-      }`}>
+      <div className={`mt-6 p-4 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-purple-50'
+        }`}>
         <p className="text-sm">
-          <span className="font-semibold">Pro Tip:</span> Use the B2C module to track customer behavior, 
+          <span className="font-semibold">Pro Tip:</span> Use the B2C module to track customer behavior,
           analyze purchase patterns, and create targeted marketing campaigns. Leverage loyalty programs to increase retention.
         </p>
       </div>

@@ -249,9 +249,8 @@ const B2BHsn: React.FC = () => {
 
     const loadSalesVouchers = async () => {
       try {
-        const url = `${
-          import.meta.env.VITE_API_URL
-        }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        const url = `${import.meta.env.VITE_API_URL
+          }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
 
         const res = await fetch(url);
         const json = await res.json();
@@ -280,8 +279,7 @@ const B2BHsn: React.FC = () => {
     const fetchLedger = async () => {
       try {
         const ledgerRes = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const ledgerData = await ledgerRes.json();
@@ -337,16 +335,15 @@ const B2BHsn: React.FC = () => {
     const fetchSalesHistory = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/sales-vouchers/sale-history?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const resJson = await res.json();
         const rows = Array.isArray(resJson?.data)
           ? resJson.data
           : Array.isArray(resJson)
-          ? resJson
-          : [];
+            ? resJson
+            : [];
 
         setSalesHistory(rows);
       } catch (err) {
@@ -369,12 +366,31 @@ const B2BHsn: React.FC = () => {
 
   const getQtyByVoucher = (voucherNo: string) => {
     const qty = salesHistoryMap.get(voucherNo)?.qtyChange;
-    return qty ? Math.abs(qty) : "";
+    return qty ? Math.abs(qty) : 0;
   };
 
   const getRateByVoucher = (voucherNo: string) => {
-    return salesHistoryMap.get(voucherNo)?.rate || "";
+    return salesHistoryMap.get(voucherNo)?.rate || 0;
   };
+
+  const dashboardTotals = useMemo(() => {
+    const filtered = matchedSales.filter((sale: any) => {
+      if (!hsnSearch.trim()) return true;
+      const hsn = getHsnByVoucher(sale.number);
+      return hsn?.toString().trim() === hsnSearch.trim();
+    });
+
+    return filtered.reduce((acc, sale) => {
+      acc.qty += Number(getQtyByVoucher(sale.number)) || 0;
+      acc.amount += Number(sale.subtotal || 0);
+      acc.taxValue += (Number(sale.igstTotal || 0) + Number(sale.cgstTotal || 0) + Number(sale.sgstTotal || 0));
+      acc.igst += Number(sale.igstTotal || 0);
+      acc.cgst += Number(sale.cgstTotal || 0);
+      acc.sgst += Number(sale.sgstTotal || 0);
+      acc.total += Number(sale.total || 0);
+      return acc;
+    }, { qty: 0, amount: 0, taxValue: 0, igst: 0, cgst: 0, sgst: 0, total: 0 });
+  }, [matchedSales, hsnSearch, salesHistoryMap]);
 
   return (
     <div className="pt-[56px] px-4">
@@ -384,11 +400,10 @@ const B2BHsn: React.FC = () => {
           <button
             onClick={() => navigate("/app/reports")}
             title="Back to Reports"
-            className={`p-2 rounded-lg mr-3 ${
-              theme === "dark"
+            className={`p-2 rounded-lg mr-3 ${theme === "dark"
                 ? "bg-gray-700 hover:bg-gray-600 text-white"
                 : "bg-gray-100 hover:bg-gray-200 text-gray-700"
-            }`}
+              }`}
           >
             <ArrowLeft size={20} />
           </button>
@@ -416,26 +431,24 @@ const B2BHsn: React.FC = () => {
           <button
             onClick={() => setShowFilterPanel(!showFilterPanel)}
             title="Toggle Filters"
-            className={`p-2 rounded-lg ${
-              showFilterPanel
+            className={`p-2 rounded-lg ${showFilterPanel
                 ? theme === "dark"
                   ? "bg-blue-600"
                   : "bg-blue-500 text-white"
                 : theme === "dark"
-                ? "bg-gray-700 hover:bg-gray-600"
-                : "bg-gray-100 hover:bg-gray-200"
-            }`}
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-100 hover:bg-gray-200"
+              }`}
           >
             <Filter size={16} />
           </button>
           <button
             onClick={handleExport}
             title="Export to Excel"
-            className={`p-2 rounded-lg ${
-              theme === "dark"
+            className={`p-2 rounded-lg ${theme === "dark"
                 ? "bg-gray-700 hover:bg-gray-600"
                 : "bg-gray-100 hover:bg-gray-200"
-            }`}
+              }`}
           >
             <Download size={16} />
           </button>
@@ -445,9 +458,8 @@ const B2BHsn: React.FC = () => {
       {/* Filter Panel */}
       {showFilterPanel && (
         <div
-          className={`p-4 rounded-lg mb-6 ${
-            theme === "dark" ? "bg-gray-800" : "bg-gray-50"
-          }`}
+          className={`p-4 rounded-lg mb-6 ${theme === "dark" ? "bg-gray-800" : "bg-gray-50"
+            }`}
         >
           <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
             <div>
@@ -458,11 +470,10 @@ const B2BHsn: React.FC = () => {
                 value={filters.dateRange}
                 onChange={(e) => handleDateRangeChange(e.target.value)}
                 title="Select date range"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-white"
                     : "bg-white border-gray-300 text-black"
-                } outline-none`}
+                  } outline-none`}
               >
                 <option value="today">Today</option>
                 <option value="this-week">This Week</option>
@@ -484,11 +495,10 @@ const B2BHsn: React.FC = () => {
                 onChange={(e) =>
                   handleFilterChange("businessFilter", e.target.value)
                 }
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-white"
                     : "bg-white border-gray-300 text-black"
-                } outline-none`}
+                  } outline-none`}
               />
             </div>
 
@@ -502,11 +512,10 @@ const B2BHsn: React.FC = () => {
                   handleFilterChange("transactionType", e.target.value)
                 }
                 title="Select transaction type"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-white"
                     : "bg-white border-gray-300 text-black"
-                } outline-none`}
+                  } outline-none`}
               >
                 <option value="">All Types</option>
                 <option value="sale">Sales</option>
@@ -524,11 +533,10 @@ const B2BHsn: React.FC = () => {
                   handleFilterChange("statusFilter", e.target.value)
                 }
                 title="Select status filter"
-                className={`w-full p-2 rounded border ${
-                  theme === "dark"
+                className={`w-full p-2 rounded border ${theme === "dark"
                     ? "bg-gray-700 border-gray-600 text-white"
                     : "bg-white border-gray-300 text-black"
-                } outline-none`}
+                  } outline-none`}
               >
                 <option value="">All Status</option>
                 <option value="pending">Pending</option>
@@ -564,20 +572,18 @@ const B2BHsn: React.FC = () => {
                 if (!disabled) setSelectedView(view);
               }}
               className={`px-4 py-2 rounded-lg capitalize whitespace-nowrap
-          ${
-            selectedView === view
-              ? theme === "dark"
-                ? "bg-blue-600 text-white"
-                : "bg-blue-500 text-white"
-              : theme === "dark"
-              ? "bg-gray-700"
-              : "bg-gray-200"
-          }
-          ${
-            disabled
-              ? "opacity-50 cursor-not-allowed"
-              : "hover:bg-blue-400 hover:text-white"
-          }
+          ${selectedView === view
+                  ? theme === "dark"
+                    ? "bg-blue-600 text-white"
+                    : "bg-blue-500 text-white"
+                  : theme === "dark"
+                    ? "bg-gray-700"
+                    : "bg-gray-200"
+                }
+          ${disabled
+                  ? "opacity-50 cursor-not-allowed"
+                  : "hover:bg-blue-400 hover:text-white"
+                }
         `}
               title={disabled ? "Coming soon" : view}
             >
@@ -591,9 +597,8 @@ const B2BHsn: React.FC = () => {
         {/* Dashboard View */}
         {selectedView === "dashboard" && (
           <div
-            className={`p-6 rounded-lg ${
-              theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-            }`}
+            className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+              }`}
           >
             {/* Header + Search */}
             <div className="flex items-center justify-between mb-4">
@@ -606,11 +611,10 @@ const B2BHsn: React.FC = () => {
                 value={hsnSearch}
                 onChange={(e) => setHsnSearch(e.target.value)}
                 className={`px-3 py-2 text-sm rounded border w-56
-          ${
-            theme === "dark"
-              ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
-              : "bg-white border-gray-300 text-black"
-          } outline-none`}
+          ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white placeholder-gray-400"
+                    : "bg-white border-gray-300 text-black"
+                  } outline-none`}
               />
             </div>
 
@@ -618,9 +622,8 @@ const B2BHsn: React.FC = () => {
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead
-                  className={`${
-                    theme === "dark" ? "bg-gray-700" : "bg-gray-50"
-                  }`}
+                  className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+                    }`}
                 >
                   <tr>
                     <th className="text-left p-3">HSN</th>
@@ -658,11 +661,10 @@ const B2BHsn: React.FC = () => {
                       return (
                         <tr
                           key={sale.id || index}
-                          className={`border-b ${
-                            theme === "dark"
+                          className={`border-b ${theme === "dark"
                               ? "border-gray-700"
                               : "border-gray-200"
-                          }`}
+                            }`}
                         >
                           {/* HSN */}
                           <td className="p-3">
@@ -703,7 +705,7 @@ const B2BHsn: React.FC = () => {
                             {Number(sale.igstTotal || 0) +
                               Number(sale.cgstTotal || 0) +
                               Number(sale.sgstTotal || 0)}
-                            
+
                           </td>
 
                           {/* IGST */}
@@ -747,6 +749,20 @@ const B2BHsn: React.FC = () => {
                       </tr>
                     )}
                 </tbody>
+                <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+                  <tr className="font-bold border-t border-gray-400">
+                    <td className="p-3" colSpan={4}>Grand Total</td>
+                    <td className="p-3">{dashboardTotals.qty}</td>
+                    <td className="p-3"></td>
+                    <td className="p-3">₹{dashboardTotals.amount.toFixed(2)}</td>
+                    <td className="p-3">₹{dashboardTotals.taxValue.toFixed(2)}</td>
+                    <td className="p-3">{dashboardTotals.igst}</td>
+                    <td className="p-3">{dashboardTotals.cgst}</td>
+                    <td className="p-3">{dashboardTotals.sgst}</td>
+                    <td className="p-3 font-semibold">₹{dashboardTotals.total.toFixed(2)}</td>
+                    <td className="p-3"></td>
+                  </tr>
+                </tfoot>
               </table>
             </div>
           </div>
@@ -767,9 +783,8 @@ const B2BHsn: React.FC = () => {
 
       {/* Pro Tip */}
       <div
-        className={`mt-6 p-4 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <p className="text-sm">
           <span className="font-semibold">Pro Tip:</span> Use the B2B module to
