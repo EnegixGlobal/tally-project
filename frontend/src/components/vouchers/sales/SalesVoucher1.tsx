@@ -142,6 +142,7 @@ const SalesVoucher: React.FC = () => {
           `${import.meta.env.VITE_API_URL}/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
+        console.log('this is unit', data)
         setUnits(data);
       } catch (error) {
         console.error("Failed to fetch units:", error);
@@ -173,7 +174,7 @@ const SalesVoucher: React.FC = () => {
       allUnits.find((u) => u.name?.toLowerCase() === String(rawUnit).toLowerCase() || u.symbol?.toLowerCase() === String(rawUnit).toLowerCase());
 
     const unitIdResult = matchedUnit?.id ?? rawUnit ?? "";
-    const unitLabelResult = matchedUnit?.symbol || matchedUnit?.name || String(rawUnit || "");
+    const unitLabelResult = item.unitName || matchedUnit?.symbol || matchedUnit?.name || String(rawUnit || "");
 
     return {
       name: item.name,
