@@ -578,180 +578,116 @@ const B2C: React.FC = () => {
       {
         totalDebit: number;
         totalCredit: number;
-        transactions: {
-          name: string;
-          debit: number;
-          credit: number;
-        }[];
+        transactionMap: Record<string, { name: string; debit: number; credit: number }>;
       }
     > = {};
 
-    matchedSales.forEach((voucher: any) => {
-      // 1️⃣ PARTY SIDE (Debit / Asset - Sundry Debtors)
-      // Check if groupName exists, otherwise default to Sundry Debtors. 
-      // Note: B2B might not have groupName populated on voucher, so default is important.
-      const groupName = voucher.groupName || "Sundry Debtors";
-      const partyAmount = Number(voucher.netAmount || voucher.total || 0);
-
+    // Helper function to add transactions to groups and aggregate by name
+    const addToGroup = (groupName: string, name: string, debit: number, credit: number) => {
       if (!groups[groupName]) {
         groups[groupName] = {
           totalDebit: 0,
           totalCredit: 0,
-          transactions: [],
+          transactionMap: {},
         };
       }
 
-      groups[groupName].totalDebit += partyAmount;
-      groups[groupName].transactions.push({
-        name: voucher.partyName || "Unknown Party",
-        debit: partyAmount,
-        credit: 0,
-      });
+      groups[groupName].totalDebit += debit;
+      groups[groupName].totalCredit += credit;
+
+      if (!groups[groupName].transactionMap[name]) {
+        groups[groupName].transactionMap[name] = {
+          name: name,
+          debit: 0,
+          credit: 0,
+        };
+      }
+
+      groups[groupName].transactionMap[name].debit += debit;
+      groups[groupName].transactionMap[name].credit += credit;
+    };
+
+    matchedSales.forEach((voucher: any) => {
+      // 1️⃣ PARTY SIDE (Debit / Asset - Sundry Debtors)
+      const groupName = voucher.groupName || "Sundry Debtors";
+      const partyAmount = Number(voucher.netAmount || voucher.total || 0);
+      const partyName = voucher.partyName || "Unknown Party";
+
+      addToGroup(groupName, partyName, partyAmount, 0);
 
       // 2️⃣ SALES SIDE (Credit / Income) via Items
       if (voucher.items && voucher.items.length > 0) {
         voucher.items.forEach((item: any) => {
           const itemGroupName = "Sales Account";
-
-          if (!groups[itemGroupName]) {
-            groups[itemGroupName] = {
-              totalDebit: 0,
-              totalCredit: 0,
-              transactions: [],
-            };
-          }
-
-          // ✅ ADJUSTED FOR DISCOUNT: Sales Value should be Gross (Amount + Discount)
-          // because we are accounting for Discount as a separate DEBIT.
           const discount = Number(item.discount || 0);
           const netAmount = Number(item.amount || 0);
           const grossAmount = netAmount + discount;
+          const salesLedgerName = item.salesLedgerName || "Unknown Sales Ledger";
 
-          groups[itemGroupName].totalCredit += grossAmount;
-          groups[itemGroupName].transactions.push({
-            name: item.salesLedgerName || "Unknown Sales Ledger",
-            debit: 0,
-            credit: grossAmount,
-          });
+          addToGroup(itemGroupName, salesLedgerName, 0, grossAmount);
         });
       }
 
       // 3️⃣ DUTIES & TAXES (Credit / Liability - Output Tax)
       const taxGroupName = "Duties & Taxes";
-
-      // Extract Unique Tax Ledger Names from Items
-      const cgstLedgers = new Set<string>();
-      const sgstLedgers = new Set<string>();
-      const igstLedgers = new Set<string>();
-
-      if (voucher.items) {
-        voucher.items.forEach((i: any) => {
-          if (i.cgstLedgerName) cgstLedgers.add(i.cgstLedgerName);
-          if (i.sgstLedgerName) sgstLedgers.add(i.sgstLedgerName);
-          if (i.igstLedgerName) igstLedgers.add(i.igstLedgerName);
-        });
-      }
-
-      // In B2B, voucher has cgstTotal etc. mapped from cgstAmount. 
-      // Use the mapped fields if consistent, or check item sums? 
-      // SalesReport checks voucher.cgstAmount. 
-      // In B2B loadSalesVouchers: cgstTotal: v.cgstAmount || v.cgstTotal
-      // So use voucher.cgstTotal
       const cgst = Number(voucher.cgstTotal || 0);
       const sgst = Number(voucher.sgstTotal || 0);
       const igst = Number(voucher.igstTotal || 0);
 
       if (cgst > 0 || sgst > 0 || igst > 0) {
-        if (!groups[taxGroupName]) {
-          groups[taxGroupName] = {
-            totalDebit: 0,
-            totalCredit: 0,
-            transactions: [],
-          };
-        }
+        // Collect Tax Ledger Names
+        const cgstLedgers = new Set<string>();
+        const sgstLedgers = new Set<string>();
+        const igstLedgers = new Set<string>();
 
-        let cgstName = "Output CGST";
-        let sgstName = "Output SGST";
-        let igstName = "Output IGST";
-
-        if (voucher.items && voucher.items.length > 0) {
-          const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
-          if (cItem) cgstName = cItem.cgstLedgerName;
-          
-          const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
-          if (sItem) sgstName = sItem.sgstLedgerName;
-          
-          const iItem = voucher.items.find((i: any) => i.igstLedgerName);
-          if (iItem) igstName = iItem.igstLedgerName;
-        }
-
-        const finalCgstName = cgstLedgers.size > 0 ? Array.from(cgstLedgers).join(", ") : cgstName;
-        const finalSgstName = sgstLedgers.size > 0 ? Array.from(sgstLedgers).join(", ") : sgstName;
-        const finalIgstName = igstLedgers.size > 0 ? Array.from(igstLedgers).join(", ") : igstName;
-
-        if (cgst > 0) {
-          groups[taxGroupName].totalCredit += cgst;
-          groups[taxGroupName].transactions.push({
-            name: finalCgstName,
-            debit: 0,
-            credit: cgst,
+        if (voucher.items) {
+          voucher.items.forEach((i: any) => {
+            if (i.cgstLedgerName) cgstLedgers.add(i.cgstLedgerName);
+            if (i.sgstLedgerName) sgstLedgers.add(i.sgstLedgerName);
+            if (i.igstLedgerName) igstLedgers.add(i.igstLedgerName);
           });
         }
-        if (sgst > 0) {
-          groups[taxGroupName].totalCredit += sgst;
-          groups[taxGroupName].transactions.push({
-            name: finalSgstName,
-            debit: 0,
-            credit: sgst,
-          });
-        }
-        if (igst > 0) {
-          groups[taxGroupName].totalCredit += igst;
-          groups[taxGroupName].transactions.push({
-            name: finalIgstName,
-            debit: 0,
-            credit: igst,
-          });
-        }
+
+        const cgstName = cgstLedgers.size > 0 ? Array.from(cgstLedgers).join(", ") : "Output CGST";
+        const sgstName = sgstLedgers.size > 0 ? Array.from(sgstLedgers).join(", ") : "Output SGST";
+        const igstName = igstLedgers.size > 0 ? Array.from(igstLedgers).join(", ") : "Output IGST";
+
+        if (cgst > 0) addToGroup(taxGroupName, cgstName, 0, cgst);
+        if (sgst > 0) addToGroup(taxGroupName, sgstName, 0, sgst);
+        if (igst > 0) addToGroup(taxGroupName, igstName, 0, igst);
       }
 
-
       // 4️⃣ DISCOUNT SIDE (Debit / Expense)
-      const voucherDiscounts: Record<string, number> = {};
-
       if (voucher.items) {
+        const discountGroupName = "Discount";
         voucher.items.forEach((item: any) => {
           const discount = Number(item.discount || 0);
-
           if (discount > 0) {
-            const ledgerName = item.discountLedgerName || "Discount";
-            voucherDiscounts[ledgerName] = (voucherDiscounts[ledgerName] || 0) + discount;
+            const discountLedgerName = item.discountLedgerName || "Discount";
+            addToGroup(discountGroupName, discountLedgerName, discount, 0);
           }
         });
       }
-
-      Object.entries(voucherDiscounts).forEach(([name, amount]) => {
-        const discountGroupName = "Discount";
-
-        if (!groups[discountGroupName]) {
-          groups[discountGroupName] = {
-            totalDebit: 0,
-            totalCredit: 0,
-            transactions: [],
-          };
-        }
-
-        groups[discountGroupName].totalDebit += amount;
-        groups[discountGroupName].transactions.push({
-          name: name,
-          debit: amount,
-          credit: 0
-        });
-      });
     });
 
-    return groups;
+    // Convert groups with transactionMap back to final structure with transactions array
+    const finalExtractData: Record<string, {
+      totalDebit: number;
+      totalCredit: number;
+      transactions: { name: string; debit: number; credit: number }[];
+    }> = {};
+
+    Object.entries(groups).forEach(([groupName, group]) => {
+      finalExtractData[groupName] = {
+        totalDebit: group.totalDebit,
+        totalCredit: group.totalCredit,
+        transactions: Object.values(group.transactionMap),
+      };
+    });
+
+    return finalExtractData;
   }, [matchedSales]);
+
 
   // 🔹 Fetch sales history for HSN codes (for QTY and Rate)
   useEffect(() => {

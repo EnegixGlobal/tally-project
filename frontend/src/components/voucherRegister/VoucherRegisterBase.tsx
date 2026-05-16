@@ -114,6 +114,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   const [searchTerm, setSearchTerm] = useState("");
   const [dateFilter, setDateFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
+  const [gstFilter, setGstFilter] = useState<"all" | "b2b" | "b2c">("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
@@ -888,7 +889,21 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         const status = getVoucherStatus(voucher);
         const statusMatch = !statusFilter || status === statusFilter;
 
-        return searchMatch && dateMatch && statusMatch;
+        // GST Filter (B2B/B2C)
+        let gstMatch = true;
+        if (gstFilter !== "all" && (voucherType === "sales" || voucherType === "purchase" || voucherType === "quotation")) {
+          const partyId = voucher.entries.find(e =>
+            voucherType === "sales" || voucherType === "quotation" ? e.type === "debit" : e.type === "credit"
+          )?.ledgerId;
+
+          const party = ledgerList.find(l => String(l.id) === String(partyId));
+          const hasGst = party && (party.gstNumber || party.gst_number || party.gstin || party.gst_no);
+
+          if (gstFilter === "b2b") gstMatch = !!hasGst;
+          else if (gstFilter === "b2c") gstMatch = !hasGst;
+        }
+
+        return searchMatch && dateMatch && statusMatch && gstMatch;
       });
 
       finalList.sort((a, b) => {
@@ -1386,6 +1401,22 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 <Trash2 className="mr-2" size={18} />
                 Delete Selected ({selectedVoucherIds.size})
               </button>
+            )}
+
+            {(voucherType === "sales" || voucherType === "purchase" || voucherType === "quotation") && (
+              <div className="flex items-center">
+                <select
+                  id="gst-filter"
+                  value={gstFilter}
+                  onChange={(e) => setGstFilter(e.target.value as any)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm cursor-pointer hover:border-gray-400 transition-colors"
+                  title="Filter by GST Type"
+                >
+                  <option value="all">All Vouchers</option>
+                  <option value="b2b">B2B (GST)</option>
+                  <option value="b2c">B2C (Non-GST)</option>
+                </select>
+              </div>
             )}
 
             <button
