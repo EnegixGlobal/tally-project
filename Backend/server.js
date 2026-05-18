@@ -94,6 +94,9 @@ app.use("/api/stock-items", stockItemRoutes);
 const stockItemAttributesRoutes = require("./routes/stockItemAttributes");
 app.use("/api/stock-item-attributes", stockItemAttributesRoutes);
 
+const stockAttributesRoutes = require("./routes/stockAttributes");
+app.use("/api/stock-attributes", stockAttributesRoutes);
+
 const salesTypesRoutes = require("./routes/salesTypes");
 app.use("/api/sales-types", salesTypesRoutes);
 

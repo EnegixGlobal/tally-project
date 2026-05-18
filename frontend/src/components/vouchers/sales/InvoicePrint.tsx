@@ -83,6 +83,7 @@ interface ItemDetails {
   hsnCode?: string;
   unit: string;
   gstRate: number | string;
+  attributes?: { name: string; value: string }[];
 }
 
 interface TotalCalculation {
@@ -779,6 +780,25 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
 
                       <td className={`${PRINT_STYLES.table.dataCell} whitespace-nowrap`}>
                         <strong>{itemDetails.name}</strong>
+                        {itemDetails.attributes && itemDetails.attributes.length > 0 && (
+                          <table className="mt-1 border-0" style={{ borderCollapse: "collapse", width: "100%" }}>
+                            <tbody>
+                              {itemDetails.attributes.map((attr, ai) => (
+                                <tr key={ai}>
+                                  <td style={{ padding: "0 4px 0 0", fontSize: "10px", color: "#555", fontWeight: 600, whiteSpace: "nowrap", verticalAlign: "top", border: "none", width: "1%" }}>
+                                    {attr.name}
+                                  </td>
+                                  <td style={{ padding: "0 6px", fontSize: "10px", color: "#555", whiteSpace: "nowrap", verticalAlign: "top", border: "none", width: "1%" }}>
+                                    :
+                                  </td>
+                                  <td style={{ padding: "0", fontSize: "10px", color: "#444", verticalAlign: "top", border: "none" }}>
+                                    {attr.value}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        )}
                       </td>
                       <td className={`${PRINT_STYLES.table.dataCellCenter} whitespace-nowrap`}>
                         {itemDetails.barcode || "-"}

@@ -28,6 +28,10 @@ router.get("/", async (req, res) => {
       }
     };
     await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
+    await ensureColumn("stock_items", "gstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "attributeId", "INT NULL");
     let query = `
       SELECT 
         s.id,
@@ -44,6 +48,7 @@ router.get("/", async (req, res) => {
         s.gstLedgerId,
         s.cgstLedgerId,
         s.sgstLedgerId,
+        s.attributeId,
 
         s.barcode,
         s.batches,
@@ -84,9 +89,10 @@ router.get("/", async (req, res) => {
     let allAttributes = [];
     if (itemIds.length > 0) {
       const [attrRows] = await connection.execute(
-        `SELECT id, stock_item_id, attribute_name as name, attribute_value as value 
-         FROM stock_item_attributes 
-         WHERE stock_item_id IN (${itemIds.join(',')})`
+        `SELECT a.id, a.stock_item_id, m.name as name, a.attribute_value as value 
+         FROM stock_item_attributes a
+         JOIN stock_attributes m ON a.attribute_id = m.id
+         WHERE a.stock_item_id IN (${itemIds.join(',')})`
       );
       allAttributes = attrRows;
     }
@@ -405,6 +411,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     await ensureColumn("stock_items", "gstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "attributeId", "INT NULL");
     await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
 
 
@@ -424,6 +431,8 @@ router.post("/", upload.single("image"), async (req, res) => {
       gstLedgerId,
       cgstLedgerId,
       sgstLedgerId,
+      attributeId,
+      attributes = [],
       standardPurchaseRate,
       standardSaleRate,
       enableBatchTracking,
@@ -446,6 +455,11 @@ router.post("/", upload.single("image"), async (req, res) => {
     let parsedGodownAllocations = Array.isArray(godownAllocations) ? godownAllocations : [];
     if (typeof godownAllocations === "string") {
       try { parsedGodownAllocations = JSON.parse(godownAllocations); } catch (e) { parsedGodownAllocations = []; }
+    }
+
+    let parsedAttributes = Array.isArray(attributes) ? attributes : [];
+    if (typeof attributes === "string") {
+      try { parsedAttributes = JSON.parse(attributes); } catch (e) { parsedAttributes = []; }
     }
 
 
@@ -588,6 +602,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     gstLedgerId,
     cgstLedgerId,
     sgstLedgerId,
+    attributeId,
 
     enableBatchTracking,
     allowNegativeStock,
@@ -600,7 +615,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     owner_id,
     type,
     image
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
     const values = [
@@ -618,6 +633,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       sanitize(gstLedgerId),
       sanitize(cgstLedgerId),
       sanitize(sgstLedgerId),
+      sanitize(attributeId),
 
       enableBatchTracking ? 1 : 0,
       allowNegativeStock ? 1 : 0,
@@ -659,6 +675,24 @@ router.post("/", upload.single("image"), async (req, res) => {
       );
     }
 
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS stock_item_attributes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        stock_item_id INT NOT NULL,
+        attribute_id INT NOT NULL,
+        attribute_value VARCHAR(255) NULL
+      )
+    `);
+
+    for (const attrId of parsedAttributes) {
+      if (attrId) {
+        await connection.execute(
+          'INSERT INTO stock_item_attributes (stock_item_id, attribute_id, attribute_value) VALUES (?, ?, ?)',
+          [stockItemId, attrId, null]
+        );
+      }
+    }
+
     await connection.commit();
 
     res.json({
@@ -687,6 +721,9 @@ const parseFormDataArrays = (req) => {
   }
   if (typeof req.body.godownAllocations === "string") {
     try { req.body.godownAllocations = JSON.parse(req.body.godownAllocations); } catch (e) { req.body.godownAllocations = []; }
+  }
+  if (typeof req.body.attributes === "string") {
+    try { req.body.attributes = JSON.parse(req.body.attributes); } catch (e) { req.body.attributes = []; }
   }
 };
 
@@ -1315,6 +1352,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     await ensureColumn("stock_items", "gstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "attributeId", "INT NULL");
     await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
 
 
@@ -1334,6 +1372,8 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       gstLedgerId,
       cgstLedgerId,
       sgstLedgerId,
+      attributeId,
+      attributes = [],
 
       taxType,
       standardPurchaseRate,
@@ -1432,6 +1472,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
           gstLedgerId = ?,
   cgstLedgerId = ?,
   sgstLedgerId = ?,
+  attributeId = ?,
         taxType = ?,
         standardPurchaseRate = ?,
         standardSaleRate = ?,
@@ -1460,6 +1501,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       sanitize(gstLedgerId),
       sanitize(cgstLedgerId),
       sanitize(sgstLedgerId),
+      sanitize(attributeId),
       taxType ?? "Taxable",
       standardPurchaseRate ?? 0,
       standardSaleRate ?? 0,
@@ -1477,6 +1519,27 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     ];
 
     await connection.execute(updateQuery, values);
+
+    await connection.execute(`
+      CREATE TABLE IF NOT EXISTS stock_item_attributes (
+        id INT AUTO_INCREMENT PRIMARY KEY,
+        stock_item_id INT NOT NULL,
+        attribute_id INT NOT NULL,
+        attribute_value VARCHAR(255) NULL
+      )
+    `);
+
+    await connection.execute('DELETE FROM stock_item_attributes WHERE stock_item_id = ?', [id]);
+    let parsedAttributes = Array.isArray(attributes) ? attributes : [];
+    for (const attrId of parsedAttributes) {
+      if (attrId) {
+        await connection.execute(
+          'INSERT INTO stock_item_attributes (stock_item_id, attribute_id, attribute_value) VALUES (?, ?, ?)',
+          [id, attrId, null]
+        );
+      }
+    }
+
     await connection.commit();
 
     return res.json({
@@ -1507,6 +1570,27 @@ router.get("/:id", async (req, res) => {
 
   const connection = await db.getConnection();
   try {
+    const ensureColumn = async (table, column, definition) => {
+      const [rows] = await connection.execute(
+        `
+        SELECT COUNT(*) AS count
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
+        `,
+        [table, column]
+      );
+      if (rows[0].count === 0) {
+        await connection.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      }
+    };
+    await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
+    await ensureColumn("stock_items", "gstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
+    await ensureColumn("stock_items", "attributeId", "INT NULL");
+
     let query = `
       SELECT 
         s.id,
@@ -1522,6 +1606,7 @@ router.get("/:id", async (req, res) => {
         s.gstLedgerId,
         s.cgstLedgerId,
         s.sgstLedgerId,
+        s.attributeId,
         s.taxType,
         s.barcode,
         s.batches,
@@ -1561,6 +1646,18 @@ router.get("/:id", async (req, res) => {
 
     const item = rows[0];
 
+    // Fetch attributes
+    let itemAttributes = [];
+    try {
+      const [attrRows] = await connection.execute(
+        `SELECT attribute_id FROM stock_item_attributes WHERE stock_item_id = ?`,
+        [id]
+      );
+      itemAttributes = attrRows.map(row => row.attribute_id.toString());
+    } catch (err) {
+      console.warn("Failed to fetch stock item attributes", err);
+    }
+
     // 🔥 batches parse
     let batches = [];
 
@@ -1582,6 +1679,7 @@ router.get("/:id", async (req, res) => {
       data: {
         ...item,
         batches,
+        attributes: itemAttributes,
       },
     });
   } catch (err) {

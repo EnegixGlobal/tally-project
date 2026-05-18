@@ -1192,6 +1192,40 @@ const PurchaseVoucher: React.FC = () => {
     setErrors((prev) => ({ ...prev, [name]: "" }));
   };
 
+  const handleAttributeValueChange = (itemId: string, attributeId: string, value: string) => {
+    setStockItems((prevItems) =>
+      prevItems.map((item) => {
+        if (String(item.id) === String(itemId)) {
+          const updatedAttributes = ((item as any).attributes || []).map((attr: any) => {
+            if (String(attr.id) === String(attributeId)) {
+              return { ...attr, value };
+            }
+            return attr;
+          });
+          return { ...item, attributes: updatedAttributes };
+        }
+        return item;
+      })
+    );
+  };
+
+  const handleAttributeValueSave = async (attributeId: string, value: string) => {
+    try {
+      await fetch(
+        `${import.meta.env.VITE_API_URL}/api/stock-item-attributes/${attributeId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ attribute_value: value }),
+        }
+      );
+    } catch (err) {
+      console.error("Error saving attribute value:", err);
+    }
+  };
+
   const handleEntryChange = (
     index: number,
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -2896,7 +2930,9 @@ const PurchaseVoucher: React.FC = () => {
                                       <input
                                         type="text"
                                         value={attr.value || ""}
-                                        readOnly
+                                        onChange={(e) => handleAttributeValueChange(entry.itemId, attr.id, e.target.value)}
+                                        onBlur={(e) => handleAttributeValueSave(attr.id, e.target.value)}
+                                        placeholder={`Enter ${attr.name}`}
                                         className={`${theme === "dark" ? "bg-gray-700 border-gray-600 focus:border-blue-500" : "bg-white border-gray-300 focus:border-blue-500"} w-full p-2 rounded border outline-none transition-colors text-[11px] h-6 flex-1 px-1 py-0`}
                                       />
                                     </div>
@@ -4003,6 +4039,19 @@ const PurchaseVoucher: React.FC = () => {
                         </td>
                         <td className={PRINT_STYLES.cell}>
                           <strong>{itemDetails.name}</strong>
+                          {(() => {
+                            const attributes = itemDetails.attributes || [];
+                            if (attributes.length === 0) return null;
+                            return (
+                              <div className="text-[8pt] text-gray-600 mt-0.5 ml-2 font-normal">
+                                {attributes.map((attr: any, i: number) => (
+                                  <span key={i} className="mr-2">
+                                    <strong>{attr.name}:</strong> {attr.value || "-"}
+                                  </span>
+                                ))}
+                              </div>
+                            );
+                          })()}
                         </td>
                         <td className={PRINT_STYLES.cellCenter}>
                           {itemDetails.hsnCode}

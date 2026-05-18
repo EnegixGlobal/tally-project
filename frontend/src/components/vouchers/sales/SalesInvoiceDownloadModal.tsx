@@ -178,7 +178,7 @@ const SalesInvoiceDownloadModal: React.FC<Props> = ({ voucherId, onClose }) => {
   const getItemDetails = (itemId: string) => {
     const item = stockItems.find((i: any) => String(i.id) === String(itemId));
     if (!item)
-      return { name: "-", hsnCode: "", unit: "-", unitId: "", unitLabel: "", gstRate: 0, rate: 0, batches: [] };
+      return { name: "-", hsnCode: "", unit: "-", unitId: "", unitLabel: "", gstRate: 0, rate: 0, batches: [], attributes: [] };
 
     const rawUnit = item.unitId ?? item.unit_id ?? item.unit ?? item.unitName ?? null;
     const matchedUnit =
@@ -192,6 +192,14 @@ const SalesInvoiceDownloadModal: React.FC<Props> = ({ voucherId, onClose }) => {
     const unitIdResult = matchedUnit?.id ?? rawUnit ?? "";
     const unitLabelResult =
       matchedUnit?.symbol || matchedUnit?.name || String(rawUnit || "");
+
+    // Parse attributes: array of { name, value } from backend
+    let parsedAttributes: { name: string; value: string }[] = [];
+    if (Array.isArray(item.attributes)) {
+      parsedAttributes = item.attributes
+        .filter((a: any) => a.name && a.value)
+        .map((a: any) => ({ name: String(a.name), value: String(a.value) }));
+    }
 
     return {
       name: item.name,
@@ -220,6 +228,7 @@ const SalesInvoiceDownloadModal: React.FC<Props> = ({ voucherId, onClose }) => {
           return [];
         }
       })(),
+      attributes: parsedAttributes,
     };
   };
 

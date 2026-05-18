@@ -1,6 +1,6 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Save, X, Trash2, ArrowLeft, Plus } from "lucide-react";
+import { Save, X, Trash2, ArrowLeft, Plus, ChevronDown } from "lucide-react";
 import { useAppContext } from "../../../context/AppContext";
 import type {
   GodownAllocation,
@@ -153,6 +153,8 @@ const StockItemForm = () => {
     { value: string; label: string }[]
   >([]);
 
+  const [masterAttributes, setMasterAttributes] = useState<{id: number; name: string}[]>([]);
+
   const [gstLedgers, setGstLedgers] = useState<{
     gst: any[];
     cgst: any[];
@@ -165,7 +167,35 @@ const StockItemForm = () => {
     igst: [],
   });
 
+  const [isAttributeDropdownOpen, setIsAttributeDropdownOpen] = useState(false);
+  const attributeDropdownRef = useRef<HTMLDivElement>(null);
 
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (attributeDropdownRef.current && !attributeDropdownRef.current.contains(event.target as Node)) {
+        setIsAttributeDropdownOpen(false);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => {
+      document.removeEventListener("mousedown", handleClickOutside);
+    };
+  }, []);
+
+
+
+  useEffect(() => {
+    async function fetchMasterAttrs() {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-attributes`);
+        const json = await res.json();
+        if (json.success) setMasterAttributes(json.data);
+      } catch (err) {
+        console.error("Failed to fetch master attributes:", err);
+      }
+    }
+    fetchMasterAttrs();
+  }, []);
 
   //get ledgers
   useEffect(() => {
@@ -319,6 +349,7 @@ const StockItemForm = () => {
             gstLedgerId: item.gstLedgerId?.toString() || "",
             cgstLedgerId: item.cgstLedgerId?.toString() || "",
             sgstLedgerId: item.sgstLedgerId?.toString() || "",
+            attributes: item.attributes || [],
 
             standardPurchaseRate: Number(item.standardPurchaseRate) || 0,
             standardSaleRate: Number(item.standardSaleRate) || 0,
@@ -450,6 +481,7 @@ const StockItemForm = () => {
     gstLedgerId: string;
     cgstLedgerId: string;
     sgstLedgerId: string;
+    attributes: string[];
 
 
 
@@ -484,6 +516,7 @@ const StockItemForm = () => {
     gstLedgerId: "",
     cgstLedgerId: "",
     sgstLedgerId: "",
+    attributes: [],
 
 
 
@@ -688,6 +721,7 @@ const StockItemForm = () => {
       gstLedgerId: formData.gstLedgerId,
       cgstLedgerId: formData.cgstLedgerId,
       sgstLedgerId: formData.sgstLedgerId,
+      attributes: formData.attributes,
 
       enableBatchTracking: formData.enableBatchTracking,
       allowNegativeStock: formData.allowNegativeStock,
@@ -711,7 +745,7 @@ const StockItemForm = () => {
     // Use FormData for file upload
     const submitData = new FormData();
     Object.entries(stockItem).forEach(([key, value]) => {
-      if (key === "batches" || key === "godownAllocations") {
+      if (key === "batches" || key === "godownAllocations" || key === "attributes") {
         submitData.append(key, JSON.stringify(value));
       } else {
         submitData.append(key, value as string);
@@ -906,6 +940,50 @@ const StockItemForm = () => {
               onChange={handleChange}
               options={sgstOptions}
             />
+
+            <div className="md:col-span-1 relative" ref={attributeDropdownRef}>
+              <label className="block text-sm font-medium mb-1">Attributes</label>
+              <div 
+                className={`w-full p-2 rounded border flex justify-between items-center cursor-pointer ${theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                onClick={() => setIsAttributeDropdownOpen(!isAttributeDropdownOpen)}
+              >
+                <span className={`truncate ${formData.attributes.length === 0 ? "text-gray-500" : ""}`}>
+                  {formData.attributes.length > 0 
+                    ? formData.attributes.map(id => masterAttributes.find(a => a.id.toString() === id)?.name.toUpperCase()).filter(Boolean).join(", ")
+                    : "Select attributes"}
+                </span>
+                <ChevronDown size={16} />
+              </div>
+              
+              {isAttributeDropdownOpen && (
+                <div className={`absolute z-10 w-full mt-1 border rounded shadow-lg max-h-48 overflow-y-auto ${theme === "dark" ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"}`}>
+                  <div className="p-2 flex flex-col gap-1">
+                    {masterAttributes.map((attr) => (
+                      <label key={attr.id} className={`flex items-center gap-2 cursor-pointer p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors`}>
+                        <input
+                          type="checkbox"
+                          checked={formData.attributes.includes(attr.id.toString())}
+                          onChange={(e) => {
+                            const checked = e.target.checked;
+                            setFormData((prev) => ({
+                              ...prev,
+                              attributes: checked
+                                ? [...prev.attributes, attr.id.toString()]
+                                : prev.attributes.filter((id) => id !== attr.id.toString()),
+                            }));
+                          }}
+                          className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                        />
+                        <span className="text-sm select-none">{attr.name.toUpperCase()}</span>
+                      </label>
+                    ))}
+                    {masterAttributes.length === 0 && (
+                      <span className="text-sm text-gray-400 p-1">No attributes found</span>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
 
             <div className="md:col-span-2">
 

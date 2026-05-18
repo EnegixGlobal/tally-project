@@ -37,7 +37,7 @@ const StockCategoryForm: React.FC = () => {
   const [formData, setFormData] = useState<StockCategory>(
     isEditMode
       ? stockCategories.find((c: StockCategory) => c.id === id) ||
-          initialFormData
+      initialFormData
       : initialFormData
   );
 
@@ -55,8 +55,7 @@ const StockCategoryForm: React.FC = () => {
     const fetchData = async () => {
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/stock-groups/list?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
         );
         const data = await res.json();
@@ -78,8 +77,7 @@ const StockCategoryForm: React.FC = () => {
       if (!isEditMode || !id) return;
       try {
         const res = await fetch(
-          `${
-            import.meta.env.VITE_API_URL
+          `${import.meta.env.VITE_API_URL
           }/api/stock-categories/${id}?owner_type=${ownerType}&owner_id=${ownerId}`
         );
 
@@ -192,19 +190,16 @@ const StockCategoryForm: React.FC = () => {
             </style>
           </head>
           <body>
-            <h1>${
-              companyInfo?.name || "Hanuman Car Wash"
-            } - Stock Category Details</h1>
+            <h1>${companyInfo?.name || "Hanuman Car Wash"
+        } - Stock Category Details</h1>
             <table>
               <tr><th>Name</th><td>${formData.name}</td></tr>
-              <tr><th>Parent Category</th><td>${
-                stockCategories.find(
-                  (c: StockCategory) => c.id === formData.parent
-                )?.name || "None"
-              }</td></tr>
-              <tr><th>Description</th><td>${
-                formData.description || "N/A"
-              }</td></tr>
+              <tr><th>Parent Category</th><td>${stockCategories.find(
+          (c: StockCategory) => c.id === formData.parent
+        )?.name || "None"
+        }</td></tr>
+              <tr><th>Description</th><td>${formData.description || "N/A"
+        }</td></tr>
             </table>
           </body>
         </html>
@@ -236,24 +231,21 @@ const StockCategoryForm: React.FC = () => {
 
   return (
     <div
-      className={`pt-[56px] px-4 ${
-        theme === "dark" ? "bg-gray-900" : "bg-gray-50"
-      }`}
+      className={`pt-[56px] px-4 ${theme === "dark" ? "bg-gray-900" : "bg-gray-50"
+        }`}
     >
       <div className="flex items-center mb-6">
         <button
           title="Back to Stock Categories"
           onClick={() => navigate("/app/masters/stock-categories")}
-          className={`mr-4 p-2 rounded-full ${
-            theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-          }`}
+          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+            }`}
         >
           <ArrowLeft size={20} />
         </button>
         <h1
-          className={`text-2xl font-bold ${
-            theme === "dark" ? "text-gray-100" : "text-gray-900"
-          }`}
+          className={`text-2xl font-bold ${theme === "dark" ? "text-gray-100" : "text-gray-900"
+            }`}
         >
           {isEditMode ? "Edit Stock Category" : "New Stock Category"}
         </h1>
@@ -261,20 +253,18 @@ const StockCategoryForm: React.FC = () => {
           <button
             title="Save Stock Category"
             onClick={handleSubmit}
-            className={`p-2 rounded-md ${
-              theme === "dark"
+            className={`p-2 rounded-md ${theme === "dark"
                 ? "bg-blue-600 hover:bg-blue-700"
                 : "bg-blue-500 hover:bg-blue-600"
-            } text-white flex items-center`}
+              } text-white flex items-center`}
           >
             <Save size={18} className="mr-2" /> Save
           </button>
           <button
             title="Print Stock Category"
             onClick={handlePrint}
-            className={`p-2 rounded-md ${
-              theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-            }`}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
           >
             <Printer size={18} />
           </button>
@@ -282,16 +272,14 @@ const StockCategoryForm: React.FC = () => {
       </div>
 
       <div
-        className={`p-6 rounded-lg ${
-          theme === "dark" ? "bg-gray-800" : "bg-white shadow"
-        }`}
+        className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
+          }`}
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
             <label
-              className={`block text-sm font-medium mb-1 ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               Name
             </label>
@@ -300,11 +288,10 @@ const StockCategoryForm: React.FC = () => {
               name="name"
               value={formData.name}
               onChange={handleChange}
-              className={`w-full p-2 rounded border ${
-                theme === "dark"
+              className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 text-gray-100"
                   : "bg-white border-gray-300 text-gray-900"
-              } focus:border-blue-500 focus:ring-blue-500`}
+                } focus:border-blue-500 focus:ring-blue-500`}
               placeholder="Enter stock category name"
             />
             {errors.name && (
@@ -313,9 +300,8 @@ const StockCategoryForm: React.FC = () => {
           </div>
           <div>
             <label
-              className={`block text-sm font-medium mb-1 ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               Name Under (Parent Category)
             </label>
@@ -324,11 +310,10 @@ const StockCategoryForm: React.FC = () => {
               name="parent"
               value={formData.parent}
               onChange={handleChange}
-              className={`w-full p-2 rounded border ${
-                theme === "dark"
+              className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 text-gray-100"
                   : "bg-white border-gray-300 text-gray-900"
-              } focus:border-blue-500 focus:ring-blue-500`}
+                } focus:border-blue-500 focus:ring-blue-500`}
             >
               {/* Default option */}
               <option value="">None</option>
@@ -344,9 +329,8 @@ const StockCategoryForm: React.FC = () => {
           </div>
           <div className="md:col-span-2">
             <label
-              className={`block text-sm font-medium mb-1 ${
-                theme === "dark" ? "text-gray-300" : "text-gray-700"
-              }`}
+              className={`block text-sm font-medium mb-1 ${theme === "dark" ? "text-gray-300" : "text-gray-700"
+                }`}
             >
               Description
             </label>
@@ -355,11 +339,10 @@ const StockCategoryForm: React.FC = () => {
               value={formData.description}
               onChange={handleChange}
               rows={3}
-              className={`w-full p-2 rounded border ${
-                theme === "dark"
+              className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600 text-gray-100"
                   : "bg-white border-gray-300 text-gray-900"
-              } focus:border-blue-500 focus:ring-blue-500`}
+                } focus:border-blue-500 focus:ring-blue-500`}
               placeholder="Enter description"
             />
           </div>
@@ -367,9 +350,8 @@ const StockCategoryForm: React.FC = () => {
       </div>
 
       <div
-        className={`mt-6 p-4 rounded ${
-          theme === "dark" ? "bg-gray-800" : "bg-blue-50"
-        }`}
+        className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
+          }`}
       >
         <p className="text-sm text-gray-700 dark:text-gray-300">
           <span className="font-semibold">Keyboard Shortcuts:</span> Ctrl+S to
