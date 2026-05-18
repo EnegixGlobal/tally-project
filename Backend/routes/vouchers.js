@@ -273,7 +273,7 @@ router.delete("/:id", async (req, res) => {
 
     // 1️⃣ Get voucher details before deletion
     const [rows] = await conn.execute(
-      "SELECT voucher_number, voucher_type, company_id, owner_type, owner_id FROM voucher_main WHERE id = ?",
+      "SELECT voucher_number, voucher_type, company_id, owner_type, owner_id, date FROM voucher_main WHERE id = ?",
       [id]
     );
 
@@ -285,9 +285,10 @@ router.delete("/:id", async (req, res) => {
     const {
       voucher_number: deletedNumber,
       voucher_type,
-      company_id,
-      owner_type,
-      owner_id
+      company_id: companyId,
+      owner_type: ownerType,
+      owner_id: ownerId,
+      date
     } = rows[0];
 
     // Extract prefix, FY, and sequence: PV/25-26/000002 -> ["PV", "25-26", "000002"]
@@ -311,10 +312,10 @@ router.delete("/:id", async (req, res) => {
     // 3️⃣ Renumber all vouchers of this type and FY chronologically
     await renumberVouchers({
       companyId,
-      ownerType: owner_type,
-      ownerId: owner_id,
+      ownerType,
+      ownerId,
       voucherType: voucher_type,
-      date: rows[0].date || new Date(),
+      date: date || new Date(),
     }, conn);
 
     await conn.commit();
