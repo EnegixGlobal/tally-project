@@ -14,6 +14,7 @@ import {
   BarChart2,
   ScanBarcode,
   Settings,
+  Tag,
 } from "lucide-react";
 
 const MastersIndex: React.FC = () => {
@@ -95,8 +96,8 @@ const MastersIndex: React.FC = () => {
           path: "/app/masters/stock-item/barcode",
         },
         {
-          icon: <Briefcase size={20} />,
-          name: "Item Management",
+          icon: <Tag size={20} />,
+          name: "Stock Attributes",
           path: "/app/masters/stock-item/manage",
         },
       ],
