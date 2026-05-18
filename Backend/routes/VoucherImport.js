@@ -3,7 +3,7 @@ const router = express.Router();
 const db = require("../db");
 
 const { getFinancialYear } = require("../utils/financialYear");
-const { generateVoucherNumber } = require("../utils/generateVoucherNumber");
+const { generateVoucherNumber, renumberVouchers } = require("../utils/generateVoucherNumber");
 
 // =========================================
 // PURCHASE EXCEL IMPORT (JSON DATA)
@@ -1867,9 +1867,43 @@ router.post("/sales_summary_import", async (req, res) => {
 
         const totalVal = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
 
+        // 🔹 DETERMINE B2B VS B2C SALES TYPE ID Strictly Based on Excel Data
+        const importGstin = voucher["GSTIN of supplier"] ? String(voucher["GSTIN of supplier"]).toUpperCase().replace(/\s+/g, "").trim() : "";
+        
+        let hasGst = false;
+        if (importGstin && importGstin !== "NULL" && importGstin !== "UNDEFINED" && importGstin !== "NAN") {
+            hasGst = true;
+        }
+
+        const [salesTypes] = await db.execute(
+            "SELECT id, sales_type FROM sales_types WHERE company_id = ? AND owner_type = ? AND owner_id = ?",
+            [companyId, ownerType, ownerId]
+        );
+
+        const targetKeyword = hasGst ? "b2b" : "b2c";
+        let matchedSalesType = salesTypes.find(st => String(st.sales_type).toLowerCase().includes(targetKeyword));
+        
+        if (!matchedSalesType) {
+            const secondaryKeywords = hasGst 
+                ? ["regular", "gst", "business", "tax"] 
+                : ["consumer", "retail", "cash", "unregistered"];
+            
+            for (const kw of secondaryKeywords) {
+                matchedSalesType = salesTypes.find(st => String(st.sales_type).toLowerCase().includes(kw));
+                if (matchedSalesType) break;
+            }
+        }
+
+        let salesTypeId = null;
+        if (matchedSalesType) {
+            salesTypeId = matchedSalesType.id;
+        } else if (salesTypes.length > 0) {
+            salesTypeId = salesTypes[0].id;
+        }
+
         // GENERATE VOUCHER NUMBER
         const voucherNumber = await generateVoucherNumber({
-            companyId, ownerType, ownerId, voucherType: "sales", date
+            companyId, ownerType, ownerId, voucherType: "sales", date, salesTypeId
         });
 
         // INSERT MAIN
@@ -1877,12 +1911,12 @@ router.post("/sales_summary_import", async (req, res) => {
             `INSERT INTO sales_vouchers (
                 number, date, narration, partyId, referenceNo, 
                 subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total, 
-                company_id, owner_type, owner_id, mode, salesLedgerId, type, isQuotation
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                company_id, owner_type, owner_id, mode, salesLedgerId, type, isQuotation, sales_type_id
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [
                 voucherNumber, date, voucher.narration || `Imported Sales ${importMode === 'item' ? 'Multi-item' : 'Accounting'}`, partyId, invoiceNo,
                 subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, totalVal,
-                companyId, ownerType, ownerId, importMode === 'item' ? 'item-invoice' : 'accounting-invoice', salesLedgerId, 'sales', 0
+                companyId, ownerType, ownerId, importMode === 'item' ? 'item-invoice' : 'accounting-invoice', salesLedgerId, 'sales', 0, salesTypeId
             ]
         );
 
@@ -1943,6 +1977,21 @@ router.post("/sales_summary_import", async (req, res) => {
                     `INSERT INTO voucher_entries (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id) VALUES ?`,
                     [entryValues]
                 );
+            }
+        }
+
+        if (salesTypeId) {
+            try {
+                await renumberVouchers({
+                    companyId,
+                    ownerType,
+                    ownerId,
+                    voucherType: "sales",
+                    date,
+                    salesTypeId
+                });
+            } catch (renumberErr) {
+                console.error("⚠️ Failed to renumber sales vouchers post-import:", renumberErr.message);
             }
         }
 
