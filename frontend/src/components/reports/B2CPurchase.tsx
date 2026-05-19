@@ -775,6 +775,15 @@ const B2CPurchase: React.FC = () => {
     return new Map(purchaseHistory.map((h: any) => [h.voucherNumber, h]));
   }, [purchaseHistory]);
 
+  const getQtyByVoucher = (voucherNo: string) => {
+    const qty = purchaseHistoryMap.get(voucherNo)?.purchaseQuantity;
+    return qty ? Math.abs(qty) : 0;
+  };
+
+  const getRateByVoucher = (voucherNo: string) => {
+    return purchaseHistoryMap.get(voucherNo)?.rate || 0;
+  };
+
   const detailedTotals = useMemo(() => {
     return filteredDetailedData.reduce((acc, sale) => {
       acc.qty += Number(getQtyByVoucher(sale.number)) || 0;
@@ -800,15 +809,6 @@ const B2CPurchase: React.FC = () => {
     });
     return totals;
   }, [columnarData]);
-
-  const getQtyByVoucher = (voucherNo: string) => {
-    const qty = purchaseHistoryMap.get(voucherNo)?.purchaseQuantity;
-    return qty ? Math.abs(qty) : 0;
-  };
-
-  const getRateByVoucher = (voucherNo: string) => {
-    return purchaseHistoryMap.get(voucherNo)?.rate || 0;
-  };
 
   const filteredTransactions = useMemo(() => {
     if (!orders || orders.length === 0) {
