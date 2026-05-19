@@ -600,13 +600,7 @@ const AllHsnPurachase: React.FC = () => {
                                     <tr className="font-bold border-t border-gray-400">
                                         <td className="p-3" colSpan={5}>Grand Total</td>
                                         <td className="p-3">
-                                            {formatAggregatedQuantities(
-                                                filteredAndSortedPurchases.map((purchase: any) => {
-                                                    const x = purchaseHistoryMap.get(purchase.number);
-                                                    return x ? { quantity: x.purchaseQuantity || x.qtyChange, unit: x.unit } : null;
-                                                }).filter(Boolean) as any[],
-                                                units
-                                            )}
+                                            {dashboardTotals.qty}
                                         </td>
                                         <td className="p-3"></td>
                                         <td className="p-3">₹{dashboardTotals.amount.toFixed(2)}</td>

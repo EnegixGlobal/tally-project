@@ -777,20 +777,7 @@ const B2BPurchaseHsn: React.FC = () => {
                   <tr className="font-bold border-t border-gray-400">
                     <td className="p-3" colSpan={4}>Grand Total</td>
                     <td className="p-3">
-                      {formatAggregatedQuantities(
-                        matchedSales
-                          .filter((sale: any) => {
-                            if (!hsnSearch.trim()) return true;
-                            const hsn = getHsnByVoucher(sale.number);
-                            return hsn?.toString().trim() === hsnSearch.trim();
-                          })
-                          .map((sale) => {
-                            const x = salesHistoryMap.get(sale.number);
-                            return x ? { quantity: x.purchaseQuantity, unit: x.unit } : null;
-                          })
-                          .filter(Boolean) as any[],
-                        units
-                      )}
+                      {dashboardTotals.qty}
                     </td>
                     <td className="p-3"></td>
                     <td className="p-3">₹{dashboardTotals.amount.toFixed(2)}</td>

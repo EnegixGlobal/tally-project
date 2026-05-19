@@ -1547,7 +1547,7 @@ const PurchaseReport1: React.FC = () => {
                     <tr className="font-semibold">
                       <td colSpan={3} className="px-2 py-3 text-right">Total</td>
                       <td className="px-2 py-3 text-right">
-                        {formatAggregatedQuantities(columnarData.rows.flatMap(r => r.items || []), units)}
+                        {columnarData.rows.reduce((sum, r) => sum + (r.quantity || 0), 0)}
                       </td>
                       <td className="px-2 py-3 text-right">
                         {columnarData.rows.reduce((sum, r) => sum + r.rate, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}

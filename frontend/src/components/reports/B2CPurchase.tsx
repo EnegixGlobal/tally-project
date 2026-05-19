@@ -1476,7 +1476,7 @@ const B2CPurchase: React.FC = () => {
                     <td className="p-3">Grand Total</td>
                     <td className="p-3"></td>
                     <td className="p-3"></td>
-                    <td className="p-3">{formatAggregatedQuantities(filteredDetailedData.flatMap((sale: any) => sale.items || []), units)}</td>
+                    <td className="p-3">{detailedTotals.qty}</td>
                     <td className="p-3"></td>
                     <td className="p-3">₹{detailedTotals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                     <td className="p-3">{detailedTotals.igst || 0}</td>
@@ -1577,7 +1577,7 @@ const B2CPurchase: React.FC = () => {
                 <tfoot className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-100"}`}>
                   <tr className="font-bold border-t border-gray-400">
                     <td className="px-2 py-3" colSpan={3}>Grand Total</td>
-                    <td className="px-2 py-3 text-right">{formatAggregatedQuantities(columnarData.rows.flatMap((r: any) => r.items || []), units)}</td>
+                    <td className="px-2 py-3 text-right">{columnarTotals.quantity}</td>
                     <td className="px-2 py-3 text-right"></td>
                     <td className="px-2 py-3 text-right font-semibold">
                       {columnarTotals.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}
