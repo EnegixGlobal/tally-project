@@ -549,6 +549,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         sgstTotal: sgst,
         igstTotal: igst,
         discountTotal,
+        overallDiscountAmount: Number(p.overallDiscountAmount || p.discountAmount || 0),
         total,
 
         entries: [
@@ -1698,6 +1699,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Discount
                     </th>
+                    {voucherType === "sales" && (
+                      <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
+                        Overall Discount
+                      </th>
+                    )}
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Invoice Value
                     </th>
@@ -1851,8 +1857,18 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
                         {/* Discount */}
                         <td className="px-6 py-4 text-sm text-red-600 text-right">
-                          {formatTableAmount(discountTotal)}
+                          {voucherType === "sales"
+                            ? formatTableAmount(Math.max(0, discountTotal - (Number(voucher.overallDiscountAmount) || 0)))
+                            : formatTableAmount(discountTotal)
+                          }
                         </td>
+
+                        {/* Overall Discount */}
+                        {voucherType === "sales" && (
+                          <td className="px-6 py-4 text-sm text-red-600 text-right">
+                            {formatTableAmount(Number(voucher.overallDiscountAmount) || 0)}
+                          </td>
+                        )}
 
                         {/* Total */}
                         <td className="px-6 py-4 text-sm text-gray-900 font-bold text-right">
@@ -1943,8 +1959,17 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-900 text-right">
                       {/* Discount Total */}
-                      {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.discountTotal) || 0), 0))}
+                      {voucherType === "sales"
+                        ? formatTableAmount(filteredVouchers.reduce((s, v) => s + Math.max(0, (Number(v.discountTotal) || 0) - (Number(v.overallDiscountAmount) || 0)), 0))
+                        : formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.discountTotal) || 0), 0))
+                      }
                     </td>
+                    {voucherType === "sales" && (
+                      <td className="px-6 py-4 text-sm text-gray-900 text-right">
+                        {/* Overall Discount Total */}
+                        {formatTableAmount(filteredVouchers.reduce((s, v) => s + (Number(v.overallDiscountAmount) || 0), 0))}
+                      </td>
+                    )}
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 text-right">
                       {formatTableAmount(
                         filteredVouchers.reduce(
