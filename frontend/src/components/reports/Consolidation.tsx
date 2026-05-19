@@ -43,6 +43,8 @@ const ConsolidatedFinancialReport: React.FC = () => {
   const navigate = useNavigate();
 
   const employeeId = localStorage.getItem("employee_id") || "";
+  const userId = localStorage.getItem("user_id") || "";
+  const userType = localStorage.getItem("userType") || "";
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
@@ -88,7 +90,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
         const startStr = startDate.toISOString().split('T')[0];
         const endStr = endDate.toISOString().split('T')[0];
 
-        const url = `${import.meta.env.VITE_API_URL}/api/consolidated-balance-sheet?employee_id=${employeeId}&startDate=${startStr}&endDate=${endStr}`;
+        const url = `${import.meta.env.VITE_API_URL}/api/consolidated-balance-sheet?employee_id=${employeeId}&user_id=${userId}&user_type=${userType}&startDate=${startStr}&endDate=${endStr}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load consolidated data");
         const data = await res.json();
