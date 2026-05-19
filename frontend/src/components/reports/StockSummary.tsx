@@ -195,11 +195,9 @@ const StockSummary: React.FC = () => {
         }/api/purchase-vouchers/purchase-history?${params.toString()}`
       );
 
-      const json = await response.json();
+      if (!response.ok) throw new Error("Failed to load purchase vouchers");
 
-      if (!response.ok || json.success === false) {
-        throw new Error(json.error || json.message || "Failed to load purchase vouchers");
-      }
+      const json = await response.json();
 
       const formatted = Array.isArray(json.data)
         ? json.data.map((v: any) => ({
@@ -239,11 +237,9 @@ const StockSummary: React.FC = () => {
         }/api/sales-vouchers/sale-history?${params.toString()}`
       );
 
-      const json = await response.json();
+      if (!response.ok) throw new Error("Failed to load sales history");
 
-      if (!response.ok || json.success === false) {
-        throw new Error(json.error || json.message || "Failed to load sales history");
-      }
+      const json = await response.json();
 
       const formatted = Array.isArray(json.data)
         ? json.data.map((v: any) => ({
@@ -391,21 +387,10 @@ const StockSummary: React.FC = () => {
       const purchaseData = await purchaseRes.json();
       const salesData = await salesRes.json();
 
-      // Guard: check for server errors before processing
-      if (!stockItemsRes.ok || stockItemsData.success === false) {
-        throw new Error(stockItemsData.error || stockItemsData.message || "Failed to load stock items");
-      }
-      if (!purchaseRes.ok || purchaseData.success === false) {
-        throw new Error(purchaseData.error || purchaseData.message || "Failed to load purchase history");
-      }
-      if (!salesRes.ok || salesData.success === false) {
-        throw new Error(salesData.error || salesData.message || "Failed to load sale history");
-      }
-
       const itemMap: Record<string, any> = {};
 
       // 1️⃣ OPENING STOCK (BATCH-WISE)
-      (Array.isArray(stockItemsData.data) ? stockItemsData.data : []).forEach((item: any) => {
+      stockItemsData.data.forEach((item: any) => {
         const itemName = item.name;
         itemMap[itemName] = {
           itemName: itemName,
@@ -468,7 +453,7 @@ const StockSummary: React.FC = () => {
       });
 
       // 2️⃣ PURCHASES (INWARD)
-      (Array.isArray(purchaseData.data) ? purchaseData.data : []).forEach((p: any) => {
+      purchaseData.data.forEach((p: any) => {
         const item = itemMap[p.itemName];
         if (!item) return;
 
@@ -492,7 +477,7 @@ const StockSummary: React.FC = () => {
       });
 
       // 3️⃣ SALES (OUTWARD)
-      (Array.isArray(salesData.data) ? salesData.data : []).forEach((s: any) => {
+      salesData.data.forEach((s: any) => {
         const item = itemMap[s.itemName];
         if (!item) return;
 
