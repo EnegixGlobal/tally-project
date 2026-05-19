@@ -17,18 +17,8 @@ router.get("/purchase-history", async (req, res) => {
       });
     }
 
-    // 🔍 Column check
-    const existingColsQuery = `
-      SELECT COLUMN_NAME 
-      FROM INFORMATION_SCHEMA.COLUMNS
-      WHERE TABLE_SCHEMA = DATABASE()
-        AND TABLE_NAME = 'purchase_history'
-    `;
-    const [colsRows] = await db.execute(existingColsQuery);
-    const existingCols = colsRows.map((r) => r.COLUMN_NAME);
-
-    // 🏗️ Create table if not exists
-    if (existingCols.length === 0) {
+    // 🏗️ Ensure table + columns exist (safe on production)
+    try {
       await db.execute(`
         CREATE TABLE IF NOT EXISTS purchase_history (
           id INT AUTO_INCREMENT PRIMARY KEY,
@@ -47,11 +37,14 @@ router.get("/purchase-history", async (req, res) => {
           mrp DECIMAL(10,2)
         )
       `);
-    } else if (!existingCols.includes("type")) {
-      await db.execute(`
-        ALTER TABLE purchase_history 
-        ADD COLUMN type VARCHAR(50) DEFAULT 'purchase'
-      `);
+
+      // Add missing columns if they don't exist
+      const [typeCol] = await db.execute(`SHOW COLUMNS FROM purchase_history LIKE 'type'`);
+      if (typeCol.length === 0) {
+        await db.execute(`ALTER TABLE purchase_history ADD COLUMN type VARCHAR(50) DEFAULT 'purchase'`);
+      }
+    } catch (schemaErr) {
+      console.warn("⚠️ purchase_history schema setup warning (non-fatal):", schemaErr.message);
     }
 
     // ✅ FINAL QUERY WITH LEDGER NAME
