@@ -1,6 +1,7 @@
 import React, { useEffect, useState, useMemo, useRef } from "react";
 import { useAppContext } from "../../context/AppContext";
 import { useNavigate } from "react-router-dom";
+import { formatSingleQuantity, formatAggregatedQuantities } from "../../utils/formatQuantity";
 import {
   ArrowLeft,
   Printer,
@@ -80,7 +81,7 @@ interface FilterState {
 }
 
 const SalesReport: React.FC = () => {
-  const { theme } = useAppContext();
+  const { theme, units } = useAppContext();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -490,6 +491,7 @@ const SalesReport: React.FC = () => {
         total: Number(voucher.netAmount || voucher.total || 0),
         quantity: 0,
         rate: 0,
+        items: voucher.items,
       };
 
       // Sum Quantity and determine Rate
@@ -1406,7 +1408,7 @@ const SalesReport: React.FC = () => {
                           {row.partyName}
                         </td>
                         <td className="px-2 py-2">{row.voucherNo}</td>
-                        <td className="px-2 py-2 text-right">{row.quantity}</td>
+                        <td className="px-2 py-2 text-right">{formatAggregatedQuantities(row.items, units)}</td>
                         <td className="px-2 py-2 text-right">
                           {row.rate > 0
                             ? row.rate.toLocaleString("en-IN", {

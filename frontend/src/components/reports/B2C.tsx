@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useRef, useEffect, type Key, type ReactNode } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { useNavigate } from 'react-router-dom';
+import { formatSingleQuantity, formatAggregatedQuantities } from '../../utils/formatQuantity';
 import axios from 'axios';
 import {
   ArrowLeft,
@@ -68,7 +69,7 @@ interface Order {
 type ViewType = 'detailed' | 'columnar' | 'extract' | 'summary' | 'partywise' | 'analytics';
 
 const B2C: React.FC = () => {
-  const { theme } = useAppContext();
+  const { theme, units } = useAppContext();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -397,6 +398,7 @@ const B2C: React.FC = () => {
         total: Number(voucher.total || 0),
         quantity: 0,
         rate: 0,
+        items: voucher.items,
       };
 
       let totalQty = 0;
@@ -1401,7 +1403,7 @@ const B2C: React.FC = () => {
                         </td> */}
 
                         {/* QTY */}
-                        <td className="p-3">{getQtyByVoucher(sale.number)}</td>
+                        <td className="p-3">{formatAggregatedQuantities(sale.items, units)}</td>
 
                         {/* Rate */}
                         <td className="p-3">{getRateByVoucher(sale.number)}</td>
@@ -1494,7 +1496,7 @@ const B2C: React.FC = () => {
                       </td>
                       <td className="px-2 py-2 font-medium">{row.partyName}</td>
                       <td className="px-2 py-2">{row.voucherNo}</td>
-                      <td className="px-2 py-2 text-right">{row.quantity}</td>
+                      <td className="px-2 py-2 text-right">{formatAggregatedQuantities(row.items, units)}</td>
                       <td className="px-2 py-2 text-right">
                         {row.rate > 0
                           ? row.rate.toLocaleString("en-IN", {

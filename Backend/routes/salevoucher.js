@@ -594,11 +594,22 @@ router.get("/sale-history", async (req, res) => {
     sh.companyId,
     sh.ownerType,
     sh.ownerId,
+    su.symbol  AS unit,
 
     sv.partyId AS partyId,
     l.name     AS partyName
 
   FROM sale_history sh
+
+  LEFT JOIN stock_items si
+    ON sh.itemName COLLATE utf8mb4_general_ci
+     = si.name COLLATE utf8mb4_general_ci
+     AND si.company_id = sh.companyId
+     AND si.owner_type = sh.ownerType
+     AND si.owner_id = sh.ownerId
+
+  LEFT JOIN stock_units su
+    ON si.unit = su.id
 
   LEFT JOIN sales_vouchers sv
     ON sv.number COLLATE utf8mb4_general_ci
