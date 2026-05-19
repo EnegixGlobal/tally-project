@@ -3,6 +3,7 @@ import { useAppContext } from "../../context/AppContext";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, Filter, ShoppingCart } from "lucide-react";
 import * as XLSX from "xlsx";
+import { formatSingleQuantity, formatAggregatedQuantities } from "../../utils/formatQuantity";
 import "./reports.css";
 
 interface TransactionLine {
@@ -30,7 +31,7 @@ interface FilterState {
 type ViewType = "dashboard";
 
 const AllHsnPurachase: React.FC = () => {
-    const { theme } = useAppContext();
+    const { theme, units } = useAppContext();
     const navigate = useNavigate();
     const printRef = useRef<HTMLDivElement | null>(null);
 
@@ -215,6 +216,14 @@ const AllHsnPurachase: React.FC = () => {
         // Check both potential property names based on B2B/B2C findings
         const qty = historyItem?.purchaseQuantity || historyItem?.qtyChange;
         return qty ? Math.abs(qty) : 0;
+    };
+
+    const getQtyFormattedByVoucher = (voucherNo: string) => {
+        const historyItem = purchaseHistoryMap.get(voucherNo);
+        if (!historyItem) return "0";
+        const qty = historyItem.purchaseQuantity || historyItem.qtyChange;
+        const finalQty = qty ? Math.abs(qty) : 0;
+        return formatSingleQuantity(finalQty, historyItem.unit, units);
     };
 
     const getRateByVoucher = (voucherNo: string) => {
@@ -546,7 +555,7 @@ const AllHsnPurachase: React.FC = () => {
 
                                                         {/* QTY */}
                                                         <td className="p-3">
-                                                            {getQtyByVoucher(purchase.number)}
+                                                            {getQtyFormattedByVoucher(purchase.number)}
                                                         </td>
 
                                                         {/* Rate */}
@@ -590,7 +599,9 @@ const AllHsnPurachase: React.FC = () => {
                                 <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                                     <tr className="font-bold border-t border-gray-400">
                                         <td className="p-3" colSpan={5}>Grand Total</td>
-                                        <td className="p-3">{dashboardTotals.qty}</td>
+                                        <td className="p-3">
+                                            {dashboardTotals.qty}
+                                        </td>
                                         <td className="p-3"></td>
                                         <td className="p-3">₹{dashboardTotals.amount.toFixed(2)}</td>
                                         <td className="p-3">₹{dashboardTotals.taxValue.toFixed(2)}</td>

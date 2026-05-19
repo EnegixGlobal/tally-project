@@ -73,6 +73,7 @@ router.get("/", async (req, res) => {
             svi.discount, 
             svi.salesLedgerId,
             svi.discountLedgerId,
+            u.symbol AS unit,
             
             sl.name AS salesLedgerName, 
             sl.group_id AS salesLedgerGroupId,
@@ -86,6 +87,8 @@ router.get("/", async (req, res) => {
 
          FROM sales_voucher_items svi
          
+         LEFT JOIN stock_items i ON svi.itemId = i.id
+         LEFT JOIN stock_units u ON i.unit = u.id
          LEFT JOIN ledgers sl ON svi.salesLedgerId = sl.id
          LEFT JOIN ledger_groups lg ON sl.group_id = lg.id
 

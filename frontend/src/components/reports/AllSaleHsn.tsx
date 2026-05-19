@@ -216,6 +216,15 @@ const AllSaleHsn: React.FC = () => {
         return qty ? Math.abs(qty) : 0;
     };
 
+    const getQtyWithUnitByVoucher = (voucherNo: string) => {
+        const hRecord = salesHistoryMap.get(voucherNo);
+        if (!hRecord) return "-";
+        const qty = hRecord.qtyChange ? Math.abs(hRecord.qtyChange) : 0;
+        if (qty === 0) return "-";
+        const unitSymbol = hRecord.unit;
+        return `${qty}${unitSymbol ? unitSymbol.toLowerCase() : ""}`;
+    };
+
     const getRateByVoucher = (voucherNo: string) => {
         return salesHistoryMap.get(voucherNo)?.rate || 0;
     };
@@ -544,7 +553,7 @@ const AllSaleHsn: React.FC = () => {
 
                                                         {/* QTY */}
                                                         <td className="p-3">
-                                                            {getQtyByVoucher(sale.number)}
+                                                            {getQtyWithUnitByVoucher(sale.number)}
                                                         </td>
 
                                                         {/* Rate */}

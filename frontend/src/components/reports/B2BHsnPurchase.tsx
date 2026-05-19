@@ -3,6 +3,7 @@ import { useAppContext } from "../../context/AppContext";
 import { useNavigate } from "react-router-dom";
 import { ArrowLeft, Download, Filter, Building2 } from "lucide-react";
 import * as XLSX from "xlsx";
+import { formatSingleQuantity, formatAggregatedQuantities } from "../../utils/formatQuantity";
 import "./reports.css";
 interface B2BTransactionLine {
   totalAmount: any;
@@ -73,7 +74,7 @@ type ViewType =
   | "contracts";
 
 const B2BPurchaseHsn: React.FC = () => {
-  const { theme } = useAppContext();
+  const { theme, units } = useAppContext();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement | null>(null);
 
@@ -370,6 +371,13 @@ const B2BPurchaseHsn: React.FC = () => {
   const getQtyByVoucher = (voucherNo: string) => {
     const qty = salesHistoryMap.get(voucherNo)?.purchaseQuantity;
     return qty ? Math.abs(qty) : 0;
+  };
+
+  const getQtyFormattedByVoucher = (voucherNo: string) => {
+    const historyItem = salesHistoryMap.get(voucherNo);
+    if (!historyItem) return "0";
+    const qty = historyItem.purchaseQuantity ? Math.abs(historyItem.purchaseQuantity) : 0;
+    return formatSingleQuantity(qty, historyItem.unit, units);
   };
 
   const getRateByVoucher = (voucherNo: string) => {
@@ -703,7 +711,7 @@ const B2BPurchaseHsn: React.FC = () => {
 
                           {/* QTY */}
                           <td className="p-3">
-                            {getQtyByVoucher(sale.number)}
+                            {getQtyFormattedByVoucher(sale.number)}
                           </td>
 
                           {/* Rate */}
@@ -768,7 +776,9 @@ const B2BPurchaseHsn: React.FC = () => {
                 <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                   <tr className="font-bold border-t border-gray-400">
                     <td className="p-3" colSpan={4}>Grand Total</td>
-                    <td className="p-3">{dashboardTotals.qty}</td>
+                    <td className="p-3">
+                      {dashboardTotals.qty}
+                    </td>
                     <td className="p-3"></td>
                     <td className="p-3">₹{dashboardTotals.amount.toFixed(2)}</td>
                     <td className="p-3">₹{dashboardTotals.taxValue.toFixed(2)}</td>

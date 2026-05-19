@@ -70,6 +70,7 @@ router.get("/purchase-history", async (req, res) => {
     ph.ownerType,
     ph.ownerId,
     ph.type,
+    su.symbol AS unit,
 
     pv.partyId AS partyId,
     l.name     AS partyName
@@ -86,6 +87,13 @@ router.get("/purchase-history", async (req, res) => {
   LEFT JOIN ledgers l
     ON l.id = pv.partyId
 
+  LEFT JOIN stock_items si
+    ON ph.itemName = si.name
+    AND si.company_id = ?
+
+  LEFT JOIN stock_units su
+    ON si.unit = su.id
+
   WHERE ph.companyId = ?
     AND ph.ownerType = ?
     AND ph.ownerId = ?
@@ -98,6 +106,7 @@ router.get("/purchase-history", async (req, res) => {
       company_id,
       owner_type,
       owner_id,
+      company_id,
       company_id,
       owner_type,
       owner_id,
