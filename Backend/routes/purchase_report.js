@@ -191,6 +191,7 @@ router.get("/", async (req, res) => {
             i.name AS itemName,
             i.hsnCode,
             i.gstRate,
+            u.symbol AS unit,
 
             pl.name AS purchaseLedgerName, 
             pl.group_id AS purchaseLedgerGroupId,
@@ -203,7 +204,8 @@ router.get("/", async (req, res) => {
             dl.name AS discountLedgerName
 
          FROM purchase_voucher_items pvi
-         LEFT JOIN items i ON pvi.itemId = i.id
+         LEFT JOIN stock_items i ON pvi.itemId = i.id
+         LEFT JOIN stock_units u ON i.unit = u.id
          LEFT JOIN ledgers pl ON pvi.purchaseLedgerId = pl.id
          LEFT JOIN ledger_groups lg ON pl.group_id = lg.id
          LEFT JOIN ledgers dl ON pvi.discountLedgerId = dl.id

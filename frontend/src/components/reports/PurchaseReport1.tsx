@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import * as XLSX from "xlsx";
 import Swal from "sweetalert2";
+import { formatAggregatedQuantities } from "../../utils/formatQuantity";
 import { allSystemGroups as baseGroups } from "../../constants/ledgerGroups";
 
 interface SalesData {
@@ -120,7 +121,7 @@ const monthIndexToName: Record<number, string> = {
 };
 
 const PurchaseReport1: React.FC = () => {
-  const { theme } = useAppContext();
+  const { theme, units } = useAppContext();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
 
@@ -588,6 +589,7 @@ const PurchaseReport1: React.FC = () => {
         total: Number(voucher.netAmount || voucher.total || 0),
         quantity: 0,
         rate: 0,
+        items: voucher.items,
       };
 
       // Sum Quantity and determine Rate
@@ -1514,9 +1516,9 @@ const PurchaseReport1: React.FC = () => {
                         <td className="px-2 py-2">
                           {new Date(row.date).toLocaleDateString("en-IN")}
                         </td>
-                        <td className="px-2 py-2 font-medium">{row.partyName}</td>
+                        <td className="px-2 py-2 text-right font-medium">{row.partyName}</td>
                         <td className="px-2 py-2">{row.voucherNo}</td>
-                        <td className="px-2 py-2 text-right">{row.quantity}</td>
+                        <td className="px-2 py-2 text-right">{formatAggregatedQuantities(row.items, units)}</td>
                         <td className="px-2 py-2 text-right">
                           {row.rate > 0 ? row.rate.toLocaleString("en-IN", { minimumFractionDigits: 2 }) : "-"}
                         </td>
@@ -1545,7 +1547,7 @@ const PurchaseReport1: React.FC = () => {
                     <tr className="font-semibold">
                       <td colSpan={3} className="px-2 py-3 text-right">Total</td>
                       <td className="px-2 py-3 text-right">
-                        {columnarData.rows.reduce((sum, r) => sum + r.quantity, 0)}
+                        {formatAggregatedQuantities(columnarData.rows.flatMap(r => r.items || []), units)}
                       </td>
                       <td className="px-2 py-3 text-right">
                         {columnarData.rows.reduce((sum, r) => sum + r.rate, 0).toLocaleString("en-IN", { minimumFractionDigits: 2 })}

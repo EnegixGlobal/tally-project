@@ -10,6 +10,7 @@ import {
   User
 } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { formatSingleQuantity, formatAggregatedQuantities } from '../../utils/formatQuantity';
 import './reports.css';
 interface Customer {
   totalSpent: number;
@@ -60,7 +61,7 @@ interface Order {
   gstNumber?: string | null; // For filtering - should always be null/empty for B2C
 }
 const B2CHsnPurchase: React.FC = () => {
-  const { theme } = useAppContext();
+  const { theme, units } = useAppContext();
   const navigate = useNavigate();
   const printRef = useRef<HTMLDivElement>(null);
   const [customers, setCustomers] = useState<Customer[]>([]);
@@ -375,6 +376,13 @@ const B2CHsnPurchase: React.FC = () => {
   const getQtyByVoucher = (voucherNo: string) => {
     const qty = purchaseHistoryMap.get(voucherNo)?.qtyChange;
     return qty ? Math.abs(qty) : 0;
+  };
+
+  const getQtyFormattedByVoucher = (voucherNo: string) => {
+    const historyItem = purchaseHistoryMap.get(voucherNo);
+    if (!historyItem) return "0";
+    const qty = historyItem.purchaseQuantity ? Math.abs(historyItem.purchaseQuantity) : 0;
+    return formatSingleQuantity(qty, historyItem.unit, units);
   };
 
   const getRateByVoucher = (voucherNo: string) => {
@@ -879,7 +887,7 @@ const B2CHsnPurchase: React.FC = () => {
 
                           {/* QTY */}
                           <td className="p-3">
-                            {getQtyByVoucher(sale.number)}
+                            {getQtyFormattedByVoucher(sale.number)}
                           </td>
 
                           {/* Rate */}
@@ -946,7 +954,22 @@ const B2CHsnPurchase: React.FC = () => {
                 <tfoot className={`${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
                   <tr className="font-bold border-t border-gray-400">
                     <td className="p-3" colSpan={3}>Grand Total</td>
-                    <td className="p-3">{dashboardTotals.qty}</td>
+                    <td className="p-3">
+                      {formatAggregatedQuantities(
+                        matchedSales
+                          .filter((sale: any) => {
+                            if (!hsnSearch.trim()) return true;
+                            const hsn = getHsnByVoucher(sale.number);
+                            return hsn?.toString().trim() === hsnSearch.trim();
+                          })
+                          .map((sale) => {
+                            const x = purchaseHistoryMap.get(sale.number);
+                            return x ? { quantity: x.purchaseQuantity, unit: x.unit } : null;
+                          })
+                          .filter(Boolean) as any[],
+                        units
+                      )}
+                    </td>
                     <td className="p-3"></td>
                     <td className="p-3">₹{dashboardTotals.amount.toFixed(2)}</td>
                     <td className="p-3">₹{dashboardTotals.taxValue.toFixed(2)}</td>
