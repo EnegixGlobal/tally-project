@@ -233,8 +233,8 @@ router.get('/employee-financial-report-consolidated', async (req, res) => {
 
 // GET /api/consolidated-balance-sheet - For consolidated balance sheet view (all employee's companies)
 router.get('/consolidated-balance-sheet', async (req, res) => {
-  const { employee_id, user_id, user_type, startDate, endDate } = req.query;
-  if (!employee_id && !user_id) return res.status(400).json({ message: "Missing employee_id or user_id" });
+  const { employee_id, startDate, endDate } = req.query;
+  if (!employee_id) return res.status(400).json({ message: "Missing employee_id" });
 
   const connection = await db.getConnection();
   try {
@@ -251,59 +251,11 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
     const svDateFilter = startDate && endDate ? ` AND sv.date BETWEEN ? AND ?` : '';
     const svDateParams = startDate && endDate ? [startDate, endDate] : [];
 
-    // Get all companies assigned to this user — support multiple user types
-    let companies = [];
-
-    // Strategy 1: Try employee_id first (works for 'employee' role)
-    if (employee_id) {
-      const [rows] = await connection.query(
-        `SELECT id, name FROM tbcompanies WHERE employee_id = ?`,
-        [employee_id]
-      );
-      companies = rows;
-    }
-
-    // Strategy 2: If no companies found via employee_id, try user_type-specific fallbacks
-    if (companies.length === 0 && user_id) {
-      if (user_type === 'ca_employee') {
-        // CA employee: get companies via tbcaemployeecompanies join
-        const [rows] = await connection.query(
-          `SELECT c.id, c.name FROM tbcompanies c
-           INNER JOIN tbcaemployeecompanies ec ON c.id = ec.company_id
-           WHERE ec.ca_employee_id = ?`,
-          [user_id]
-        );
-        companies = rows;
-
-        // Also try using the owner employee_id from those companies
-        if (companies.length === 0) {
-          const [rows2] = await connection.query(
-            `SELECT DISTINCT c.id, c.name FROM tbcompanies c
-             INNER JOIN tbcaemployeecompanies ec ON c.id = ec.company_id
-             JOIN tbcaemployees ce ON ce.id = ?
-             WHERE ec.ca_employee_id = ?`,
-            [user_id, user_id]
-          );
-          companies = rows2;
-        }
-      } else if (user_type === 'company_user') {
-        // Company user: get their specific company from tbusers
-        const [rows] = await connection.query(
-          `SELECT c.id, c.name FROM tbcompanies c
-           INNER JOIN tbusers u ON u.company_id = c.id
-           WHERE u.id = ?`,
-          [user_id]
-        );
-        companies = rows;
-      } else {
-        // Generic fallback: try treating user_id as employee_id
-        const [rows] = await connection.query(
-          `SELECT id, name FROM tbcompanies WHERE employee_id = ?`,
-          [user_id]
-        );
-        companies = rows;
-      }
-    }
+    // Get all companies assigned to this employee
+    const [companies] = await connection.query(
+      `SELECT id, name FROM tbcompanies WHERE employee_id = ?`,
+      [employee_id]
+    );
 
     if (companies.length === 0) {
       connection.release();
