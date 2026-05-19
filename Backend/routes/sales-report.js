@@ -27,6 +27,7 @@ router.get("/", async (req, res) => {
           sv.cgstTotal AS cgstAmount,
           sv.sgstTotal AS sgstAmount,
           sv.igstTotal AS igstAmount,
+          sv.mode,
           
           l.id AS ledgerId,
           l.name AS partyName,
@@ -101,18 +102,26 @@ router.get("/", async (req, res) => {
       // =========================================================
       // 🔹 FETCH VOUCHER ENTRIES (For Accounting Summary Vouchers)
       // =========================================================
-      const [voucherEntries] = await pool.query(
-        `SELECT 
-            ve.id, ve.voucher_id AS voucherId, ve.ledger_id AS ledgerId,
-            ve.amount, ve.entry_type AS type, ve.narration,
-            l.name AS ledgerName, l.group_id AS groupId,
-            lg.name AS groupName
-         FROM voucher_entries ve
-         LEFT JOIN ledgers l ON ve.ledger_id = l.id
-         LEFT JOIN ledger_groups lg ON l.group_id = lg.id
-         WHERE ve.voucher_id IN (?)`,
-        [voucherIds]
-      );
+      const accVoucherIds = rows
+        .filter(row => row.mode === "accounting-invoice")
+        .map(row => row.id);
+
+      let voucherEntries = [];
+      if (accVoucherIds.length > 0) {
+        const [entriesResult] = await pool.query(
+          `SELECT 
+              ve.id, ve.voucher_id AS voucherId, ve.ledger_id AS ledgerId,
+              ve.amount, ve.entry_type AS type, ve.narration,
+              l.name AS ledgerName, l.group_id AS groupId,
+              lg.name AS groupName
+           FROM voucher_entries ve
+           LEFT JOIN ledgers l ON ve.ledger_id = l.id
+           LEFT JOIN ledger_groups lg ON l.group_id = lg.id
+           WHERE ve.voucher_id IN (?)`,
+          [accVoucherIds]
+        );
+        voucherEntries = entriesResult;
+      }
 
       // Attach items to their respective vouchers with numeric conversion
       const itemsMap = {};
