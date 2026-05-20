@@ -169,11 +169,13 @@ function toInt(v, def = 0) {
 
 router.get("/api/outstanding-receivables", async (req, res) => {
   try {
-    const { company_id, owner_type, owner_id } = req.query;
+    const { company_id, owner_type, owner_id, group_id } = req.query;
 
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({ error: "Missing tenant info" });
     }
+
+    const parentGroupId = group_id ? parseInt(group_id, 10) : -110;
 
     // 1. Fetch subgroups and calculate their total balance from underlying ledgers
     const groupSql = `
@@ -192,7 +194,7 @@ router.get("/api/outstanding-receivables", async (req, res) => {
         ), 0) AS net_balance
       FROM ledger_groups lg
       LEFT JOIN ledgers l ON l.group_id = lg.id
-      WHERE lg.parent = -110 
+      WHERE lg.parent = ? 
         AND lg.company_id = ? 
         AND lg.owner_type = ? 
         AND lg.owner_id = ?
@@ -215,14 +217,14 @@ router.get("/api/outstanding-receivables", async (req, res) => {
           COALESCE((SELECT SUM(amount) FROM voucher_entries WHERE ledger_id = l.id AND entry_type = 'credit'), 0)
         ) AS net_balance
       FROM ledgers l
-      WHERE (l.group_id = -110 OR l.group_id IN (SELECT id FROM ledger_groups WHERE parent = -110))
+      WHERE (l.group_id = ? OR l.group_id IN (SELECT id FROM ledger_groups WHERE parent = ?))
         AND l.company_id = ? 
         AND l.owner_type = ? 
         AND l.owner_id = ?
     `;
 
-    const [groups] = await pool.query(groupSql, [company_id, owner_type, owner_id]);
-    const [ledgers] = await pool.query(ledgerSql, [company_id, owner_type, owner_id]);
+    const [groups] = await pool.query(groupSql, [parentGroupId, company_id, owner_type, owner_id]);
+    const [ledgers] = await pool.query(ledgerSql, [parentGroupId, parentGroupId, company_id, owner_type, owner_id]);
 
     // Format results to use positive closing_balance and 'debit'/'credit' type
     const formatItem = (item) => ({
