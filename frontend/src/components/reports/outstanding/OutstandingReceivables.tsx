@@ -21,6 +21,11 @@ const OutstandingReceivables: React.FC = () => {
   const [data, setData] = useState<ReportItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [groupHistory, setGroupHistory] = useState<{ id: number; name: string }[]>([
+    { id: -110, name: "Sundry Debtors" }
+  ]);
+
+  const currentGroup = groupHistory[groupHistory.length - 1];
 
   useEffect(() => {
     const fetchOutstandingData = async () => {
@@ -41,7 +46,7 @@ const OutstandingReceivables: React.FC = () => {
 
       try {
         const apiUrl = import.meta.env.VITE_API_URL || "";
-        const url = `${apiUrl}/api/outstanding-receivables?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+        const url = `${apiUrl}/api/outstanding-receivables?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&group_id=${currentGroup.id}`;
         const response = await fetch(url);
 
         if (!response.ok) {
@@ -58,7 +63,7 @@ const OutstandingReceivables: React.FC = () => {
     };
 
     fetchOutstandingData();
-  }, []);
+  }, [currentGroup.id]);
 
   const filteredData = useMemo(() => {
     if (!searchTerm) return data;
@@ -85,10 +90,34 @@ const OutstandingReceivables: React.FC = () => {
               Receivables Outstanding
             </h2>
             <p className={`mt-1 ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-              Subgroups and Ledgers under Sundry Debtors (-110)
+              Subgroups and Ledgers under {currentGroup.name}
             </p>
           </div>
         </div>
+
+        {/* 🗺️ Breadcrumb Trail */}
+        {groupHistory.length > 1 && (
+          <div className="flex items-center gap-2 mb-6 px-3 py-2 rounded-lg bg-gray-100 dark:bg-gray-750 text-sm font-medium">
+            {groupHistory.map((grp, idx) => (
+              <React.Fragment key={grp.id}>
+                {idx > 0 && <span className="text-gray-400 font-normal">/</span>}
+                {idx === groupHistory.length - 1 ? (
+                  <span className={`${theme === "dark" ? "text-gray-300" : "text-gray-700"} font-semibold`}>
+                    {grp.name}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => setGroupHistory((prev) => prev.slice(0, idx + 1))}
+                    className="text-blue-600 dark:text-blue-400 hover:underline transition-colors"
+                  >
+                    {grp.name}
+                  </button>
+                )}
+              </React.Fragment>
+            ))}
+          </div>
+        )}
 
         <div className="relative mb-6">
           <Search className="absolute left-3 top-2.5 w-4 h-4 text-gray-500" />
@@ -134,6 +163,8 @@ const OutstandingReceivables: React.FC = () => {
                       onClick={() => {
                         if (item.entry_type === "ledger") {
                           navigate(`/app/reports/ledger/${item.id}`);
+                        } else if (item.entry_type === "group") {
+                          setGroupHistory((prev) => [...prev, { id: item.id, name: item.name }]);
                         }
                       }}
                     >
