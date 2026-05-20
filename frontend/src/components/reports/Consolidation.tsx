@@ -43,6 +43,10 @@ const ConsolidatedFinancialReport: React.FC = () => {
   const navigate = useNavigate();
 
   const employeeId = localStorage.getItem("employee_id") || "";
+  const userId = localStorage.getItem("user_id") || "";
+  const userType = localStorage.getItem("userType") || "";
+  const supplier = localStorage.getItem("supplier") || "employee";
+  const ownerId = supplier === "employee" ? employeeId : userId;
 
   const [companies, setCompanies] = useState<Company[]>([]);
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
@@ -80,7 +84,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
 
   useEffect(() => {
     const fetchData = async () => {
-      if (!employeeId) return;
+      if (!employeeId && !userId) return;
       setLoading(true);
       setError(null);
       try {
@@ -88,7 +92,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
         const startStr = startDate.toISOString().split('T')[0];
         const endStr = endDate.toISOString().split('T')[0];
 
-        const url = `${import.meta.env.VITE_API_URL}/api/consolidated-balance-sheet?employee_id=${employeeId}&startDate=${startStr}&endDate=${endStr}`;
+        const url = `${import.meta.env.VITE_API_URL}/api/consolidated-balance-sheet?employee_id=${employeeId}&ca_id=${userId}&ca_employee_id=${userId}&user_type=${userType}&startDate=${startStr}&endDate=${endStr}`;
         const res = await fetch(url);
         if (!res.ok) throw new Error("Failed to load consolidated data");
         const data = await res.json();
@@ -112,21 +116,21 @@ const ConsolidatedFinancialReport: React.FC = () => {
           data.companies.forEach(async (c: Company) => {
             // Stock Items
             try {
-              const stockRes = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?company_id=${c.id}&owner_type=employee&owner_id=${employeeId}`);
+              const stockRes = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?company_id=${c.id}&owner_type=${supplier}&owner_id=${ownerId}`);
               const stockData = await stockRes.json();
               setStockItemsMap(prev => ({ ...prev, [c.id]: stockData.data || [] }));
             } catch (err) { console.error(`Stock fetch error for ${c.id}`, err); }
 
             // Purchase History
             try {
-              const purRes = await fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?company_id=${c.id}&owner_type=employee&owner_id=${employeeId}`);
+              const purRes = await fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?company_id=${c.id}&owner_type=${supplier}&owner_id=${ownerId}`);
               const purData = await purRes.json();
               setPurchaseHistoryMap(prev => ({ ...prev, [c.id]: purData.data || [] }));
             } catch (err) { console.error(`Purchase fetch error for ${c.id}`, err); }
 
             // Sales History
             try {
-              const saleRes = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers/sale-history?company_id=${c.id}&owner_type=employee&owner_id=${employeeId}`);
+              const saleRes = await fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers/sale-history?company_id=${c.id}&owner_type=${supplier}&owner_id=${ownerId}`);
               const saleData = await saleRes.json();
               setSalesHistoryMap(prev => ({ ...prev, [c.id]: saleData.data || [] }));
             } catch (err) { console.error(`Sales fetch error for ${c.id}`, err); }
@@ -139,7 +143,7 @@ const ConsolidatedFinancialReport: React.FC = () => {
       }
     };
     fetchData();
-  }, [employeeId, selectedFinYear]);
+  }, [employeeId, userId, selectedFinYear]);
 
   const calculateClosingBalance = (ledger: Ledger): number => {
     const opening = Number(ledger.openingBalance) || 0;
