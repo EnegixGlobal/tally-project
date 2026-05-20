@@ -318,14 +318,22 @@ const SalesImport: React.FC = () => {
             jsonData.forEach((row, index) => {
                 const invoiceNo = String(row["Invoice number"] || row["Invoice No"] || row["Voucher No"] || row["Reference No"] || row["Ref No"] || row["invoice_no"] || row["bill_no"] || (lastHeader ? lastHeader["Invoice number"] : "")).trim();
                 const invoiceDate = formatDate(row["Invoice Date"] || row["Date"] || row["Invoice date"] || row["date"] || row["invoice_date"] || (lastHeader ? lastHeader["Invoice Date"] : ""));
-                const rawGstin = String(row["GSTIN of Customer"] || row["GSTIN of customer"] || row["GSTIN of supplier"] || row["GSTIN"] || row["gstin"] || (lastHeader ? lastHeader["GSTIN of Customer"] : ""));
-                const rawPartyName = String(row["Trade/Legal name of the Customer"] || row["Trade/Legal name of the Customer"] || row["Trade/Legal name of the Supplier"] || row["Customer Name"] || row["Supplier Name"] || row["Party Name"] || row["party_name"] || (lastHeader ? lastHeader["Trade/Legal name of the Customer"] : ""));
+                let rawGstin = String(row["GSTIN of Customer"] || row["GSTIN of customer"] || row["GSTIN of supplier"] || row["GSTIN"] || row["gstin"] || (lastHeader ? lastHeader["GSTIN of Customer"] : ""));
+                if (rawGstin === "undefined" || rawGstin === "null") {
+                    rawGstin = "";
+                }
+                
+                let rawPartyName = String(row["Trade/Legal name of the Customer"] || row["Customer Name"] || row["Party Name"] || row["party_name"] || (lastHeader ? lastHeader["Trade/Legal name of the Customer"] : ""));
+                if (rawPartyName === "undefined" || rawPartyName === "null") {
+                    rawPartyName = "";
+                }
+                
                 const rawPlaceOfSupply = String(row["Place of supply"] || row["POS"] || row["Place Of Supply"] || row["pos"] || (lastHeader ? lastHeader["Place of supply"] : ""));
                 const rawSalesLedger = String(row["Sales Ledger"] || row["sales_ledger"] || row["Purchase Ledger"] || (lastHeader ? lastHeader["Sales Ledger"] : ""));
                 const rawInvoiceValue = row["Invoice Value (₹)"] !== undefined ? row["Invoice Value (₹)"] : (row["Invoice Value"] || row["Total Amount"] || (lastHeader ? lastHeader["Invoice Value (₹)"] : 0));
 
                 const gstin = rawGstin.toUpperCase().replace(/\s+/g, "").trim();
-                const partyName = rawPartyName.replace(/\s+/g, " ").trim();
+                let partyName = rawPartyName.replace(/\s+/g, " ").trim();
                 let placeOfSupply = rawPlaceOfSupply.toLowerCase().replace(/\s+/g, " ").trim();
 
                 const groupKey = `${gstin}-${invoiceNo}-${invoiceDate}`;
@@ -347,7 +355,31 @@ const SalesImport: React.FC = () => {
                     let errorMessage = "";
                     let suggestedLedger = null;
 
-                    if (partyName) {
+                    // 1. First try matching by GST number if present in Excel
+                    if (gstin) {
+                        const matchedLedgerByGst = ledgers.find(l => {
+                            const lGst = (l.gst_number || l.gstNumber) ? String(l.gst_number || l.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
+                            return lGst === gstin;
+                        });
+
+                        if (matchedLedgerByGst) {
+                            // If GST matches, use name from database ("name get and show")
+                            partyName = matchedLedgerByGst.name;
+                            matchedLedgerByName = matchedLedgerByGst;
+                            gstMatch = true;
+                            stateMatch = true; // Trust database ledger's state
+                            if (matchedLedgerByGst.state) {
+                                placeOfSupply = matchedLedgerByGst.state;
+                            }
+                        } else {
+                            // GST not found in database -> it's fresh!
+                            // "name also save gst number" -> set partyName to gstin
+                            partyName = gstin;
+                        }
+                    }
+
+                    // 2. Fallback to name matching if no GSTIN was provided or if name is still not matched
+                    if (!matchedLedgerByName && partyName && partyName !== gstin) {
                         const excelName = partyName.toLowerCase();
                         matchedLedgerByName = ledgers.find(l => {
                             const lName = l.name ? String(l.name).toLowerCase().replace(/\s+/g, " ").trim() : "";
@@ -357,10 +389,12 @@ const SalesImport: React.FC = () => {
                         if (matchedLedgerByName) {
                             const lGst = (matchedLedgerByName.gst_number || matchedLedgerByName.gstNumber) ? String(matchedLedgerByName.gst_number || matchedLedgerByName.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
                             const lState = matchedLedgerByName.state ? String(matchedLedgerByName.state).toLowerCase().replace(/\s+/g, " ").trim() : "";
-                            gstMatch = !gstin || lGst === gstin;
+                            gstMatch = lGst === gstin;
 
+                            // If ledger is matched, we trust its state over Excel's POS
                             if (lState) {
                                 stateMatch = true;
+                                // Update the local variable so calculations use the ledger state
                                 placeOfSupply = lState;
                             } else {
                                 const excelStateCode = extractStateCode(placeOfSupply);
@@ -376,7 +410,7 @@ const SalesImport: React.FC = () => {
                             else if (!stateMatch) errorMessage = `State mismatch (Ledger has: ${lState || 'Empty'})`;
                         } else {
                             errorMessage = "Customer Name not found in ledgers";
-                            // Autofix: Find by GSTIN
+                            // Autofix logic: find by GSTIN
                             const gstinMatch = gstin ? ledgers.find(l => {
                                 const lGst = (l.gst_number || l.gstNumber) ? String(l.gst_number || l.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
                                 return lGst === gstin;
@@ -385,11 +419,15 @@ const SalesImport: React.FC = () => {
                             if (gstinMatch) {
                                 suggestedLedger = gstinMatch;
                             } else {
+                                // Neither name nor GSTIN matched
                                 errorMessage = "Customer Ledger does not exist";
                             }
                         }
-                    } else if (currentImportMode === "item") {
-                        errorMessage = "Customer Name is required for item-wise import";
+                    } else if (!matchedLedgerByName && partyName === gstin) {
+                        // Fresh GSTIN ledger case
+                        errorMessage = "Customer Ledger does not exist";
+                    } else if (!partyName && currentImportMode === "item") {
+                        errorMessage = "Customer Name/GSTIN is required for item-wise import";
                     }
 
                     const excelSalesLedger = rawSalesLedger ? String(rawSalesLedger).trim().toLowerCase() : "";
@@ -726,7 +764,7 @@ const SalesImport: React.FC = () => {
                             const customerName = debitEntry["Particulars (Ledger Name)"];
                             voucher["Trade/Legal name of the Customer"] = customerName;
 
-                            const matchedLedger = ledgers.find(l => l.name.toLowerCase().trim() === customerName.toLowerCase().trim());
+                            const matchedLedger = ledgers.find(l => String(l.name).toLowerCase().trim() === String(customerName || "").toLowerCase().trim());
                             if (matchedLedger) {
                                 voucher._matchedLedgerId = matchedLedger.id;
                                 voucher.partyMatch = true;
@@ -939,7 +977,7 @@ const SalesImport: React.FC = () => {
                 setGroupedVouchers(prev => prev.map(v => {
                     if (!v._missingLedger) return v;
 
-                    const excelName = v["Trade/Legal name of the Customer"].toLowerCase();
+                    const excelName = String(v["Trade/Legal name of the Customer"] || "").toLowerCase();
                     const excelGst = v["GSTIN of Customer"].toUpperCase().replace(/\s+/g, "").trim();
 
                     const matchedLedger = updatedLedgers.find(l => {
@@ -960,7 +998,7 @@ const SalesImport: React.FC = () => {
                         let updatedEntries = v.accountingEntries ? [...v.accountingEntries] : [];
                         if (updatedEntries.length > 0) {
                             updatedEntries = updatedEntries.map(ae => {
-                                if (ae["Particulars (Ledger Name)"].toLowerCase().trim() === v["Trade/Legal name of the Customer"].toLowerCase().trim() || (v.accSummaryRows && ae.Type === 'debit')) {
+                                if (ae["Particulars (Ledger Name)"].toLowerCase().trim() === String(v["Trade/Legal name of the Customer"] || "").toLowerCase().trim() || (v.accSummaryRows && ae.Type === 'debit')) {
                                     return { ...ae, "Particulars (Ledger Name)": matchedLedger.name, _matchedLedgerId: matchedLedger.id };
                                 }
                                 return ae;
@@ -1170,7 +1208,7 @@ const SalesImport: React.FC = () => {
                     });
 
                     const totalInvoiceValue = voucher.accSummaryRows.reduce((s, r) => s + r.rowTotal, 0);
-                    const partyLedgerMatch = ledgers.find(l => String(l.name).toLowerCase().trim() === voucher["Trade/Legal name of the Customer"].toLowerCase().trim());
+                    const partyLedgerMatch = ledgers.find(l => String(l.name).toLowerCase().trim() === String(voucher["Trade/Legal name of the Customer"] || "").toLowerCase().trim());
                     newEntries.push({
                         "Particulars (Ledger Name)": voucher["Trade/Legal name of the Customer"] || "Customer",
                         "Amount (₹)": totalInvoiceValue,
