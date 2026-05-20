@@ -88,7 +88,7 @@ router.get("/purchase-history", async (req, res) => {
     ON l.id = pv.partyId
 
   LEFT JOIN stock_items si
-    ON ph.itemName = si.name
+    ON ph.itemName COLLATE utf8mb4_general_ci = si.name COLLATE utf8mb4_general_ci
     AND si.company_id = ?
 
   LEFT JOIN stock_units su
