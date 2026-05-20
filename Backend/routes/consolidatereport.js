@@ -3,16 +3,39 @@ const router = express.Router();
 const db = require('../db'); // your mysql2 connection pool
 
 router.get('/employee-financial-report', async (req, res) => {
-  const employee_id = req.query.employee_id;
-  if (!employee_id) return res.status(400).json({ message: "Missing employee_id" });
+  const { employee_id, ca_id, ca_employee_id, user_type } = req.query;
+  if (!employee_id && !ca_id && !ca_employee_id) {
+    return res.status(400).json({ message: "Missing identifier" });
+  }
 
   const connection = await db.getConnection();
   try {
     // --- Assigned companies
-    const [companies] = await connection.query(
-      `SELECT id, name FROM tbcompanies WHERE employee_id = ?`,
-      [employee_id]
-    );
+    let companies = [];
+    if (user_type === 'ca' && ca_id) {
+      const [caRows] = await connection.query('SELECT fdname FROM tbca WHERE fdSiNo = ?', [ca_id]);
+      const caName = caRows.length > 0 ? caRows[0].fdname.trim() : null;
+      const [rows] = await connection.query(
+        `SELECT id, name FROM tbcompanies WHERE (fdAccountantName = ?) OR (employee_id = ?)`,
+        [caName, ca_id]
+      );
+      companies = rows;
+    } else if (user_type === 'ca_employee' && ca_employee_id) {
+      const [rows] = await connection.query(
+        `SELECT c.id, c.name FROM tbcompanies c INNER JOIN tbcaemployeecompanies a ON c.id = a.company_id WHERE a.ca_employee_id = ?`,
+        [ca_employee_id]
+      );
+      companies = rows;
+    } else {
+      const fetchId = employee_id || ca_id || ca_employee_id;
+      if (fetchId) {
+        const [rows] = await connection.query(
+          `SELECT id, name FROM tbcompanies WHERE employee_id = ? OR id = ?`,
+          [fetchId, fetchId]
+        );
+        companies = rows;
+      }
+    }
 
     let balanceRowsMap = {};
     let tradingRowsMap = {};
@@ -153,15 +176,38 @@ router.get('/employee-financial-report', async (req, res) => {
 });
 
 router.get('/employee-financial-report-consolidated', async (req, res) => {
-  const employee_id = req.query.employee_id;
-  if (!employee_id) return res.status(400).json({ message: "Missing employee_id" });
+  const { employee_id, ca_id, ca_employee_id, user_type } = req.query;
+  if (!employee_id && !ca_id && !ca_employee_id) {
+    return res.status(400).json({ message: "Missing identifier" });
+  }
 
   const connection = await db.getConnection();
   try {
-    const [companies] = await connection.query(
-      `SELECT id, name FROM tbcompanies WHERE employee_id = ?`,
-      [employee_id]
-    );
+    let companies = [];
+    if (user_type === 'ca' && ca_id) {
+      const [caRows] = await connection.query('SELECT fdname FROM tbca WHERE fdSiNo = ?', [ca_id]);
+      const caName = caRows.length > 0 ? caRows[0].fdname.trim() : null;
+      const [rows] = await connection.query(
+        `SELECT id, name FROM tbcompanies WHERE (fdAccountantName = ?) OR (employee_id = ?)`,
+        [caName, ca_id]
+      );
+      companies = rows;
+    } else if (user_type === 'ca_employee' && ca_employee_id) {
+      const [rows] = await connection.query(
+        `SELECT c.id, c.name FROM tbcompanies c INNER JOIN tbcaemployeecompanies a ON c.id = a.company_id WHERE a.ca_employee_id = ?`,
+        [ca_employee_id]
+      );
+      companies = rows;
+    } else {
+      const fetchId = employee_id || ca_id || ca_employee_id;
+      if (fetchId) {
+        const [rows] = await connection.query(
+          `SELECT id, name FROM tbcompanies WHERE employee_id = ? OR id = ?`,
+          [fetchId, fetchId]
+        );
+        companies = rows;
+      }
+    }
 
     // Generic helper for ledger groups
     async function getSectionData(companyId, ledgerNameLike) {
@@ -233,8 +279,10 @@ router.get('/employee-financial-report-consolidated', async (req, res) => {
 
 // GET /api/consolidated-balance-sheet - For consolidated balance sheet view (all employee's companies)
 router.get('/consolidated-balance-sheet', async (req, res) => {
-  const { employee_id, startDate, endDate } = req.query;
-  if (!employee_id) return res.status(400).json({ message: "Missing employee_id" });
+  const { employee_id, startDate, endDate, ca_id, ca_employee_id, user_type } = req.query;
+  if (!employee_id && !ca_id && !ca_employee_id) {
+    return res.status(400).json({ message: "Missing identifier (employee_id, ca_id, or ca_employee_id)" });
+  }
 
   const connection = await db.getConnection();
   try {
@@ -251,11 +299,32 @@ router.get('/consolidated-balance-sheet', async (req, res) => {
     const svDateFilter = startDate && endDate ? ` AND sv.date BETWEEN ? AND ?` : '';
     const svDateParams = startDate && endDate ? [startDate, endDate] : [];
 
-    // Get all companies assigned to this employee
-    const [companies] = await connection.query(
-      `SELECT id, name FROM tbcompanies WHERE employee_id = ?`,
-      [employee_id]
-    );
+    // Get all companies assigned to this user based on role/type
+    let companies = [];
+    if (user_type === 'ca' && ca_id) {
+      const [caRows] = await connection.query('SELECT fdname FROM tbca WHERE fdSiNo = ?', [ca_id]);
+      const caName = caRows.length > 0 ? caRows[0].fdname.trim() : null;
+      const [rows] = await connection.query(
+        `SELECT id, name FROM tbcompanies WHERE (fdAccountantName = ?) OR (employee_id = ?)`,
+        [caName, ca_id]
+      );
+      companies = rows;
+    } else if (user_type === 'ca_employee' && ca_employee_id) {
+      const [rows] = await connection.query(
+        `SELECT c.id, c.name FROM tbcompanies c INNER JOIN tbcaemployeecompanies a ON c.id = a.company_id WHERE a.ca_employee_id = ?`,
+        [ca_employee_id]
+      );
+      companies = rows;
+    } else {
+      const fetchId = employee_id || ca_id || ca_employee_id;
+      if (fetchId) {
+        const [rows] = await connection.query(
+          `SELECT id, name FROM tbcompanies WHERE employee_id = ? OR id = ?`,
+          [fetchId, fetchId]
+        );
+        companies = rows;
+      }
+    }
 
     if (companies.length === 0) {
       connection.release();
