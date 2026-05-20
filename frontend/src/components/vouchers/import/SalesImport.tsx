@@ -164,6 +164,159 @@ const extractStateCode = (pos: string): string => {
     return "";
 };
 
+interface FlatRow {
+    voucher: GroupedVoucher;
+    parentIndex: number;
+    subIndex: number;
+    isFirstInVoucher: boolean;
+    rowCount: number;
+    invoiceNo: string;
+    invoiceDate: string;
+    partyName: string;
+    gstin: string;
+    pos: string;
+    ledgerName: string;
+    particulars: string;
+    qty: string | number;
+    rate: string | number;
+    taxableValue: number;
+    gstRate: string | number;
+    igst: number;
+    cgst: number;
+    sgst: number;
+    discount: number;
+    rowTotal: number;
+    isItemMode: boolean;
+    isSummaryMode: boolean;
+    isLegacyMode: boolean;
+    itemRef?: ImportedItem;
+    summaryRef?: AccSummaryRow;
+    entryRef?: AccountingEntry;
+    calculationWarning?: string;
+}
+
+const getFlatRows = (vouchers: GroupedVoucher[]): FlatRow[] => {
+    const rows: FlatRow[] = [];
+    vouchers.forEach((voucher, vi) => {
+        const isItemMode = voucher.importMode === 'item';
+        const isSummaryMode = !!voucher.accSummaryRows;
+        const isLegacyMode = !isItemMode && !isSummaryMode;
+
+        let subRowsCount = 0;
+        if (isItemMode) {
+            subRowsCount = voucher.items?.length || 1;
+        } else if (isSummaryMode) {
+            subRowsCount = voucher.accSummaryRows?.length || 1;
+        } else {
+            subRowsCount = voucher.accountingEntries?.length || 1;
+        }
+
+        for (let i = 0; i < subRowsCount; i++) {
+            const isFirstInVoucher = i === 0;
+            const invoiceNo = voucher["Invoice number"] || "";
+            const invoiceDate = voucher["Invoice Date"] || "";
+            const partyName = voucher["Trade/Legal name of the Customer"] || "";
+            const gstin = voucher["GSTIN of Customer"] || "";
+            const pos = voucher["Place of supply"] || "";
+            
+            let ledgerName = "";
+            let particulars = "";
+            let qty: string | number = "";
+            let rate: string | number = "";
+            let taxableValue = 0;
+            let gstRate: string | number = "";
+            let igst = 0;
+            let cgst = 0;
+            let sgst = 0;
+            let discount = 0;
+            let rowTotal = 0;
+            let calculationWarning = undefined;
+            let itemRef: ImportedItem | undefined;
+            let summaryRef: AccSummaryRow | undefined;
+            let entryRef: AccountingEntry | undefined;
+
+            if (isItemMode) {
+                const item = voucher.items?.[i];
+                if (item) {
+                    itemRef = item;
+                    particulars = item["Item Name"] || "";
+                    qty = item["Quantity"] ?? "";
+                    rate = item["Item Rate (₹)"] ?? 0;
+                    taxableValue = item["Taxable Value (₹)"] ?? 0;
+                    gstRate = item["Rate (%)"] ?? 0;
+                    igst = item["Integrated Tax (₹)"] ?? 0;
+                    cgst = item["Central Tax (₹)"] ?? 0;
+                    sgst = item["State/UT tax (₹)"] ?? 0;
+                    rowTotal = taxableValue + igst + cgst + sgst;
+                    calculationWarning = item.calculationWarning;
+                    ledgerName = voucher["Sales Ledger"] || "";
+                }
+            } else if (isSummaryMode) {
+                const row = voucher.accSummaryRows?.[i];
+                if (row) {
+                    summaryRef = row;
+                    ledgerName = row.salesLedger || "";
+                    particulars = row.salesLedger || "";
+                    taxableValue = row.taxableValue ?? 0;
+                    gstRate = row.gstRate ?? 0;
+                    igst = row.igst ?? 0;
+                    cgst = row.cgst ?? 0;
+                    sgst = row.sgst ?? 0;
+                    discount = row.discount ?? 0;
+                    rowTotal = row.rowTotal ?? 0;
+                    calculationWarning = row.calculationWarning;
+                }
+            } else {
+                const entry = voucher.accountingEntries?.[i];
+                if (entry) {
+                    entryRef = entry;
+                    particulars = entry["Particulars (Ledger Name)"] || "";
+                    rowTotal = entry["Amount (₹)"] ?? 0;
+                    taxableValue = entry["Amount (₹)"] ?? 0;
+                    gstRate = entry["Rate (%)"] ?? "";
+                    igst = entry["Integrated Tax (₹)"] ?? 0;
+                    cgst = entry["Central Tax (₹)"] ?? 0;
+                    sgst = entry["State/UT tax (₹)"] ?? 0;
+                    calculationWarning = entry.calculationWarning;
+                    ledgerName = voucher["Sales Ledger"] || "";
+                }
+            }
+
+            rows.push({
+                voucher,
+                parentIndex: vi,
+                subIndex: i,
+                isFirstInVoucher,
+                rowCount: subRowsCount,
+                invoiceNo,
+                invoiceDate,
+                partyName,
+                gstin,
+                pos,
+                ledgerName,
+                particulars,
+                qty,
+                rate,
+                taxableValue,
+                gstRate,
+                igst,
+                cgst,
+                sgst,
+                discount,
+                rowTotal,
+                isItemMode,
+                isSummaryMode,
+                isLegacyMode,
+                itemRef,
+                summaryRef,
+                entryRef,
+                calculationWarning
+            });
+        }
+    });
+    return rows;
+};
+
 const SalesImport: React.FC = () => {
     const navigate = useNavigate();
     const { companyInfo } = useCompany();
@@ -1346,6 +1499,22 @@ const SalesImport: React.FC = () => {
 
                 {activeTab === "preview" && (
                     <div className="space-y-6">
+                        <style dangerouslySetInnerHTML={{__html: `
+                          .custom-scroll::-webkit-scrollbar {
+                            height: 6px;
+                            width: 6px;
+                          }
+                          .custom-scroll::-webkit-scrollbar-track {
+                            background: transparent;
+                          }
+                          .custom-scroll::-webkit-scrollbar-thumb {
+                            background: rgba(156, 163, 175, 0.45);
+                            border-radius: 4px;
+                          }
+                          .custom-scroll::-webkit-scrollbar-thumb:hover {
+                            background: rgba(156, 163, 175, 0.7);
+                          }
+                        `}} />
                         <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white p-6 rounded-2xl border border-gray-200 shadow-sm">
                             <div>
                                 <h3 className="text-lg font-bold text-gray-900">Import Preview</h3>
@@ -1424,296 +1593,294 @@ const SalesImport: React.FC = () => {
                                 </div>
                             )}
 
-                        <div className="space-y-4">
-                            {groupedVouchers.map((voucher, vi) => (
-                                <div key={vi} className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
-                                    {/* Voucher Header Row */}
-                                    <div className="bg-gray-50 p-4 border-b border-gray-200">
-                                        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                                            <div className="flex items-center space-x-3">
-                                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-600 font-bold text-sm">
-                                                    {vi + 1}
-                                                </div>
-                                                {(importMode === 'item' || importMode === 'accounting') && (
-                                                    <div>
-                                                        <p className="text-xs font-bold text-gray-400 uppercase">Customer {voucher._matchedLedgerId && `(ID: ${voucher._matchedLedgerId})`}</p>
-                                                        <p className={`font-bold text-sm flex items-center gap-1 ${!voucher.partyMatch ? "text-red-500" : "text-gray-900"}`}>
-                                                            {voucher["Trade/Legal name of the Customer"]}
-                                                            {voucher._matchedLedgerId && <CheckCircle size={14} className="text-green-500" />}
-                                                        </p>
-                                                        <div className="flex flex-col gap-0.5 mt-1">
-                                                            <p className="text-[10px] text-gray-500 flex items-center gap-1">
-                                                                GST: {voucher["GSTIN of Customer"]}
-                                                                {voucher._matchedGstinId ? <CheckCircle size={10} className="text-green-500" /> : <AlertTriangle size={10} className="text-amber-400" />}
-                                                            </p>
-                                                            <p className="text-[10px] text-gray-500 flex items-center gap-1">
-                                                                POS: {voucher["Place of supply"]}
-                                                                {voucher._matchedStateId ? <CheckCircle size={10} className="text-green-500" /> : <AlertTriangle size={10} className="text-amber-400" />}
-                                                            </p>
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-gray-500 uppercase">Invoice Details</p>
-                                                <p className="text-sm font-bold text-gray-900">No: {voucher["Invoice number"]}</p>
-                                                <p className="text-xs text-gray-600">Date: {voucher["Invoice Date"]}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-xs font-bold text-gray-400 uppercase">
-                                                    {(importMode === 'accounting' && !voucher.accSummaryRows)
-                                                        ? `Totals (${voucher.accountingEntries?.filter(ae => ae.Type === 'credit').length} Cr / ${voucher.accountingEntries?.filter(ae => ae.Type === 'debit').length} Dr)`
-                                                        : 'Invoice Value'
-                                                    }
-                                                </p>
-                                                <p className="text-sm font-bold text-blue-600 flex items-center gap-3">
-                                                    {(importMode === 'accounting' && !voucher.accSummaryRows)
-                                                        ? <>
-                                                            <span className="flex items-center gap-1">
-                                                                <span className="text-[10px] text-gray-400 font-bold uppercase">Cr:</span>
-                                                                <span className="text-green-600">₹{voucher.accountingEntries?.reduce((s, ae) => ae.Type === 'credit' ? s + ae["Amount (₹)"] : s, 0).toLocaleString()}</span>
-                                                            </span>
-                                                            <span className="text-gray-200">|</span>
-                                                            <span className="flex items-center gap-1">
-                                                                <span className="text-[10px] text-gray-400 font-bold uppercase">Dr:</span>
-                                                                <span className="text-red-600">₹{voucher.accountingEntries?.reduce((s, ae) => ae.Type === 'debit' ? s + ae["Amount (₹)"] : s, 0).toLocaleString()}</span>
-                                                            </span>
-                                                        </>
-                                                        : `₹${voucher["Invoice Value (₹)"].toLocaleString()}`
-                                                    }
-                                                </p>
-                                            </div>
-                                            <div className="flex flex-col items-end justify-center">
-                                                {voucher.status === "imported" ? (
-                                                    <span className="flex items-center text-green-600 font-bold text-xs bg-green-50 px-3 py-1 rounded-full border border-green-200">
-                                                        <CheckCircle size={12} className="mr-1" /> Success
-                                                    </span>
-                                                ) : voucher.status === "error" ? (
-                                                    <span className="flex items-center text-red-600 font-bold text-xs bg-red-50 px-3 py-1 rounded-full border border-red-200" title={voucher.errorMessage}>
-                                                        <AlertTriangle size={12} className="mr-1" /> Error
-                                                    </span>
-                                                ) : voucher.status === "importing" ? (
-                                                    <span className="flex items-center text-blue-600 font-bold text-xs bg-blue-50 px-3 py-1 rounded-full border border-blue-200">
-                                                        <RefreshCw size={12} className="mr-1 animate-spin" /> Saving...
-                                                    </span>
-                                                ) : (
-                                                    <span className="flex items-center text-gray-600 font-bold text-xs bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
-                                                        Ready
-                                                    </span>
-                                                )}
-                                                {voucher.errorMessage && (
-                                                    <div className="flex flex-col items-end">
-                                                        <p className="text-[10px] text-red-500 mt-1 max-w-[200px] text-right">{voucher.errorMessage}</p>
-                                                        {voucher._suggestedLedger && (
-                                                            <button
-                                                                onClick={() => fixVoucherParty(voucher.id)}
-                                                                className="mt-1 px-2 py-1 bg-blue-100 text-blue-700 text-[9px] font-bold rounded border border-blue-200 hover:bg-blue-200 transition-colors flex items-center gap-1 shadow-sm"
-                                                            >
-                                                                <RefreshCw size={10} className="text-blue-600" />
-                                                                Autofix: Use "{voucher._suggestedLedger.name}"
-                                                            </button>
-                                                        )}
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
+                        <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+                            <div className="overflow-x-auto custom-scroll w-full">
+                                <table className="w-full text-left border-collapse table-auto border-spacing-0">
+                                    <thead className="bg-gray-100 sticky top-0 z-20 border-b border-gray-300 shadow-[0_1px_0_rgba(0,0,0,0.05)]">
+                                        <tr className="">
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider w-12 text-center bg-gray-100">#</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center bg-gray-100 min-w-[80px]">Status</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 min-w-[110px]">Invoice No</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 min-w-[90px]">Invoice Date</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 min-w-[180px]">Customer Name</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 min-w-[130px]">GSTIN</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 min-w-[120px]">POS (State)</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 min-w-[150px]">Sales Ledger</th>
+                                            {importMode === "item" && (
+                                                <>
+                                                    <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 min-w-[180px]">Particulars (Item Name)</th>
+                                                    <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">Qty</th>
+                                                    <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">Rate (₹)</th>
+                                                </>
+                                            )}
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">Taxable Value (₹)</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-center bg-gray-100">GST %</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">IGST (₹)</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">CGST (₹)</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">SGST (₹)</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">Discount (₹)</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">Total (₹)</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 min-w-[200px]">Remarks / Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-200">
+                                        {getFlatRows(groupedVouchers).map((row, index, arr) => {
+                                            const isLastInVoucher = row.subIndex === row.rowCount - 1;
+                                            const rowBg = row.parentIndex % 2 === 0 ? "bg-white" : "bg-slate-50/40";
+                                            const rowBorderBottom = isLastInVoucher ? "border-b-2 border-gray-300 shadow-[0_1px_0_rgba(0,0,0,0.05)]" : "border-b border-gray-200/60";
 
-                                    {/* Items/Accounting Table */}
-                                    <div className="p-0 overflow-x-auto">
-                                        <table className="w-full text-left">
-                                            <thead className="bg-white border-b border-gray-100">
-                                                <tr>
-                                                    {voucher.accSummaryRows ? (
+                                            return (
+                                                <tr key={index} className={`${rowBg} ${rowBorderBottom} hover:bg-blue-50/20 transition-colors`}>
+                                                    <td className="px-3 py-2.5 text-xs text-gray-400 font-medium text-center">{index + 1}</td>
+                                                    
+                                                    {row.isFirstInVoucher ? (
+                                                        <td rowSpan={row.rowCount} className="px-3 py-2.5 text-center align-middle font-semibold bg-white/70">
+                                                            {row.voucher.status === "imported" ? (
+                                                                <span className="inline-flex items-center text-green-600 text-[10px] font-bold bg-green-50 px-2 py-0.5 rounded-full border border-green-200">
+                                                                    <CheckCircle size={10} className="mr-1 shrink-0" /> Success
+                                                                </span>
+                                                            ) : row.voucher.status === "error" ? (
+                                                                <span className="inline-flex items-center text-red-600 text-[10px] font-bold bg-red-50 px-2 py-0.5 rounded-full border border-red-200" title={row.voucher.errorMessage}>
+                                                                    <AlertTriangle size={10} className="mr-1 shrink-0" /> Error
+                                                                </span>
+                                                            ) : row.voucher.status === "importing" ? (
+                                                                <span className="inline-flex items-center text-blue-600 text-[10px] font-bold bg-blue-50 px-2 py-0.5 rounded-full border border-blue-200">
+                                                                    <RefreshCw size={10} className="mr-1 shrink-0 animate-spin" /> Saving...
+                                                                </span>
+                                                            ) : (
+                                                                <span className="inline-flex items-center text-gray-600 text-[10px] font-bold bg-gray-100 px-2 py-0.5 rounded-full border border-gray-200">
+                                                                    Ready
+                                                                </span>
+                                                            )}
+                                                        </td>
+                                                    ) : null}
+
+                                                    {row.isFirstInVoucher ? (
+                                                        <td rowSpan={row.rowCount} className="px-3 py-2.5 text-xs font-bold text-gray-900 align-middle bg-white/70">
+                                                            {row.invoiceNo}
+                                                        </td>
+                                                    ) : null}
+
+                                                    {row.isFirstInVoucher ? (
+                                                        <td rowSpan={row.rowCount} className="px-3 py-2.5 text-xs text-gray-600 align-middle bg-white/70">
+                                                            {row.invoiceDate}
+                                                        </td>
+                                                    ) : null}
+
+                                                    {row.isFirstInVoucher ? (
+                                                        <td rowSpan={row.rowCount} className="px-3 py-2.5 align-middle bg-white/70">
+                                                            <div className="flex flex-col">
+                                                                <span className={`font-bold text-xs flex items-center gap-1 ${!row.voucher.partyMatch ? "text-red-500" : "text-gray-900"}`}>
+                                                                    {row.partyName || "Unnamed Customer"}
+                                                                    {row.voucher._matchedLedgerId && <CheckCircle size={12} className="text-green-500 shrink-0" />}
+                                                                </span>
+                                                                {row.voucher._matchedLedgerId && <span className="text-[9px] text-gray-400">ID: {row.voucher._matchedLedgerId}</span>}
+                                                            </div>
+                                                        </td>
+                                                    ) : null}
+
+                                                    {row.isFirstInVoucher ? (
+                                                        <td rowSpan={row.rowCount} className="px-3 py-2.5 align-middle bg-white/70">
+                                                            {row.gstin ? (
+                                                                <span className="text-xs font-semibold text-gray-700 flex items-center gap-1">
+                                                                    {row.gstin}
+                                                                    {row.voucher._matchedGstinId ? <CheckCircle size={10} className="text-green-500 shrink-0" /> : <AlertTriangle size={10} className="text-amber-400 shrink-0" />}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs text-gray-400 italic">None</span>
+                                                            )}
+                                                        </td>
+                                                    ) : null}
+
+                                                    {row.isFirstInVoucher ? (
+                                                        <td rowSpan={row.rowCount} className="px-3 py-2.5 align-middle bg-white/70">
+                                                            {row.pos ? (
+                                                                <span className="text-xs text-gray-700 flex items-center gap-1">
+                                                                    {row.pos}
+                                                                    {row.voucher._matchedStateId ? <CheckCircle size={10} className="text-green-500 shrink-0" /> : <AlertTriangle size={10} className="text-amber-400 shrink-0" />}
+                                                                </span>
+                                                            ) : (
+                                                                <span className="text-xs text-gray-400 italic">None</span>
+                                                            )}
+                                                        </td>
+                                                    ) : null}
+
+                                                    {/* Sales Ledger */}
+                                                    <td className="px-3 py-2.5">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-xs font-medium text-gray-700 flex items-center gap-1">
+                                                                {row.ledgerName || "-"}
+                                                                {row.ledgerName && (row.isSummaryMode ? (
+                                                                    ledgers.some(l => String(l.name).toLowerCase().trim() === row.ledgerName.toLowerCase().trim())
+                                                                        ? <CheckCircle size={10} className="text-green-500 shrink-0" />
+                                                                        : <AlertTriangle size={10} className="text-amber-400 shrink-0" />
+                                                                ) : (
+                                                                    row.voucher._matchedSalesLedgerId ? <CheckCircle size={10} className="text-green-500 shrink-0" /> : null
+                                                                ))}
+                                                            </span>
+                                                            {!row.isSummaryMode && row.voucher._matchedSalesLedgerId && <span className="text-[9px] text-gray-400">ID: {row.voucher._matchedSalesLedgerId}</span>}
+                                                        </div>
+                                                    </td>
+
+                                                    {importMode === "item" && (
                                                         <>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider w-16">No</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Taxable Value</th>
-                                                            {voucher.accSummaryRows.some(r => r.igst > 0) && <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">IGST (₹)</th>}
-                                                            {voucher.accSummaryRows.some(r => r.cgst > 0) && <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">CGST (₹)</th>}
-                                                            {voucher.accSummaryRows.some(r => r.sgst > 0) && <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">SGST (₹)</th>}
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-center">GST Rate</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sales Ledger</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Discount (₹)</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Invoice Total</th>
-                                                        </>
-                                                    ) : importMode === 'item' ? (
-                                                        <>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider w-16">No</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Item Name</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">HSN</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Batch</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Qty</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Rate</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Taxable</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">GST %</th>
-                                                            {voucher.items.some(it => it["Integrated Tax (₹)"] > 0) && <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">IGST</th>}
-                                                            {voucher.items.some(it => it["Central Tax (₹)"] > 0) && <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">CGST</th>}
-                                                            {voucher.items.some(it => it["State/UT tax (₹)"] > 0) && <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">SGST</th>}
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Tax Amt</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Sales Ledger</th>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider w-16">No</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Particulars</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider">Type</th>
-                                                            <th className="px-6 py-2 text-[10px] font-bold text-gray-400 uppercase tracking-wider text-right">Amount</th>
+                                                            {/* Particulars */}
+                                                            <td className="px-3 py-2.5">
+                                                                <div className="flex flex-col">
+                                                                    {row.isItemMode ? (
+                                                                        <>
+                                                                            <div className="flex items-center gap-1">
+                                                                                <span className="text-xs font-semibold text-gray-700">{row.particulars || "-"}</span>
+                                                                                {row.itemRef?._matchedItemId ? <CheckCircle size={11} className="text-green-500 shrink-0" /> : <AlertTriangle size={11} className="text-amber-400 shrink-0" />}
+                                                                            </div>
+                                                                            {row.itemRef?._matchedItemId && <span className="text-[9px] text-gray-400">ID: {row.itemRef._matchedItemId}</span>}
+                                                                            {row.itemRef?.["HSN Code"] && (
+                                                                                <span className="text-[9px] text-gray-500 flex items-center gap-1 mt-0.5">
+                                                                                    HSN: {row.itemRef["HSN Code"]}
+                                                                                    {row.itemRef._matchedHsnId && <CheckCircle size={9} className="text-green-500 shrink-0" />}
+                                                                                </span>
+                                                                            )}
+                                                                            {row.itemRef?.["Batch No"] && (
+                                                                                <span className="text-[9px] text-gray-500 flex items-center gap-1">
+                                                                                    Batch: {row.itemRef["Batch No"]}
+                                                                                    {row.itemRef._matchedBatchFound && <CheckCircle size={9} className="text-green-500 shrink-0" />}
+                                                                                </span>
+                                                                            )}
+                                                                        </>
+                                                                    ) : (
+                                                                        <span className="text-xs font-semibold text-gray-700">{row.particulars || "-"}</span>
+                                                                    )}
+                                                                </div>
+                                                            </td>
+
+                                                            {/* Qty */}
+                                                            <td className="px-3 py-2.5 text-xs text-gray-700 text-right font-medium">
+                                                                {row.isItemMode && row.qty !== "" ? row.qty : "-"}
+                                                            </td>
+
+                                                            {/* Rate */}
+                                                            <td className="px-3 py-2.5 text-xs text-gray-700 text-right">
+                                                                {row.isItemMode && row.rate !== "" ? `₹${Number(row.rate).toLocaleString()}` : "-"}
+                                                            </td>
                                                         </>
                                                     )}
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-gray-50">
-                                                {importMode === 'item' ? (
-                                                    voucher.items.map((item, ii) => {
-                                                        const taxAmt = (item["Integrated Tax (₹)"] || 0) + (item["Central Tax (₹)"] || 0) + (item["State/UT tax (₹)"] || 0);
-                                                        return (
-                                                            <tr key={ii} className="hover:bg-blue-50/30 transition-colors">
-                                                                <td className="px-6 py-3 text-sm text-gray-400 font-medium">{ii + 1}</td>
-                                                                <td className="px-6 py-3">
-                                                                    <div className="flex flex-col">
-                                                                        <div className="flex items-center gap-1">
-                                                                            <span className="text-sm font-semibold text-gray-700">{item["Item Name"]}</span>
-                                                                            {item._matchedItemId ? <CheckCircle size={12} className="text-green-500" /> : <AlertTriangle size={12} className="text-amber-400" />}
-                                                                        </div>
-                                                                        {item._matchedItemId && <span className="text-[10px] text-gray-400">ID: {item._matchedItemId}</span>}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-6 py-3">
-                                                                    <div className="flex items-center gap-1">
-                                                                        <span className="text-xs text-gray-500">{item["HSN Code"]}</span>
-                                                                        {item._matchedHsnId && <CheckCircle size={10} className="text-green-500" />}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-6 py-3">
-                                                                    <div className="flex flex-col">
-                                                                        <div className="flex items-center gap-1">
-                                                                            <span className="text-xs text-gray-500 uppercase">{item["Batch No"] || "-"}</span>
-                                                                            {item._matchedBatchFound && <CheckCircle size={10} className="text-green-500" />}
-                                                                        </div>
-                                                                        {item._matchedBatchFound && <span className="text-[9px] text-gray-400">Match Found</span>}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-6 py-3 text-sm text-gray-700 text-right font-medium">{item["Quantity"]}</td>
-                                                                <td className="px-6 py-3 text-sm text-gray-700 text-right">₹{item["Item Rate (₹)"].toLocaleString()}</td>
-                                                                <td className="px-6 py-3 text-sm text-gray-900 text-right font-bold relative">
-                                                                    ₹{item["Taxable Value (₹)"].toLocaleString()}
-                                                                    {item.calculationWarning?.includes("Qty") && <AlertTriangle size={12} className="text-red-500 absolute -top-1 right-1" />}
-                                                                </td>
-                                                                <td className="px-6 py-3 text-sm text-gray-700 text-right">{item["Rate (%)"]}%</td>
-                                                                {voucher.items.some(it => it["Integrated Tax (₹)"] > 0) && <td className="px-6 py-3 text-sm text-gray-600 text-right">₹{item["Integrated Tax (₹)"].toLocaleString()}</td>}
-                                                                {voucher.items.some(it => it["Central Tax (₹)"] > 0) && <td className="px-6 py-3 text-sm text-gray-600 text-right">₹{item["Central Tax (₹)"].toLocaleString()}</td>}
-                                                                {voucher.items.some(it => it["State/UT tax (₹)"] > 0) && <td className="px-6 py-3 text-sm text-gray-600 text-right">₹{item["State/UT tax (₹)"].toLocaleString()}</td>}
-                                                                <td className="px-6 py-3 text-sm text-blue-600 text-right font-bold relative">
-                                                                    ₹{taxAmt.toLocaleString()}
-                                                                    {item.calculationWarning?.includes("Tax Discrepancy") && <AlertTriangle size={12} className="text-amber-500 absolute -top-1 right-1" />}
-                                                                </td>
-                                                                <td className="px-6 py-3">
-                                                                    <div className="flex flex-col">
-                                                                        <div className="flex items-center gap-1">
-                                                                            <span className="text-xs text-gray-700">{voucher["Sales Ledger"]}</span>
-                                                                            {voucher._matchedSalesLedgerId && <CheckCircle size={10} className="text-green-500" />}
-                                                                        </div>
-                                                                        {voucher._matchedSalesLedgerId && <span className="text-[9px] text-gray-400">ID: {voucher._matchedSalesLedgerId}</span>}
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })
-                                                ) : voucher.accSummaryRows ? (
-                                                    voucher.accSummaryRows.map((row, ri) => (
-                                                        <tr key={ri} className="hover:bg-blue-50/30 transition-colors">
-                                                            <td className="px-6 py-3 text-sm text-gray-400 font-medium">{ri + 1}</td>
-                                                            <td className="px-6 py-3 text-sm text-gray-900 text-right font-bold">₹{row.taxableValue.toLocaleString()}</td>
-                                                            {voucher.accSummaryRows.some(r => r.igst > 0) && <td className="px-6 py-3 text-sm text-gray-700 text-right">₹{row.igst.toLocaleString()}</td>}
-                                                            {voucher.accSummaryRows.some(r => r.cgst > 0) && <td className="px-6 py-3 text-sm text-gray-700 text-right">₹{row.cgst.toLocaleString()}</td>}
-                                                            {voucher.accSummaryRows.some(r => r.sgst > 0) && <td className="px-6 py-3 text-sm text-gray-700 text-right">₹{row.sgst.toLocaleString()}</td>}
-                                                            <td className="px-6 py-3 text-sm text-gray-600 text-center">{row.gstRate}%</td>
-                                                            <td className="px-6 py-3">
-                                                                <div className="flex items-center gap-1">
-                                                                    <span className="text-xs text-gray-700">{row.salesLedger}</span>
-                                                                    {ledgers.some(l => String(l.name).toLowerCase().trim() === row.salesLedger.toLowerCase().trim())
-                                                                        ? <CheckCircle size={10} className="text-green-500" />
-                                                                        : <AlertTriangle size={10} className="text-amber-400" />}
-                                                                </div>
-                                                            </td>
-                                                            <td className="px-6 py-3 text-sm text-gray-700 text-right">₹{row.discount.toLocaleString()}</td>
-                                                            <td className="px-6 py-3 text-sm text-blue-600 text-right font-bold relative">
-                                                                ₹{row.rowTotal.toLocaleString()}
-                                                                {row.calculationWarning && <AlertTriangle size={12} className="text-amber-500 absolute -top-1 right-1" title={row.calculationWarning} />}
-                                                            </td>
-                                                        </tr>
-                                                    ))
-                                                ) : (
-                                                    voucher.accountingEntries?.map((ae, ai) => {
-                                                        const isMatch = ledgers.some(l => l.name.toLowerCase().trim() === ae["Particulars (Ledger Name)"].toLowerCase().trim());
-                                                        return (
-                                                            <tr key={ai} className="hover:bg-blue-50/30 transition-colors">
-                                                                <td className="px-6 py-3 text-sm text-gray-400 font-medium">{ai + 1}</td>
-                                                                <td className="px-6 py-3">
-                                                                    <div className="flex items-center gap-1">
-                                                                        <span className="text-sm font-semibold text-gray-700">
-                                                                            {ae["Particulars (Ledger Name)"]}
-                                                                            {ae._matchedLedgerId && (
-                                                                                <span className="text-gray-400 font-normal ml-1">({ae._matchedLedgerId})</span>
-                                                                            )}
-                                                                        </span>
-                                                                        {isMatch ? <CheckCircle size={12} className="text-green-500" /> : <AlertTriangle size={12} className="text-amber-400" />}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="px-6 py-3">
-                                                                    <span className={`px-2 py-0.5 rounded text-[10px] font-bold uppercase ${ae.Type === 'credit' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                                        {ae.Type}
-                                                                    </span>
-                                                                </td>
-                                                                <td className="px-6 py-3 text-sm text-gray-900 text-right font-bold">₹{ae["Amount (₹)"].toLocaleString()}</td>
-                                                            </tr>
-                                                        );
-                                                    })
-                                                )}
-                                            </tbody>
-                                            <tfoot className="bg-gray-50/50 border-t border-gray-100">
-                                                <tr className="font-bold">
-                                                    <td colSpan={importMode === 'item' ? 6 : 3} className="px-6 py-2 text-[10px] text-gray-500 uppercase text-right">Totals</td>
-                                                    <td className="px-4 py-2 text-[11px] text-gray-900 text-right">
-                                                        {importMode === 'item' ? (
-                                                            `₹${voucher.items.reduce((s, it) => s + it["Taxable Value (₹)"], 0).toLocaleString()}`
-                                                        ) : (
-                                                            <div className="flex items-center justify-end gap-6 py-1">
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[9px] text-gray-400 uppercase font-bold">Total Cr ({voucher.accountingEntries?.filter(ae => ae.Type === 'credit').length}):</span>
-                                                                    <span className="text-green-700">₹{voucher.accountingEntries?.reduce((s, ae) => ae.Type === 'credit' ? s + ae["Amount (₹)"] : s, 0).toLocaleString()}</span>
-                                                                </div>
-                                                                <div className="flex items-center gap-1.5">
-                                                                    <span className="text-[9px] text-gray-400 uppercase font-bold">Total Dr ({voucher.accountingEntries?.filter(ae => ae.Type === 'debit').length}):</span>
-                                                                    <span className="text-red-700">₹{voucher.accountingEntries?.reduce((s, ae) => ae.Type === 'debit' ? s + ae["Amount (₹)"] : s, 0).toLocaleString()}</span>
-                                                                </div>
-                                                            </div>
+
+                                                    {/* Taxable Value */}
+                                                    <td className="px-3 py-2.5 text-xs text-gray-900 text-right font-bold relative">
+                                                        {row.taxableValue ? `₹${row.taxableValue.toLocaleString()}` : "-"}
+                                                        {row.calculationWarning?.includes("Qty") && (
+                                                            <AlertTriangle size={10} className="text-red-500 absolute top-1 right-1" title={row.calculationWarning} />
                                                         )}
                                                     </td>
-                                                    {importMode === 'item' && (
-                                                        <>
-                                                            <td className="px-6 py-2"></td>
-                                                            <td className="px-6 py-2 text-[10px] text-gray-700 text-right">
-                                                                ₹{voucher.items.reduce((s, it) => s + it["Integrated Tax (₹)"], 0).toLocaleString()}
-                                                            </td>
-                                                            <td className="px-6 py-2 text-[10px] text-gray-700 text-right">
-                                                                ₹{voucher.items.reduce((s, it) => s + it["Central Tax (₹)"], 0).toLocaleString()}
-                                                            </td>
-                                                            <td className="px-6 py-2 text-[10px] text-gray-700 text-right">
-                                                                ₹{voucher.items.reduce((s, it) => s + it["State/UT tax (₹)"], 0).toLocaleString()}
-                                                            </td>
-                                                            <td className="px-6 py-2 text-sm text-blue-700 text-right">
-                                                                ₹{voucher.items.reduce((s, it) => s + (it["Integrated Tax (₹)"] + it["Central Tax (₹)"] + it["State/UT tax (₹)"]), 0).toLocaleString()}
-                                                            </td>
-                                                            <td className="px-6 py-2"></td>
-                                                        </>
-                                                    )}
+
+                                                    {/* GST % */}
+                                                    <td className="px-3 py-2.5 text-xs text-gray-700 text-center font-medium">
+                                                        {row.gstRate !== "" ? `${row.gstRate}%` : "-"}
+                                                    </td>
+
+                                                    {/* IGST */}
+                                                    <td className="px-3 py-2.5 text-xs text-gray-600 text-right font-medium">
+                                                        {row.igst ? `₹${row.igst.toLocaleString()}` : "-"}
+                                                    </td>
+
+                                                    {/* CGST */}
+                                                    <td className="px-3 py-2.5 text-xs text-gray-600 text-right font-medium">
+                                                        {row.cgst ? `₹${row.cgst.toLocaleString()}` : "-"}
+                                                    </td>
+
+                                                    {/* SGST */}
+                                                    <td className="px-3 py-2.5 text-xs text-gray-600 text-right font-medium">
+                                                        {row.sgst ? `₹${row.sgst.toLocaleString()}` : "-"}
+                                                    </td>
+
+                                                    {/* Discount */}
+                                                    <td className="px-3 py-2.5 text-xs text-gray-700 text-right font-medium text-red-500">
+                                                        {row.discount ? `₹${row.discount.toLocaleString()}` : "-"}
+                                                    </td>
+
+                                                    {/* Total (₹) */}
+                                                    <td className="px-3 py-2.5 text-xs text-blue-600 text-right font-bold relative">
+                                                        {row.rowTotal ? `₹${row.rowTotal.toLocaleString()}` : "-"}
+                                                        {row.calculationWarning?.includes("Tax Discrepancy") && (
+                                                            <AlertTriangle size={10} className="text-amber-500 absolute top-1 right-1" title={row.calculationWarning} />
+                                                        )}
+                                                    </td>
+
+                                                    {/* Remarks / Actions (Merged) */}
+                                                    {row.isFirstInVoucher ? (
+                                                        <td rowSpan={row.rowCount} className="px-3 py-2.5 align-middle bg-white/70">
+                                                            <div className="flex flex-col gap-1.5">
+                                                                {row.voucher.errorMessage ? (
+                                                                    <p className="text-[10px] text-red-500 font-medium leading-relaxed max-w-[220px]">
+                                                                        {row.voucher.errorMessage}
+                                                                    </p>
+                                                                ) : (
+                                                                    <p className="text-[10px] text-green-600 font-medium">
+                                                                        Voucher is ready for import
+                                                                    </p>
+                                                                )}
+                                                                
+                                                                {row.voucher._suggestedLedger && (
+                                                                    <button
+                                                                        onClick={() => fixVoucherParty(row.voucher.id)}
+                                                                        className="w-fit px-2 py-1 bg-blue-50 text-blue-700 text-[9px] font-bold rounded border border-blue-200 hover:bg-blue-100 transition-colors flex items-center gap-1 shadow-sm"
+                                                                    >
+                                                                        <RefreshCw size={8} className="text-blue-600 animate-pulse" />
+                                                                        Use: "{row.voucher._suggestedLedger.name}"
+                                                                    </button>
+                                                                )}
+                                                            </div>
+                                                        </td>
+                                                    ) : null}
                                                 </tr>
-                                            </tfoot>
-                                        </table>
-                                    </div>
-                                </div>
-                            ))}
+                                            );
+                                        })}
+                                    </tbody>
+                                    <tfoot className="bg-slate-100 font-bold border-t-2 border-slate-300 sticky bottom-0 z-20 shadow-[0_-2px_5px_rgba(0,0,0,0.05)]">
+                                        <tr className="">
+                                            <td colSpan={7} className="px-3 py-3 text-[11px] text-slate-700 uppercase tracking-wider text-right bg-slate-100">
+                                                Grand Totals ({groupedVouchers.length} Vouchers)
+                                            </td>
+                                            <td className="px-3 py-3 bg-slate-100"></td>
+                                            {importMode === "item" && (
+                                                <>
+                                                    <td className="px-3 py-3 bg-slate-100"></td>
+                                                    <td className="px-3 py-3 bg-slate-100"></td>
+                                                    <td className="px-3 py-3 bg-slate-100"></td>
+                                                </>
+                                            )}
+                                            
+                                            <td className="px-3 py-3 text-xs text-slate-800 text-right bg-slate-100">
+                                                ₹{groupedVouchers.reduce((s, v) => s + (v.importMode === 'item' ? v.items.reduce((s2, it) => s2 + (it["Taxable Value (₹)"] || 0), 0) : v.accSummaryRows ? v.accSummaryRows.reduce((s2, r) => s2 + (r.taxableValue || 0), 0) : v.accountingEntries?.reduce((s2, ae) => s2 + (ae["Amount (₹)"] || 0), 0) || 0), 0).toLocaleString()}
+                                            </td>
+                                            
+                                            <td className="px-3 py-3 bg-slate-100"></td>
+                                            
+                                            <td className="px-3 py-3 text-xs text-slate-800 text-right bg-slate-100">
+                                                ₹{groupedVouchers.reduce((s, v) => s + (v.importMode === 'item' ? v.items.reduce((s2, it) => s2 + (it["Integrated Tax (₹)"] || 0), 0) : v.accSummaryRows ? v.accSummaryRows.reduce((s2, r) => s2 + (r.igst || 0), 0) : v.accountingEntries?.reduce((s2, ae) => s2 + (ae["Integrated Tax (₹)"] || 0), 0) || 0), 0).toLocaleString()}
+                                            </td>
+
+                                            <td className="px-3 py-3 text-xs text-slate-800 text-right bg-slate-100">
+                                                ₹{groupedVouchers.reduce((s, v) => s + (v.importMode === 'item' ? v.items.reduce((s2, it) => s2 + (it["Central Tax (₹)"] || 0), 0) : v.accSummaryRows ? v.accSummaryRows.reduce((s2, r) => s2 + (r.cgst || 0), 0) : v.accountingEntries?.reduce((s2, ae) => s2 + (ae["Central Tax (₹)"] || 0), 0) || 0), 0).toLocaleString()}
+                                            </td>
+
+                                            <td className="px-3 py-3 text-xs text-slate-800 text-right bg-slate-100">
+                                                ₹{groupedVouchers.reduce((s, v) => s + (v.importMode === 'item' ? v.items.reduce((s2, it) => s2 + (it["State/UT tax (₹)"] || 0), 0) : v.accSummaryRows ? v.accSummaryRows.reduce((s2, r) => s2 + (r.sgst || 0), 0) : v.accountingEntries?.reduce((s2, ae) => s2 + (ae["State/UT tax (₹)"] || 0), 0) || 0), 0).toLocaleString()}
+                                            </td>
+
+                                            <td className="px-3 py-3 text-xs text-slate-800 text-right bg-slate-100 text-red-500">
+                                                ₹{groupedVouchers.reduce((s, v) => s + (v.accSummaryRows ? v.accSummaryRows.reduce((s2, r) => s2 + (r.discount || 0), 0) : 0), 0).toLocaleString()}
+                                            </td>
+
+                                            <td className="px-3 py-3 text-xs text-blue-700 text-right bg-slate-100">
+                                                ₹{groupedVouchers.reduce((s, v) => s + (v["Invoice Value (₹)"] || 0), 0).toLocaleString()}
+                                            </td>
+                                            
+                                            <td className="px-3 py-3 bg-slate-100"></td>
+                                        </tr>
+                                    </tfoot>
+                                </table>
+                            </div>
                         </div>
                     </div>
                 )}
