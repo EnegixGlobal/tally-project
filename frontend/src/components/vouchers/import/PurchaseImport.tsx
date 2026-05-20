@@ -321,14 +321,23 @@ const PurchaseImport: React.FC = () => {
                 // Forward-filling logic: if header is missing, use last known header
                 const invoiceNo = String(row["Invoice number"] || row["Invoice No"] || row["Voucher No"] || row["Reference No"] || row["Ref No"] || row["invoice_no"] || row["bill_no"] || (lastHeader ? lastHeader["Invoice number"] : "")).trim();
                 const invoiceDate = formatDate(row["Invoice Date"] || row["Date"] || row["Invoice date"] || row["date"] || row["invoice_date"] || (lastHeader ? lastHeader["Invoice Date"] : ""));
-                const rawGstin = String(row["GSTIN of supplier"] || row["GSTIN"] || row["gstin"] || (lastHeader ? lastHeader["GSTIN of supplier"] : ""));
-                const rawPartyName = String(row["Trade/Legal name of the Supplier"] || row["Supplier Name"] || row["Party Name"] || row["party_name"] || (lastHeader ? lastHeader["Trade/Legal name of the Supplier"] : ""));
+                
+                let rawGstin = String(row["GSTIN of supplier"] || row["GSTIN"] || row["gstin"] || (lastHeader ? lastHeader["GSTIN of supplier"] : ""));
+                if (rawGstin === "undefined" || rawGstin === "null") {
+                    rawGstin = "";
+                }
+                
+                let rawPartyName = String(row["Trade/Legal name of the Supplier"] || row["Supplier Name"] || row["Party Name"] || row["party_name"] || (lastHeader ? lastHeader["Trade/Legal name of the Supplier"] : ""));
+                if (rawPartyName === "undefined" || rawPartyName === "null") {
+                    rawPartyName = "";
+                }
+                
                 const rawPlaceOfSupply = String(row["Place of supply"] || row["POS"] || row["Place Of Supply"] || row["pos"] || (lastHeader ? lastHeader["Place of supply"] : ""));
                 const rawPurchaseLedger = String(row["Purchase Ledger"] || row["purchase_ledger"] || (lastHeader ? lastHeader["Purchase Ledger"] : ""));
                 const rawInvoiceValue = row["Invoice Value (₹)"] !== undefined ? row["Invoice Value (₹)"] : (row["Invoice Value"] || row["Total Amount"] || (lastHeader ? lastHeader["Invoice Value (₹)"] : 0));
 
                 const gstin = rawGstin.toUpperCase().replace(/\s+/g, "").trim();
-                const partyName = rawPartyName.replace(/\s+/g, " ").trim();
+                let partyName = rawPartyName.replace(/\s+/g, " ").trim();
                 let placeOfSupply = rawPlaceOfSupply.toLowerCase().replace(/\s+/g, " ").trim();
 
                 const groupKey = `${gstin}-${invoiceNo}-${invoiceDate}`;
@@ -352,7 +361,31 @@ const PurchaseImport: React.FC = () => {
                     let errorMessage = "";
                     let suggestedLedger = null;
 
-                    if (partyName) {
+                    // 1. First try matching by GST number if present in Excel
+                    if (gstin) {
+                        const matchedLedgerByGst = ledgers.find(l => {
+                            const lGst = (l.gst_number || l.gstNumber) ? String(l.gst_number || l.gstNumber).toUpperCase().replace(/\s+/g, "").trim() : "";
+                            return lGst === gstin;
+                        });
+
+                        if (matchedLedgerByGst) {
+                            // If GST matches, use name from database ("name get and show")
+                            partyName = matchedLedgerByGst.name;
+                            matchedLedgerByName = matchedLedgerByGst;
+                            gstMatch = true;
+                            stateMatch = true; // Trust database ledger's state
+                            if (matchedLedgerByGst.state) {
+                                placeOfSupply = matchedLedgerByGst.state;
+                            }
+                        } else {
+                            // GST not found in database -> it's fresh!
+                            // "name also save gst number" -> set partyName to gstin
+                            partyName = gstin;
+                        }
+                    }
+
+                    // 2. Fallback to name matching if no GSTIN was provided or if name is still not matched
+                    if (!matchedLedgerByName && partyName && partyName !== gstin) {
                         const excelName = partyName.toLowerCase();
                         matchedLedgerByName = ledgers.find(l => {
                             const lName = l.name ? String(l.name).toLowerCase().replace(/\s+/g, " ").trim() : "";
@@ -396,8 +429,11 @@ const PurchaseImport: React.FC = () => {
                                 errorMessage = "Supplier Ledger does not exist";
                             }
                         }
-                    } else if (currentImportMode === "item") {
-                        errorMessage = "Supplier Name is required for item-wise import";
+                    } else if (!matchedLedgerByName && partyName === gstin) {
+                        // Fresh GSTIN ledger case
+                        errorMessage = "Supplier Ledger does not exist";
+                    } else if (!partyName && currentImportMode === "item") {
+                        errorMessage = "Supplier Name/GSTIN is required for item-wise import";
                     }
 
                     const excelPurchaseLedger = rawPurchaseLedger ? String(rawPurchaseLedger).trim().toLowerCase() : "";
