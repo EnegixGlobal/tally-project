@@ -604,9 +604,9 @@ router.get("/sale-history", async (req, res) => {
   LEFT JOIN stock_items si
     ON sh.itemName COLLATE utf8mb4_general_ci
      = si.name COLLATE utf8mb4_general_ci
-     AND si.company_id = sh.companyId
-     AND si.owner_type = sh.ownerType
-     AND si.owner_id = sh.ownerId
+     AND si.company_id COLLATE utf8mb4_general_ci = sh.companyId COLLATE utf8mb4_general_ci
+     AND si.owner_type COLLATE utf8mb4_general_ci = sh.ownerType COLLATE utf8mb4_general_ci
+     AND si.owner_id COLLATE utf8mb4_general_ci = sh.ownerId COLLATE utf8mb4_general_ci
 
   LEFT JOIN stock_units su
     ON si.unit = su.id
