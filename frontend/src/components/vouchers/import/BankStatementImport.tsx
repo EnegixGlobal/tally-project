@@ -7,12 +7,22 @@ import {
     CheckCircle,
     AlertTriangle,
     RefreshCw,
-    FileSpreadsheet,
+    Trash2,
+    Edit3,
+    Check,
+    X,
+    Sparkles,
+    Layers,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import * as XLSX from "xlsx";
 import axios from "axios";
 import Swal from "sweetalert2";
+import * as pdfjsLib from "pdfjs-dist";
+import * as Tesseract from "tesseract.js";
+
+// Set up PDF.js worker
+pdfjsLib.GlobalWorkerOptions.workerSrc = `https://cdnjs.cloudflare.com/ajax/libs/pdf.js/${pdfjsLib.version}/pdf.worker.min.js`;
 
 interface ImportedRow {
     Date: string;
@@ -28,7 +38,44 @@ interface ImportedRow {
     status: "pending" | "importing" | "imported" | "error";
     errorMessage?: string;
     particularsId?: string | number;
+    isDuplicate?: boolean;
+    duplicateVoucherNo?: string;
+    skipImport?: boolean;
 }
+
+const isBankLedgerMatch = (ledgerName: string, bankName: string): boolean => {
+    const lName = ledgerName.toLowerCase().trim();
+    const bName = bankName.toLowerCase().trim();
+    
+    if (lName === bName) return true;
+    
+    const synonymGroups = [
+        ["state bank of india", "sbi", "state bank"],
+        ["hdfc bank", "hdfc"],
+        ["icici bank", "icici"],
+        ["axis bank", "axis"],
+        ["punjab national bank", "pnb"],
+        ["bank of baroda", "bob"],
+        ["canara bank", "canara"],
+        ["union bank of india", "union bank"],
+        ["kotak mahindra bank", "kotak bank", "kotak"],
+        ["idbi bank", "idbi"]
+    ];
+    
+    for (const group of synonymGroups) {
+        const bMatch = group.some(syn => bName === syn || bName.includes(syn) || syn.includes(bName));
+        if (bMatch) {
+            const lMatch = group.some(syn => lName === syn || lName.includes(syn) || syn.includes(lName));
+            if (lMatch) return true;
+        }
+    }
+    
+    if (lName.includes(bName) || bName.includes(lName)) {
+        return true;
+    }
+    
+    return false;
+};
 
 const BankStatementImport: React.FC = () => {
     const navigate = useNavigate();
@@ -42,10 +89,17 @@ const BankStatementImport: React.FC = () => {
     const [selectedFile, setSelectedFile] = useState<File | null>(null);
     const [importedRows, setImportedRows] = useState<ImportedRow[]>([]);
     const [isProcessing, setIsProcessing] = useState(false);
+    const [processingStage, setProcessingStage] = useState("");
     const [dragActive, setDragActive] = useState(false);
     const [activeTab, setActiveTab] = useState<"import" | "preview" | "templates">("import");
     const [isMatchingDB, setIsMatchingDB] = useState(false);
     const [saveProgress, setSaveProgress] = useState({ done: 0, total: 0 });
+
+    // Premium OCR & Duplicates States
+    const [daybookVouchers, setDaybookVouchers] = useState<any[]>([]);
+    const [editingIndex, setEditingIndex] = useState<number | null>(null);
+    const [editValues, setEditValues] = useState<Partial<ImportedRow>>({});
+    const [skipDuplicates, setSkipDuplicates] = useState(true);
 
     const companyId = localStorage.getItem("company_id") || "";
     const ownerType = localStorage.getItem("supplier") || "";
@@ -53,6 +107,7 @@ const BankStatementImport: React.FC = () => {
 
     useEffect(() => {
         fetchLedgers();
+        fetchDaybookVouchers();
     }, [companyId, ownerType, ownerId]);
 
     const fetchLedgers = async () => {
@@ -64,13 +119,26 @@ const BankStatementImport: React.FC = () => {
                     owner_id: ownerId
                 },
             });
-            setLedgers(response.data);
+            setLedgers(response.data as any[]);
         } catch (error) {
             console.error("Error fetching ledgers:", error);
         }
     };
 
-
+    const fetchDaybookVouchers = async () => {
+        try {
+            const response = await axios.get(`${import.meta.env.VITE_API_URL}/api/daybookTable2`, {
+                params: {
+                    company_id: companyId,
+                    owner_type: ownerType,
+                    owner_id: ownerId
+                },
+            });
+            setDaybookVouchers((response.data as any[]) || []);
+        } catch (error) {
+            console.error("Error fetching daybook vouchers:", error);
+        }
+    };
 
     const handleDrag = (e: React.DragEvent) => {
         e.preventDefault();
@@ -95,19 +163,43 @@ const BankStatementImport: React.FC = () => {
     const handleFileSelect = (file: File) => {
         if (!file) return;
 
-        const validTypes = [
+        const isPdf = file.type === "application/pdf" || file.name.endsWith(".pdf");
+        const validExcelTypes = [
             "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
             "application/vnd.ms-excel",
             "text/csv",
         ];
 
-        if (!validTypes.includes(file.type)) {
-            alert("Please select a valid Excel (.xlsx, .xls) or CSV file");
+        if (!validExcelTypes.includes(file.type) && !isPdf) {
+            alert("Please select a valid Excel (.xlsx, .xls), CSV or PDF file");
             return;
         }
 
         setSelectedFile(file);
-        processFile(file);
+        if (isPdf) {
+            processPdfFile(file);
+        } else {
+            processFile(file);
+        }
+    };
+
+    const extractDateString = (str: string): string => {
+        if (!str) return "";
+        const dateRegexes = [
+            /\d{1,2}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{2,4}/,
+            /\d{1,2}\s*[-/]\s*[a-zA-Z]{3,9}\s*[-/]\s*\d{2,4}/,
+            /\d{1,2}\s+[a-zA-Z]{3,9}\s+\d{2,4}/,
+            /\d{4}\s*[-/.]\s*\d{1,2}\s*[-/.]\s*\d{1,2}/,
+            /[a-zA-Z]{3,9}\s+\d{1,2},?\s+\d{2,4}/,
+            /\d{1,2},?\s+[a-zA-Z]{3,9},?\s+\d{2,4}/
+        ];
+        for (const rx of dateRegexes) {
+            const match = str.match(rx);
+            if (match) {
+                return match[0].trim();
+            }
+        }
+        return "";
     };
 
     const formatDate = (dateValue: unknown): string => {
@@ -118,12 +210,54 @@ const BankStatementImport: React.FC = () => {
                 return date.toISOString().split("T")[0];
             }
             if (typeof dateValue === "string") {
-                const parts = dateValue.split("/");
-                if (parts.length === 3) {
-                    const day = parts[0].padStart(2, "0");
-                    const month = parts[1].padStart(2, "0");
-                    const year = parts[2];
-                    return `${year}-${month}-${day}`;
+                const extracted = extractDateString(dateValue);
+                if (extracted) {
+                    if (/\d{1,2}\s+[a-zA-Z]{3,9}\s+\d{2,4}/.test(extracted)) {
+                        const parts = extracted.split(/\s+/);
+                        if (parts.length === 3) {
+                            let day = parts[0].padStart(2, "0");
+                            let month = parts[1];
+                            let year = parts[2];
+                            if (year.length === 2) year = "20" + year;
+                            
+                            const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+                            const mIdx = months.findIndex(m => month.toLowerCase().startsWith(m));
+                            if (mIdx !== -1) {
+                                month = String(mIdx + 1).padStart(2, "0");
+                            } else {
+                                month = month.padStart(2, "0");
+                            }
+                            return `${year}-${month}-${day}`;
+                        }
+                    }
+
+                    const parts = extracted.split(/[-/.]/);
+                    if (parts.length === 3) {
+                        let day = parts[0].trim().padStart(2, "0");
+                        let month = parts[1].trim().padStart(2, "0");
+                        let year = parts[2].trim();
+                        
+                        // Handle 2-digit years
+                        if (year.length === 2) {
+                            year = "20" + year;
+                        }
+                        
+                        // Handle case where year is first (YYYY-MM-DD)
+                        if (parts[0].trim().length === 4) {
+                            return `${parts[0].trim()}-${parts[1].trim().padStart(2, "0")}-${parts[2].trim().padStart(2, "0")}`;
+                        }
+
+                        // Handle text months (e.g. 15-May-2024)
+                        if (isNaN(Number(month))) {
+                            const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+                            const mIdx = months.findIndex(m => month.toLowerCase().startsWith(m));
+                            if (mIdx !== -1) {
+                                month = String(mIdx + 1).padStart(2, "0");
+                            }
+                        }
+
+                        return `${year}-${month}-${day}`;
+                    }
                 }
             }
             return new Date(dateValue as string).toISOString().split("T")[0];
@@ -132,8 +266,196 @@ const BankStatementImport: React.FC = () => {
         }
     };
 
+    const detectDate = (str: string): boolean => {
+        if (!str) return false;
+        return extractDateString(str) !== "";
+    };
+
+    const isStartOfDate = (str: string): boolean => {
+        if (!str) return false;
+        const clean = str.trim().toLowerCase();
+        
+        // E.g. "10 Feb", "09/02", "10-02"
+        const months = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+        const hasMonth = months.some(m => clean.includes(m));
+        
+        // Match day/month formats: e.g. "10/02", "10-02", "10.02" or "10 Feb"
+        const hasDigits = /\d+/.test(clean);
+        const hasSeparators = clean.includes("/") || clean.includes("-") || clean.includes(".");
+        
+        if (hasDigits && (hasMonth || hasSeparators)) {
+            // Ensure it's not JUST a 4-digit year (like "2026")
+            const isJustYear = /^\d{4}$/.test(clean);
+            if (!isJustYear) {
+                return true;
+            }
+        }
+        return false;
+    };
+
+    const detectDuplicates = (rows: ImportedRow[], vouchers: any[]): ImportedRow[] => {
+        if (!vouchers || vouchers.length === 0) return rows;
+
+        return rows.map(row => {
+            const rowAmount = row.Debit > 0 ? row.Debit : row.Credit;
+            const rowType = row.Debit > 0 ? 'payment' : 'receipt';
+
+            const match = vouchers.find(v => {
+                // 1. Match date (normalized to YYYY-MM-DD)
+                const vDate = v.date ? new Date(v.date).toISOString().split('T')[0] : "";
+                const rDate = row.Date;
+                if (vDate !== rDate) return false;
+
+                // 2. Match reference number (if available)
+                const vRef = v.reference_no ? String(v.reference_no).trim().toLowerCase() : "";
+                const rRef = row["Reference number"] ? String(row["Reference number"]).trim().toLowerCase() : "";
+                if (vRef && rRef && vRef === rRef) return true;
+
+                // 3. Match debit/credit entry details
+                const entryMatch = v.entries?.find((entry: any) => {
+                    const entryAmt = Number(entry.amount || 0);
+                    const isAmtMatch = Math.abs(entryAmt - rowAmount) < 0.05;
+                    const vLedger = entry.ledger_name ? entry.ledger_name.toLowerCase().trim() : "";
+                    const rLedger = row.Particulars ? row.Particulars.toLowerCase().trim() : "";
+                    return isAmtMatch && (vLedger === rLedger || v.voucher_type === rowType);
+                });
+
+                return !!entryMatch;
+            });
+
+            if (match) {
+                return {
+                    ...row,
+                    isDuplicate: true,
+                    duplicateVoucherNo: match.voucher_number || "Existing",
+                    skipImport: true // Skip by default
+                };
+            }
+            return row;
+        });
+    };
+
+    const mapAndSequenceRows = async (rawRows: any[], extractedBank: string) => {
+        setExcelBankName(extractedBank);
+        const matchedBankLedger = ledgers.find((l) => isBankLedgerMatch(l.name, extractedBank));
+        setExcelBankMatch(!!matchedBankLedger);
+        setExcelBankId(matchedBankLedger ? matchedBankLedger.id : null);
+
+        const processedRows: ImportedRow[] = rawRows.map((row) => {
+            const debit = Number(row.Debit || row.debit || 0);
+            const credit = Number(row.Credit || row.credit || 0);
+            let voucherCol = String(row.Voucher || row.voucher || "").toLowerCase().trim();
+            let targetType: ImportedRow["VoucherTargetType"] = "error";
+
+            if (debit > 0) {
+                targetType = voucherCol === "contra" ? "contra" : "payment";
+            } else if (credit > 0) {
+                targetType = voucherCol === "journal" ? "journal" : "receipt";
+            }
+
+            const particularsName = String(row.Particulars || row.Particular || row.particulars || row.particular || "").trim();
+            const matchedParticulars = ledgers.find(
+                (l) => l.name.toLowerCase() === particularsName.toLowerCase()
+            );
+            const isParticularsMatch = !!matchedParticulars;
+
+            let initialStatus: "pending" | "error" = "pending";
+            let initialError = "";
+
+            if (!isParticularsMatch) {
+                initialStatus = "error";
+                initialError = `Ledger '${particularsName}' not found.`;
+            }
+            if (!matchedBankLedger) {
+                initialStatus = "error";
+                initialError += (initialError ? " " : "") + `Bank '${extractedBank}' not found.`;
+            }
+
+            return {
+                Date: formatDate(row.Date || row.date),
+                Particulars: particularsName,
+                Narration: String(row.Narration || row.narration || "").trim(),
+                Debit: debit,
+                Credit: credit,
+                Balance: row.Balance || row.balance || "",
+                "Reference number": String(row["Reference number"] || row["Reference No"] || row["Reference Number"] || row["Refrance number"] || row.refNo || row.ref || "").trim(),
+                VoucherTargetType: targetType,
+                particularsMatch: isParticularsMatch,
+                particularsId: matchedParticulars ? matchedParticulars.id : undefined,
+                status: initialStatus,
+                errorMessage: initialError,
+                skipImport: false
+            };
+        });
+
+        // Run Duplicate Check
+        const rowsWithDuplicates = detectDuplicates(processedRows, daybookVouchers);
+
+        setIsMatchingDB(true);
+
+        try {
+            const types = ["payment", "receipt", "contra", "journal"];
+            const nextDocs: Record<string, string> = {};
+
+            const firstDate = rowsWithDuplicates[0]?.Date || new Date().toISOString().split('T')[0];
+
+            await Promise.all(types.map(async (type) => {
+                try {
+                    const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/vouchers/next-number`, {
+                        params: {
+                            company_id: companyId,
+                            owner_type: ownerType,
+                            owner_id: ownerId,
+                            voucherType: type,
+                            date: firstDate
+                        }
+                    });
+                    const resData = res.data as any;
+                    if (resData.success) {
+                        nextDocs[type] = resData.voucherNumber;
+                    }
+                } catch (e) {
+                    console.error(`Failed to fetch next number for ${type}`);
+                }
+            }));
+
+            const trackers = { ...nextDocs };
+
+            const finalRows = rowsWithDuplicates.map(row => {
+                if (row.VoucherTargetType === "error") return row;
+
+                const currentNum = trackers[row.VoucherTargetType];
+
+                if (currentNum) {
+                    row.SimulatedVoucherNumber = currentNum;
+
+                    const parts = currentNum.split("/");
+                    if (parts.length === 3) {
+                        const seq = parseInt(parts[2], 10);
+                        if (!isNaN(seq)) {
+                            parts[2] = String(seq + 1).padStart(6, "0");
+                            trackers[row.VoucherTargetType] = parts.join("/");
+                        }
+                    }
+                }
+                return row;
+            });
+
+            setImportedRows(finalRows);
+        } catch (err) {
+            console.error("Failed to sequence voucher numbers", err);
+            setImportedRows(rowsWithDuplicates);
+        }
+
+        setActiveTab("preview");
+        setTimeout(() => {
+            setIsMatchingDB(false);
+        }, 1500);
+    };
+
     const processFile = async (file: File) => {
         setIsProcessing(true);
+        setProcessingStage("Reading Excel sheet...");
 
         try {
             const data = await file.arrayBuffer();
@@ -182,11 +504,6 @@ const BankStatementImport: React.FC = () => {
                 return;
             }
 
-            setExcelBankName(extractedBankName);
-            const matchedBankLedger = ledgers.find((l) => l.name.toLowerCase() === extractedBankName.toLowerCase());
-            setExcelBankMatch(!!matchedBankLedger);
-            setExcelBankId(matchedBankLedger ? matchedBankLedger.id : null);
-
             const headers = rawData[headerRowIndex] as string[];
             const dataRows = rawData.slice(headerRowIndex + 1);
 
@@ -198,114 +515,10 @@ const BankStatementImport: React.FC = () => {
                 return obj;
             });
 
-            const processedRows: ImportedRow[] = jsonData
-                .filter((row) => Number(row.Debit || 0) > 0 || Number(row.Credit || 0) > 0)
-                .map((row) => {
-                    const debit = Number(row.Debit || 0);
-                    const credit = Number(row.Credit || 0);
-                    let voucherCol = String(row.Voucher || "").toLowerCase().trim();
-                    let targetType: ImportedRow["VoucherTargetType"] = "error";
+            const rawTxns = jsonData.filter((row) => Number(row.Debit || 0) > 0 || Number(row.Credit || 0) > 0);
 
-                    if (debit > 0) {
-                        targetType = voucherCol === "contra" ? "contra" : "payment";
-                    } else if (credit > 0) {
-                        targetType = voucherCol === "journal" ? "journal" : "receipt";
-                    }
+            await mapAndSequenceRows(rawTxns, extractedBankName);
 
-                    const particularsName = String(row.Particulars || row.Particular || "").trim();
-                    const matchedParticulars = ledgers.find(
-                        (l) => l.name.toLowerCase() === particularsName.toLowerCase()
-                    );
-                    const isParticularsMatch = !!matchedParticulars;
-
-                    let initialStatus: "pending" | "error" = "pending";
-                    let initialError = "";
-
-                    if (!isParticularsMatch) {
-                        initialStatus = "error";
-                        initialError = `Ledger '${particularsName}' not found.`;
-                    }
-                    if (!matchedBankLedger) {
-                        initialStatus = "error";
-                        initialError += (initialError ? " " : "") + `Bank '${extractedBankName}' not found.`;
-                    }
-
-                    return {
-                        Date: formatDate(row.Date),
-                        Particulars: particularsName,
-                        Narration: String(row.Narration || "").trim(),
-                        Debit: debit,
-                        Credit: credit,
-                        Balance: row.Balance || row.balance || "",
-                        "Reference number": String(row["Reference number"] || row["Reference No"] || row["Reference Number"] || row["Refrance number"] || "").trim(),
-                        VoucherTargetType: targetType,
-                        particularsMatch: isParticularsMatch,
-                        particularsId: matchedParticulars ? matchedParticulars.id : undefined,
-                        status: initialStatus,
-                        errorMessage: initialError,
-                    };
-                });
-
-            setIsMatchingDB(true);
-
-            try {
-                const types = ["payment", "receipt", "contra", "journal"];
-                const nextDocs: Record<string, string> = {};
-
-                // Use first date for FY prefix calculation
-                const firstDate = processedRows[0]?.Date || new Date().toISOString().split('T')[0];
-
-                await Promise.all(types.map(async (type) => {
-                    try {
-                        const res = await axios.get(`${import.meta.env.VITE_API_URL}/api/vouchers/next-number`, {
-                            params: {
-                                company_id: companyId,
-                                owner_type: ownerType,
-                                owner_id: ownerId,
-                                voucherType: type,
-                                date: firstDate
-                            }
-                        });
-                        if (res.data.success) {
-                            nextDocs[type] = res.data.voucherNumber;
-                        }
-                    } catch (e) {
-                        console.error(`Failed to fetch next number for ${type}`);
-                    }
-                }));
-
-                const trackers = { ...nextDocs };
-
-                const finalRows = processedRows.map(row => {
-                    if (row.VoucherTargetType === "error") return row;
-
-                    const currentNum = trackers[row.VoucherTargetType];
-
-                    if (currentNum) {
-                        row.SimulatedVoucherNumber = currentNum;
-
-                        const parts = currentNum.split("/");
-                        if (parts.length === 3) {
-                            const seq = parseInt(parts[2], 10);
-                            if (!isNaN(seq)) {
-                                parts[2] = String(seq + 1).padStart(6, "0");
-                                trackers[row.VoucherTargetType] = parts.join("/");
-                            }
-                        }
-                    }
-                    return row;
-                });
-
-                setImportedRows(finalRows);
-            } catch (err) {
-                console.error("Failed to sequence voucher numbers", err);
-                setImportedRows(processedRows);
-            }
-
-            setActiveTab("preview");
-            setTimeout(() => {
-                setIsMatchingDB(false);
-            }, 1500);
         } catch (err) {
             console.error("File Read Error:", err);
             alert("Invalid Excel file!");
@@ -314,17 +527,623 @@ const BankStatementImport: React.FC = () => {
         }
     };
 
+    const processPdfFile = async (file: File) => {
+        setIsProcessing(true);
+        setProcessingStage("Initializing PDF Engine...");
+
+        try {
+            const data = await file.arrayBuffer();
+            const loadingTask = pdfjsLib.getDocument({ data });
+            const pdf = await loadingTask.promise;
+
+            let hasSelectableText = false;
+            const pagesData: any[] = [];
+
+            setProcessingStage("Scanning document layout...");
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const textContent = await page.getTextContent();
+                if (textContent.items.length > 5) {
+                    hasSelectableText = true;
+                }
+                pagesData.push({ page, textContent });
+            }
+
+            if (!hasSelectableText) {
+                setIsProcessing(false);
+                const result = await Swal.fire({
+                    title: "Scanned PDF Detected",
+                    text: "This document appears to be a scanned image with no selectable text. Would you like to run OCR text recognition?",
+                    icon: "warning",
+                    showCancelButton: true,
+                    confirmButtonColor: "#2563eb",
+                    confirmButtonText: "Yes, Run OCR",
+                    cancelButtonText: "No, Cancel",
+                });
+
+                if (result.isConfirmed) {
+                    await processPdfOcr(pdf);
+                }
+                return;
+            }
+
+            await parseStructuredPdf(pagesData);
+        } catch (err: any) {
+            console.error("PDF Parsing Error:", err);
+            Swal.fire("PDF Parse Error", err.message || "Failed to process PDF file", "error");
+        } finally {
+            setIsProcessing(false);
+        }
+    };
+
+    const extractAccountName = (text: string): string => {
+        const nameRegex = /(?:account\s+name|customer\s+name|name)\s*(?::-|:|-)\s*(?::)?\s*(?:mr\.|mrs\.|ms\.|dr\.|shri|smt\.)?\s*([A-Za-z0-9\s.&'-]+)/i;
+        const match = text.match(nameRegex);
+        if (match && match[1]) {
+            let name = match[1].trim();
+            name = name.replace(/\s+/g, ' ');
+            const stopWords = ["statement", "page", "date", "address", "period", "from", "to", "branch", "account", "no", "number"];
+            for (const stopWord of stopWords) {
+                const stopIndex = name.toLowerCase().indexOf(" " + stopWord);
+                if (stopIndex !== -1) {
+                    name = name.substring(0, stopIndex).trim();
+                }
+            }
+            name = name.replace(/^(mr|mrs|ms|dr|shri|smt)\s+/i, "").trim();
+            return name;
+        }
+        return "";
+    };
+
+    const parseStructuredPdf = async (pagesData: any[]) => {
+        setProcessingStage("Analyzing columns and coordinates...");
+        let allExtractedTxns: any[] = [];
+        let detectedBank = "";
+        let extractedAccountNameVal = "";
+
+        if (pagesData.length > 0) {
+            const originalText = pagesData[0].textContent.items.map((i: any) => i.str).join(" ");
+            const firstPageText = originalText.toLowerCase();
+            
+            const extractedName = extractAccountName(originalText);
+            if (extractedName) {
+                extractedAccountNameVal = extractedName;
+            }
+            
+            if (firstPageText.includes("state bank of india") || firstPageText.includes("sbi")) {
+                detectedBank = "State Bank of India";
+            } else if (firstPageText.includes("hdfc")) {
+                detectedBank = "HDFC Bank";
+            } else if (firstPageText.includes("icici")) {
+                detectedBank = "ICICI Bank";
+            } else if (firstPageText.includes("axis")) {
+                detectedBank = "Axis Bank";
+            } else if (firstPageText.includes("punjab national bank") || firstPageText.includes("pnb")) {
+                detectedBank = "Punjab National Bank";
+            } else if (firstPageText.includes("bank of baroda") || firstPageText.includes("bob")) {
+                detectedBank = "Bank of Baroda";
+            } else if (firstPageText.includes("canara")) {
+                detectedBank = "Canara Bank";
+            } else if (firstPageText.includes("union bank")) {
+                detectedBank = "Union Bank of India";
+            } else if (firstPageText.includes("idbi")) {
+                detectedBank = "IDBI Bank";
+            } else if (firstPageText.includes("kotak")) {
+                detectedBank = "Kotak Mahindra Bank";
+            } else if (firstPageText.includes("yes bank")) {
+                detectedBank = "Yes Bank";
+            } else if (firstPageText.includes("federal bank")) {
+                detectedBank = "Federal Bank";
+            }
+        }
+
+        if (!detectedBank) {
+            detectedBank = "State Bank of India";
+        }
+
+        let activeColumnCoords: any = null;
+        let currentTxn: any = null;
+
+        for (let p = 0; p < pagesData.length; p++) {
+            const { textContent } = pagesData[p];
+            const rowsByY: { y: number; items: any[] }[] = [];
+
+            textContent.items.forEach((item: any) => {
+                const text = item.str.trim();
+                if (!text) return;
+                const x = item.transform[4];
+                const y = item.transform[5];
+                const height = item.height || 10;
+
+                // Restored precise Y-clustering threshold of 5px to prevent collapses/merging of consecutive transactions
+                let foundRow = rowsByY.find(r => Math.abs(r.y - y) <= 5);
+                if (!foundRow) {
+                    foundRow = { y, items: [] };
+                    rowsByY.push(foundRow);
+                }
+                foundRow.items.push({ text, x, y, width: item.width || 0, height });
+            });
+
+            rowsByY.sort((a, b) => b.y - a.y);
+
+            rowsByY.forEach(row => {
+                row.items.sort((a, b) => a.x - b.x);
+            });
+
+            rowsByY.forEach(row => {
+                const merged: any[] = [];
+                row.items.forEach(item => {
+                    if (merged.length === 0) {
+                        merged.push({ ...item });
+                    } else {
+                        const last = merged[merged.length - 1];
+                        const gap = item.x - (last.x + last.width);
+                        // Relaxed gap threshold to 15px to merge split digits/characters correctly
+                        if (gap <= 15) {
+                            last.text += " " + item.text;
+                            last.width = (item.x + item.width) - last.x;
+                        } else {
+                            merged.push({ ...item });
+                        }
+                    }
+                });
+                row.items = merged;
+            });
+
+            let headerRowIndex = -1;
+            let pageColumnCoords = { date: -1, particulars: -1, refNo: -1, debit: -1, credit: -1, balance: -1 };
+
+            for (let r = 0; r < Math.min(25, rowsByY.length); r++) {
+                const row = rowsByY[r];
+                let tempCoords = { date: -1, particulars: -1, refNo: -1, debit: -1, credit: -1, balance: -1 };
+
+                row.items.forEach(item => {
+                    const text = item.text.toLowerCase().replace(/[^a-z0-9]/g, "");
+                    if (text.includes("date") || text === "dt") {
+                        tempCoords.date = item.x;
+                    } else if (
+                        text.includes("particular") || 
+                        text.includes("description") || 
+                        text.includes("narration") || 
+                        text.includes("remark") || 
+                        text.includes("detail") || 
+                        text.includes("transaction") || 
+                        text === "txn" || 
+                        text === "info"
+                    ) {
+                        tempCoords.particulars = item.x;
+                    } else if (
+                        text.includes("debit") || 
+                        text.includes("withdrawal") || 
+                        text.includes("payment") || 
+                        text === "dr" || 
+                        text.includes("withdrawn")
+                    ) {
+                        tempCoords.debit = item.x;
+                    } else if (
+                        text.includes("credit") || 
+                        text.includes("deposit") || 
+                        text.includes("receipt") || 
+                        text === "cr"
+                    ) {
+                        tempCoords.credit = item.x;
+                    } else if (text.includes("balance") || text === "bal" || text.includes("closing")) {
+                        tempCoords.balance = item.x;
+                    } else if (
+                        text.includes("ref") || 
+                        text.includes("cheque") || 
+                        text.includes("chq") || 
+                        text.includes("instrument") || 
+                        text.includes("doc")
+                    ) {
+                        tempCoords.refNo = item.x;
+                    }
+                });
+
+                if (tempCoords.date !== -1 && tempCoords.particulars !== -1 && (tempCoords.debit !== -1 || tempCoords.credit !== -1 || tempCoords.balance !== -1)) {
+                    headerRowIndex = r;
+                    pageColumnCoords = tempCoords;
+                    break;
+                }
+            }
+
+            if (headerRowIndex !== -1) {
+                if (!activeColumnCoords) {
+                    activeColumnCoords = { ...pageColumnCoords };
+                } else {
+                    // Smart coordinate merging to keep previously found columns
+                    Object.keys(pageColumnCoords).forEach(k => {
+                        const key = k as keyof typeof pageColumnCoords;
+                        const val = pageColumnCoords[key];
+                        if (val !== -1) {
+                            activeColumnCoords[key] = val;
+                        }
+                    });
+                }
+            }
+
+            const coords = activeColumnCoords;
+            const startIdx = headerRowIndex !== -1 ? headerRowIndex + 1 : 0;
+
+            if (!coords || coords.date === -1) {
+                continue;
+            }
+
+            const getClosestColumn = (x: number) => {
+                let closestCol = "";
+                let minDiff = Infinity;
+                Object.entries(coords).forEach(([colName, colX]: [string, any]) => {
+                    if (colX === -1) return;
+                    const diff = Math.abs(x - colX);
+                    if (diff < minDiff) {
+                        minDiff = diff;
+                        closestCol = colName;
+                    }
+                });
+                return closestCol;
+            };
+
+            for (let r = startIdx; r < rowsByY.length; r++) {
+                const row = rowsByY[r];
+                const rowData = {
+                    date: "",
+                    particulars: "",
+                    refNo: "",
+                    debit: "",
+                    credit: "",
+                    balance: ""
+                };
+
+                row.items.forEach(item => {
+                    const col = getClosestColumn(item.x);
+                    if (col) {
+                        if (rowData[col as keyof typeof rowData]) {
+                            rowData[col as keyof typeof rowData] += " " + item.text;
+                        } else {
+                            rowData[col as keyof typeof rowData] = item.text;
+                        }
+                    }
+                });
+
+                if (isStartOfDate(rowData.date)) {
+                    if (currentTxn) {
+                        allExtractedTxns.push({
+                            Date: currentTxn.Date,
+                            Particulars: extractedAccountNameVal || currentTxn.Particulars,
+                            Narration: currentTxn.Narration,
+                            Debit: Number(currentTxn.Debit.replace(/[^\d.]/g, "")) || 0,
+                            Credit: Number(currentTxn.Credit.replace(/[^\d.]/g, "")) || 0,
+                            Balance: currentTxn.Balance,
+                            "Reference number": currentTxn.refNo
+                        });
+                    }
+                    currentTxn = {
+                        Date: rowData.date,
+                        Particulars: rowData.particulars,
+                        Narration: rowData.particulars,
+                        Debit: rowData.debit,
+                        Credit: rowData.credit,
+                        Balance: rowData.balance,
+                        refNo: rowData.refNo
+                    };
+                } else if (currentTxn) {
+                    if (rowData.date) {
+                        currentTxn.Date += " " + rowData.date;
+                    }
+                    if (rowData.particulars) {
+                        currentTxn.Particulars = currentTxn.Particulars ? currentTxn.Particulars + " " + rowData.particulars : rowData.particulars;
+                        currentTxn.Narration = currentTxn.Narration ? currentTxn.Narration + " " + rowData.particulars : rowData.particulars;
+                    }
+                    if (rowData.debit) {
+                        currentTxn.Debit = currentTxn.Debit ? currentTxn.Debit + " " + rowData.debit : rowData.debit;
+                    }
+                    if (rowData.credit) {
+                        currentTxn.Credit = currentTxn.Credit ? currentTxn.Credit + " " + rowData.credit : rowData.credit;
+                    }
+                    if (rowData.balance) {
+                        currentTxn.Balance = currentTxn.Balance ? currentTxn.Balance + " " + rowData.balance : rowData.balance;
+                    }
+                    if (rowData.refNo) {
+                        currentTxn.refNo = currentTxn.refNo ? currentTxn.refNo + " " + rowData.refNo : rowData.refNo;
+                    }
+                }
+            }
+        }
+
+        if (currentTxn) {
+            allExtractedTxns.push({
+                Date: currentTxn.Date,
+                Particulars: extractedAccountNameVal || currentTxn.Particulars,
+                Narration: currentTxn.Narration,
+                Debit: Number(currentTxn.Debit.replace(/[^\d.]/g, "")) || 0,
+                Credit: Number(currentTxn.Credit.replace(/[^\d.]/g, "")) || 0,
+                Balance: currentTxn.Balance,
+                "Reference number": currentTxn.refNo
+            });
+        }
+
+        if (allExtractedTxns.length === 0) {
+            Swal.fire("Warning", "Could not extract any transaction rows. Please check file format.", "warning");
+            return;
+        }
+
+        await mapAndSequenceRows(allExtractedTxns, detectedBank);
+    };
+
+    const processPdfOcr = async (pdf: any) => {
+        setIsProcessing(true);
+        setSaveProgress({ done: 0, total: pdf.numPages });
+        const allOcrTxns: any[] = [];
+        let detectedBank = "";
+        let extractedAccountNameVal = "";
+
+        // Set up Tesseract worker
+        setProcessingStage("Loading OCR modules...");
+        const worker = await Tesseract.createWorker();
+
+        try {
+            for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+                setProcessingStage(`Rendering page ${pageNum} for OCR...`);
+                const page = await pdf.getPage(pageNum);
+                
+                // 2.0x scale for crisp OCR scans
+                const viewport = page.getViewport({ scale: 2.0 });
+                const canvas = document.createElement("canvas");
+                const context = canvas.getContext("2d");
+                canvas.height = viewport.height;
+                canvas.width = viewport.width;
+
+                await page.render({
+                    canvasContext: context!,
+                    viewport: viewport
+                }).promise;
+
+                setProcessingStage(`Running character recognition (Page ${pageNum}/${pdf.numPages})...`);
+                const { data: { text } } = await worker.recognize(canvas);
+
+                if (pageNum === 1) {
+                    const extractedName = extractAccountName(text);
+                    if (extractedName) {
+                        extractedAccountNameVal = extractedName;
+                    }
+                    const lowerText = text.toLowerCase();
+                    if (lowerText.includes("state bank of india") || lowerText.includes("sbi")) {
+                        detectedBank = "State Bank of India";
+                    } else if (lowerText.includes("hdfc")) {
+                        detectedBank = "HDFC Bank";
+                    } else if (lowerText.includes("icici")) {
+                        detectedBank = "ICICI Bank";
+                    } else if (lowerText.includes("axis")) {
+                        detectedBank = "Axis Bank";
+                    } else if (lowerText.includes("punjab national bank") || lowerText.includes("pnb")) {
+                        detectedBank = "Punjab National Bank";
+                    } else if (lowerText.includes("bank of baroda") || lowerText.includes("bob")) {
+                        detectedBank = "Bank of Baroda";
+                    } else if (lowerText.includes("canara")) {
+                        detectedBank = "Canara Bank";
+                    } else if (lowerText.includes("union bank")) {
+                        detectedBank = "Union Bank of India";
+                    } else if (lowerText.includes("idbi")) {
+                        detectedBank = "IDBI Bank";
+                    } else if (lowerText.includes("kotak")) {
+                        detectedBank = "Kotak Mahindra Bank";
+                    } else if (lowerText.includes("yes bank")) {
+                        detectedBank = "Yes Bank";
+                    } else if (lowerText.includes("federal bank")) {
+                        detectedBank = "Federal Bank";
+                    }
+                }
+
+                const lines = text.split("\n");
+                const parsedOcrRows = parseOcrLines(lines);
+                parsedOcrRows.forEach(row => {
+                    allOcrTxns.push(row);
+                });
+
+                setSaveProgress(prev => ({ ...prev, done: pageNum }));
+            }
+
+            if (allOcrTxns.length === 0) {
+                Swal.fire("OCR Warning", "Tesseract could not identify any transaction lines. Ensure scan quality is adequate.", "warning");
+                return;
+            }
+
+            if (!detectedBank) {
+                detectedBank = "State Bank of India";
+            }
+
+            const mappedOcrTxns = allOcrTxns.map(t => ({
+                Date: t.date,
+                Particulars: extractedAccountNameVal || t.particulars,
+                Narration: t.particulars,
+                Debit: t.debit,
+                Credit: t.credit,
+                Balance: t.balance,
+                "Reference number": t.refNo
+            }));
+
+            await mapAndSequenceRows(mappedOcrTxns, detectedBank);
+        } catch (err: any) {
+            console.error("OCR Fallback Error:", err);
+            Swal.fire("OCR Failed", err.message || "Failed during Tesseract scanning", "error");
+        } finally {
+            await worker.terminate();
+            setIsProcessing(false);
+        }
+    };
+
+    const parseOcrLines = (lines: string[]): any[] => {
+        const parsedRows: any[] = [];
+        const dateRegex = /(\d{1,2}[-/.]\d{1,2}[-/.]\d{2,4}|\d{1,2}[-/][a-zA-Z]{3,9}[-/]\d{2,4}|\d{1,2}\s+[a-zA-Z]{3,9}\s+\d{2,4}|\d{4}[-/.]\d{1,2}[-/.]\d{1,2})/;
+        
+        lines.forEach(line => {
+            const cleanLine = line.trim();
+            if (!cleanLine) return;
+            
+            const dateMatch = cleanLine.match(dateRegex);
+            if (!dateMatch) return;
+            
+            const dateStr = dateMatch[1];
+            const dateIndex = cleanLine.indexOf(dateStr);
+            const afterDate = cleanLine.substring(dateIndex + dateStr.length).trim();
+            if (!afterDate) return;
+            
+            // Extract numeric amounts at the end of the line
+            const numberRegex = /(-?\d{1,3}(?:,\d{3})*(?:\.\d{2})?|-?\d+(?:\.\d{2})?)/g;
+            const matches = afterDate.match(numberRegex);
+            
+            if (!matches || matches.length < 1) return;
+            
+            const amounts = matches.map(m => m.replace(/,/g, ""));
+            const firstAmount = matches[0];
+            const particularsIndex = afterDate.indexOf(firstAmount);
+            let particulars = afterDate.substring(0, particularsIndex).trim();
+            
+            particulars = particulars.replace(/^[-/\\s]+|[-/\\s]+$/g, "").trim();
+            
+            let debit = 0;
+            let credit = 0;
+            let balance = "";
+            let refNo = "";
+            
+            const refMatch = particulars.match(/\b(\d{8,18})\b/);
+            if (refMatch) {
+                refNo = refMatch[1];
+            }
+            
+            if (amounts.length >= 3) {
+                const val1 = Number(amounts[amounts.length - 3]);
+                const val2 = Number(amounts[amounts.length - 2]);
+                const val3 = amounts[amounts.length - 1];
+                
+                if (val1 > 0 && val2 === 0) {
+                    debit = val1;
+                } else if (val2 > 0 && val1 === 0) {
+                    credit = val2;
+                } else {
+                    debit = val1;
+                    credit = val2;
+                }
+                balance = val3;
+            } else if (amounts.length === 2) {
+                const val1 = Number(amounts[amounts.length - 2]);
+                const val2 = amounts[amounts.length - 1];
+                const lowerLine = cleanLine.toLowerCase();
+                const isCredit = lowerLine.includes("cr") || lowerLine.includes("deposit") || lowerLine.includes("received") || lowerLine.includes("refund") || lowerLine.includes("interest");
+                if (isCredit) {
+                    credit = val1;
+                } else {
+                    debit = val1;
+                }
+                balance = val2;
+            } else if (amounts.length === 1) {
+                const val1 = Number(amounts[0]);
+                const lowerLine = cleanLine.toLowerCase();
+                const isCredit = lowerLine.includes("cr") || lowerLine.includes("deposit") || lowerLine.includes("received") || lowerLine.includes("refund") || lowerLine.includes("interest");
+                if (isCredit) {
+                    credit = val1;
+                } else {
+                    debit = val1;
+                }
+            }
+            
+            parsedRows.push({
+                date: dateStr,
+                particulars,
+                refNo,
+                debit,
+                credit,
+                balance
+            });
+        });
+        
+        return parsedRows;
+    };
+
+    const handleDeleteRow = (index: number) => {
+        Swal.fire({
+            title: "Are you sure?",
+            text: "Do you want to delete this row from the import list?",
+            icon: "warning",
+            showCancelButton: true,
+            confirmButtonColor: "#d33",
+            cancelButtonColor: "#3085d6",
+            confirmButtonText: "Yes, delete it!"
+        }).then((result) => {
+            if (result.isConfirmed) {
+                setImportedRows(prev => prev.filter((_, i) => i !== index));
+            }
+        });
+    };
+
+    const startEditing = (index: number) => {
+        setEditingIndex(index);
+        setEditValues({ ...importedRows[index] });
+    };
+
+    const saveEditing = (index: number) => {
+        handleUpdateRow(index, editValues);
+        setEditingIndex(null);
+    };
+
+    const cancelEditing = () => {
+        setEditingIndex(null);
+    };
+
+    const handleUpdateRow = (index: number, updatedFields: Partial<ImportedRow>) => {
+        setImportedRows(prev => {
+            const newRows = [...prev];
+            const row = { ...newRows[index], ...updatedFields };
+
+            // Re-evaluate matches and ledger status
+            if (updatedFields.Particulars !== undefined) {
+                const particularsName = updatedFields.Particulars.trim();
+                const matchedParticulars = ledgers.find(
+                    (l) => l.name.toLowerCase() === particularsName.toLowerCase()
+                );
+                row.particularsMatch = !!matchedParticulars;
+                row.particularsId = matchedParticulars ? matchedParticulars.id : undefined;
+                row.Particulars = matchedParticulars ? matchedParticulars.name : particularsName;
+            }
+
+            const bankLedgerName = excelBankName;
+            const matchedBankLedger = ledgers.find((l) => isBankLedgerMatch(l.name, bankLedgerName));
+
+            let newStatus: "pending" | "error" = "pending";
+            let newError = "";
+
+            if (!row.particularsMatch) {
+                newStatus = "error";
+                newError = `Ledger '${row.Particulars}' not found.`;
+            }
+            if (!matchedBankLedger) {
+                newStatus = "error";
+                newError += (newError ? " " : "") + `Bank '${bankLedgerName}' not found.`;
+            }
+
+            row.status = newStatus;
+            row.errorMessage = newError || undefined;
+
+            newRows[index] = row;
+            return newRows;
+        });
+    };
+
     const saveImportedVouchers = async () => {
         setIsProcessing(true);
-        const bankLedgerName = ledgers.find(l => l.name.toLowerCase() === excelBankName.toLowerCase())?.name || excelBankName;
-        const pendingRows = importedRows.filter(r => r.status === "pending");
+        const bankLedgerName = ledgers.find(l => isBankLedgerMatch(l.name, excelBankName))?.name || excelBankName;
+        
+        // Exclude duplicate rows if skipDuplicates is toggled
+        const pendingRows = importedRows.filter(r => r.status === "pending" && !(skipDuplicates && r.skipImport));
         setSaveProgress({ done: 0, total: pendingRows.length });
 
         const updatedRows = [...importedRows];
 
-        // Mark all pending as "importing" to show spinner per row
+        // Mark matching rows as importing
         updatedRows.forEach((r, i) => {
-            if (r.status === "pending") updatedRows[i] = { ...r, status: "importing" };
+            if (r.status === "pending" && !(skipDuplicates && r.skipImport)) {
+                updatedRows[i] = { ...r, status: "importing" };
+            }
         });
         setImportedRows([...updatedRows]);
 
@@ -332,7 +1151,7 @@ const BankStatementImport: React.FC = () => {
 
         for (let i = 0; i < importedRows.length; i++) {
             const row = importedRows[i];
-            if (row.status !== "pending") continue;
+            if (row.status !== "pending" || (skipDuplicates && row.skipImport)) continue;
 
             let endpoint = "";
             let payload: any = {};
@@ -355,7 +1174,8 @@ const BankStatementImport: React.FC = () => {
 
             try {
                 const res = await axios.post(`${import.meta.env.VITE_API_URL}${endpoint}`, payload);
-                updatedRows[i] = { ...updatedRows[i], status: res.data.success ? "imported" : "error", errorMessage: res.data.success ? undefined : "Backend error" };
+                const resData = res.data as any;
+                updatedRows[i] = { ...updatedRows[i], status: resData.success ? "imported" : "error", errorMessage: resData.success ? undefined : "Backend error" };
             } catch (err: any) {
                 updatedRows[i] = { ...updatedRows[i], status: "error", errorMessage: err.response?.data?.message || err.message || "Failed" };
             }
@@ -374,8 +1194,7 @@ const BankStatementImport: React.FC = () => {
             Swal.fire({
                 icon: "success",
                 title: "Import Successful!",
-                html: `<b>${savedCount}</b> voucher${savedCount > 1 ? "s" : ""} saved successfully!${errorCount > 0 ? `<br/><span style="color:#e53e3e">${errorCount} rows had errors.</span>` : ""
-                    }`,
+                html: `<b>${savedCount}</b> voucher${savedCount > 1 ? "s" : ""} saved successfully!${errorCount > 0 ? `<br/><span style="color:#e53e3e">${errorCount} rows had errors.</span>` : ""}`,
                 showConfirmButton: true,
                 confirmButtonText: "Great!",
                 confirmButtonColor: "#2563eb",
@@ -424,7 +1243,7 @@ const BankStatementImport: React.FC = () => {
                     </h2>
                 </div>
                 <p className="text-sm text-gray-600">
-                    Upload bank statements in Excel format and auto-route to Payment, Receipt, Contra, and Journal vouchers.
+                    Upload bank statements in Excel, CSV, or PDF formats and auto-route to Payment, Receipt, Contra, and Journal vouchers.
                 </p>
             </div>
 
@@ -463,11 +1282,16 @@ const BankStatementImport: React.FC = () => {
                         >
                             <Upload className="h-12 w-12 mx-auto text-gray-400 mb-4" />
                             <h3 className="text-lg font-medium text-gray-900 mb-2">
-                                Drop your Bank Statement Excel/CSV here
+                                Drop your Bank Statement Excel/CSV/PDF here
                             </h3>
                             <p className="text-sm text-gray-600 mb-4">
-                                Format: Bank name must be at the top prefixed by "Bank :-"
+                                Supports Excel (with Bank name at top prefixed by "Bank :-"), standard PDF, and scanned OCR statements.
                             </p>
+                            {selectedFile && (
+                                <p className="mt-1 mb-4 text-xs font-semibold text-blue-600 bg-blue-50 border border-blue-200 inline-block px-3 py-1 rounded-full">
+                                    Selected File: {selectedFile.name}
+                                </p>
+                            )}
                             <button
                                 onClick={() => fileInputRef.current?.click()}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
@@ -477,7 +1301,7 @@ const BankStatementImport: React.FC = () => {
                             <input
                                 ref={fileInputRef}
                                 type="file"
-                                accept=".xlsx,.xls,.csv"
+                                accept=".xlsx,.xls,.csv,.pdf"
                                 onChange={(e) => e.target.files?.[0] && handleFileSelect(e.target.files[0])}
                                 className="hidden"
                                 title="Select file for import"
@@ -487,7 +1311,7 @@ const BankStatementImport: React.FC = () => {
                     {isProcessing && (
                         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-center space-x-3">
                             <RefreshCw className="h-5 w-5 text-blue-600 animate-spin" />
-                            <span className="text-blue-700">Processing file...</span>
+                            <span className="text-blue-700 font-medium">{processingStage || "Processing file..."}</span>
                         </div>
                     )}
                 </div>
@@ -495,13 +1319,13 @@ const BankStatementImport: React.FC = () => {
 
             {activeTab === "preview" && (
                 <div className="space-y-6">
-                    <div className="flex items-center justify-between">
+                    <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
                         <div>
                             <h3 className="text-lg font-semibold text-gray-900">
                                 Preview Bank Statement Rows
                             </h3>
                             <p className="text-sm text-gray-600">
-                                Review data before saving. Vouchers will be routed automatically.
+                                Review extracted data and resolve missing ledgers before importing. Hover on rows to Edit/Delete.
                             </p>
                             {excelBankName && (
                                 <div className={`mt-3 px-4 py-3 rounded-xl border-2 flex items-center space-x-3 ${excelBankMatch ? "bg-green-50 border-green-300" : "bg-red-50 border-red-300"}`}>
@@ -515,7 +1339,7 @@ const BankStatementImport: React.FC = () => {
                                             {excelBankId && <span className="text-sm font-normal ml-2 opacity-70">(ID: {excelBankId})</span>}
                                         </p>
                                         <p className={`text-xs mt-0.5 ${excelBankMatch ? "text-green-600" : "text-red-600"}`}>
-                                            {excelBankMatch ? "✓ Matched in your ledgers" : "✗ Not found in ledgers"}
+                                            {excelBankMatch ? "✓ Matched in your ledgers" : "✗ Not found in ledgers (edit row to assign alternative)"}
                                         </p>
                                     </div>
                                 </div>
@@ -539,7 +1363,19 @@ const BankStatementImport: React.FC = () => {
                                     </div>
                                 </div>
                             )}
-                            <div className="flex space-x-3">
+                            <div className="flex flex-wrap items-center gap-3">
+                                <label className="flex items-center space-x-2 text-sm text-gray-700 bg-gray-50 px-3 py-2 border rounded-lg cursor-pointer hover:bg-gray-100">
+                                    <input
+                                        type="checkbox"
+                                        checked={skipDuplicates}
+                                        onChange={(e) => setSkipDuplicates(e.target.checked)}
+                                        className="h-4 w-4 text-blue-600 border-gray-300 rounded"
+                                    />
+                                    <span className="font-medium text-orange-700 flex items-center space-x-1">
+                                        <Sparkles className="h-4 w-4" />
+                                        <span>Skip Potential Duplicates</span>
+                                    </span>
+                                </label>
                                 <button
                                     onClick={resetImport}
                                     className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
@@ -548,13 +1384,13 @@ const BankStatementImport: React.FC = () => {
                                 </button>
                                 <button
                                     onClick={saveImportedVouchers}
-                                    disabled={isProcessing || importedRows.filter(r => r.status === "pending").length === 0}
-                                    className="flex items-center space-x-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 transition-colors font-medium"
+                                    disabled={isProcessing || importedRows.filter(r => r.status === "pending" && !(skipDuplicates && r.skipImport)).length === 0}
+                                    className="flex items-center space-x-2 px-5 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:bg-gray-300 transition-colors font-medium shadow"
                                 >
                                     {isProcessing ? (
                                         <><RefreshCw className="h-4 w-4 animate-spin" /><span>Saving...</span></>
                                     ) : (
-                                        <><CheckCircle className="h-4 w-4" /><span>Save All Vouchers ({importedRows.filter(r => r.status === "pending").length} ready)</span></>
+                                        <><CheckCircle className="h-4 w-4" /><span>Save Vouchers ({importedRows.filter(r => r.status === "pending" && !(skipDuplicates && r.skipImport)).length} ready)</span></>
                                     )}
                                 </button>
                             </div>
@@ -564,27 +1400,36 @@ const BankStatementImport: React.FC = () => {
                     {isMatchingDB ? (
                         <div className="bg-white border border-gray-200 rounded-lg p-16 flex flex-col items-center justify-center space-y-4 shadow-sm">
                             <RefreshCw className="h-12 w-12 text-blue-500 animate-spin" />
-                            <h3 className="text-xl font-semibold text-gray-900">Verifying Ledgers...</h3>
+                            <h3 className="text-xl font-semibold text-gray-900">Verifying Ledgers & Checking Duplicates...</h3>
                             <p className="text-gray-500 text-center max-w-sm">
-                                Securely scanning your Excel file and matching ledgers against your live database.
+                                Securely scanning your transactions and running pattern matching against live ledger accounts.
                             </p>
                         </div>
                     ) : (
                         <>
-                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                                     <div className="flex items-center space-x-2">
                                         <CheckCircle className="h-5 w-5 text-blue-600" />
-                                        <span className="font-medium text-blue-900">Ready</span>
+                                        <span className="font-medium text-blue-900">Ready for Import</span>
                                     </div>
                                     <div className="text-2xl font-bold text-blue-600 mt-2">
-                                        {importedRows.filter((v) => v.status === "pending").length}
+                                        {importedRows.filter((v) => v.status === "pending" && !(skipDuplicates && v.skipImport)).length}
+                                    </div>
+                                </div>
+                                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                                    <div className="flex items-center space-x-2">
+                                        <Layers className="h-5 w-5 text-orange-600" />
+                                        <span className="font-medium text-orange-900">Duplicates Flagged</span>
+                                    </div>
+                                    <div className="text-2xl font-bold text-orange-600 mt-2">
+                                        {importedRows.filter((v) => v.isDuplicate).length}
                                     </div>
                                 </div>
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                                     <div className="flex items-center space-x-2">
                                         <AlertTriangle className="h-5 w-5 text-red-600" />
-                                        <span className="font-medium text-red-900">Errors</span>
+                                        <span className="font-medium text-red-900">Errors (Resolve by Editing)</span>
                                     </div>
                                     <div className="text-2xl font-bold text-red-600 mt-2">
                                         {importedRows.filter((v) => v.status === "error").length}
@@ -593,7 +1438,7 @@ const BankStatementImport: React.FC = () => {
                                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                                     <div className="flex items-center space-x-2">
                                         <CheckCircle className="h-5 w-5 text-green-600" />
-                                        <span className="font-medium text-green-900">Imported</span>
+                                        <span className="font-medium text-green-900">Imported Successfully</span>
                                     </div>
                                     <div className="text-2xl font-bold text-green-600 mt-2">
                                         {importedRows.filter((v) => v.status === "imported").length}
@@ -601,13 +1446,13 @@ const BankStatementImport: React.FC = () => {
                                 </div>
                             </div>
 
-                            <div className="bg-white border rounded-lg overflow-hidden">
+                            <div className="bg-white border rounded-lg overflow-hidden shadow-sm">
                                 <div className="overflow-x-auto">
                                     <table className="w-full">
                                         <thead className="bg-gray-50">
                                             <tr>
+                                                <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase w-12">Import</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
-
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Vch No.</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Date</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Particulars</th>
@@ -617,50 +1462,216 @@ const BankStatementImport: React.FC = () => {
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-right">Credit</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase text-right">Balance</th>
                                                 <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Ref No</th>
+                                                <th className="px-4 py-3 text-center text-xs font-medium text-gray-500 uppercase w-20">Actions</th>
                                             </tr>
                                         </thead>
                                         <tbody className="divide-y divide-gray-200">
-                                            {importedRows.map((row, i) => (
-                                                <tr key={i} className="hover:bg-gray-50">
-                                                    <td className="px-4 py-3 text-sm">
-                                                        {row.status === "error" ? (
-                                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800">Error</span>
-                                                        ) : row.status === "imported" ? (
-                                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">✓ Done</span>
-                                                        ) : row.status === "importing" ? (
-                                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 flex items-center space-x-1"><RefreshCw className="h-3 w-3 animate-spin" /><span>Saving...</span></span>
-                                                        ) : (
-                                                            <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800">Ready</span>
-                                                        )}
-                                                        {row.errorMessage && <div className="text-xs text-red-600 mt-1">{row.errorMessage}</div>}
-                                                    </td>
-
-                                                    <td className="px-4 py-3 text-sm text-gray-800 font-mono font-medium">
-                                                        {row.SimulatedVoucherNumber || "-"}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm">{row.Date}</td>
-                                                    <td className="px-4 py-3 text-sm font-medium">
-                                                        <div className="flex items-center space-x-2">
-                                                            <span className={row.particularsMatch ? "text-gray-900 font-medium" : "text-red-500 font-bold"}>
-                                                                {row.Particulars} {row.particularsId && <span className="text-gray-500 ml-1">({row.particularsId})</span>}
-                                                            </span>
-                                                            {row.particularsMatch ? (
-                                                                <CheckCircle className="h-4 w-4 text-green-500" title="Ledger Matched" />
+                                            {importedRows.map((row, i) => {
+                                                const isEditing = editingIndex === i;
+                                                const rowSkipped = skipDuplicates && row.skipImport;
+                                                
+                                                return (
+                                                    <tr key={i} className={`group hover:bg-gray-50 transition-colors ${rowSkipped ? "bg-orange-50/50 opacity-60" : ""}`}>
+                                                        <td className="px-4 py-3 text-sm">
+                                                            <input
+                                                                title="Toggle import row"
+                                                                type="checkbox"
+                                                                disabled={row.status === "imported" || row.status === "importing"}
+                                                                checked={!row.skipImport}
+                                                                onChange={(e) => {
+                                                                    handleUpdateRow(i, { skipImport: !e.target.checked });
+                                                                }}
+                                                                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                                                            />
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm">
+                                                            {row.status === "error" ? (
+                                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">Error</span>
+                                                            ) : row.status === "imported" ? (
+                                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800 border border-green-200">✓ Done</span>
+                                                            ) : row.status === "importing" ? (
+                                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 flex items-center space-x-1 border border-blue-200"><RefreshCw className="h-3 w-3 animate-spin" /><span>Saving...</span></span>
+                                                            ) : rowSkipped ? (
+                                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">Skipped (Duplicate)</span>
                                                             ) : (
-                                                                <AlertTriangle className="h-4 w-4 text-red-500" title="Ledger Not Found" />
+                                                                <span className="px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 border border-yellow-200">Ready</span>
                                                             )}
-                                                        </div>
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-gray-600 truncate max-w-xs">{row.Narration}</td>
-                                                    <td className="px-4 py-3 text-sm font-semibold capitalize text-blue-700">
-                                                        {row.VoucherTargetType}
-                                                    </td>
-                                                    <td className="px-4 py-3 text-sm text-right text-red-600 font-medium">{row.Debit > 0 ? row.Debit : "-"}</td>
-                                                    <td className="px-4 py-3 text-sm text-right text-green-600 font-medium">{row.Credit > 0 ? row.Credit : "-"}</td>
-                                                    <td className="px-4 py-3 text-sm text-right text-gray-800 font-medium">{row.Balance ? row.Balance : "-"}</td>
-                                                    <td className="px-4 py-3 text-sm">{row["Reference number"]}</td>
-                                                </tr>
-                                            ))}
+                                                            {row.errorMessage && <div className="text-xs text-red-600 mt-1 max-w-[150px] break-words">{row.errorMessage}</div>}
+                                                        </td>
+
+                                                        <td className="px-4 py-3 text-sm text-gray-800 font-mono font-medium">
+                                                            {row.SimulatedVoucherNumber || "-"}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm">
+                                                            {isEditing ? (
+                                                                <input
+                                                                    title="Edit Row Date"
+                                                                    type="date"
+                                                                    value={editValues.Date || ""}
+                                                                    onChange={e => setEditValues(prev => ({ ...prev, Date: e.target.value }))}
+                                                                    className="px-2 py-1 border rounded text-xs"
+                                                                />
+                                                            ) : (
+                                                                row.Date
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm font-medium">
+                                                            {isEditing ? (
+                                                                <select
+                                                                    title="Select Ledger"
+                                                                    value={editValues.Particulars || ""}
+                                                                    onChange={e => setEditValues(prev => ({ ...prev, Particulars: e.target.value }))}
+                                                                    className="px-2 py-1 border rounded text-xs w-full max-w-[180px]"
+                                                                >
+                                                                    <option value="">-- Map Ledger --</option>
+                                                                    {ledgers.map(l => (
+                                                                        <option key={l.id} value={l.name}>{l.name}</option>
+                                                                    ))}
+                                                                </select>
+                                                            ) : (
+                                                                <div className="flex flex-wrap items-center gap-1">
+                                                                    <span className={row.particularsMatch ? "text-gray-900 font-medium" : "text-red-600 font-bold"}>
+                                                                        {row.Particulars} {row.particularsId && <span className="text-gray-500 ml-1 text-xs font-normal">({row.particularsId})</span>}
+                                                                    </span>
+                                                                    {row.particularsMatch ? (
+                                                                        <span title="Ledger Matched"><CheckCircle className="h-4 w-4 text-green-500 shrink-0" /></span>
+                                                                    ) : (
+                                                                        <span title="Ledger Not Found"><AlertTriangle className="h-4 w-4 text-red-500 shrink-0" /></span>
+                                                                    )}
+                                                                    {row.isDuplicate && (
+                                                                        <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-orange-100 text-orange-800 border border-orange-200 flex items-center gap-0.5">
+                                                                            <Sparkles className="h-3 w-3 shrink-0" />
+                                                                            <span>Duplicate ({row.duplicateVoucherNo})</span>
+                                                                        </span>
+                                                                    )}
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-gray-600 truncate max-w-xs">
+                                                            {isEditing ? (
+                                                                <input
+                                                                    title="Edit Narration"
+                                                                    type="text"
+                                                                    value={editValues.Narration || ""}
+                                                                    onChange={e => setEditValues(prev => ({ ...prev, Narration: e.target.value }))}
+                                                                    className="px-2 py-1 border rounded text-xs w-full"
+                                                                />
+                                                            ) : (
+                                                                row.Narration
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm font-semibold capitalize text-blue-700">
+                                                            {isEditing ? (
+                                                                <select
+                                                                    title="Select Voucher Target Type"
+                                                                    value={editValues.VoucherTargetType || ""}
+                                                                    onChange={e => setEditValues(prev => ({ ...prev, VoucherTargetType: e.target.value as any }))}
+                                                                    className="px-2 py-1 border rounded text-xs"
+                                                                >
+                                                                    <option value="payment">payment</option>
+                                                                    <option value="receipt">receipt</option>
+                                                                    <option value="contra">contra</option>
+                                                                    <option value="journal">journal</option>
+                                                                    <option value="error">error</option>
+                                                                </select>
+                                                            ) : (
+                                                                row.VoucherTargetType
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-right text-red-600 font-medium">
+                                                            {isEditing ? (
+                                                                <input
+                                                                    title="Edit Debit Amount"
+                                                                    type="number"
+                                                                    value={editValues.Debit || 0}
+                                                                    onChange={e => setEditValues(prev => ({ ...prev, Debit: Number(e.target.value) }))}
+                                                                    className="px-2 py-1 border rounded text-xs w-20 text-right"
+                                                                />
+                                                            ) : (
+                                                                row.Debit > 0 ? row.Debit : "-"
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-right text-green-600 font-medium">
+                                                            {isEditing ? (
+                                                                <input
+                                                                    title="Edit Credit Amount"
+                                                                    type="number"
+                                                                    value={editValues.Credit || 0}
+                                                                    onChange={e => setEditValues(prev => ({ ...prev, Credit: Number(e.target.value) }))}
+                                                                    className="px-2 py-1 border rounded text-xs w-20 text-right"
+                                                                />
+                                                            ) : (
+                                                                row.Credit > 0 ? row.Credit : "-"
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-right text-gray-800 font-medium">
+                                                            {isEditing ? (
+                                                                <input
+                                                                    title="Edit Balance"
+                                                                    type="text"
+                                                                    value={editValues.Balance || ""}
+                                                                    onChange={e => setEditValues(prev => ({ ...prev, Balance: e.target.value }))}
+                                                                    className="px-2 py-1 border rounded text-xs w-20 text-right"
+                                                                />
+                                                            ) : (
+                                                                row.Balance ? row.Balance : "-"
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm">
+                                                            {isEditing ? (
+                                                                <input
+                                                                    title="Edit Ref No"
+                                                                    type="text"
+                                                                    value={editValues["Reference number"] || ""}
+                                                                    onChange={e => setEditValues(prev => ({ ...prev, "Reference number": e.target.value }))}
+                                                                    className="px-2 py-1 border rounded text-xs w-24"
+                                                                />
+                                                            ) : (
+                                                                row["Reference number"] || "-"
+                                                            )}
+                                                        </td>
+                                                        <td className="px-4 py-3 text-sm text-center">
+                                                            {isEditing ? (
+                                                                <div className="flex items-center justify-center space-x-1">
+                                                                    <button
+                                                                        title="Save row changes"
+                                                                        onClick={() => saveEditing(i)}
+                                                                        className="p-1 text-green-600 hover:bg-green-100 rounded"
+                                                                    >
+                                                                        <Check size={16} />
+                                                                    </button>
+                                                                    <button
+                                                                        title="Cancel editing"
+                                                                        onClick={cancelEditing}
+                                                                        className="p-1 text-gray-500 hover:bg-gray-100 rounded"
+                                                                    >
+                                                                        <X size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            ) : (
+                                                                <div className="flex items-center justify-center space-x-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                                                                    <button
+                                                                        title="Edit this row inline"
+                                                                        disabled={row.status === "imported" || row.status === "importing"}
+                                                                        onClick={() => startEditing(i)}
+                                                                        className="p-1 text-blue-600 hover:bg-blue-100 rounded disabled:opacity-30"
+                                                                    >
+                                                                        <Edit3 size={16} />
+                                                                    </button>
+                                                                    <button
+                                                                        title="Delete this row"
+                                                                        disabled={row.status === "imported" || row.status === "importing"}
+                                                                        onClick={() => handleDeleteRow(i)}
+                                                                        className="p-1 text-red-600 hover:bg-red-100 rounded disabled:opacity-30"
+                                                                    >
+                                                                        <Trash2 size={16} />
+                                                                    </button>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
                                         </tbody>
                                     </table>
                                 </div>
@@ -672,15 +1683,15 @@ const BankStatementImport: React.FC = () => {
 
             {activeTab === "templates" && (
                 <div className="space-y-6">
-                    <div className="border border-gray-200 rounded-lg p-6 max-w-lg">
+                    <div className="border border-gray-200 rounded-lg p-6 max-w-lg shadow-sm bg-white">
                         <h4 className="font-semibold text-gray-900 mb-2">Bank Statement Template</h4>
                         <div className="text-sm text-gray-600 mb-4 space-y-2">
-                            <p><strong>Top of file:</strong> Put <code className="bg-gray-100 p-1">Bank :- Your Bank Name</code> at the very top.</p>
+                            <p><strong>Top of file:</strong> Put <code className="bg-gray-100 p-1">Bank :- Enter Bank Ledger Name</code> at the very top.</p>
                             <p><strong>Required Columns:</strong> Date, Particulars, Narration, Debit, Credit, Balance, Voucher, Reference number</p>
                         </div>
                         <button
                             onClick={downloadTemplate}
-                            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                            className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 shadow"
                         >
                             <Download className="h-4 w-4" />
                             <span>Download Template</span>

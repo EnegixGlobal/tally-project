@@ -62,15 +62,36 @@ const UnitForm: React.FC = () => {
           if (!res.ok) throw new Error("Unit not found");
           const unit = await res.json();
 
+          // Parse compound unit format if applicable
+          const isCompound = unit.symbol && unit.symbol.includes(" of ");
+          let firstUnit = "";
+          let conversionFactor = 1;
+          let secondUnit = "";
+          let type: "Simple" | "Compound" = "Simple";
+
+          if (isCompound) {
+            const parts = unit.symbol.split(" of ");
+            if (parts.length === 2) {
+              firstUnit = parts[0].trim();
+              const rightPart = parts[1].trim();
+              const match = rightPart.match(/^(\d+(?:\.\d+)?)\s+(.+)$/);
+              if (match) {
+                type = "Compound";
+                conversionFactor = Number(match[1]);
+                secondUnit = match[2].trim();
+              }
+            }
+          }
+
           setFormData({
             name: unit.name,
             symbol: unit.symbol,
-            type: unit.type || "Simple",
-            formalName: unit.formalName || "",
-            decimalPlaces: unit.decimalPlaces || 2,
-            firstUnit: unit.firstUnit || "",
-            conversionFactor: unit.conversionFactor || 1,
-            secondUnit: unit.secondUnit || "",
+            type: type,
+            formalName: type === "Simple" ? (unit.formalName || "") : "",
+            decimalPlaces: type === "Simple" ? (unit.decimalPlaces || 2) : 2,
+            firstUnit: firstUnit,
+            conversionFactor: conversionFactor,
+            secondUnit: secondUnit,
           });
         } catch (err) {
           console.error("Error fetching unit:", err);
@@ -99,8 +120,14 @@ const UnitForm: React.FC = () => {
 
   const companyId = localStorage.getItem("company_id");
 
+  // Dynamically compute final symbol if type is Compound
+  const finalSymbol = formData.type === "Compound"
+    ? `${formData.firstUnit} of ${formData.conversionFactor} ${formData.secondUnit}`
+    : formData.symbol;
+
   const payload = {
     ...formData,
+    symbol: finalSymbol,
     company_id: companyId,
     owner_type: ownerType,
     owner_id: ownerId,
