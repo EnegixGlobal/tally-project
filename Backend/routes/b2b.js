@@ -57,8 +57,8 @@ router.get('/b2b-transactions', async (req, res) => {
         svi.igstRate
       FROM sales_vouchers sv
       JOIN ledgers l ON sv.partyId = l.id
-      LEFT JOIN sales_voucher_items svi ON sv.id = svi.voucherId
-      LEFT JOIN stock_items si ON si.id = svi.itemId
+      JOIN sales_voucher_items svi ON sv.id = svi.voucherId
+      JOIN stock_items si ON si.id = svi.itemId
       WHERE sv.company_id = ? AND sv.owner_type = ? AND sv.owner_id = ?
         AND sv.date BETWEEN ? AND ?
         AND l.gst_number IS NOT NULL AND l.gst_number != ''

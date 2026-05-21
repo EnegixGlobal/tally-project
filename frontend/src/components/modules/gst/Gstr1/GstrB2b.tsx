@@ -22,13 +22,11 @@ const Gstr2B2b = () => {
   const [ledger, setLedger] = useState<any[]>([]);
   const [matchedSales, setMatchedSales] = useState<any[]>([]);
 
-  const [filters, setFilters] = useState(() => {
-    const savedFrom = localStorage.getItem("gstr1_fromDate");
-    const savedTo = localStorage.getItem("gstr1_toDate");
-    return {
-      fromDate: savedFrom || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
-      toDate: savedTo || new Date().toISOString().split("T")[0],
-    };
+  const [filters, setFilters] = useState({
+    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .split("T")[0],
+    toDate: new Date().toISOString().split("T")[0],
   });
 
   useEffect(() => {
@@ -405,9 +403,7 @@ const Gstr2B2b = () => {
               <button
                 type="button"
                 onClick={() => {
-                  localStorage.setItem("gstr1_fromDate", filters.fromDate);
-                  localStorage.setItem("gstr1_toDate", filters.toDate);
-                  setShowFilterPanel(false);
+                  // Data will reload automatically via useEffect
                 }}
                 className={`px-4 py-2 rounded ${theme === "dark"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
