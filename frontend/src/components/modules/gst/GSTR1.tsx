@@ -17,9 +17,20 @@ const GSTR1: React.FC = () => {
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState({
-    month: "03",
-    year: "2024",
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    const savedFrom = localStorage.getItem("gstr1_fromDate");
+    if (savedFrom) {
+      const d = new Date(savedFrom);
+      return {
+        month: String(d.getMonth() + 1).padStart(2, "0"),
+        year: String(d.getFullYear()),
+      };
+    }
+    const now = new Date();
+    return {
+      month: String(now.getMonth() + 1).padStart(2, "0"),
+      year: String(now.getFullYear()),
+    };
   });
 
   // get company infomatiion
@@ -344,11 +355,13 @@ const GSTR1: React.FC = () => {
   const [ledger, setLedger] = useState<any[]>([]);
 
   // ================= DATE FILTER =================
-  const [filters, setFilters] = useState({
-    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0],
-    toDate: new Date().toISOString().split("T")[0],
+  const [filters, setFilters] = useState(() => {
+    const savedFrom = localStorage.getItem("gstr1_fromDate");
+    const savedTo = localStorage.getItem("gstr1_toDate");
+    return {
+      fromDate: savedFrom || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
+      toDate: savedTo || new Date().toISOString().split("T")[0],
+    };
   });
 
   // ================= SALES FETCH =================
@@ -554,6 +567,14 @@ const GSTR1: React.FC = () => {
     let minInv = "";
     let maxInv = "";
 
+    // State check for inter-state/intra-state
+    const cleanStateCode = (s: string) => {
+      if (!s) return "";
+      const match = s.match(/\((\d+)\)/);
+      if (match) return match[1];
+      return s.replace(/\(.*?\)/g, "").trim().toLowerCase();
+    };
+
     saleData.forEach((sale) => {
       const party = ledger.find((l) => l.id === sale.partyId);
       const hasGst = Boolean(party?.gstNumber && String(party.gstNumber).trim());
@@ -562,22 +583,43 @@ const GSTR1: React.FC = () => {
       const invValue = Number(sale.total || 0);
       const taxValue = Number(sale.subtotal || 0);
 
+      const ledgerState = party?.state || "";
+      const destinationState = sale.destination || "";
+      const posState = destinationState || ledgerState;
+      const placeOfSupplyCode = cleanStateCode(posState);
+      const isIntraState = !companyStateCode || !placeOfSupplyCode || (companyStateCode === placeOfSupplyCode);
+
+      let igstRate = 0;
+      let cgstRate = 0;
+      let sgstRate = 0;
+      if (taxValue > 0) {
+        if (Number(sale.igstTotal || 0) > 0) {
+          igstRate = Math.round((Number(sale.igstTotal) / taxValue) * 100);
+        }
+        if (Number(sale.cgstTotal || 0) > 0) {
+          cgstRate = Math.round((Number(sale.cgstTotal) / taxValue) * 100);
+        }
+        if (Number(sale.sgstTotal || 0) > 0) {
+          sgstRate = Math.round((Number(sale.sgstTotal) / taxValue) * 100);
+        }
+      }
+
       const flatEntry = {
         gstin: gstin,
         receiverName: party?.name || "Cash/Unknown",
         invoiceNumber: sale.number,
         invoiceDate: new Date(sale.date).toLocaleDateString('en-GB'),
         invoiceValue: invValue,
-        placeOfSupply: party?.state || "",
+        placeOfSupply: posState,
         reverseCharge: "N",
         invoiceType: "Regular",
         ecommerceGstin: "",
         taxableValue: taxValue,
-        igstRate: 0, // Simplified unless we explode items
+        igstRate,
         igstAmount: Number(sale.igstTotal || 0),
-        cgstRate: 0,
+        cgstRate,
         cgstAmount: Number(sale.cgstTotal || 0),
-        sgstRate: 0,
+        sgstRate,
         sgstAmount: Number(sale.sgstTotal || 0),
         cessRate: 0,
         cessAmount: 0
@@ -586,7 +628,7 @@ const GSTR1: React.FC = () => {
       // Categorization
       if (hasGst) {
         b2b.push(flatEntry);
-      } else if (invValue > 250000) {
+      } else if (!isIntraState && invValue > 250000) {
         b2cLarge.push(flatEntry);
       } else {
         b2cSmall.push(flatEntry);
@@ -749,8 +791,31 @@ const GSTR1: React.FC = () => {
               </select>
             </div>
             <div className="flex items-end">
-              <button
+               <button
                 type="button"
+                onClick={() => {
+                  const year = parseInt(selectedPeriod.year);
+                  const month = parseInt(selectedPeriod.month);
+                  const startDate = new Date(year, month - 1, 1);
+                  const endDate = new Date(year, month, 0); // last day of month
+                  const fromStr = startDate.toISOString().split("T")[0];
+                  const toStr = endDate.toISOString().split("T")[0];
+
+                  setFilters({
+                    fromDate: fromStr,
+                    toDate: toStr,
+                  });
+
+                  localStorage.setItem("gstr1_fromDate", fromStr);
+                  localStorage.setItem("gstr1_toDate", toStr);
+
+                  setFormData((prev) => ({
+                    ...prev,
+                    returnPeriod: `${selectedPeriod.month}/${selectedPeriod.year}`
+                  }));
+
+                  setShowFilterPanel(false);
+                }}
                 className={`px-4 py-2 rounded ${theme === "dark"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
                   : "bg-blue-600 hover:bg-blue-700 text-white"
