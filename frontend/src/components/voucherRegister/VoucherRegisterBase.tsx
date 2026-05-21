@@ -123,6 +123,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     null
   );
   const [ledgerList, setLedgerList] = useState<any[]>([]);
+  const [stockItemList, setStockItemList] = useState<any[]>([]);
   // State for inline invoice download (sales only)
   const [downloadVoucherId, setDownloadVoucherId] = useState<string | null>(null);
 
@@ -157,7 +158,12 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   // Initialize mock data
 
   const getLedgerName = (ledgerId?: number | string) => {
-    if (!ledgerId) return "Unknown Ledger (-)";
+    if (!ledgerId) return "Unknown (-)";
+
+    if (voucherType === "stock_journal" || voucherType === "stock-journal") {
+      const item = stockItemList?.find((i: any) => String(i.id) === String(ledgerId));
+      if (item) return item.name;
+    }
 
     // Try finding in locally fetched ledgerList first (most up-to-date)
     let ledger = ledgerList?.find(
@@ -169,7 +175,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       ledger = ledgers?.find((l: any) => String(l.id) === String(ledgerId));
     }
 
-    return ledger ? ledger.name : `Unknown Ledger (${ledgerId})`;
+    return ledger ? ledger.name : `Unknown (${ledgerId})`;
   };
   const getParticulars = (voucher: VoucherEntry): string => {
     return voucher.entries
@@ -801,15 +807,15 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       };
     }
 
-    // ---------------------- JOURNAL ----------------------
-    if (voucherType === "journal") {
+    // ---------------------- JOURNAL & STOCK JOURNAL ----------------------
+    if (voucherType === "journal" || voucherType === "stock_journal" || voucherType === "stock-journal") {
       return {
         id: String(p.id),
         date: p.date,
         number: p.number || p.voucher_number || "",
         referenceNo: p.referenceNo || p.reference_no || "",
         narration: p.narration || "",
-        type: "journal",
+        type: voucherType === "journal" ? "journal" : "stock-journal",
 
         supplierInvoiceDate: p.supplier_invoice_date || "",
         subtotal: 0,
@@ -818,7 +824,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         igstTotal: 0,
 
         entries: (p.entries || []).map((e: any) => ({
-          ledgerId: String(e.ledger_id || ""),
+          ledgerId: String(e.ledgerId || e.ledger_id || ""),
           amount: Number(e.amount || 0),
           type: e.type || e.entry_type,
           narration: e.narration || "",
@@ -1167,13 +1173,43 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       }
     };
 
+    const fetchStockItems = async () => {
+      try {
+        const params = new URLSearchParams({
+          company_id: companyId,
+          owner_type: ownerType,
+          owner_id: ownerId,
+        });
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`);
+        const json = await res.json();
+        let items: any[] = [];
+        if (Array.isArray(json)) {
+          items = json;
+        } else if (json && Array.isArray(json.data)) {
+          items = json.data;
+        } else {
+          const arr = Object.values(json || {}).find(v => Array.isArray(v));
+          if (Array.isArray(arr)) items = arr;
+        }
+        setStockItemList(items);
+      } catch (error) {
+        console.error("Failed to fetch stock items in register:", error);
+      }
+    };
+
     if (companyId && ownerType && ownerId) {
       fetchLedgers();
+      fetchStockItems();
     }
   }, [companyId, ownerType, ownerId]);
   //helper function to fetch party name/ ledger name
   const getLedgerNameById = (ledgerId?: number | string) => {
     if (!ledgerId) return "-";
+
+    if (voucherType === "stock_journal" || voucherType === "stock-journal") {
+      const item = stockItemList?.find((i: any) => String(i.id) === String(ledgerId));
+      if (item) return item.name;
+    }
 
     const ledger = ledgerList.find((l) => String(l.id) === String(ledgerId));
 
@@ -1216,6 +1252,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         } else if (voucherType === "journal") {
           url = `${import.meta.env.VITE_API_URL
             }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=journal`;
+        } else if (voucherType === "stock_journal" || voucherType === "stock-journal") {
+          url = `${import.meta.env.VITE_API_URL
+            }/api/StockJournal?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
         } else {
           console.warn("Unknown voucherType:", voucherType);
           return;
@@ -1227,6 +1266,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
         // -- Handle different API response formats --
         if (json.data) setVouchers(json.data);
+        else if (json.vouchers) setVouchers(json.vouchers);
         else if (Array.isArray(json)) setVouchers(json);
         else if (json.purchaseOrders) setVouchers(json.purchaseOrders);
         else setVouchers([]);
@@ -1649,7 +1689,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Voucher No
                 </th>
-                {["receipt", "contra", "journal"].includes(voucherType) ? (
+                {["receipt", "contra", "journal", "stock_journal", "stock-journal"].includes(voucherType) ? (
                   <>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Voucher Type
@@ -1761,7 +1801,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       {voucher.number ?? "-"}
                     </td>
 
-                    {["receipt", "contra", "journal"].includes(voucherType) ? (
+                    {["receipt", "contra", "journal", "stock_journal", "stock-journal"].includes(voucherType) ? (
                       <>
                         {/* Voucher Type */}
                         <td className="px-6 py-4 text-sm text-gray-500">
