@@ -16,6 +16,31 @@ const UnitForm: React.FC = () => {
   );
   console.log(ownerType, ownerId);
 
+  const [units, setUnits] = useState<UnitOfMeasurement[]>([]);
+
+  useEffect(() => {
+    const fetchUnits = async () => {
+      try {
+        const companyId = localStorage.getItem("company_id");
+        if (!companyId || !ownerType || !ownerId) return;
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/stock-units?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        if (res.ok) {
+          const data = await res.json();
+          setUnits(data);
+        }
+      } catch (error) {
+        console.error("Failed to fetch units:", error);
+      }
+    };
+    fetchUnits();
+  }, [ownerType, ownerId]);
+
+  const simpleUnits = units.filter(
+    (u) => u.symbol && !u.symbol.includes(" of ")
+  );
+
   const [formData, setFormData] = useState<Omit<UnitOfMeasurement, "id">>({
     name: "",
     symbol: "",
@@ -125,8 +150,13 @@ const UnitForm: React.FC = () => {
     ? `${formData.firstUnit} of ${formData.conversionFactor} ${formData.secondUnit}`
     : formData.symbol;
 
+  const finalName = formData.type === "Compound"
+    ? `1 ${formData.firstUnit} of ${formData.conversionFactor} ${formData.secondUnit}`
+    : formData.name;
+
   const payload = {
     ...formData,
+    name: finalName,
     symbol: finalSymbol,
     company_id: companyId,
     owner_type: ownerType,
@@ -201,10 +231,21 @@ const UnitForm: React.FC = () => {
               type="text"
               id="name"
               name="name"
-              value={formData.name}
+              value={
+                formData.type === "Compound"
+                  ? formData.firstUnit && formData.secondUnit
+                    ? `1 ${formData.firstUnit} of ${formData.conversionFactor} ${formData.secondUnit}`
+                    : ""
+                  : formData.name
+              }
               onChange={handleChange}
-              required
-              placeholder="e.g., Kilogram, Pieces, Meters"
+              disabled={formData.type === "Compound"}
+              required={formData.type !== "Compound"}
+              placeholder={
+                formData.type === "Compound"
+                  ? "Auto-generated conversion name"
+                  : "e.g., Kilogram, Pieces, Meters"
+              }
               className={`w-full p-2 rounded border ${
                 theme === "dark"
                   ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
@@ -327,20 +368,31 @@ const UnitForm: React.FC = () => {
                     >
                       First Unit *
                     </label>
-                    <input
-                      type="text"
+                    <select
                       id="firstUnit"
                       name="firstUnit"
                       value={formData.firstUnit}
                       onChange={handleChange}
                       required
-                      placeholder="e.g., Kg"
                       className={`w-full p-2 rounded border ${
                         theme === "dark"
                           ? "bg-gray-800 border-gray-600 focus:border-blue-500 text-white"
                           : "bg-white border-gray-300 focus:border-blue-500"
                       } outline-none transition-colors`}
-                    />
+                    >
+                      <option value="">Select First Unit</option>
+                      {simpleUnits.length === 0 ? (
+                        <option value="" disabled>
+                          No simple units found
+                        </option>
+                      ) : (
+                        simpleUnits.map((u) => (
+                          <option key={u.id} value={u.symbol}>
+                            {u.name} ({u.symbol})
+                          </option>
+                        ))
+                      )}
+                    </select>
                   </div>
 
                   <div>
@@ -375,20 +427,31 @@ const UnitForm: React.FC = () => {
                     >
                       Second Unit *
                     </label>
-                    <input
-                      type="text"
+                    <select
                       id="secondUnit"
                       name="secondUnit"
                       value={formData.secondUnit}
                       onChange={handleChange}
                       required
-                      placeholder="e.g., Gms"
                       className={`w-full p-2 rounded border ${
                         theme === "dark"
                           ? "bg-gray-800 border-gray-600 focus:border-blue-500 text-white"
                           : "bg-white border-gray-300 focus:border-blue-500"
                       } outline-none transition-colors`}
-                    />
+                    >
+                      <option value="">Select Second Unit</option>
+                      {simpleUnits.length === 0 ? (
+                        <option value="" disabled>
+                          No simple units found
+                        </option>
+                      ) : (
+                        simpleUnits.map((u) => (
+                          <option key={u.id} value={u.symbol}>
+                            {u.name} ({u.symbol})
+                          </option>
+                        ))
+                      )}
+                    </select>
                   </div>
                 </div>
 
