@@ -1,30 +1,35 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../../context/AppContext';
 import { useCompany } from '../../../context/CompanyContext';
 import { useNavigate } from 'react-router-dom';
 import type { VoucherEntry, StockItem, Godown } from '../../../types';
-import { Save, Plus, Trash2, ArrowLeft } from 'lucide-react';
+import { Save, Plus, Trash2, ArrowLeft, Settings } from 'lucide-react';
 import Swal from 'sweetalert2';
 import { useFinancialYear, getFinancialYearDefaults } from '../../../hooks/useFinancialYear';
 
 const StockJournalVoucher: React.FC = () => {
-  const { theme, stockItems, godowns = [], addVoucher } = useAppContext();
+  const { theme, addVoucher } = useAppContext();
   const navigate = useNavigate();
   const { activeCompanyId } = useCompany();
   const companyId = activeCompanyId ?? localStorage.getItem('company_id');
-  const ownerType = localStorage.getItem('userType');
+  const ownerType = localStorage.getItem('supplier') || localStorage.getItem('userType') || 'admin';
   const ownerId = localStorage.getItem(ownerType === 'employee' ? 'employee_id' : 'user_id');
   const { selectedFinYear } = useFinancialYear();
   const { defaultDate, maxDate } = getFinancialYearDefaults(selectedFinYear);
-  const generateVoucherNumber = () => {
-    const prefix = 'STKJRNLV';
-    const randomNumber = Math.floor(100000 + Math.random() * 900000); // 6-digit
-    return `${prefix}${randomNumber}`;
-  };
+
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [godowns, setGodowns] = useState<Godown[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [showConfigPanel, setShowConfigPanel] = useState(false);
+  const [config, setConfig] = useState({
+    autoNumbering: true,
+  });
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formData, setFormData] = useState<Omit<VoucherEntry, 'id'>>({
     date: defaultDate,
     type: 'stock-journal',
-    number: generateVoucherNumber(),
+    number: '',
     narration: '',
     referenceNo: '',
     mode: 'transfer',
@@ -36,15 +41,87 @@ const StockJournalVoucher: React.FC = () => {
 
   const [errors, setErrors] = useState<{ [key: string]: string }>({});
 
-  if (!stockItems) {
-    console.warn('Stock items are undefined in AppContext');
-    return (
-      <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
-        <h1 className="text-2xl font-bold mb-4">Stock Journal Voucher</h1>
-        <p className="text-red-500">Error: Stock items are not available. Please configure stock items in the application.</p>
-      </div>
-    );
-  }
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        if (!companyId || !ownerType || !ownerId) {
+          console.warn('Missing authorization params:', { companyId, ownerType, ownerId });
+          setLoading(false);
+          return;
+        }
+
+        const params = new URLSearchParams({
+          company_id: companyId,
+          owner_type: ownerType,
+          owner_id: ownerId,
+        });
+
+        // Fetch stock items
+        const itemRes = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params.toString()}`);
+        const itemJson = await itemRes.json();
+        let items: any[] = [];
+        if (Array.isArray(itemJson)) {
+          items = itemJson;
+        } else if (itemJson && Array.isArray(itemJson.data)) {
+          items = itemJson.data;
+        } else {
+          const arr = Object.values(itemJson || {}).find(v => Array.isArray(v));
+          if (Array.isArray(arr)) items = arr;
+        }
+        setStockItems(items);
+
+        // Fetch godowns
+        const godownRes = await fetch(`${import.meta.env.VITE_API_URL}/api/godowns?${params.toString()}`);
+        const godownJson = await godownRes.json();
+        let godownsList: any[] = [];
+        if (godownJson && godownJson.success && Array.isArray(godownJson.data)) {
+          godownsList = godownJson.data;
+        } else if (Array.isArray(godownJson)) {
+          godownsList = godownJson;
+        }
+        setGodowns(godownsList);
+
+        setLoading(false);
+      } catch (err) {
+        console.error('Error fetching stock journal initial data:', err);
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, [companyId, ownerType, ownerId]);
+
+  useEffect(() => {
+    if (!config.autoNumbering || formData.number) return;
+    if (!companyId || !ownerType || !ownerId) return;
+
+    const fetchNextNumber = async () => {
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/vouchers/next-number` +
+          `?company_id=${companyId}` +
+          `&owner_type=${ownerType}` +
+          `&owner_id=${ownerId}` +
+          `&voucherType=stock-journal` +
+          `&date=${formData.date}`
+        );
+
+        const data = await res.json();
+
+        if (data.success) {
+          setFormData((prev) => ({
+            ...prev,
+            number: data.voucherNumber,
+          }));
+        }
+      } catch (err) {
+        console.error("Stock journal voucher number preview error", err);
+      }
+    };
+
+    fetchNextNumber();
+  }, [formData.date, config.autoNumbering, formData.number, companyId, ownerType, ownerId]);
+
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -56,7 +133,7 @@ const StockJournalVoucher: React.FC = () => {
     const { name, value, type } = e.target;
     const updatedEntries = [...formData.entries];
     const entry = updatedEntries[index]; if (name === 'itemId') {
-      const selectedItem = stockItems.find(item => item.id === value);
+      const selectedItem = stockItems.find(item => String(item.id) === String(value));
       const gstRate = selectedItem?.gstRate ?? 0;
       updatedEntries[index] = {
         ...entry,
@@ -144,29 +221,34 @@ const StockJournalVoucher: React.FC = () => {
   //   return Object.keys(newErrors).length === 0;
   // };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    // if (!isBalanced) {
-    //   alert('Total debit must equal total credit');
-    //   return;
-    // }
+  const handleSubmit = async (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (isSubmitting) return;
 
+    if (!formData.number) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'Required Field',
+        text: 'Voucher number is required',
+      });
+      return;
+    }
 
     const formattedEntries = formData.entries.map(entry => ({
       id: entry.id,
-      ledgerId: entry.ledgerId,
+      ledgerId: entry.itemId, // corrected from entry.ledgerId to map to selected stock item
       batchNumber: entry.batchNumber || '',
       quantity: parseFloat((entry.quantity || 0).toString()),
       rate: parseFloat((entry.rate || 0).toString()),
       amount: parseFloat((entry.amount || 0).toString()),
-      type: entry.type,
+      type: entry.type === 'source' ? 'credit' : 'debit', // map 'source' to 'credit' and 'destination' to 'debit' to match DB enum constraints
     }));
 
     const payload = {
       date: formData.date,
-      number: formData.number || 'Auto',
+      number: formData.number,
       narration: formData.narration,
-      type: 'journal',
+      type: 'stock-journal',
       companyId,
       ownerType,
       ownerId,
@@ -174,25 +256,32 @@ const StockJournalVoucher: React.FC = () => {
     };
 
     try {
+      setIsSubmitting(true);
       const response = await fetch(`${import.meta.env.VITE_API_URL}/api/StockJournal`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       });
 
-      if (!response.ok) throw new Error('Failed to save voucher');
+      const data = await response.json();
 
-      addVoucher(await response.json());
+      if (!response.ok) {
+        throw new Error(data.message || data.error || 'Failed to save voucher');
+      }
+
+      addVoucher(data);
       Swal.fire({
         icon: 'success',
         title: 'Success',
-        text: "Voucher created Successfully",
+        text: "Voucher created successfully",
       }).then(() => {
-        navigate('/app/vouchers'); // or your route to go back
+        navigate('/app/vouchers');
       });
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
-      alert('Failed to save voucher.');
+      Swal.fire('Error', err.message || 'Failed to save voucher.', 'error');
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -201,9 +290,43 @@ const StockJournalVoucher: React.FC = () => {
   const totalSourceAmount = sourceEntries.reduce((sum, e) => sum + e.amount, 0);
   const totalDestAmount = destEntries.reduce((sum, e) => sum + e.amount, 0);
   const isValueBalanced = Math.abs(totalSourceAmount - totalDestAmount) < 0.01;
+  const handleAutoNumberingToggle = (checked: boolean) => {
+    setConfig(prev => ({ ...prev, autoNumbering: checked }));
+    if (checked) {
+      setFormData(prev => ({ ...prev, number: '' }));
+    }
+  };
+
+  const handleKeyDown = (e: KeyboardEvent) => {
+    if (e.ctrlKey && e.key === 's') {
+      e.preventDefault();
+      handleSubmit();
+    } else if (e.key === 'F12') {
+      e.preventDefault();
+      setShowConfigPanel(prev => !prev);
+    } else if (e.key === 'Escape') {
+      navigate('/app/vouchers');
+    }
+  };
+
+  useEffect(() => {
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [formData, showConfigPanel, isSubmitting]);
+
+  if (loading) {
+    return (
+      <div className={`pt-[56px] px-4 flex items-center justify-center min-h-[400px]`}>
+        <div className="flex flex-col items-center space-y-4">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-500"></div>
+          <p className={`${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Loading inventory items and godowns...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className='pt-[56px] px-4'>
+    <div className={`pt-[56px] px-4 ${theme === "dark" ? "bg-gray-900" : "bg-gray-50"}`}>
       <div className="flex items-center mb-6">
         <button
           title='Back to Vouchers'
@@ -212,7 +335,27 @@ const StockJournalVoucher: React.FC = () => {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold">Stock Journal Voucher</h1>
+        <h1 className="text-2xl font-bold">New Stock Journal Voucher</h1>
+        <div className="ml-auto flex space-x-2">
+          <button
+            title="Save Voucher"
+            onClick={() => handleSubmit()}
+            disabled={isSubmitting}
+            className={`p-2 rounded-md ${theme === "dark"
+              ? "bg-blue-600 hover:bg-blue-700"
+              : "bg-blue-500 hover:bg-blue-600"
+              } text-white flex items-center ${isSubmitting ? "opacity-50 cursor-not-allowed" : ""}`}
+          >
+            <Save size={18} className="mr-2" /> {isSubmitting ? "Saving..." : "Save"}
+          </button>
+          <button
+            title="Configure"
+            onClick={() => setShowConfigPanel(!showConfigPanel)}
+            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"}`}
+          >
+            <Settings size={18} />
+          </button>
+        </div>
       </div>
 
       <div className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800' : 'bg-white shadow'}`}>
@@ -244,8 +387,9 @@ const StockJournalVoucher: React.FC = () => {
                 name="number"
                 value={formData.number}
                 onChange={handleChange}
-                placeholder="Auto"
-                className={`w-full p-2 rounded border ${theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500' : 'bg-white border-gray-300 focus:border-blue-500'} outline-none transition-colors`}
+                placeholder={config.autoNumbering ? "Auto" : "Enter voucher number"}
+                readOnly={config.autoNumbering}
+                className={`w-full p-2 rounded border ${theme === 'dark' ? 'bg-gray-700 border-gray-600 focus:border-blue-500' : 'bg-white border-gray-300 focus:border-blue-500'} outline-none transition-colors ${config.autoNumbering ? "opacity-50" : ""}`}
               />
             </div>
             <div>
@@ -311,7 +455,7 @@ const StockJournalVoucher: React.FC = () => {
                 </thead>                <tbody>
                   {sourceEntries.map((entry) => {
                     const globalIndex = formData.entries.indexOf(entry);
-                    const selectedItem = stockItems.find(item => item.id === entry.itemId);
+                    const selectedItem = stockItems.find(item => String(item.id) === String(entry.itemId));
                     return (
                       <tr key={globalIndex} className={`${theme === 'dark' ? 'border-b border-gray-600' : 'border-b border-gray-300'}`}>
                         <td className="px-4 py-2">
@@ -442,7 +586,7 @@ const StockJournalVoucher: React.FC = () => {
                 </thead>                <tbody>
                   {destEntries.map((entry) => {
                     const globalIndex = formData.entries.indexOf(entry);
-                    const selectedItem = stockItems.find(item => item.id === entry.itemId);
+                    const selectedItem = stockItems.find(item => String(item.id) === String(entry.itemId));
                     return (
                       <tr key={globalIndex} className={`${theme === 'dark' ? 'border-b border-gray-600' : 'border-b border-gray-300'}`}>
                         <td className="px-4 py-2">
@@ -566,6 +710,23 @@ const StockJournalVoucher: React.FC = () => {
             </div>
             {errors.entries && <p className="text-red-500 text-xs mt-1">{errors.entries}</p>}
           </div>
+
+          {showConfigPanel && (
+            <div className={`p-4 mb-6 rounded ${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
+              <h3 className="font-semibold mb-4">Configuration (F12)</h3>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <label className="flex items-center cursor-pointer select-none">
+                  <input
+                    type="checkbox"
+                    checked={config.autoNumbering}
+                    onChange={(e) => handleAutoNumberingToggle(e.target.checked)}
+                    className={`mr-2 rounded ${theme === "dark" ? "bg-gray-600 border-gray-500" : "bg-white border-gray-300"}`}
+                  />
+                  Auto Numbering
+                </label>
+              </div>
+            </div>
+          )}
 
           <div className="flex justify-end space-x-4">
             <button

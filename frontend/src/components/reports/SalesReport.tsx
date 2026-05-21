@@ -492,6 +492,7 @@ const SalesReport: React.FC = () => {
         quantity: 0,
         rate: 0,
         items: voucher.items,
+        overallDiscount: Number(voucher.overallDiscount || 0),
       };
 
       // Sum Quantity and determine Rate
@@ -1380,6 +1381,9 @@ const SalesReport: React.FC = () => {
                       </th>
                       <th className="px-2 py-3 text-right font-medium">Rate</th>
                       <th className="px-2 py-3 text-right font-medium">
+                        Overall Discount
+                      </th>
+                      <th className="px-2 py-3 text-right font-medium">
                         Total
                       </th>
                       {columnarData.headers.map((col) => (
@@ -1416,6 +1420,13 @@ const SalesReport: React.FC = () => {
                             })
                             : "-"}
                         </td>
+                        <td className="px-2 py-2 text-right text-red-600 font-medium">
+                          {row.overallDiscount > 0
+                            ? row.overallDiscount.toLocaleString("en-IN", {
+                              minimumFractionDigits: 2,
+                            })
+                            : "-"}
+                        </td>
                         <td className="px-2 py-2 text-right font-semibold">
                           {row.total?.toLocaleString("en-IN", {
                             minimumFractionDigits: 2,
@@ -1439,7 +1450,7 @@ const SalesReport: React.FC = () => {
                     {columnarData.rows.length === 0 && (
                       <tr>
                         <td
-                          colSpan={5 + columnarData.headers.length}
+                          colSpan={6 + columnarData.headers.length}
                           className="px-4 py-8 text-center opacity-50"
                         >
                           No transactions found.
@@ -1464,6 +1475,13 @@ const SalesReport: React.FC = () => {
                       <td className="px-2 py-3 text-right">
                         {columnarData.rows
                           .reduce((sum, r) => sum + r.rate, 0)
+                          .toLocaleString("en-IN", {
+                            minimumFractionDigits: 2,
+                          })}
+                      </td>
+                      <td className="px-2 py-3 text-right text-red-600">
+                        {columnarData.rows
+                          .reduce((sum, r) => sum + r.overallDiscount, 0)
                           .toLocaleString("en-IN", {
                             minimumFractionDigits: 2,
                           })}
