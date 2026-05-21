@@ -53,13 +53,13 @@ LEFT JOIN ledgers l
   ON l.id = sv.partyId
 
 LEFT JOIN sale_history svi
-  ON svi.voucherNumber COLLATE utf8mb4_general_ci
-     = sv.number COLLATE utf8mb4_general_ci
+  ON CONVERT(svi.voucherNumber USING utf8mb4) COLLATE utf8mb4_general_ci
+     = CONVERT(sv.number USING utf8mb4) COLLATE utf8mb4_general_ci
 
 WHERE sv.company_id = ?
-  AND sv.owner_type COLLATE utf8mb4_general_ci = ?
+  AND CONVERT(sv.owner_type USING utf8mb4) COLLATE utf8mb4_general_ci = ?
   AND sv.owner_id = ?
-  AND sv.type COLLATE utf8mb4_general_ci = 'sales'
+  AND CONVERT(sv.type USING utf8mb4) COLLATE utf8mb4_general_ci = 'sales'
 
 ORDER BY sv.date DESC
 `,

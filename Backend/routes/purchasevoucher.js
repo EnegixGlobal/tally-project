@@ -78,8 +78,8 @@ router.get("/purchase-history", async (req, res) => {
   FROM purchase_history ph
 
   LEFT JOIN purchase_vouchers pv
-    ON pv.number COLLATE utf8mb4_general_ci
-     = ph.voucherNumber COLLATE utf8mb4_general_ci
+    ON CONVERT(pv.number USING utf8mb4) COLLATE utf8mb4_general_ci
+     = CONVERT(ph.voucherNumber USING utf8mb4) COLLATE utf8mb4_general_ci
     AND pv.company_id = ?
     AND pv.owner_type = ?
     AND pv.owner_id = ?
@@ -88,7 +88,7 @@ router.get("/purchase-history", async (req, res) => {
     ON l.id = pv.partyId
 
   LEFT JOIN stock_items si
-    ON ph.itemName COLLATE utf8mb4_general_ci = si.name COLLATE utf8mb4_general_ci
+    ON CONVERT(ph.itemName USING utf8mb4) COLLATE utf8mb4_general_ci = CONVERT(si.name USING utf8mb4) COLLATE utf8mb4_general_ci
     AND si.company_id = ?
 
   LEFT JOIN stock_units su

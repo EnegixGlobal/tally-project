@@ -389,8 +389,12 @@ const StockSummary: React.FC = () => {
 
       const itemMap: Record<string, any> = {};
 
+      const stockItemsList = Array.isArray(stockItemsData?.data) ? stockItemsData.data : [];
+      const purchaseList = Array.isArray(purchaseData?.data) ? purchaseData.data : [];
+      const salesList = Array.isArray(salesData?.data) ? salesData.data : [];
+
       // 1️⃣ OPENING STOCK (BATCH-WISE)
-      stockItemsData.data.forEach((item: any) => {
+      stockItemsList.forEach((item: any) => {
         const itemName = item.name;
         itemMap[itemName] = {
           itemName: itemName,
@@ -453,7 +457,7 @@ const StockSummary: React.FC = () => {
       });
 
       // 2️⃣ PURCHASES (INWARD)
-      purchaseData.data.forEach((p: any) => {
+      purchaseList.forEach((p: any) => {
         const item = itemMap[p.itemName];
         if (!item) return;
 
@@ -477,7 +481,7 @@ const StockSummary: React.FC = () => {
       });
 
       // 3️⃣ SALES (OUTWARD)
-      salesData.data.forEach((s: any) => {
+      salesList.forEach((s: any) => {
         const item = itemMap[s.itemName];
         if (!item) return;
 
