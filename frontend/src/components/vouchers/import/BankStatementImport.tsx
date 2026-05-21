@@ -371,9 +371,11 @@ const BankStatementImport: React.FC = () => {
                 initialError += (initialError ? " " : "") + `Bank '${extractedBank}' not found.`;
             }
 
+            const displayParticulars = matchedParticulars ? matchedParticulars.name : particularsName;
+
             return {
                 Date: formatDate(row.Date || row.date),
-                Particulars: particularsName,
+                Particulars: displayParticulars,
                 Narration: String(row.Narration || row.narration || "").trim(),
                 Debit: debit,
                 Credit: credit,
@@ -809,8 +811,8 @@ const BankStatementImport: React.FC = () => {
                     if (currentTxn) {
                         allExtractedTxns.push({
                             Date: currentTxn.Date,
-                            Particulars: extractedAccountNameVal || currentTxn.Particulars,
-                            Narration: currentTxn.Narration,
+                            Particulars: "SUSPENSE",
+                            Narration: currentTxn.Particulars,
                             Debit: Number(currentTxn.Debit.replace(/[^\d.]/g, "")) || 0,
                             Credit: Number(currentTxn.Credit.replace(/[^\d.]/g, "")) || 0,
                             Balance: currentTxn.Balance,
@@ -853,8 +855,8 @@ const BankStatementImport: React.FC = () => {
         if (currentTxn) {
             allExtractedTxns.push({
                 Date: currentTxn.Date,
-                Particulars: extractedAccountNameVal || currentTxn.Particulars,
-                Narration: currentTxn.Narration,
+                Particulars: "SUSPENSE",
+                Narration: currentTxn.Particulars,
                 Debit: Number(currentTxn.Debit.replace(/[^\d.]/g, "")) || 0,
                 Credit: Number(currentTxn.Credit.replace(/[^\d.]/g, "")) || 0,
                 Balance: currentTxn.Balance,
@@ -954,7 +956,7 @@ const BankStatementImport: React.FC = () => {
 
             const mappedOcrTxns = allOcrTxns.map(t => ({
                 Date: t.date,
-                Particulars: extractedAccountNameVal || t.particulars,
+                Particulars: "SUSPENSE",
                 Narration: t.particulars,
                 Debit: t.debit,
                 Credit: t.credit,
