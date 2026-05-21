@@ -188,6 +188,13 @@ router.get('/b2c-purchases', async (req, res) => {
   }
 });
 
+const cleanState = (s) => {
+  if (!s) return "";
+  const match = s.match(/\((\d+)\)/);
+  if (match) return match[1];
+  return s.replace(/\(.*?\)/g, "").trim().toLowerCase();
+};
+
 // Fetch B2C Large (B2CL) transactions - invoice value > 2.5 lakh
 router.get('/b2cl', async (req, res) => {
   try {
@@ -195,6 +202,11 @@ router.get('/b2cl', async (req, res) => {
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({ error: 'Missing required parameters.' });
     }
+
+    // Fetch company state
+    const [companyRows] = await pool.query("SELECT state FROM tbcompanies WHERE id = ?", [company_id]);
+    const companyState = companyRows.length > 0 ? companyRows[0].state : "";
+    const companyStateCode = cleanState(companyState);
 
     const params = [company_id, owner_type, owner_id];
     let dateFilter = '';
@@ -238,13 +250,38 @@ router.get('/b2cl', async (req, res) => {
         AND sv.owner_type = ?
         AND sv.owner_id = ?
         AND (l.gst_number IS NULL OR l.gst_number = '')
-        AND COALESCE(sv.total, sv.subtotal, 0) >= 250000
         ${dateFilter}
       ORDER BY sv.date DESC, sv.number DESC;
     `;
 
     const [rows] = await pool.query(sql, params);
-    res.json(rows);
+
+    // Filter in JS
+    const b2clRows = rows.map(row => {
+      let igstRate = Number(row.igstRate || 0);
+      let cgstRate = Number(row.cgstRate || 0);
+      let sgstRate = Number(row.sgstRate || 0);
+      const taxableValue = Number(row.taxableValue || 0);
+      if (taxableValue > 0) {
+        if (igstRate === 0 && Number(row.igstAmount || 0) > 0) {
+          igstRate = Math.round((Number(row.igstAmount) / taxableValue) * 100);
+        }
+        if (cgstRate === 0 && Number(row.cgstAmount || 0) > 0) {
+          cgstRate = Math.round((Number(row.cgstAmount) / taxableValue) * 100);
+        }
+        if (sgstRate === 0 && Number(row.sgstAmount || 0) > 0) {
+          sgstRate = Math.round((Number(row.sgstAmount) / taxableValue) * 100);
+        }
+      }
+      return { ...row, igstRate, cgstRate, sgstRate };
+    }).filter(row => {
+      const placeOfSupplyCode = cleanState(row.placeOfSupply);
+      const isIntraState = (companyStateCode && placeOfSupplyCode && companyStateCode === placeOfSupplyCode);
+      const invoiceValue = Number(row.invoiceValue || 0);
+      return !isIntraState && invoiceValue >= 250000;
+    });
+
+    res.json(b2clRows);
   } catch (err) {
     console.error('Error fetching B2CL data:', err);
     res.status(500).json({ error: 'Internal Server Error' });
@@ -259,6 +296,11 @@ router.get('/b2c-small', async (req, res) => {
       return res.status(400).json({ error: 'Missing required parameters.' });
     }
 
+    // Fetch company state
+    const [companyRows] = await pool.query("SELECT state FROM tbcompanies WHERE id = ?", [company_id]);
+    const companyState = companyRows.length > 0 ? companyRows[0].state : "";
+    const companyStateCode = cleanState(companyState);
+
     const params = [company_id, owner_type, owner_id];
     let dateFilter = '';
 
@@ -301,13 +343,38 @@ router.get('/b2c-small', async (req, res) => {
         AND sv.owner_type = ?
         AND sv.owner_id = ?
         AND (l.gst_number IS NULL OR l.gst_number = '')
-        AND COALESCE(sv.total, sv.subtotal, 0) < 250000
         ${dateFilter}
       ORDER BY sv.date DESC, sv.number DESC;
     `;
 
     const [rows] = await pool.query(sql, params);
-    res.json(rows);
+
+    // Filter in JS
+    const b2cSmallRows = rows.map(row => {
+      let igstRate = Number(row.igstRate || 0);
+      let cgstRate = Number(row.cgstRate || 0);
+      let sgstRate = Number(row.sgstRate || 0);
+      const taxableValue = Number(row.taxableValue || 0);
+      if (taxableValue > 0) {
+        if (igstRate === 0 && Number(row.igstAmount || 0) > 0) {
+          igstRate = Math.round((Number(row.igstAmount) / taxableValue) * 100);
+        }
+        if (cgstRate === 0 && Number(row.cgstAmount || 0) > 0) {
+          cgstRate = Math.round((Number(row.cgstAmount) / taxableValue) * 100);
+        }
+        if (sgstRate === 0 && Number(row.sgstAmount || 0) > 0) {
+          sgstRate = Math.round((Number(row.sgstAmount) / taxableValue) * 100);
+        }
+      }
+      return { ...row, igstRate, cgstRate, sgstRate };
+    }).filter(row => {
+      const placeOfSupplyCode = cleanState(row.placeOfSupply);
+      const isIntraState = !companyStateCode || !placeOfSupplyCode || (companyStateCode === placeOfSupplyCode);
+      const invoiceValue = Number(row.invoiceValue || 0);
+      return isIntraState || invoiceValue < 250000;
+    });
+
+    res.json(b2cSmallRows);
   } catch (err) {
     console.error('Error fetching B2C Small data:', err);
     res.status(500).json({ error: 'Internal Server Error' });

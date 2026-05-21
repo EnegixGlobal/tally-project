@@ -36,11 +36,13 @@ const GstrB2cl = () => {
       ownerType === "employee" ? "employee_id" : "user_id"
     ) || "";
 
-  const [filters, setFilters] = useState({
-    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0],
-    toDate: new Date().toISOString().split("T")[0],
+  const [filters, setFilters] = useState(() => {
+    const savedFrom = localStorage.getItem("gstr1_fromDate");
+    const savedTo = localStorage.getItem("gstr1_toDate");
+    return {
+      fromDate: savedFrom || new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split("T")[0],
+      toDate: savedTo || new Date().toISOString().split("T")[0],
+    };
   });
 
   useEffect(() => {
@@ -376,7 +378,12 @@ const GstrB2cl = () => {
             <div className="flex items-end">
               <button
                 type="button"
-                onClick={fetchB2CLData}
+                onClick={() => {
+                  localStorage.setItem("gstr1_fromDate", filters.fromDate);
+                  localStorage.setItem("gstr1_toDate", filters.toDate);
+                  fetchB2CLData();
+                  setShowFilterPanel(false);
+                }}
                 className={`px-4 py-2 rounded ${theme === "dark"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
                   : "bg-blue-600 hover:bg-blue-700 text-white"
