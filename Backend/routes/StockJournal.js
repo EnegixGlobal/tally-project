@@ -65,6 +65,30 @@ router.get('/', async (req, res) => {
       [company_id, owner_type, owner_id]
     );
 
+    if (rows.length > 0) {
+      const voucherIds = rows.map(r => r.id);
+      const [entries] = await db.query(
+        `SELECT id, voucher_id AS voucherId, ledger_id AS ledgerId, type, quantity, rate, amount, batch_no AS batchNumber
+         FROM stock_journal_entries
+         WHERE voucher_id IN (?)`,
+        [voucherIds]
+      );
+
+      // Group entries by voucher id
+      const entriesMap = {};
+      entries.forEach(entry => {
+        if (!entriesMap[entry.voucherId]) {
+          entriesMap[entry.voucherId] = [];
+        }
+        entriesMap[entry.voucherId].push(entry);
+      });
+
+      // Attach entries to rows
+      rows.forEach(row => {
+        row.entries = entriesMap[row.id] || [];
+      });
+    }
+
     return res.json({ success: true, vouchers: rows });
   } catch (err) {
     console.error('Error fetching stock journal vouchers:', err);
