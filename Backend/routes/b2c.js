@@ -188,7 +188,7 @@ router.get('/b2c-purchases', async (req, res) => {
   }
 });
 
-// Fetch B2C Large (B2CL) transactions - invoice value > 2.5 lakh
+// Fetch B2C Large (B2CL) transactions - invoice value > 2.5 lakh and inter-state
 router.get('/b2cl', async (req, res) => {
   try {
     const { company_id, owner_type, owner_id, fromDate, toDate } = req.query;
@@ -215,6 +215,7 @@ router.get('/b2cl', async (req, res) => {
         sv.sgstTotal AS sgstAmount,
         sv.igstTotal AS igstAmount,
         COALESCE(NULLIF(sv.destination, ''), l.state, '') AS placeOfSupply,
+        c.state AS companyState,
         CASE 
           WHEN sv.igstTotal > 0 THEN 
             COALESCE((SELECT MAX(igstRate) FROM sales_voucher_items WHERE voucherId = sv.id AND igstRate > 0), 0)
@@ -234,24 +235,39 @@ router.get('/b2cl', async (req, res) => {
         0 AS cessAmount
       FROM sales_vouchers sv
       JOIN ledgers l ON sv.partyId = l.id
+      LEFT JOIN tbcompanies c ON sv.company_id = c.id
       WHERE sv.company_id = ?
         AND sv.owner_type = ?
         AND sv.owner_id = ?
         AND (l.gst_number IS NULL OR l.gst_number = '')
-        AND COALESCE(sv.total, sv.subtotal, 0) >= 250000
         ${dateFilter}
       ORDER BY sv.date DESC, sv.number DESC;
     `;
 
     const [rows] = await pool.query(sql, params);
-    res.json(rows);
+
+    const cleanState = (state = "") =>
+      state.replace(/\(.*?\)/g, "").trim().toLowerCase();
+
+    const filteredRows = rows.filter(row => {
+      const pState = cleanState(row.placeOfSupply);
+      const cState = cleanState(row.companyState);
+      const hasIgst = Number(row.igstAmount || 0) > 0;
+      const isIntraState = !hasIgst && (!pState || !cState || pState === cState);
+      const invoiceVal = Number(row.invoiceValue || 0);
+
+      // B2C Large is strictly inter-state and invoice value >= 2.5 Lakhs
+      return !isIntraState && invoiceVal >= 250000;
+    });
+
+    res.json(filteredRows);
   } catch (err) {
     console.error('Error fetching B2CL data:', err);
     res.status(500).json({ error: 'Internal Server Error' });
   }
 });
 
-// Fetch B2C Small (B2CS) transactions - invoice value < 2.5 lakh
+// Fetch B2C Small (B2CS) transactions - intra-state or invoice < 2.5 lakh
 router.get('/b2c-small', async (req, res) => {
   try {
     const { company_id, owner_type, owner_id, fromDate, toDate } = req.query;
@@ -278,6 +294,7 @@ router.get('/b2c-small', async (req, res) => {
         sv.sgstTotal AS sgstAmount,
         sv.igstTotal AS igstAmount,
         COALESCE(NULLIF(sv.destination, ''), l.state, '') AS placeOfSupply,
+        c.state AS companyState,
         CASE 
           WHEN sv.igstTotal > 0 THEN 
             COALESCE((SELECT MAX(igstRate) FROM sales_voucher_items WHERE voucherId = sv.id AND igstRate > 0), 0)
@@ -297,17 +314,32 @@ router.get('/b2c-small', async (req, res) => {
         0 AS cessAmount
       FROM sales_vouchers sv
       JOIN ledgers l ON sv.partyId = l.id
+      LEFT JOIN tbcompanies c ON sv.company_id = c.id
       WHERE sv.company_id = ?
         AND sv.owner_type = ?
         AND sv.owner_id = ?
         AND (l.gst_number IS NULL OR l.gst_number = '')
-        AND COALESCE(sv.total, sv.subtotal, 0) < 250000
         ${dateFilter}
       ORDER BY sv.date DESC, sv.number DESC;
     `;
 
     const [rows] = await pool.query(sql, params);
-    res.json(rows);
+
+    const cleanState = (state = "") =>
+      state.replace(/\(.*?\)/g, "").trim().toLowerCase();
+
+    const filteredRows = rows.filter(row => {
+      const pState = cleanState(row.placeOfSupply);
+      const cState = cleanState(row.companyState);
+      const hasIgst = Number(row.igstAmount || 0) > 0;
+      const isIntraState = !hasIgst && (!pState || !cState || pState === cState);
+      const invoiceVal = Number(row.invoiceValue || 0);
+
+      // B2C Small is intra-state of any value, OR inter-state <= 2.5 Lakh
+      return isIntraState || invoiceVal < 250000;
+    });
+
+    res.json(filteredRows);
   } catch (err) {
     console.error('Error fetching B2C Small data:', err);
     res.status(500).json({ error: 'Internal Server Error' });
