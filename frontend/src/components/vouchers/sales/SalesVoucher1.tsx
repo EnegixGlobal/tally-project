@@ -2872,7 +2872,7 @@ const SalesVoucher: React.FC = () => {
               </div>
               <div className="overflow-x-auto">
                 {formData.mode === "item-invoice" ? (
-                  <table className="w-full mb-4">
+                  <table className="w-full min-w-[1200px] mb-4">
                     <thead>
                       <tr
                         className={`${theme === "dark"
@@ -2880,18 +2880,18 @@ const SalesVoucher: React.FC = () => {
                           : "border-b border-gray-300"
                           }`}
                       >
-                        <th className="px-4 py-2 text-left">S.No</th>
-                        <th className="px-4 py-2 text-left">Item</th>
-                        <th className="px-4 py-2 text-left">HSN/SAC</th>
+                        <th className="px-4 py-2 text-left whitespace-nowrap">S.No</th>
+                        <th className="px-4 py-2 text-left whitespace-nowrap">Item</th>
+                        <th className="px-4 py-2 text-left whitespace-nowrap">HSN/SAC</th>
                         {columnSettings.showBatch && hasAnyBatch && (
-                          <th>Batch</th>
+                          <th className="whitespace-nowrap">Batch</th>
                         )}
 
-                        <th className="px-4 py-2 text-right">Quantity</th>
-                        <th className="px-4 py-2 text-left">Unit</th>
-                        <th className="px-4 py-2 text-right">Rate</th>
+                        <th className="px-4 py-2 text-right whitespace-nowrap">Quantity</th>
+                        <th className="px-4 py-2 text-left whitespace-nowrap">Unit</th>
+                        <th className="px-4 py-2 text-right whitespace-nowrap">Rate</th>
                         {profitConfig.customerType === "retailer" && profitConfig.method === "on_mrp" && (
-                          <th className="px-4 py-2 text-right">Profit</th>
+                          <th className="px-4 py-2 text-right whitespace-nowrap">Profit</th>
                         )}
                         {columnSettings.showGST &&
                           (() => {
@@ -2908,32 +2908,32 @@ const SalesVoucher: React.FC = () => {
 
                             // ❌ No party selected → show nothing
                             if (!hasParty) {
-                              return <th className="px-4 py-2 text-center">IGST%</th>;
+                              return <th className="px-4 py-2 text-center whitespace-nowrap">IGST%</th>;
                             }
 
                             // ✅ Same state → CGST + SGST
                             if (statesMatch) {
                               return (
                                 <>
-                                  <th className="px-4 py-2 text-center">CGST%</th>
-                                  <th className="px-4 py-2 text-center">SGST%</th>
+                                  <th className="px-4 py-2 text-center whitespace-nowrap">CGST%</th>
+                                  <th className="px-4 py-2 text-center whitespace-nowrap">SGST%</th>
                                 </>
                               );
                             }
 
                             // ✅ Different state → IGST
-                            return <th className="px-4 py-2 text-center">IGST%</th>;
+                            return <th className="px-4 py-2 text-center whitespace-nowrap">IGST%</th>;
                           })()}
 
 
-                        <th className="px-4 py-2 text-right">Taxable</th>
-                        {columnSettings.showDiscount && <th>Discount</th>}
+                        <th className="px-4 py-2 text-right whitespace-nowrap">Taxable</th>
+                        {columnSettings.showDiscount && <th className="whitespace-nowrap">Discount</th>}
 
                         {godownEnabled === "yes" && columnSettings.showGodown && (
-                          <th className="px-4 py-2 text-left">Godown</th>
+                          <th className="px-4 py-2 text-left whitespace-nowrap">Godown</th>
                         )}
-                        <th className="px-4 py-2 text-left">Sales Ledger</th>
-                        <th className="px-4 py-2 text-center">Action</th>
+                        <th className="px-4 py-2 text-left whitespace-nowrap">Sales Ledger</th>
+                        <th className="px-4 py-2 text-center whitespace-nowrap">Action</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -3124,24 +3124,24 @@ const SalesVoucher: React.FC = () => {
                               (() => {
                                 if (!hasParty) {
                                   return (
-                                    <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                    <td className="px-1 py-2 text-center min-w-[50px] text-xs align-top pt-3">
                                       {getLedgerNameById(entry.gstLedgerId)}
                                     </td>
                                   );
                                 } else if (statesMatch) {
                                   return (
                                     <>
-                                      <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                      <td className="px-1 py-2 text-center min-w-[50px] text-xs align-top pt-3">
                                         {getLedgerNameById(entry.cgstLedgerId)}
                                       </td>
-                                      <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                      <td className="px-1 py-2 text-center min-w-[50px] text-xs align-top pt-3">
                                         {getLedgerNameById(entry.sgstLedgerId)}
                                       </td>
                                     </>
                                   );
                                 } else {
                                   return (
-                                    <td className="px-1 py-2 text-center min-w-[50px] text-xs">
+                                    <td className="px-1 py-2 text-center min-w-[50px] text-xs align-top pt-3">
                                       {getLedgerNameById(entry.igstLedgerId)}
                                     </td>
                                   );
@@ -3176,7 +3176,7 @@ const SalesVoucher: React.FC = () => {
 
                             {/* GODOWN */}
                             {godownEnabled === "yes" && columnSettings.showGodown && (
-                              <td className="px-1 py-2 min-w-[95px]">
+                              <td className="px-1 py-2 min-w-[95px] align-top">
                                 {godownList.length === 1 ? (
                                   <input
                                     readOnly
@@ -3203,7 +3203,7 @@ const SalesVoucher: React.FC = () => {
                             )}
 
                             {/* SALES LEDGER */}
-                            <td className="px-1 py-2 min-w-[120px]">
+                            <td className="px-1 py-2 min-w-[120px] align-top">
                               <select
                                 name="salesLedgerId"
                                 value={entry.salesLedgerId || ""}
