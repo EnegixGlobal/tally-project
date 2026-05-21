@@ -602,18 +602,18 @@ router.get("/sale-history", async (req, res) => {
   FROM sale_history sh
 
   LEFT JOIN stock_items si
-    ON sh.itemName COLLATE utf8mb4_general_ci
-     = si.name COLLATE utf8mb4_general_ci
-     AND si.company_id COLLATE utf8mb4_general_ci = sh.companyId COLLATE utf8mb4_general_ci
-     AND si.owner_type COLLATE utf8mb4_general_ci = sh.ownerType COLLATE utf8mb4_general_ci
-     AND si.owner_id COLLATE utf8mb4_general_ci = sh.ownerId COLLATE utf8mb4_general_ci
+    ON CONVERT(sh.itemName USING utf8mb4) COLLATE utf8mb4_general_ci
+     = CONVERT(si.name USING utf8mb4) COLLATE utf8mb4_general_ci
+     AND CONVERT(si.company_id USING utf8mb4) COLLATE utf8mb4_general_ci = CONVERT(sh.companyId USING utf8mb4) COLLATE utf8mb4_general_ci
+     AND CONVERT(si.owner_type USING utf8mb4) COLLATE utf8mb4_general_ci = CONVERT(sh.ownerType USING utf8mb4) COLLATE utf8mb4_general_ci
+     AND CONVERT(si.owner_id USING utf8mb4) COLLATE utf8mb4_general_ci = CONVERT(sh.ownerId USING utf8mb4) COLLATE utf8mb4_general_ci
 
   LEFT JOIN stock_units su
     ON si.unit = su.id
 
   LEFT JOIN sales_vouchers sv
-    ON sv.number COLLATE utf8mb4_general_ci
-     = sh.voucherNumber COLLATE utf8mb4_general_ci
+    ON CONVERT(sv.number USING utf8mb4) COLLATE utf8mb4_general_ci
+     = CONVERT(sh.voucherNumber USING utf8mb4) COLLATE utf8mb4_general_ci
     AND sv.company_id = ?
     AND sv.owner_type = ?
     AND sv.owner_id = ?

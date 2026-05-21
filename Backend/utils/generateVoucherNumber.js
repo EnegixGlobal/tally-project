@@ -16,6 +16,8 @@ const CONFIG_MAP = {
   bank: { prefix: "BV", table: "voucher_main", column: "voucher_number", typeCol: "voucher_type" },
   debit_note: { prefix: "DNV", table: "debit_note_vouchers", column: "number" },
   credit_note: { prefix: "CNV", table: "credit_vouchers", column: "number" },
+  stock_journal: { prefix: "STKJ", table: "stock_journal_vouchers", column: "number" },
+  'stock-journal': { prefix: "STKJ", table: "stock_journal_vouchers", column: "number" },
 };
 
 /**
