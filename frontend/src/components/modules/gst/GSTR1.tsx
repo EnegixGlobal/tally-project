@@ -17,23 +17,9 @@ const GSTR1: React.FC = () => {
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
-
-  const currentMonth = String(new Date().getMonth() + 1).padStart(2, "0");
-  const currentYear = String(new Date().getFullYear());
-
-  const [selectedPeriod, setSelectedPeriod] = useState(() => {
-    const savedFrom = localStorage.getItem("gstr1_fromDate");
-    if (savedFrom) {
-      const d = new Date(savedFrom);
-      return {
-        month: String(d.getMonth() + 1).padStart(2, "0"),
-        year: String(d.getFullYear()),
-      };
-    }
-    return {
-      month: currentMonth,
-      year: currentYear,
-    };
+  const [selectedPeriod, setSelectedPeriod] = useState({
+    month: "03",
+    year: "2024",
   });
 
   // get company infomatiion
@@ -53,14 +39,6 @@ const GSTR1: React.FC = () => {
     b2bSupplies: [],
     b2cLargeSupplies: [],
   });
-
-  // Keep returnPeriod in sync when selectedPeriod changes
-  useEffect(() => {
-    setFormData((prev) => ({
-      ...prev,
-      returnPeriod: `${selectedPeriod.month}/${selectedPeriod.year}`,
-    }));
-  }, [selectedPeriod]);
 
   // Simple print functionality - no complex dependencies needed
 
@@ -366,37 +344,12 @@ const GSTR1: React.FC = () => {
   const [ledger, setLedger] = useState<any[]>([]);
 
   // ================= DATE FILTER =================
-  const [filters, setFilters] = useState(() => {
-    const savedFrom = localStorage.getItem("gstr1_fromDate");
-    const savedTo = localStorage.getItem("gstr1_toDate");
-    if (savedFrom && savedTo) {
-      return {
-        fromDate: savedFrom,
-        toDate: savedTo,
-      };
-    }
-    return {
-      fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-        .toISOString()
-        .split("T")[0],
-      toDate: new Date().toISOString().split("T")[0],
-    };
+  const [filters, setFilters] = useState({
+    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .split("T")[0],
+    toDate: new Date().toISOString().split("T")[0],
   });
-
-  // Save filters to localStorage whenever they change
-  useEffect(() => {
-    localStorage.setItem("gstr1_fromDate", filters.fromDate);
-    localStorage.setItem("gstr1_toDate", filters.toDate);
-  }, [filters.fromDate, filters.toDate]);
-
-  const handleApplyFilter = () => {
-    const year = Number(selectedPeriod.year);
-    const month = Number(selectedPeriod.month) - 1;
-    const fromStr = new Date(year, month, 1).toISOString().split("T")[0];
-    const toStr = new Date(year, month + 1, 0).toISOString().split("T")[0];
-    setFilters({ fromDate: fromStr, toDate: toStr });
-    setShowFilterPanel(false);
-  };
 
   // ================= SALES FETCH =================
   useEffect(() => {
@@ -631,15 +584,9 @@ const GSTR1: React.FC = () => {
       };
 
       // Categorization
-      const cleanStateStr = (stateStr: string) => stateStr.replace(/\(.*?\)/g, "").trim().toLowerCase();
-      const pState = cleanStateStr(party?.state || "");
-      const cState = cleanStateStr(companyState || "");
-      const hasIgst = Number(sale.igstTotal || 0) > 0;
-      const isIntraState = !hasIgst && (!pState || !cState || pState === cState);
-
       if (hasGst) {
         b2b.push(flatEntry);
-      } else if (!isIntraState && invValue > 250000) {
+      } else if (invValue > 250000) {
         b2cLarge.push(flatEntry);
       } else {
         b2cSmall.push(flatEntry);
@@ -693,7 +640,7 @@ const GSTR1: React.FC = () => {
         cancel: 0
       }
     };
-  }, [saleData, ledger, companyState]);
+  }, [saleData, ledger]);
 
   return (
     <div className="pt-[56px] px-4 min-h-screen">
@@ -796,20 +743,14 @@ const GSTR1: React.FC = () => {
                   : "bg-white border-gray-300"
                   }`}
               >
-                {Array.from({ length: 5 }, (_, i) => {
-                  const y = new Date().getFullYear() - i;
-                  return (
-                    <option key={y} value={String(y)}>
-                      {y}
-                    </option>
-                  );
-                })}
+                <option value="2024">2024</option>
+                <option value="2023">2023</option>
+                <option value="2022">2022</option>
               </select>
             </div>
             <div className="flex items-end">
               <button
                 type="button"
-                onClick={handleApplyFilter}
                 className={`px-4 py-2 rounded ${theme === "dark"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
                   : "bg-blue-600 hover:bg-blue-700 text-white"

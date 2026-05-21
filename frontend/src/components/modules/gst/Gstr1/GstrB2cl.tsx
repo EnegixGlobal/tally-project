@@ -36,21 +36,11 @@ const GstrB2cl = () => {
       ownerType === "employee" ? "employee_id" : "user_id"
     ) || "";
 
-  const [filters, setFilters] = useState(() => {
-    const savedFrom = localStorage.getItem("gstr1_fromDate");
-    const savedTo = localStorage.getItem("gstr1_toDate");
-    if (savedFrom && savedTo) {
-      return {
-        fromDate: savedFrom,
-        toDate: savedTo,
-      };
-    }
-    return {
-      fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-        .toISOString()
-        .split("T")[0],
-      toDate: new Date().toISOString().split("T")[0],
-    };
+  const [filters, setFilters] = useState({
+    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
+      .toISOString()
+      .split("T")[0],
+    toDate: new Date().toISOString().split("T")[0],
   });
 
   useEffect(() => {
