@@ -259,8 +259,9 @@ const SalesReport: React.FC = () => {
           // Determine the correct group for this item
           let itemGroupName = item.salesLedgerGroupName || "Sales Account";
 
-          const isTax = gName.includes("duties") || gName.includes("tax") ||
-            lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst");
+          const isTax = gName.includes("duties") || gName.includes("tax") || 
+            item.salesLedgerGroupId === -103 ||
+            ((gName === "" || gName.includes("sales account")) && (lName.includes("cgst") || lName.includes("sgst") || lName.includes("igst") || lName.includes("utgst")) && !lName.includes("sales"));
 
           if (isTax) {
             itemGroupName = "Duties & Taxes";
