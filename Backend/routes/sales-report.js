@@ -2,6 +2,48 @@ const express = require("express");
 const router = express.Router();
 const pool = require("../db");
 
+const systemGroups = {
+  "-3": "Branch/Division",
+  "-4": "Capital Account",
+  "-5": "Current Assets",
+  "-6": "Current Liabilities",
+  "-7": "Direct Expenses",
+  "-8": "Direct Income",
+  "-9": "Fixed Assets",
+  "-10": "Indirect Expenses",
+  "-11": "Indirect Income",
+  "-12": "Investments",
+  "-13": "Loan(Liability)",
+  "-14": "Misc. Expense (Assets)",
+  "-15": "Purchase Accounts",
+  "-16": "Sales Accounts",
+  "-17": "Suspense A/C",
+  "-18": "Profit & Loss A/c",
+  "-19": "TDS Payables",
+  "-100": "Debit/Credit Note from Creditors",
+  "-101": "Debit/Credit Note to Debtors",
+  "-102": "Deposite(Assest)",
+  "-103": "Duties & Taxes",
+  "-104": "Loans and Advances (Assets)",
+  "-105": "Provisions",
+  "-106": "Reserves & Surplus",
+  "-107": "Secured Loan",
+  "-108": "Stock-In-Hand",
+  "-109": "Sundry Creditors",
+  "-110": "Sundry Debtors",
+  "-111": "Unsecured Loans",
+  "-112": "Cash-in-Hand",
+  "-113": "Bank Accounts",
+  "-114": "Bank OD A/c"
+};
+
+function getGroupName(groupId, dbGroupName) {
+  if (groupId && groupId < 0) {
+    return systemGroups[String(groupId)] || dbGroupName;
+  }
+  return dbGroupName;
+}
+
 router.get("/", async (req, res) => {
   try {
     const finalCompanyId = req.query.company_id || req.body?.companyId;
@@ -92,9 +134,9 @@ router.get("/", async (req, res) => {
          LEFT JOIN ledgers sl ON svi.salesLedgerId = sl.id
          LEFT JOIN ledger_groups lg ON sl.group_id = lg.id
 
-          LEFT JOIN ledgers l_cgst ON (svi.cgstRate = l_cgst.id AND l_cgst.group_id IN (SELECT id FROM ledger_groups WHERE name LIKE '%Duties%' OR name LIKE '%Tax%'))
-          LEFT JOIN ledgers l_sgst ON (svi.sgstRate = l_sgst.id AND l_sgst.group_id IN (SELECT id FROM ledger_groups WHERE name LIKE '%Duties%' OR name LIKE '%Tax%'))
-          LEFT JOIN ledgers l_igst ON (svi.igstRate = l_igst.id AND l_igst.group_id IN (SELECT id FROM ledger_groups WHERE name LIKE '%Duties%' OR name LIKE '%Tax%'))
+          LEFT JOIN ledgers l_cgst ON (svi.cgstRate = l_cgst.id AND (l_cgst.group_id = -103 OR l_cgst.group_id IN (SELECT id FROM ledger_groups WHERE parent = -103 OR name LIKE '%Duties%' OR name LIKE '%Tax%')))
+          LEFT JOIN ledgers l_sgst ON (svi.sgstRate = l_sgst.id AND (l_sgst.group_id = -103 OR l_sgst.group_id IN (SELECT id FROM ledger_groups WHERE parent = -103 OR name LIKE '%Duties%' OR name LIKE '%Tax%')))
+          LEFT JOIN ledgers l_igst ON (svi.igstRate = l_igst.id AND (l_igst.group_id = -103 OR l_igst.group_id IN (SELECT id FROM ledger_groups WHERE parent = -103 OR name LIKE '%Duties%' OR name LIKE '%Tax%')))
          
          LEFT JOIN ledgers l_disc ON svi.discountLedgerId = l_disc.id
 
@@ -134,6 +176,7 @@ router.get("/", async (req, res) => {
         if (!itemsMap[item.voucherId]) itemsMap[item.voucherId] = [];
         itemsMap[item.voucherId].push({
           ...item,
+          salesLedgerGroupName: getGroupName(item.salesLedgerGroupId, item.salesLedgerGroupName),
           quantity: Number(item.quantity) || 0,
           rate: Number(item.rate) || 0,
           amount: Number(item.amount) || 0,
@@ -158,19 +201,21 @@ router.get("/", async (req, res) => {
           String(voucher.partyName).toLowerCase() === String(entry.ledgerName).toLowerCase()
         )) return;
 
+        const resolvedGroupName = getGroupName(entry.groupId, entry.groupName);
         const lName = (entry.ledgerName || "").toLowerCase();
-        const gName = (entry.groupName || "").toLowerCase();
+        const gName = (resolvedGroupName || "").toLowerCase();
         
-        const isTax = gName.includes("duties") || gName.includes("tax");
-        const isSales = gName.includes("sales account");
-        const isDiscount = lName.includes("discount") || gName.includes("discount");
+        const isTax = gName.includes("duties") || gName.includes("tax") || entry.groupId === -103;
+        const isSales = gName.includes("sales account") || entry.groupId === -16;
+        const isDiscount = lName.includes("discount") || gName.includes("discount") || entry.groupId === -10 || entry.groupId === -11;
 
         itemsMap[entry.voucherId].push({
           id: entry.id,
           voucherId: entry.voucherId,
           amount: Number(entry.amount) || 0,
           salesLedgerName: entry.ledgerName,
-          salesLedgerGroupName: entry.groupName,
+          salesLedgerGroupName: resolvedGroupName,
+          salesLedgerGroupId: entry.groupId,
           // Map GST ledgers if they are in the tax group
           cgstLedgerName: (isTax && lName.includes("cgst")) ? entry.ledgerName : null,
           sgstLedgerName: (isTax && (lName.includes("sgst") || lName.includes("utgst"))) ? entry.ledgerName : null,
@@ -182,6 +227,7 @@ router.get("/", async (req, res) => {
 
       rows.forEach(row => {
         row.items = itemsMap[row.id] || [];
+        row.groupName = getGroupName(row.groupId, row.groupName);
 
         // Ensure voucher level totals are numbers
         row.netAmount = Number(row.netAmount) || 0;
