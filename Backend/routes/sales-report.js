@@ -92,9 +92,9 @@ router.get("/", async (req, res) => {
          LEFT JOIN ledgers sl ON svi.salesLedgerId = sl.id
          LEFT JOIN ledger_groups lg ON sl.group_id = lg.id
 
-         LEFT JOIN ledgers l_cgst ON svi.cgstRate = l_cgst.id
-         LEFT JOIN ledgers l_sgst ON svi.sgstRate = l_sgst.id
-         LEFT JOIN ledgers l_igst ON svi.igstRate = l_igst.id
+          LEFT JOIN ledgers l_cgst ON (svi.cgstRate = l_cgst.id AND l_cgst.group_id IN (SELECT id FROM ledger_groups WHERE name LIKE '%Duties%' OR name LIKE '%Tax%'))
+          LEFT JOIN ledgers l_sgst ON (svi.sgstRate = l_sgst.id AND l_sgst.group_id IN (SELECT id FROM ledger_groups WHERE name LIKE '%Duties%' OR name LIKE '%Tax%'))
+          LEFT JOIN ledgers l_igst ON (svi.igstRate = l_igst.id AND l_igst.group_id IN (SELECT id FROM ledger_groups WHERE name LIKE '%Duties%' OR name LIKE '%Tax%'))
          
          LEFT JOIN ledgers l_disc ON svi.discountLedgerId = l_disc.id
 
@@ -153,7 +153,10 @@ router.get("/", async (req, res) => {
         
         // Skip the party entry (as it is already the main partyName in rows)
         // Usually, the party is a debit entry in a sales voucher
-        if (voucher && String(voucher.ledgerId) === String(entry.ledgerId)) return;
+        if (voucher && (
+          String(voucher.ledgerId) === String(entry.ledgerId) ||
+          String(voucher.partyName).toLowerCase() === String(entry.ledgerName).toLowerCase()
+        )) return;
 
         const lName = (entry.ledgerName || "").toLowerCase();
         const gName = (entry.groupName || "").toLowerCase();

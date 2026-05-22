@@ -252,6 +252,7 @@ const SalesReport: React.FC = () => {
 
       if (voucher.items && voucher.items.length > 0) {
         voucher.items.forEach((item: any) => {
+          if (item.salesLedgerName === voucher.partyName) return;
           const lName = (item.salesLedgerName || "").toLowerCase();
           const gName = (item.salesLedgerGroupName || "").toLowerCase();
 
@@ -340,13 +341,13 @@ const SalesReport: React.FC = () => {
         let igstName = "Output IGST";
 
         if (voucher.items && voucher.items.length > 0) {
-          const cItem = voucher.items.find((i: any) => i.cgstLedgerName);
+          const cItem = voucher.items.find((i: any) => i.cgstLedgerName && i.cgstLedgerName !== voucher.partyName);
           if (cItem) cgstName = cItem.cgstLedgerName;
 
-          const sItem = voucher.items.find((i: any) => i.sgstLedgerName);
+          const sItem = voucher.items.find((i: any) => i.sgstLedgerName && i.sgstLedgerName !== voucher.partyName);
           if (sItem) sgstName = sItem.sgstLedgerName;
 
-          const iItem = voucher.items.find((i: any) => i.igstLedgerName);
+          const iItem = voucher.items.find((i: any) => i.igstLedgerName && i.igstLedgerName !== voucher.partyName);
           if (iItem) igstName = iItem.igstLedgerName;
         }
 
