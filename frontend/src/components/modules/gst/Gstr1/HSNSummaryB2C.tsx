@@ -12,6 +12,9 @@ const HSNSummaryB2C = () => {
   const [loading, setLoading] = useState(false);
   const [downloadLoading, setDownloadLoading] = useState(false);
   const [hsnData, setHsnData] = useState<any[]>([]);
+  const [previewJson, setPreviewJson] = useState<string | null>(null);
+  const [pendingFilename, setPendingFilename] = useState<string>("");
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const companyId = localStorage.getItem("company_id") || "";
   const ownerType = localStorage.getItem("supplier") || "";
@@ -107,6 +110,18 @@ const HSNSummaryB2C = () => {
     XLSX.writeFile(wb, `HSN_Summary_B2C_${filters.fromDate}_to_${filters.toDate}.xlsx`);
   };
 
+  const downloadJsonFile = (jsonContent: string, filename: string) => {
+    const blob = new Blob([jsonContent], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const generateFullJSON = (dataToExport?: any[], fromDate?: string, toDate?: string) => {
     const list = dataToExport || hsnData;
     if (list.length === 0) return;
@@ -143,17 +158,8 @@ const HSNSummaryB2C = () => {
     };
 
     const jsonStr = JSON.stringify(payload, null, 2);
-    const blob = new Blob([jsonStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `HSN_Summary_B2C_${fDate}_to_${tDate}.json`;
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    setPreviewJson(jsonStr);
+    setPendingFilename(`HSN_Summary_B2C_${fDate}_to_${tDate}.json`);
   };
 
   const handleMonthDownload = async (monthIndex: number) => {
@@ -563,6 +569,78 @@ const HSNSummaryB2C = () => {
           )}
         </div>
       </div>
+
+      {previewJson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print animate-fadeIn">
+          <div
+            className={`w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden border transition-all transform scale-100 ${
+              theme === "dark"
+                ? "bg-gray-800 border-gray-700 text-white"
+                : "bg-white border-gray-200 text-gray-800"
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-blue-600 text-white">
+              <span className="font-bold text-lg">JSON Preview ({pendingFilename})</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(previewJson);
+                  setCopySuccess(true);
+                  setTimeout(() => setCopySuccess(false), 2000);
+                }}
+                className="text-xs px-2.5 py-1.5 bg-white/20 hover:bg-white/30 rounded font-medium transition-all"
+              >
+                {copySuccess ? "Copied!" : "Copy to Clipboard"}
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Review the generated GSTR-1 HSN Summary JSON before downloading. Click "Download" to save the file.
+              </p>
+              <div className="relative">
+                <pre
+                  className="max-h-[50vh] overflow-auto font-mono text-[11px] p-4 bg-gray-900 text-green-400 rounded-lg border border-gray-700 leading-relaxed tab-size-2 scrollbar-thin scrollbar-thumb-gray-700"
+                  style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
+                >
+                  {previewJson}
+                </pre>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-800/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewJson(null);
+                  setPendingFilename("");
+                }}
+                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all ${
+                  theme === "dark"
+                    ? "border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                    : "border-gray-300 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  downloadJsonFile(previewJson, pendingFilename);
+                  setPreviewJson(null);
+                  setPendingFilename("");
+                }}
+                className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md shadow-blue-500/20 transition-all"
+              >
+                Download JSON
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
