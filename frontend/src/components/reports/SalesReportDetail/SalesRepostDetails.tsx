@@ -231,6 +231,7 @@ const SalesRepostDetails = () => {
     const ledger = ledgers.find((l: any) => String(l.id) === String(partyId));
     return ledger?.name || "-";
   };
+
   const getGroupTotal = (group: any) => {
     return group.ledgers.reduce((groupSum: number, ledger: any) => {
       const ledgerTotal = ledger.sales.reduce(
@@ -246,6 +247,86 @@ const SalesRepostDetails = () => {
       return sum + getGroupTotal(group);
     }, 0);
   };
+
+  // ──────────────────────────────────────────────────────────────────────────
+  // Build Tally-style summary: group → sub-ledger → debit / credit
+  // Order: 1=Party group (Debit), 2=Sales Accounts (Credit),
+  //        3=Duties & Taxes (Credit), 4=Discount (Debit)
+  // ──────────────────────────────────────────────────────────────────────────
+  const buildTallySummary = () => {
+    const allGroups = [...ledgerGroups, ...baseGroups];
+
+    // Helper: resolve group name for a given ledger id
+    const resolvePartyGroup = (ledgerId: number | string) => {
+      const l = ledgers.find((x: any) => String(x.id) === String(ledgerId));
+      if (!l) return { groupName: "Sundry Debtors", ledgerName: getPartyName(ledgerId) };
+      const g = allGroups.find((x: any) => String(x.id) === String(l.groupId));
+      return {
+        groupName: g?.name || "Sundry Debtors",
+        ledgerName: l.name,
+      };
+    };
+
+    // Map: groupName → { order, ledgers: Map<ledgerName, {debit, credit}> }
+    const groupMap = new Map<string, { order: number; ledgers: Map<string, { debit: number; credit: number }> }>();
+
+    const addToLedger = (groupName: string, order: number, ledgerName: string, debit: number, credit: number) => {
+      if (!groupMap.has(groupName)) {
+        groupMap.set(groupName, { order, ledgers: new Map() });
+      }
+      const grp = groupMap.get(groupName)!;
+      const existing = grp.ledgers.get(ledgerName) || { debit: 0, credit: 0 };
+      existing.debit += debit;
+      existing.credit += credit;
+      grp.ledgers.set(ledgerName, existing);
+    };
+
+    sales.forEach((sale) => {
+      const total     = Number(sale.total || 0);
+      const subtotal  = Number(sale.subtotal || 0);
+      const cgst      = Number(sale.cgstTotal || 0);
+      const sgst      = Number(sale.sgstTotal || 0);
+      const igst      = Number(sale.igstTotal || 0);
+      const discount  = Number(sale.discountTotal || 0);
+
+      // ── 1. Party → Debit side
+      const { groupName: partyGroupName, ledgerName: partyName } = resolvePartyGroup(sale.partyId);
+      addToLedger(partyGroupName, 1, partyName, total, 0);
+
+      // ── 2. Sales Accounts → Credit side
+      const salesLedgerName = sale.salesLedgerName || (ledgers.find((l: any) => String(l.id) === String(sale.salesLedgerId))?.name) || "Sales";
+      const salesAmt = subtotal > 0 ? subtotal : total - cgst - sgst - igst - discount;
+      addToLedger("Sales Accounts", 2, salesLedgerName, 0, salesAmt > 0 ? salesAmt : 0);
+
+      // ── 3. Duties & Taxes → Credit side
+      if (cgst > 0) addToLedger("Duties & Taxes", 3, sale.cgstLedgerName || "CGST", 0, cgst);
+      if (sgst > 0) addToLedger("Duties & Taxes", 3, sale.sgstLedgerName || "SGST", 0, sgst);
+      if (igst > 0) addToLedger("Duties & Taxes", 3, sale.igstLedgerName || "IGST", 0, igst);
+
+      // ── 4. Discount → Debit side (expense / reduction)
+      if (discount > 0) addToLedger("Discount", 4, sale.discountLedgerName || "Discount", discount, 0);
+    });
+
+    // Convert map → sorted array
+    return Array.from(groupMap.entries())
+      .sort((a, b) => a[1].order - b[1].order)
+      .map(([groupName, { ledgers: ledgerMap }]) => {
+        const subLedgers = Array.from(ledgerMap.entries()).map(([name, amounts]) => ({
+          name,
+          debit: amounts.debit,
+          credit: amounts.credit,
+        }));
+        const totalDebit  = subLedgers.reduce((s, l) => s + l.debit,  0);
+        const totalCredit = subLedgers.reduce((s, l) => s + l.credit, 0);
+        return { groupName, subLedgers, totalDebit, totalCredit };
+      });
+  };
+
+  // Format number: show value if > 0, else "-"
+  const fmt = (n: number) =>
+    n > 0
+      ? n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+      : "-";
 
   return (
     <div className="p-4 pt-[56px]">
@@ -379,58 +460,63 @@ const SalesRepostDetails = () => {
           No sales found {filters.fromDate && filters.toDate ? `for the selected date range` : `for ${month}`}
         </p>
       ) : !showDetail ? (
-        <>
-          {/* ================= SUMMARY VIEW ================= */}
-          <div className="max-full">
-            {/* Header */}
-            <div className="grid grid-cols-3 px-3 py-2 font-bold border-b">
-              <div>Particulars</div>
-              <div className="text-right">Debit</div>
-              <div className="text-right">Credit</div>
-            </div>
-
-            {/* Rows */}
-            {groupedSales.map((group) => {
-              const total = getGroupTotal(group);
-
-              return (
-                <div
-                  key={group.groupId}
-                  className="grid grid-cols-3 px-3 py-2 text-sm"
-                >
-                  <div className="font-medium">{group.groupName}</div>
-
-                  {/* Debit (only if negative type – optional future logic) */}
-                  <div className="text-right font-mono">
-                    {/* keep blank for sales */}
-                  </div>
-
-                  {/* Credit */}
-                  <div className="text-right font-mono">
-                    ₹{total.toLocaleString("en-IN")}
-                  </div>
+        (() => {
+          const tallySummary = buildTallySummary();
+          const grandDebit   = tallySummary.reduce((s, g) => s + g.totalDebit,  0);
+          const grandCredit  = tallySummary.reduce((s, g) => s + g.totalCredit, 0);
+          return (
+            <>
+              {/* ================= SUMMARY VIEW (Tally-style) ================= */}
+              <div className="w-full">
+                {/* ── Table Header ── */}
+                <div className="grid grid-cols-3 px-3 py-2 font-bold border-b border-gray-400 text-sm">
+                  <div>Particulars</div>
+                  <div className="text-right">Debit</div>
+                  <div className="text-right">Credit</div>
                 </div>
-              );
-            })}
 
-            {/* Divider */}
-            <div className="border-t my-2" />
+                {/* ── Group + Sub-Ledger Rows ── */}
+                {tallySummary.map((group) => (
+                  <div key={group.groupName}>
+                    {/* Group Header Row */}
+                    <div className="grid grid-cols-3 px-3 py-1.5 text-sm font-semibold border-b border-gray-200 bg-gray-50">
+                      <div>{group.groupName}</div>
+                      <div className="text-right font-mono">
+                        {fmt(group.totalDebit)}
+                      </div>
+                      <div className="text-right font-mono">
+                        {fmt(group.totalCredit)}
+                      </div>
+                    </div>
 
-            {/* Grand Total */}
-            <div className="grid grid-cols-3 px-3 py-2 font-bold">
-              <div>Grand Total</div>
-              <div className="text-right"></div>
-              <div className="text-right font-mono">
-                ₹{getGrandTotal().toLocaleString("en-IN")}
+                    {/* Sub-Ledger Rows (indented) */}
+                    {group.subLedgers.map((sub) => (
+                      <div
+                        key={sub.name}
+                        className="grid grid-cols-3 px-3 py-1 text-sm border-b border-gray-100"
+                      >
+                        <div className="pl-6 text-gray-700">{sub.name}</div>
+                        <div className="text-right font-mono text-gray-700">
+                          {fmt(sub.debit)}
+                        </div>
+                        <div className="text-right font-mono text-gray-700">
+                          {fmt(sub.credit)}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ))}
+
+                {/* ── Grand Total Row ── */}
+                <div className="grid grid-cols-3 px-3 py-2 font-bold border-t-2 border-gray-400 mt-1 text-sm">
+                  <div>Grand Total</div>
+                  <div className="text-right font-mono">{fmt(grandDebit)}</div>
+                  <div className="text-right font-mono">{fmt(grandCredit)}</div>
+                </div>
               </div>
-            </div>
-            <div className="mt-6 flex justify-end">
-              <div className="w-full max-w-sm border-t pt-3 text-right font-bold">
-                Grand Total : ₹{getGrandTotal().toLocaleString()}
-              </div>
-            </div>
-          </div>
-        </>
+            </>
+          );
+        })()
       ) : (
         /* ================= DETAIL VIEW ================= */
 

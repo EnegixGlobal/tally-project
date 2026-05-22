@@ -315,23 +315,25 @@ router.get("/month-wise", async (req, res) => {
   try {
     let sql = `
       SELECT 
-        id,
-        number,
-        date,
-        partyId,
-        referenceNo,
-        supplierInvoiceDate,
-        subtotal,
-        cgstTotal,
-        sgstTotal,
-        igstTotal,
-        discountTotal,
-        total,
-        salesLedgerId,
-        company_id
-      FROM sales_vouchers
-      WHERE owner_type = ?
-        AND owner_id = ?
+        sv.id,
+        sv.number,
+        sv.date,
+        sv.partyId,
+        sv.referenceNo,
+        sv.supplierInvoiceDate,
+        sv.subtotal,
+        sv.cgstTotal,
+        sv.sgstTotal,
+        sv.igstTotal,
+        sv.discountTotal,
+        sv.total,
+        sv.salesLedgerId,
+        sv.company_id,
+        sl.name AS salesLedgerName
+      FROM sales_vouchers sv
+      LEFT JOIN ledgers sl ON sv.salesLedgerId = sl.id
+      WHERE sv.owner_type = ?
+        AND sv.owner_id = ?
     `;
 
     const params = [owner_type, owner_id];
@@ -339,7 +341,7 @@ router.get("/month-wise", async (req, res) => {
     // Date range filter (takes priority over month/year)
     if (fromDate && toDate) {
       // Use DATE() function to ensure proper date comparison and include entire toDate
-      sql += " AND DATE(date) >= DATE(?) AND DATE(date) <= DATE(?)";
+      sql += " AND DATE(sv.date) >= DATE(?) AND DATE(sv.date) <= DATE(?)";
       params.push(fromDate, toDate);
     } else if (month && year) {
       // Fallback to month/year filter if date range not provided
@@ -367,21 +369,70 @@ router.get("/month-wise", async (req, res) => {
         });
       }
 
-      sql += " AND MONTH(date) = ? AND YEAR(date) = ?";
+      sql += " AND MONTH(sv.date) = ? AND YEAR(sv.date) = ?";
       params.push(monthNumber, year);
     }
 
     // optional company filter
     if (company_id) {
-      sql += " AND company_id = ?";
+      sql += " AND sv.company_id = ?";
       params.push(company_id);
     }
 
-    sql += " ORDER BY date DESC";
+    sql += " ORDER BY sv.date DESC";
 
     const [rows] = await pool.execute(sql, params);
 
+    // ── Enrich each row with GST ledger names from items ──────────────────
+    if (rows.length > 0) {
+      const voucherIds = rows.map(r => r.id);
 
+      // Fetch distinct GST ledger names per voucher from sales_voucher_items
+      const [itemRows] = await pool.query(
+        `SELECT DISTINCT
+            svi.voucherId,
+            l_cgst.name  AS cgstLedgerName,
+            l_sgst.name  AS sgstLedgerName,
+            l_igst.name  AS igstLedgerName,
+            l_disc.name  AS discountLedgerName
+         FROM sales_voucher_items svi
+         LEFT JOIN ledgers l_cgst ON svi.cgstRate  = l_cgst.id
+         LEFT JOIN ledgers l_sgst ON svi.sgstRate  = l_sgst.id
+         LEFT JOIN ledgers l_igst ON svi.igstRate  = l_igst.id
+         LEFT JOIN ledgers l_disc ON svi.discountLedgerId = l_disc.id
+         WHERE svi.voucherId IN (?)`,
+        [voucherIds]
+      );
+
+      // Build a map for fast lookup
+      const itemMap = {};
+      itemRows.forEach(item => {
+        if (!itemMap[item.voucherId]) {
+          itemMap[item.voucherId] = {
+            cgstLedgerName:     item.cgstLedgerName     || null,
+            sgstLedgerName:     item.sgstLedgerName     || null,
+            igstLedgerName:     item.igstLedgerName     || null,
+            discountLedgerName: item.discountLedgerName || null,
+          };
+        } else {
+          // Keep first non-null value found
+          const m = itemMap[item.voucherId];
+          if (!m.cgstLedgerName)     m.cgstLedgerName     = item.cgstLedgerName;
+          if (!m.sgstLedgerName)     m.sgstLedgerName     = item.sgstLedgerName;
+          if (!m.igstLedgerName)     m.igstLedgerName     = item.igstLedgerName;
+          if (!m.discountLedgerName) m.discountLedgerName = item.discountLedgerName;
+        }
+      });
+
+      // Merge into rows
+      rows.forEach(row => {
+        const info = itemMap[row.id] || {};
+        row.cgstLedgerName     = info.cgstLedgerName     || null;
+        row.sgstLedgerName     = info.sgstLedgerName     || null;
+        row.igstLedgerName     = info.igstLedgerName     || null;
+        row.discountLedgerName = info.discountLedgerName || null;
+      });
+    }
 
     return res.status(200).json({
       success: true,
@@ -400,5 +451,6 @@ router.get("/month-wise", async (req, res) => {
     });
   }
 });
+
 
 module.exports = router;
