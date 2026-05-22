@@ -249,76 +249,137 @@ const SalesRepostDetails = () => {
   };
 
   // ──────────────────────────────────────────────────────────────────────────
-  // Build Tally-style summary: group → sub-ledger → debit / credit
-  // Order: 1=Party group (Debit), 2=Sales Accounts (Credit),
+  // Build Tally-style 3-level summary:
+  //   Top Group  (e.g. "Sundry Debtors")
+  //     Sub Group  (e.g. "B2B Customer")   ← only if ledger's group is NOT the top group
+  //       Ledger
+  //
+  // Order: 1=Party top-group (Debit), 2=Sales Accounts (Credit),
   //        3=Duties & Taxes (Credit), 4=Discount (Debit)
   // ──────────────────────────────────────────────────────────────────────────
   const buildTallySummary = () => {
     const allGroups = [...ledgerGroups, ...baseGroups];
 
-    // Helper: resolve group name for a given ledger id
-    const resolvePartyGroup = (ledgerId: number | string) => {
+    // Resolve a group by id (searches both DB groups and system groups)
+    const findGroup = (id: number | string | null | undefined) => {
+      if (id == null) return null;
+      return allGroups.find((g: any) => String(g.id) === String(id)) || null;
+    };
+
+    // For a ledger, resolve:
+    //   topGroupName  – the ultimate ancestor (system group level)
+    //   subGroupName  – the ledger's immediate group if it's NOT the top group, else null
+    const resolveHierarchy = (ledgerId: number | string) => {
       const l = ledgers.find((x: any) => String(x.id) === String(ledgerId));
-      if (!l) return { groupName: "Sundry Debtors", ledgerName: getPartyName(ledgerId) };
-      const g = allGroups.find((x: any) => String(x.id) === String(l.groupId));
+      if (!l) return { topGroupName: "Sundry Debtors", subGroupName: null as string | null, ledgerName: String(ledgerId) };
+
+      const immediateGroup = findGroup(l.groupId);
+      if (!immediateGroup) {
+        return { topGroupName: "Unknown Group", subGroupName: null as string | null, ledgerName: l.name };
+      }
+
+      // Walk up to find the topmost group
+      let topGroup = immediateGroup;
+      while (topGroup.parent != null) {
+        const parent = findGroup(topGroup.parent);
+        if (!parent) break;
+        topGroup = parent;
+      }
+
+      const isDirectlyUnderTop = String(immediateGroup.id) === String(topGroup.id);
+
       return {
-        groupName: g?.name || "Sundry Debtors",
-        ledgerName: l.name,
+        topGroupName: topGroup.name,
+        subGroupName: isDirectlyUnderTop ? null : immediateGroup.name,
+        ledgerName:   l.name,
       };
     };
 
-    // Map: groupName → { order, ledgers: Map<ledgerName, {debit, credit}> }
-    const groupMap = new Map<string, { order: number; ledgers: Map<string, { debit: number; credit: number }> }>();
+    // Structure: topGroupName → { order, subGroups: Map<subGroupKey, { ledgers: Map<name,{debit,credit}> }> }
+    // subGroupKey: use "__direct__" when no subgroup (ledger directly under top group)
+    const DIRECT = "__direct__";
+    const topMap = new Map<string, {
+      order: number;
+      subGroups: Map<string, Map<string, { debit: number; credit: number }>>;
+    }>();
 
-    const addToLedger = (groupName: string, order: number, ledgerName: string, debit: number, credit: number) => {
-      if (!groupMap.has(groupName)) {
-        groupMap.set(groupName, { order, ledgers: new Map() });
+    const addEntry = (
+      topGroupName: string,
+      order: number,
+      subGroupName: string | null,
+      ledgerName: string,
+      debit: number,
+      credit: number
+    ) => {
+      if (!topMap.has(topGroupName)) {
+        topMap.set(topGroupName, { order, subGroups: new Map() });
       }
-      const grp = groupMap.get(groupName)!;
-      const existing = grp.ledgers.get(ledgerName) || { debit: 0, credit: 0 };
-      existing.debit += debit;
+      const top = topMap.get(topGroupName)!;
+      const subKey = subGroupName ?? DIRECT;
+      if (!top.subGroups.has(subKey)) {
+        top.subGroups.set(subKey, new Map());
+      }
+      const ledgerMap = top.subGroups.get(subKey)!;
+      const existing = ledgerMap.get(ledgerName) || { debit: 0, credit: 0 };
+      existing.debit  += debit;
       existing.credit += credit;
-      grp.ledgers.set(ledgerName, existing);
+      ledgerMap.set(ledgerName, existing);
     };
 
     sales.forEach((sale) => {
-      const total     = Number(sale.total || 0);
-      const subtotal  = Number(sale.subtotal || 0);
-      const cgst      = Number(sale.cgstTotal || 0);
-      const sgst      = Number(sale.sgstTotal || 0);
-      const igst      = Number(sale.igstTotal || 0);
-      const discount  = Number(sale.discountTotal || 0);
+      const total    = Number(sale.total        || 0);
+      const subtotal = Number(sale.subtotal     || 0);
+      const cgst     = Number(sale.cgstTotal    || 0);
+      const sgst     = Number(sale.sgstTotal    || 0);
+      const igst     = Number(sale.igstTotal    || 0);
+      const discount = Number(sale.discountTotal|| 0);
 
       // ── 1. Party → Debit side
-      const { groupName: partyGroupName, ledgerName: partyName } = resolvePartyGroup(sale.partyId);
-      addToLedger(partyGroupName, 1, partyName, total, 0);
+      const { topGroupName, subGroupName, ledgerName: partyName } = resolveHierarchy(sale.partyId);
+      addEntry(topGroupName, 1, subGroupName, partyName, total, 0);
 
       // ── 2. Sales Accounts → Credit side
-      const salesLedgerName = sale.salesLedgerName || (ledgers.find((l: any) => String(l.id) === String(sale.salesLedgerId))?.name) || "Sales";
+      const { topGroupName: sTopGroup, subGroupName: sSubGroup, ledgerName: sLedgerName } = resolveHierarchy(sale.salesLedgerId);
+      const resolvedSalesTopGroup = sTopGroup === "Unknown Group" ? "Sales Accounts" : sTopGroup;
+      const salesLedgerDisplayName = sale.salesLedgerName || sLedgerName;
       const salesAmt = subtotal > 0 ? subtotal : total - cgst - sgst - igst - discount;
-      addToLedger("Sales Accounts", 2, salesLedgerName, 0, salesAmt > 0 ? salesAmt : 0);
+      addEntry(resolvedSalesTopGroup, 2, sSubGroup, salesLedgerDisplayName, 0, salesAmt > 0 ? salesAmt : 0);
 
-      // ── 3. Duties & Taxes → Credit side
-      if (cgst > 0) addToLedger("Duties & Taxes", 3, sale.cgstLedgerName || "CGST", 0, cgst);
-      if (sgst > 0) addToLedger("Duties & Taxes", 3, sale.sgstLedgerName || "SGST", 0, sgst);
-      if (igst > 0) addToLedger("Duties & Taxes", 3, sale.igstLedgerName || "IGST", 0, igst);
+      // ── 3. Duties & Taxes → Credit side (always flat – no subgroup)
+      if (cgst > 0) addEntry("Duties & Taxes", 3, null, sale.cgstLedgerName || "CGST", 0, cgst);
+      if (sgst > 0) addEntry("Duties & Taxes", 3, null, sale.sgstLedgerName || "SGST", 0, sgst);
+      if (igst > 0) addEntry("Duties & Taxes", 3, null, sale.igstLedgerName || "IGST", 0, igst);
 
-      // ── 4. Discount → Debit side (expense / reduction)
-      if (discount > 0) addToLedger("Discount", 4, sale.discountLedgerName || "Discount", discount, 0);
+      // ── 4. Discount → Debit side
+      if (discount > 0) addEntry("Discount", 4, null, sale.discountLedgerName || "Discount", discount, 0);
     });
 
-    // Convert map → sorted array
-    return Array.from(groupMap.entries())
+    // Convert to sorted output array
+    return Array.from(topMap.entries())
       .sort((a, b) => a[1].order - b[1].order)
-      .map(([groupName, { ledgers: ledgerMap }]) => {
-        const subLedgers = Array.from(ledgerMap.entries()).map(([name, amounts]) => ({
-          name,
-          debit: amounts.debit,
-          credit: amounts.credit,
-        }));
-        const totalDebit  = subLedgers.reduce((s, l) => s + l.debit,  0);
-        const totalCredit = subLedgers.reduce((s, l) => s + l.credit, 0);
-        return { groupName, subLedgers, totalDebit, totalCredit };
+      .map(([topGroupName, { subGroups }]) => {
+        // Build sub-group list; DIRECT entries come first
+        const subGroupList = Array.from(subGroups.entries())
+          .map(([subKey, ledgerMap]) => {
+            const isDirectly = subKey === DIRECT;
+            const ledgerList = Array.from(ledgerMap.entries()).map(([name, amounts]) => ({
+              name,
+              debit:  amounts.debit,
+              credit: amounts.credit,
+            }));
+            const totalDebit  = ledgerList.reduce((s, l) => s + l.debit,  0);
+            const totalCredit = ledgerList.reduce((s, l) => s + l.credit, 0);
+            return {
+              subGroupName: isDirectly ? null : subKey,
+              ledgers: ledgerList,
+              totalDebit,
+              totalCredit,
+            };
+          });
+
+        const totalDebit  = subGroupList.reduce((s, sg) => s + sg.totalDebit,  0);
+        const totalCredit = subGroupList.reduce((s, sg) => s + sg.totalCredit, 0);
+        return { topGroupName, subGroupList, totalDebit, totalCredit };
       });
   };
 
@@ -466,49 +527,57 @@ const SalesRepostDetails = () => {
           const grandCredit  = tallySummary.reduce((s, g) => s + g.totalCredit, 0);
           return (
             <>
-              {/* ================= SUMMARY VIEW (Tally-style) ================= */}
-              <div className="w-full">
+              {/* ================= SUMMARY VIEW (Tally 3-level) ================= */}
+              <div className="w-full border border-gray-200 rounded-md overflow-hidden">
+
                 {/* ── Table Header ── */}
-                <div className="grid grid-cols-3 px-3 py-2 font-bold border-b border-gray-400 text-sm">
+                <div className="grid grid-cols-3 px-4 py-2 font-bold bg-gray-100 border-b border-gray-300 text-sm">
                   <div>Particulars</div>
                   <div className="text-right">Debit</div>
                   <div className="text-right">Credit</div>
                 </div>
 
-                {/* ── Group + Sub-Ledger Rows ── */}
+                {/* ── Top Group rows ── */}
                 {tallySummary.map((group) => (
-                  <div key={group.groupName}>
-                    {/* Group Header Row */}
-                    <div className="grid grid-cols-3 px-3 py-1.5 text-sm font-semibold border-b border-gray-200 bg-gray-50">
-                      <div>{group.groupName}</div>
-                      <div className="text-right font-mono">
-                        {fmt(group.totalDebit)}
-                      </div>
-                      <div className="text-right font-mono">
-                        {fmt(group.totalCredit)}
-                      </div>
+                  <div key={group.topGroupName}>
+
+                    {/* Level 1: Top Group Header */}
+                    <div className="grid grid-cols-3 px-4 py-1.5 text-sm font-bold bg-gray-50 border-b border-gray-300">
+                      <div>{group.topGroupName}</div>
+                      <div className="text-right font-mono">{fmt(group.totalDebit)}</div>
+                      <div className="text-right font-mono">{fmt(group.totalCredit)}</div>
                     </div>
 
-                    {/* Sub-Ledger Rows (indented) */}
-                    {group.subLedgers.map((sub) => (
-                      <div
-                        key={sub.name}
-                        className="grid grid-cols-3 px-3 py-1 text-sm border-b border-gray-100"
-                      >
-                        <div className="pl-6 text-gray-700">{sub.name}</div>
-                        <div className="text-right font-mono text-gray-700">
-                          {fmt(sub.debit)}
-                        </div>
-                        <div className="text-right font-mono text-gray-700">
-                          {fmt(sub.credit)}
-                        </div>
+                    {group.subGroupList.map((sg) => (
+                      <div key={sg.subGroupName ?? "__direct__"}>
+
+                        {/* Level 2: Sub Group Header (only if a named sub-group exists) */}
+                        {sg.subGroupName && (
+                          <div className="grid grid-cols-3 pl-6 pr-4 py-1.5 text-sm font-semibold border-b border-gray-200 bg-white">
+                            <div className="text-gray-800">{sg.subGroupName}</div>
+                            <div className="text-right font-mono text-gray-800">{fmt(sg.totalDebit)}</div>
+                            <div className="text-right font-mono text-gray-800">{fmt(sg.totalCredit)}</div>
+                          </div>
+                        )}
+
+                        {/* Level 3: Ledger rows */}
+                        {sg.ledgers.map((led) => (
+                          <div
+                            key={led.name}
+                            className={`grid grid-cols-3 pr-4 py-1 text-sm border-b border-gray-100 ${sg.subGroupName ? "pl-12" : "pl-8"}`}
+                          >
+                            <div className="text-gray-600">{led.name}</div>
+                            <div className="text-right font-mono text-gray-600">{fmt(led.debit)}</div>
+                            <div className="text-right font-mono text-gray-600">{fmt(led.credit)}</div>
+                          </div>
+                        ))}
                       </div>
                     ))}
                   </div>
                 ))}
 
                 {/* ── Grand Total Row ── */}
-                <div className="grid grid-cols-3 px-3 py-2 font-bold border-t-2 border-gray-400 mt-1 text-sm">
+                <div className="grid grid-cols-3 px-4 py-2 font-bold bg-gray-100 border-t-2 border-gray-400 text-sm">
                   <div>Grand Total</div>
                   <div className="text-right font-mono">{fmt(grandDebit)}</div>
                   <div className="text-right font-mono">{fmt(grandCredit)}</div>
