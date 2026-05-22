@@ -109,6 +109,9 @@ interface Ledger {
   gstNumber?: string;
   address?: string;
   state?: string;
+  district?: string;
+  pinCode?: string;
+  phone?: string;
 }
 
 interface InvoicePrintProps {
@@ -151,6 +154,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
     name: "",
     address: "",
     city: "",
+    district: "",
     state: "",
     pinCode: "",
     gstin: "",
@@ -170,10 +174,11 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
         name: partyLedger.name,
         address: partyLedger.address || "",
         city: "",
+        district: partyLedger.district || "",
         state: partyLedger.state || "",
-        pinCode: "",
+        pinCode: partyLedger.pinCode || "",
         gstin: partyLedger.gstNumber || "",
-        phone: "",
+        phone: partyLedger.phone || "",
       });
     }
   }, [partyLedger]);
@@ -200,11 +205,12 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
     setShippingAddress({
       name: partyLedger.name,
       address: partyLedger.address || "",
-      city: "Party City",
+      city: "",
+      district: partyLedger.district || "",
       state: partyLedger.state || "",
-      pinCode: "Party PIN",
+      pinCode: partyLedger.pinCode || "",
       gstin: partyLedger.gstNumber || "",
-      phone: "Party Phone",
+      phone: partyLedger.phone || "",
     });
   };
 
@@ -478,6 +484,20 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                 />
               </div>
               <div>
+                <label className="block text-sm font-medium mb-1">District</label>
+                <input
+                  type="text"
+                  name="district"
+                  value={shippingAddress.district}
+                  onChange={handleShippingChange}
+                  placeholder="Enter district"
+                  className={`w-full p-2 border rounded ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600"
+                    : "bg-white border-gray-300"
+                    }`}
+                />
+              </div>
+              <div>
                 <label className="block text-sm font-medium mb-1">State</label>
                 <input
                   type="text"
@@ -645,7 +665,16 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                         <div className="mt-1">
                           {partyLedger.address || "N/A"}
                         </div>
+                        {partyLedger.district && (
+                          <div>District: {partyLedger.district}</div>
+                        )}
                         <div>State: {partyLedger.state || "N/A"}</div>
+                        {partyLedger.pinCode && (
+                          <div>PIN Code: {partyLedger.pinCode}</div>
+                        )}
+                        {partyLedger.phone && (
+                          <div>Phone: {partyLedger.phone}</div>
+                        )}
                         <div>GSTIN: {partyLedger.gstNumber || "N/A"}</div>
                       </>
                     )}
@@ -674,12 +703,16 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                         <div className="mt-1">
                           {shippingAddress.address || "Same as billing address"}
                         </div>
-                        <div>
-                          {shippingAddress.city && `${shippingAddress.city}, `}
-                          {shippingAddress.state &&
-                            `${shippingAddress.state} - `}
-                          {shippingAddress.pinCode}
-                        </div>
+                        {shippingAddress.city && (
+                          <div>City: {shippingAddress.city}</div>
+                        )}
+                        {shippingAddress.district && (
+                          <div>District: {shippingAddress.district}</div>
+                        )}
+                        <div>State: {shippingAddress.state || "N/A"}</div>
+                        {shippingAddress.pinCode && (
+                          <div>PIN Code: {shippingAddress.pinCode}</div>
+                        )}
                         {shippingAddress.phone && (
                           <div>Phone: {shippingAddress.phone}</div>
                         )}
@@ -701,7 +734,16 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
                             <div className="mt-1">
                               {partyLedger.address || "N/A"}
                             </div>
+                            {partyLedger.district && (
+                              <div>District: {partyLedger.district}</div>
+                            )}
                             <div>State: {partyLedger.state || "N/A"}</div>
+                            {partyLedger.pinCode && (
+                              <div>PIN Code: {partyLedger.pinCode}</div>
+                            )}
+                            {partyLedger.phone && (
+                              <div>Phone: {partyLedger.phone}</div>
+                            )}
                             <div>GSTIN: {partyLedger.gstNumber || "N/A"}</div>
                           </>
                         )}
