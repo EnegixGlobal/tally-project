@@ -5,12 +5,13 @@ import { ArrowLeft, CheckCircle, XCircle, AlertTriangle, FileSpreadsheet, Loader
 import * as XLSX from 'xlsx';
 
 const SalesInvoiceMatching: React.FC = () => {
-  const { theme, ledgers } = useAppContext();
+  const { theme } = useAppContext();
   const navigate = useNavigate();
   const fileInputRef = React.useRef<HTMLInputElement>(null);
 
   const [salesVouchers, setSalesVouchers] = React.useState<any[]>([]);
   const [salesHistory, setSalesHistory] = React.useState<any[]>([]);
+  const [dbLedgers, setDbLedgers] = React.useState<any[]>([]);
   const [importedData, setImportedData] = React.useState<any[]>([]);
   const [loading, setLoading] = React.useState(true);
   const [matching, setMatching] = React.useState(false);
@@ -78,6 +79,13 @@ const SalesInvoiceMatching: React.FC = () => {
               : []
         );
 
+        // Fetch DB Ledgers to resolve party name correctly
+        const ledgersRes = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const ledgersJson = await ledgersRes.json();
+        setDbLedgers(Array.isArray(ledgersJson) ? ledgersJson : []);
+
       } catch (err) {
         console.error(err);
       } finally {
@@ -99,7 +107,7 @@ const SalesInvoiceMatching: React.FC = () => {
 
       // Resolve Party Name
       const historyPartyName = historyItems[0]?.partyName;
-      const ledgerParty = ledgers.find((l: any) => String(l.id) === String(voucher.partyId));
+      const ledgerParty = dbLedgers.find((l: any) => String(l.id) === String(voucher.partyId));
       const resolvedPartyName = ledgerParty?.name || historyPartyName || voucher.partyId || '';
 
       return {
@@ -295,7 +303,7 @@ const SalesInvoiceMatching: React.FC = () => {
       }
     };
 
-  }, [salesVouchers, salesHistory, importedData, ledgers]);
+  }, [salesVouchers, salesHistory, importedData, dbLedgers]);
 
   return (
     <div className={`min-h-screen pt-[56px] ${theme === 'dark' ? 'bg-gray-900 text-white' : 'bg-gray-50 text-gray-900'}`}>
