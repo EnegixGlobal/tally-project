@@ -22,11 +22,16 @@ const Gstr2B2b = () => {
   const [ledger, setLedger] = useState<any[]>([]);
   const [matchedSales, setMatchedSales] = useState<any[]>([]);
 
-  const [filters, setFilters] = useState({
-    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0],
-    toDate: new Date().toISOString().split("T")[0],
+  const [filters, setFilters] = useState(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const mm = String(m + 1).padStart(2, "0");
+    return {
+      fromDate: `${y}-${mm}-01`,
+      toDate: `${y}-${mm}-${String(lastDay).padStart(2, "0")}`,
+    };
   });
 
   useEffect(() => {
@@ -48,10 +53,16 @@ const Gstr2B2b = () => {
         let filteredVouchers = vouchers;
         if (filters.fromDate && filters.toDate) {
           filteredVouchers = vouchers.filter((v: any) => {
-            const voucherDate = new Date(v.date);
-            const fromDate = new Date(filters.fromDate);
-            const toDate = new Date(filters.toDate);
-            return voucherDate >= fromDate && voucherDate <= toDate;
+            if (!v.date) return false;
+            const d = new Date(v.date);
+            if (isNaN(d.getTime())) return false;
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const voucherDateStr = `${year}-${month}-${day}`;
+            return (
+              voucherDateStr >= filters.fromDate && voucherDateStr <= filters.toDate
+            );
           });
         }
 
@@ -259,13 +270,19 @@ const Gstr2B2b = () => {
     const startDate = new Date(actualYear, monthIndex, 1);
     const endDate = new Date(actualYear, monthIndex + 1, 0);
 
-    const fromStr = startDate.toISOString().split("T")[0];
-    const toStr = endDate.toISOString().split("T")[0];
+    const fromStr = `${actualYear}-${String(monthIndex + 1).padStart(2, "0")}-01`;
+    const toStr = `${actualYear}-${String(monthIndex + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
 
     // Filter allSales for this month and only GST-enabled ledgers
     const monthSales = allSales.filter((s: any) => {
+      if (!s.date) return false;
       const d = new Date(s.date);
-      return d >= startDate && d <= endDate;
+      if (isNaN(d.getTime())) return false;
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const voucherDateStr = `${year}-${month}-${day}`;
+      return voucherDateStr >= fromStr && voucherDateStr <= toStr;
     });
 
     const monthB2B = monthSales.map((s) => {

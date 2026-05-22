@@ -17,9 +17,12 @@ const GSTR1: React.FC = () => {
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState({
-    month: "03",
-    year: "2024",
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    const now = new Date();
+    return {
+      month: String(now.getMonth() + 1).padStart(2, "0"),
+      year: String(now.getFullYear()),
+    };
   });
 
   // get company infomatiion
@@ -344,12 +347,39 @@ const GSTR1: React.FC = () => {
   const [ledger, setLedger] = useState<any[]>([]);
 
   // ================= DATE FILTER =================
-  const [filters, setFilters] = useState({
-    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0],
-    toDate: new Date().toISOString().split("T")[0],
+  const [filters, setFilters] = useState(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const mm = String(m + 1).padStart(2, "0");
+    return {
+      fromDate: `${y}-${mm}-01`,
+      toDate: `${y}-${mm}-${String(lastDay).padStart(2, "0")}`,
+    };
   });
+
+  const handleApplyFilter = () => {
+    const year = parseInt(selectedPeriod.year, 10);
+    const month = parseInt(selectedPeriod.month, 10) - 1; // 0-indexed
+    const toDate = new Date(year, month + 1, 0); // Last day of month
+    
+    const yStr = String(year);
+    const mStr = String(month + 1).padStart(2, "0");
+    const dStr = String(toDate.getDate()).padStart(2, "0");
+
+    setFilters({
+      fromDate: `${yStr}-${mStr}-01`,
+      toDate: `${yStr}-${mStr}-${dStr}`,
+    });
+
+    setFormData((prev) => ({
+      ...prev,
+      returnPeriod: `${selectedPeriod.month}/${selectedPeriod.year}`,
+    }));
+
+    setShowFilterPanel(false);
+  };
 
   // ================= SALES FETCH =================
   useEffect(() => {
@@ -368,9 +398,15 @@ const GSTR1: React.FC = () => {
         let filtered = vouchers;
         if (filters.fromDate && filters.toDate) {
           filtered = vouchers.filter((v: any) => {
+            if (!v.date) return false;
             const d = new Date(v.date);
+            if (isNaN(d.getTime())) return false;
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const voucherDateStr = `${year}-${month}-${day}`;
             return (
-              d >= new Date(filters.fromDate) && d <= new Date(filters.toDate)
+              voucherDateStr >= filters.fromDate && voucherDateStr <= filters.toDate
             );
           });
         }
@@ -743,6 +779,12 @@ const GSTR1: React.FC = () => {
                   : "bg-white border-gray-300"
                   }`}
               >
+                <option value="2030">2030</option>
+                <option value="2029">2029</option>
+                <option value="2028">2028</option>
+                <option value="2027">2027</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
                 <option value="2024">2024</option>
                 <option value="2023">2023</option>
                 <option value="2022">2022</option>
@@ -751,6 +793,7 @@ const GSTR1: React.FC = () => {
             <div className="flex items-end">
               <button
                 type="button"
+                onClick={handleApplyFilter}
                 className={`px-4 py-2 rounded ${theme === "dark"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
                   : "bg-blue-600 hover:bg-blue-700 text-white"

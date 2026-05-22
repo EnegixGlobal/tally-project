@@ -19,11 +19,16 @@ const HSNSummaryB2C = () => {
       ownerType === "employee" ? "employee_id" : "user_id"
     ) || "";
 
-  const [filters, setFilters] = useState({
-    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0],
-    toDate: new Date().toISOString().split("T")[0],
+  const [filters, setFilters] = useState(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const mm = String(m + 1).padStart(2, "0");
+    return {
+      fromDate: `${y}-${mm}-01`,
+      toDate: `${y}-${mm}-${String(lastDay).padStart(2, "0")}`,
+    };
   });
 
   useEffect(() => {
@@ -155,8 +160,8 @@ const HSNSummaryB2C = () => {
       const startDate = new Date(actualYear, monthIndex, 1);
       const endDate = new Date(actualYear, monthIndex + 1, 0);
 
-      const fromStr = startDate.toISOString().split("T")[0];
-      const toStr = endDate.toISOString().split("T")[0];
+      const fromStr = `${actualYear}-${String(monthIndex + 1).padStart(2, "0")}-01`;
+      const toStr = `${actualYear}-${String(monthIndex + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
 
       const params = new URLSearchParams({
         company_id: companyId,
