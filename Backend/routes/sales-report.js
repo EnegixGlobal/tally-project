@@ -145,6 +145,31 @@ router.get("/", async (req, res) => {
       );
 
       // =========================================================
+      // 🔹 FETCH GST LEDGER NAMES BY NAME PATTERN (Server-safe fallback)
+      // The JOIN svi.cgstRate/sgstRate/igstRate = ledger.id may fail on some servers
+      // if those columns store percentage rates instead of ledger IDs.
+      // We pre-fetch the actual GST ledger names from the DB as a reliable fallback.
+      // =========================================================
+      const [gstLedgerRows] = await pool.query(
+        `SELECT id, name, group_id FROM ledgers
+         WHERE LOWER(name) LIKE '%igst%'
+            OR LOWER(name) LIKE '%cgst%'
+            OR LOWER(name) LIKE '%utgst%'
+            OR (LOWER(name) LIKE '%sgst%' AND LOWER(name) NOT LIKE '%igst%')`
+      );
+
+      // Pick the first matching ledger for each GST type
+      const fallbackCgstLedger = gstLedgerRows.find(l => {
+        const n = l.name.toLowerCase();
+        return n.includes('cgst') && !n.includes('igst');
+      });
+      const fallbackSgstLedger = gstLedgerRows.find(l => {
+        const n = l.name.toLowerCase();
+        return (n.includes('sgst') || n.includes('utgst')) && !n.includes('igst');
+      });
+      const fallbackIgstLedger = gstLedgerRows.find(l => l.name.toLowerCase().includes('igst'));
+
+      // =========================================================
       // 🔹 FETCH VOUCHER ENTRIES (For Accounting Summary Vouchers)
       // =========================================================
       const accVoucherIds = rows
@@ -170,10 +195,23 @@ router.get("/", async (req, res) => {
 
       // Attach items to their respective vouchers with numeric conversion
       const itemsMap = {};
-      
+
       // Process items from sales_voucher_items (Item-wise)
       items.forEach(item => {
         if (!itemsMap[item.voucherId]) itemsMap[item.voucherId] = [];
+
+        const cgstRateNum = Number(item.cgstRate) || 0;
+        const sgstRateNum = Number(item.sgstRate) || 0;
+        const igstRateNum = Number(item.igstRate) || 0;
+
+        // Use JOIN result if available, else fall back to name-based ledger lookup
+        const resolvedCgstName = item.cgstLedgerName ||
+          (cgstRateNum > 0 && fallbackCgstLedger ? fallbackCgstLedger.name : null);
+        const resolvedSgstName = item.sgstLedgerName ||
+          (sgstRateNum > 0 && fallbackSgstLedger ? fallbackSgstLedger.name : null);
+        const resolvedIgstName = item.igstLedgerName ||
+          (igstRateNum > 0 && fallbackIgstLedger ? fallbackIgstLedger.name : null);
+
         itemsMap[item.voucherId].push({
           ...item,
           salesLedgerGroupName: getGroupName(item.salesLedgerGroupId, item.salesLedgerGroupName),
@@ -181,9 +219,12 @@ router.get("/", async (req, res) => {
           rate: Number(item.rate) || 0,
           amount: Number(item.amount) || 0,
           discount: Number(item.discount) || 0,
-          cgstRate: Number(item.cgstRate) || 0,
-          sgstRate: Number(item.sgstRate) || 0,
-          igstRate: Number(item.igstRate) || 0,
+          cgstRate: cgstRateNum,
+          sgstRate: sgstRateNum,
+          igstRate: igstRateNum,
+          cgstLedgerName: resolvedCgstName,
+          sgstLedgerName: resolvedSgstName,
+          igstLedgerName: resolvedIgstName,
         });
       });
 
