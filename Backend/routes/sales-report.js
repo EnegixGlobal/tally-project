@@ -204,22 +204,29 @@ router.get("/", async (req, res) => {
         const resolvedGroupName = getGroupName(entry.groupId, entry.groupName);
         const lName = (entry.ledgerName || "").toLowerCase();
         const gName = (resolvedGroupName || "").toLowerCase();
-        
-        const isTax = gName.includes("duties") || gName.includes("tax") || entry.groupId === -103;
-        const isSales = gName.includes("sales account") || entry.groupId === -16;
-        const isDiscount = lName.includes("discount") || gName.includes("discount") || entry.groupId === -10 || entry.groupId === -11;
+
+        // Detect GST ledger type by ledger name pattern (fallback for servers where group_id != -103)
+        const isIgstLedger = lName.includes("igst");
+        const isCgstLedger = lName.includes("cgst") && !isIgstLedger;
+        const isSgstLedger = (lName.includes("sgst") || lName.includes("utgst")) && !isIgstLedger;
+        const isGstByName = isIgstLedger || isCgstLedger || isSgstLedger;
+
+        const isTax = gName.includes("duties") || gName.includes("tax") || entry.groupId === -103 || isGstByName;
+        const isSales = !isGstByName && (gName.includes("sales account") || entry.groupId === -16);
+        const isDiscount = !isGstByName && (lName.includes("discount") || gName.includes("discount") || entry.groupId === -10 || entry.groupId === -11);
 
         itemsMap[entry.voucherId].push({
           id: entry.id,
           voucherId: entry.voucherId,
           amount: Number(entry.amount) || 0,
           salesLedgerName: entry.ledgerName,
-          salesLedgerGroupName: resolvedGroupName,
-          salesLedgerGroupId: entry.groupId,
-          // Map GST ledgers if they are in the tax group
-          cgstLedgerName: (isTax && lName.includes("cgst")) ? entry.ledgerName : null,
-          sgstLedgerName: (isTax && (lName.includes("sgst") || lName.includes("utgst"))) ? entry.ledgerName : null,
-          igstLedgerName: (isTax && lName.includes("igst")) ? entry.ledgerName : null,
+          // Force Duties & Taxes group for recognized tax ledgers so frontend classifies correctly
+          salesLedgerGroupName: isTax ? "Duties & Taxes" : resolvedGroupName,
+          salesLedgerGroupId: isTax ? -103 : entry.groupId,
+          // Map GST ledger names using precise name-based flags (works even if group_id != -103 on server)
+          cgstLedgerName: (isTax && isCgstLedger) ? entry.ledgerName : null,
+          sgstLedgerName: (isTax && isSgstLedger) ? entry.ledgerName : null,
+          igstLedgerName: (isTax && isIgstLedger) ? entry.ledgerName : null,
           discountLedgerName: isDiscount ? entry.ledgerName : null,
           type: entry.type
         });
