@@ -16,10 +16,16 @@ const GSTR1: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
+  const [previewJson, setPreviewJson] = useState<string | null>(null);
+  const [pendingFilename, setPendingFilename] = useState<string>("");
+  const [copySuccess, setCopySuccess] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
-  const [selectedPeriod, setSelectedPeriod] = useState({
-    month: "03",
-    year: "2024",
+  const [selectedPeriod, setSelectedPeriod] = useState(() => {
+    const now = new Date();
+    return {
+      month: String(now.getMonth() + 1).padStart(2, "0"),
+      year: String(now.getFullYear()),
+    };
   });
 
   // get company infomatiion
@@ -174,11 +180,16 @@ const GSTR1: React.FC = () => {
     };
 
     const jsonString = JSON.stringify(gstr1Data, null, 2);
-    const blob = new Blob([jsonString], { type: "application/json" });
+    setPreviewJson(jsonString);
+    setPendingFilename(`GSTR1_${formData.gstin}_${selectedPeriod.month}${selectedPeriod.year}.json`);
+  };
+
+  const downloadJsonFile = (jsonContent: string, filename: string) => {
+    const blob = new Blob([jsonContent], { type: "application/json" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = `GSTR1_${formData.gstin}_${selectedPeriod.month}${selectedPeriod.year}.json`;
+    link.download = filename;
     document.body.appendChild(link);
     link.click();
     document.body.removeChild(link);
@@ -344,12 +355,39 @@ const GSTR1: React.FC = () => {
   const [ledger, setLedger] = useState<any[]>([]);
 
   // ================= DATE FILTER =================
-  const [filters, setFilters] = useState({
-    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0],
-    toDate: new Date().toISOString().split("T")[0],
+  const [filters, setFilters] = useState(() => {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const mm = String(m + 1).padStart(2, "0");
+    return {
+      fromDate: `${y}-${mm}-01`,
+      toDate: `${y}-${mm}-${String(lastDay).padStart(2, "0")}`,
+    };
   });
+
+  const handleApplyFilter = () => {
+    const year = parseInt(selectedPeriod.year, 10);
+    const month = parseInt(selectedPeriod.month, 10) - 1; // 0-indexed
+    const toDate = new Date(year, month + 1, 0); // Last day of month
+    
+    const yStr = String(year);
+    const mStr = String(month + 1).padStart(2, "0");
+    const dStr = String(toDate.getDate()).padStart(2, "0");
+
+    setFilters({
+      fromDate: `${yStr}-${mStr}-01`,
+      toDate: `${yStr}-${mStr}-${dStr}`,
+    });
+
+    setFormData((prev) => ({
+      ...prev,
+      returnPeriod: `${selectedPeriod.month}/${selectedPeriod.year}`,
+    }));
+
+    setShowFilterPanel(false);
+  };
 
   // ================= SALES FETCH =================
   useEffect(() => {
@@ -368,9 +406,15 @@ const GSTR1: React.FC = () => {
         let filtered = vouchers;
         if (filters.fromDate && filters.toDate) {
           filtered = vouchers.filter((v: any) => {
+            if (!v.date) return false;
             const d = new Date(v.date);
+            if (isNaN(d.getTime())) return false;
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const voucherDateStr = `${year}-${month}-${day}`;
             return (
-              d >= new Date(filters.fromDate) && d <= new Date(filters.toDate)
+              voucherDateStr >= filters.fromDate && voucherDateStr <= filters.toDate
             );
           });
         }
@@ -417,7 +461,14 @@ const GSTR1: React.FC = () => {
 
   // ================= MAIN LOGIC =================
   useEffect(() => {
-    if (!ledger.length || !saleData.length || !companyStateCode) return;
+    if (!ledger.length || !companyStateCode) return;
+    if (!saleData.length) {
+      setGstInterState([]);
+      setGstIntraState([]);
+      setNonGstInterState([]);
+      setNonGstIntraState([]);
+      return;
+    }
 
     const gstInter: any[] = [];
     const gstIntra: any[] = [];
@@ -692,6 +743,8 @@ const GSTR1: React.FC = () => {
           </button>
         </div>
       </div>
+
+
       {/* Filter Panel */}
       {showFilterPanel && (
         <div
@@ -743,6 +796,12 @@ const GSTR1: React.FC = () => {
                   : "bg-white border-gray-300"
                   }`}
               >
+                <option value="2030">2030</option>
+                <option value="2029">2029</option>
+                <option value="2028">2028</option>
+                <option value="2027">2027</option>
+                <option value="2026">2026</option>
+                <option value="2025">2025</option>
                 <option value="2024">2024</option>
                 <option value="2023">2023</option>
                 <option value="2022">2022</option>
@@ -751,6 +810,7 @@ const GSTR1: React.FC = () => {
             <div className="flex items-end">
               <button
                 type="button"
+                onClick={handleApplyFilter}
                 className={`px-4 py-2 rounded ${theme === "dark"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
                   : "bg-blue-600 hover:bg-blue-700 text-white"
@@ -848,7 +908,7 @@ const GSTR1: React.FC = () => {
             {/* RIGHT SIDE – VIEW MORE */}
             <button
               type="button"
-              onClick={() => navigate("/app/gst/gstr-1/b2b")}
+              onClick={() => navigate("/app/gst/gstr-1/b2b", { state: { fromDate: filters.fromDate, toDate: filters.toDate } })}
               className="text-xs px-3 py-1 rounded bg-white text-blue-800 font-semibold hover:bg-gray-100"
             >
               View More →
@@ -883,7 +943,7 @@ const GSTR1: React.FC = () => {
             {/* RIGHT */}
             <button
               type="button"
-              onClick={() => navigate("/app/gst/gstr-1/b2cl")}
+              onClick={() => navigate("/app/gst/gstr-1/b2cl", { state: { fromDate: filters.fromDate, toDate: filters.toDate } })}
               className="text-xs px-3 py-1 rounded bg-white text-blue-800 font-semibold hover:bg-gray-100"
             >
               View More →
@@ -917,7 +977,7 @@ const GSTR1: React.FC = () => {
             {/* RIGHT */}
             <button
               type="button"
-              onClick={() => navigate("/app/gst/gstr-1/b2c-small")}
+              onClick={() => navigate("/app/gst/gstr-1/b2c-small", { state: { fromDate: filters.fromDate, toDate: filters.toDate } })}
               className="text-xs px-3 py-1 rounded bg-white text-blue-800 font-semibold hover:bg-gray-100"
             >
               View More →
@@ -1228,14 +1288,14 @@ B - Credit/Debit Notes (Unregistered) */}
             <div className="flex space-x-2">
               <button
                 type="button"
-                onClick={() => navigate("/app/gst/gstr-1/hsn-summary")}
+                onClick={() => navigate("/app/gst/gstr-1/hsn-summary", { state: { fromDate: filters.fromDate, toDate: filters.toDate } })}
                 className="self-start sm:self-auto text-xs px-3 py-1 rounded bg-blue-700 text-white font-semibold hover:bg-blue-800 transition whitespace-nowrap"
               >
                 B2B HSN Summary
               </button>
               <button
                 type="button"
-                onClick={() => navigate("/app/gst/gstr-1/hsn-summary-b2c")}
+                onClick={() => navigate("/app/gst/gstr-1/hsn-summary-b2c", { state: { fromDate: filters.fromDate, toDate: filters.toDate } })}
                 className="self-start sm:self-auto text-xs px-3 py-1 rounded bg-purple-700 text-white font-semibold hover:bg-purple-800 transition whitespace-nowrap"
               >
                 B2C HSN Summary
@@ -1604,6 +1664,78 @@ B - Credit/Debit Notes (Unregistered) */}
           <li>• Keep backup of all supporting documents</li>
         </ul>
       </div>
+
+      {previewJson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print animate-fadeIn">
+          <div
+            className={`w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden border transition-all transform scale-100 ${
+              theme === "dark"
+                ? "bg-gray-800 border-gray-700 text-white"
+                : "bg-white border-gray-200 text-gray-800"
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-blue-600 text-white">
+              <span className="font-bold text-lg">JSON Preview ({pendingFilename})</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(previewJson);
+                  setCopySuccess(true);
+                  setTimeout(() => setCopySuccess(false), 2000);
+                }}
+                className="text-xs px-2.5 py-1.5 bg-white/20 hover:bg-white/30 rounded font-medium transition-all"
+              >
+                {copySuccess ? "Copied!" : "Copy to Clipboard"}
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Review the generated cumulative GSTR-1 JSON before downloading. Click "Download" to save the file.
+              </p>
+              <div className="relative">
+                <pre
+                  className="max-h-[50vh] overflow-auto font-mono text-[11px] p-4 bg-gray-900 text-green-400 rounded-lg border border-gray-700 leading-relaxed tab-size-2 scrollbar-thin scrollbar-thumb-gray-700"
+                  style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
+                >
+                  {previewJson}
+                </pre>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-800/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewJson(null);
+                  setPendingFilename("");
+                }}
+                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all ${
+                  theme === "dark"
+                    ? "border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                    : "border-gray-300 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  downloadJsonFile(previewJson, pendingFilename);
+                  setPreviewJson(null);
+                  setPendingFilename("");
+                }}
+                className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md shadow-blue-500/20 transition-all"
+              >
+                Download JSON
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

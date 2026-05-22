@@ -1,14 +1,18 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAppContext } from "../../../../context/AppContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Filter, Download, Printer } from "lucide-react";
 import * as XLSX from "xlsx";
 
 const Gstr2B2b = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [previewJson, setPreviewJson] = useState<string | null>(null);
+  const [pendingFilename, setPendingFilename] = useState<string>("");
+  const [copySuccess, setCopySuccess] = useState(false);
 
   const companyId = localStorage.getItem("company_id") || "";
   const ownerType = localStorage.getItem("supplier") || "";
@@ -22,11 +26,22 @@ const Gstr2B2b = () => {
   const [ledger, setLedger] = useState<any[]>([]);
   const [matchedSales, setMatchedSales] = useState<any[]>([]);
 
-  const [filters, setFilters] = useState({
-    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1)
-      .toISOString()
-      .split("T")[0],
-    toDate: new Date().toISOString().split("T")[0],
+  const [filters, setFilters] = useState(() => {
+    if (location.state?.fromDate && location.state?.toDate) {
+      return {
+        fromDate: location.state.fromDate,
+        toDate: location.state.toDate,
+      };
+    }
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = now.getMonth();
+    const lastDay = new Date(y, m + 1, 0).getDate();
+    const mm = String(m + 1).padStart(2, "0");
+    return {
+      fromDate: `${y}-${mm}-01`,
+      toDate: `${y}-${mm}-${String(lastDay).padStart(2, "0")}`,
+    };
   });
 
   useEffect(() => {
@@ -48,10 +63,16 @@ const Gstr2B2b = () => {
         let filteredVouchers = vouchers;
         if (filters.fromDate && filters.toDate) {
           filteredVouchers = vouchers.filter((v: any) => {
-            const voucherDate = new Date(v.date);
-            const fromDate = new Date(filters.fromDate);
-            const toDate = new Date(filters.toDate);
-            return voucherDate >= fromDate && voucherDate <= toDate;
+            if (!v.date) return false;
+            const d = new Date(v.date);
+            if (isNaN(d.getTime())) return false;
+            const year = d.getFullYear();
+            const month = String(d.getMonth() + 1).padStart(2, "0");
+            const day = String(d.getDate()).padStart(2, "0");
+            const voucherDateStr = `${year}-${month}-${day}`;
+            return (
+              voucherDateStr >= filters.fromDate && voucherDateStr <= filters.toDate
+            );
           });
         }
 
@@ -88,7 +109,11 @@ const Gstr2B2b = () => {
   }, [companyId, ownerType, ownerId]);
 
   useEffect(() => {
-    if (!ledger.length || !saleData.length) return;
+    if (!ledger.length) return;
+    if (!saleData.length) {
+      setMatchedSales([]);
+      return;
+    }
 
     // sirf GST wale ledgers
     const gstLedgers = ledger.filter(
@@ -193,6 +218,18 @@ const Gstr2B2b = () => {
     );
   };
 
+  const downloadJsonFile = (jsonContent: string, filename: string) => {
+    const blob = new Blob([jsonContent], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
+
   const generateFullJSON = (dataToExport?: any[], fromDate?: string, toDate?: string) => {
     const list = dataToExport || matchedSales;
     if (list.length === 0) return;
@@ -233,17 +270,8 @@ const Gstr2B2b = () => {
     };
 
     const jsonStr = JSON.stringify(payload, null, 2);
-    const blob = new Blob([jsonStr], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `B2B_Report_${fDate}_to_${tDate}.json`;
-
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    URL.revokeObjectURL(url);
+    setPreviewJson(jsonStr);
+    setPendingFilename(`B2B_Report_${fDate}_to_${tDate}.json`);
   };
 
   const handleMonthDownload = (monthIndex: number) => {
@@ -259,13 +287,19 @@ const Gstr2B2b = () => {
     const startDate = new Date(actualYear, monthIndex, 1);
     const endDate = new Date(actualYear, monthIndex + 1, 0);
 
-    const fromStr = startDate.toISOString().split("T")[0];
-    const toStr = endDate.toISOString().split("T")[0];
+    const fromStr = `${actualYear}-${String(monthIndex + 1).padStart(2, "0")}-01`;
+    const toStr = `${actualYear}-${String(monthIndex + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
 
     // Filter allSales for this month and only GST-enabled ledgers
     const monthSales = allSales.filter((s: any) => {
+      if (!s.date) return false;
       const d = new Date(s.date);
-      return d >= startDate && d <= endDate;
+      if (isNaN(d.getTime())) return false;
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const voucherDateStr = `${year}-${month}-${day}`;
+      return voucherDateStr >= fromStr && voucherDateStr <= toStr;
     });
 
     const monthB2B = monthSales.map((s) => {
@@ -279,6 +313,28 @@ const Gstr2B2b = () => {
     }
 
     generateFullJSON(monthB2B, fromStr, toStr);
+  };
+
+  const getActivePeriodLabel = () => {
+    if (filters.fromDate === "2000-01-01" && filters.toDate === "2099-12-31") {
+      return "All Months (Cumulative Total)";
+    }
+    if (!filters.fromDate) return "-";
+    const parts = filters.fromDate.split("-");
+    if (parts.length === 3) {
+      return `Selected Month: ${parts[1]}/${parts[0]}`;
+    }
+    const d = new Date(filters.fromDate);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `Selected Month: ${mm}/${d.getFullYear()}`;
+  };
+
+  const getActiveYear = () => {
+    if (filters.fromDate && filters.fromDate !== "2000-01-01") {
+      const parts = filters.fromDate.split("-");
+      if (parts.length === 3) return parts[0];
+    }
+    return String(new Date().getFullYear());
   };
 
   const handlePrint = () => {
@@ -361,6 +417,89 @@ const Gstr2B2b = () => {
         </div>
       </div>
 
+      {/* Quick Filter Bar */}
+      <div
+        className={`p-4 mb-6 rounded-lg flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 no-print ${
+          theme === "dark"
+            ? "bg-gray-800 border border-gray-700 text-white"
+            : "bg-white shadow border border-gray-200 text-gray-800"
+        }`}
+      >
+        <div className="flex flex-col">
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Active Return Period Filter
+          </span>
+          <span className="text-lg font-bold">
+            {getActivePeriodLabel()}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setFilters({
+                fromDate: "2000-01-01",
+                toDate: "2099-12-31"
+              });
+            }}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer ${
+              filters.fromDate === "2000-01-01" && filters.toDate === "2099-12-31"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                : theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+            }`}
+          >
+            All Months (Total)
+          </button>
+          
+          <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
+
+          {[
+            { label: "Jan", val: "01" },
+            { label: "Feb", val: "02" },
+            { label: "Mar", val: "03" },
+            { label: "Apr", val: "04" },
+            { label: "May", val: "05" },
+            { label: "Jun", val: "06" },
+            { label: "Jul", val: "07" },
+            { label: "Aug", val: "08" },
+            { label: "Sep", val: "09" },
+            { label: "Oct", val: "10" },
+            { label: "Nov", val: "11" },
+            { label: "Dec", val: "12" },
+          ].map((m) => {
+            const yearStr = getActiveYear();
+            const startStr = `${yearStr}-${m.val}-01`;
+            const lastDay = new Date(parseInt(yearStr, 10), parseInt(m.val, 10), 0).getDate();
+            const endStr = `${yearStr}-${m.val}-${String(lastDay).padStart(2, "0")}`;
+            const isActive = filters.fromDate === startStr && filters.toDate === endStr;
+
+            return (
+              <button
+                key={m.val}
+                type="button"
+                onClick={() => {
+                  setFilters({
+                    fromDate: startStr,
+                    toDate: endStr,
+                  });
+                }}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                    : theme === "dark"
+                    ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                    : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                }`}
+              >
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Filter Panel */}
       {showFilterPanel && (
         <div
@@ -403,7 +542,7 @@ const Gstr2B2b = () => {
               <button
                 type="button"
                 onClick={() => {
-                  // Data will reload automatically via useEffect
+                  setShowFilterPanel(false);
                 }}
                 className={`px-4 py-2 rounded ${theme === "dark"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
@@ -577,6 +716,78 @@ const Gstr2B2b = () => {
           )}
         </div>
       </div>
+
+      {previewJson && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 no-print animate-fadeIn">
+          <div
+            className={`w-full max-w-3xl rounded-xl shadow-2xl overflow-hidden border transition-all transform scale-100 ${
+              theme === "dark"
+                ? "bg-gray-800 border-gray-700 text-white"
+                : "bg-white border-gray-200 text-gray-800"
+            }`}
+          >
+            {/* Modal Header */}
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between bg-blue-600 text-white">
+              <span className="font-bold text-lg">JSON Preview ({pendingFilename})</span>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(previewJson);
+                  setCopySuccess(true);
+                  setTimeout(() => setCopySuccess(false), 2000);
+                }}
+                className="text-xs px-2.5 py-1.5 bg-white/20 hover:bg-white/30 rounded font-medium transition-all"
+              >
+                {copySuccess ? "Copied!" : "Copy to Clipboard"}
+              </button>
+            </div>
+
+            {/* Modal Body */}
+            <div className="p-4">
+              <p className="text-xs text-gray-500 dark:text-gray-400 mb-3">
+                Review the generated GSTR-1 B2B Supplies JSON before downloading. Click "Download" to save the file.
+              </p>
+              <div className="relative">
+                <pre
+                  className="max-h-[50vh] overflow-auto font-mono text-[11px] p-4 bg-gray-900 text-green-400 rounded-lg border border-gray-700 leading-relaxed tab-size-2 scrollbar-thin scrollbar-thumb-gray-700"
+                  style={{ whiteSpace: "pre-wrap", wordBreak: "break-all" }}
+                >
+                  {previewJson}
+                </pre>
+              </div>
+            </div>
+
+            {/* Modal Footer */}
+            <div className="p-4 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3 bg-gray-50 dark:bg-gray-800/50">
+              <button
+                type="button"
+                onClick={() => {
+                  setPreviewJson(null);
+                  setPendingFilename("");
+                }}
+                className={`px-4 py-2 text-xs font-semibold rounded-lg border transition-all ${
+                  theme === "dark"
+                    ? "border-gray-600 text-gray-300 hover:bg-gray-700 hover:text-white"
+                    : "border-gray-300 text-gray-600 hover:bg-gray-100"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  downloadJsonFile(previewJson, pendingFilename);
+                  setPreviewJson(null);
+                  setPendingFilename("");
+                }}
+                className="px-5 py-2 text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 rounded-lg shadow-md shadow-blue-500/20 transition-all"
+              >
+                Download JSON
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
