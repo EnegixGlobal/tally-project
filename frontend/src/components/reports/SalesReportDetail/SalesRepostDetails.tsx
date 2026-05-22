@@ -267,8 +267,8 @@ const SalesRepostDetails = () => {
     };
 
     // For a ledger, resolve:
-    //   topGroupName  – the ultimate ancestor (system group level)
-    //   subGroupName  – the ledger's immediate group if it's NOT the top group, else null
+    //   topGroupName  – the first system/primary group going up the chain (negative ID = system group)
+    //   subGroupName  – the ledger's immediate user-defined group (if it differs from topGroup)
     const resolveHierarchy = (ledgerId: number | string) => {
       const l = ledgers.find((x: any) => String(x.id) === String(ledgerId));
       if (!l) return { topGroupName: "Sundry Debtors", subGroupName: null as string | null, ledgerName: String(ledgerId) };
@@ -278,14 +278,25 @@ const SalesRepostDetails = () => {
         return { topGroupName: "Unknown Group", subGroupName: null as string | null, ledgerName: l.name };
       }
 
-      // Walk up to find the topmost group
+      // If the ledger is directly under a system group (negative ID), no subgroup
+      if (Number(immediateGroup.id) < 0) {
+        return {
+          topGroupName: immediateGroup.name,
+          subGroupName: null as string | null,
+          ledgerName:   l.name,
+        };
+      }
+
+      // Ledger is under a user-defined group — walk UP until we hit a system group (negative ID)
+      // System groups are the true Tally top-level groups (Sundry Debtors, Sales Accounts, etc.)
       let topGroup = immediateGroup;
-      while (topGroup.parent != null) {
+      while (Number(topGroup.id) > 0 && topGroup.parent != null) {
         const parent = findGroup(topGroup.parent);
         if (!parent) break;
         topGroup = parent;
       }
 
+      // immediateGroup is the subgroup; topGroup is the system-level parent
       const isDirectlyUnderTop = String(immediateGroup.id) === String(topGroup.id);
 
       return {
@@ -336,11 +347,17 @@ const SalesRepostDetails = () => {
 
       // ── 1. Party → Debit side
       const { topGroupName, subGroupName, ledgerName: partyName } = resolveHierarchy(sale.partyId);
-      addEntry(topGroupName, 1, subGroupName, partyName, total, 0);
+      // If party falls under an expense/discount group, treat it as Discount (debit)
+      const isExpenseGroup = ["Indirect Expenses", "Direct Expenses", "Discount"].includes(topGroupName);
+      if (isExpenseGroup) {
+        addEntry("Discount", 4, subGroupName, partyName, total, 0);
+      } else {
+        addEntry(topGroupName, 1, subGroupName, partyName, total, 0);
+      }
 
       // ── 2. Sales Accounts → Credit side
       const { topGroupName: sTopGroup, subGroupName: sSubGroup, ledgerName: sLedgerName } = resolveHierarchy(sale.salesLedgerId);
-      const resolvedSalesTopGroup = sTopGroup === "Unknown Group" ? "Sales Accounts" : sTopGroup;
+      const resolvedSalesTopGroup = (sTopGroup === "Unknown Group" || !sale.salesLedgerId) ? "Sales Accounts" : sTopGroup;
       const salesLedgerDisplayName = sale.salesLedgerName || sLedgerName;
       const salesAmt = subtotal > 0 ? subtotal : total - cgst - sgst - igst - discount;
       addEntry(resolvedSalesTopGroup, 2, sSubGroup, salesLedgerDisplayName, 0, salesAmt > 0 ? salesAmt : 0);
@@ -350,13 +367,27 @@ const SalesRepostDetails = () => {
       if (sgst > 0) addEntry("Duties & Taxes", 3, null, sale.sgstLedgerName || "SGST", 0, sgst);
       if (igst > 0) addEntry("Duties & Taxes", 3, null, sale.igstLedgerName || "IGST", 0, igst);
 
-      // ── 4. Discount → Debit side
+      // ── 4. Discount → Debit side (from voucher-level discountTotal)
       if (discount > 0) addEntry("Discount", 4, null, sale.discountLedgerName || "Discount", discount, 0);
     });
 
+    // Known group display order (groups not in this map get order 99)
+    const GROUP_ORDER: Record<string, number> = {
+      "Sundry Debtors": 1,
+      "Bank Accounts":  2,
+      "Cash-in-Hand":   3,
+      "Sales Accounts": 4,
+      "Duties & Taxes": 5,
+      "Discount":       6,
+    };
+
     // Convert to sorted output array
     return Array.from(topMap.entries())
-      .sort((a, b) => a[1].order - b[1].order)
+      .sort((a, b) => {
+        const oa = GROUP_ORDER[a[0]] ?? (a[1].order + 10);
+        const ob = GROUP_ORDER[b[0]] ?? (b[1].order + 10);
+        return oa - ob;
+      })
       .map(([topGroupName, { subGroups }]) => {
         // Build sub-group list; DIRECT entries come first
         const subGroupList = Array.from(subGroups.entries())
