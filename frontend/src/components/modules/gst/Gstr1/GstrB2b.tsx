@@ -1,12 +1,13 @@
 import { useEffect, useState, useMemo } from "react";
 import { useAppContext } from "../../../../context/AppContext";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { ArrowLeft, Filter, Download, Printer } from "lucide-react";
 import * as XLSX from "xlsx";
 
 const Gstr2B2b = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
+  const location = useLocation();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -23,6 +24,12 @@ const Gstr2B2b = () => {
   const [matchedSales, setMatchedSales] = useState<any[]>([]);
 
   const [filters, setFilters] = useState(() => {
+    if (location.state?.fromDate && location.state?.toDate) {
+      return {
+        fromDate: location.state.fromDate,
+        toDate: location.state.toDate,
+      };
+    }
     const now = new Date();
     const y = now.getFullYear();
     const m = now.getMonth();
@@ -99,7 +106,11 @@ const Gstr2B2b = () => {
   }, [companyId, ownerType, ownerId]);
 
   useEffect(() => {
-    if (!ledger.length || !saleData.length) return;
+    if (!ledger.length) return;
+    if (!saleData.length) {
+      setMatchedSales([]);
+      return;
+    }
 
     // sirf GST wale ledgers
     const gstLedgers = ledger.filter(
@@ -298,6 +309,28 @@ const Gstr2B2b = () => {
     generateFullJSON(monthB2B, fromStr, toStr);
   };
 
+  const getActivePeriodLabel = () => {
+    if (filters.fromDate === "2000-01-01" && filters.toDate === "2099-12-31") {
+      return "All Months (Cumulative Total)";
+    }
+    if (!filters.fromDate) return "-";
+    const parts = filters.fromDate.split("-");
+    if (parts.length === 3) {
+      return `Selected Month: ${parts[1]}/${parts[0]}`;
+    }
+    const d = new Date(filters.fromDate);
+    const mm = String(d.getMonth() + 1).padStart(2, "0");
+    return `Selected Month: ${mm}/${d.getFullYear()}`;
+  };
+
+  const getActiveYear = () => {
+    if (filters.fromDate && filters.fromDate !== "2000-01-01") {
+      const parts = filters.fromDate.split("-");
+      if (parts.length === 3) return parts[0];
+    }
+    return String(new Date().getFullYear());
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -378,6 +411,89 @@ const Gstr2B2b = () => {
         </div>
       </div>
 
+      {/* Quick Filter Bar */}
+      <div
+        className={`p-4 mb-6 rounded-lg flex flex-col xl:flex-row items-start xl:items-center justify-between gap-4 no-print ${
+          theme === "dark"
+            ? "bg-gray-800 border border-gray-700 text-white"
+            : "bg-white shadow border border-gray-200 text-gray-800"
+        }`}
+      >
+        <div className="flex flex-col">
+          <span className="text-xs font-semibold uppercase tracking-wider text-gray-500 dark:text-gray-400">
+            Active Return Period Filter
+          </span>
+          <span className="text-lg font-bold">
+            {getActivePeriodLabel()}
+          </span>
+        </div>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              setFilters({
+                fromDate: "2000-01-01",
+                toDate: "2099-12-31"
+              });
+            }}
+            className={`px-3 py-1.5 text-xs font-semibold rounded-full transition-all cursor-pointer ${
+              filters.fromDate === "2000-01-01" && filters.toDate === "2099-12-31"
+                ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                : theme === "dark"
+                ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+            }`}
+          >
+            All Months (Total)
+          </button>
+          
+          <div className="w-px h-5 bg-gray-300 dark:bg-gray-600 mx-1" />
+
+          {[
+            { label: "Jan", val: "01" },
+            { label: "Feb", val: "02" },
+            { label: "Mar", val: "03" },
+            { label: "Apr", val: "04" },
+            { label: "May", val: "05" },
+            { label: "Jun", val: "06" },
+            { label: "Jul", val: "07" },
+            { label: "Aug", val: "08" },
+            { label: "Sep", val: "09" },
+            { label: "Oct", val: "10" },
+            { label: "Nov", val: "11" },
+            { label: "Dec", val: "12" },
+          ].map((m) => {
+            const yearStr = getActiveYear();
+            const startStr = `${yearStr}-${m.val}-01`;
+            const lastDay = new Date(parseInt(yearStr, 10), parseInt(m.val, 10), 0).getDate();
+            const endStr = `${yearStr}-${m.val}-${String(lastDay).padStart(2, "0")}`;
+            const isActive = filters.fromDate === startStr && filters.toDate === endStr;
+
+            return (
+              <button
+                key={m.val}
+                type="button"
+                onClick={() => {
+                  setFilters({
+                    fromDate: startStr,
+                    toDate: endStr,
+                  });
+                }}
+                className={`px-3 py-1.5 text-xs font-medium rounded-full transition-all cursor-pointer ${
+                  isActive
+                    ? "bg-blue-600 text-white shadow-md shadow-blue-500/20"
+                    : theme === "dark"
+                    ? "bg-gray-700 hover:bg-gray-600 text-gray-200"
+                    : "bg-gray-100 hover:bg-gray-200 text-gray-700"
+                }`}
+              >
+                {m.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
       {/* Filter Panel */}
       {showFilterPanel && (
         <div
@@ -420,7 +536,7 @@ const Gstr2B2b = () => {
               <button
                 type="button"
                 onClick={() => {
-                  // Data will reload automatically via useEffect
+                  setShowFilterPanel(false);
                 }}
                 className={`px-4 py-2 rounded ${theme === "dark"
                   ? "bg-blue-600 hover:bg-blue-700 text-white"
