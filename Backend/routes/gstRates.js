@@ -12,10 +12,10 @@ router.get('/', async (req, res) => {
         sc.name AS category,
         sc.description,
         si.hsnCode,
-        si.gstRate,
+        0.00 AS gstRate,
         si.createdAt AS effectiveFrom
       FROM stock_items si
-      LEFT JOIN stock_categories sc ON si.stockGroupId = sc.id
+      LEFT JOIN stock_categories sc ON si.categoryId = sc.id
     `);
 
     // Add a fallback ID field for frontend usage

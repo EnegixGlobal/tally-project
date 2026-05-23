@@ -73,7 +73,11 @@ const ItemMonthlySummary = () => {
     const stockItemsData = (await stockItemRes.json()).data || [];
 
     // ✅ Get Opening Balance (Forward Calculation)
-    const itemData = stockItemsData.find((i: any) => i.name === itemName);
+    const normalizedItemName = itemName ? itemName.toLowerCase().trim() : "";
+    const itemData = stockItemsData.find((i: any) => i.name && i.name.toLowerCase().trim() === normalizedItemName);
+    const matchedMasterName = itemData ? itemData.name : itemName;
+    const matchedMasterNameNormalized = matchedMasterName ? matchedMasterName.toLowerCase().trim() : "";
+
     const isDefaultBatch = batchName === "Default";
 
     let openingQty = 0;
@@ -110,18 +114,70 @@ const ItemMonthlySummary = () => {
 
     // ✅ Filter Transactions
     const purchases = purchaseData.filter((p: any) => {
-      if (p.itemName !== itemName) return false;
-      if (p.batchNumber === batchName) return true;
-      if (isDefaultBatch && (!p.batchNumber || p.batchNumber === "default")) return true;
+      const pName = p.itemName ? p.itemName.toLowerCase().trim() : "";
+      if (pName !== matchedMasterNameNormalized) return false;
+      const pBatch = p.batchNumber || "Default";
+      if (pBatch.toLowerCase() === batchName.toLowerCase()) return true;
+      if (isDefaultBatch && (!p.batchNumber || p.batchNumber === "default" || p.batchNumber === "Default")) return true;
       return false;
     });
 
     const sales = salesData.filter((s: any) => {
-      if (s.itemName !== itemName) return false;
-      if (s.batchNumber === batchName) return true;
-      if (isDefaultBatch && (!s.batchNumber || s.batchNumber === "default")) return true;
+      const sName = s.itemName ? s.itemName.toLowerCase().trim() : "";
+      if (sName !== matchedMasterNameNormalized) return false;
+      const sBatch = s.batchNumber || "Default";
+      if (sBatch.toLowerCase() === batchName.toLowerCase()) return true;
+      if (isDefaultBatch && (!s.batchNumber || s.batchNumber === "default" || s.batchNumber === "Default")) return true;
       return false;
     });
+
+    // Backfill imported purchases from stock items batches
+    if (itemData && itemData.batches && Array.isArray(itemData.batches)) {
+      itemData.batches.forEach((b: any) => {
+        if (b.mode === "purchase") {
+          const bName = b.batchName || "Default";
+          // We check if this batch should be included for the current view
+          const matchBatch = isDefaultBatch || bName.toLowerCase() === batchName.toLowerCase();
+          if (matchBatch) {
+            const alreadyExists = purchases.some((p: any) => {
+              const pBatch = p.batchNumber || "Default";
+              return pBatch.toLowerCase() === bName.toLowerCase();
+            });
+
+            if (!alreadyExists) {
+              purchases.push({
+                itemName: matchedMasterName,
+                hsnCode: itemData.hsnCode || "",
+                batchNumber: bName,
+                purchaseQuantity: Number(b.batchQuantity || 0),
+                rate: Number(b.openingRate || 0),
+                purchaseDate: itemData.createdAt ? itemData.createdAt.split(" ")[0] : new Date().toISOString().split("T")[0],
+              });
+            }
+          }
+        } else if (b.mode === "sales") {
+          const bName = b.batchName || "Default";
+          const matchBatch = isDefaultBatch || bName.toLowerCase() === batchName.toLowerCase();
+          if (matchBatch) {
+            const alreadyExists = sales.some((s: any) => {
+              const sBatch = s.batchNumber || "Default";
+              return sBatch.toLowerCase() === bName.toLowerCase();
+            });
+
+            if (!alreadyExists) {
+              sales.push({
+                itemName: matchedMasterName,
+                hsnCode: itemData.hsnCode || "",
+                batchNumber: bName,
+                qtyChange: -Math.abs(Number(b.batchQuantity || 0)),
+                rate: Number(b.openingRate || 0),
+                movementDate: itemData.createdAt ? itemData.createdAt.split(" ")[0] : new Date().toISOString().split("T")[0],
+              });
+            }
+          }
+        }
+      });
+    }
 
     // ✅ Group by Month
     const monthMap: Record<string, any> = {};

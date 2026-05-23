@@ -344,7 +344,6 @@ const BatchList: React.FC = () => {
     return stockItems
       .map((item) => {
         const batches = (item.batches || [])
-          .filter((batch: any) => batch.mode === "purchase")
           .map((batch: any) => ({
             ...batch,
             batchType: batch.batchType || batch.mode || "opening",

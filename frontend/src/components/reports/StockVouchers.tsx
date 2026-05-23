@@ -62,16 +62,75 @@ const StockVouchers = () => {
     const sales = (await salesRes.json()).data || [];
     const stockItemsData = (await stockItemRes.json()).data || [];
 
-    const itemData = stockItemsData.find((i: any) => i.name === itemName);
+    const normalizedItemName = itemName ? itemName.toLowerCase().trim() : "";
+    const itemData = stockItemsData.find((i: any) => i.name && i.name.toLowerCase().trim() === normalizedItemName);
+    const matchedMasterName = itemData ? itemData.name : itemName;
+    const matchedMasterNameNormalized = matchedMasterName ? matchedMasterName.toLowerCase().trim() : "";
+
     const isDefaultBatch = batchName === "Default";
 
     // 🔹 Detect REAL opening batch
     // 🔹 Match Logic Helper (Consistent with ItemMonthlySummary)
     const isMatch = (itemBatch: string | null | undefined) => {
       if (itemBatch === batchName) return true;
-      if (isDefaultBatch && (!itemBatch || itemBatch === "default")) return true;
+      if (isDefaultBatch && (!itemBatch || itemBatch === "default" || itemBatch === "Default")) return true;
       return false;
     };
+
+    // Backfill imported purchases from stock items batches
+    if (itemData && itemData.batches && Array.isArray(itemData.batches)) {
+      itemData.batches.forEach((b: any) => {
+        if (b.mode === "purchase") {
+          const bName = b.batchName || "Default";
+          const matchBatch = isMatch(bName);
+          if (matchBatch) {
+            const alreadyExists = purchases.some((p: any) => {
+              const pBatch = p.batchNumber || "Default";
+              const pName = p.itemName ? p.itemName.toLowerCase().trim() : "";
+              return pBatch.toLowerCase() === bName.toLowerCase() && pName === matchedMasterNameNormalized;
+            });
+
+            if (!alreadyExists) {
+              purchases.push({
+                id: `imported-${b.id || b.batchName}`,
+                itemName: matchedMasterName,
+                hsnCode: itemData.hsnCode || "",
+                batchNumber: bName,
+                purchaseQuantity: Number(b.batchQuantity || 0),
+                rate: Number(b.openingRate || 0),
+                purchaseDate: itemData.createdAt ? itemData.createdAt.split(" ")[0] : new Date().toISOString().split("T")[0],
+                partyName: "Imported Purchase",
+                voucherNumber: "Imported",
+              });
+            }
+          }
+        } else if (b.mode === "sales") {
+          const bName = b.batchName || "Default";
+          const matchBatch = isMatch(bName);
+          if (matchBatch) {
+            const alreadyExists = sales.some((s: any) => {
+              const sBatch = s.batchNumber || "Default";
+              const sName = s.itemName ? s.itemName.toLowerCase().trim() : "";
+              return sBatch.toLowerCase() === bName.toLowerCase() && sName === matchedMasterNameNormalized;
+            });
+
+            if (!alreadyExists) {
+              sales.push({
+                id: `imported-${b.id || b.batchName}`,
+                itemName: matchedMasterName,
+                hsnCode: itemData.hsnCode || "",
+                batchNumber: bName,
+                qtyChange: -Math.abs(Number(b.batchQuantity || 0)),
+                rate: Number(b.openingRate || 0),
+                movementDate: itemData.createdAt ? itemData.createdAt.split(" ")[0] : new Date().toISOString().split("T")[0],
+                partyName: "Imported Sales",
+                voucherNumber: "Imported",
+              });
+            }
+          }
+        }
+      });
+    }
 
     /* ------------------------------------------------------------------
      * 1. Calculate Opening Balance (Forward Calculation)
@@ -113,13 +172,15 @@ const StockVouchers = () => {
 
     purchases.forEach((p: any) => {
       const d = new Date(p.purchaseDate);
+      const pName = p.itemName ? p.itemName.toLowerCase().trim() : "";
       if (
-        p.itemName === itemName &&
+        pName === matchedMasterNameNormalized &&
         isMatch(p.batchNumber) &&
         d >= start &&
         d <= end
       ) {
         tempRows.push({
+          id: p.id,
           date: d,
           party: p.partyName || p.ledgerName || "-",
           type: "Purchase",
@@ -134,14 +195,16 @@ const StockVouchers = () => {
 
     sales.forEach((s: any) => {
       const d = new Date(s.movementDate || s.date);
+      const sName = s.itemName ? s.itemName.toLowerCase().trim() : "";
       if (
-        s.itemName === itemName &&
+        sName === matchedMasterNameNormalized &&
         isMatch(s.batchNumber) &&
         d >= start &&
         d <= end
       ) {
         const qty = Math.abs(Number(s.qtyChange || 0));
         tempRows.push({
+          id: s.id,
           date: d,
           party: s.partyName || s.ledgerName || "-",
           type: "Sales",
@@ -154,7 +217,22 @@ const StockVouchers = () => {
       }
     });
 
-    tempRows.sort((a, b) => a.date.getTime() - b.date.getTime());
+    tempRows.sort((a, b) => {
+      const timeDiff = a.date.getTime() - b.date.getTime();
+      if (timeDiff !== 0) return timeDiff;
+
+      // Extract numeric IDs if possible, else compare as strings/fallbacks
+      const idA = typeof a.id === "string" && a.id.startsWith("imported") ? 0 : Number(a.id || 0);
+      const idB = typeof b.id === "string" && b.id.startsWith("imported") ? 0 : Number(b.id || 0);
+
+      if (idA !== idB) return idA - idB;
+
+      // Secondary fallback (Purchase before Sales)
+      if (a.type !== b.type) {
+        return a.type === "Purchase" ? -1 : 1;
+      }
+      return 0;
+    });
 
     // 🔹 Accumulated opening (before month)
     let accumulatedQty = openingQty;
@@ -162,8 +240,9 @@ const StockVouchers = () => {
 
     purchases.forEach((p: any) => {
       const d = new Date(p.purchaseDate);
+      const pName = p.itemName ? p.itemName.toLowerCase().trim() : "";
       if (
-        p.itemName === itemName &&
+        pName === matchedMasterNameNormalized &&
         isMatch(p.batchNumber) &&
         d < start
       ) {
@@ -174,8 +253,9 @@ const StockVouchers = () => {
 
     sales.forEach((s: any) => {
       const d = new Date(s.movementDate || s.date);
+      const sName = s.itemName ? s.itemName.toLowerCase().trim() : "";
       if (
-        s.itemName === itemName &&
+        sName === matchedMasterNameNormalized &&
         isMatch(s.batchNumber) &&
         d < start
       ) {
@@ -191,8 +271,6 @@ const StockVouchers = () => {
     const finalRows: any[] = [];
 
     // Add Opening Row if there is a balance brought forward
-    // OR if we want to show "Opening Balance" explicitly at the top of the vouchers list
-    // usually Apna Book shows "Opening Balance" as the first line if it's non-zero
     if (Math.abs(accumulatedQty) > 0.001 || Math.abs(accumulatedValue) > 0.01) {
       finalRows.push({
         isOpening: true,
@@ -292,16 +370,11 @@ const StockVouchers = () => {
                           Opening Balance
                         </td>
 
-                        {/* Opening Inward */}
-                        <td className="border p-2 text-right text-sm font-bold">
-                          {r.closingQty !== "" ? Math.abs(r.closingQty) : ""}
-                        </td>
-                        <td className="border p-2 text-right text-sm font-bold">
-                          {r.closingValue !== ""
-                            ? Math.abs(r.closingValue).toFixed(2)
-                            : ""}
-                        </td>
+                        {/* Opening Inward: Empty */}
+                        <td className="border p-2 text-right text-sm font-bold"></td>
+                        <td className="border p-2 text-right text-sm font-bold"></td>
 
+                        {/* Opening Outward: Empty */}
                         <td className="border p-2 text-right text-sm"></td>
                         <td className="border p-2 text-right text-sm"></td>
 

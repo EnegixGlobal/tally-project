@@ -34,22 +34,10 @@ async function bulkInsertItems(items, connection, companyId, ownerType, ownerId)
 
     const values = [
       item.name,
-      item.stockGroupId || null,
       item.unit,
-      item.openingBalance || 0,
-      item.openingValue || 0,
       item.hsnCode || null,
-      item.gstRate || 0,
       item.taxType || "Taxable",
-      item.standardPurchaseRate || 0,
-      item.standardSaleRate || 0,
       item.enableBatchTracking ? 1 : 0,
-      item.allowNegativeStock ? 1 : 0,
-      item.maintainInPieces ? 1 : 0,
-      item.secondaryUnit || '',
-      item.batchName || item.batchNumber || null,
-      item.batchExpiryDate ? new Date(item.batchExpiryDate) : null,
-      item.batchManufacturingDate ? new Date(item.batchManufacturingDate) : null,
       companyId,
       ownerType,
       ownerId,
@@ -62,11 +50,9 @@ async function bulkInsertItems(items, connection, companyId, ownerType, ownerId)
     try {
       const [result] = await connection.execute(
         `INSERT INTO stock_items
-         (name, stockGroupId, unit, openingBalance, openingValue, hsnCode, gstRate, taxType,
-          standardPurchaseRate, standardSaleRate, enableBatchTracking, allowNegativeStock,
-          maintainInPieces, secondaryUnit, batchNumber, batchExpiryDate, batchManufacturingDate,
+         (name, unit, hsnCode, taxType, enableBatchTracking, 
           company_id, owner_type, owner_id, gstLedgerId, cgstLedgerId, sgstLedgerId, barcode)
-         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
         values
       );
 

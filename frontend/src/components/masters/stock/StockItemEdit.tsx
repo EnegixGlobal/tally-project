@@ -264,9 +264,6 @@ const StockItemEdit = () => {
     if (!formData.stockGroupId) newErrors.stockGroupId = 'Group is required';
     if (!formData.unit) newErrors.unit = 'Unit is required';
     if (!formData.taxType) newErrors.taxType = 'Tax Type is required';
-    if (formData.openingBalance < 0 && !formData.allowNegativeStock) {
-      newErrors.openingBalance = 'Opening Balance cannot be negative';
-    }
     if (formData.openingValue < 0) newErrors.openingValue = 'Opening Value cannot be negative';
     if (formData.standardPurchaseRate < 0) newErrors.standardPurchaseRate = 'Purchase Rate cannot be negative';
     if (formData.standardSaleRate < 0) newErrors.standardSaleRate = 'Sale Rate cannot be negative';
@@ -419,16 +416,7 @@ const StockItemEdit = () => {
             required
             error={errors.name}
           />
-          <SelectField
-            id="stockGroupId"
-            name="stockGroupId"
-            label="Group"
-            value={formData.stockGroupId}
-            onChange={handleChange}
-            options={stockGroupOptions}
-            required
-            error={errors.stockGroupId}
-          />
+
           <SelectField
             id="unit"
             name="unit"
@@ -439,24 +427,7 @@ const StockItemEdit = () => {
             required
             error={errors.unit}
           />
-          <InputField
-            id="openingBalance"
-            name="openingBalance"
-            label="Opening Balance"
-            type="number"
-            value={formData.openingBalance}
-            onChange={handleChange}
-            error={errors.openingBalance}
-          />
-          <InputField
-            id="openingValue"
-            name="openingValue"
-            label="Opening Value"
-            type="number"
-            value={formData.openingValue}
-            onChange={handleChange}
-            error={errors.openingValue}
-          />
+
           <SelectField
             id="taxType"
             name="taxType"
@@ -501,59 +472,8 @@ const StockItemEdit = () => {
               key="gstClassification-hsn"
             />
           )}
-          <SelectField
-            id="gstRateOption"
-            name="gstRateOption"
-            label="GST Rate Option"
-            value={formData.gstRateOption}
-            onChange={handleChange}
-            options={gstRateOptions}
-            required
-            error={errors.gstRateOption}
-          />
-          {formData.gstRateOption === 'specify-details' && (
-            <InputField
-              id="gstRate"
-              name="gstRate"
-              label="GST Rate (%)"
-              type="number"
-              value={formData.gstRate}
-              onChange={handleChange}
-              required
-              error={errors.gstRate}
-              key="gstRate"
-            />
-          )}
-          {formData.gstRateOption === 'use-classification' && (
-            <SelectField
-              id="gstClassification"
-              name="gstClassification"
-              label="GST Classification"
-              value={formData.gstClassification}
-              onChange={handleChange}
-              options={gstClassificationOptions}
-              error={errors.gstClassification}
-              key="gstClassification-rate"
-            />
-          )}
-          <InputField
-            id="standardPurchaseRate"
-            name="standardPurchaseRate"
-            label="Standard Purchase Rate"
-            type="number"
-            value={formData.standardPurchaseRate}
-            onChange={handleChange}
-            error={errors.standardPurchaseRate}
-          />
-          <InputField
-            id="standardSaleRate"
-            name="standardSaleRate"
-            label="Standard Sale Rate"
-            type="number"
-            value={formData.standardSaleRate}
-            onChange={handleChange}
-            error={errors.standardSaleRate}
-          />
+
+
           <div>
             <label className="flex items-center gap-2 text-sm font-medium">
               <input
@@ -577,62 +497,11 @@ const StockItemEdit = () => {
                 required
                 error={errors.batchName}
               />
-              <InputField
-                id="batchExpiryDate"
-                name="batchExpiryDate"
-                label="Expiry Date"
-                type="date"
-                value={formData.batchExpiryDate}
-                onChange={handleChange}
-                error={errors.batchExpiryDate}
-              />
-              <InputField
-                id="batchManufacturingDate"
-                name="batchManufacturingDate"
-                label="Manufacturing Date"
-                type="date"
-                value={formData.batchManufacturingDate}
-                onChange={handleChange}
-                error={errors.batchManufacturingDate}
-              />
+
             </>
           )}
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                name="allowNegativeStock"
-                checked={formData.allowNegativeStock}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              Allow Negative Stock
-            </label>
-          </div>
-          <div>
-            <label className="flex items-center gap-2 text-sm font-medium">
-              <input
-                type="checkbox"
-                name="maintainInPieces"
-                checked={formData.maintainInPieces}
-                onChange={handleChange}
-                className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-              />
-              Maintain in Pieces
-            </label>
-          </div>
-          {formData.maintainInPieces && (
-            <SelectField
-              id="secondaryUnit"
-              name="secondaryUnit"
-              label="Secondary Unit"
-              value={formData.secondaryUnit}
-              onChange={handleChange}
-              options={unitOptions}
-              required
-              error={errors.secondaryUnit}
-            />
-          )}
+
+
           <GodownAllocationField
             allocations={godownAllocations}
             setAllocations={setGodownAllocations}

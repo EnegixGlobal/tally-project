@@ -34,9 +34,8 @@ router.get("/item-by-barcode", async (req, res) => {
 
   try {
     const query = `
-      SELECT s.*, sg.name as stockGroupName, u.name as unitName
+      SELECT s.*, NULL as stockGroupName, u.name as unitName
       FROM stock_items s
-      LEFT JOIN stock_groups sg ON s.stockGroupId = sg.id
       LEFT JOIN stock_units u ON s.unit = u.id
       WHERE s.barcode = ? AND s.company_id = ? AND s.owner_type = ? AND s.owner_id = ?
     `;

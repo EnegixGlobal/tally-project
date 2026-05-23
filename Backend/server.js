@@ -1,4 +1,4 @@
-// ✅ server.js (Updated without express-session)
+// ✅ server.js (Updated without express-session) - Trigger restart to run migrations
 require("dotenv").config();
 const express = require("express");
 const mysql = require("mysql2");
