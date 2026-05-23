@@ -726,11 +726,8 @@ const ConsolidatedFinancialReport: React.FC = () => {
               {renderRowWithLedgers('Sales', -16, getSalesForCompany, getTotalSales())}
               {renderRowWithLedgers('Direct Income', -8, getDirectIncomeForCompany, getTotalDirectIncome())}
               {renderRowWithLedgers('Closing Stock', 'closing_stock', getCompanyClosingStock, companies.reduce((sum, c) => sum + getCompanyClosingStock(c.id), 0))}
-              {renderRowWithLedgers('Purchase', -15, getPurchaseForCompany, getTotalPurchase())}
-              {renderRowWithLedgers('Opening Stock', 'opening_stock', getCompanyOpeningStock, companies.reduce((sum, c) => sum + getCompanyOpeningStock(c.id), 0))}
-              {renderRowWithLedgers('Direct Expense', -7, getDirectExpenseForCompany, getTotalDirectExpense())}
 
-              {/* Totals for Trading Account */}
+              {/* Total of Credit side */}
               <tr className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-blue-50/50'} font-semibold`}>
                 <td className={tdClass}>Total of Credit side</td>
                 {companies.map(c => (
@@ -738,6 +735,12 @@ const ConsolidatedFinancialReport: React.FC = () => {
                 ))}
                 <td className={`${tdRightClass} text-indigo-600 font-bold`}>{formatINR(getTotalSales() + getTotalDirectIncome() + companies.reduce((sum, c) => sum + getCompanyClosingStock(c.id), 0))}</td>
               </tr>
+
+              {renderRowWithLedgers('Purchase', -15, getPurchaseForCompany, getTotalPurchase())}
+              {renderRowWithLedgers('Opening Stock', 'opening_stock', getCompanyOpeningStock, companies.reduce((sum, c) => sum + getCompanyOpeningStock(c.id), 0))}
+              {renderRowWithLedgers('Direct Expense', -7, getDirectExpenseForCompany, getTotalDirectExpense())}
+
+              {/* Total of Debit side */}
               <tr className={`text-xs ${isDark ? 'bg-gray-750' : 'bg-red-50/50'} font-semibold`}>
                 <td className={tdClass}>Total of Debit side</td>
                 {companies.map(c => (
