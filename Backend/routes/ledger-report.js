@@ -623,6 +623,7 @@ ORDER BY vm.date ASC
 
     // Sales Voucher → Credit
     salesVouchers.forEach((sv) => {
+      if (sv.mode && String(sv.mode).toLowerCase() === "accounting-invoice") return;
       let debit = 0;
       let credit = 0;
       let particulars = "";
