@@ -73,7 +73,11 @@ const ItemMonthlySummary = () => {
     const stockItemsData = (await stockItemRes.json()).data || [];
 
     // ✅ Get Opening Balance (Forward Calculation)
-    const itemData = stockItemsData.find((i: any) => i.name === itemName);
+    const normalizedItemName = itemName ? itemName.toLowerCase().trim() : "";
+    const itemData = stockItemsData.find((i: any) => i.name && i.name.toLowerCase().trim() === normalizedItemName);
+    const matchedMasterName = itemData ? itemData.name : itemName;
+    const matchedMasterNameNormalized = matchedMasterName ? matchedMasterName.toLowerCase().trim() : "";
+
     const isDefaultBatch = batchName === "Default";
 
     let openingQty = 0;
@@ -110,7 +114,8 @@ const ItemMonthlySummary = () => {
 
     // ✅ Filter Transactions
     const purchases = purchaseData.filter((p: any) => {
-      if (p.itemName !== itemName) return false;
+      const pName = p.itemName ? p.itemName.toLowerCase().trim() : "";
+      if (pName !== matchedMasterNameNormalized) return false;
       const pBatch = p.batchNumber || "Default";
       if (pBatch.toLowerCase() === batchName.toLowerCase()) return true;
       if (isDefaultBatch && (!p.batchNumber || p.batchNumber === "default" || p.batchNumber === "Default")) return true;
@@ -118,7 +123,8 @@ const ItemMonthlySummary = () => {
     });
 
     const sales = salesData.filter((s: any) => {
-      if (s.itemName !== itemName) return false;
+      const sName = s.itemName ? s.itemName.toLowerCase().trim() : "";
+      if (sName !== matchedMasterNameNormalized) return false;
       const sBatch = s.batchNumber || "Default";
       if (sBatch.toLowerCase() === batchName.toLowerCase()) return true;
       if (isDefaultBatch && (!s.batchNumber || s.batchNumber === "default" || s.batchNumber === "Default")) return true;
@@ -140,7 +146,7 @@ const ItemMonthlySummary = () => {
 
             if (!alreadyExists) {
               purchases.push({
-                itemName: itemName,
+                itemName: matchedMasterName,
                 hsnCode: itemData.hsnCode || "",
                 batchNumber: bName,
                 purchaseQuantity: Number(b.batchQuantity || 0),
@@ -160,7 +166,7 @@ const ItemMonthlySummary = () => {
 
             if (!alreadyExists) {
               sales.push({
-                itemName: itemName,
+                itemName: matchedMasterName,
                 hsnCode: itemData.hsnCode || "",
                 batchNumber: bName,
                 qtyChange: -Math.abs(Number(b.batchQuantity || 0)),

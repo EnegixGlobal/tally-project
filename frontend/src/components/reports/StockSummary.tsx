@@ -133,9 +133,19 @@ const StockSummary: React.FC = () => {
       const json = await response.json();
       // console.log("json", json.data);
       const formatted = Array.isArray(json.data)
-        ? json.data.map((item: any) => ({
-          itemName: item.name,
-          unitName: units.find((u) => u.id === item.unit)?.name ?? "",
+        ? json.data.map((item: any) => {
+          let matchedUnitName = item.unitName || "";
+          if (!matchedUnitName) {
+            const matchedUnit = units.find((u) => String(u.id) === String(item.unit));
+            if (matchedUnit && matchedUnit.name) {
+              matchedUnitName = matchedUnit.name;
+            } else if (item.unit && isNaN(Number(item.unit))) {
+              matchedUnitName = item.unit;
+            }
+          }
+          return {
+            itemName: item.name,
+            unitName: matchedUnitName,
           hsnCode: item.hsnCode || "",
           gstRate: Number(item.gstRate || 0),
           taxType: item.taxType || "",
@@ -165,7 +175,8 @@ const StockSummary: React.FC = () => {
             }
             return [];
           })(),
-        }))
+        };
+      })
         : [];
 
 
@@ -330,9 +341,18 @@ const StockSummary: React.FC = () => {
         {};
       if (Array.isArray(stockItemsData.data)) {
         stockItemsData.data.forEach((item: any) => {
+          let matchedUnitName = item.unitName || "";
+          if (!matchedUnitName) {
+            const matchedUnit = units.find((u) => String(u.id) === String(item.unit));
+            if (matchedUnit && matchedUnit.name) {
+              matchedUnitName = matchedUnit.name;
+            } else if (item.unit && isNaN(Number(item.unit))) {
+              matchedUnitName = item.unit;
+            }
+          }
           itemUnitMap[item.name] = {
             hsnCode: item.hsnCode || "",
-            unitName: units.find((u) => u.id === item.unit)?.name ?? "",
+            unitName: matchedUnitName,
           };
         });
       }
@@ -340,47 +360,62 @@ const StockSummary: React.FC = () => {
       // Track closing balance for each item and batch (only Purchase - Sales)
       // Batch-wise closing only for items with opening stock
       const closingMap: Record<string, Record<string, number>> = {};
-      const itemInfo: Record<string, { hsnCode: string; unitName: string }> =
-        {};
+      const itemInfo: Record<
+        string,
+        { originalName: string; hsnCode: string; unitName: string }
+      > = {};
       const movementCheck: Record<string, boolean> = {}; // Track movement
 
       // 1️⃣ Opening stock => default batch
       if (Array.isArray(stockItemsData.data)) {
         stockItemsData.data.forEach((item: any) => {
           const itemName = item.name;
+          const lookupKey = itemName.toLowerCase().trim();
 
-          closingMap[itemName] = {
+          closingMap[lookupKey] = {
             default: Number(item.openingBalance || 0),
           };
 
-          itemInfo[itemName] = {
+          let matchedUnitName = item.unitName || "";
+          if (!matchedUnitName) {
+            const matchedUnit = units.find((u) => String(u.id) === String(item.unit));
+            if (matchedUnit && matchedUnit.name) {
+              matchedUnitName = matchedUnit.name;
+            } else if (item.unit && isNaN(Number(item.unit))) {
+              matchedUnitName = item.unit;
+            }
+          }
+
+          itemInfo[lookupKey] = {
+            originalName: itemName,
             hsnCode: item.hsnCode || "",
-            unitName: units.find((u) => u.id === item.unit)?.name ?? "",
+            unitName: matchedUnitName,
           };
 
-          movementCheck[itemName] = false; // initially no movement
+          movementCheck[lookupKey] = false; // initially no movement
         });
       }
 
       // 2️⃣ Purchase
       const purchaseList = Array.isArray(purchaseData.data) ? purchaseData.data : [];
       purchaseList.forEach((v: any) => {
-        const itemName = v.itemName;
+        const lookupKey = v.itemName ? v.itemName.toLowerCase().trim() : "";
         const batch = v.batchNumber || "default";
         const qty = Number(v.purchaseQuantity || 0);
 
-        if (!closingMap[itemName]) return; // no opening => skip
+        if (!closingMap[lookupKey]) return; // no opening => skip
 
-        closingMap[itemName][batch] =
-          (closingMap[itemName][batch] || 0) + qty;
+        closingMap[lookupKey][batch] =
+          (closingMap[lookupKey][batch] || 0) + qty;
 
-        movementCheck[itemName] = true;
+        movementCheck[lookupKey] = true;
       });
 
       // Backfill imported purchases into closingMap
       if (Array.isArray(stockItemsData.data)) {
         stockItemsData.data.forEach((item: any) => {
           const itemName = item.name;
+          const lookupKey = itemName.toLowerCase().trim();
           if (item.batches && item.batches.length > 0) {
             item.batches.forEach((b: any) => {
               if (b.mode === "purchase") {
@@ -391,10 +426,10 @@ const StockSummary: React.FC = () => {
                     (p.batchNumber || "default").toLowerCase().trim() === batch.toLowerCase().trim()
                 );
 
-                if (!alreadyExists && closingMap[itemName]) {
-                  closingMap[itemName][batch] =
-                    (closingMap[itemName][batch] || 0) + Number(b.batchQuantity || 0);
-                  movementCheck[itemName] = true;
+                if (!alreadyExists && closingMap[lookupKey]) {
+                  closingMap[lookupKey][batch] =
+                    (closingMap[lookupKey][batch] || 0) + Number(b.batchQuantity || 0);
+                  movementCheck[lookupKey] = true;
                 }
               }
             });
@@ -405,26 +440,26 @@ const StockSummary: React.FC = () => {
       // 3️⃣ Sales
       if (Array.isArray(salesData.data)) {
         salesData.data.forEach((v: any) => {
-          const itemName = v.itemName;
+          const lookupKey = v.itemName ? v.itemName.toLowerCase().trim() : "";
           const batch = v.batchNumber || "default";
           const qty = Math.abs(Number(v.qtyChange || 0));
 
-          if (!closingMap[itemName]) return;
+          if (!closingMap[lookupKey]) return;
 
-          closingMap[itemName][batch] =
-            (closingMap[itemName][batch] || 0) - qty;
+          closingMap[lookupKey][batch] =
+            (closingMap[lookupKey][batch] || 0) - qty;
 
-          movementCheck[itemName] = true;
+          movementCheck[lookupKey] = true;
         });
       }
 
       // 4️⃣ Format Closing Data and Update State
       const formattedData: any[] = [];
-      Object.entries(closingMap).forEach(([itemName, batches]) => {
-        const info = itemInfo[itemName] || { hsnCode: "", unitName: "" };
+      Object.entries(closingMap).forEach(([lookupKey, batches]) => {
+        const info = itemInfo[lookupKey] || { originalName: "", hsnCode: "", unitName: "" };
         Object.entries(batches).forEach(([batchNumber, closingQty]) => {
           formattedData.push({
-            itemName,
+            itemName: info.originalName,
             unitName: info.unitName,
             hsnCode: info.hsnCode,
             batchNumber: batchNumber === "default" ? "Default" : batchNumber,
@@ -474,11 +509,24 @@ const StockSummary: React.FC = () => {
       // 1️⃣ OPENING STOCK (BATCH-WISE)
       stockItemsList.forEach((item: any) => {
         const itemName = item.name;
-        itemMap[itemName] = {
+        const lookupKey = itemName.toLowerCase().trim();
+
+        let matchedUnitName = item.unitName || "";
+        if (!matchedUnitName) {
+          const matchedUnit = units.find((u) => String(u.id) === String(item.unit));
+          if (matchedUnit && matchedUnit.name) {
+            matchedUnitName = matchedUnit.name;
+          } else if (item.unit && isNaN(Number(item.unit))) {
+            matchedUnitName = item.unit;
+          }
+        }
+
+        const itemObj = {
           itemName: itemName,
-          unitName: units.find((u) => u.id === item.unit)?.name ?? "",
+          unitName: matchedUnitName,
           batches: {},
         };
+        itemMap[lookupKey] = itemObj;
 
         let batchesProcessed = false;
 
@@ -486,8 +534,8 @@ const StockSummary: React.FC = () => {
           item.batches.forEach((b: any) => {
             const batchName = b.batchName || "Default";
 
-            if (!itemMap[itemName].batches[batchName]) {
-              itemMap[itemName].batches[batchName] = {
+            if (!itemObj.batches[batchName]) {
+              itemObj.batches[batchName] = {
                 batchName: batchName,
                 opening: { qty: 0, rate: 0, value: 0 },
                 inward: { qty: 0, rate: 0, value: 0 },
@@ -496,7 +544,7 @@ const StockSummary: React.FC = () => {
               };
             }
 
-            const batch = itemMap[itemName].batches[batchName];
+            const batch = itemObj.batches[batchName];
 
             if (b.mode === "purchase") {
               // Store imported purchase batch data so we can backfill if purchase_history is missing it
@@ -518,8 +566,8 @@ const StockSummary: React.FC = () => {
         // If no batches were processed (or explicitly empty), but item has master opening balance
         if (!batchesProcessed && (Number(item.openingBalance) > 0 || Number(item.quantity) > 0)) {
           const batchName = "Default";
-          if (!itemMap[itemName].batches[batchName]) {
-            itemMap[itemName].batches[batchName] = {
+          if (!itemObj.batches[batchName]) {
+            itemObj.batches[batchName] = {
               batchName: batchName,
               opening: { qty: 0, rate: 0, value: 0 },
               inward: { qty: 0, rate: 0, value: 0 },
@@ -528,7 +576,7 @@ const StockSummary: React.FC = () => {
             };
           }
 
-          const batch = itemMap[itemName].batches[batchName];
+          const batch = itemObj.batches[batchName];
           const opQty = Number(item.openingBalance || item.quantity || 0);
           const opRate = Number(item.openingRate || item.rate || 0); // Check field names from API
 
@@ -540,7 +588,8 @@ const StockSummary: React.FC = () => {
 
       // 2️⃣ PURCHASES (INWARD)
       purchaseList.forEach((p: any) => {
-        const item = itemMap[p.itemName];
+        const lookupKey = p.itemName ? p.itemName.toLowerCase().trim() : "";
+        const item = itemMap[lookupKey];
         if (!item) return;
 
         const batchName = p.batchNumber || "Default";
@@ -564,7 +613,8 @@ const StockSummary: React.FC = () => {
 
       // 3️⃣ SALES (OUTWARD)
       salesList.forEach((s: any) => {
-        const item = itemMap[s.itemName];
+        const lookupKey = s.itemName ? s.itemName.toLowerCase().trim() : "";
+        const item = itemMap[lookupKey];
         if (!item) return;
 
         const batchName = s.batchNumber || "Default";
@@ -1525,7 +1575,7 @@ const StockSummary: React.FC = () => {
                               </td>
 
                               <td className="border p-2 text-right align-middle">
-                                {totals.openingQty || ""}
+                                {totals.openingQty ? `${totals.openingQty} ${item.unitName}`.trim() : ""}
                               </td>
                               <td className="border p-2 text-right align-middle">
                                 {formatCurrency(openingRate)}
@@ -1535,7 +1585,7 @@ const StockSummary: React.FC = () => {
                               </td>
 
                               <td className="border p-2 text-right align-middle">
-                                {totals.inwardQty || ""}
+                                {totals.inwardQty ? `${totals.inwardQty} ${item.unitName}`.trim() : ""}
                               </td>
                               <td className="border p-2 text-right align-middle">
                                 {formatCurrency(inwardRate)}
@@ -1545,7 +1595,7 @@ const StockSummary: React.FC = () => {
                               </td>
 
                               <td className="border p-2 text-right align-middle">
-                                {totals.outwardQty || ""}
+                                {totals.outwardQty ? `${totals.outwardQty} ${item.unitName}`.trim() : ""}
                               </td>
                               <td className="border p-2 text-right align-middle">
                                 {formatCurrency(outwardRate)}
@@ -1555,7 +1605,7 @@ const StockSummary: React.FC = () => {
                               </td>
 
                               <td className="border p-2 text-right align-middle">
-                                {Math.abs(totals.closingQty)}
+                                {totals.closingQty ? `${Math.abs(totals.closingQty)} ${item.unitName}`.trim() : ""}
                               </td>
                               <td className="border p-2 text-right align-middle">
                                 {formatCurrency(Math.abs(closingRate))}
@@ -1590,7 +1640,7 @@ const StockSummary: React.FC = () => {
                                     </td>
 
                                     <td className="border p-2 text-right align-middle">
-                                      {b.opening.qty || ""}
+                                      {b.opening.qty ? `${b.opening.qty} ${item.unitName}`.trim() : ""}
                                     </td>
                                     <td className="border p-2 text-right align-middle">
                                       {formatCurrency(b.opening.rate)}
@@ -1600,7 +1650,7 @@ const StockSummary: React.FC = () => {
                                     </td>
 
                                     <td className="border p-2 text-right align-middle">
-                                      {b.inward.qty || ""}
+                                      {b.inward.qty ? `${b.inward.qty} ${item.unitName}`.trim() : ""}
                                     </td>
                                     <td className="border p-2 text-right align-middle">
                                       {b.inward.rate
@@ -1614,7 +1664,7 @@ const StockSummary: React.FC = () => {
                                     </td>
 
                                     <td className="border p-2 text-right align-middle">
-                                      {b.outward.qty || ""}
+                                      {b.outward.qty ? `${b.outward.qty} ${item.unitName}`.trim() : ""}
                                     </td>
                                     <td className="border p-2 text-right align-middle">
                                       {b.outward.rate
@@ -1628,7 +1678,7 @@ const StockSummary: React.FC = () => {
                                     </td>
 
                                     <td className="border p-2 text-right align-middle">
-                                      {Math.abs(b.closing.qty)}
+                                      {b.closing.qty ? `${Math.abs(b.closing.qty)} ${item.unitName}`.trim() : ""}
                                     </td>
                                     <td className="border p-2 text-right align-middle">
                                       {formatCurrency(Math.abs(b.closing.rate))}
