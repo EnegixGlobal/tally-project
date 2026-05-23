@@ -219,9 +219,13 @@ const SalesReport: React.FC = () => {
     > = {};
 
     filteredVouchers.forEach((voucher) => {
+      let voucherDebit = 0;
+      let voucherCredit = 0;
+
       // 1️⃣ PARTY SIDE (Debit / Asset - Sundry Debtors)
       const groupName = voucher.groupName || "Sundry Debtors";
       const partyAmount = Number(voucher.netAmount || voucher.total || 0);
+      voucherDebit += partyAmount;
 
       if (!groups[groupName]) {
         groups[groupName] = {
@@ -234,7 +238,7 @@ const SalesReport: React.FC = () => {
       groups[groupName].totalDebit += partyAmount;
 
       const existingParty = groups[groupName].transactions.find(
-        (t) => t.name === (voucher.partyName || "Unknown Party")
+        (t) => t.name.toLowerCase() === (voucher.partyName || "Unknown Party").toLowerCase()
       );
 
       if (existingParty) {
@@ -283,13 +287,15 @@ const SalesReport: React.FC = () => {
 
           if (isDebit) {
             groups[itemGroupName].totalDebit += itemAmount;
+            voucherDebit += itemAmount;
           } else {
             groups[itemGroupName].totalCredit += itemAmount;
+            voucherCredit += itemAmount;
           }
 
           const ledgerName = item.salesLedgerName || "Unknown Sales Ledger";
           const existingItem = groups[itemGroupName].transactions.find(
-            (t) => t.name === ledgerName
+            (t) => t.name.toLowerCase() === ledgerName.toLowerCase()
           );
 
           if (existingItem) {
@@ -330,9 +336,10 @@ const SalesReport: React.FC = () => {
         ) => {
           if (amount > 0) {
             groups[taxGroupName].totalCredit += amount;
+            voucherCredit += amount;
 
             const existingTax = groups[taxGroupName].transactions.find(
-              (t) => t.name === defaultName
+              (t) => t.name.toLowerCase() === defaultName.toLowerCase()
             );
 
             if (existingTax) {
@@ -377,6 +384,7 @@ const SalesReport: React.FC = () => {
           const discountAmt = Number(item.discount || 0);
           if (discountAmt > 0) {
             totalVoucherDiscountSeen += discountAmt;
+            voucherDebit += discountAmt;
             const ledgerName = item.discountLedgerName || "Discount to Customer 1%";
 
             if (!groups[expGroupName]) {
@@ -384,7 +392,9 @@ const SalesReport: React.FC = () => {
             }
             groups[expGroupName].totalDebit += discountAmt;
 
-            const existingExp = groups[expGroupName].transactions.find(t => t.name === ledgerName);
+            const existingExp = groups[expGroupName].transactions.find(
+              (t) => t.name.toLowerCase() === ledgerName.toLowerCase()
+            );
             if (existingExp) {
               existingExp.debit += discountAmt;
             } else {
@@ -397,6 +407,7 @@ const SalesReport: React.FC = () => {
       // Check voucher level overall discount
       const globalDiscount = Number(voucher.overallDiscount || voucher.discountTotal || 0);
       if (globalDiscount > 0) {
+        voucherDebit += globalDiscount;
         const ledgerName = voucher.overallDiscountLedgerName || "Discount to Customer 1%";
 
         if (!groups[expGroupName]) {
@@ -404,11 +415,57 @@ const SalesReport: React.FC = () => {
         }
         groups[expGroupName].totalDebit += globalDiscount;
 
-        const existingExp = groups[expGroupName].transactions.find(t => t.name === ledgerName);
+        const existingExp = groups[expGroupName].transactions.find(
+          (t) => t.name.toLowerCase() === ledgerName.toLowerCase()
+        );
         if (existingExp) {
           existingExp.debit += globalDiscount;
         } else {
           groups[expGroupName].transactions.push({ name: ledgerName, debit: globalDiscount, credit: 0 });
+        }
+      }
+
+      // 5️⃣ AUTO-BALANCING ROUNDING CHECK (per voucher)
+      const diff = voucherCredit - voucherDebit;
+      if (Math.abs(diff) > 0.01) {
+        const roundGroupName = "Indirect Expenses";
+        const roundLedgerName = "Rounding Off";
+
+        if (!groups[roundGroupName]) {
+          groups[roundGroupName] = { totalDebit: 0, totalCredit: 0, transactions: [] };
+        }
+
+        if (diff > 0) {
+          // More Credit than Debit -> Add to Debit
+          groups[roundGroupName].totalDebit += diff;
+          const existing = groups[roundGroupName].transactions.find(
+            (t) => t.name.toLowerCase() === roundLedgerName.toLowerCase()
+          );
+          if (existing) {
+            existing.debit += diff;
+          } else {
+            groups[roundGroupName].transactions.push({
+              name: roundLedgerName,
+              debit: diff,
+              credit: 0,
+            });
+          }
+        } else {
+          // More Debit than Credit -> Add to Credit
+          const absDiff = Math.abs(diff);
+          groups[roundGroupName].totalCredit += absDiff;
+          const existing = groups[roundGroupName].transactions.find(
+            (t) => t.name.toLowerCase() === roundLedgerName.toLowerCase()
+          );
+          if (existing) {
+            existing.credit += absDiff;
+          } else {
+            groups[roundGroupName].transactions.push({
+              name: roundLedgerName,
+              debit: 0,
+              credit: absDiff,
+            });
+          }
         }
       }
     });
