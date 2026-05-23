@@ -290,11 +290,11 @@ router.post("/purchase_import", async (req, res) => {
             const historyValues = [];
             for (const row of group.items) {
                 const batchNo = row["Batch No"] ? String(row["Batch No"]).trim() : "";
-                if (batchNo) {
+                if (row["Item Name"]) {
                     historyValues.push([
                         row["Item Name"] || "",
                         row["HSN Code"] || "",
-                        batchNo,
+                        batchNo || "",
                         Number(row.Quantity || 0),
                         header.Date, // purchaseDate
                         companyId,
@@ -633,11 +633,11 @@ router.post("/sales_import", async (req, res) => {
             const historyValues = [];
             for (const row of group.items) {
                 const batchNo = row["Batch No"] ? String(row["Batch No"]).trim() : "";
-                if (batchNo) {
+                if (row["Item Name"]) {
                     historyValues.push([
                         row["Item Name"] || "",
                         row["HSN Code"] || "",
-                        batchNo,
+                        batchNo || "",
                         Number(row.Quantity || 0), // qtyChange
                         Number(row.Rate || 0),
                         header.Date, // movementDate
@@ -1659,10 +1659,10 @@ router.post("/purchase_summary_import", async (req, res) => {
                     }
                 }
 
-                if (pi.batchNo && pi.itemId) {
+                if (pi.itemId) {
                     // 2. Insert into purchase_history
                     const historyValues = [[
-                        pi.itemName, pi.hsnCode, pi.batchNo, pi.quantity, date,
+                        pi.itemName, pi.hsnCode, pi.batchNo || "", pi.quantity, date,
                         companyId, ownerType, ownerId, "purchase", pi.rate, voucherNumber, null
                     ]];
                     await db.query(`INSERT INTO purchase_history (itemName, hsnCode, batchNumber, purchaseQuantity, purchaseDate, companyId, ownerType, ownerId, type, rate, voucherNumber, godownId) VALUES ?`, [historyValues]);
@@ -1958,9 +1958,9 @@ router.post("/sales_summary_import", async (req, res) => {
                     }
                 }
 
-                if (pi.batchNo && pi.itemId) {
+                if (pi.itemId) {
                     const historyValues = [[
-                        pi.itemName, pi.hsnCode, pi.batchNo, pi.quantity, pi.rate, date,
+                        pi.itemName, pi.hsnCode, pi.batchNo || "", pi.quantity, pi.rate, date,
                         null, voucherNumber, companyId, ownerType, ownerId
                     ]];
                     await db.query(`INSERT INTO sale_history (itemName, hsnCode, batchNumber, qtyChange, rate, movementDate, godownId, voucherNumber, companyId, ownerType, ownerId) VALUES ?`, [historyValues]);

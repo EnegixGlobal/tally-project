@@ -69,9 +69,60 @@ const StockVouchers = () => {
     // 🔹 Match Logic Helper (Consistent with ItemMonthlySummary)
     const isMatch = (itemBatch: string | null | undefined) => {
       if (itemBatch === batchName) return true;
-      if (isDefaultBatch && (!itemBatch || itemBatch === "default")) return true;
+      if (isDefaultBatch && (!itemBatch || itemBatch === "default" || itemBatch === "Default")) return true;
       return false;
     };
+
+    // Backfill imported purchases from stock items batches
+    if (itemData && itemData.batches && Array.isArray(itemData.batches)) {
+      itemData.batches.forEach((b: any) => {
+        if (b.mode === "purchase") {
+          const bName = b.batchName || "Default";
+          const matchBatch = isMatch(bName);
+          if (matchBatch) {
+            const alreadyExists = purchases.some((p: any) => {
+              const pBatch = p.batchNumber || "Default";
+              return pBatch.toLowerCase() === bName.toLowerCase() && p.itemName === itemName;
+            });
+
+            if (!alreadyExists) {
+              purchases.push({
+                itemName: itemName,
+                hsnCode: itemData.hsnCode || "",
+                batchNumber: bName,
+                purchaseQuantity: Number(b.batchQuantity || 0),
+                rate: Number(b.openingRate || 0),
+                purchaseDate: itemData.createdAt ? itemData.createdAt.split(" ")[0] : new Date().toISOString().split("T")[0],
+                partyName: "Imported Purchase",
+                voucherNumber: "Imported",
+              });
+            }
+          }
+        } else if (b.mode === "sales") {
+          const bName = b.batchName || "Default";
+          const matchBatch = isMatch(bName);
+          if (matchBatch) {
+            const alreadyExists = sales.some((s: any) => {
+              const sBatch = s.batchNumber || "Default";
+              return sBatch.toLowerCase() === bName.toLowerCase() && s.itemName === itemName;
+            });
+
+            if (!alreadyExists) {
+              sales.push({
+                itemName: itemName,
+                hsnCode: itemData.hsnCode || "",
+                batchNumber: bName,
+                qtyChange: -Math.abs(Number(b.batchQuantity || 0)),
+                rate: Number(b.openingRate || 0),
+                movementDate: itemData.createdAt ? itemData.createdAt.split(" ")[0] : new Date().toISOString().split("T")[0],
+                partyName: "Imported Sales",
+                voucherNumber: "Imported",
+              });
+            }
+          }
+        }
+      });
+    }
 
     /* ------------------------------------------------------------------
      * 1. Calculate Opening Balance (Forward Calculation)
