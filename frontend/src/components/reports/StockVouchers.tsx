@@ -343,16 +343,11 @@ const StockVouchers = () => {
                           Opening Balance
                         </td>
 
-                        {/* Opening Inward */}
-                        <td className="border p-2 text-right text-sm font-bold">
-                          {r.closingQty !== "" ? Math.abs(r.closingQty) : ""}
-                        </td>
-                        <td className="border p-2 text-right text-sm font-bold">
-                          {r.closingValue !== ""
-                            ? Math.abs(r.closingValue).toFixed(2)
-                            : ""}
-                        </td>
+                        {/* Opening Inward: Empty */}
+                        <td className="border p-2 text-right text-sm font-bold"></td>
+                        <td className="border p-2 text-right text-sm font-bold"></td>
 
+                        {/* Opening Outward: Empty */}
                         <td className="border p-2 text-right text-sm"></td>
                         <td className="border p-2 text-right text-sm"></td>
 
