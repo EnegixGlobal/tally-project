@@ -805,59 +805,8 @@ const StockPerchaseItem = () => {
                 key="gstClassification-hsn"
               />
             )}
-            <SelectField
-              id="gstRateOption"
-              name="gstRateOption"
-              label="GST Rate Option"
-              value={formData.gstRateOption}
-              onChange={handleChange}
-              options={gstRateOptions}
-              required
-              error={errors.gstRateOption}
-            />
-            {formData.gstRateOption === "specify-details" && (
-              <InputField
-                id="gstRate"
-                name="gstRate"
-                label="GST Rate (%)"
-                type="number"
-                value={formData.gstRate}
-                onChange={handleChange}
-                required
-                error={errors.gstRate}
-                key="gstRate"
-              />
-            )}
-            {formData.gstRateOption === "use-classification" && (
-              <SelectField
-                id="gstClassification"
-                name="gstClassification"
-                label="GST Classification"
-                value={formData.gstClassification}
-                onChange={handleChange}
-                options={gstClassificationOptions}
-                error={errors.gstClassification}
-                key="gstClassification-rate"
-              />
-            )}
-            <InputField
-              id="standardPurchaseRate"
-              name="standardPurchaseRate"
-              label="Standard Purchase Rate"
-              type="number"
-              value={formData.standardPurchaseRate}
-              onChange={handleChange}
-              error={errors.standardPurchaseRate}
-            />
-            <InputField
-              id="standardSaleRate"
-              name="standardSaleRate"
-              label="Standard Sale Rate"
-              type="number"
-              value={formData.standardSaleRate}
-              onChange={handleChange}
-              error={errors.standardSaleRate}
-            />
+
+
 
             {/* ----------------- Batch Tracking Dynamic Rows ----------------- */}
             <div className="flex justify-between items-center mt-4">
@@ -994,18 +943,7 @@ const StockPerchaseItem = () => {
 
             {/* ---------------------------------------------------------------- */}
 
-            <div>
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  name="allowNegativeStock"
-                  checked={formData.allowNegativeStock}
-                  onChange={handleChange}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                Allow Negative Stock
-              </label>
-            </div>
+
             <div></div>
             {barcode && (
               <div className="mb-4">

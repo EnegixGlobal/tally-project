@@ -30,10 +30,6 @@ router.get('/api/stock-summary', async (req, res) => {
       filters.push('vm.date BETWEEN ? AND ?');
       params.push(fromDate, toDate);
     }
-    if (stockGroupId) {
-      filters.push('si.stockGroupId = ?');
-      params.push(stockGroupId);
-    }
     if (stockItemId) {
       filters.push('si.id = ?');
       params.push(stockItemId);
@@ -64,10 +60,10 @@ router.get('/api/stock-summary', async (req, res) => {
   si.id as itemId,
   si.name,
   si.unit,
-  si.stockGroupId,
-  si.openingBalance,
-  si.standardPurchaseRate,
-  si.standardSaleRate,
+  NULL AS stockGroupId,
+  0.00 AS openingBalance,
+  0.00 AS standardPurchaseRate,
+  0.00 AS standardSaleRate,
   SUM(CASE WHEN ve.entry_type IN ('debit', 'destination') THEN svi.quantity ELSE 0 END) as inwardQty,
   SUM(CASE WHEN ve.entry_type IN ('credit', 'source') THEN svi.quantity ELSE 0 END) as outwardQty,
   SUM(CASE WHEN ve.entry_type IN ('debit', 'destination') THEN ve.amount ELSE 0 END) as inwardValue,
@@ -80,9 +76,8 @@ WHERE vm.date BETWEEN ? AND ?
   AND vm.company_id = ?
   AND vm.owner_type = ?
   AND vm.owner_id = ?
-GROUP BY si.id, si.name, si.unit, si.stockGroupId, si.openingBalance, si.standardPurchaseRate, si.standardSaleRate
+GROUP BY si.id, si.name, si.unit
 ORDER BY si.name;
-
     `;
 
     const [rows] = await pool.query(sql, params);

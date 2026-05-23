@@ -1423,7 +1423,7 @@ router.post("/purchase_summary_import", async (req, res) => {
         );
 
         const [stockItems] = await db.execute(
-            "SELECT id, name, batches, openingBalance FROM stock_items WHERE company_id=?",
+            "SELECT id, name, batches, 0.00 AS openingBalance FROM stock_items WHERE company_id=?",
             [companyId]
         );
 
@@ -1655,8 +1655,7 @@ router.post("/purchase_summary_import", async (req, res) => {
                             });
                         }
 
-                        const newTotalBalance = (Number(stockItem.openingBalance) || 0) + pi.quantity;
-                        await db.execute("UPDATE stock_items SET batches = ?, openingBalance = ? WHERE id = ?", [JSON.stringify(dbBatches), newTotalBalance, pi.itemId]);
+                        await db.execute("UPDATE stock_items SET batches = ? WHERE id = ?", [JSON.stringify(dbBatches), pi.itemId]);
                     }
                 }
 
@@ -1726,7 +1725,7 @@ router.post("/sales_summary_import", async (req, res) => {
         );
 
         const [stockItems] = await db.execute(
-            "SELECT id, name, batches, openingBalance FROM stock_items WHERE company_id=?",
+            "SELECT id, name, batches, 0.00 AS openingBalance FROM stock_items WHERE company_id=?",
             [companyId]
         );
 
@@ -1955,8 +1954,7 @@ router.post("/sales_summary_import", async (req, res) => {
                             dbBatches[existingBatchIndex].batchQuantity = (Number(dbBatches[existingBatchIndex].batchQuantity) || 0) - pi.quantity;
                         }
 
-                        const newTotalBalance = (Number(stockItem.openingBalance) || 0) - pi.quantity;
-                        await db.execute("UPDATE stock_items SET batches = ?, openingBalance = ? WHERE id = ?", [JSON.stringify(dbBatches), newTotalBalance, pi.itemId]);
+                        await db.execute("UPDATE stock_items SET batches = ? WHERE id = ?", [JSON.stringify(dbBatches), pi.itemId]);
                     }
                 }
 

@@ -36,20 +36,17 @@ router.get("/", async (req, res) => {
       SELECT 
         s.id,
         s.name,
-        s.stockGroupId,
-        sg.name AS stockGroupName,
+        NULL AS stockGroupId,
+        NULL AS stockGroupName,
         s.unit,
         u.name AS unitName,
-        s.openingBalance,
+        0.00 AS openingBalance,
         s.hsnCode,
         s.taxType,
-
-     
         s.gstLedgerId,
         s.cgstLedgerId,
         s.sgstLedgerId,
         s.attributeId,
-
         s.barcode,
         s.batches,
         s.type,
@@ -58,7 +55,6 @@ router.get("/", async (req, res) => {
         s.owner_type,
         s.owner_id
       FROM stock_items s
-      LEFT JOIN stock_groups sg ON s.stockGroupId = sg.id
       LEFT JOIN stock_units u ON s.unit = u.id
       WHERE 1 = 1
     `;
@@ -396,12 +392,6 @@ router.post("/", upload.single("image"), async (req, res) => {
 
     // 🔒 REQUIRED SAFE COLUMNS (LOCAL + PROD)
     await ensureColumn("stock_items", "categoryId", "VARCHAR(50) NULL");
-    await ensureColumn("stock_items", "stockGroupId", "INT(11) NULL");
-    await ensureColumn(
-      "stock_items",
-      "openingValue",
-      "DECIMAL(10,2) DEFAULT 0"
-    );
     await ensureColumn("stock_items", "type", "VARCHAR(50) DEFAULT 'opening'");
     await ensureColumn(
       "stock_items",
@@ -590,24 +580,15 @@ router.post("/", upload.single("image"), async (req, res) => {
     const insertQuery = `
   INSERT INTO stock_items (
     name,
-    stockGroupId,
     categoryId,
     unit,
-    openingBalance,
-    openingValue,
     hsnCode,
-    gstRate,
     taxType,
-
     gstLedgerId,
     cgstLedgerId,
     sgstLedgerId,
     attributeId,
-
     enableBatchTracking,
-    allowNegativeStock,
-    maintainInPieces,
-    secondaryUnit,
     barcode,
     batches,
     company_id,
@@ -615,30 +596,20 @@ router.post("/", upload.single("image"), async (req, res) => {
     owner_id,
     type,
     image
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
     const values = [
       name,
-      sanitize(stockGroupId),
       sanitize(categoryId),
       sanitize(unit),
-      openingBalance ?? 0,
-      totalOpeningValue ?? 0,
       sanitize(hsnCode),
-      safeNumber(gstRate, 0),
       taxType,
-
-      // 🔥 LEDGER IDS — AB 100% SAVE HONGE
       sanitize(gstLedgerId),
       sanitize(cgstLedgerId),
       sanitize(sgstLedgerId),
       sanitize(attributeId),
-
       enableBatchTracking ? 1 : 0,
-      allowNegativeStock ? 1 : 0,
-      maintainInPieces ? 1 : 0,
-      sanitize(secondaryUnit),
       sanitize(barcode),
       JSON.stringify(batchData),
       sanitize(company_id),
@@ -948,12 +919,11 @@ router.get("/barcode/:barcode", async (req, res) => {
   try {
     const [rows] = await connection.execute(
       `SELECT 
-        s.id, s.name, s.stockGroupId, s.unit, s.openingBalance,
-        s.hsnCode, s.gstRate, s.taxType, s.barcode,
-        sg.name AS stockGroupName,
+        s.id, s.name, NULL AS stockGroupId, s.unit, 0.00 AS openingBalance,
+        s.hsnCode, 0.00 AS gstRate, s.taxType, s.barcode,
+        NULL AS stockGroupName,
         u.name AS unitName
       FROM stock_items s
-      LEFT JOIN stock_groups sg ON s.stockGroupId = sg.id
       LEFT JOIN stock_units u ON s.unit = u.id
       WHERE s.barcode = ?`,
       [barcode]
@@ -1343,12 +1313,6 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 
     // Ensure required columns
     await ensureColumn("stock_items", "categoryId", "VARCHAR(50) NULL");
-    await ensureColumn("stock_items", "stockGroupId", "INT(11) NULL");
-    await ensureColumn(
-      "stock_items",
-      "openingValue",
-      "DECIMAL(10,2) DEFAULT 0"
-    );
     await ensureColumn("stock_items", "gstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
@@ -1462,24 +1426,15 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     const updateQuery = `
       UPDATE stock_items SET 
         name = ?,
-        stockGroupId = ?,
         categoryId = ?,
         unit = ?,
-        openingBalance = ?,
-        openingValue = ?,
         hsnCode = ?,
-        gstRate = ?,
-          gstLedgerId = ?,
-  cgstLedgerId = ?,
-  sgstLedgerId = ?,
-  attributeId = ?,
+        gstLedgerId = ?,
+        cgstLedgerId = ?,
+        sgstLedgerId = ?,
+        attributeId = ?,
         taxType = ?,
-        standardPurchaseRate = ?,
-        standardSaleRate = ?,
         enableBatchTracking = ?,
-        allowNegativeStock = ?,
-        maintainInPieces = ?,
-        secondaryUnit = ?,
         batches = ?,
         barcode = ?,
         company_id = ?,
@@ -1491,24 +1446,15 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 
     const values = [
       sanitize(name),
-      sanitize(stockGroupId),
       sanitize(categoryId),
       sanitize(unit),
-      openingBalance ?? 0,
-      totalOpeningValue ?? 0,
       sanitize(hsnCode),
-      gstRate ?? 0,
       sanitize(gstLedgerId),
       sanitize(cgstLedgerId),
       sanitize(sgstLedgerId),
       sanitize(attributeId),
       taxType ?? "Taxable",
-      standardPurchaseRate ?? 0,
-      standardSaleRate ?? 0,
       enableBatchTracking ? 1 : 0,
-      allowNegativeStock ? 1 : 0,
-      maintainInPieces ? 1 : 0,
-      sanitize(secondaryUnit),
       JSON.stringify(batchData),
       sanitize(barcode),
       sanitize(company_id),
@@ -1595,14 +1541,14 @@ router.get("/:id", async (req, res) => {
       SELECT 
         s.id,
         s.name,
-        s.stockGroupId,
+        NULL AS stockGroupId,
         s.categoryId,
-        sg.name AS stockGroupName,
+        NULL AS stockGroupName,
         s.unit,
         u.name AS unitName,
-        s.openingBalance,
+        0.00 AS openingBalance,
         s.hsnCode,
-        s.gstRate,
+        0.00 AS gstRate,
         s.gstLedgerId,
         s.cgstLedgerId,
         s.sgstLedgerId,
@@ -1615,7 +1561,6 @@ router.get("/:id", async (req, res) => {
         s.owner_type,
         s.owner_id
       FROM stock_items s
-      LEFT JOIN stock_groups sg ON s.stockGroupId = sg.id
       LEFT JOIN stock_units u ON s.unit = u.id
       WHERE s.id = ?
     `;
@@ -1725,7 +1670,7 @@ router.patch("/:id/batches", async (req, res) => {
 
     const item = rows[0];
     let batches = JSON.parse(item.batches || "[]");
-    const allowNegative = item.allowNegativeStock === 1;
+    const allowNegative = true; // Always allow negative stock
 
     // ====================================================================
     // ✅ SMART LOGIC: Handle empty/null batchName (no-batch selection)

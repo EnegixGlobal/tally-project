@@ -1432,111 +1432,23 @@ const SalesVoucher: React.FC = () => {
         const oldQty = Number(entry.quantity || 0);
         const newQty = Number(value || 0);
 
-        // 🟢 If NO batch system → check for a null-name purchase batch first
-        if (!entry.batches || entry.batches.length === 0) {
-          updatedEntries[index].quantity = newQty;
-          updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-          setFormData((p) => ({ ...p, entries: updatedEntries }));
-          return;
-        }
+        updatedEntries[index].quantity = newQty;
 
-        // 🟡 If batch exists but no batch selected
-        if (!entry.batchNumber) {
-          // update UI first
-          updatedEntries[index].quantity = newQty;
-
-          // Recalculate discount if percentage ledger selected
-          if (updatedEntries[index].discountLedgerId) {
-            const ledger = safeLedgers.find(l => String(l.id) === String(updatedEntries[index].discountLedgerId));
-            if (ledger) {
-              const m = ledger.name.match(/(\d+(\.\d+)?)/);
-              const percent = m ? Number(m[1]) : 0;
-              if (percent > 0) {
-                const baseAmount = newQty * (Number(updatedEntries[index].rate) || 0);
-                updatedEntries[index].discount = (baseAmount * percent) / 100;
-              }
+        // Recalculate discount if percentage ledger selected
+        if (updatedEntries[index].discountLedgerId) {
+          const ledger = safeLedgers.find(l => String(l.id) === String(updatedEntries[index].discountLedgerId));
+          if (ledger) {
+            const m = ledger.name.match(/(\d+(\.\d+)?)/);
+            const percent = m ? Number(m[1]) : 0;
+            if (percent > 0) {
+              const baseAmount = newQty * (Number(updatedEntries[index].rate) || 0);
+              updatedEntries[index].discount = (baseAmount * percent) / 100;
             }
           }
-
-          updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-          setFormData((p) => ({ ...p, entries: updatedEntries }));
-
-          // Try to find a candidate batch with empty name but quantity/meta present
-          const candidateBatch = (entry.batches || []).find((b: any) => {
-            const nameEmpty =
-              !b?.batchName || String(b.batchName).trim() === "";
-            const hasQtyMeta =
-              (b?.batchQuantity && Number(b.batchQuantity) !== 0) ||
-              (b?.openingRate && Number(b.openingRate) !== 0) ||
-              (b?.openingValue && Number(b.openingValue) !== 0);
-            return nameEmpty && hasQtyMeta;
-          });
-
-
-          // Stock diff logic removed - we should not patch stock on input change
-          // Stock will be deducted ONLY on Voucher Save
-
-          // Check stock against candidateBatch (null-name purchase batch)
-          if (candidateBatch) {
-            const availableQty = Number(candidateBatch.batchQuantity ?? candidateBatch.quantity ?? 0);
-            const itemDetails = getItemDetails(entry.itemId);
-            const allowNegative = !!itemDetails?.allowNegativeStock;
-
-            if (newQty > availableQty && !allowNegative) {
-              Swal.fire({
-                icon: "warning",
-                title: "Stock Warning",
-                text: `Only ${availableQty} available in stock.`,
-                timer: 2000,
-                showConfirmButton: false
-              });
-              // ✅ CAP the quantity — don't allow going over
-              updatedEntries[index].quantity = availableQty;
-              updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-              setFormData((p) => ({ ...p, entries: updatedEntries }));
-              return;
-            }
-          }
-          return;
         }
 
-        const selectedBatch = entry.batches.find(
-          (b) => String(b.batchName) === String(entry.batchNumber)
-        );
-
-        const availableQty = Number(
-          selectedBatch?.batchQuantity ?? selectedBatch?.quantity ?? 0
-        );
-
-        // 🔴 If batch selected but NO STOCK
-        if (availableQty <= 0) {
-          Swal.fire({
-            icon: "warning",
-            title: "Stock Not Available in the Selected Batch",
-          });
-
-          updatedEntries[index].quantity = 0;
-          updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
-          setFormData((p) => ({ ...p, entries: updatedEntries }));
-          return;
-        }
-
-        let finalQty = newQty;
-
-        // 🔴 User entered more quantity than available
-        if (newQty > availableQty) {
-          Swal.fire({
-            icon: "warning",
-            title: "Stock Not Available",
-            text: `Only ${availableQty} available`,
-          });
-          finalQty = availableQty;
-        }
-
-        updatedEntries[index].quantity = finalQty;
         updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
         setFormData((p) => ({ ...p, entries: updatedEntries }));
-
         return;
       }
 

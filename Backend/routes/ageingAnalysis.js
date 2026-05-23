@@ -37,10 +37,6 @@ router.get('/api/ageing-analysis', async (req, res) => {
       itemFilters.push('si.id = ?');
       itemParams.push(stockItemId);
     }
-    if (stockGroupId) {
-      itemFilters.push('si.stockGroupId = ?');
-      itemParams.push(stockGroupId);
-    }
     if (batchId) {
       itemFilters.push('si.batchNumber = ?');
       itemParams.push(batchId);
@@ -54,10 +50,10 @@ router.get('/api/ageing-analysis', async (req, res) => {
       SELECT DISTINCT
         si.id AS item_id,
         si.name AS item_name,
-        si.batchNumber,
-        si.batchExpiryDate,
-        si.openingBalance,
-        si.standardPurchaseRate AS rate,
+        NULL AS batchNumber,
+        NULL AS batchExpiryDate,
+        0.00 AS openingBalance,
+        0.00 AS rate,
         COALESCE(pvi.godownId, COALESCE(svi.godownId, 0)) AS godown_id
       FROM stock_items si
       LEFT JOIN purchase_voucher_items pvi ON pvi.itemId = si.id
@@ -75,7 +71,7 @@ router.get('/api/ageing-analysis', async (req, res) => {
         AND sv.owner_id = ?
         ${godownId ? 'AND svi.godownId = ?' : ''}
       ${itemWhereClause}
-      HAVING godown_id > 0 OR si.openingBalance > 0
+      HAVING godown_id > 0 OR openingBalance > 0
       ORDER BY si.id ASC, godown_id ASC
     `;
 
