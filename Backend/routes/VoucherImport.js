@@ -1644,9 +1644,10 @@ router.post("/purchase_summary_import", async (req, res) => {
 
                         if (existingBatchIndex > -1) {
                             dbBatches[existingBatchIndex].batchQuantity = (Number(dbBatches[existingBatchIndex].batchQuantity) || 0) + pi.quantity;
-                        } else if (pi.batchNo) {
+                            dbBatches[existingBatchIndex].mode = "purchase";
+                        } else {
                             dbBatches.push({
-                                batchName: pi.batchNo,
+                                batchName: pi.batchNo || "",
                                 batchQuantity: pi.quantity,
                                 openingRate: pi.rate,
                                 openingValue: pi.quantity * pi.rate,
