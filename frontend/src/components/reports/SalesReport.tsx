@@ -279,7 +279,13 @@ const SalesReport: React.FC = () => {
           }
 
           const itemAmount = Number(item.amount || 0);
-          groups[itemGroupName].totalCredit += itemAmount;
+          const isDebit = item.type === "debit";
+
+          if (isDebit) {
+            groups[itemGroupName].totalDebit += itemAmount;
+          } else {
+            groups[itemGroupName].totalCredit += itemAmount;
+          }
 
           const ledgerName = item.salesLedgerName || "Unknown Sales Ledger";
           const existingItem = groups[itemGroupName].transactions.find(
@@ -287,12 +293,16 @@ const SalesReport: React.FC = () => {
           );
 
           if (existingItem) {
-            existingItem.credit += itemAmount;
+            if (isDebit) {
+              existingItem.debit += itemAmount;
+            } else {
+              existingItem.credit += itemAmount;
+            }
           } else {
             groups[itemGroupName].transactions.push({
               name: ledgerName,
-              debit: 0,
-              credit: itemAmount,
+              debit: isDebit ? itemAmount : 0,
+              credit: isDebit ? 0 : itemAmount,
             });
           }
         });
@@ -384,22 +394,21 @@ const SalesReport: React.FC = () => {
         });
       }
 
-      // Check voucher level global discount (if it wasn't already covered by items)
-      const globalDiscount = Number(voucher.discountTotal || 0);
-      if (globalDiscount > totalVoucherDiscountSeen) {
-        const remainingDiscount = globalDiscount - totalVoucherDiscountSeen;
-        const ledgerName = "Discount to Customer 1%";
+      // Check voucher level overall discount
+      const globalDiscount = Number(voucher.overallDiscount || voucher.discountTotal || 0);
+      if (globalDiscount > 0) {
+        const ledgerName = voucher.overallDiscountLedgerName || "Discount to Customer 1%";
 
         if (!groups[expGroupName]) {
           groups[expGroupName] = { totalDebit: 0, totalCredit: 0, transactions: [] };
         }
-        groups[expGroupName].totalDebit += remainingDiscount;
+        groups[expGroupName].totalDebit += globalDiscount;
 
         const existingExp = groups[expGroupName].transactions.find(t => t.name === ledgerName);
         if (existingExp) {
-          existingExp.debit += remainingDiscount;
+          existingExp.debit += globalDiscount;
         } else {
-          groups[expGroupName].transactions.push({ name: ledgerName, debit: remainingDiscount, credit: 0 });
+          groups[expGroupName].transactions.push({ name: ledgerName, debit: globalDiscount, credit: 0 });
         }
       }
     });
@@ -430,15 +439,8 @@ const SalesReport: React.FC = () => {
         }
 
         // Check global discount
-        let globalDiscountLedgerName = null;
-        if (v.items && v.items.length > 0) {
-          const itemWithDiscountLedger = v.items.find((i: any) => i.discountLedgerName);
-          if (itemWithDiscountLedger) {
-            globalDiscountLedgerName = itemWithDiscountLedger.discountLedgerName;
-          }
-        }
-        const globalLedgerName = globalDiscountLedgerName || "Discount to Customer 1%";
-        const globalDiscount = Number(v.discountTotal || 0);
+        const globalDiscount = Number(v.overallDiscount || v.discountTotal || 0);
+        const globalLedgerName = v.overallDiscountLedgerName || "Discount to Customer 1%";
         if (globalDiscount > 0 && globalLedgerName === columnarDrillDown) {
           return true;
         }
@@ -466,14 +468,9 @@ const SalesReport: React.FC = () => {
         });
       }
       // Global discount column
-      const gDiscount = Number(voucher.discountTotal || 0);
+      const gDiscount = Number(voucher.overallDiscount || voucher.discountTotal || 0);
       if (gDiscount > 0) {
-        let globalName = null;
-        if (voucher.items && voucher.items.length > 0) {
-          const dItem = voucher.items.find((i: any) => i.discountLedgerName);
-          if (dItem) globalName = dItem.discountLedgerName;
-        }
-        discountColumns.add(globalName || "Discount to Customer 1%");
+        discountColumns.add(voucher.overallDiscountLedgerName || "Discount to Customer 1%");
       }
     });
 
@@ -565,16 +562,10 @@ const SalesReport: React.FC = () => {
         });
       }
 
-      const gDiscount = Number(voucher.discountTotal || 0);
-      if (gDiscount > totalDiscSeen) {
-        const diff = gDiscount - totalDiscSeen;
-        let globalName = null;
-        if (voucher.items && voucher.items.length > 0) {
-          const dItem = voucher.items.find((i: any) => i.discountLedgerName);
-          if (dItem) globalName = dItem.discountLedgerName;
-        }
-        const finalName = globalName || "Discount to Customer 1%";
-        row[finalName] = (row[finalName] || 0) + diff;
+      const gDiscount = Number(voucher.overallDiscount || voucher.discountTotal || 0);
+      if (gDiscount > 0) {
+        const finalName = voucher.overallDiscountLedgerName || "Discount to Customer 1%";
+        row[finalName] = (row[finalName] || 0) + gDiscount;
       }
 
       return row;
