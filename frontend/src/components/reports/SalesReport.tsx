@@ -475,10 +475,69 @@ const SalesReport: React.FC = () => {
 
   // 🔹 COLUMNAR DATA PREPARATION
   const columnarData = useMemo(() => {
+    // Helper to calculate rounding difference
+    const getVoucherRoundingDiff = (v: any) => {
+      let vDebit = Number(v.netAmount || v.total || 0);
+      let vCredit = 0;
+
+      if (v.items && v.items.length > 0) {
+        v.items.forEach((item: any) => {
+          if (item.salesLedgerName === v.partyName) return;
+          const itemAmount = Number(item.amount || 0);
+          const isDebit = item.type === "debit";
+          if (isDebit) {
+            vDebit += itemAmount;
+          } else {
+            vCredit += itemAmount;
+          }
+        });
+      }
+
+      const seenTax = { cgst: false, sgst: false, igst: false };
+      if (v.items && v.items.length > 0) {
+        v.items.forEach((item: any) => {
+          const lName = (item.salesLedgerName || "").toLowerCase();
+          const gName = (item.salesLedgerGroupName || "").toLowerCase();
+          const isTax = gName.includes("duties") || gName.includes("tax") || item.salesLedgerGroupId === -103;
+          if (isTax) {
+            if (lName.includes("cgst")) seenTax.cgst = true;
+            if (lName.includes("sgst") || lName.includes("utgst")) seenTax.sgst = true;
+            if (lName.includes("igst")) seenTax.igst = true;
+          }
+        });
+      }
+
+      const cgst = seenTax.cgst ? 0 : Number(v.cgstAmount || 0);
+      const sgst = seenTax.sgst ? 0 : Number(v.sgstAmount || 0);
+      const igst = seenTax.igst ? 0 : Number(v.igstAmount || 0);
+      vCredit += cgst + sgst + igst;
+
+      if (v.items && v.items.length > 0) {
+        v.items.forEach((item: any) => {
+          const discountAmt = Number(item.discount || 0);
+          if (discountAmt > 0) {
+            vDebit += discountAmt;
+          }
+        });
+      }
+
+      const globalDiscount = Number(v.overallDiscount || v.discountTotal || 0);
+      if (globalDiscount > 0) {
+        vDebit += globalDiscount;
+      }
+
+      return vCredit - vDebit;
+    };
+
     // Apply Drill-Down Filter if active
     let vouchersToProcess = filteredVouchers;
     if (columnarDrillDown) {
       vouchersToProcess = filteredVouchers.filter(v => {
+        // Special check for Rounding Off
+        if (columnarDrillDown.toLowerCase() === "rounding off") {
+          return Math.abs(getVoucherRoundingDiff(v)) > 0.01;
+        }
+
         // Check Party Name
         if ((v.partyName || "Unknown Party") === columnarDrillDown) return true;
 
@@ -512,7 +571,6 @@ const SalesReport: React.FC = () => {
 
     // 1. Collect all unique Ledger Names for Headers
     vouchersToProcess.forEach((voucher) => {
-
       if (voucher.items) {
         voucher.items.forEach((item: any) => {
           if (item.salesLedgerName) salesColumns.add(item.salesLedgerName);
@@ -528,6 +586,10 @@ const SalesReport: React.FC = () => {
       const gDiscount = Number(voucher.overallDiscount || voucher.discountTotal || 0);
       if (gDiscount > 0) {
         discountColumns.add(voucher.overallDiscountLedgerName || "Discount to Customer 1%");
+      }
+      // Rounding Off column
+      if (Math.abs(getVoucherRoundingDiff(voucher)) > 0.01) {
+        discountColumns.add("Rounding Off");
       }
     });
 
@@ -623,6 +685,12 @@ const SalesReport: React.FC = () => {
       if (gDiscount > 0) {
         const finalName = voucher.overallDiscountLedgerName || "Discount to Customer 1%";
         row[finalName] = (row[finalName] || 0) + gDiscount;
+      }
+
+      // Map Rounding Off amount to column
+      const roundDiff = getVoucherRoundingDiff(voucher);
+      if (Math.abs(roundDiff) > 0.01) {
+        row["Rounding Off"] = roundDiff;
       }
 
       return row;
