@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import type { LedgerGroup } from '../../../types';
 import { ArrowLeft, Save, Plus, Trash2, Copy } from 'lucide-react';
 import Swal from 'sweetalert2';
+import { allSystemGroups as baseGroups } from '../../../constants/ledgerGroups';
 
 interface MultiLedgerEntry {
   tempId: string;
@@ -239,6 +240,11 @@ const ownerId = ownerType === "employee"
                       >
                         <option value="">Select Group</option>
                         {ledgerGroups.map((group) => (
+                          <option key={group.id} value={group.id}>
+                            {group.name}
+                          </option>
+                        ))}
+                        {baseGroups.map((group) => (
                           <option key={group.id} value={group.id}>
                             {group.name}
                           </option>
