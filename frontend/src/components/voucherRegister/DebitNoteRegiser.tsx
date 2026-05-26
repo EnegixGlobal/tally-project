@@ -674,11 +674,11 @@ const DebitNoteRegiser: React.FC = () => {
             )}
             {hasPermission("add") && (
               <button
-                onClick={() => navigate("/app/vouchers/payment")}
+                onClick={() => navigate("/app/vouchers/debit-note/create")}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
-                title="Add new payment voucher"
+                title="Add new debit note voucher"
               >
-                Add New Payment
+                Add New Debit Note
               </button>
             )}
           </div>

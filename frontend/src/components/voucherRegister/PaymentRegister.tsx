@@ -680,7 +680,7 @@ const PaymentRegister: React.FC = () => {
             )}
             {hasPermission("add") && (
               <button
-                onClick={() => navigate("/app/vouchers/payment")}
+                onClick={() => navigate("/app/vouchers/payment/create")}
                 className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors shadow-md text-sm font-semibold"
                 title="Add new payment voucher"
               >
