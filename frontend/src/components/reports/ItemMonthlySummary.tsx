@@ -1,8 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
+import { useAppContext } from "../../context/AppContext";
 
 const ItemMonthlySummary = () => {
+  const { theme, units } = useAppContext();
   const [params] = useSearchParams();
   const navigate = useNavigate();
 
@@ -13,6 +15,7 @@ const ItemMonthlySummary = () => {
 
   const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
+  const [unitName, setUnitName] = useState("");
 
   const company_id = localStorage.getItem("company_id") || "";
   const owner_type = localStorage.getItem("owner_type") || "employee";
@@ -77,6 +80,20 @@ const ItemMonthlySummary = () => {
     const itemData = stockItemsData.find((i: any) => i.name && i.name.toLowerCase().trim() === normalizedItemName);
     const matchedMasterName = itemData ? itemData.name : itemName;
     const matchedMasterNameNormalized = matchedMasterName ? matchedMasterName.toLowerCase().trim() : "";
+
+    let matchedUnitName = "";
+    if (itemData) {
+      matchedUnitName = itemData.unitName || "";
+      if (!matchedUnitName && Array.isArray(units)) {
+        const matchedUnit = units.find((u: any) => String(u.id) === String(itemData.unit));
+        if (matchedUnit && matchedUnit.name) {
+          matchedUnitName = matchedUnit.name;
+        } else if (itemData.unit && isNaN(Number(itemData.unit))) {
+          matchedUnitName = itemData.unit;
+        }
+      }
+    }
+    setUnitName(matchedUnitName);
 
     const isDefaultBatch = batchName === "Default";
 
@@ -312,27 +329,86 @@ const ItemMonthlySummary = () => {
 
 
     const finalRows = Object.entries(monthMap).map(([month, v]: any, index) => {
-      // Calculate running total regardless of display
-      runningQty = runningQty + v.inQty - v.outQty;
-      runningValue = runningValue + v.inValue - v.outValue;
+      // 1. Monthly Opening Balance is the state before any transactions this month
+      const currentOpeningQty = runningQty;
+      const currentOpeningValue = runningValue;
+      const currentOpeningRate = currentOpeningQty > 0 ? currentOpeningValue / currentOpeningQty : 0;
 
-      // Determine if we should SHOW the closing balance
-      // Show only if index >= startMonthIndex
+      // 2. Inwards / Outwards Qty, Value, and Rate
+      const inQty = v.inQty;
+      const inValue = v.inValue;
+      const inRate = inQty > 0 ? inValue / inQty : 0;
+
+      const outQty = v.outQty;
+      const outValue = v.outValue;
+      const outRate = outQty > 0 ? outValue / outQty : 0;
+
+      // 3. Update running totals for the end of the month
+      runningQty = runningQty + inQty - outQty;
+      runningValue = runningValue + inValue - outValue;
+
+      // Precision adjustment to avoid -0.00 or floating point noise
+      if (Math.abs(runningQty) < 0.001) runningQty = 0;
+      if (Math.abs(runningValue) < 0.01) runningValue = 0;
+
+      const currentClosingQty = runningQty;
+      const currentClosingValue = runningValue;
+      const currentClosingRate = currentClosingQty > 0 ? currentClosingValue / currentClosingQty : 0;
+
+      // Determine if we should SHOW the values (same hiding logic as before)
       const showValues = index >= startMonthIndex;
 
       return {
         month,
-        ...v,
-        closingQty: showValues ? runningQty : "",
-        closingValue: showValues ? runningValue : "",
-        openingQty,
-        openingValue
+        // Opening
+        openingQty: showValues ? currentOpeningQty : "",
+        openingValue: showValues ? currentOpeningValue : "",
+        openingRate: showValues ? currentOpeningRate : "",
+        // Inwards
+        inQty,
+        inValue,
+        inRate,
+        // Outwards
+        outQty,
+        outValue,
+        outRate,
+        // Closing
+        closingQty: showValues ? currentClosingQty : "",
+        closingValue: showValues ? currentClosingValue : "",
+        closingRate: showValues ? currentClosingRate : "",
       };
     });
 
     setRows(finalRows);
     setLoading(false);
   };
+
+  const formatQty = (val: any) => {
+    if (val === "" || val === null || val === undefined || Number(val) === 0) return "";
+    return `${Number(val)} ${unitName}`.trim();
+  };
+
+  const formatAmount = (val: any) => {
+    if (val === "" || val === null || val === undefined || Number(val) === 0) return "";
+    return Number(val).toFixed(2);
+  };
+
+  // Calculate Grand Totals
+  const totalOpeningQty = (rows.length > 0 && typeof rows[0].openingQty === "number") ? rows[0].openingQty : 0;
+  const totalOpeningValue = (rows.length > 0 && typeof rows[0].openingValue === "number") ? rows[0].openingValue : 0;
+  const totalOpeningRate = totalOpeningQty > 0 ? totalOpeningValue / totalOpeningQty : 0;
+
+  const totalInQty = rows.reduce((sum, r) => sum + Number(r.inQty || 0), 0);
+  const totalInValue = rows.reduce((sum, r) => sum + Number(r.inValue || 0), 0);
+  const totalInRate = totalInQty > 0 ? totalInValue / totalInQty : 0;
+
+  const totalOutQty = rows.reduce((sum, r) => sum + Number(r.outQty || 0), 0);
+  const totalOutValue = rows.reduce((sum, r) => sum + Number(r.outValue || 0), 0);
+  const totalOutRate = totalOutQty > 0 ? totalOutValue / totalOutQty : 0;
+
+  const totalClosingQty = (rows.length > 0 && typeof rows[rows.length - 1].closingQty === "number") ? rows[rows.length - 1].closingQty : 0;
+  const totalClosingValue = (rows.length > 0 && typeof rows[rows.length - 1].closingValue === "number") ? rows[rows.length - 1].closingValue : 0;
+  const totalClosingRate = totalClosingQty > 0 ? totalClosingValue / totalClosingQty : 0;
 
   return (
     <div className="pt-[56px] px-4">
@@ -416,78 +492,92 @@ const ItemMonthlySummary = () => {
           ) : (
             <table className="w-full border-collapse text-sm">
               <thead>
-                <tr>
-                  <th className="border p-1">Month</th>
-                  <th colSpan={2} className="border p-1">
-                    Inwards
-                  </th>
-                  <th colSpan={2} className="border p-1">
-                    Outwards
-                  </th>
-                  <th colSpan={2} className="border p-1">
-                    Closing
-                  </th>
+                <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200 text-black"}>
+                  <th rowSpan={2} className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center font-semibold`}>Month</th>
+                  <th colSpan={3} className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center font-semibold`}>Opening Balance</th>
+                  <th colSpan={3} className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center font-semibold`}>Inwards</th>
+                  <th colSpan={3} className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center font-semibold`}>Outwards</th>
+                  <th colSpan={3} className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center font-semibold`}>Closing Balance</th>
                 </tr>
-                <tr>
-                  <th></th>
-                  <th className="border p-1">Qty</th>
-                  <th className="border p-1">Value</th>
-                  <th className="border p-1">Qty</th>
-                  <th className="border p-1">Value</th>
-                  <th className="border p-1">Qty</th>
-                  <th className="border p-1">Value</th>
+                <tr className={theme === "dark" ? "bg-gray-700 text-white" : "bg-gray-200 text-black"}>
+                  {/* Opening */}
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Quantity</th>
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Rate</th>
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Value</th>
+                  {/* Inwards */}
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Quantity</th>
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Rate</th>
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Value</th>
+                  {/* Outwards */}
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Quantity</th>
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Rate</th>
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Value</th>
+                  {/* Closing */}
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Quantity</th>
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Rate</th>
+                  <th className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>Value</th>
                 </tr>
               </thead>
               <tbody>
-                <tr className="font-semibold bg-gray-50">
-                  <td className="border p-1">Opening Value</td>
-                  <td className="border p-1 text-right"></td>
-                  <td className="border p-1 text-right"></td>
-                  <td className="border p-1 text-right"></td>
-                  <td className="border p-1 text-right"></td>
-                  <td className="border p-1 text-right">{rows.length > 0 ? rows[0].openingQty || "" : ""}</td>
-                  <td className="border p-1 text-right">{rows.length > 0 ? (rows[0].openingValue ? rows[0].openingValue.toFixed(2) : "") : ""}</td>
-                </tr>
                 {rows.map((r, i) => (
                   <tr
                     key={i}
-                    className="cursor-pointer hover:bg-yellow-100"
+                    className={`cursor-pointer hover:bg-yellow-100 ${theme === "dark" ? "text-white hover:bg-gray-800" : "text-black hover:bg-yellow-50 bg-white"}`}
                     onClick={() => {
                       navigate(
                         `/app/reports/stock-vouchers?item=${itemName}&batch=${batchName}&month=${r.month}`
                       );
                     }}
                   >
-                    <td className="border p-1">{r.month}</td>
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-left font-medium`}>{r.month}</td>
 
-                    <td className="border p-1 text-right">
-                      {r.inQty || ""}
-                    </td>
+                    {/* Opening */}
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatQty(r.openingQty)}</td>
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatAmount(r.openingRate)}</td>
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatAmount(r.openingValue)}</td>
 
-                    <td className="border p-1 text-right">
-                      {r.inValue ? r.inValue.toFixed(2) : ""}
-                    </td>
+                    {/* Inwards */}
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatQty(r.inQty)}</td>
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatAmount(r.inRate)}</td>
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatAmount(r.inValue)}</td>
 
-                    <td className="border p-1 text-right">
-                      {r.outQty || ""}
-                    </td>
+                    {/* Outwards */}
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatQty(r.outQty)}</td>
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatAmount(r.outRate)}</td>
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatAmount(r.outValue)}</td>
 
-                    <td className="border p-1 text-right">
-                      {r.outValue ? r.outValue.toFixed(2) : ""}
-                    </td>
-
-                    <td className="border p-1 text-right">
-                      {r.closingQty !== "" ? Math.abs(r.closingQty) : ""}
-                    </td>
-
-                    <td className="border p-1 text-right">
-                      {r.closingValue !== ""
-                        ? Math.abs(r.closingValue).toFixed(2)
-                        : ""}
-                    </td>
+                    {/* Closing */}
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatQty(r.closingQty)}</td>
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatAmount(r.closingRate)}</td>
+                    <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatAmount(r.closingValue)}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className={`font-bold ${theme === "dark" ? "bg-gray-800 text-white" : "bg-gray-100 text-black"}`}>
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-left`}>Grand Total</td>
+                  
+                  {/* Opening */}
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatQty(totalOpeningQty)}</td>
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatAmount(totalOpeningRate)}</td>
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatAmount(totalOpeningValue)}</td>
+
+                  {/* Inwards */}
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatQty(totalInQty)}</td>
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatAmount(totalInRate)}</td>
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatAmount(totalInValue)}</td>
+
+                  {/* Outwards */}
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatQty(totalOutQty)}</td>
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatAmount(totalOutRate)}</td>
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatAmount(totalOutValue)}</td>
+
+                  {/* Closing */}
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatQty(totalClosingQty)}</td>
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatAmount(totalClosingRate)}</td>
+                  <td className={`border ${theme === "dark" ? "border-gray-600" : "border-gray-300"} p-1 text-center`}>{formatAmount(totalClosingValue)}</td>
+                </tr>
+              </tfoot>
             </table>
           )}
         </div>
