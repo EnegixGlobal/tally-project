@@ -392,6 +392,90 @@ router.post("/bulk-delete", async (req, res) => {
       }
     });
 
+    // Revert stock batch quantities before deletion
+    if (voucherType === "sales") {
+      const [items] = await conn.query(
+        "SELECT itemId, quantity, batchNumber FROM sales_voucher_items WHERE voucherId IN (?)",
+        [ids]
+      );
+      for (const item of items) {
+        if (!item.itemId) continue;
+        const [stockRows] = await conn.query(
+          "SELECT batches FROM stock_items WHERE id = ? AND company_id = ? AND owner_type = ? AND owner_id = ?",
+          [item.itemId, companyId, ownerType, ownerId]
+        );
+        if (stockRows.length > 0) {
+          const stockItem = stockRows[0];
+          let batches = [];
+          try {
+            batches = stockItem.batches ? JSON.parse(stockItem.batches) : [];
+          } catch (e) {
+            batches = [];
+          }
+
+          const bName = item.batchNumber || "";
+          const isEmptyBatchName = bName === "" || bName === null;
+
+          const index = isEmptyBatchName
+            ? batches.findIndex(b => b.batchName === null || b.batchName === "" || b.batchName === undefined)
+            : batches.findIndex(b => String(b.batchName ?? "") === String(bName));
+
+          if (index !== -1) {
+            batches[index].batchQuantity = Number(batches[index].batchQuantity || 0) + Number(item.quantity || 0);
+            await conn.query(
+              "UPDATE stock_items SET batches = ? WHERE id = ?",
+              [JSON.stringify(batches), item.itemId]
+            );
+          }
+        }
+      }
+    } else if (voucherType === "purchase") {
+      const numbers = vouchers.map((v) => v.voucher_number);
+      if (numbers.length > 0) {
+        const [historyRows] = await conn.query(
+          "SELECT itemName, batchNumber, purchaseQuantity FROM purchase_history WHERE voucherNumber IN (?) AND companyId = ? AND ownerType = ? AND ownerId = ?",
+          [numbers, companyId, ownerType, ownerId]
+        );
+
+        for (const hRow of historyRows) {
+          const [itemRows] = await conn.query(
+            "SELECT id, batches FROM stock_items WHERE name = ? AND company_id = ? AND owner_type = ? AND owner_id = ?",
+            [hRow.itemName, companyId, ownerType, ownerId]
+          );
+          if (itemRows.length > 0) {
+            const stockItem = itemRows[0];
+            let batches = [];
+            try {
+              batches = stockItem.batches ? JSON.parse(stockItem.batches) : [];
+            } catch (e) {
+              batches = [];
+            }
+
+            const bName = hRow.batchNumber || "";
+            const isEmptyBatchName = bName === "" || bName === null;
+
+            const index = isEmptyBatchName
+              ? batches.findIndex(b => b.batchName === null || b.batchName === "" || b.batchName === undefined)
+              : batches.findIndex(b => String(b.batchName ?? "") === String(bName));
+
+            if (index !== -1) {
+              const newQty = Number(batches[index].batchQuantity || 0) - Number(hRow.purchaseQuantity || 0);
+              batches[index].batchQuantity = newQty;
+              
+              if (newQty <= 0 && batches[index].mode === "purchase") {
+                batches.splice(index, 1);
+              }
+
+              await conn.query(
+                "UPDATE stock_items SET batches = ? WHERE id = ?",
+                [JSON.stringify(batches), stockItem.id]
+              );
+            }
+          }
+        }
+      }
+    }
+
     // 2️⃣ Delete vouchers and related data
     if (voucherType === "sales" || voucherType === "purchase") {
       await conn.query(`DELETE FROM ${entriesTable} WHERE voucher_id IN (?)`, [

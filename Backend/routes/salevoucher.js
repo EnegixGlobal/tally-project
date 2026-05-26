@@ -749,6 +749,45 @@ router.delete("/:id", async (req, res) => {
 
     const { number: deletedNumber, company_id, owner_type, owner_id, sales_type_id } = rows[0];
 
+    // Revert stock batch quantities
+    const [items] = await conn.execute(
+      "SELECT itemId, quantity, batchNumber FROM sales_voucher_items WHERE voucherId = ?",
+      [voucherId]
+    );
+
+    for (const item of items) {
+      if (!item.itemId) continue;
+      const [stockRows] = await conn.execute(
+        "SELECT batches FROM stock_items WHERE id = ? AND company_id = ? AND owner_type = ? AND owner_id = ?",
+        [item.itemId, company_id, owner_type, owner_id]
+      );
+      if (stockRows.length > 0) {
+        const stockItem = stockRows[0];
+        let batches = [];
+        try {
+          batches = stockItem.batches ? JSON.parse(stockItem.batches) : [];
+        } catch (e) {
+          batches = [];
+        }
+
+        const bName = item.batchNumber || "";
+        const isEmptyBatchName = bName === "" || bName === null;
+
+        const index = isEmptyBatchName
+          ? batches.findIndex(b => b.batchName === null || b.batchName === "" || b.batchName === undefined)
+          : batches.findIndex(b => String(b.batchName ?? "") === String(bName));
+
+        if (index !== -1) {
+          // Since sales voucher is deleted, we ADD the quantity back to the batch!
+          batches[index].batchQuantity = Number(batches[index].batchQuantity || 0) + Number(item.quantity || 0);
+          await conn.execute(
+            "UPDATE stock_items SET batches = ? WHERE id = ?",
+            [JSON.stringify(batches), item.itemId]
+          );
+        }
+      }
+    }
+
     // Delete current voucher and related data
     await conn.execute("DELETE FROM sale_history WHERE voucherNumber = ?", [deletedNumber]);
     await conn.execute("DELETE FROM sales_voucher_items WHERE voucherId = ?", [voucherId]);
