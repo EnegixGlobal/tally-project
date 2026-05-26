@@ -907,6 +907,51 @@ router.delete("/:id", async (req, res) => {
 
     const { number: deletedNumber, company_id: companyId, owner_type: ownerType, owner_id: ownerId, date } = rows[0];
 
+    // Revert stock batch quantities
+    const [historyRows] = await conn.execute(
+      "SELECT itemName, batchNumber, purchaseQuantity FROM purchase_history WHERE voucherNumber = ? AND companyId = ? AND ownerType = ? AND ownerId = ?",
+      [deletedNumber, companyId, ownerType, ownerId]
+    );
+
+    for (const hRow of historyRows) {
+      const [itemRows] = await conn.execute(
+        "SELECT id, batches FROM stock_items WHERE name = ? AND company_id = ? AND owner_type = ? AND owner_id = ?",
+        [hRow.itemName, companyId, ownerType, ownerId]
+      );
+      if (itemRows.length > 0) {
+        const stockItem = itemRows[0];
+        let batches = [];
+        try {
+          batches = stockItem.batches ? JSON.parse(stockItem.batches) : [];
+        } catch (e) {
+          batches = [];
+        }
+
+        const bName = hRow.batchNumber || "";
+        const isEmptyBatchName = bName === "" || bName === null;
+
+        const index = isEmptyBatchName
+          ? batches.findIndex(b => b.batchName === null || b.batchName === "" || b.batchName === undefined)
+          : batches.findIndex(b => String(b.batchName ?? "") === String(bName));
+
+        if (index !== -1) {
+          // Since purchase is deleted, we SUBTRACT the quantity from the batch!
+          const newQty = Number(batches[index].batchQuantity || 0) - Number(hRow.purchaseQuantity || 0);
+          batches[index].batchQuantity = newQty;
+          
+          // Clean up if it was a purchase-mode batch and quantity is <= 0
+          if (newQty <= 0 && batches[index].mode === "purchase") {
+            batches.splice(index, 1);
+          }
+
+          await conn.execute(
+            "UPDATE stock_items SET batches = ? WHERE id = ?",
+            [JSON.stringify(batches), stockItem.id]
+          );
+        }
+      }
+    }
+
     // Extract prefix, FY, and sequence: PRV/25-26/000002 -> ["PRV", "25-26", "000002"]
     const parts = deletedNumber.split("/");
     if (parts.length < 3) {
