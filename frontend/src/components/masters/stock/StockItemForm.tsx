@@ -353,7 +353,7 @@ const StockItemForm = () => {
 
             standardPurchaseRate: Number(item.standardPurchaseRate) || 0,
             standardSaleRate: Number(item.standardSaleRate) || 0,
-            enableBatchTracking: !!item.enableBatchTracking,
+            enableBatchTracking: !!item.enableBatchTracking && Array.isArray(item.batches) && item.batches.length > 0,
             batchName: item.batchNumber || "",
             batchExpiryDate: item.batchExpiryDate || "",
             batchManufacturingDate: item.batchManufacturingDate || "",
@@ -381,12 +381,13 @@ const StockItemForm = () => {
                 const qty = Number(b.batchQuantity) || 0;
 
                 return {
+                  id: b.id || nanoid(),
                   batchName: b.batchName || "",
                   batchQuantity: qty,
                   batchRate: rate, // Always filled
                   openingRate: Number(b.openingRate) || rate, // Fallback to rate
-                  batchExpiryDate: b.batchExpiryDate || "",
-                  batchManufacturingDate: b.batchManufacturingDate || "",
+                  batchExpiryDate: b.batchExpiryDate ? b.batchExpiryDate.split("T")[0] : "",
+                  batchManufacturingDate: b.batchManufacturingDate ? b.batchManufacturingDate.split("T")[0] : "",
                   openingValue: Number(b.openingValue) || rate * qty, // Always calculated
                   mode: b.mode,
                   mrp: b.mrp || "",
@@ -1069,9 +1070,9 @@ const StockItemForm = () => {
                 {batchRows.map((row, index) => (
                   <div
                     key={row.id}
-                    className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-12 gap-3 items-end w-full"
+                    className="flex flex-col md:flex-row gap-3 items-end w-full"
                   >
-                    <div className="md:col-span-2">
+                    <div className="w-full md:flex-1">
                       <InputField
                         id={`batchName-${index}`}
                         name={`batchName-${index}`}
@@ -1084,7 +1085,7 @@ const StockItemForm = () => {
                       />
                     </div>
 
-                    <div className="md:col-span-1">
+                    <div className="w-full md:flex-1">
                       <InputField
                         id={`batchQuantity-${index}`}
                         name={`batchQuantity-${index}`}
@@ -1097,7 +1098,7 @@ const StockItemForm = () => {
                       />
                     </div>
 
-                    <div className="md:col-span-1">
+                    <div className="w-full md:flex-1">
                       <InputField
                         id={`batchRate-${index}`}
                         name={`batchRate-${index}`}
@@ -1110,7 +1111,7 @@ const StockItemForm = () => {
                       />
                     </div>
 
-                    <div className="md:col-span-1">
+                    <div className="w-full md:flex-1">
                       <InputField
                         id={`openingRate-${index}`}
                         name={`openingRate-${index}`}
@@ -1123,7 +1124,7 @@ const StockItemForm = () => {
                       />
                     </div>
 
-                    <div className="md:col-span-1">
+                    <div className="w-full md:flex-1">
                       <InputField
                         id={`mrp-${index}`}
                         name={`mrp-${index}`}
@@ -1135,7 +1136,7 @@ const StockItemForm = () => {
                       />
                     </div>
 
-                    <div className="md:col-span-2">
+                    <div className="w-full md:flex-1">
                       <InputField
                         id={`batchManufacturingDate-${index}`}
                         name={`batchManufacturingDate-${index}`}
@@ -1152,7 +1153,7 @@ const StockItemForm = () => {
                       />
                     </div>
 
-                    <div className="md:col-span-2">
+                    <div className="w-full md:flex-1">
                       <InputField
                         id={`batchExpiryDate-${index}`}
                         name={`batchExpiryDate-${index}`}
@@ -1169,7 +1170,7 @@ const StockItemForm = () => {
                       />
                     </div>
 
-                    <div className="md:col-span-1 flex justify-center pb-2">
+                    <div className="flex justify-center pb-2 w-full md:w-auto">
                       <button
                         type="button"
                         onClick={() => removeBatchRow(index)}
