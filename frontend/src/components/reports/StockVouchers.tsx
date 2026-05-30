@@ -295,9 +295,9 @@ const StockVouchers = () => {
       finalRows.push({
         isOpening: true,
         date: start, // First day of month
-        openingQty: "",
-        openingValue: "",
-        openingRate: "",
+        openingQty: accumulatedQty,
+        openingValue: accumulatedValue,
+        openingRate: opRate,
         inQty: 0,
         inValue: 0,
         inRate: 0,
@@ -460,9 +460,9 @@ const StockVouchers = () => {
                         <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}></td>
 
                         {/* Opening */}
-                        <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}></td>
-                        <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}></td>
-                        <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}></td>
+                        <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatQty(r.openingQty)}</td>
+                        <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatAmount(r.openingRate)}</td>
+                        <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}>{formatAmount(r.openingValue)}</td>
 
                         {/* Inwards */}
                         <td className={`border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} p-1 text-center`}></td>
