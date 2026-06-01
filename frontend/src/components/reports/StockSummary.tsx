@@ -372,9 +372,7 @@ const StockSummary: React.FC = () => {
           const itemName = item.name;
           const lookupKey = itemName.toLowerCase().trim();
 
-          closingMap[lookupKey] = {
-            default: Number(item.openingBalance || 0),
-          };
+          closingMap[lookupKey] = {};
 
           let matchedUnitName = item.unitName || "";
           if (!matchedUnitName) {
@@ -393,6 +391,28 @@ const StockSummary: React.FC = () => {
           };
 
           movementCheck[lookupKey] = false; // initially no movement
+
+          let batchesProcessed = false;
+          if (item.batches && item.batches.length > 0) {
+            item.batches.forEach((b: any) => {
+              if (!b.mode || b.mode === "opening") {
+                const batch = (b.batchName || "default").toLowerCase().trim();
+                closingMap[lookupKey][batch] =
+                  (closingMap[lookupKey][batch] || 0) + Number(b.batchQuantity || 0);
+                batchesProcessed = true;
+              }
+            });
+          }
+
+          // Fallback to item level opening balance if no batches were processed
+          if (!batchesProcessed && (Number(item.openingBalance || 0) > 0)) {
+            closingMap[lookupKey]["default"] = Number(item.openingBalance || 0);
+          }
+
+          // Ensure there is always a default batch key
+          if (Object.keys(closingMap[lookupKey]).length === 0) {
+            closingMap[lookupKey]["default"] = 0;
+          }
         });
       }
 
