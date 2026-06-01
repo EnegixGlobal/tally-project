@@ -168,14 +168,26 @@ const StockVouchers = () => {
 
       // 2. Check Batches (Validation/Override)
       if (itemData.batches && Array.isArray(itemData.batches)) {
-        const batch = itemData.batches.find((b: any) =>
+        const matchingBatches = itemData.batches.filter((b: any) =>
           b.batchName === batchName ||
           (isDefaultBatch && (!b.batchName || b.batchName === "Default"))
         );
 
-        if (batch && batch.mode === 'opening') {
-          openingQty = Number(batch.batchQuantity || 0);
-          openingValue = openingQty * Number(batch.openingRate || 0);
+        let batchQtySum = 0;
+        let batchValSum = 0;
+        let hasOpeningBatch = false;
+
+        matchingBatches.forEach((b: any) => {
+          if (b.mode === 'opening') {
+            batchQtySum += Number(b.batchQuantity || 0);
+            batchValSum += Number(b.batchQuantity || 0) * Number(b.openingRate || 0);
+            hasOpeningBatch = true;
+          }
+        });
+
+        if (hasOpeningBatch) {
+          openingQty = batchQtySum;
+          openingValue = batchValSum;
         }
       }
     }
