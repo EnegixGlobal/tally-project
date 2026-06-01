@@ -36,7 +36,7 @@ const GSTR1: React.FC = () => {
   // Form data state matching the screenshot structure
   // Form data state
   const [formData, setFormData] = useState({
-    gstin: companyData?.gst_number || "",
+    gstin: companyData?.gstNumber || companyData?.gst_number || "",
     legalName: companyData?.name || "",
     tradeName: companyData?.name || "",
     returnPeriod: `${selectedPeriod.month}/${selectedPeriod.year}`,
@@ -45,6 +45,34 @@ const GSTR1: React.FC = () => {
     b2bSupplies: [],
     b2cLargeSupplies: [],
   });
+
+  useEffect(() => {
+    const companyIdVal = localStorage.getItem("company_id") || "";
+    if (!companyIdVal) return;
+    const fetchCompanyInfo = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/company/company/${companyIdVal}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const data = await res.json();
+        if (data) {
+          setFormData((prev) => ({
+            ...prev,
+            gstin: data.gstNumber || data.gst_number || prev.gstin,
+            legalName: data.name || prev.legalName,
+            tradeName: data.name || prev.tradeName,
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch company details in GSTR-1:", err);
+      }
+    };
+    fetchCompanyInfo();
+  }, []);
 
   // Simple print functionality - no complex dependencies needed
 
@@ -852,32 +880,32 @@ const GSTR1: React.FC = () => {
                 <div className="flex">
                   <span className="w-32 text-sm font-medium">GSTIN:</span>
                   <span className="text-sm font-mono">
-                    {companyData.gst_number}
+                    {companyData?.gstNumber || companyData?.gst_number || formData.gstin || "-"}
                   </span>
                 </div>
                 <div className="flex">
                   <span className="w-32 text-sm font-medium ">Legal Name:</span>
                   <span className="text-sm uppercase">
-                    {companyData.name}
+                    {companyData?.name || formData.legalName || "-"}
                   </span>
                 </div>
                 <div className="flex">
                   <span className="w-32 text-sm font-medium">Trade Name:</span>
-                  <span className="text-sm uppercase">{companyData.name}</span>
+                  <span className="text-sm uppercase">{companyData?.name || formData.tradeName || "-"}</span>
                 </div>
               </div>
               <div className="space-y-3">
                 <div className="flex">
                   <span className="w-32 text-sm font-medium">State:</span>
-                  <span className="text-sm uppercase">{companyData.state}</span>
+                  <span className="text-sm uppercase">{companyData?.state || "-"}</span>
                 </div>
                 <div className="flex">
                   <span className="w-32 text-sm font-medium">Pan Number:</span>
-                  <span className="text-sm">{companyData.pan_number}</span>
+                  <span className="text-sm">{companyData?.panNumber || companyData?.pan_number || "-"}</span>
                 </div>
                 <div className="flex">
                   <span className="w-32 text-sm font-medium">Pin:</span>
-                  <span className="text-sm">{companyData.pin}</span>
+                  <span className="text-sm">{companyData?.pin || "-"}</span>
                 </div>
               </div>
             </div>
