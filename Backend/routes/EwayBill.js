@@ -34,6 +34,7 @@ SELECT
   l.gst_number,
   l.state,
   l.district,
+  l.pin_code AS pincode,
 
   sv.subtotal,
   sv.cgstTotal,
