@@ -353,7 +353,7 @@ const StockItemForm = () => {
 
             standardPurchaseRate: Number(item.standardPurchaseRate) || 0,
             standardSaleRate: Number(item.standardSaleRate) || 0,
-            enableBatchTracking: !!item.enableBatchTracking && Array.isArray(item.batches) && item.batches.length > 0,
+            enableBatchTracking: !!item.enableBatchTracking && Array.isArray(item.batches) && item.batches.some((b: any) => b.batchName && b.batchName.trim() !== ""),
             batchName: item.batchNumber || "",
             batchExpiryDate: item.batchExpiryDate || "",
             batchManufacturingDate: item.batchManufacturingDate || "",
@@ -395,7 +395,18 @@ const StockItemForm = () => {
               })
             );
           } else {
-            setBatchRows([]);
+            setBatchRows([
+              {
+                id: nanoid(),
+                batchName: "",
+                batchExpiryDate: "",
+                batchManufacturingDate: "",
+                batchQuantity: "",
+                batchRate: "",
+                openingRate: 0,
+                mrp: "",
+              },
+            ]);
           }
         } else {
           Swal.fire(
@@ -729,13 +740,15 @@ const StockItemForm = () => {
       maintainInPieces: formData.maintainInPieces,
       secondaryUnit: formData.secondaryUnit,
 
-      batches: formData.enableBatchTracking ? batchRows.map((b) => ({
-        ...b,
-        mode: "opening",
-        batchQuantity: Number(b.batchQuantity) || 0,
-        batchRate: Number(b.batchRate) || 0,
-        openingRate: Number(b.batchRate || 0) * Number(b.batchQuantity || 0),
-      })) : [],
+      batches: batchRows
+        .filter((b) => b.batchQuantity || b.batchRate || b.mrp || b.batchName)
+        .map((b) => ({
+          ...b,
+          mode: "opening",
+          batchQuantity: Number(b.batchQuantity) || 0,
+          batchRate: Number(b.batchRate) || 0,
+          openingRate: Number(b.batchRate || 0) * Number(b.batchQuantity || 0),
+        })),
       godownAllocations,
       barcode,
       company_id: companyId,
@@ -1052,26 +1065,25 @@ const StockItemForm = () => {
 
 
 
-              {/* Right: Add Batch Button */}
-
-              {formData.enableBatchTracking && (
-                <button
-                  type="button"
-                  onClick={addBatchRow}
-                  className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
-                >
-                  <Plus size={16} /> Add Batch
-                </button>
-              )}
+              {/* Right: Add Batch Button - ALWAYS SHOWN */}
+              <button
+                type="button"
+                onClick={addBatchRow}
+                className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700"
+              >
+                <Plus size={16} /> Add Batch
+              </button>
             </div>
 
-            {formData.enableBatchTracking && (
-              <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
-                {batchRows.map((row, index) => (
-                  <div
-                    key={row.id}
-                    className="flex flex-col md:flex-row gap-3 items-end w-full"
-                  >
+            {/* ALWAYS SHOWN BATCH CONTAINER */}
+            <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
+              {batchRows.map((row, index) => (
+                <div
+                  key={row.id}
+                  className="flex flex-col md:flex-row gap-3 items-end w-full"
+                >
+                  {/* Batch/Serial Number field - ONLY visible when enableBatchTracking is checked */}
+                  {formData.enableBatchTracking && (
                     <div className="w-full md:flex-1">
                       <InputField
                         id={`batchName-${index}`}
@@ -1084,58 +1096,65 @@ const StockItemForm = () => {
                         error={errors[`batchName-${index}`]}
                       />
                     </div>
+                  )}
 
-                    <div className="w-full md:flex-1">
-                      <InputField
-                        id={`batchQuantity-${index}`}
-                        name={`batchQuantity-${index}`}
-                        label="Qty"
-                        value={row.batchQuantity}
-                        onChange={(e) =>
-                          updateBatchRow(index, "batchQuantity", e.target.value)
-                        }
-                        error={errors[`batchQuantity-${index}`]}
-                      />
-                    </div>
+                  {/* Qty field - ALWAYS visible */}
+                  <div className="w-full md:flex-1">
+                    <InputField
+                      id={`batchQuantity-${index}`}
+                      name={`batchQuantity-${index}`}
+                      label="Qty"
+                      value={row.batchQuantity}
+                      onChange={(e) =>
+                        updateBatchRow(index, "batchQuantity", e.target.value)
+                      }
+                      error={errors[`batchQuantity-${index}`]}
+                    />
+                  </div>
 
-                    <div className="w-full md:flex-1">
-                      <InputField
-                        id={`batchRate-${index}`}
-                        name={`batchRate-${index}`}
-                        label="Rate"
-                        value={row.batchRate}
-                        onChange={(e) =>
-                          updateBatchRow(index, "batchRate", e.target.value)
-                        }
-                        error={errors[`batchRate-${index}`]}
-                      />
-                    </div>
+                  {/* Rate field - ALWAYS visible */}
+                  <div className="w-full md:flex-1">
+                    <InputField
+                      id={`batchRate-${index}`}
+                      name={`batchRate-${index}`}
+                      label="Rate"
+                      value={row.batchRate}
+                      onChange={(e) =>
+                        updateBatchRow(index, "batchRate", e.target.value)
+                      }
+                      error={errors[`batchRate-${index}`]}
+                    />
+                  </div>
 
-                    <div className="w-full md:flex-1">
-                      <InputField
-                        id={`openingRate-${index}`}
-                        name={`openingRate-${index}`}
-                        label="Total Value"
-                        type="number"
-                        value={row.batchRate && row.batchQuantity ? Number(row.batchRate) * Number(row.batchQuantity) : ""}
-                        onChange={() => { }}
-                        error={errors[`openingRate-${index}`]}
-                        disabled
-                      />
-                    </div>
+                  {/* Total Value field - ALWAYS visible */}
+                  <div className="w-full md:flex-1">
+                    <InputField
+                      id={`openingRate-${index}`}
+                      name={`openingRate-${index}`}
+                      label="Total Value"
+                      type="number"
+                      value={row.batchRate && row.batchQuantity ? Number(row.batchRate) * Number(row.batchQuantity) : ""}
+                      onChange={() => { }}
+                      error={errors[`openingRate-${index}`]}
+                      disabled
+                    />
+                  </div>
 
-                    <div className="w-full md:flex-1">
-                      <InputField
-                        id={`mrp-${index}`}
-                        name={`mrp-${index}`}
-                        label="MRP"
-                        type="number"
-                        value={row.mrp || ""}
-                        onChange={(e) => updateBatchRow(index, "mrp", e.target.value)}
-                        error={errors[`mrp-${index}`]}
-                      />
-                    </div>
+                  {/* MRP field - ALWAYS visible */}
+                  <div className="w-full md:flex-1">
+                    <InputField
+                      id={`mrp-${index}`}
+                      name={`mrp-${index}`}
+                      label="MRP"
+                      type="number"
+                      value={row.mrp || ""}
+                      onChange={(e) => updateBatchRow(index, "mrp", e.target.value)}
+                      error={errors[`mrp-${index}`]}
+                    />
+                  </div>
 
+                  {/* MFG Date field - ONLY visible when enableBatchTracking is checked */}
+                  {formData.enableBatchTracking && (
                     <div className="w-full md:flex-1">
                       <InputField
                         id={`batchManufacturingDate-${index}`}
@@ -1152,7 +1171,10 @@ const StockItemForm = () => {
                         }
                       />
                     </div>
+                  )}
 
+                  {/* Expiry Date field - ONLY visible when enableBatchTracking is checked */}
+                  {formData.enableBatchTracking && (
                     <div className="w-full md:flex-1">
                       <InputField
                         id={`batchExpiryDate-${index}`}
@@ -1169,20 +1191,21 @@ const StockItemForm = () => {
                         }
                       />
                     </div>
+                  )}
 
-                    <div className="flex justify-center pb-2 w-full md:w-auto">
-                      <button
-                        type="button"
-                        onClick={() => removeBatchRow(index)}
-                        className="p-2 text-red-700 hover:text-red-900"
-                      >
-                        <Trash2 size={20} />
-                      </button>
-                    </div>
+                  {/* Delete Button - ALWAYS visible */}
+                  <div className="flex justify-center pb-2 w-full md:w-auto">
+                    <button
+                      type="button"
+                      onClick={() => removeBatchRow(index)}
+                      className="p-2 text-red-700 hover:text-red-900"
+                    >
+                      <Trash2 size={20} />
+                    </button>
                   </div>
-                ))}
-              </div>
-            )}
+                </div>
+              ))}
+            </div>
 
             {/* ---------------------------------------------------------------- */}
 

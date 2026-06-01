@@ -99,31 +99,42 @@ const ItemMonthlySummary = () => {
 
     let openingQty = 0;
     let openingRate = 0;
+    let openingValue = 0;
 
     if (itemData) {
       if (isDefaultBatch) {
         // 1. Default to Item Level Opening Balance
         openingQty = Number(itemData.openingBalance || 0);
         openingRate = Number(itemData.openingRate || 0);
+        openingValue = openingQty * openingRate;
       }
 
       // 2. Check Batches (Validation/Override)
       if (itemData.batches && Array.isArray(itemData.batches)) {
-        const batch = itemData.batches.find((b: any) =>
+        const matchingBatches = itemData.batches.filter((b: any) =>
           b.batchName === batchName ||
           (isDefaultBatch && (!b.batchName || b.batchName === "Default"))
         );
 
-        // If we found a specific Opening Batch, it supercedes/defines the opening
-        if (batch && batch.mode === 'opening') {
-          openingQty = Number(batch.batchQuantity || 0);
-          openingRate = Number(batch.openingRate || 0);
+        let batchQtySum = 0;
+        let batchValSum = 0;
+        let hasOpeningBatch = false;
+
+        matchingBatches.forEach((b: any) => {
+          if (b.mode === 'opening') {
+            batchQtySum += Number(b.batchQuantity || 0);
+            batchValSum += Number(b.batchQuantity || 0) * Number(b.openingRate || 0);
+            hasOpeningBatch = true;
+          }
+        });
+
+        if (hasOpeningBatch) {
+          openingQty = batchQtySum;
+          openingValue = batchValSum;
+          openingRate = openingQty > 0 ? openingValue / openingQty : 0;
         }
       }
     }
-
-    // ✅ Calculate Opening Value
-    let openingValue = openingQty * openingRate;
 
     // Handle small precision errors
     if (Math.abs(openingQty) < 0.001) openingQty = 0;
@@ -266,13 +277,11 @@ const ItemMonthlySummary = () => {
     // Find the earliest date in purchases or sales for this batch if NOT opening mode
 
     let isOpeningMode = false;
-    if (itemData && itemData.batches) {
-      const batch = itemData.batches.find((b: any) =>
-        b.batchName === batchName || (isDefaultBatch && !b.batchName)
+    if (itemData && itemData.batches && Array.isArray(itemData.batches)) {
+      isOpeningMode = itemData.batches.some((b: any) =>
+        (b.batchName === batchName || (isDefaultBatch && (!b.batchName || b.batchName === "Default"))) &&
+        b.mode === 'opening'
       );
-      if (batch && batch.mode === 'opening') {
-        isOpeningMode = true;
-      }
     }
 
     if (!isOpeningMode) {
