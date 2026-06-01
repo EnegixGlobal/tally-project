@@ -892,9 +892,11 @@ const DebitNoteRegiser: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                {showActions && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -952,29 +954,31 @@ const DebitNoteRegiser: React.FC = () => {
                         {status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
+                    {showActions && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-2">
 
-                        {hasPermission("edit") && (
-                          <button
-                            onClick={() => editHandler(voucher.id)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                            title="Edit voucher"
-                          >
-                            Edit
-                          </button>
-                        )}
-                        {hasPermission("delete") && (
-                          <button
-                            onClick={() => deleteHandler(voucher.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete voucher"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                          {hasPermission("edit") && (
+                            <button
+                              onClick={() => editHandler(voucher.id)}
+                              className="text-indigo-600 hover:text-indigo-900"
+                              title="Edit voucher"
+                            >
+                              Edit
+                            </button>
+                          )}
+                          {hasPermission("delete") && (
+                            <button
+                              onClick={() => deleteHandler(voucher.id)}
+                              className="text-red-600 hover:text-red-900"
+                              title="Delete voucher"
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}

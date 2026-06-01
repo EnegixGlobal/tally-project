@@ -2,6 +2,8 @@ import React, { useState } from "react";
 
 import GSTPurchase from "./GSTAnalysis/GSTPurchase";
 import GSTSales from "./GSTAnalysis/GSTSales";
+import GSTCreditNote from "./GSTAnalysis/GSTCreditNote";
+import GSTDebitNote from "./GSTAnalysis/GSTDebitNote";
 
 import { ArrowLeft, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -13,9 +15,11 @@ const GSTAnalysis: React.FC = () => {
   // ================= STATES =================
   const [showSettings, setShowSettings] = useState(false);
 
-  // Default OFF
+  // Default ON
   const [showPurchase, setShowPurchase] = useState(true);
   const [showSales, setShowSales] = useState(true);
+  const [showCreditNote, setShowCreditNote] = useState(true);
+  const [showDebitNote, setShowDebitNote] = useState(true);
 
 
   return (
@@ -66,6 +70,17 @@ const GSTAnalysis: React.FC = () => {
               </label>
 
 
+              {/* Debit Note */}
+              <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showDebitNote}
+                  onChange={() => setShowDebitNote(!showDebitNote)}
+                />
+                Debit Note
+              </label>
+
+
               {/* Sales */}
               <label className="flex items-center gap-2 mt-2 cursor-pointer">
                 <input
@@ -74,6 +89,17 @@ const GSTAnalysis: React.FC = () => {
                   onChange={() => setShowSales(!showSales)}
                 />
                 Sales
+              </label>
+
+
+              {/* Credit Note */}
+              <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showCreditNote}
+                  onChange={() => setShowCreditNote(!showCreditNote)}
+                />
+                Credit Note
               </label>
 
             </div>
@@ -103,9 +129,25 @@ const GSTAnalysis: React.FC = () => {
       )}
 
 
+      {/* ================= DEBIT NOTE SECTION ================= */}
+      {showDebitNote && (
+        <section className="mb-16">
+
+          <h2 className="text-xl font-semibold text-gray-700 mb-4 text-center">
+            Debit Note Analysis
+          </h2>
+
+          <div className="bg-white rounded-xl shadow">
+            <GSTDebitNote />
+          </div>
+
+        </section>
+      )}
+
+
       {/* ================= SALES SECTION ================= */}
       {showSales && (
-        <section className="mb-10">
+        <section className="mb-16">
 
           <h2 className="text-xl font-semibold text-gray-700 mb-4 text-center">
             Sales Analysis
@@ -119,9 +161,26 @@ const GSTAnalysis: React.FC = () => {
       )}
 
 
+      {/* ================= CREDIT NOTE SECTION ================= */}
+      {showCreditNote && (
+        <section className="mb-10">
+
+          <h2 className="text-xl font-semibold text-gray-700 mb-4 text-center">
+            Credit Note Analysis
+          </h2>
+
+          <div className="bg-white rounded-xl shadow">
+            <GSTCreditNote />
+          </div>
+
+        </section>
+      )}
+
+
 
     </div>
   );
 };
 
 export default GSTAnalysis;
+

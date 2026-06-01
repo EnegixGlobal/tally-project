@@ -527,6 +527,384 @@ router.get("/sales", async (req, res) => {
 });
 
 
+router.get("/credit-note", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id } = req.query;
+
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id, owner_type and owner_id are required",
+      });
+    }
+
+    // ================================
+    // FETCH ALL RELATED LEDGERS
+    // ================================
+    const [rows] = await db.execute(
+      `
+      SELECT id, name
+      FROM ledgers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND (owner_id = ? OR owner_id = 0)
+        AND (
+          LOWER(name) LIKE '%sales%'
+          OR LOWER(name) LIKE '%credit%'
+          OR LOWER(name) LIKE '%igst%'
+          OR LOWER(name) LIKE '%cgst%'
+          OR LOWER(name) LIKE '%sgst%'
+          OR LOWER(name) LIKE '%intra%'
+          OR LOWER(name) LIKE '%inter%'
+        )
+      ORDER BY name
+      `,
+      [company_id, owner_type, owner_id]
+    );
+
+    // ================================
+    // GROUP LEDGERS
+    // ================================
+    const ledgers = {
+      intraSales: [],
+      interSales: [],
+      igst: [],
+      cgst: [],
+      sgst: []
+    };
+
+    rows.forEach((row) => {
+      const name = row.name.toLowerCase();
+
+      // Intra Sales
+      if ((name.includes("sales") || name.includes("credit")) && name.includes("intra")) {
+        ledgers.intraSales.push(row);
+      }
+      // Inter Sales
+      else if ((name.includes("sales") || name.includes("credit")) && name.includes("inter")) {
+        ledgers.interSales.push(row);
+      }
+      // Taxes
+      else if (name.includes("igst")) {
+        ledgers.igst.push(row);
+      }
+      else if (name.includes("cgst")) {
+        ledgers.cgst.push(row);
+      }
+      else if (name.includes("sgst")) {
+        ledgers.sgst.push(row);
+      }
+    });
+
+    // ================================
+    // FETCH VOUCHERS
+    // ================================
+    const [vouchers] = await db.execute(
+      `
+      SELECT id, date, narration
+      FROM credit_vouchers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+      `,
+      [company_id, owner_type, owner_id]
+    );
+
+    const monthNames = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+
+    const monthlyData = {};
+    const ledgerMap = new Map();
+    rows.forEach(r => ledgerMap.set(r.id, r));
+
+    vouchers.forEach((v) => {
+      let monthVal = null;
+      if (v.date) {
+        const d = new Date(v.date);
+        if (!isNaN(d.getTime())) {
+          monthVal = d.getMonth() + 1;
+        }
+      }
+      if (!monthVal) return;
+
+      const mName = monthNames[monthVal - 1];
+
+      if (!monthlyData[mName]) {
+        monthlyData[mName] = {
+          intraSales: {},
+          interSales: {},
+          cgst: {},
+          sgst: {},
+          igst: {},
+          totalIntraSales: 0,
+          totalInterSales: 0,
+          totalCGST: 0,
+          totalSGST: 0,
+          totalIGST: 0
+        };
+      }
+
+      let entries = [];
+      if (v.narration) {
+        try {
+          const parsed = JSON.parse(v.narration);
+          entries = parsed.accountingEntries || [];
+        } catch (err) {
+          // not JSON, ignore
+        }
+      }
+
+      entries.forEach((e) => {
+        const ledgerId = Number(e.ledgerId);
+        const amount = Number(e.amount || 0);
+        if (!ledgerId || amount <= 0) return;
+
+        const ledger = ledgerMap.get(ledgerId);
+        if (!ledger) return;
+
+        const ledgerName = ledger.name.toLowerCase();
+
+        // 1. Check if it's Intra Sales
+        if (ledgerName.includes("intra") && (ledgerName.includes("sales") || ledgerName.includes("credit"))) {
+          monthlyData[mName].intraSales[ledgerId] =
+            (monthlyData[mName].intraSales[ledgerId] || 0) + amount;
+          monthlyData[mName].totalIntraSales += amount;
+        }
+        // 2. Check if it's Inter Sales
+        else if (ledgerName.includes("inter") && (ledgerName.includes("sales") || ledgerName.includes("credit"))) {
+          monthlyData[mName].interSales[ledgerId] =
+            (monthlyData[mName].interSales[ledgerId] || 0) + amount;
+          monthlyData[mName].totalInterSales += amount;
+        }
+        // 3. Check if it's CGST
+        else if (ledgerName.includes("cgst")) {
+          monthlyData[mName].cgst[ledgerId] =
+            (monthlyData[mName].cgst[ledgerId] || 0) + amount;
+          monthlyData[mName].totalCGST += amount;
+        }
+        // 4. Check if it's SGST
+        else if (ledgerName.includes("sgst")) {
+          monthlyData[mName].sgst[ledgerId] =
+            (monthlyData[mName].sgst[ledgerId] || 0) + amount;
+          monthlyData[mName].totalSGST += amount;
+        }
+        // 5. Check if it's IGST
+        else if (ledgerName.includes("igst")) {
+          monthlyData[mName].igst[ledgerId] =
+            (monthlyData[mName].igst[ledgerId] || 0) + amount;
+          monthlyData[mName].totalIGST += amount;
+        }
+      });
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        ledgers,
+        monthlyData
+      }
+    });
+
+  } catch (error) {
+    console.error("Credit Note GST Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server Error"
+    });
+  }
+});
+
+router.get("/debit-note", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id } = req.query;
+
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id, owner_type and owner_id are required",
+      });
+    }
+
+    // ================================
+    // FETCH ALL RELATED LEDGERS
+    // ================================
+    const [rows] = await db.execute(
+      `
+      SELECT id, name
+      FROM ledgers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND (owner_id = ? OR owner_id = 0)
+        AND (
+          LOWER(name) LIKE '%purchase%'
+          OR LOWER(name) LIKE '%debit%'
+          OR LOWER(name) LIKE '%igst%'
+          OR LOWER(name) LIKE '%cgst%'
+          OR LOWER(name) LIKE '%sgst%'
+          OR LOWER(name) LIKE '%intra%'
+          OR LOWER(name) LIKE '%inter%'
+        )
+      ORDER BY name
+      `,
+      [company_id, owner_type, owner_id]
+    );
+
+    // ================================
+    // GROUP LEDGERS
+    // ================================
+    const ledgers = {
+      intraPurchase: [],
+      interPurchase: [],
+      igst: [],
+      cgst: [],
+      sgst: []
+    };
+
+    rows.forEach((row) => {
+      const name = row.name.toLowerCase();
+
+      // Intra Purchase
+      if ((name.includes("purchase") || name.includes("debit")) && name.includes("intra")) {
+        ledgers.intraPurchase.push(row);
+      }
+      // Inter Purchase
+      else if ((name.includes("purchase") || name.includes("debit")) && name.includes("inter")) {
+        ledgers.interPurchase.push(row);
+      }
+      // Taxes
+      else if (name.includes("igst")) {
+        ledgers.igst.push(row);
+      }
+      else if (name.includes("cgst")) {
+        ledgers.cgst.push(row);
+      }
+      else if (name.includes("sgst")) {
+        ledgers.sgst.push(row);
+      }
+    });
+
+    // ================================
+    // FETCH VOUCHERS
+    // ================================
+    const [vouchers] = await db.execute(
+      `
+      SELECT id, date, narration
+      FROM debit_note_vouchers
+      WHERE company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+      `,
+      [company_id, owner_type, owner_id]
+    );
+
+    const monthNames = [
+      "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+      "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+    ];
+
+    const monthlyData = {};
+    const ledgerMap = new Map();
+    rows.forEach(r => ledgerMap.set(r.id, r));
+
+    vouchers.forEach((v) => {
+      let monthVal = null;
+      if (v.date) {
+        const d = new Date(v.date);
+        if (!isNaN(d.getTime())) {
+          monthVal = d.getMonth() + 1;
+        }
+      }
+      if (!monthVal) return;
+
+      const mName = monthNames[monthVal - 1];
+
+      if (!monthlyData[mName]) {
+        monthlyData[mName] = {
+          intraPurchase: {},
+          interPurchase: {},
+          cgst: {},
+          sgst: {},
+          igst: {},
+          totalIntraPurchase: 0,
+          totalInterPurchase: 0,
+          totalCGST: 0,
+          totalSGST: 0,
+          totalIGST: 0
+        };
+      }
+
+      let entries = [];
+      if (v.narration) {
+        try {
+          const parsed = JSON.parse(v.narration);
+          entries = parsed.accountingEntries || [];
+        } catch (err) {
+          // not JSON, ignore
+        }
+      }
+
+      entries.forEach((e) => {
+        const ledgerId = Number(e.ledgerId);
+        const amount = Number(e.amount || 0);
+        if (!ledgerId || amount <= 0) return;
+
+        const ledger = ledgerMap.get(ledgerId);
+        if (!ledger) return;
+
+        const ledgerName = ledger.name.toLowerCase();
+
+        // 1. Check if it's Intra Purchase
+        if (ledgerName.includes("intra") && (ledgerName.includes("purchase") || ledgerName.includes("debit"))) {
+          monthlyData[mName].intraPurchase[ledgerId] =
+            (monthlyData[mName].intraPurchase[ledgerId] || 0) + amount;
+          monthlyData[mName].totalIntraPurchase += amount;
+        }
+        // 2. Check if it's Inter Purchase
+        else if (ledgerName.includes("inter") && (ledgerName.includes("purchase") || ledgerName.includes("debit"))) {
+          monthlyData[mName].interPurchase[ledgerId] =
+            (monthlyData[mName].interPurchase[ledgerId] || 0) + amount;
+          monthlyData[mName].totalInterPurchase += amount;
+        }
+        // 3. Check if it's CGST
+        else if (ledgerName.includes("cgst")) {
+          monthlyData[mName].cgst[ledgerId] =
+            (monthlyData[mName].cgst[ledgerId] || 0) + amount;
+          monthlyData[mName].totalCGST += amount;
+        }
+        // 4. Check if it's SGST
+        else if (ledgerName.includes("sgst")) {
+          monthlyData[mName].sgst[ledgerId] =
+            (monthlyData[mName].sgst[ledgerId] || 0) + amount;
+          monthlyData[mName].totalSGST += amount;
+        }
+        // 5. Check if it's IGST
+        else if (ledgerName.includes("igst")) {
+          monthlyData[mName].igst[ledgerId] =
+            (monthlyData[mName].igst[ledgerId] || 0) + amount;
+          monthlyData[mName].totalIGST += amount;
+        }
+      });
+    });
+
+    return res.json({
+      success: true,
+      data: {
+        ledgers,
+        monthlyData
+      }
+    });
+
+  } catch (error) {
+    console.error("Debit Note GST Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server Error"
+    });
+  }
+});
 
 
 module.exports = router;
+
