@@ -683,7 +683,11 @@ const StockSummary: React.FC = () => {
           const totalInQty = b.opening.qty + b.inward.qty;
           const totalInValue = b.opening.value + b.inward.value;
 
-          b.closing.rate = totalInQty > 0 ? totalInValue / totalInQty : 0;
+          if (totalInQty > 0) {
+            b.closing.rate = totalInValue / totalInQty;
+          } else {
+            b.closing.rate = b.outward.qty > 0 ? b.outward.value / b.outward.qty : 0;
+          }
           b.closing.value = b.closing.qty * b.closing.rate;
 
           // 🔹 Safety (precision)
@@ -1508,8 +1512,8 @@ const StockSummary: React.FC = () => {
                         );
 
                         const closingRate =
-                          totals.closingQty > 0
-                            ? totals.closingValue / totals.closingQty
+                          totals.closingQty !== 0
+                            ? Math.abs(totals.closingValue / totals.closingQty)
                             : 0;
 
                         const openingRate =
@@ -1589,13 +1593,13 @@ const StockSummary: React.FC = () => {
                               </td>
 
                               <td className="border p-2 text-right align-middle">
-                                {totals.closingQty ? `${Math.abs(totals.closingQty)} ${item.unitName}`.trim() : ""}
+                                {totals.closingQty ? `${totals.closingQty} ${item.unitName}`.trim() : ""}
                               </td>
                               <td className="border p-2 text-right align-middle">
-                                {formatCurrency(Math.abs(closingRate))}
+                                {formatCurrency(closingRate)}
                               </td>
                               <td className="border p-2 text-right align-middle">
-                                {formatCurrency(Math.abs(totals.closingValue))}
+                                {formatCurrency(totals.closingValue)}
                               </td>
                             </tr>
 
@@ -1662,13 +1666,13 @@ const StockSummary: React.FC = () => {
                                     </td>
 
                                     <td className="border p-2 text-right align-middle">
-                                      {b.closing.qty ? `${Math.abs(b.closing.qty)} ${item.unitName}`.trim() : ""}
+                                      {b.closing.qty ? `${b.closing.qty} ${item.unitName}`.trim() : ""}
                                     </td>
                                     <td className="border p-2 text-right align-middle">
-                                      {formatCurrency(Math.abs(b.closing.rate))}
+                                      {formatCurrency(b.closing.rate)}
                                     </td>
                                     <td className="border p-2 text-right align-middle">
-                                      {formatCurrency(Math.abs(b.closing.value))}
+                                      {formatCurrency(b.closing.value)}
                                     </td>
                                   </tr>
                                 )
@@ -1766,13 +1770,13 @@ const StockSummary: React.FC = () => {
 
                             {/* Closing */}
                             <td className="border p-2 text-right align-middle">
-                              {Math.abs(grand.closingQty) || ""}
+                              {grand.closingQty || ""}
                             </td>
                             <td className="border p-2 text-right align-middle">
                               {/* Rate */}
                             </td>
                             <td className="border p-2 text-right align-middle">
-                              {formatCurrency(Math.abs(grand.closingValue))}
+                              {formatCurrency(grand.closingValue)}
                             </td>
                           </tr>
                         );
