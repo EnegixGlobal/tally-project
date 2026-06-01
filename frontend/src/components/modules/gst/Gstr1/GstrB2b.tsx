@@ -5,7 +5,7 @@ import { ArrowLeft, Filter, Download, Printer } from "lucide-react";
 import * as XLSX from "xlsx";
 
 const Gstr2B2b = () => {
-  const { theme } = useAppContext();
+  const { theme, companyInfo } = useAppContext();
   const navigate = useNavigate();
   const location = useLocation();
   const [showFilterPanel, setShowFilterPanel] = useState(false);
@@ -25,6 +25,29 @@ const Gstr2B2b = () => {
   const [allSales, setAllSales] = useState<any[]>([]);
   const [ledger, setLedger] = useState<any[]>([]);
   const [matchedSales, setMatchedSales] = useState<any[]>([]);
+  const [companyDetails, setCompanyDetails] = useState<any>(null);
+
+  useEffect(() => {
+    if (!companyId) return;
+    const fetchCompanyDetails = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/company/company/${companyId}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const data = await res.json();
+        if (data) {
+          setCompanyDetails(data);
+        }
+      } catch (err) {
+        console.error("Failed to fetch company details:", err);
+      }
+    };
+    fetchCompanyDetails();
+  }, [companyId]);
 
   const [filters, setFilters] = useState(() => {
     if (location.state?.fromDate && location.state?.toDate) {
@@ -237,36 +260,126 @@ const Gstr2B2b = () => {
     const fDate = fromDate || filters.fromDate;
     const tDate = toDate || filters.toDate;
 
-    const payload = {
-      type: "GSTR-1",
-      section: "B2B Cumulative",
-      period: {
-        from: fDate,
-        to: tDate,
-      },
-      data: list.map((row: any) => {
-        const ledger = row.ledger;
-        return {
-          gstin: ledger?.gstNumber || "",
-          receiverName: ledger?.name || "",
-          invoiceNumber: row.number,
-          invoiceDate: row.date,
-          placeOfSupply: ledger?.state || "",
-          invoiceValue: Number(row.total || 0),
-          taxableValue: Number(row.subtotal || 0),
-          igst: Number(row.igstTotal || 0),
-          cgst: Number(row.cgstTotal || 0),
-          sgst: Number(row.sgstTotal || 0),
-          cess: 0,
+    // Retrieve taxpayer GSTIN
+    const companyInfoStr = localStorage.getItem("companyInfo");
+    const companyInfoObj = companyInfoStr ? JSON.parse(companyInfoStr) : null;
+    const taxpayerGstin =
+      companyDetails?.gstNumber ||
+      companyDetails?.gst_number ||
+      companyInfo?.gstNumber ||
+      companyInfo?.gst_number ||
+      companyInfoObj?.gstNumber ||
+      companyInfoObj?.gst_number ||
+      "";
+
+    // Format FP (Financial Period MMYYYY)
+    let fp = "";
+    if (fDate && fDate !== "2000-01-01") {
+      const d = new Date(fDate);
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = String(d.getFullYear());
+      fp = `${mm}${yyyy}`;
+    } else {
+      const dates = list.map(item => item.date).filter(Boolean);
+      const latestDateStr = dates.length > 0 ? dates.reduce((max, d) => d > max ? d : max) : null;
+      const fpDate = latestDateStr ? new Date(latestDateStr) : new Date();
+      const mm = String(fpDate.getMonth() + 1).padStart(2, "0");
+      const yyyy = String(fpDate.getFullYear());
+      fp = `${mm}${yyyy}`;
+    }
+
+    // Helper to format date to DD-MM-YYYY
+    const formatInvoiceDate = (dateStr: string) => {
+      if (!dateStr) return "";
+      const d = new Date(dateStr);
+      const dd = String(d.getDate()).padStart(2, "0");
+      const mm = String(d.getMonth() + 1).padStart(2, "0");
+      const yyyy = d.getFullYear();
+      return `${dd}-${mm}-${yyyy}`;
+    };
+
+    // Helper to parse State Code from Place of Supply string (e.g. "Jharkhand(20)" -> "20")
+    const parsePos = (posStr: string) => {
+      if (!posStr) return "";
+      const match = posStr.match(/\((\d+)\)/);
+      if (match) return match[1];
+      const matchDigits = posStr.match(/\b\d{2}\b/);
+      if (matchDigits) return matchDigits[0];
+      const match2 = posStr.match(/(\d+)/);
+      if (match2) return match2[1];
+      return posStr;
+    };
+
+    // Group by CTIN (Customer GSTIN)
+    const groupedB2bMap: { [ctin: string]: any[] } = {};
+    list.forEach((row: any) => {
+      const ledger = row.ledger;
+      const ctin = (ledger?.gstNumber || "").trim();
+      if (!ctin) return;
+
+      if (!groupedB2bMap[ctin]) {
+        groupedB2bMap[ctin] = [];
+      }
+      groupedB2bMap[ctin].push(row);
+    });
+
+    const b2bList = Object.keys(groupedB2bMap).map((ctin) => {
+      const rows = groupedB2bMap[ctin];
+      const invList = rows.map((row) => {
+        const rt = getTaxRate(
+          Number(row.igstTotal || 0) + Number(row.cgstTotal || 0) + Number(row.sgstTotal || 0),
+          row.subtotal
+        );
+        const numValue = Math.round(rt * 100) + 1;
+
+        const itm_det: any = {
+          txval: Number(row.subtotal || 0),
+          rt: rt
         };
-      }),
-      totals: {
-        taxableValue: list.reduce((acc, row) => acc + (Number(row.subtotal) || 0), 0),
-        igst: list.reduce((acc, row) => acc + (Number(row.igstTotal) || 0), 0),
-        cgst: list.reduce((acc, row) => acc + (Number(row.cgstTotal) || 0), 0),
-        sgst: list.reduce((acc, row) => acc + (Number(row.sgstTotal) || 0), 0),
-      },
-      generatedAt: new Date().toISOString(),
+
+        const igstVal = Number(row.igstTotal || 0);
+        const cgstVal = Number(row.cgstTotal || 0);
+        const sgstVal = Number(row.sgstTotal || 0);
+
+        if (igstVal > 0) {
+          itm_det.iamt = igstVal;
+        }
+        if (cgstVal > 0 || igstVal === 0) {
+          itm_det.camt = cgstVal;
+        }
+        if (sgstVal > 0 || igstVal === 0) {
+          itm_det.samt = sgstVal;
+        }
+        itm_det.csamt = 0;
+
+        return {
+          inum: String(row.number || ""),
+          idt: formatInvoiceDate(row.date),
+          val: Number(row.total || 0),
+          pos: parsePos(row.ledger?.state || ""),
+          rchrg: "N",
+          inv_typ: "R",
+          itms: [
+            {
+              num: numValue,
+              itm_det: itm_det
+            }
+          ]
+        };
+      });
+
+      return {
+        ctin: ctin,
+        inv: invList
+      };
+    });
+
+    const payload = {
+      gstin: taxpayerGstin,
+      fp: fp,
+      version: "GST3.2.4",
+      hash: "hash",
+      b2b: b2bList
     };
 
     const jsonStr = JSON.stringify(payload, null, 2);
