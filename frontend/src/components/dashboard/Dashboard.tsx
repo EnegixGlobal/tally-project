@@ -624,20 +624,20 @@ const Dashboard: React.FC = () => {
                 </p>
 
                 <p className="text-sm opacity-75 mb-1">
-                  Books Beginning From: {companyInfo.books_beginning_year}
+                  Books Beginning From: {companyInfo.books_beginning_year || companyInfo.booksBeginningYear}
                 </p>
 
                 <p className="text-sm opacity-75 mb-1">
-                  GST Number: {companyInfo.gst_number}
+                  GST Number: {companyInfo.gst_number || companyInfo.gstNumber || companyInfo.gstin}
                 </p>
 
                 <p className="text-sm opacity-75 mb-1">
-                  PAN Number: {companyInfo.pan_number}
+                  PAN Number: {companyInfo.pan_number || companyInfo.panNumber}
                 </p>
 
                 <p className="text-sm opacity-75 mb-1">
                   Address: {companyInfo.address}, {companyInfo.state} -{" "}
-                  {companyInfo.pin}
+                  {companyInfo.pin || companyInfo.pin_code || companyInfo.pincode}
                 </p>
 
                 <p className="text-sm opacity-75 mb-1">
@@ -645,7 +645,7 @@ const Dashboard: React.FC = () => {
                 </p>
 
                 <p className="text-sm opacity-75">
-                  Phone: {companyInfo.phone_number}
+                  Phone: {companyInfo.phone_number || companyInfo.phoneNumber || companyInfo.phone}
                 </p>
               </div>
 

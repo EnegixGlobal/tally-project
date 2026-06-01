@@ -82,6 +82,8 @@ const EWayBill: React.FC = () => {
   const [generateEWay, setGenerateEWay] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [combineView, setCombineView] = useState(false);
+  const [showJSONPreview, setShowJSONPreview] = useState(false);
+  const [jsonPreviewContent, setJsonPreviewContent] = useState("");
 
 
 
@@ -99,21 +101,51 @@ const EWayBill: React.FC = () => {
   });
 
   useEffect(() => {
-    if (!companyInfo?.id) return;
+    // 1. Initial populate from localStorage (instant UI response)
+    if (companyInfo && Object.keys(companyInfo).length > 0) {
+      setSupplier({
+        gstin: companyInfo.gst_number || companyInfo.gstNumber || companyInfo.gstin || "",
+        legalName: companyInfo.name || companyInfo.legalName || "",
+        tradeName: companyInfo.name || companyInfo.tradeName || "",
+        address1: companyInfo.address || companyInfo.address1 || "",
+        address2: "",
+        location: companyInfo.address || companyInfo.location || "",
+        state: extractStateCode(companyInfo.state || ""),
+        pincode: companyInfo.pin || companyInfo.pin_code || companyInfo.pincode || "",
+        phone: companyInfo.phone_number || companyInfo.phoneNumber || companyInfo.phone || "",
+        email: companyInfo.email || "",
+      });
+    }
 
-    setSupplier({
-      gstin: companyInfo.gst_number || "",
-      legalName: companyInfo.name || "",
-      tradeName: companyInfo.name || "",
-      address1: companyInfo.address || "",
-      address2: "",
-      location: companyInfo.address || "",
-      state: extractStateCode(companyInfo.state || ""),
-      pincode: companyInfo.pin || "",
-      phone: companyInfo.phone_number || "",
-      email: companyInfo.email || "",
-    });
-  }, []);
+    // 2. Fresh fetch from backend to guarantee latest, correct details
+    if (!companyId) return;
+    const fetchCompanyData = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/company/company/${companyId}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (data) {
+            setSupplier(prev => ({
+              ...prev,
+              gstin: data.gstNumber || data.gst_number || data.gstin || prev.gstin,
+              legalName: data.name || data.legalName || prev.legalName,
+              tradeName: data.name || data.tradeName || prev.tradeName,
+              address1: data.address || data.address1 || prev.address1,
+              location: data.address || data.location || prev.location,
+              state: extractStateCode(data.state || prev.state),
+              pincode: data.pin || data.pin_code || data.pincode || prev.pincode,
+              phone: data.phoneNumber || data.phone_number || data.phone || prev.phone,
+              email: data.email || prev.email,
+            }));
+          }
+        }
+      } catch (err) {
+        console.error("Error fetching company details in EWayBill:", err);
+      }
+    };
+
+    fetchCompanyData();
+  }, [companyId]);
 
   // RecRecipient Masters
   const [recipient, setRecipient] = useState({
@@ -142,7 +174,7 @@ const EWayBill: React.FC = () => {
       address2: "",
       location: selectedSale.district || "",
       state: extractStateCode(selectedSale.state),
-      pincode: "",
+      pincode: selectedSale.pincode || "",
       phone: selectedSale.phone || "",
       email: selectedSale.email || "",
     });
@@ -163,6 +195,21 @@ const EWayBill: React.FC = () => {
   useEffect(() => {
     if (!selectedSale) return;
 
+    // Calculate actual GST rate percentage
+    const igstVal = Number(selectedSale.igstTotal || 0);
+    const cgstVal = Number(selectedSale.cgstTotal || 0);
+    const sgstVal = Number(selectedSale.sgstTotal || 0);
+    const subtotalVal = Number(selectedSale.subtotal || 0);
+
+    let calculatedGstRate = 0;
+    if (subtotalVal > 0) {
+      if (igstVal > 0) {
+        calculatedGstRate = Math.round((igstVal / subtotalVal) * 100);
+      } else if (cgstVal > 0 || sgstVal > 0) {
+        calculatedGstRate = Math.round(((cgstVal + sgstVal) / subtotalVal) * 100);
+      }
+    }
+
     setProduct({
       description: selectedSale.itemName || "",
       isService: "No",
@@ -175,7 +222,7 @@ const EWayBill: React.FC = () => {
 
       unitPrice: Number(selectedSale.rate || 0),
 
-      gst: selectedSale.igstTotal > 0 ? "IGST" : "CGST+SGST",
+      gst: calculatedGstRate ? String(calculatedGstRate) : "18", // fallback to standard 18% if no tax specified
     });
 
   }, [selectedSale]);
@@ -226,7 +273,7 @@ const EWayBill: React.FC = () => {
       gstin: selectedSale.gst_number || "",
       address: selectedSale.address || "",
       place: selectedSale.district || "",
-      pincode: "",
+      pincode: selectedSale.pincode || "",
       state: extractStateCode(selectedSale.state),
     });
 
@@ -278,7 +325,40 @@ const EWayBill: React.FC = () => {
 
 
   // json genrate
-  const handleDownloadJSON = () => {
+  // Generate JSON content and show in preview modal
+  const handleGenerateJSONPreview = () => {
+    // Utility to clean up newlines, extra spaces, carriage returns
+    const cleanStr = (str: string) => {
+      if (!str) return "";
+      return str.replace(/[\r\n]+/g, " ").replace(/\s+/g, " ").trim();
+    };
+
+    // Date formatting (DD/MM/YYYY)
+    const formatDateGB = (dateStr: string) => {
+      if (!dateStr) return new Date().toLocaleDateString("en-GB");
+      const dateObj = new Date(dateStr);
+      const day = String(dateObj.getDate()).padStart(2, '0');
+      const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+      const year = dateObj.getFullYear();
+      return `${day}/${month}/${year}`;
+    };
+
+    const assVal = Number(product.unitPrice || 0) * Number(product.qty || 0);
+    const gstRt = Number(product.gst || 0);
+    const isInterstate = selectedSale?.igstTotal > 0;
+    const igstVal = isInterstate ? Number((assVal * (gstRt / 100)).toFixed(2)) : 0;
+    const cgstVal = !isInterstate ? Number((assVal * ((gstRt / 2) / 100)).toFixed(2)) : 0;
+    const sgstVal = !isInterstate ? Number((assVal * ((gstRt / 2) / 100)).toFixed(2)) : 0;
+    
+    // Original discount total from sales voucher
+    const discountVal = Number(selectedSale?.discountTotal || 0);
+    
+    // TotInvVal = AssVal + IgstVal + CgstVal + SgstVal - Discount
+    const totInvVal = Number((assVal + igstVal + cgstVal + sgstVal - discountVal).toFixed(2));
+    
+    // Item TotVal (before overall discount) = AssVal + IgstVal + CgstVal + SgstVal
+    const totItemVal = Number((assVal + igstVal + cgstVal + sgstVal).toFixed(2));
+
     const ewayBillJSON = [
       {
         Version: "1.1",
@@ -294,94 +374,80 @@ const EWayBill: React.FC = () => {
         DocDtls: {
           Typ: "INV",
           No: selectedSale?.number || "",
-          Dt: new Date().toLocaleDateString("en-GB").split("/").join("/"),
+          Dt: formatDateGB(selectedSale?.date),
         },
 
         SellerDtls: {
-          Gstin: supplier.gstin,
-          LglNm: supplier.legalName,
-          Addr1: supplier.address1,
-          Addr2: supplier.address2 || "",
-          Loc: supplier.location,
+          Gstin: cleanStr(supplier.gstin),
+          LglNm: cleanStr(supplier.legalName),
+          Addr1: cleanStr(supplier.address1),
+          Addr2: cleanStr(supplier.address2 || ""),
+          Loc: cleanStr(supplier.location),
           Pin: Number(supplier.pincode || 0),
-          Stcd: supplier.state || "",
-          Ph: supplier.phone || null,
-          Em: supplier.email || null,
+          Stcd: cleanStr(supplier.state || ""),
+          Ph: cleanStr(supplier.phone) || null,
+          Em: cleanStr(supplier.email) || null,
         },
 
         BuyerDtls: {
-          Gstin: recipient.gstin,
-          LglNm: recipient.legalName,
-          Addr1: recipient.address1,
-          Addr2: recipient.address2 || "",
-          Loc: recipient.location,
+          Gstin: cleanStr(recipient.gstin),
+          LglNm: cleanStr(recipient.legalName),
+          Addr1: cleanStr(recipient.address1),
+          Addr2: cleanStr(recipient.address2 || ""),
+          Loc: cleanStr(recipient.location),
           Pin: Number(recipient.pincode || 0),
-          Pos: recipient.state || "",
-          Stcd: recipient.state || "",
-          Ph: recipient.phone || null,
-          Em: recipient.email || null,
+          Pos: cleanStr(recipient.state || ""),
+          Stcd: cleanStr(recipient.state || ""),
+          Ph: cleanStr(recipient.phone) || null,
+          Em: cleanStr(recipient.email) || null,
         },
-
-        ShipToDtls: {
-          Gstin: shipping.gstin || "",
-          LglNm: shipping.legalName || "",
-          Addr1: shipping.address || "",
-          Addr2: "",
-          Loc: shipping.place || "",
-          Pin: Number(shipping.pincode || 0),
-          Stcd: shipping.state || "",
-        },
-
 
         ValDtls: {
-          AssVal: Number(product.unitPrice || 0) * Number(product.qty || 0),
-          IgstVal: 0,
-          CgstVal: 0,
-          SgstVal: 0,
+          AssVal: assVal,
+          IgstVal: igstVal,
+          CgstVal: cgstVal,
+          SgstVal: sgstVal,
           CesVal: 0,
           StCesVal: 0,
-          Discount: 0,
+          Discount: discountVal,
           OthChrg: 0,
           RndOffAmt: 0,
-          TotInvVal:
-            Number(product.unitPrice || 0) * Number(product.qty || 0),
+          TotInvVal: totInvVal,
         },
 
-        EwbDtls: generateEWay ? {
-          TransId: transport.transporterId || null,
-          TransName: transport.transporterName || null,
-          TransMode: transport.mode === "Transport Mode" ? "1" : transport.mode === "Rail" ? "2" : transport.mode === "Air" ? "3" : transport.mode === "Ship" ? "4" : "1",
+        EwbDtls: {
+          TransId: transport.transporterId ? cleanStr(transport.transporterId) : null,
+          TransName: transport.transporterName ? cleanStr(transport.transporterName) : null,
+          TransMode: transport.mode === "Rail" ? "2" : transport.mode === "Air" ? "3" : transport.mode === "Ship" ? "4" : "1",
           Distance: Number(transport.distance || 0),
           TransDocNo: selectedSale?.number || "",
-          TransDocDt: new Date().toLocaleDateString("en-GB"),
-          VehNo: transport.vehicleNo || null,
+          TransDocDt: formatDateGB(selectedSale?.date),
+          VehNo: transport.vehicleNo ? cleanStr(transport.vehicleNo) : null,
           VehType: transport.vehicleType === "Over Dimensnional Cargo" ? "O" : "R",
-        } : undefined,
+        },
 
         RefDtls: {
-          InvRm: "Generated from App",
+          InvRm: "NICGEPP2.0",
         },
 
         ItemList: [
           {
             SlNo: "1",
-            PrdDesc: product.description,
+            PrdDesc: cleanStr(product.description),
             IsServc: product.isService == "Yes" ? "Y" : "N",
-            HsnCd: product.hsn,
+            HsnCd: cleanStr(product.hsn),
             Qty: Number(product.qty || 0),
             FreeQty: 0,
-            Unit: product.unit,
+            Unit: cleanStr(product.unit),
             UnitPrice: Number(product.unitPrice || 0),
-            TotAmt:
-              Number(product.unitPrice || 0) * Number(product.qty || 0),
+            TotAmt: assVal,
             Discount: 0,
             PreTaxVal: 0,
-            AssAmt:
-              Number(product.unitPrice || 0) * Number(product.qty || 0),
-            GstRt: Number(product.gst || 0),
-            IgstAmt: 0,
-            CgstAmt: 0,
-            SgstAmt: 0,
+            AssAmt: assVal,
+            GstRt: gstRt,
+            IgstAmt: igstVal,
+            CgstAmt: cgstVal,
+            SgstAmt: sgstVal,
             CesRt: 0,
             CesAmt: 0,
             CesNonAdvlAmt: 0,
@@ -389,23 +455,31 @@ const EWayBill: React.FC = () => {
             StateCesAmt: 0,
             StateCesNonAdvlAmt: 0,
             OthChrg: 0,
-            TotItemVal:
-              Number(product.unitPrice || 0) * Number(product.qty || 0),
+            TotItemVal: totItemVal,
           },
         ],
       },
     ];
 
-    const blob = new Blob([JSON.stringify(ewayBillJSON, null, 2)], {
+    setJsonPreviewContent(JSON.stringify(ewayBillJSON, null, 2));
+    setShowJSONPreview(true);
+  };
+
+  // Download the generated JSON file
+  const handleDownloadJSON = () => {
+    if (!jsonPreviewContent) return;
+
+    const blob = new Blob([jsonPreviewContent], {
       type: "application/json",
     });
 
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
     a.href = url;
-    a.download = "eway-bill.json";
+    a.download = `eway-bill-${selectedSale?.number || "draft"}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    setShowJSONPreview(false); // Close preview modal after download
   };
 
 
@@ -1019,9 +1093,11 @@ const EWayBill: React.FC = () => {
                   </label>
                   <input
                     type="text"
-                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm
-                   focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
-                    placeholder="800001"
+                    value={recipient.pincode}
+                    onChange={(e) =>
+                      setRecipient({ ...recipient, pincode: e.target.value })
+                    }
+                    className="w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
                   />
                 </div>
               </div>
@@ -1424,15 +1500,69 @@ const EWayBill: React.FC = () => {
               </button>
 
               <button
-                onClick={handleDownloadJSON}
+                onClick={handleGenerateJSONPreview}
                 className="px-6 py-2 rounded-md bg-blue-600 text-white hover:bg-blue-700"
               >
-                Download JSON
+                Preview JSON
               </button>
             </div>
 
 
 
+          </div>
+        </div>
+      )}
+
+      {/* JSON Preview Modal */}
+      {showJSONPreview && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-gray-900/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl overflow-hidden flex flex-col max-h-[85vh] animate-in fade-in zoom-in-95 duration-200">
+            {/* Header */}
+            <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-b">
+              <h3 className="text-lg font-bold text-gray-800">
+                JSON Preview - E-Way Bill ({selectedSale?.number})
+              </h3>
+              <button
+                onClick={() => setShowJSONPreview(false)}
+                className="text-gray-400 hover:text-gray-600 transition"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            {/* Code Body */}
+            <div className="p-6 overflow-y-auto flex-1 bg-gray-950">
+              <pre className="text-xs font-mono text-green-400 select-all overflow-x-auto whitespace-pre-wrap leading-relaxed">
+                {jsonPreviewContent}
+              </pre>
+            </div>
+
+            {/* Footer / Buttons */}
+            <div className="flex justify-between items-center px-6 py-4 bg-gray-50 border-t">
+              <button
+                onClick={() => {
+                  navigator.clipboard.writeText(jsonPreviewContent);
+                  alert("Copied to clipboard!");
+                }}
+                className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 text-sm font-semibold transition"
+              >
+                Copy JSON
+              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setShowJSONPreview(false)}
+                  className="px-4 py-2 border border-gray-300 rounded-md hover:bg-gray-100 text-sm font-semibold transition"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handleDownloadJSON}
+                  className="px-5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-semibold transition"
+                >
+                  Download JSON
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
