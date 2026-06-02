@@ -32,6 +32,7 @@ router.get("/", async (req, res) => {
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "attributeId", "INT NULL");
+    await ensureColumn("stock_items", "gstRate", "DECIMAL(5,2) DEFAULT 0.00");
     let query = `
       SELECT 
         s.id,
@@ -46,6 +47,7 @@ router.get("/", async (req, res) => {
         s.gstLedgerId,
         s.cgstLedgerId,
         s.sgstLedgerId,
+        s.gstRate,
         s.attributeId,
         s.barcode,
         s.batches,

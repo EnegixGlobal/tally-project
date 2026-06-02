@@ -4,6 +4,7 @@ import GSTPurchase from "./GSTAnalysis/GSTPurchase";
 import GSTSales from "./GSTAnalysis/GSTSales";
 import GSTCreditNote from "./GSTAnalysis/GSTCreditNote";
 import GSTDebitNote from "./GSTAnalysis/GSTDebitNote";
+import GSTTradingAccount from "./GSTAnalysis/GSTTradingAccount";
 
 import { ArrowLeft, Settings } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -20,6 +21,7 @@ const GSTAnalysis: React.FC = () => {
   const [showSales, setShowSales] = useState(true);
   const [showCreditNote, setShowCreditNote] = useState(true);
   const [showDebitNote, setShowDebitNote] = useState(true);
+  const [showTradingAccount, setShowTradingAccount] = useState(true);
 
 
   return (
@@ -102,6 +104,16 @@ const GSTAnalysis: React.FC = () => {
                 Credit Note
               </label>
 
+              {/* Trading Account */}
+              <label className="flex items-center gap-2 mt-2 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={showTradingAccount}
+                  onChange={() => setShowTradingAccount(!showTradingAccount)}
+                />
+                Trading Account
+              </label>
+
             </div>
           )}
 
@@ -163,7 +175,7 @@ const GSTAnalysis: React.FC = () => {
 
       {/* ================= CREDIT NOTE SECTION ================= */}
       {showCreditNote && (
-        <section className="mb-10">
+        <section className="mb-16">
 
           <h2 className="text-xl font-semibold text-gray-700 mb-4 text-center">
             Credit Note Analysis
@@ -172,6 +184,16 @@ const GSTAnalysis: React.FC = () => {
           <div className="bg-white rounded-xl shadow">
             <GSTCreditNote />
           </div>
+
+        </section>
+      )}
+
+
+      {/* ================= TRADING ACCOUNT SECTION ================= */}
+      {showTradingAccount && (
+        <section className="mb-10">
+
+          <GSTTradingAccount />
 
         </section>
       )}
