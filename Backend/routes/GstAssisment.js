@@ -906,5 +906,314 @@ router.get("/debit-note", async (req, res) => {
 });
 
 
+router.get("/trading-account", async (req, res) => {
+  try {
+    const { company_id, owner_type, owner_id } = req.query;
+
+    if (!company_id || !owner_type || !owner_id) {
+      return res.status(400).json({
+        success: false,
+        message: "company_id, owner_type and owner_id are required",
+      });
+    }
+
+    const ensureColumn = async (table, column, definition) => {
+      const [rows] = await db.execute(
+        `
+        SELECT COUNT(*) AS count
+        FROM information_schema.COLUMNS
+        WHERE TABLE_SCHEMA = DATABASE()
+          AND TABLE_NAME = ?
+          AND COLUMN_NAME = ?
+        `,
+        [table, column]
+      );
+      if (rows[0].count === 0) {
+        await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      }
+    };
+
+    await ensureColumn("stock_items", "openingBalance", "DECIMAL(10,2) DEFAULT 0.00");
+    await ensureColumn("stock_items", "openingValue", "DECIMAL(10,2) DEFAULT 0.00");
+    await ensureColumn("stock_items", "openingRate", "DECIMAL(10,2) DEFAULT 0.00");
+    await ensureColumn("stock_items", "standardPurchaseRate", "DECIMAL(10,2) DEFAULT 0.00");
+    await ensureColumn("stock_items", "gstRate", "DECIMAL(5,2) DEFAULT 0.00");
+
+    // 1. Fetch all ledgers to build rate extractor
+    const [ledgers] = await db.execute(
+      `SELECT id, name, group_id, opening_balance, balance_type 
+       FROM ledgers 
+       WHERE company_id = ? AND owner_type = ? AND (owner_id = ? OR owner_id = 0)`,
+      [company_id, owner_type, owner_id]
+    );
+
+    const ledgerMap = new Map();
+    ledgers.forEach(l => ledgerMap.set(l.id, l));
+
+    const getRateFromLedger = (ledgerId) => {
+      if (!ledgerId) return 0;
+      const ledger = ledgerMap.get(Number(ledgerId));
+      if (!ledger) {
+        if (Number(ledgerId) < 100) return Number(ledgerId);
+        return 0;
+      }
+      const match = ledger.name.match(/(\d+(\.\d+)?)/);
+      return match ? parseFloat(match[0]) : 0;
+    };
+
+    // 2. Fetch stock items
+    const [stockItems] = await db.execute(
+      `SELECT id, name, openingBalance, openingValue, gstRate, batches, openingRate, standardPurchaseRate 
+       FROM stock_items 
+       WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
+      [company_id, owner_type, owner_id]
+    );
+
+    // 3. Compute Opening Stock grouped by GST Rate
+    const openingStockByRate = {};
+    stockItems.forEach(item => {
+      const rate = Number(item.gstRate || 0);
+      let val = 0;
+      let batches = [];
+      try {
+        batches = item.batches ? JSON.parse(item.batches) : [];
+      } catch (e) {}
+
+      if (batches && batches.length > 0) {
+        batches.forEach(b => {
+          val += (Number(b.batchQuantity) || 0) * (Number(b.openingRate) || 0);
+        });
+      } else {
+        val += (Number(item.openingBalance) || 0) * (Number(item.openingRate || item.standardPurchaseRate || 0) || 0);
+      }
+      openingStockByRate[rate] = (openingStockByRate[rate] || 0) + val;
+    });
+
+    // 4. Compute Closing Stock grouped by GST Rate using Tally's standard average cost
+    const [purchaseHistory] = await db.execute(
+      `SELECT i.itemId, i.quantity AS purchaseQuantity, i.rate, i.amount
+       FROM purchase_voucher_items i
+       JOIN purchase_vouchers v ON i.voucherId = v.id
+       WHERE v.company_id = ? AND v.owner_type = ? AND v.owner_id = ?`,
+      [company_id, owner_type, owner_id]
+    );
+
+    const [salesHistory] = await db.execute(
+      `SELECT i.itemId, i.quantity AS qtyChange
+       FROM sales_voucher_items i
+       JOIN sales_vouchers v ON i.voucherId = v.id
+       WHERE v.company_id = ? AND v.owner_type = ? AND v.owner_id = ?`,
+      [company_id, owner_type, owner_id]
+    );
+
+    const itemMap = {};
+    stockItems.forEach(item => {
+      const itemId = item.id;
+      itemMap[itemId] = {
+        gstRate: Number(item.gstRate || 0),
+        openingQty: 0,
+        openingValue: 0,
+        inwardQty: 0,
+        inwardValue: 0,
+        outwardQty: 0
+      };
+
+      let batches = [];
+      try {
+        batches = item.batches ? JSON.parse(item.batches) : [];
+      } catch (e) {}
+
+      if (batches && batches.length > 0) {
+        batches.forEach(b => {
+          const q = Number(b.batchQuantity || 0);
+          const r = Number(b.openingRate || 0);
+          itemMap[itemId].openingQty += q;
+          itemMap[itemId].openingValue += q * r;
+        });
+      } else {
+        const q = Number(item.openingBalance || 0);
+        const r = Number(item.openingRate || item.standardPurchaseRate || 0);
+        itemMap[itemId].openingQty += q;
+        itemMap[itemId].openingValue += q * r;
+      }
+    });
+
+    purchaseHistory.forEach(p => {
+      const itemId = p.itemId;
+      if (!itemMap[itemId]) return;
+      const q = Number(p.purchaseQuantity || 0);
+      const v = q * Number(p.rate || 0);
+      itemMap[itemId].inwardQty += q;
+      itemMap[itemId].inwardValue += v;
+    });
+
+    salesHistory.forEach(s => {
+      const itemId = s.itemId;
+      if (!itemMap[itemId]) return;
+      const q = Math.abs(Number(s.qtyChange || 0));
+      itemMap[itemId].outwardQty += q;
+    });
+
+    const closingStockByRate = {};
+    Object.values(itemMap).forEach(item => {
+      const rate = item.gstRate;
+      const totalInQty = item.openingQty + item.inwardQty;
+      const totalInValue = item.openingValue + item.inwardValue;
+      const avgRate = totalInQty > 0 ? totalInValue / totalInQty : 0;
+      const closingQty = totalInQty - item.outwardQty;
+      const closingValue = closingQty * avgRate;
+
+      closingStockByRate[rate] = (closingStockByRate[rate] || 0) + Math.max(0, closingValue);
+    });
+
+    // 5. Compute Purchases by GST Rate
+    const [purchaseItems] = await db.execute(
+      `SELECT i.amount, i.cgstRate, i.sgstRate, i.igstRate, s.gstRate AS itemGstRate
+       FROM purchase_voucher_items i
+       JOIN purchase_vouchers v ON i.voucherId = v.id
+       LEFT JOIN stock_items s ON i.itemId = s.id
+       WHERE v.company_id = ? AND v.owner_type = ? AND v.owner_id = ?`,
+      [company_id, owner_type, owner_id]
+    );
+
+    const purchaseByRate = {};
+    purchaseItems.forEach(item => {
+      const cgst = getRateFromLedger(item.cgstRate);
+      const sgst = getRateFromLedger(item.sgstRate);
+      const igst = getRateFromLedger(item.igstRate);
+      
+      let rate = igst > 0 ? igst : (cgst + sgst);
+      if (rate === 0) {
+        rate = Number(item.itemGstRate || 0);
+      }
+      const amt = Number(item.amount || 0);
+      purchaseByRate[rate] = (purchaseByRate[rate] || 0) + amt;
+    });
+
+    // 6. Compute Sales by GST Rate
+    const [salesItems] = await db.execute(
+      `SELECT i.amount, i.cgstRate, i.sgstRate, i.igstRate, s.gstRate AS itemGstRate
+       FROM sales_voucher_items i
+       JOIN sales_vouchers v ON i.voucherId = v.id
+       LEFT JOIN stock_items s ON i.itemId = s.id
+       WHERE v.company_id = ? AND v.owner_type = ? AND v.owner_id = ?`,
+      [company_id, owner_type, owner_id]
+    );
+
+    const salesByRate = {};
+    salesItems.forEach(item => {
+      const cgst = getRateFromLedger(item.cgstRate);
+      const sgst = getRateFromLedger(item.sgstRate);
+      const igst = getRateFromLedger(item.igstRate);
+      
+      let rate = igst > 0 ? igst : (cgst + sgst);
+      if (rate === 0) {
+        rate = Number(item.itemGstRate || 0);
+      }
+      const amt = Number(item.amount || 0);
+      salesByRate[rate] = (salesByRate[rate] || 0) + amt;
+    });
+
+    // 7. Compute Direct Expenses by GST Rate
+    const [groups] = await db.execute(`SELECT id, name, parent FROM ledger_groups`);
+    const directGroups = new Set([-7]);
+    let added = true;
+    while (added) {
+      added = false;
+      groups.forEach(g => {
+        if (g.parent && directGroups.has(Number(g.parent)) && !directGroups.has(g.id)) {
+          directGroups.add(g.id);
+          added = true;
+        }
+      });
+    }
+
+    const directLedgers = ledgers.filter(l => directGroups.has(Number(l.group_id)));
+    const directExpensesByRate = {};
+    let commonExpenses = 0;
+
+    for (const ledger of directLedgers) {
+      const [entries] = await db.execute(
+        `SELECT 
+           SUM(CASE WHEN entry_type = 'debit' THEN amount ELSE -amount END) AS balance
+         FROM voucher_entries ve
+         JOIN vouchers v ON ve.voucher_id = v.id
+         WHERE ve.ledger_id = ? AND v.company_id = ? AND v.owner_type = ? AND v.owner_id = ?`,
+        [ledger.id, company_id, owner_type, owner_id]
+      );
+      
+      const balance = Number(entries[0]?.balance || 0) + Number(ledger.opening_balance || 0);
+      if (balance === 0) continue;
+
+      const match = ledger.name.match(/(\d+(\.\d+)?)/);
+      if (match) {
+        const rate = parseFloat(match[0]);
+        directExpensesByRate[rate] = (directExpensesByRate[rate] || 0) + balance;
+      } else {
+        commonExpenses += balance;
+      }
+    }
+
+    const totalPurchase = Object.values(purchaseByRate).reduce((a, b) => a + b, 0);
+    if (commonExpenses > 0) {
+      if (totalPurchase > 0) {
+        Object.keys(purchaseByRate).forEach(rateStr => {
+          const rate = parseFloat(rateStr);
+          const pct = purchaseByRate[rate] / totalPurchase;
+          directExpensesByRate[rate] = (directExpensesByRate[rate] || 0) + (commonExpenses * pct);
+        });
+      } else {
+        directExpensesByRate[0] = (directExpensesByRate[0] || 0) + commonExpenses;
+      }
+    }
+
+    // 8. Collect all GST rates
+    const allRatesSet = new Set([
+      ...Object.keys(openingStockByRate).map(Number),
+      ...Object.keys(purchaseByRate).map(Number),
+      ...Object.keys(salesByRate).map(Number),
+      ...Object.keys(closingStockByRate).map(Number),
+      ...Object.keys(directExpensesByRate).map(Number)
+    ]);
+    const rates = Array.from(allRatesSet).sort((a, b) => a - b);
+
+    // Build the final response list
+    const tradingAccount = rates.map(rate => {
+      const openingStock = openingStockByRate[rate] || 0;
+      const purchase = purchaseByRate[rate] || 0;
+      const directExpense = directExpensesByRate[rate] || 0;
+      const sales = salesByRate[rate] || 0;
+      const closingStock = closingStockByRate[rate] || 0;
+
+      const totalDebits = openingStock + purchase + directExpense;
+      const totalCredits = sales + closingStock;
+      const grossProfit = totalCredits - totalDebits;
+
+      return {
+        gstRate: rate,
+        openingStock,
+        purchase,
+        directExpense,
+        sales,
+        closingStock,
+        grossProfit
+      };
+    });
+
+    res.json({
+      success: true,
+      data: tradingAccount
+    });
+
+  } catch (error) {
+    console.error("Trading Account GST Error:", error);
+    res.status(500).json({
+      success: false,
+      message: "Server Error"
+    });
+  }
+});
+
+
 module.exports = router;
 
