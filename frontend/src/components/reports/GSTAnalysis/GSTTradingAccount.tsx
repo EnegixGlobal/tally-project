@@ -4,10 +4,14 @@ import { DollarSign, Percent, TrendingUp, ArrowDownRight, ArrowUpRight } from "l
 interface TradingRow {
   gstRate: number;
   openingStock: number;
+  openingStockByGroup?: Record<string, number>;
+  openingStockByItem?: Record<string, number>;
   purchase: number;
   directExpense: number;
   sales: number;
   closingStock: number;
+  closingStockByGroup?: Record<string, number>;
+  closingStockByItem?: Record<string, number>;
   grossProfit: number;
 }
 
@@ -84,6 +88,26 @@ const GSTTradingAccount: React.FC = () => {
   const totalDebits = totalOpening + totalPurchase + totalDirect;
   const totalCredits = totalSales + totalClosing;
 
+  // Extract all unique stock group names present in opening/closing stocks, excluding "Primary"
+  const groupNames = Array.from(
+    new Set(
+      data.flatMap((row) => [
+        ...Object.keys(row.openingStockByGroup || {}),
+        ...Object.keys(row.closingStockByGroup || {}),
+      ])
+    )
+  ).filter(name => name !== "Primary").sort();
+
+  // Extract all unique stock item names present in opening/closing stocks
+  const itemNames = Array.from(
+    new Set(
+      data.flatMap((row) => [
+        ...Object.keys(row.openingStockByItem || {}),
+        ...Object.keys(row.closingStockByItem || {}),
+      ])
+    )
+  ).sort();
+
   // Format currency helper
   const formatVal = (val: number) => {
     return val ? val.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 }) : "0.00";
@@ -117,11 +141,45 @@ const GSTTradingAccount: React.FC = () => {
             {/* Topmost Level Headers */}
             <tr className="bg-gray-100 text-gray-700 font-bold border-b border-gray-200">
               <th className="py-4 px-5 font-semibold text-gray-800 w-[240px]">Particulars</th>
-              {data.map((row) => (
-                <th key={row.gstRate} className="py-4 px-4 text-center font-bold text-gray-800">
-                  GST {row.gstRate}%
-                </th>
-              ))}
+              {data.map((row) => {
+                // Find all stock groups present in this specific row's opening/closing stock
+                const rowGroups = [
+                  ...Object.keys(row.openingStockByGroup || {}),
+                  ...Object.keys(row.closingStockByGroup || {})
+                ].filter(g => g !== "Primary");
+
+                let headerText = `GST ${row.gstRate}%`;
+                if (rowGroups.length > 0) {
+                  headerText = rowGroups[0];
+                } else {
+                  // Fallback: try to find if there is a group name containing the rate number in the entire data
+                  const allGroups = Array.from(
+                    new Set(
+                      data.flatMap((r) => [
+                        ...Object.keys(r.openingStockByGroup || {}),
+                        ...Object.keys(r.closingStockByGroup || {}),
+                      ])
+                    )
+                  ).filter(g => g !== "Primary");
+
+                  const matchingGroup = allGroups.find(groupName => {
+                    const matches = groupName.match(/\d+/);
+                    return matches && parseInt(matches[0], 10) === row.gstRate;
+                  });
+
+                  if (matchingGroup) {
+                    headerText = matchingGroup;
+                  } else if (row.gstRate === 0) {
+                    headerText = "18% services"; // default fallback for 0% if no groups
+                  }
+                }
+
+                return (
+                  <th key={row.gstRate} className="py-4 px-4 text-center font-bold text-gray-800">
+                    {headerText}
+                  </th>
+                );
+              })}
               <th className="py-4 px-5 text-right font-bold text-gray-900 bg-gray-50 border-l border-gray-200 w-[180px]">
                 Total
               </th>
@@ -131,17 +189,69 @@ const GSTTradingAccount: React.FC = () => {
           <tbody className="divide-y divide-gray-100 font-medium text-gray-700">
             
             {/* 1. Opening Stock */}
-            <tr className="hover:bg-gray-50/50 transition-colors">
-              <td className="py-3.5 px-5 text-gray-600">Opening Stock</td>
+            <tr className="bg-gray-50/30 font-semibold border-b border-gray-100">
+              <td className="py-3 px-5 text-gray-800">Opening Stock (Total)</td>
               {data.map((row) => (
-                <td key={row.gstRate} className="py-3.5 px-4 text-center text-gray-800 font-mono">
+                <td key={row.gstRate} className="py-3 px-4 text-center text-gray-900 font-mono font-bold">
                   {formatVal(row.openingStock)}
                 </td>
               ))}
-              <td className="py-3.5 px-5 text-right font-semibold text-gray-900 bg-gray-50 border-l border-gray-200 font-mono">
+              <td className="py-3 px-5 text-right font-bold text-gray-950 bg-gray-100 border-l border-gray-200 font-mono">
                 {formatVal(totalOpening)}
               </td>
             </tr>
+
+            {/* Opening Stock Breakdown by Group */}
+            {groupNames.map((groupName) => {
+              const totalVal = data.reduce((acc, row) => acc + (row.openingStockByGroup?.[groupName] || 0), 0);
+              if (totalVal === 0) return null;
+
+              return (
+                <tr key={`opening-${groupName}`} className="hover:bg-gray-50/50 transition-colors text-xs bg-gray-50/10">
+                  <td className="py-2.5 px-8 text-gray-500 italic flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                    {groupName}
+                  </td>
+                  {data.map((row) => {
+                    const val = row.openingStockByGroup?.[groupName] || 0;
+                    return (
+                      <td key={row.gstRate} className="py-2.5 px-4 text-center text-gray-600 font-mono">
+                        {formatVal(val)}
+                      </td>
+                    );
+                  })}
+                  <td className="py-2.5 px-5 text-right font-medium text-gray-700 bg-gray-50/30 border-l border-gray-200 font-mono">
+                    {formatVal(totalVal)}
+                  </td>
+                </tr>
+              );
+            })}
+
+            {/* Opening Stock Breakdown by Item */}
+            {itemNames.map((itemName) => {
+              const totalVal = data.reduce((acc, row) => acc + (row.openingStockByItem?.[itemName] || 0), 0);
+              if (totalVal === 0) return null;
+
+              return (
+                <tr key={`opening-item-${itemName}`} className="hover:bg-gray-50/50 transition-colors text-xs">
+                  <td className="py-2.5 px-8 text-gray-600 pl-12 flex items-center gap-1.5 font-medium">
+                    <span className="w-1 h-1 rounded-full bg-blue-500"></span>
+                    {itemName}
+                  </td>
+                  {data.map((row) => {
+                    const val = row.openingStockByItem?.[itemName] || 0;
+                    return (
+                      <td key={row.gstRate} className="py-2.5 px-4 text-center text-gray-700 font-mono">
+                        {formatVal(val)}
+                      </td>
+                    );
+                  })}
+                  <td className="py-2.5 px-5 text-right font-semibold text-gray-800 bg-gray-50/30 border-l border-gray-200 font-mono">
+                    {formatVal(totalVal)}
+                  </td>
+                </tr>
+              );
+            })}
 
             {/* 2. Purchase */}
             <tr className="hover:bg-gray-50/50 transition-colors">
@@ -257,17 +367,69 @@ const GSTTradingAccount: React.FC = () => {
             </tr>
 
             {/* 9. Closing Stock */}
-            <tr className="hover:bg-gray-50/50 transition-colors">
-              <td className="py-3.5 px-5 text-gray-600 font-medium">Closing Stock</td>
+            <tr className="bg-gray-50/30 font-semibold border-b border-gray-100">
+              <td className="py-3 px-5 text-gray-800">Closing Stock (Total)</td>
               {data.map((row) => (
-                <td key={row.gstRate} className="py-3.5 px-4 text-center text-gray-800 font-mono">
+                <td key={row.gstRate} className="py-3 px-4 text-center text-gray-900 font-mono font-bold">
                   {formatVal(row.closingStock)}
                 </td>
               ))}
-              <td className="py-3.5 px-5 text-right font-semibold text-gray-900 bg-gray-50 border-l border-gray-200 font-mono">
+              <td className="py-3 px-5 text-right font-bold text-gray-950 bg-gray-100 border-l border-gray-200 font-mono">
                 {formatVal(totalClosing)}
               </td>
             </tr>
+
+            {/* Closing Stock Breakdown by Group */}
+            {groupNames.map((groupName) => {
+              const totalVal = data.reduce((acc, row) => acc + (row.closingStockByGroup?.[groupName] || 0), 0);
+              if (totalVal === 0) return null;
+
+              return (
+                <tr key={`closing-${groupName}`} className="hover:bg-gray-50/50 transition-colors text-xs bg-gray-50/10">
+                  <td className="py-2.5 px-8 text-gray-500 italic flex items-center gap-1.5">
+                    <span className="w-1.5 h-1.5 rounded-full bg-gray-300"></span>
+                    {groupName}
+                  </td>
+                  {data.map((row) => {
+                    const val = row.closingStockByGroup?.[groupName] || 0;
+                    return (
+                      <td key={row.gstRate} className="py-2.5 px-4 text-center text-gray-600 font-mono">
+                        {formatVal(val)}
+                      </td>
+                    );
+                  })}
+                  <td className="py-2.5 px-5 text-right font-medium text-gray-700 bg-gray-50/30 border-l border-gray-200 font-mono">
+                    {formatVal(totalVal)}
+                  </td>
+                </tr>
+              );
+            })}
+
+            {/* Closing Stock Breakdown by Item */}
+            {itemNames.map((itemName) => {
+              const totalVal = data.reduce((acc, row) => acc + (row.closingStockByItem?.[itemName] || 0), 0);
+              if (totalVal === 0) return null;
+
+              return (
+                <tr key={`closing-item-${itemName}`} className="hover:bg-gray-50/50 transition-colors text-xs">
+                  <td className="py-2.5 px-8 text-gray-600 pl-12 flex items-center gap-1.5 font-medium">
+                    <span className="w-1.5 h-1.5 rounded-full bg-blue-500"></span>
+                    {itemName}
+                  </td>
+                  {data.map((row) => {
+                    const val = row.closingStockByItem?.[itemName] || 0;
+                    return (
+                      <td key={row.gstRate} className="py-2.5 px-4 text-center text-gray-700 font-mono">
+                        {formatVal(val)}
+                      </td>
+                    );
+                  })}
+                  <td className="py-2.5 px-5 text-right font-semibold text-gray-800 bg-gray-50/30 border-l border-gray-200 font-mono">
+                    {formatVal(totalVal)}
+                  </td>
+                </tr>
+              );
+            })}
 
             {/* 10. Grand Total (Credit Side) */}
             <tr className="bg-gray-800 text-white border-t-2 border-gray-900">

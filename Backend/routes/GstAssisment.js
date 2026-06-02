@@ -961,9 +961,19 @@ router.get("/trading-account", async (req, res) => {
       return match ? parseFloat(match[0]) : 0;
     };
 
+    // Fetch all stock groups for this company/owner
+    const [stockGroups] = await db.execute(
+      `SELECT id, name FROM stock_groups WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
+      [company_id, owner_type, owner_id]
+    );
+    const stockGroupMap = {};
+    stockGroups.forEach(g => {
+      stockGroupMap[g.id] = g.name;
+    });
+
     // 2. Fetch stock items
     const [stockItems] = await db.execute(
-      `SELECT id, name, openingBalance, openingValue, gstRate, batches, openingRate, standardPurchaseRate 
+      `SELECT id, name, stockGroupId, openingBalance, openingValue, gstRate, batches, openingRate, standardPurchaseRate 
        FROM stock_items 
        WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
       [company_id, owner_type, owner_id]
@@ -971,8 +981,14 @@ router.get("/trading-account", async (req, res) => {
 
     // 3. Compute Opening Stock grouped by GST Rate
     const openingStockByRate = {};
+    const openingStockByRateAndGroup = {}; // rate -> { groupName -> val }
+    const openingStockByRateAndItem = {}; // rate -> { itemName -> val }
     stockItems.forEach(item => {
       const rate = Number(item.gstRate || 0);
+      const groupId = item.stockGroupId;
+      const groupName = stockGroupMap[groupId] || "Primary";
+      const itemName = item.name;
+
       let val = 0;
       let batches = [];
       try {
@@ -987,6 +1003,16 @@ router.get("/trading-account", async (req, res) => {
         val += (Number(item.openingBalance) || 0) * (Number(item.openingRate || item.standardPurchaseRate || 0) || 0);
       }
       openingStockByRate[rate] = (openingStockByRate[rate] || 0) + val;
+
+      if (!openingStockByRateAndGroup[rate]) {
+        openingStockByRateAndGroup[rate] = {};
+      }
+      openingStockByRateAndGroup[rate][groupName] = (openingStockByRateAndGroup[rate][groupName] || 0) + val;
+
+      if (!openingStockByRateAndItem[rate]) {
+        openingStockByRateAndItem[rate] = {};
+      }
+      openingStockByRateAndItem[rate][itemName] = (openingStockByRateAndItem[rate][itemName] || 0) + val;
     });
 
     // 4. Compute Closing Stock grouped by GST Rate using Tally's standard average cost
@@ -1010,7 +1036,9 @@ router.get("/trading-account", async (req, res) => {
     stockItems.forEach(item => {
       const itemId = item.id;
       itemMap[itemId] = {
+        name: item.name,
         gstRate: Number(item.gstRate || 0),
+        groupName: stockGroupMap[item.stockGroupId] || "Primary",
         openingQty: 0,
         openingValue: 0,
         inwardQty: 0,
@@ -1055,15 +1083,30 @@ router.get("/trading-account", async (req, res) => {
     });
 
     const closingStockByRate = {};
+    const closingStockByRateAndGroup = {}; // rate -> { groupName -> val }
+    const closingStockByRateAndItem = {}; // rate -> { itemName -> val }
     Object.values(itemMap).forEach(item => {
       const rate = item.gstRate;
+      const groupName = item.groupName;
+      const itemName = item.name;
       const totalInQty = item.openingQty + item.inwardQty;
       const totalInValue = item.openingValue + item.inwardValue;
       const avgRate = totalInQty > 0 ? totalInValue / totalInQty : 0;
       const closingQty = totalInQty - item.outwardQty;
       const closingValue = closingQty * avgRate;
 
-      closingStockByRate[rate] = (closingStockByRate[rate] || 0) + Math.max(0, closingValue);
+      const finalClosingVal = Math.max(0, closingValue);
+      closingStockByRate[rate] = (closingStockByRate[rate] || 0) + finalClosingVal;
+
+      if (!closingStockByRateAndGroup[rate]) {
+        closingStockByRateAndGroup[rate] = {};
+      }
+      closingStockByRateAndGroup[rate][groupName] = (closingStockByRateAndGroup[rate][groupName] || 0) + finalClosingVal;
+
+      if (!closingStockByRateAndItem[rate]) {
+        closingStockByRateAndItem[rate] = {};
+      }
+      closingStockByRateAndItem[rate][itemName] = (closingStockByRateAndItem[rate][itemName] || 0) + finalClosingVal;
     });
 
     // 5. Compute Purchases by GST Rate
@@ -1192,10 +1235,14 @@ router.get("/trading-account", async (req, res) => {
       return {
         gstRate: rate,
         openingStock,
+        openingStockByGroup: openingStockByRateAndGroup[rate] || {},
+        openingStockByItem: openingStockByRateAndItem[rate] || {},
         purchase,
         directExpense,
         sales,
         closingStock,
+        closingStockByGroup: closingStockByRateAndGroup[rate] || {},
+        closingStockByItem: closingStockByRateAndItem[rate] || {},
         grossProfit
       };
     });
