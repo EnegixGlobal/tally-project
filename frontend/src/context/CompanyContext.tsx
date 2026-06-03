@@ -130,8 +130,9 @@ async function fetchCompanyFromAPI(companyId: string | number): Promise<CompanyI
 
     if (response.ok) {
       const data = await response.json();
-      if (data.success && data.company) {
-        const companyInfo: CompanyInfo = convertToCompanyInfo(data.company);
+      const companyData = data.company || (data.id ? data : null);
+      if (companyData) {
+        const companyInfo: CompanyInfo = convertToCompanyInfo(companyData);
         return companyInfo;
       }
     }

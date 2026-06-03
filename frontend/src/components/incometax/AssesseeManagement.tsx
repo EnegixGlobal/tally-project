@@ -1,7 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
-import { ArrowLeft, User, Plus, Edit, Trash2, Search, Download, Upload } from 'lucide-react';
+import { useCompany } from '../../context/CompanyContext';
+import { 
+  ArrowLeft, User, Plus, Edit, Trash2, Search, Download, Upload,
+  Building2, MapPin, Mail, Phone, Calendar, Shield, ChevronDown, ChevronUp, Briefcase, Globe, FileText
+} from 'lucide-react';
 
 interface Assessee {
   id: string;
@@ -28,9 +32,33 @@ interface Assessee {
 
 const AssesseeManagement: React.FC = () => {
   const { theme } = useAppContext();
+  const { companyInfo } = useCompany();
   const navigate = useNavigate();
 
+  const [showCompanyDetails, setShowCompanyDetails] = useState(true);
   const [assessees, setAssessees] = useState<Assessee[]>([]);
+
+  const cInfo = companyInfo ? {
+    name: companyInfo.name,
+    panNumber: companyInfo.pan_number || companyInfo.panNumber || '',
+    tanNumber: companyInfo.tan_number || companyInfo.tanNumber || '',
+    gstNumber: companyInfo.gst_number || companyInfo.gstNumber || companyInfo.gstin || '',
+    vatNumber: companyInfo.vat_number || companyInfo.vatNumber || '',
+    taxType: companyInfo.tax_type || companyInfo.taxType || 'GST',
+    phoneNumber: companyInfo.phone_number || companyInfo.phoneNumber || companyInfo.phone || '',
+    email: companyInfo.email || '',
+    address: companyInfo.address || '',
+    pin: companyInfo.pin || companyInfo.pin_code || companyInfo.pincode || '',
+    state: companyInfo.state || '',
+    country: companyInfo.country || 'India',
+    financialYear: companyInfo.financial_year || companyInfo.financialYear || '',
+    booksBeginningYear: companyInfo.books_beginning_year || companyInfo.booksBeginningYear || '',
+    backDateAllowed: companyInfo.back_date_allowed !== undefined 
+      ? (companyInfo.back_date_allowed === 1 || companyInfo.back_date_allowed === true || companyInfo.back_date_allowed === '1')
+      : (companyInfo.backDateAllowed === 1 || companyInfo.backDateAllowed === true || companyInfo.backDateAllowed === '1'),
+    maintainBy: companyInfo.fdAccountType || companyInfo.maintainBy || companyInfo.maintain_by || 'self',
+    accountantName: companyInfo.fdAccountantName || companyInfo.accountantName || companyInfo.accountant_name || ''
+  } : null;
 
 useEffect(() => {
   const fetchAssessees = async () => {
@@ -285,424 +313,156 @@ const handleDelete = async (id: string) => {
           <ArrowLeft size={20} />
         </button>
         <h1 className="text-2xl font-bold">Assessee Management</h1>
-        <div className="ml-auto flex space-x-2">
-          <button
-            onClick={() => setShowForm(true)}
-            className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md flex items-center"
-          >
-            <Plus size={16} className="mr-2" />
-            Add Assessee
-          </button>
-          <button
-            className={`p-2 rounded-md ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
+      </div>
+
+      {/* Active Company Details Panel */}
+      {cInfo && (
+        <div className={`mb-6 rounded-lg border transition-all duration-300 ${
+          theme === 'dark' 
+            ? 'bg-gray-800 border-gray-700 text-white' 
+            : 'bg-white border-gray-200 shadow-sm text-gray-800'
+        }`}>
+          {/* Header row */}
+          <div 
+            onClick={() => setShowCompanyDetails(!showCompanyDetails)}
+            className={`p-4 flex items-center justify-between cursor-pointer select-none rounded-t-lg transition-colors ${
+              theme === 'dark' ? 'hover:bg-gray-750' : 'hover:bg-gray-50'
             }`}
-            title="Import"
           >
-            <Upload size={18} />
-          </button>
-          <button
-            className={`p-2 rounded-md ${
-              theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
-            }`}
-            title="Export"
-          >
-            <Download size={18} />
-          </button>
-        </div>
-      </div>
-
-      {/* Search and Filter */}
-      <div className={sectionClass}>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="relative">
-            <Search size={16} className="absolute left-3 top-3 text-gray-400" />
-            <input
-              type="text"
-              placeholder="Search by name, PAN, or email"
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              className={`${inputClass} pl-10`}
-            />
-          </div>
-          <div>
-            <select
-              value={filterCategory}
-              onChange={(e) => setFilterCategory(e.target.value)}
-              className={inputClass}
-              title="Filter by Category"
-            >
-              <option value="all">All Categories</option>
-              <option value="individual">Individual</option>
-              <option value="huf">HUF</option>
-              <option value="firm">Firm</option>
-              <option value="company">Company</option>
-            </select>
-          </div>
-          <div className="text-sm text-gray-500 flex items-center">
-            Total: {filteredAssessees.length} assessee(s)
-          </div>
-        </div>
-      </div>
-
-      {/* Assessees List */}
-      <div className={sectionClass}>
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead>
-              <tr className={`${theme === 'dark' ? 'border-b border-gray-600' : 'border-b border-gray-300'}`}>
-                <th className="px-4 py-3 text-left">Name</th>
-                <th className="px-4 py-3 text-left">PAN</th>
-                <th className="px-4 py-3 text-left">Category</th>
-                <th className="px-4 py-3 text-left">Profession</th>
-                <th className="px-4 py-3 text-left">Contact</th>
-                <th className="px-4 py-3 text-left">Status</th>
-                <th className="px-4 py-3 text-center">Actions</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAssessees.map((assessee) => (
-                <tr 
-                  key={assessee.id}
-                  className={`${theme === 'dark' ? 'border-b border-gray-600 hover:bg-gray-700' : 'border-b border-gray-200 hover:bg-gray-50'}`}
-                >
-                  <td className="px-4 py-3">
-                    <div>
-                      <div className="font-medium">{assessee.name}</div>
-                      <div className="text-sm text-gray-500">S/o {assessee.fatherName}</div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3 font-mono">{assessee.pan}</td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      assessee.category === 'individual' ? 'bg-blue-100 text-blue-800' :
-                      assessee.category === 'huf' ? 'bg-green-100 text-green-800' :
-                      assessee.category === 'firm' ? 'bg-purple-100 text-purple-800' :
-                      'bg-orange-100 text-orange-800'
-                    }`}>
-                      {assessee.category.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3">{assessee.profession}</td>
-                  <td className="px-4 py-3">
-                    <div className="text-sm">
-                      <div>{assessee.email}</div>
-                      <div className="text-gray-500">{assessee.phone}</div>
-                    </div>
-                  </td>
-                  <td className="px-4 py-3">
-                    <span className={`px-2 py-1 rounded-full text-xs ${
-                      assessee.status === 'active' 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-red-100 text-red-800'
-                    }`}>
-                      {assessee.status}
-                    </span>
-                  </td>
-                  <td className="px-4 py-3 text-center">
-                    <div className="flex justify-center space-x-2">
-                      <button
-                        onClick={() => handleEdit(assessee)}
-                        className={`p-1 rounded ${
-                          theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
-                        }`}
-                        title="Edit"
-                      >
-                        <Edit size={16} />
-                      </button>
-                      <button
-                        onClick={() => handleDelete(assessee.id)}
-                        className={`p-1 rounded text-red-600 ${
-                          theme === 'dark' ? 'hover:bg-gray-600' : 'hover:bg-gray-200'
-                        }`}
-                        title="Delete"
-                      >
-                        <Trash2 size={16} />
-                      </button>
-                    </div>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-
-          {filteredAssessees.length === 0 && (
-            <div className="text-center py-8 text-gray-500">
-              No assessees found matching your criteria
-            </div>
-          )}
-        </div>
-      </div>
-
-      {/* Add/Edit Form Modal */}
-      {showForm && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-          <div className={`w-full max-w-4xl max-h-[90vh] rounded-lg overflow-hidden ${
-            theme === 'dark' ? 'bg-gray-800' : 'bg-white'
-          }`}>
-            <div className="p-6 border-b border-gray-200 dark:border-gray-700">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold">
-                  {editingAssessee ? 'Edit Assessee' : 'Add New Assessee'}
+            <div className="flex items-center space-x-3">
+              <div className={`p-2 rounded-lg ${theme === 'dark' ? 'bg-blue-900/30 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                <Building2 size={20} />
+              </div>
+              <div>
+                <h3 className="font-semibold text-lg flex items-center gap-2">
+                  {cInfo.name}
+                  <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${
+                    theme === 'dark' ? 'bg-green-900/30 text-green-400' : 'bg-green-50 text-green-600'
+                  }`}>
+                    Active Company
+                  </span>
                 </h3>
-                <button
-                  onClick={resetForm}
-                  className={`p-2 rounded-full ${
-                    theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'
-                  }`}
-                >
-                  ×
-                </button>
+                <div className="flex items-center space-x-4 text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                  {cInfo.panNumber && <span className="font-mono">PAN: {cInfo.panNumber}</span>}
+                  {cInfo.tanNumber && <span className="font-mono">TAN: {cInfo.tanNumber}</span>}
+                  {cInfo.gstNumber && <span className="font-mono">GSTIN: {cInfo.gstNumber}</span>}
+                  {cInfo.vatNumber && <span className="font-mono">VAT: {cInfo.vatNumber}</span>}
+                </div>
               </div>
             </div>
+            <button 
+              className={`p-1.5 rounded-md transition-colors ${
+                theme === 'dark' ? 'hover:bg-gray-700 text-gray-400' : 'hover:bg-gray-100 text-gray-500'
+              }`}
+              title={showCompanyDetails ? "Collapse Details" : "Expand Details"}
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowCompanyDetails(!showCompanyDetails);
+              }}
+            >
+              {showCompanyDetails ? <ChevronUp size={18} /> : <ChevronDown size={18} />}
+            </button>
+          </div>
 
-            <div className="p-6 overflow-y-auto max-h-[calc(90vh-120px)]">
-              <form onSubmit={handleSubmit}>
-                {/* Personal Information */}
-                <div className="mb-6">
-                  <h4 className="font-medium mb-4 flex items-center">
-                    <User size={16} className="mr-2" />
-                    Personal Information
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Full Name *</label>
-                      <input
-                        type="text"
-                        value={formData.name}
-                        onChange={(e) => handleInputChange('name', e.target.value)}
-                        className={inputClass}
-                        required
-                        placeholder="Enter full name"
-                      />
+          {/* Collapsible Content */}
+          {showCompanyDetails && (
+            <div className={`p-4 border-t ${theme === 'dark' ? 'border-gray-700' : 'border-gray-150'}`}>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                
+                {/* Registration & Tax */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Tax & Registration</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-start space-x-2 text-sm">
+                      <Shield size={16} className="text-blue-500 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400 block text-xs">PAN / TAN Number</span>
+                        <span className="font-mono font-medium">{cInfo.panNumber || 'N/A'} {cInfo.tanNumber ? ` / ${cInfo.tanNumber}` : ''}</span>
+                      </div>
                     </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Father's Name *</label>
-                      <input
-                        type="text"
-                        value={formData.fatherName}
-                        onChange={(e) => handleInputChange('fatherName', e.target.value)}
-                        className={inputClass}
-                        required
-                        placeholder="Enter father's name"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Date of Birth *</label>
-                      <input
-                        type="date"
-                        value={formData.dateOfBirth}
-                        onChange={(e) => handleInputChange('dateOfBirth', e.target.value)}
-                        className={inputClass}
-                        required
-                        title="Date of Birth"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Category *</label>
-                      <select
-                        value={formData.category}
-                        onChange={(e) => handleInputChange('category', e.target.value)}
-                        className={inputClass}
-                        required
-                        title="Select Category"
-                      >
-                        <option value="individual">Individual</option>
-                        <option value="huf">HUF</option>
-                        <option value="firm">Firm</option>
-                        <option value="company">Company</option>
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                {/* Identity Information */}
-                <div className="mb-6">
-                  <h4 className="font-medium mb-4">Identity Information</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">PAN *</label>
-                      <input
-                        type="text"
-                        value={formData.pan}
-                        onChange={(e) => handleInputChange('pan', e.target.value.toUpperCase())}
-                        className={inputClass}
-                        required
-                        placeholder="ABCDE1234F"
-                        maxLength={10}
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Aadhar Number</label>
-                      <input
-                        type="text"
-                        value={formData.aadhar}
-                        onChange={(e) => handleInputChange('aadhar', e.target.value)}
-                        className={inputClass}
-                        placeholder="123456789012"
-                        maxLength={12}
-                      />
+                    <div className="flex items-start space-x-2 text-sm">
+                      <FileText size={16} className="text-blue-500 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400 block text-xs">Tax Registration ({cInfo.taxType || 'GST'})</span>
+                        <span className="font-mono font-medium">{cInfo.gstNumber || cInfo.vatNumber || 'Not Registered'}</span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
                 {/* Contact Information */}
-                <div className="mb-6">
-                  <h4 className="font-medium mb-4">Contact Information</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Email *</label>
-                      <input
-                        type="email"
-                        value={formData.email}
-                        onChange={(e) => handleInputChange('email', e.target.value)}
-                        className={inputClass}
-                        required
-                        placeholder="email@example.com"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Phone Number *</label>
-                      <input
-                        type="tel"
-                        value={formData.phone}
-                        onChange={(e) => handleInputChange('phone', e.target.value)}
-                        className={inputClass}
-                        required
-                        placeholder="9876543210"
-                      />
-                    </div>
-                  </div>
-                </div>
-
-                {/* Address Information */}
-                <div className="mb-6">
-                  <h4 className="font-medium mb-4">Address Information</h4>
-                  <div className="grid grid-cols-1 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Address Line 1 *</label>
-                      <input
-                        type="text"
-                        value={formData.address.line1}
-                        onChange={(e) => handleInputChange('address.line1', e.target.value)}
-                        className={inputClass}
-                        required
-                        placeholder="Enter address line 1"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Address Line 2</label>
-                      <input
-                        type="text"
-                        value={formData.address.line2}
-                        onChange={(e) => handleInputChange('address.line2', e.target.value)}
-                        className={inputClass}
-                        placeholder="Enter address line 2"
-                      />
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Contact Details</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-start space-x-2 text-sm">
+                      <Phone size={16} className="text-green-500 mt-0.5 shrink-0" />
                       <div>
-                        <label className="block text-sm font-medium mb-1">City *</label>
-                        <input
-                          type="text"
-                          value={formData.address.city}
-                          onChange={(e) => handleInputChange('address.city', e.target.value)}
-                          className={inputClass}
-                          required
-                          placeholder="Enter city"
-                        />
+                        <span className="text-gray-500 dark:text-gray-400 block text-xs">Phone Number</span>
+                        <span className="font-medium">{cInfo.phoneNumber || 'N/A'}</span>
                       </div>
+                    </div>
+                    <div className="flex items-start space-x-2 text-sm">
+                      <Mail size={16} className="text-green-500 mt-0.5 shrink-0" />
                       <div>
-                        <label className="block text-sm font-medium mb-1">State *</label>
-                        <input
-                          type="text"
-                          value={formData.address.state}
-                          onChange={(e) => handleInputChange('address.state', e.target.value)}
-                          className={inputClass}
-                          required
-                          placeholder="Enter state"
-                        />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Pincode *</label>
-                        <input
-                          type="text"
-                          value={formData.address.pincode}
-                          onChange={(e) => handleInputChange('address.pincode', e.target.value)}
-                          className={inputClass}
-                          required
-                          placeholder="400001"
-                          maxLength={6}
-                        />
+                        <span className="text-gray-500 dark:text-gray-400 block text-xs">Email Address</span>
+                        <span className="font-medium truncate max-w-[200px] block" title={cInfo.email}>{cInfo.email || 'N/A'}</span>
                       </div>
                     </div>
                   </div>
                 </div>
 
-                {/* Professional Information */}
-                <div className="mb-6">
-                  <h4 className="font-medium mb-4">Professional Information</h4>
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Profession</label>
-                      <input
-                        type="text"
-                        value={formData.profession}
-                        onChange={(e) => handleInputChange('profession', e.target.value)}
-                        className={inputClass}
-                        placeholder="Enter profession"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Assessment Year</label>
-                      <select
-                        value={formData.assessmentYear}
-                        onChange={(e) => handleInputChange('assessmentYear', e.target.value)}
-                        className={inputClass}
-                        title="Select Assessment Year"
-                      >
-                        <option value="2024-25">2024-25</option>
-                        <option value="2023-24">2023-24</option>
-                        <option value="2022-23">2022-23</option>
-                      </select>
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium mb-1">Status</label>
-                      <select
-                        value={formData.status}
-                        onChange={(e) => handleInputChange('status', e.target.value)}
-                        className={inputClass}
-                        title="Select Status"
-                      >
-                        <option value="active">Active</option>
-                        <option value="inactive">Inactive</option>
-                      </select>
+                {/* Address Details */}
+                <div className="space-y-3 md:col-span-1">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Address Details</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-start space-x-2 text-sm">
+                      <MapPin size={16} className="text-red-500 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400 block text-xs">Registered Address</span>
+                        <span className="font-medium block leading-tight">{cInfo.address || 'N/A'}</span>
+                        <span className="font-medium block mt-0.5 text-xs text-gray-500 dark:text-gray-400">
+                          {[cInfo.state, cInfo.pin, cInfo.country].filter(Boolean).join(', ')}
+                        </span>
+                      </div>
                     </div>
                   </div>
                 </div>
 
-                <div className="flex justify-end space-x-4">
-                  <button
-                    type="button"
-                    onClick={resetForm}
-                    className={`px-4 py-2 rounded ${
-                      theme === 'dark' 
-                        ? 'bg-gray-700 hover:bg-gray-600' 
-                        : 'bg-gray-200 hover:bg-gray-300'
-                    }`}
-                  >
-                    Cancel
-                  </button>
-                  <button
-                    type="submit"
-                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded"
-                  >
-                    {editingAssessee ? 'Update' : 'Add'} Assessee
-                  </button>
+                {/* Financial & Management */}
+                <div className="space-y-3">
+                  <h4 className="text-xs font-bold uppercase tracking-wider text-gray-400">Financial & Management</h4>
+                  <div className="space-y-2">
+                    <div className="flex items-start space-x-2 text-sm">
+                      <Calendar size={16} className="text-purple-500 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400 block text-xs">Financial / Books Year</span>
+                        <span className="font-medium">FY {cInfo.financialYear || 'N/A'} (From {cInfo.booksBeginningYear || 'N/A'})</span>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-2 text-sm">
+                      <Briefcase size={16} className="text-purple-500 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400 block text-xs">Books Managed By</span>
+                        <span className="font-medium text-xs">
+                          {cInfo.maintainBy === 'accountant' ? `CA / Accountant (${cInfo.accountantName || 'N/A'})` : 'Self Managed'}
+                        </span>
+                      </div>
+                    </div>
+                    <div className="flex items-start space-x-2 text-sm">
+                      <Globe size={16} className="text-purple-500 mt-0.5 shrink-0" />
+                      <div>
+                        <span className="text-gray-500 dark:text-gray-400 block text-xs">Back Date Allowed</span>
+                        <span className="font-medium text-xs">
+                          {cInfo.backDateAllowed ? 'Yes' : 'No'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-              </form>
+
+              </div>
             </div>
-          </div>
+          )}
         </div>
       )}
 
