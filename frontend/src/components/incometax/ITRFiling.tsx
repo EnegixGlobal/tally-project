@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
+import { useCompany } from '../../context/CompanyContext';
 import { ArrowLeft, Save, Download, Printer, Calculator, User } from 'lucide-react';
 
 interface AssesseeInfo {
@@ -95,6 +96,7 @@ interface ITRData {
 
 const ITRFiling: React.FC = () => {
   const { theme } = useAppContext();
+  const { companyInfo } = useCompany();
   const navigate = useNavigate();
 
   const [formData, setFormData] = useState<ITRData>({
@@ -163,6 +165,35 @@ const ITRFiling: React.FC = () => {
       { date: '', chequeNo: '', bsrCode: '', bankName: '', amount: 0 }
     ]
   });
+
+  useEffect(() => {
+    if (companyInfo) {
+      const name = companyInfo.name || '';
+      const pan = companyInfo.pan_number || companyInfo.panNumber || '';
+      const email = companyInfo.email || '';
+      const address = companyInfo.address || '';
+      const pin = companyInfo.pin || companyInfo.pin_code || companyInfo.pincode || '';
+      const state = companyInfo.state || '';
+      const country = companyInfo.country || 'India';
+      const combinedAddress = [address, state, pin, country].filter(Boolean).join(', ');
+
+      const financialYear = companyInfo.financial_year || companyInfo.financialYear || '2023-24';
+      const assessmentYear = companyInfo.assessmentYear || (financialYear ? `${parseInt(financialYear.split('-')[0]) + 1}-${(parseInt(financialYear.split('-')[0]) + 2).toString().slice(-2)}` : '2024-25');
+
+      setFormData(prev => ({
+        ...prev,
+        assessee: {
+          ...prev.assessee,
+          name: prev.assessee.name || name,
+          pan: prev.assessee.pan || pan,
+          email: prev.assessee.email || email,
+          address: prev.assessee.address || combinedAddress,
+          financialYear: prev.assessee.financialYear || financialYear,
+          assessmentYear: prev.assessee.assessmentYear || assessmentYear,
+        }
+      }));
+    }
+  }, [companyInfo]);
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
   e.preventDefault();
 

@@ -41,6 +41,22 @@ const MainLayout: React.FC = () => {
 
     // Role-based route protection
     if (!isLoading && isAuthenticated) {
+      const isCa = user?.userType === 'ca';
+      if (isCa) {
+        const caRestrictedPaths = [
+          '/app/masters',
+          '/app/vouchers',
+          '/app/reports',
+          '/app/voucher-register',
+        ];
+        const isCaRestricted = caRestrictedPaths.some(path => location.pathname.startsWith(path));
+        if (isCaRestricted) {
+          console.warn(`Access denied to ${location.pathname} for CA role`);
+          navigate('/app');
+          return;
+        }
+      }
+
       const restrictedPaths = [
         { path: '/app/gst', moduleId: 'gst' },
         { path: '/app/tds', moduleId: 'tds' },
@@ -54,7 +70,7 @@ const MainLayout: React.FC = () => {
         navigate('/app');
       }
     }
-  }, [isLoading, isAuthenticated, hasCompany, navigate, location, checkPermission]);
+  }, [isLoading, isAuthenticated, hasCompany, navigate, location, checkPermission, user]);
 
   // Global subscription UI guard: if subscription / trial expired, only allow dashboard
   useEffect(() => {

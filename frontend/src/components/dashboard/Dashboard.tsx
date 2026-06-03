@@ -200,7 +200,7 @@ const Dashboard: React.FC = () => {
 
         let url = `${import.meta.env.VITE_API_URL}/api/dashboard-data?employee_id=${fetchOwnerId}`;
 
-        if ((userType === 'company_user' || userType === 'ca_employee') && restrictedId) {
+        if (restrictedId) {
           url += `&company_id=${restrictedId}`;
         }
 
@@ -227,6 +227,7 @@ const Dashboard: React.FC = () => {
           setUserLimit(data.userLimit ?? 1);
 
           setCompanies(data.companies || []);
+          setContextCompanies(data.companies || []);
 
           setLedgers(data.ledgers || []);
           setVouchers(data.vouchers || []);
