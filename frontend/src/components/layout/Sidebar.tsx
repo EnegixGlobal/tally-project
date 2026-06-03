@@ -24,7 +24,7 @@ interface SidebarProps {
 
 const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
   const { theme } = useAppContext();
-  const { logout, hasCompany, checkPermission } = useAuth();
+  const { logout, hasCompany, checkPermission, user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -58,7 +58,20 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
     >
       <nav className="p-2 pb-16">
         <ul className="space-y-1">
-          {menuItems.map((item, index) => {
+          {menuItems
+            .filter((item) => {
+              if (user?.userType === "ca") {
+                const titleLower = item.title.toLowerCase();
+                return !(
+                  titleLower === "masters" ||
+                  titleLower === "vouchers" ||
+                  titleLower === "vouchers register" ||
+                  titleLower === "reports"
+                );
+              }
+              return true;
+            })
+            .map((item, index) => {
             // Check if user has permission for this item
             let hasPermission = true;
             if (item.permissionId) {

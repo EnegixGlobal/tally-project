@@ -89,7 +89,7 @@ const HorizontalMenu: React.FC<HorizontalMenuProps> = ({ sidebarOpen }) => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { hasCompany, checkPermission } = useAuth();
+  const { hasCompany, checkPermission, user } = useAuth();
 
   const allowedWhenNoCompany = ['/app', '/app/company'];
 
@@ -105,7 +105,20 @@ const HorizontalMenu: React.FC<HorizontalMenuProps> = ({ sidebarOpen }) => {
         }`}
     >
       <div className="flex items-center h-full px-2 space-x-2 min-w-max">
-        {menuItems.map((item, index) => {
+        {menuItems
+          .filter((item) => {
+            if (user?.userType === "ca") {
+              const titleLower = item.title.toLowerCase();
+              return !(
+                titleLower === "masters" ||
+                titleLower === "vouchers" ||
+                titleLower === "vouchers register" ||
+                titleLower === "reports"
+              );
+            }
+            return true;
+          })
+          .map((item, index) => {
           let hasPermission = true;
           if ((item as any).permissionId) {
             hasPermission = checkPermission((item as any).permissionId);

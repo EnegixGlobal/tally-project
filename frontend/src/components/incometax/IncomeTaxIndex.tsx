@@ -1,27 +1,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAppContext } from '../../context/AppContext';
-import { ArrowLeft, FileText, Calculator, Download, Printer, User, Building, PiggyBank, TrendingUp, Receipt } from 'lucide-react';
+import { ArrowLeft, FileText, Calculator, Download, Printer, User, Building, PiggyBank, TrendingUp, Receipt, Briefcase, Home, Coins } from 'lucide-react';
 
 const IncomeTaxIndex: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
 
   const incomeTaxOptions = [
-    {
-      title: 'ITR Filing',
-      description: 'File Income Tax Return with all income sources',
-      icon: <FileText size={24} />,
-      path: '/app/income-tax/itr-filing',
-      color: 'bg-blue-500'
-    },
-    {
-      title: 'Tax Calculator',
-      description: 'Calculate income tax liability',
-      icon: <Calculator size={24} />,
-      path: '/app/income-tax/calculator',
-      color: 'bg-green-500'
-    },
     {
       title: 'Assessee Management',
       description: 'Manage assessee details and profiles',
@@ -30,32 +16,67 @@ const IncomeTaxIndex: React.FC = () => {
       color: 'bg-purple-500'
     },
     {
-      title: 'Business Income',
+      title: 'Income from salary',
+      description: 'Record salary income, allowances and professional tax deductions',
+      icon: <Briefcase size={24} />,
+      path: '/app/income-tax/salary',
+      color: 'bg-green-500'
+    },
+    {
+      title: 'Income from business',
       description: 'Manage business and professional income',
       icon: <Building size={24} />,
       path: '/app/income-tax/business',
+      color: 'bg-blue-500'
+    },
+    {
+      title: 'Income from house property',
+      description: 'Manage let-out or self-occupied property rental incomes & home loans',
+      icon: <Home size={24} />,
+      path: '/app/income-tax/house-property',
       color: 'bg-orange-500'
+    },
+    {
+      title: 'Income from capital gain',
+      description: 'Calculate short-term and long-term capital gains on assets',
+      icon: <TrendingUp size={24} />,
+      path: '/app/income-tax/capital-gains',
+      color: 'bg-red-500'
+    },
+    {
+      title: 'Income from other sources',
+      description: 'Track saving interest, FDs, dividends, lotteries and pensions',
+      icon: <Coins size={24} />,
+      path: '/app/income-tax/other-sources',
+      color: 'bg-teal-500'
+    },
+    {
+      title: 'ITR Filing',
+      description: 'File Income Tax Return with all income sources',
+      icon: <FileText size={24} />,
+      path: '/app/income-tax/itr-filing',
+      color: 'bg-indigo-500'
+    },
+    {
+      title: 'Tax Calculator',
+      description: 'Calculate income tax liability',
+      icon: <Calculator size={24} />,
+      path: '/app/income-tax/calculator',
+      color: 'bg-pink-500'
     },
     {
       title: 'Investment & Deductions',
       description: 'Track 80C, 80D and other deductions',
       icon: <PiggyBank size={24} />,
       path: '/app/income-tax/deductions',
-      color: 'bg-indigo-500'
-    },
-    {
-      title: 'Capital Gains',
-      description: 'Calculate short-term and long-term capital gains',
-      icon: <TrendingUp size={24} />,
-      path: '/app/income-tax/capital-gains',
-      color: 'bg-red-500'
+      color: 'bg-yellow-500'
     },
     {
       title: 'TDS Management',
       description: 'Track TDS certificates and payments',
       icon: <Receipt size={24} />,
       path: '/app/income-tax/tds',
-      color: 'bg-teal-500'
+      color: 'bg-cyan-500'
     },
     {
       title: 'Reports',

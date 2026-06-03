@@ -186,6 +186,9 @@ import InvestmentManagement from "./components/incometax/InvestmentManagement";
 import CapitalGainsManagement from "./components/incometax/CapitalGainsManagement";
 import TDSManagement from "./components/incometax/TDSManagement";
 import IncomeTaxReports from "./components/incometax/IncomeTaxReports";
+import SalaryIncomeManagement from "./components/incometax/SalaryIncomeManagement";
+import HousePropertyIncomeManagement from "./components/incometax/HousePropertyIncomeManagement";
+import OtherSourcesIncomeManagement from "./components/incometax/OtherSourcesIncomeManagement";
 
 // Other Modules
 // import AccountingModule from './components/accounting/AccountingModule';
@@ -2036,6 +2039,30 @@ function App() {
                   element={
                     <RequireCompany>
                       <IncomeTaxReports />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="income-tax/salary"
+                  element={
+                    <RequireCompany>
+                      <SalaryIncomeManagement />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="income-tax/house-property"
+                  element={
+                    <RequireCompany>
+                      <HousePropertyIncomeManagement />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="income-tax/other-sources"
+                  element={
+                    <RequireCompany>
+                      <OtherSourcesIncomeManagement />
                     </RequireCompany>
                   }
                 />
