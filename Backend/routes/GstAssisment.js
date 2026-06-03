@@ -917,28 +917,6 @@ router.get("/trading-account", async (req, res) => {
       });
     }
 
-    const ensureColumn = async (table, column, definition) => {
-      const [rows] = await db.execute(
-        `
-        SELECT COUNT(*) AS count
-        FROM information_schema.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = ?
-          AND COLUMN_NAME = ?
-        `,
-        [table, column]
-      );
-      if (rows[0].count === 0) {
-        await db.execute(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-      }
-    };
-
-    await ensureColumn("stock_items", "openingBalance", "DECIMAL(10,2) DEFAULT 0.00");
-    await ensureColumn("stock_items", "openingValue", "DECIMAL(10,2) DEFAULT 0.00");
-    await ensureColumn("stock_items", "openingRate", "DECIMAL(10,2) DEFAULT 0.00");
-    await ensureColumn("stock_items", "standardPurchaseRate", "DECIMAL(10,2) DEFAULT 0.00");
-    await ensureColumn("stock_items", "gstRate", "DECIMAL(5,2) DEFAULT 0.00");
-
     // 1. Fetch all ledgers to build rate extractor
     const [ledgers] = await db.execute(
       `SELECT id, name, group_id, opening_balance, balance_type 
@@ -971,9 +949,9 @@ router.get("/trading-account", async (req, res) => {
       stockGroupMap[g.id] = g.name;
     });
 
-    // 2. Fetch stock items
+    // 2. Fetch stock items (using SQL fallback aliases to avoid runtime DDL/ALTER TABLE)
     const [stockItems] = await db.execute(
-      `SELECT id, name, stockGroupId, openingBalance, openingValue, gstRate, batches, openingRate, standardPurchaseRate 
+      `SELECT id, name, NULL AS stockGroupId, 0.00 AS openingBalance, 0.00 AS openingValue, 0.00 AS gstRate, batches, 0.00 AS openingRate, 0.00 AS standardPurchaseRate 
        FROM stock_items 
        WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
       [company_id, owner_type, owner_id]
@@ -1111,7 +1089,7 @@ router.get("/trading-account", async (req, res) => {
 
     // 5. Compute Purchases by GST Rate
     const [purchaseItems] = await db.execute(
-      `SELECT i.amount, i.cgstRate, i.sgstRate, i.igstRate, s.gstRate AS itemGstRate
+      `SELECT i.amount, i.cgstRate, i.sgstRate, i.igstRate, 0.00 AS itemGstRate
        FROM purchase_voucher_items i
        JOIN purchase_vouchers v ON i.voucherId = v.id
        LEFT JOIN stock_items s ON i.itemId = s.id
@@ -1135,7 +1113,7 @@ router.get("/trading-account", async (req, res) => {
 
     // 6. Compute Sales by GST Rate
     const [salesItems] = await db.execute(
-      `SELECT i.amount, i.cgstRate, i.sgstRate, i.igstRate, s.gstRate AS itemGstRate
+      `SELECT i.amount, i.cgstRate, i.sgstRate, i.igstRate, 0.00 AS itemGstRate
        FROM sales_voucher_items i
        JOIN sales_vouchers v ON i.voucherId = v.id
        LEFT JOIN stock_items s ON i.itemId = s.id
