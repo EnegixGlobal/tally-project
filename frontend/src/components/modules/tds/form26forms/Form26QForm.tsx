@@ -254,8 +254,6 @@ export const Form26QForm: React.FC = () => {
     if (!deductor.address.flatNo) newErrors.flatNo = 'Flat No. is required';
     if (!deductor.address.pinCode) newErrors.pinCode = 'PIN Code is required';
     if (!deductor.responsiblePerson.name) newErrors['responsiblePerson.name'] = 'Responsible Person name is required';
-    if (!verification.fullName) newErrors.fullName = 'Full Name is required';
-    if (!verification.declarationPlace) newErrors.declarationPlace = 'Declaration Place is required';
 
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
@@ -973,93 +971,6 @@ export const Form26QForm: React.FC = () => {
         </div>
       </div>
 
-      {/* 4. Verification & Declaration */}
-      <div className={cardBorderClass}>
-        <div className="bg-gray-50 px-6 py-4 border-b border-black flex items-center gap-3">
-          <AlertCircle className="text-black h-5 w-5" />
-          <h3 className="text-lg font-bold text-black">Verification & Declaration</h3>
-        </div>
-
-        <div className="p-6 space-y-6">
-          <div className="p-4 bg-white text-black border border-black rounded-lg text-sm font-semibold leading-relaxed">
-            I solemnly declare that the information given above is correct and complete and that the amount of tax deducted 
-            and reflected in this statement has been paid to the credit of the Central Government.
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div>
-              <label className="block text-sm font-bold mb-1.5 text-black">Capacity *</label>
-              <select
-                name="capacity"
-                value={verification.capacity}
-                onChange={handleVerificationChange}
-                className={inputClass}
-              >
-                <option value="Deductor">Deductor</option>
-                <option value="Authorized Representative">Authorized Representative</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold mb-1.5 text-black">Place of Declaration *</label>
-              <input
-                type="text"
-                name="declarationPlace"
-                value={verification.declarationPlace}
-                onChange={handleVerificationChange}
-                className={`${inputClass} ${errors.declarationPlace ? 'border-red-500' : ''}`}
-              />
-              {errors.declarationPlace && <p className="text-red-600 font-semibold text-xs mt-1">{errors.declarationPlace}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold mb-1.5 text-black">Date of Declaration *</label>
-              <input
-                type="date"
-                name="declarationDate"
-                value={verification.declarationDate}
-                onChange={handleVerificationChange}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold mb-1.5 text-black">Full Name of Declarant *</label>
-              <input
-                type="text"
-                name="fullName"
-                value={verification.fullName}
-                onChange={handleVerificationChange}
-                className={`${inputClass} ${errors.fullName ? 'border-red-500' : ''}`}
-              />
-              {errors.fullName && <p className="text-red-600 font-semibold text-xs mt-1">{errors.fullName}</p>}
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold mb-1.5 text-black">Designation of Declarant *</label>
-              <input
-                type="text"
-                name="designation"
-                value={verification.designation}
-                onChange={handleVerificationChange}
-                className={inputClass}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-bold mb-1.5 text-black">Signature / Digital Signature</label>
-              <input
-                type="text"
-                name="signature"
-                value={verification.signature}
-                placeholder="Digital signature ID or Full Name"
-                onChange={handleVerificationChange}
-                className={inputClass}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
 
       <div className="flex justify-end pt-4">
         <button
