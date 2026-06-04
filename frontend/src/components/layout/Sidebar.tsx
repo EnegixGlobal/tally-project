@@ -36,6 +36,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
     { icon: <BarChart2 size={18} />, title: "Reports", path: "/app/reports", permissionId: 'reports' },
     { icon: <ShoppingCart size={18} />, title: "GST", path: "/app/gst", permissionId: 'gst' },
     { icon: <Truck size={18} />, title: "TDS", path: "/app/tds", permissionId: 'tds' },
+    { icon: <Truck size={18} />, title: "TDS Report", path: "/app/tds-report", permissionId: 'tds' },
     { icon: <Wallet size={18} />, title: "Income Tax", path: "/app/income-tax", permissionId: 'income-tax' },
     { icon: <BookOpen size={18} />, title: "Audit", path: "/app/audit", permissionId: 'audit' },
     { icon: <Landmark size={18} />, title: "Loan", path: "/app/loan", permissionId: 'loan' },

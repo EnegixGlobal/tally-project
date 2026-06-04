@@ -60,6 +60,7 @@ const MainLayout: React.FC = () => {
       const restrictedPaths = [
         { path: '/app/gst', moduleId: 'gst' },
         { path: '/app/tds', moduleId: 'tds' },
+        { path: '/app/tds-report', moduleId: 'tds' },
         { path: '/app/audit', moduleId: 'audit' },
         { path: '/app/income-tax', moduleId: 'income-tax' },
       ];

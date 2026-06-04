@@ -32,7 +32,7 @@ const Form26Q: React.FC = () => {
         <div className="flex items-center justify-between border-b border-black pb-5">
           <div className="flex items-center space-x-4">
             <button
-              onClick={() => navigate('/app/tds')}
+              onClick={() => navigate(window.location.pathname.includes('tds-report') ? '/app/tds-report' : '/app/tds')}
               className="p-2.5 rounded-xl border border-black bg-white text-black hover:bg-gray-50 shadow-sm transition-all duration-300"
               title="Back to TDS Dashboard"
             >

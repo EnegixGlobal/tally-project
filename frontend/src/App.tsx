@@ -142,6 +142,7 @@ import TDSSummary from "./components/modules/tds/TDSSummary";
 
 //TDSvModules
 import TDSModule from "./components/modules/tds/TDSModule";
+import TDSReportModule from "./components/modules/tds/TDSReportModule";
 import Form24Q from "./components/modules/tds/Form24Q";
 import Form26Q from "./components/modules/tds/Form26Q";
 import Form27QPage from "./components/modules/tds/Form27QPage";
@@ -1802,6 +1803,111 @@ function App() {
                 />
                 <Route
                   path="tds/form-26qc"
+                  element={
+                    <RequireCompany>
+                      <Form26QC />
+                    </RequireCompany>
+                  }
+                />
+                {/* TDS Report Module Routes */}
+                <Route
+                  path="tds-report"
+                  element={
+                    <RequireCompany>
+                      <TDSReportModule />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/form-24q"
+                  element={
+                    <RequireCompany>
+                      <Form24Q />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/form-26q"
+                  element={
+                    <RequireCompany>
+                      <Form26Q />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/form-27q"
+                  element={
+                    <RequireCompany>
+                      <Form27QPage />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/form-27eq"
+                  element={
+                    <RequireCompany>
+                      <Form27EQ />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/summary"
+                  element={
+                    <RequireCompany>
+                      <TDSSummary />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/rates"
+                  element={
+                    <RequireCompany>
+                      <TDSRates />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/form-16"
+                  element={
+                    <RequireCompany>
+                      <Form16 />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/compliance"
+                  element={
+                    <RequireCompany>
+                      <ComplianceCheck2 />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/deductees"
+                  element={
+                    <RequireCompany>
+                      <DeducteeMaster />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/tan"
+                  element={
+                    <RequireCompany>
+                      <TANRegistration />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/form-26qb"
+                  element={
+                    <RequireCompany>
+                      <Form26QB />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="tds-report/form-26qc"
                   element={
                     <RequireCompany>
                       <Form26QC />
