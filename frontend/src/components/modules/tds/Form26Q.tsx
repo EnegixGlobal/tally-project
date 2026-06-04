@@ -21,7 +21,7 @@ const Form26Q: React.FC = () => {
 
   return (
     <div className="min-h-screen pt-16 px-4 md:px-8 pb-12 bg-gray-50 text-black">
-      <div className="max-w-7xl mx-auto space-y-6">
+      <div className="w-full space-y-6">
         
         {/* Header Section */}
         <div className="flex items-center justify-between border-b border-black pb-5">

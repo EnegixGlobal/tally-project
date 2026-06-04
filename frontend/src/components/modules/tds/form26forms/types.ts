@@ -71,19 +71,30 @@ export interface DeductorDetails {
 
 export interface ChallanDetails {
   serialNo: number;
-  bsrCode: string;
-  dateOfDeposit: string;
-  challanSerialNo: string;
-  tax: number;
-  surcharge: number;
-  educationCess: number;
-  other: number;
-  interest: number;
-  penalty: number;
-  fee: number;
-  total: number;
+  updateMode: string;
+  sectionCode: string;
+  tax: number; // Column 4: TDS
+  surcharge: number; // Column 5: Surcharge
+  educationCess: number; // Column 6: Education Cess
+  interest: number; // Column 7: Interest
+  fee: number; // Column 8: Fee
+  penalty: number; // Column 9: Penalty/Others
+  lastTotalTaxDeposited: number; // Column 10
+  total: number; // Column 11: Total Amount Deposited (4+5+6+7+8+9)
+  chequeDDNo: string; // Column 12
+  lastBSRCode: string; // Column 13
+  bsrCode: string; // Column 14: BSR Code / Receipt Number
+  lastDateOfDeposit: string; // Column 15
+  dateOfDeposit: string; // Column 16: Date on which Tax Deposited
+  lastChallanSerialNo: string; // Column 17
+  challanSerialNo: string; // Column 18: Challan Serial No / DDO Serial No
+  bookAdjustment: 'Yes' | 'No'; // Column 19: Mode of Deposit through Book Adjustment (Yes/No)
+  interestAllocated: number; // Column 20
+  other: number; // Column 21: Others
+  minorHead: '200' | '400'; // Column 22: Minor Head of Challan 200/400
+  challanBalance: number; // Column 23
+  status?: 'Deposited' | 'Book Adjustment'; // For backward compatibility
   transferVoucherNo?: string;
-  status: 'Deposited' | 'Book Adjustment';
 }
 
 export interface DeducteeDetails {
