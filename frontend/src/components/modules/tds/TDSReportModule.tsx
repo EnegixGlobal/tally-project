@@ -37,7 +37,7 @@ const TDSReportModule: React.FC = () => {
 
   return (
     <div className='pt-[56px] px-4 '>
-      <h1 className="text-2xl font-bold mb-6 text-black dark:text-white">TDS Report Module</h1>
+      <h1 className="text-2xl font-bold mb-6 text-black ">TDS Report Module</h1>
       
       <div className="grid grid-cols-1 gap-6">
         {tdsFeatures.map((category, index) => (
