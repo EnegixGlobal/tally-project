@@ -922,7 +922,7 @@ useEffect(() => {
             <button
                 title='Back to Reports'
                 type='button'
-                  onClick={() => navigate('/app/tds')}
+                  onClick={() => navigate(window.location.pathname.includes('tds-report') ? '/app/tds-report' : '/app/tds')}
                   className="mr-4 p-2 rounded-full hover:bg-gray-200"
                 >
                   <ArrowLeft size={20} />

@@ -951,7 +951,7 @@ router.get("/trading-account", async (req, res) => {
 
     // 2. Fetch stock items (using SQL fallback aliases to avoid runtime DDL/ALTER TABLE)
     const [stockItems] = await db.execute(
-      `SELECT id, name, NULL AS stockGroupId, 0.00 AS openingBalance, 0.00 AS openingValue, 0.00 AS gstRate, batches, 0.00 AS openingRate, 0.00 AS standardPurchaseRate 
+      `SELECT id, name, NULL AS stockGroupId, 0.00 AS openingBalance, 0.00 AS openingValue, gstRate, batches, 0.00 AS openingRate, 0.00 AS standardPurchaseRate 
        FROM stock_items 
        WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
       [company_id, owner_type, owner_id]

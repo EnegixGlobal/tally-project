@@ -78,6 +78,7 @@ const menuItems = [
   // { title: 'Sales Order', path: '/app/sales-order' },
   { title: 'GST', path: '/app/gst', permissionId: 'gst' },
   { title: 'TDS', path: '/app/tds', permissionId: 'tds' },
+  { title: 'TDS Report', path: '/app/tds-report', permissionId: 'tds' },
   { title: 'Income Tax', path: '/app/income-tax', permissionId: 'income-tax' },
   { title: 'Audit', path: '/app/audit', permissionId: 'audit' },
   { title: 'Loan', path: '/app/loan', permissionId: 'loan' },

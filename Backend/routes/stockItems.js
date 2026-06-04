@@ -45,6 +45,7 @@ router.get("/", async (req, res) => {
         s.hsnCode,
         s.taxType,
         s.gstLedgerId,
+        gl.name AS gstLedgerName,
         s.cgstLedgerId,
         s.sgstLedgerId,
         s.gstRate,
@@ -58,6 +59,7 @@ router.get("/", async (req, res) => {
         s.owner_id
       FROM stock_items s
       LEFT JOIN stock_units u ON s.unit = u.id
+      LEFT JOIN ledgers gl ON s.gstLedgerId = gl.id
       WHERE 1 = 1
     `;
 
@@ -95,17 +97,27 @@ router.get("/", async (req, res) => {
       allAttributes = attrRows;
     }
 
-    const formattedRows = rows.map((item) => ({
-      ...item,
-      batches: (() => {
-        try {
-          return item.batches ? JSON.parse(item.batches) : [];
-        } catch {
-          return [];
+    const formattedRows = rows.map((item) => {
+      let rate = Number(item.gstRate || 0);
+      if (rate === 0 && item.gstLedgerName) {
+        const match = item.gstLedgerName.match(/(\d+(\.\d+)?)/);
+        if (match) {
+          rate = parseFloat(match[0]);
         }
-      })(),
-      attributes: allAttributes.filter(a => a.stock_item_id === item.id)
-    }));
+      }
+      return {
+        ...item,
+        gstRate: rate,
+        batches: (() => {
+          try {
+            return item.batches ? JSON.parse(item.batches) : [];
+          } catch {
+            return [];
+          }
+        })(),
+        attributes: allAttributes.filter(a => a.stock_item_id === item.id)
+      };
+    });
 
     return res.json({
       success: true,
@@ -922,7 +934,7 @@ router.get("/barcode/:barcode", async (req, res) => {
     const [rows] = await connection.execute(
       `SELECT 
         s.id, s.name, NULL AS stockGroupId, s.unit, 0.00 AS openingBalance,
-        s.hsnCode, 0.00 AS gstRate, s.taxType, s.barcode,
+        s.hsnCode, s.gstRate, s.taxType, s.barcode,
         NULL AS stockGroupName,
         u.name AS unitName
       FROM stock_items s
@@ -1551,8 +1563,9 @@ router.get("/:id", async (req, res) => {
         0.00 AS openingBalance,
         0.00 AS openingValue,
         s.hsnCode,
-        0.00 AS gstRate,
+        s.gstRate,
         s.gstLedgerId,
+        gl.name AS gstLedgerName,
         s.cgstLedgerId,
         s.sgstLedgerId,
         s.attributeId,
@@ -1569,6 +1582,7 @@ router.get("/:id", async (req, res) => {
         s.owner_id
       FROM stock_items s
       LEFT JOIN stock_units u ON s.unit = u.id
+      LEFT JOIN ledgers gl ON s.gstLedgerId = gl.id
       WHERE s.id = ?
     `;
 
@@ -1626,10 +1640,19 @@ router.get("/:id", async (req, res) => {
       );
     }
 
+    let rate = Number(item.gstRate || 0);
+    if (rate === 0 && item.gstLedgerName) {
+      const match = item.gstLedgerName.match(/(\d+(\.\d+)?)/);
+      if (match) {
+        rate = parseFloat(match[0]);
+      }
+    }
+
     res.json({
       success: true,
       data: {
         ...item,
+        gstRate: rate,
         batches,
         attributes: itemAttributes,
       },

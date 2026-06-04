@@ -12,7 +12,7 @@ router.get('/', async (req, res) => {
         sc.name AS category,
         sc.description,
         si.hsnCode,
-        0.00 AS gstRate,
+        si.gstRate,
         si.createdAt AS effectiveFrom
       FROM stock_items si
       LEFT JOIN stock_categories sc ON si.categoryId = sc.id
