@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Save, User, Shield, Phone, MapPin, CheckCircle, AlertCircle, Copy } from 'lucide-react';
 import type { DeductorDetails, Verification } from './types';
+import { useCompany } from '../../../../context/CompanyContext';
 
 const assessmentYears = [
   { value: '2026-27', label: 'AY 2026-27 (FY 2025-26)' },
@@ -72,7 +73,28 @@ const ministryNames = [
   { value: 'Others', label: 'Others' }
 ];
 
+const findStateCode = (stateStr: string): string => {
+  if (!stateStr) return 'JH';
+  const cleanState = stateStr.toLowerCase();
+  
+  const foundByLabel = states.find(s => 
+    cleanState.includes(s.label.toLowerCase())
+  );
+  if (foundByLabel) return foundByLabel.value;
+
+  const foundByCode = states.find(s => {
+    const code = s.value.toLowerCase();
+    return cleanState === code || new RegExp(`\\b${code}\\b`).test(cleanState);
+  });
+  if (foundByCode) return foundByCode.value;
+
+  return 'JH';
+};
+
 export const Form26QForm: React.FC = () => {
+  const { companyInfo } = useCompany();
+  const formRef = useRef<HTMLFormElement>(null);
+
   const [deductor, setDeductor] = useState<DeductorDetails>({
     quarter: 'Q4',
     tan: '',
@@ -150,6 +172,110 @@ export const Form26QForm: React.FC = () => {
 
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [successMsg, setSuccessMsg] = useState('');
+
+  useEffect(() => {
+    if (companyInfo) {
+      const mappedState = findStateCode(companyInfo.state);
+      
+      let fy = '2025-26';
+      let ay = '2026-27';
+      if (companyInfo.financialYear) {
+        if (companyInfo.financialYear.includes('2025-26')) {
+          fy = '2025-26';
+          ay = '2026-27';
+        } else if (companyInfo.financialYear.includes('2024-25')) {
+          fy = '2024-25';
+          ay = '2025-26';
+        } else if (companyInfo.financialYear.includes('2023-24')) {
+          fy = '2023-24';
+          ay = '2024-25';
+        }
+      }
+      
+      let std = '';
+      let phone = companyInfo.phoneNumber || companyInfo.phone_number || '';
+      if (phone.includes('-')) {
+        const parts = phone.split('-');
+        std = parts[0].trim();
+        phone = parts.slice(1).join('-').trim();
+      }
+
+      setDeductor(prev => {
+        const updated = {
+          ...prev,
+          tan: companyInfo.tanNumber || companyInfo.tan_number || prev.tan,
+          financialYear: fy,
+          assessmentYear: ay,
+          panOfDeductor: companyInfo.panNumber || companyInfo.pan_number || prev.panOfDeductor,
+          deductorName: companyInfo.name || prev.deductorName,
+          gstn: companyInfo.gstNumber || companyInfo.gst_number || prev.gstn,
+          email: companyInfo.email || prev.email,
+          stdCodeNo: std || prev.stdCodeNo,
+          telephoneNo: phone || prev.telephoneNo,
+          address: {
+            ...prev.address,
+            flatNo: companyInfo.address || prev.address.flatNo,
+            state: mappedState,
+            pinCode: companyInfo.pin || prev.address.pinCode,
+            country: companyInfo.country || prev.address.country
+          }
+        };
+
+        if (updated.responsiblePerson.sameAsAbove) {
+          updated.responsiblePerson = {
+            ...updated.responsiblePerson,
+            name: updated.deductorName,
+            pan: updated.panOfDeductor,
+            stdCodeNo: updated.stdCodeNo,
+            telephoneNo: updated.telephoneNo,
+            email: updated.email,
+            address: { ...updated.address }
+          };
+        }
+
+        return updated;
+      });
+    }
+  }, [companyInfo]);
+
+  useEffect(() => {
+    if (!formRef.current) return;
+
+    const elements = formRef.current.querySelectorAll('input, select, textarea');
+    elements.forEach((el: any) => {
+      if (el.type === 'checkbox' || el.type === 'submit' || el.type === 'button') return;
+
+      const hasValue = el.value && el.value.trim() !== '';
+      
+      const name = el.getAttribute('name');
+      let hasError = false;
+      if (name) {
+        if (errors[name]) hasError = true;
+        const parts = name.split('.');
+        const lastPart = parts[parts.length - 1];
+        if (errors[lastPart]) hasError = true;
+      }
+
+      if (hasError) {
+        el.style.borderColor = '';
+        el.style.borderWidth = '';
+        el.style.backgroundColor = '';
+        el.classList.remove('border-green-600', 'focus:border-green-600', 'focus:ring-green-500', 'border-2');
+      } else if (hasValue) {
+        el.style.borderColor = '#16a34a';
+        el.style.borderWidth = '2px';
+        el.style.backgroundColor = '#f3f4f6';
+        el.classList.remove('border-black', 'focus:border-blue-500', 'focus:ring-blue-500');
+        el.classList.add('border-green-600', 'focus:border-green-600', 'focus:ring-green-500', 'border-2');
+      } else {
+        el.style.borderColor = '';
+        el.style.borderWidth = '';
+        el.style.backgroundColor = '';
+        el.classList.remove('border-green-600', 'focus:border-green-600', 'focus:ring-green-500', 'border-2');
+        el.classList.add('border-black');
+      }
+    });
+  }, [deductor, verification, errors]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
     const { name, value } = e.target;
@@ -276,7 +402,7 @@ export const Form26QForm: React.FC = () => {
   const headerBorderClass = "bg-gray-50 px-6 py-4 border-b border-black flex items-center gap-3";
 
   return (
-    <form onSubmit={handleSave} className="space-y-8 animate-fadeIn text-black">
+    <form ref={formRef} onSubmit={handleSave} className="space-y-8 animate-fadeIn text-black">
       
       {successMsg && (
         <div className="flex items-center gap-2 bg-green-50 border border-black text-green-900 p-4 rounded-lg">
