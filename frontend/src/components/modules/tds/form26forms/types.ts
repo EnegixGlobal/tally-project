@@ -98,21 +98,50 @@ export interface ChallanDetails {
 }
 
 export interface DeducteeDetails {
-  serialNo: number;
-  panOfDeductee: string;
-  nameOfDeductee: string;
-  amountPaid: number;
-  amountOfTax: number;
-  taxDeposited: number;
-  dateOfPayment: string;
-  natureOfPayment: string;
-  sectionUnderDeducted: string;
-  rateOfDeduction: number;
-  certSerialNo?: string;
+  rowNumber: number; // Column 1
+  cashWithdrawal1cr: number; // Column 2
+  cashWithdrawal20lto1crNonCoop: number; // Column 3
+  cashWithdrawal1crNonCoop: number; // Column 4
+  cashWithdrawal20lto1crCoop: number; // Column 5
+  totalTaxDeducted: number; // Column 6 (calculated)
+  lastTotalTaxDeducted: number; // Column 7
+  taxDeposited: number; // Column 8: Total Tax Deposited
+  lastTotalTaxDeposited: number; // Column 9
+  dateOfDeduction: string; // Column 10
+  remarkCode: string; // Column 11: Remarks
+  deducteeCode: string; // Column 12: Deductee Code
+  rateOfDeduction: number; // Column 13: Rate of Deduction
+  paidByBookEntry: 'Yes' | 'No'; // Column 14
+  certSerialNo: string; // Column 15: Certificate Number
+  serialNo: number; // Column 16: Sr. No.
+  deducteeRefNo: string; // Column 17
+  lastPanOfDeductee: string; // Column 18
+  panOfDeductee: string; // Column 19
+  nameOfDeductee: string; // Column 20
+  dateOfPayment: string; // Column 21
+  amountPaid: number; // Column 22
+  amountOfTax: number; // Column 23: TDS
+  surcharge: number; // Column 24
+  educationCess: number; // Column 25: Cess
+  challanSerialNo: string; // Column 26
+  updateMode: string; // Column 27: Update Mode
+  bsrCode: string; // Column 28: BSR Code
+  dateOfTaxDeposited: string; // Column 29: Date on which tax deposited
+  transferVoucherSerialNo: string; // Column 30
+  sectionUnderDeducted: string; // Column 31: Section Under Which Payment Made
+  totalTdsAllocated: number; // Column 32
+  interest: number; // Column 33
+  others: number; // Column 34
+  totalTax: number; // Column 35: Total (7+8+9)
+  cashWithdrawal3crCoop: number; // Column 36
+  cashWithdrawal20lto3crCoop: number; // Column 37
+  cashWithdrawal3crCoopProviso: number; // Column 38
+
+  // Optional fields for compatibility
+  natureOfPayment?: string;
   dateOfTDSCertificate?: string;
-  amountPaidCredited: number;
+  amountPaidCredited?: number;
   gstIdentificationNo?: string;
-  remarkCode?: string;
 }
 
 export interface AnnexureDetails {
