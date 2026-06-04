@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import React from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, FileText, Landmark, Users } from 'lucide-react';
 import { Form26QForm } from './form26forms/Form26QForm';
 import { Form26QChallan } from './form26forms/Form26QChallan';
@@ -11,7 +11,12 @@ type TabType = 'form' | 'challan' | 'annexure';
 const Form26Q: React.FC = () => {
   const navigate = useNavigate();
   const { theme } = useAppContext();
-  const [activeTab, setActiveTab] = useState<TabType>('form');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab = (searchParams.get('tab') as TabType) || 'form';
+
+  const setActiveTab = (tab: TabType) => {
+    setSearchParams({ tab });
+  };
 
   const tabs = [
     { id: 'form', label: 'Form', icon: FileText },
