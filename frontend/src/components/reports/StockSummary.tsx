@@ -892,33 +892,33 @@ const StockSummary: React.FC = () => {
     return [
       {
         header: "Stock Item",
-        accessor: "name",
+        accessor: "itemName",
         align: "center" as const,
-        render: (r: any) => r.item?.name ?? "",
+        render: (r: any) => r.itemName ?? "",
       },
       {
         header: "Unit",
         accessor: "unitName",
         align: "center" as const,
-        render: (r: any) => r.item?.unitName ?? "",
+        render: (r: any) => r.unitName ?? "",
       },
       {
         header: "HSN",
         accessor: "hsnCode",
         align: "center" as const,
-        render: (r: any) => r.item?.hsnCode ?? "",
+        render: (r: any) => r.hsnCode ?? "",
       },
       {
         header: "GST",
         accessor: "gstRate",
         align: "center" as const,
-        render: (r: any) => (r.item?.gstRate ?? 0) + "%",
+        render: (r: any) => (r.gstRate ?? 0) + "%",
       },
       {
         header: "Tax Type",
         accessor: "taxType",
         align: "center" as const,
-        render: (r: any) => r.item?.taxType ?? "",
+        render: (r: any) => r.taxType ?? "",
       },
     ];
   }, [reportView]);

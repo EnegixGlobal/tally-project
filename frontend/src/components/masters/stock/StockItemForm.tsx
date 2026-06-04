@@ -717,6 +717,15 @@ const StockItemForm = () => {
       return;
     }
 
+    const selectedLedger = [
+      ...gstLedgers.gst,
+      ...gstLedgers.igst,
+    ].find((l) => l.id.toString() === formData.gstLedgerId);
+    
+    const extractedRate = selectedLedger
+      ? (parseInt(selectedLedger.name.replace(/[^0-9]/g, "")) || 0)
+      : Number(formData.gstRate || 0);
+
     // Construct stockItem object
     const stockItem: any = {
       name: formData.name,
@@ -727,7 +736,7 @@ const StockItemForm = () => {
       openingValue: formData.openingValue,
 
       hsnCode: formData.hsnCode,
-      gstRate: Number(formData.gstRate),
+      gstRate: extractedRate,
       taxType: formData.taxType,
 
       gstLedgerId: formData.gstLedgerId,
