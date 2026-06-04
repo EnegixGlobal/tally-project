@@ -64,14 +64,15 @@ useEffect(() => {
   const fetchAssessees = async () => {
     try {
       const employee_id = localStorage.getItem('employee_id');
+      const company_id = localStorage.getItem('company_id');
 
-      if (!employee_id) {
-        console.error('Employee ID not found in local storage');
+      if (!employee_id || !company_id) {
+        console.error('Employee ID or Company ID not found in local storage');
         return;
       }
 
-      // Add employee_id as a query parameter
-      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assessee?employee_id=${encodeURIComponent(employee_id)}`, {
+      // Add employee_id and company_id as query parameters
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/assessee?employee_id=${encodeURIComponent(employee_id)}&company_id=${encodeURIComponent(company_id)}`, {
         headers: {
           'Content-Type': 'application/json',
         },
