@@ -121,10 +121,14 @@ router.put('/:id', async (req, res) => {
 
 
 router.get('/', async (req, res) => {
-  const { employee_id } = req.query;
+  const { employee_id, company_id } = req.query;
 
   if (!employee_id) {
     return res.status(400).json({ error: 'employee_id query parameter is required' });
+  }
+
+  if (!company_id) {
+    return res.status(400).json({ error: 'company_id query parameter is required' });
   }
 
   try {
