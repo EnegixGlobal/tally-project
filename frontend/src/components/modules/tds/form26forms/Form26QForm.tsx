@@ -1,7 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Save, User, Shield, Phone, MapPin, CheckCircle, AlertCircle, Copy } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Save, User, Shield, Phone, MapPin, CheckCircle, AlertCircle, Copy, Loader2 } from 'lucide-react';
 import type { DeductorDetails, Verification } from './types';
 import { useCompany } from '../../../../context/CompanyContext';
+import axiosInstance from '../../../../api/axiosInstance';
+import Swal from 'sweetalert2';
 
 const assessmentYears = [
   { value: '2026-27', label: 'AY 2026-27 (FY 2025-26)' },
@@ -91,9 +94,11 @@ const findStateCode = (stateStr: string): string => {
   return 'JH';
 };
 
-export const Form26QForm: React.FC = () => {
+export const Form26QForm: React.FC<{ setReturnId: (id: number) => void }> = ({ setReturnId }) => {
   const { companyInfo } = useCompany();
   const formRef = useRef<HTMLFormElement>(null);
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('editId');
 
   const [deductor, setDeductor] = useState<DeductorDetails>({
     quarter: 'Q4',
@@ -171,7 +176,7 @@ export const Form26QForm: React.FC = () => {
   });
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [successMsg, setSuccessMsg] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
     if (companyInfo) {
@@ -237,6 +242,64 @@ export const Form26QForm: React.FC = () => {
       });
     }
   }, [companyInfo]);
+
+  useEffect(() => {
+    const fetchEditData = async () => {
+      if (!editId) return;
+      try {
+        const response = await axiosInstance.get(`/tds26q/${editId}`);
+        const data = response.data;
+        if (data) {
+          setDeductor(prev => ({
+            ...prev,
+            tan: data.tan || prev.tan,
+            assessmentYear: data.assessmentYear || prev.assessmentYear,
+            panOfDeductor: data.panOfDeductor || prev.panOfDeductor,
+            category: data.category || prev.category,
+            deductorName: data.deductorName || prev.deductorName,
+            branchSrlNo: data.branch_serial_no || '',
+            address: {
+              ...prev.address,
+              flatNo: data.deductor_flat_no || '',
+              premisesName: data.deductor_premises_name || '',
+              roadStreet: data.deductor_road_street || '',
+              area: data.deductor_area || '',
+              town: data.deductor_town_city || '',
+              state: data.deductor_state || 'JH',
+              country: data.deductor_country || 'India',
+              pinCode: data.deductor_pin_code || '',
+            },
+            stdCodeNo: data.deductor_std_code || '',
+            telephoneNo: data.deductor_telephone || '',
+            email: data.deductor_email || '',
+            responsiblePerson: {
+              ...prev.responsiblePerson,
+              status: data.resp_status || 'Deductor',
+              designation: data.resp_designation || '',
+              name: data.resp_name || '',
+              fatherName: data.resp_father_name || '',
+              pan: data.resp_pan || '',
+            }
+          }));
+
+          setVerification({
+            capacity: data.verification_capacity || 'Deductor',
+            declarationPlace: data.verification_place || '',
+            declarationDate: data.verification_date ? new Date(data.verification_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            fullName: data.verification_full_name || '',
+            designation: data.verification_designation || '',
+            signature: data.verification_signature || ''
+          });
+
+          setReturnId(Number(editId));
+        }
+      } catch (err) {
+        console.error("Error fetching edit data:", err);
+      }
+    };
+    
+    fetchEditData();
+  }, [editId]);
 
   useEffect(() => {
     if (!formRef.current) return;
@@ -385,14 +448,65 @@ export const Form26QForm: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!validate()) {
+      Swal.fire({
+        title: 'Validation Error',
+        text: 'Please fill in all required fields correctly.',
+        icon: 'warning',
+        confirmButtonColor: '#000000',
+      });
+      return;
+    }
 
-    console.log('Saving comprehensive Form 26Q:', { deductor, verification });
-    setSuccessMsg('Form 26Q particulars saved successfully!');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
-    setTimeout(() => setSuccessMsg(''), 5000);
+    setIsSubmitting(true);
+    try {
+      const payload = {
+        deductorDetails: deductor,
+        challanDetails: [],
+        deducteeDetails: [],
+        verification,
+        assessmentYear: deductor.assessmentYear,
+      };
+
+      let response;
+      if (editId) {
+        response = await axiosInstance.put(`/tds26q/${editId}`, payload);
+      } else {
+        response = await axiosInstance.post('/tds26q', payload);
+      }
+      
+      if (response.data.success) {
+        if (response.data.returnId) {
+          setReturnId(response.data.returnId);
+        }
+        Swal.fire({
+          title: 'Saved Successfully!',
+          text: 'Form 26Q particulars have been saved.',
+          icon: 'success',
+          confirmButtonColor: '#16a34a',
+        });
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+      } else {
+        Swal.fire({
+          title: 'Error!',
+          text: 'Failed to save Form 26Q.',
+          icon: 'error',
+          confirmButtonColor: '#dc2626',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error saving Form 26Q:', error);
+      Swal.fire({
+        title: 'Error!',
+        text: error.response?.data?.error || 'An error occurred while saving.',
+        icon: 'error',
+        confirmButtonColor: '#dc2626',
+      });
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   // High-contrast input fields ALWAYS white background and black text/borders (in both light and dark modes)
@@ -403,14 +517,6 @@ export const Form26QForm: React.FC = () => {
 
   return (
     <form ref={formRef} onSubmit={handleSave} className="space-y-8 animate-fadeIn text-black">
-      
-      {successMsg && (
-        <div className="flex items-center gap-2 bg-green-50 border border-black text-green-900 p-4 rounded-lg">
-          <CheckCircle className="h-5 w-5 shrink-0" />
-          <span className="text-sm font-semibold">{successMsg}</span>
-        </div>
-      )}
-
       {/* 1. Particulars of Statement */}
       <div className={cardBorderClass}>
         <div className={headerBorderClass}>
@@ -1101,10 +1207,11 @@ export const Form26QForm: React.FC = () => {
       <div className="flex justify-end pt-4">
         <button
           type="submit"
-          className="inline-flex items-center gap-2 bg-black hover:bg-gray-900 text-white font-bold px-6 py-3 rounded-lg border border-black shadow-sm transition-colors cursor-pointer dark:bg-white dark:text-black dark:border-white dark:hover:bg-gray-100"
+          disabled={isSubmitting}
+          className={`inline-flex items-center gap-2 ${isSubmitting ? 'bg-gray-600' : 'bg-black hover:bg-gray-900'} text-white font-bold px-6 py-3 rounded-lg border border-black shadow-sm transition-colors cursor-pointer dark:bg-white dark:text-black dark:border-white dark:hover:bg-gray-100`}
         >
-          <Save size={18} />
-          Save NSDL Form 26Q
+          {isSubmitting ? <Loader2 size={18} className="animate-spin" /> : <Save size={18} />}
+          {isSubmitting ? 'Saving...' : 'Save NSDL Form 26Q'}
         </button>
       </div>
     </form>

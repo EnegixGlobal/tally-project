@@ -143,8 +143,9 @@ import TDSSummary from "./components/modules/tds/TDSSummary";
 //TDSvModules
 import TDSModule from "./components/modules/tds/TDSModule";
 import TDSReportModule from "./components/modules/tds/TDSReportModule";
-import Form24Q from "./components/modules/tds/Form24Q";
-import Form26Q from "./components/modules/tds/Form26Q";
+import Form24Q from './components/modules/tds/Form24Q';
+import Form26Q from './components/modules/tds/Form26Q';
+import Form26QReport from './components/modules/tds/Form26QReport';
 import Form27QPage from "./components/modules/tds/Form27QPage";
 import Form27EQ from "./components/modules/tds/Form27EQ";
 import TDSRates from "./components/modules/tds/TDSRates";
@@ -1830,7 +1831,7 @@ function App() {
                   path="tds-report/form-26q"
                   element={
                     <RequireCompany>
-                      <Form26Q />
+                      <Form26QReport />
                     </RequireCompany>
                   }
                 />
