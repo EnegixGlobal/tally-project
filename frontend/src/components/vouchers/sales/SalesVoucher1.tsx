@@ -488,9 +488,12 @@ const SalesVoucher: React.FC = () => {
             return {
               id: `e${idx + 1}`,
               itemId: e.itemId || e.item_id || "",
+              ledgerId: e.ledgerId?.toString() || e.ledger_id?.toString() || "",
               quantity: qty,
               rate: rate,
-              amount: qty * rate, // ✅ Use GROSS amount
+              amount: v.mode === "accounting-invoice" 
+                ? Number(e.amount || 0) 
+                : qty * rate, // ✅ Use GROSS amount
               type: e.type || "debit",
               // The component logic expects ledger IDs in these fields, 
               // which are then hydrated into rates by a separate useEffect.
@@ -506,6 +509,7 @@ const SalesVoucher: React.FC = () => {
               discountLedgerId: e.discountLedgerId || e.discount_ledger_id || "",
               hsnCode: e.hsnCode || e.hsn_code || "",
               batchNumber: e.batchNumber || e.batch_number || "",
+              narration: e.narration || "",
             };
           });
 
