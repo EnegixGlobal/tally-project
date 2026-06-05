@@ -3,6 +3,7 @@ import { Save, Plus, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
 import type { DeducteeDetails } from './types';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../../../api/axiosInstance';
+import { useAuth } from '../../../../home/context/AuthContext';
 
 const sectionCodes = [
   { value: '193', label: '193 - Interest on Securities' },
@@ -39,6 +40,7 @@ const remarkCodes = [
 ];
 
 export const Form26QAnnexure: React.FC<{ returnId: number | null }> = ({ returnId }) => {
+  const { companyId } = useAuth();
   const [deductees, setDeductees] = useState<DeducteeDetails[]>([
     {
       rowNumber: 1,
@@ -84,50 +86,119 @@ export const Form26QAnnexure: React.FC<{ returnId: number | null }> = ({ returnI
 
   const [errors, setErrors] = useState<Record<string, string>>({});
 
-  const addDeductee = () => {
-    setDeductees(prev => [
-      ...prev,
-      {
-        rowNumber: prev.length + 1,
-        cashWithdrawal1cr: 0,
-        cashWithdrawal20lto1crNonCoop: 0,
-        cashWithdrawal1crNonCoop: 0,
-        cashWithdrawal20lto1crCoop: 0,
-        totalTaxDeducted: 0,
-        lastTotalTaxDeducted: 0,
-        taxDeposited: 0,
-        lastTotalTaxDeposited: 0,
-        dateOfDeduction: '',
-        remarkCode: '',
-        deducteeCode: '02',
-        rateOfDeduction: 0,
-        paidByBookEntry: 'No',
-        certSerialNo: '',
-        serialNo: prev.length + 1,
-        deducteeRefNo: '',
-        lastPanOfDeductee: '',
-        panOfDeductee: '',
-        nameOfDeductee: '',
-        dateOfPayment: '',
-        amountPaid: 0,
-        amountOfTax: 0,
-        surcharge: 0,
-        educationCess: 0,
-        challanSerialNo: '',
-        updateMode: 'Add',
-        bsrCode: '',
-        dateOfTaxDeposited: '',
-        transferVoucherSerialNo: '',
-        sectionUnderDeducted: '194C',
-        totalTdsAllocated: 0,
-        interest: 0,
-        others: 0,
-        totalTax: 0,
-        cashWithdrawal3crCoop: 0,
-        cashWithdrawal20lto3crCoop: 0,
-        cashWithdrawal3crCoopProviso: 0
+  const addDeductee = async () => {
+    try {
+      const response = await axiosInstance.get(`/tds26q_challan?companyId=${companyId || ''}${returnId ? `&returnId=${returnId}` : ''}`);
+      const challansData = response.data;
+      
+      if (!challansData || challansData.length === 0) {
+        Swal.fire('No Challans Found', 'Please add and save Challans first before adding Deductees.', 'info');
+        return;
       }
-    ]);
+
+      const html = `
+        <div class="text-left font-arial">
+          <p class="mb-4 text-sm font-semibold text-gray-700">Enter the number of deductee rows to generate for each challan:</p>
+          <div class="space-y-3 max-h-60 overflow-y-auto pr-2 scrollbar-thin">
+            ${challansData.map((c: any, i: number) => `
+              <div class="flex items-center justify-between bg-gray-50 p-3 rounded-lg border border-gray-200">
+                <div>
+                  <div class="font-bold text-black">Challan Sr: ${i + 1}</div>
+                  <div class="text-xs text-gray-500">BSR Code: ${c.bsr_code || 'N/A'}</div>
+                </div>
+                <input type="number" id="challan_input_${i}" class="swal2-input !w-24 !m-0 !h-10 text-center !text-sm" placeholder="Rows" min="0" value="0" />
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+
+      const result = await Swal.fire({
+        title: 'Generate Deductee Rows',
+        html,
+        showCancelButton: true,
+        confirmButtonText: 'Generate Rows',
+        confirmButtonColor: '#000000',
+        cancelButtonColor: '#dc2626',
+        width: '500px',
+        preConfirm: () => {
+          const counts = challansData.map((_: any, i: number) => {
+            const val = (document.getElementById(`challan_input_${i}`) as HTMLInputElement).value;
+            return parseInt(val, 10) || 0;
+          });
+          return counts;
+        }
+      });
+
+      if (result.isConfirmed && result.value) {
+        const counts = result.value as number[];
+        const newDeductees: DeducteeDetails[] = [];
+        
+        let startSerial = deductees.length;
+        
+        counts.forEach((count: number, challanIndex: number) => {
+          const c = challansData[challanIndex];
+          for (let k = 0; k < count; k++) {
+            startSerial++;
+            newDeductees.push({
+              rowNumber: startSerial,
+              cashWithdrawal1cr: 0,
+              cashWithdrawal20lto1crNonCoop: 0,
+              cashWithdrawal1crNonCoop: 0,
+              cashWithdrawal20lto1crCoop: 0,
+              totalTaxDeducted: 0,
+              lastTotalTaxDeducted: 0,
+              taxDeposited: 0,
+              lastTotalTaxDeposited: 0,
+              dateOfDeduction: '',
+              remarkCode: '',
+              deducteeCode: '02',
+              rateOfDeduction: 0,
+              paidByBookEntry: 'No',
+              certSerialNo: '',
+              serialNo: startSerial,
+              deducteeRefNo: '',
+              lastPanOfDeductee: '',
+              panOfDeductee: '',
+              nameOfDeductee: '',
+              dateOfPayment: '',
+              amountPaid: 0,
+              amountOfTax: 0,
+              surcharge: 0,
+              educationCess: 0,
+              challanSerialNo: String(challanIndex + 1),
+              updateMode: 'Add',
+              bsrCode: '',
+              dateOfTaxDeposited: '',
+              transferVoucherSerialNo: '',
+              sectionUnderDeducted: '194C',
+              totalTdsAllocated: 0,
+              interest: 0,
+              others: 0,
+              totalTax: 0,
+              cashWithdrawal3crCoop: 0,
+              cashWithdrawal20lto3crCoop: 0,
+              cashWithdrawal3crCoopProviso: 0
+            });
+          }
+        });
+
+        if (newDeductees.length > 0) {
+          const firstRow = deductees[0];
+          const isInitialEmpty = deductees.length === 1 && !firstRow.panOfDeductee && !firstRow.nameOfDeductee && !firstRow.amountPaid;
+          
+          if (isInitialEmpty) {
+            const fixed = newDeductees.map((d, i) => ({ ...d, serialNo: i + 1, rowNumber: i + 1 }));
+            setDeductees(fixed);
+          } else {
+            setDeductees(prev => [...prev, ...newDeductees]);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching challans for deductees popup', err);
+      Swal.fire('Error', 'Failed to fetch Challans data. Make sure Challans are saved first.', 'error');
+    }
   };
 
   const removeDeductee = (index: number) => {
@@ -254,26 +325,47 @@ export const Form26QAnnexure: React.FC<{ returnId: number | null }> = ({ returnI
     }
   };
 
-  const inputClass = "w-full p-2 border bg-white text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
-  const selectClass = "w-full p-2 border bg-white text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
+  const getRowColor = (challanNo: string) => {
+    const num = parseInt(challanNo, 10);
+    if (isNaN(num) || !num) return 'bg-white hover:bg-gray-50';
+    
+    const colors = [
+      'bg-red-50 hover:bg-red-100',
+      'bg-blue-50 hover:bg-blue-100',
+      'bg-green-50 hover:bg-green-100',
+      'bg-yellow-50 hover:bg-yellow-100',
+      'bg-purple-50 hover:bg-purple-100',
+      'bg-pink-50 hover:bg-pink-100',
+      'bg-indigo-50 hover:bg-indigo-100',
+      'bg-teal-50 hover:bg-teal-100',
+      'bg-orange-50 hover:bg-orange-100',
+      'bg-cyan-50 hover:bg-cyan-100'
+    ];
+    
+    // num - 1 so that Challan 1 gets the first color, Challan 2 gets second, etc.
+    return colors[(num - 1) % colors.length];
+  };
+
+  const inputClass = "w-full p-2 border bg-transparent text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
+  const selectClass = "w-full p-2 border bg-transparent text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
 
   return (
     <div className="space-y-6 animate-fadeIn text-black font-arial">
 
       <div className="bg-white rounded-xl shadow-sm border border-black overflow-hidden">
-        <div className="bg-gray-50 px-6 py-4 border-b border-black flex justify-between items-center">
-          <div>
+        <div className="bg-gray-50 px-6 py-4 border-b border-black">
+          <div className="flex items-center gap-4">
             <h3 className="text-lg font-bold text-black">Part C - Annexure (Deducted details)</h3>
-            <p className="text-xs text-gray-600 mt-0.5 font-semibold">Details of amount paid/credited and tax deducted at source</p>
+            <button
+              type="button"
+              onClick={addDeductee}
+              className="inline-flex items-center gap-1.5 bg-black hover:bg-gray-900 text-white font-bold px-3 py-1.5 rounded-lg text-sm border border-black transition-colors cursor-pointer"
+            >
+              <Plus size={16} />
+              Add Deductee
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={addDeductee}
-            className="inline-flex items-center gap-1.5 bg-black hover:bg-gray-955 text-white font-bold px-3 py-1.5 rounded-lg text-sm border border-black transition-colors cursor-pointer"
-          >
-            <Plus size={16} />
-            Add Deductee
-          </button>
+          <p className="text-xs text-gray-600 mt-0.5 font-semibold">Details of amount paid/credited and tax deducted at source</p>
         </div>
 
         <div className="p-6">
@@ -334,7 +426,7 @@ export const Form26QAnnexure: React.FC<{ returnId: number | null }> = ({ returnI
               </thead>
               <tbody className="divide-y divide-black">
                 {deductees.map((deductee, index) => (
-                  <tr key={index} className="hover:bg-gray-50 transition-colors">
+                  <tr key={index} className={`${getRowColor(deductee.challanSerialNo)} transition-colors`}>
                     {/* 1. Row Number */}
                     <td className="p-1.5 border-r border-black">
                       <input
@@ -407,7 +499,7 @@ export const Form26QAnnexure: React.FC<{ returnId: number | null }> = ({ returnI
                     </td>
 
                     {/* 6. Total Tax Deducted (23+24+25) */}
-                    <td className="p-2 border-r border-black font-bold text-black text-center text-xs bg-gray-50">
+                    <td className="p-2 border-r border-black font-bold text-black text-center text-xs">
                       ₹{deductee.totalTaxDeducted.toLocaleString()}
                     </td>
 

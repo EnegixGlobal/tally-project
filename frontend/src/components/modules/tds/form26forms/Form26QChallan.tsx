@@ -214,8 +214,28 @@ export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId
     }
   };
 
-  const inputClass = "w-full p-2 border bg-white text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
-  const selectClass = "w-full p-2 border bg-white text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
+  const getRowColor = (challanNo: string | number) => {
+    const num = parseInt(String(challanNo), 10);
+    if (isNaN(num) || !num) return 'bg-white hover:bg-gray-50';
+    
+    const colors = [
+      'bg-red-50 hover:bg-red-100',
+      'bg-blue-50 hover:bg-blue-100',
+      'bg-green-50 hover:bg-green-100',
+      'bg-yellow-50 hover:bg-yellow-100',
+      'bg-purple-50 hover:bg-purple-100',
+      'bg-pink-50 hover:bg-pink-100',
+      'bg-indigo-50 hover:bg-indigo-100',
+      'bg-teal-50 hover:bg-teal-100',
+      'bg-orange-50 hover:bg-orange-100',
+      'bg-cyan-50 hover:bg-cyan-100'
+    ];
+    
+    return colors[(num - 1) % colors.length];
+  };
+
+  const inputClass = "w-full p-2 border bg-transparent text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
+  const selectClass = "w-full p-2 border bg-transparent text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
 
   return (
     <div className="space-y-6 animate-fadeIn text-black font-arial">
@@ -294,7 +314,7 @@ export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId
               </thead>
               <tbody className="divide-y divide-black">
                 {challans.map((challan, index) => (
-                  <tr key={index} className="hover:bg-gray-50 transition-colors">
+                  <tr key={index} className={`${getRowColor(challan.serialNo)} transition-colors`}>
                     {/* 1. Sr. No. */}
                     <td className="p-2 text-center font-bold text-black border-r border-black">
                       {challan.serialNo}
@@ -559,7 +579,7 @@ export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId
                         value={challan.lastTotalTaxDeposited}
                         onChange={(e) => handleChallanChange(index, 'lastTotalTaxDeposited', e.target.value)}
                         placeholder="0"
-                        className={inputClass}
+                        className={`${inputClass} bg-transparent`}
                       />
                     </td>
 
