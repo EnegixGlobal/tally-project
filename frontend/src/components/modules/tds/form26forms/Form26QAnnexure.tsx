@@ -292,6 +292,7 @@ export const Form26QAnnexure: React.FC<{ returnId: number | null }> = ({ returnI
                 {/* Row 2: Field Names */}
                 <tr className="bg-gray-100 text-black font-bold border-b border-black text-xs">
                   <th className="p-2 border-r border-black text-center">Row Number</th>
+                  <th className="p-2 border-r border-black">Challan Serial No.</th>
                   <th className="p-2 border-r border-black">Amt of cash withdrawal &gt; 1cr u/s 194N</th>
                   <th className="p-2 border-r border-black">Amt of cash withdrawal 20L-1cr (Non-coop proviso u/s 194N)</th>
                   <th className="p-2 border-r border-black">Amt of cash withdrawal &gt; 1cr (Non-coop proviso u/s 194N)</th>
@@ -316,7 +317,6 @@ export const Form26QAnnexure: React.FC<{ returnId: number | null }> = ({ returnI
                   <th className="p-2 border-r border-black">TDS</th>
                   <th className="p-2 border-r border-black">Surcharge</th>
                   <th className="p-2 border-r border-black">Health & Education Cess</th>
-                  <th className="p-2 border-r border-black">Challan Serial No.</th>
                   <th className="p-2 border-r border-black">Update Mode For Deductee</th>
                   <th className="p-2 border-r border-black">BSR Code of Branch</th>
                   <th className="p-2 border-r border-black">Date of Deposit (DD/MM/YYYY)</th>
@@ -346,7 +346,19 @@ export const Form26QAnnexure: React.FC<{ returnId: number | null }> = ({ returnI
                       />
                     </td>
 
-                    {/* 2. Amount of cash withdrawal in excess of Rs. 1 crore */}
+                    {/* 2. Challan Serial No. */}
+                    <td className="p-1.5 border-r border-black">
+                      <input
+                        title="Challan Serial No."
+                        type="text"
+                        value={deductee.challanSerialNo}
+                        onChange={(e) => handleDeducteeChange(index, 'challanSerialNo', e.target.value)}
+                        placeholder="Challan No."
+                        className={inputClass}
+                      />
+                    </td>
+
+                    {/* 3. Amount of cash withdrawal in excess of Rs. 1 crore */}
                     <td className="p-1.5 border-r border-black">
                       <input
                         title="Amt of cash withdrawal > 1cr"
@@ -622,18 +634,6 @@ export const Form26QAnnexure: React.FC<{ returnId: number | null }> = ({ returnI
                         value={deductee.educationCess || ''}
                         onChange={(e) => handleDeducteeChange(index, 'educationCess', e.target.value)}
                         placeholder="0"
-                        className={inputClass}
-                      />
-                    </td>
-
-                    {/* 26. Challan Serial No. */}
-                    <td className="p-1.5 border-r border-black">
-                      <input
-                        title="Challan Serial No."
-                        type="text"
-                        value={deductee.challanSerialNo}
-                        onChange={(e) => handleDeducteeChange(index, 'challanSerialNo', e.target.value)}
-                        placeholder="Serial No."
                         className={inputClass}
                       />
                     </td>

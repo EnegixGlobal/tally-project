@@ -223,26 +223,73 @@ router.get("/api/tds26q/:id", async (req, res) => {
   }
 });
 
-// POST: create or update Challans for a specific returnId
+// GET: Fetch all standalone or company specific challans
+router.get("/api/tds26q_challan", async (req, res) => {
+  const { companyId, returnId } = req.query;
+  try {
+    let query = "SELECT * FROM tds_26q_challans WHERE 1=1";
+    let params = [];
+    if (returnId) {
+      query += " AND return_id = ?";
+      params.push(returnId);
+    } else if (companyId) {
+      query += " AND (company_id = ? OR return_id = 0)";
+      params.push(companyId);
+    }
+    query += " ORDER BY serial_no ASC, id ASC";
+    const [challans] = await db.query(query, params);
+    res.json(challans);
+  } catch (error) {
+    console.error("Error fetching challans:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// DELETE: Delete a standalone challan by ID
+router.delete("/api/tds26q_challan/:id", async (req, res) => {
+  try {
+    const conn = await db.getConnection();
+    try {
+      await conn.query("DELETE FROM tds_26q_challans WHERE id = ?", [req.params.id]);
+      conn.release();
+      res.json({ success: true, message: "Challan deleted successfully" });
+    } catch (err) {
+      conn.release();
+      throw err;
+    }
+  } catch (error) {
+    console.error("Error deleting challan:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST: create or update Challans for a specific returnId or as standalone entries
 router.post("/api/tds26q_challan", async (req, res) => {
-  const { returnId, challans } = req.body;
-  if (!returnId || !challans) return res.status(400).json({ error: "Missing returnId or challans" });
+  const { returnId, companyId, challans } = req.body;
+  if (!challans) return res.status(400).json({ error: "Missing challans" });
 
   try {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
       
-      // Delete existing challans for this returnId
-      await conn.query("DELETE FROM tds_26q_challans WHERE return_id = ?", [returnId]);
+      const rId = returnId || 0;
+      
+      // Delete existing challans
+      if (rId > 0) {
+        await conn.query("DELETE FROM tds_26q_challans WHERE return_id = ?", [rId]);
+      } else if (companyId) {
+        await conn.query("DELETE FROM tds_26q_challans WHERE return_id = 0 AND company_id = ?", [companyId]);
+      }
 
       if (challans.length > 0) {
         const placeholders = challans.map(() =>
-          "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+          "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
         ).join(",");
 
         const values = challans.flatMap((ch, index) => [
-          returnId,
+          rId,
+          companyId || null,
           ch.serialNo || index + 1,
           ch.bsrCode || '',
           ch.dateOfDeposit || null,
@@ -256,13 +303,25 @@ router.post("/api/tds26q_challan", async (req, res) => {
           ch.fee || 0,
           ch.total || 0,
           ch.transferVoucherNo || null,
-          ch.status || 'Deposited'
+          ch.status || 'Deposited',
+          ch.lastBSRCode || null,
+          ch.lastDateOfDeposit || null,
+          ch.lastChallanSerialNo || null,
+          ch.lastTotalTaxDeposited || 0,
+          ch.updateMode || 'Add',
+          ch.sectionCode || '94C',
+          ch.interestAllocated || 0,
+          ch.minorHead || '200',
+          ch.challanBalance || 0,
+          ch.chequeDDNo || null
         ]);
 
         const insertChallansSql = `
           INSERT INTO tds_26q_challans (
-            return_id, serial_no, bsr_code, date_of_deposit, challan_serial_no, tax, surcharge, education_cess,
-            other_charges, interest, penalty, fee, total_amount, transfer_voucher_no, status
+            return_id, company_id, serial_no, bsr_code, date_of_deposit, challan_serial_no, tax, surcharge, education_cess,
+            other_charges, interest, penalty, fee, total_amount, transfer_voucher_no, status,
+            last_bsr_code, last_date_of_deposit, last_challan_serial_no, last_total_tax_deposited,
+            update_mode, section_code, interest_allocated, minor_head, challan_balance, cheque_dd_no
           ) VALUES ${placeholders}
         `;
         await conn.query(insertChallansSql, values);
