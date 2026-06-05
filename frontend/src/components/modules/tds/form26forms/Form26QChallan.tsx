@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Save, Plus, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
 import type { ChallanDetails } from './types';
+import Swal from 'sweetalert2';
+import axiosInstance from '../../../../api/axiosInstance';
 
-export const Form26QChallan: React.FC = () => {
+export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId }) => {
   const [challans, setChallans] = useState<ChallanDetails[]>([
     {
       serialNo: 1,
@@ -33,7 +35,6 @@ export const Form26QChallan: React.FC = () => {
   ]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
-  const [successMsg, setSuccessMsg] = useState('');
 
   const addChallan = () => {
     setChallans(prev => [
@@ -125,13 +126,54 @@ export const Form26QChallan: React.FC = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!validate()) return;
+    if (!returnId) {
+      Swal.fire({
+        title: 'Missing Form 26Q Details',
+        text: 'Please save the main Form 26Q Particulars first before saving Challans.',
+        icon: 'error',
+        confirmButtonColor: '#dc2626',
+      });
+      return;
+    }
 
-    console.log('Saving Challans:', challans);
-    setSuccessMsg('Challan details saved successfully!');
-    setTimeout(() => setSuccessMsg(''), 5000);
+    if (!validate()) {
+      Swal.fire({
+        title: 'Validation Error',
+        text: 'Please correct the highlighted errors before saving.',
+        icon: 'warning',
+        confirmButtonColor: '#000000',
+      });
+      return;
+    }
+
+    try {
+      const response = await axiosInstance.post('/tds26q_challan', { returnId, challans });
+      if (response.data.success) {
+        Swal.fire({
+          title: 'Saved Successfully!',
+          text: 'Challan details have been saved.',
+          icon: 'success',
+          confirmButtonColor: '#16a34a',
+        });
+      } else {
+        Swal.fire({
+          title: 'Error!',
+          text: 'Failed to save Challan details.',
+          icon: 'error',
+          confirmButtonColor: '#dc2626',
+        });
+      }
+    } catch (error: any) {
+      console.error('Error saving Challans:', error);
+      Swal.fire({
+        title: 'Error!',
+        text: error.response?.data?.error || 'An error occurred while saving Challans.',
+        icon: 'error',
+        confirmButtonColor: '#dc2626',
+      });
+    }
   };
 
   const inputClass = "w-full p-2 border bg-white text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
@@ -139,12 +181,6 @@ export const Form26QChallan: React.FC = () => {
 
   return (
     <div className="space-y-6 animate-fadeIn text-black font-arial">
-      {successMsg && (
-        <div className="flex items-center gap-2 bg-green-50 border border-black text-green-900 p-4 rounded-lg">
-          <CheckCircle className="h-5 w-5 shrink-0" />
-          <span className="text-sm font-semibold">{successMsg}</span>
-        </div>
-      )}
 
       <div className="bg-white rounded-xl shadow-sm border border-black overflow-hidden">
         <div className="bg-gray-50 px-6 py-4 border-b border-black flex justify-between items-center">

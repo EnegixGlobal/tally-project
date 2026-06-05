@@ -16,6 +16,17 @@ router.post("/api/tds26q", async (req, res) => {
     const conn = await db.getConnection();
     try {
       await conn.beginTransaction();
+      // 0. Check for existing PAN and TAN
+      const [existing] = await conn.query(
+        "SELECT id FROM tds_26q_returns WHERE tan = ? AND pan_of_deductor = ?",
+        [deductorDetails.tan, deductorDetails.panOfDeductor]
+      );
+
+      if (existing.length > 0) {
+        await conn.rollback();
+        conn.release();
+        return res.status(409).json({ error: "An entry with this PAN and TAN already exists. Duplicate entries are not allowed." });
+      }
 
       // 1. Insert returns main info
       const [result] = await conn.query(
@@ -181,6 +192,126 @@ router.get("/api/tds26q", async (req, res) => {
   } catch (error) {
     console.error("Error fetching Form 26Q returns:", error);
     res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// POST: create or update Challans for a specific returnId
+router.post("/api/tds26q_challan", async (req, res) => {
+  const { returnId, challans } = req.body;
+  if (!returnId || !challans) return res.status(400).json({ error: "Missing returnId or challans" });
+
+  try {
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+      
+      // Delete existing challans for this returnId
+      await conn.query("DELETE FROM tds_26q_challans WHERE return_id = ?", [returnId]);
+
+      if (challans.length > 0) {
+        const placeholders = challans.map(() =>
+          "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).join(",");
+
+        const values = challans.flatMap((ch, index) => [
+          returnId,
+          ch.serialNo || index + 1,
+          ch.bsrCode || '',
+          ch.dateOfDeposit || null,
+          ch.challanSerialNo || '',
+          ch.tax || 0,
+          ch.surcharge || 0,
+          ch.educationCess || 0,
+          ch.other || 0,
+          ch.interest || 0,
+          ch.penalty || 0,
+          ch.fee || 0,
+          ch.total || 0,
+          ch.transferVoucherNo || null,
+          ch.status || 'Deposited'
+        ]);
+
+        const insertChallansSql = `
+          INSERT INTO tds_26q_challans (
+            return_id, serial_no, bsr_code, date_of_deposit, challan_serial_no, tax, surcharge, education_cess,
+            other_charges, interest, penalty, fee, total_amount, transfer_voucher_no, status
+          ) VALUES ${placeholders}
+        `;
+        await conn.query(insertChallansSql, values);
+      }
+
+      await conn.commit();
+      conn.release();
+      res.json({ success: true, message: "Challans saved successfully." });
+    } catch (err) {
+      await conn.rollback();
+      conn.release();
+      console.error("Error saving challans:", err);
+      res.status(500).json({ error: "Failed to save Challans", details: err.message });
+    }
+  } catch (err) {
+    res.status(500).json({ error: "Database error", details: err.message });
+  }
+});
+
+// POST: create or update Deductees (Annexure) for a specific returnId
+router.post("/api/tds26q_deductee", async (req, res) => {
+  const { returnId, deductees } = req.body;
+  if (!returnId || !deductees) return res.status(400).json({ error: "Missing returnId or deductees" });
+
+  try {
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+      
+      // Delete existing deductees for this returnId
+      await conn.query("DELETE FROM tds_26q_deductees WHERE return_id = ?", [returnId]);
+
+      if (deductees.length > 0) {
+        const placeholders = deductees.map(() =>
+          "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"
+        ).join(",");
+
+        const values = deductees.flatMap((de, index) => [
+          returnId,
+          de.serialNo || index + 1,
+          de.panOfDeductee || '',
+          de.nameOfDeductee || '',
+          de.amountPaid || 0,
+          de.amountOfTax || 0,
+          de.taxDeposited || 0,
+          de.dateOfPayment || null,
+          de.natureOfPayment || null,
+          de.sectionUnderDeducted || '',
+          de.rateOfDeduction || 0,
+          de.certSerialNo || null,
+          de.dateOfTDSCertificate || null,
+          de.amountPaidCredited || 0,
+          de.gstIdentificationNo || null,
+          de.remarkCode || null
+        ]);
+
+        const insertDeducteesSql = `
+          INSERT INTO tds_26q_deductees (
+            return_id, serial_no, pan_of_deductee, name_of_deductee, amount_paid, tax_deducted, tax_deposited,
+            date_of_payment, nature_of_payment, section_deducted, rate_of_deduction, certificate_no, date_of_certificate,
+            amount_paid_credited, gst_no, remark_code
+          ) VALUES ${placeholders}
+        `;
+        await conn.query(insertDeducteesSql, values);
+      }
+
+      await conn.commit();
+      conn.release();
+      res.json({ success: true, message: "Annexure details saved successfully." });
+    } catch (err) {
+      await conn.rollback();
+      conn.release();
+      console.error("Error saving annexure:", err);
+      res.status(500).json({ error: "Failed to save Annexure details", details: err.message });
+    }
+  } catch (err) {
+    res.status(500).json({ error: "Database error", details: err.message });
   }
 });
 
