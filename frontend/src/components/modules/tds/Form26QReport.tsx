@@ -33,9 +33,10 @@ interface Form26QReturn {
 }
 
 const assessmentYears = [
-  { value: '2026-27', label: 'AY 2026-27 (FY 2025-26)' },
-  { value: '2025-26', label: 'AY 2025-26 (FY 2024-25)' },
-  { value: '2024-25', label: 'AY 2024-25 (FY 2023-24)' }
+  { value: '2027-28', label: 'AY 2027-28' },
+  { value: '2026-27', label: 'AY 2026-27' },
+  { value: '2025-26', label: 'AY 2025-26' },
+  { value: '2024-25', label: 'AY 2024-25' }
 ];
 
 export const Form26QReport: React.FC = () => {
