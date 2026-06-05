@@ -1,10 +1,12 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Save, Plus, Trash2, CheckCircle, AlertCircle } from 'lucide-react';
 import type { ChallanDetails } from './types';
 import Swal from 'sweetalert2';
 import axiosInstance from '../../../../api/axiosInstance';
+import { useAuth } from '../../../../home/context/AuthContext';
 
 export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId }) => {
+  const { companyId } = useAuth();
   const [challans, setChallans] = useState<ChallanDetails[]>([
     {
       serialNo: 1,
@@ -35,6 +37,51 @@ export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId
   ]);
 
   const [errors, setErrors] = useState<Record<string, string>>({});
+
+  useEffect(() => {
+    const fetchChallans = async () => {
+      try {
+        const queryParams = new URLSearchParams();
+        if (returnId) queryParams.append('returnId', returnId.toString());
+        if (companyId) queryParams.append('companyId', companyId.toString());
+        
+        const response = await axiosInstance.get(`/tds26q_challan?${queryParams.toString()}`);
+        if (response.data && response.data.length > 0) {
+          const mapped = response.data.map((row: any, i: number) => ({
+            serialNo: i + 1,
+            updateMode: row.update_mode || 'Add',
+            sectionCode: row.section_code || '94C',
+            tax: row.tax || 0,
+            surcharge: row.surcharge || 0,
+            educationCess: row.education_cess || 0,
+            interest: row.interest || 0,
+            fee: row.fee || 0,
+            penalty: row.penalty || 0,
+            lastTotalTaxDeposited: row.last_total_tax_deposited || 0,
+            total: row.total_amount || 0,
+            chequeDDNo: row.cheque_dd_no || row.transfer_voucher_no || '',
+            lastBSRCode: row.last_bsr_code || '',
+            bsrCode: row.bsr_code || '',
+            lastDateOfDeposit: row.last_date_of_deposit ? new Date(row.last_date_of_deposit).toISOString().split('T')[0] : '',
+            dateOfDeposit: row.date_of_deposit ? new Date(row.date_of_deposit).toISOString().split('T')[0] : '',
+            lastChallanSerialNo: row.last_challan_serial_no || '',
+            challanSerialNo: row.challan_serial_no || '',
+            bookAdjustment: row.status === 'Book Adjustment' ? 'Yes' : 'No',
+            interestAllocated: row.interest_allocated || 0,
+            other: row.other_charges || 0,
+            minorHead: row.minor_head || '200',
+            challanBalance: row.challan_balance || 0,
+            status: row.status || 'Deposited'
+          }));
+          setChallans(mapped);
+        }
+      } catch (err) {
+        console.error('Error fetching challans for prepopulation', err);
+      }
+    };
+
+    fetchChallans();
+  }, [returnId, companyId]);
 
   const addChallan = () => {
     setChallans(prev => [
@@ -128,15 +175,6 @@ export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!returnId) {
-      Swal.fire({
-        title: 'Missing Form 26Q Details',
-        text: 'Please save the main Form 26Q Particulars first before saving Challans.',
-        icon: 'error',
-        confirmButtonColor: '#dc2626',
-      });
-      return;
-    }
 
     if (!validate()) {
       Swal.fire({
@@ -149,7 +187,7 @@ export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId
     }
 
     try {
-      const response = await axiosInstance.post('/tds26q_challan', { returnId, challans });
+      const response = await axiosInstance.post('/tds26q_challan', { returnId, companyId, challans });
       if (response.data.success) {
         Swal.fire({
           title: 'Saved Successfully!',
@@ -176,8 +214,28 @@ export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId
     }
   };
 
-  const inputClass = "w-full p-2 border bg-white text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
-  const selectClass = "w-full p-2 border bg-white text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
+  const getRowColor = (challanNo: string | number) => {
+    const num = parseInt(String(challanNo), 10);
+    if (isNaN(num) || !num) return 'bg-white hover:bg-gray-50';
+    
+    const colors = [
+      'bg-red-50 hover:bg-red-100',
+      'bg-blue-50 hover:bg-blue-100',
+      'bg-green-50 hover:bg-green-100',
+      'bg-yellow-50 hover:bg-yellow-100',
+      'bg-purple-50 hover:bg-purple-100',
+      'bg-pink-50 hover:bg-pink-100',
+      'bg-indigo-50 hover:bg-indigo-100',
+      'bg-teal-50 hover:bg-teal-100',
+      'bg-orange-50 hover:bg-orange-100',
+      'bg-cyan-50 hover:bg-cyan-100'
+    ];
+    
+    return colors[(num - 1) % colors.length];
+  };
+
+  const inputClass = "w-full p-2 border bg-transparent text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
+  const selectClass = "w-full p-2 border bg-transparent text-black border-black focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all duration-200 text-xs font-semibold";
 
   return (
     <div className="space-y-6 animate-fadeIn text-black font-arial">
@@ -256,7 +314,7 @@ export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId
               </thead>
               <tbody className="divide-y divide-black">
                 {challans.map((challan, index) => (
-                  <tr key={index} className="hover:bg-gray-50 transition-colors">
+                  <tr key={index} className={`${getRowColor(challan.serialNo)} transition-colors`}>
                     {/* 1. Sr. No. */}
                     <td className="p-2 text-center font-bold text-black border-r border-black">
                       {challan.serialNo}
@@ -521,7 +579,7 @@ export const Form26QChallan: React.FC<{ returnId: number | null }> = ({ returnId
                         value={challan.lastTotalTaxDeposited}
                         onChange={(e) => handleChallanChange(index, 'lastTotalTaxDeposited', e.target.value)}
                         placeholder="0"
-                        className={inputClass}
+                        className={`${inputClass} bg-transparent`}
                       />
                     </td>
 

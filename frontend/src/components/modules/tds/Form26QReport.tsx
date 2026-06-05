@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, FileText, Landmark, Users, Search, Loader2, Edit, Trash2, ChevronDown, ChevronUp } from 'lucide-react';
 import { useAppContext } from '../../../context/AppContext';
+import { useAuth } from '../../../home/context/AuthContext';
 import axiosInstance from '../../../api/axiosInstance';
 import Swal from 'sweetalert2';
 
@@ -33,9 +34,10 @@ interface Form26QReturn {
 }
 
 const assessmentYears = [
-  { value: '2026-27', label: 'AY 2026-27 (FY 2025-26)' },
-  { value: '2025-26', label: 'AY 2025-26 (FY 2024-25)' },
-  { value: '2024-25', label: 'AY 2024-25 (FY 2023-24)' }
+  { value: '2027-28', label: 'AY 2027-28' },
+  { value: '2026-27', label: 'AY 2026-27' },
+  { value: '2025-26', label: 'AY 2025-26' },
+  { value: '2024-25', label: 'AY 2024-25' }
 ];
 
 export const Form26QReport: React.FC = () => {
@@ -46,8 +48,10 @@ export const Form26QReport: React.FC = () => {
 
   const [year, setYear] = useState(assessmentYears[0].value);
   const [data, setData] = useState<Form26QReturn[]>([]);
+  const [challansData, setChallansData] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const { companyId } = useAuth();
   const [expandedRowId, setExpandedRowId] = useState<number | null>(null);
 
   const setActiveTab = (tab: TabType) => {
@@ -86,6 +90,38 @@ export const Form26QReport: React.FC = () => {
     }
   };
 
+  const handleEditChallan = (id: number) => {
+    navigate(`/app/tds/form-26q?tab=challan`);
+  };
+
+  const handleDeleteChallan = async (id: number) => {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: "This will permanently delete the Challan entry!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#dc2626',
+      cancelButtonColor: '#000000',
+      confirmButtonText: 'Yes, delete it!'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        await axiosInstance.delete(`/tds26q_challan/${id}`);
+        Swal.fire({
+          title: 'Deleted!',
+          text: 'The Challan has been deleted.',
+          icon: 'success',
+          confirmButtonColor: '#000000',
+        });
+        fetchChallans();
+      } catch (err) {
+        console.error('Delete error', err);
+        Swal.fire('Error', 'Failed to delete the challan', 'error');
+      }
+    }
+  };
+
   const fetchReturns = async () => {
     setLoading(true);
     setError('');
@@ -100,11 +136,27 @@ export const Form26QReport: React.FC = () => {
     }
   };
 
+  const fetchChallans = async () => {
+    setLoading(true);
+    setError('');
+    try {
+      const response = await axiosInstance.get(`/tds26q_challan?companyId=${companyId || ''}`);
+      setChallansData(response.data);
+    } catch (err: any) {
+      console.error('Error fetching Challans:', err);
+      setError('Failed to fetch challan data.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   useEffect(() => {
     if (activeTab === 'form') {
       fetchReturns();
+    } else if (activeTab === 'challan') {
+      fetchChallans();
     }
-  }, [year, activeTab]);
+  }, [year, activeTab, companyId]);
 
   const tabs = [
     { id: 'form', label: 'Form Returns', icon: FileText },
@@ -294,8 +346,64 @@ export const Form26QReport: React.FC = () => {
           )}
 
           {activeTab === 'challan' && (
-            <div className="p-12 text-center text-gray-500 font-semibold">
-              Challan Report View - To be implemented
+            <div className="p-0">
+              {loading ? (
+                <div className="flex justify-center items-center p-12">
+                  <Loader2 className="animate-spin text-gray-500" size={32} />
+                </div>
+              ) : error ? (
+                <div className="p-6 text-center text-red-600 font-bold">{error}</div>
+              ) : challansData.length === 0 ? (
+                <div className="p-12 text-center text-gray-500 font-semibold">
+                  No Challan details found.
+                </div>
+              ) : (
+                <div className="overflow-x-auto scrollbar-thin">
+                  <table className="w-full text-left text-sm border-collapse">
+                    <thead className="bg-gray-50 border-b border-black text-black">
+                      <tr>
+                        <th className="p-4 font-bold border-r border-black">Sr No.</th>
+                        <th className="p-4 font-bold border-r border-black">BSR Code</th>
+                        <th className="p-4 font-bold border-r border-black">Date of Deposit</th>
+                        <th className="p-4 font-bold border-r border-black">Challan Serial No.</th>
+                        <th className="p-4 font-bold border-r border-black text-right">Tax</th>
+                        <th className="p-4 font-bold border-r border-black text-right">Total Amount</th>
+                        <th className="p-4 font-bold border-r border-black text-center">Status</th>
+                        <th className="p-4 font-bold text-center">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {challansData.map((row, index) => (
+                        <tr key={row.id} className="hover:bg-gray-50 transition-colors">
+                          <td className="p-4 font-semibold border-r border-black">{index + 1}</td>
+                          <td className="p-4 font-medium border-r border-black">{row.bsr_code}</td>
+                          <td className="p-4 font-medium border-r border-black">
+                            {row.date_of_deposit ? new Date(row.date_of_deposit).toLocaleDateString('en-IN') : '-'}
+                          </td>
+                          <td className="p-4 font-medium border-r border-black">{row.challan_serial_no}</td>
+                          <td className="p-4 font-medium text-right border-r border-black">₹{Number(row.tax).toLocaleString()}</td>
+                          <td className="p-4 font-bold text-right text-green-700 border-r border-black">
+                            ₹{Number(row.total_amount).toLocaleString()}
+                          </td>
+                          <td className="p-4 font-medium text-center border-r border-black">
+                            <span className={`px-2 py-1 rounded-md text-xs font-bold ${row.status === 'Deposited' ? 'bg-green-100 text-green-800' : 'bg-blue-100 text-blue-800'}`}>
+                              {row.status}
+                            </span>
+                          </td>
+                          <td className="p-4 font-medium text-center space-x-2">
+                            <button onClick={() => handleEditChallan(row.id)} className="p-1.5 text-black hover:bg-gray-200 rounded transition-colors" title="Edit">
+                              <Edit size={16} />
+                            </button>
+                            <button onClick={() => handleDeleteChallan(row.id)} className="p-1.5 text-red-600 hover:bg-red-50 rounded transition-colors" title="Delete">
+                              <Trash2 size={16} />
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
 

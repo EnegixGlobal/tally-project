@@ -3,19 +3,22 @@ import { useSearchParams } from 'react-router-dom';
 import { Save, User, Shield, Phone, MapPin, CheckCircle, AlertCircle, Copy, Loader2 } from 'lucide-react';
 import type { DeductorDetails, Verification } from './types';
 import { useCompany } from '../../../../context/CompanyContext';
+import { useAuth } from '../../../../home/context/AuthContext';
 import axiosInstance from '../../../../api/axiosInstance';
 import Swal from 'sweetalert2';
 
 const assessmentYears = [
-  { value: '2026-27', label: 'AY 2026-27 (FY 2025-26)' },
-  { value: '2025-26', label: 'AY 2025-26 (FY 2024-25)' },
-  { value: '2024-25', label: 'AY 2024-25 (FY 2023-24)' }
+  { value: '2027-28', label: 'AY 2027-28' },
+  { value: '2026-27', label: 'AY 2026-27' },
+  { value: '2025-26', label: 'AY 2025-26' },
+  { value: '2024-25', label: 'AY 2024-25' }
 ];
 
 const financialYears = [
-  { value: '2025-26', label: 'FY 2025-26 (AY 2026-27)' },
-  { value: '2024-25', label: 'FY 2024-25 (AY 2025-26)' },
-  { value: '2023-24', label: 'FY 2023-24 (AY 2024-25)' }
+  { value: '2026-27', label: 'FY 2026-27' },
+  { value: '2025-26', label: 'FY 2025-26' },
+  { value: '2024-25', label: 'FY 2024-25' },
+  { value: '2023-24', label: 'FY 2023-24' }
 ];
 
 const deductorCategories = [
@@ -96,6 +99,7 @@ const findStateCode = (stateStr: string): string => {
 
 export const Form26QForm: React.FC<{ setReturnId: (id: number) => void }> = ({ setReturnId }) => {
   const { companyInfo } = useCompany();
+  const { user } = useAuth();
   const formRef = useRef<HTMLFormElement>(null);
   const [searchParams] = useSearchParams();
   const editId = searchParams.get('editId');
@@ -103,7 +107,7 @@ export const Form26QForm: React.FC<{ setReturnId: (id: number) => void }> = ({ s
   const [deductor, setDeductor] = useState<DeductorDetails>({
     quarter: 'Q4',
     tan: '',
-    financialYear: '2025-26',
+    financialYear: '2026-27',
     lastTan: '',
     assessmentYear: '2026-27',
     panOfDeductor: '',
@@ -179,26 +183,29 @@ export const Form26QForm: React.FC<{ setReturnId: (id: number) => void }> = ({ s
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   useEffect(() => {
-    if (companyInfo) {
-      const mappedState = findStateCode(companyInfo.state);
+    if (companyInfo || user) {
+      const mappedState = companyInfo ? findStateCode(companyInfo.state) : 'JH';
       
-      let fy = '2025-26';
+      let fy = '2026-27';
       let ay = '2026-27';
-      if (companyInfo.financialYear) {
-        if (companyInfo.financialYear.includes('2025-26')) {
-          fy = '2025-26';
+      if (companyInfo && companyInfo.financialYear) {
+        if (companyInfo.financialYear.includes('2026-27')) {
+          fy = '2026-27';
           ay = '2026-27';
+        } else if (companyInfo.financialYear.includes('2025-26')) {
+          fy = '2025-26';
+          ay = '2025-26';
         } else if (companyInfo.financialYear.includes('2024-25')) {
           fy = '2024-25';
-          ay = '2025-26';
+          ay = '2024-25';
         } else if (companyInfo.financialYear.includes('2023-24')) {
           fy = '2023-24';
-          ay = '2024-25';
+          ay = '2023-24';
         }
       }
       
       let std = '';
-      let phone = companyInfo.phoneNumber || companyInfo.phone_number || '';
+      let phone = (user?.phoneNumber) || (companyInfo?.phoneNumber) || (companyInfo as any)?.phone_number || '';
       if (phone.includes('-')) {
         const parts = phone.split('-');
         std = parts[0].trim();
@@ -208,21 +215,21 @@ export const Form26QForm: React.FC<{ setReturnId: (id: number) => void }> = ({ s
       setDeductor(prev => {
         const updated = {
           ...prev,
-          tan: companyInfo.tanNumber || companyInfo.tan_number || prev.tan,
+          tan: companyInfo?.tanNumber || (companyInfo as any)?.tan_number || prev.tan,
           financialYear: fy,
           assessmentYear: ay,
-          panOfDeductor: companyInfo.panNumber || companyInfo.pan_number || prev.panOfDeductor,
-          deductorName: companyInfo.name || prev.deductorName,
-          gstn: companyInfo.gstNumber || companyInfo.gst_number || prev.gstn,
-          email: companyInfo.email || prev.email,
+          panOfDeductor: user?.pan || companyInfo?.panNumber || (companyInfo as any)?.pan_number || prev.panOfDeductor,
+          deductorName: user?.firstName ? `${user.firstName} ${user.lastName || ''}`.trim() : (companyInfo?.name || prev.deductorName),
+          gstn: companyInfo?.gstNumber || (companyInfo as any)?.gst_number || prev.gstn,
+          email: user?.email || companyInfo?.email || prev.email,
           stdCodeNo: std || prev.stdCodeNo,
           telephoneNo: phone || prev.telephoneNo,
           address: {
             ...prev.address,
-            flatNo: companyInfo.address || prev.address.flatNo,
+            flatNo: user?.address || companyInfo?.address || prev.address.flatNo,
             state: mappedState,
-            pinCode: companyInfo.pin || prev.address.pinCode,
-            country: companyInfo.country || prev.address.country
+            pinCode: companyInfo?.pin || prev.address.pinCode,
+            country: companyInfo?.country || prev.address.country
           }
         };
 
@@ -241,7 +248,7 @@ export const Form26QForm: React.FC<{ setReturnId: (id: number) => void }> = ({ s
         return updated;
       });
     }
-  }, [companyInfo]);
+  }, [companyInfo, user]);
 
   useEffect(() => {
     const fetchEditData = async () => {
@@ -365,9 +372,7 @@ export const Form26QForm: React.FC<{ setReturnId: (id: number) => void }> = ({ s
         (updated as any)[name] = value;
         // Auto sync assessment year when financial year changes
         if (name === 'financialYear') {
-          if (value === '2025-26') updated.assessmentYear = '2026-27';
-          if (value === '2024-25') updated.assessmentYear = '2025-26';
-          if (value === '2023-24') updated.assessmentYear = '2024-25';
+          updated.assessmentYear = value;
         }
       }
 

@@ -95,6 +95,20 @@ const formatTableAmount = (val: any) => {
   });
 };
 
+const fixVoucherNumber = (num: string) => {
+  if (!num) return "";
+  // Fix for older vouchers that were saved as {prefix}//{suffix}/{number}
+  // Example: b2c//26-27/1 -> b2c/1/26-27
+  const match = String(num).match(/^(.*)\/\/(.*)\/(\d+)$/);
+  if (match) {
+    const prefix = match[1];
+    const suffix = match[2];
+    const nextNo = match[3];
+    return `${prefix}/${nextNo}/${suffix}`;
+  }
+  return String(num);
+};
+
 const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   title,
   voucherType,
@@ -477,7 +491,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       return {
         id: String(p.id),
         date: p.date,
-        number: p.number,
+        number: fixVoucherNumber(p.number),
         referenceNo: p.referenceNo || "",
         type: "purchase",
 
@@ -545,7 +559,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       return {
         id: String(p.id),
         date: p.date,
-        number: p.number,
+        number: fixVoucherNumber(p.number),
         referenceNo,
         type: "sales",
 
@@ -614,7 +628,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       return {
         id: String(p.id),
         date: p.date,
-        number: p.number,
+        number: fixVoucherNumber(p.number),
         referenceNo,
         narration: p.narration || "",
         type: "quotation",
@@ -675,7 +689,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       return {
         id: String(p.id),
         date: p.date,
-        number: p.number,
+        number: fixVoucherNumber(p.number),
         referenceNo,
         type: "sales_order",
 
@@ -721,7 +735,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       return {
         id: String(p.id),
         date: orderDate,
-        number: p.number,
+        number: fixVoucherNumber(p.number),
         referenceNo: referenceNo || null,
         type: "purchase_order",
 
@@ -752,7 +766,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       return {
         id: String(p.id),
         date: p.date,
-        number: p.number || p.voucher_number || "",
+        number: fixVoucherNumber(p.number || p.voucher_number) || "",
         referenceNo: p.referenceNo || p.reference_no || "",
         narration: p.narration || "",
         type: "receipt",
@@ -782,7 +796,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       return {
         id: String(p.id),
         date: p.date,
-        number: p.number || p.voucher_number || "",
+        number: fixVoucherNumber(p.number || p.voucher_number) || "",
         referenceNo: p.referenceNo || p.reference_no || "",
         narration: p.narration || "",
         type: "contra",
@@ -812,7 +826,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       return {
         id: String(p.id),
         date: p.date,
-        number: p.number || p.voucher_number || "",
+        number: fixVoucherNumber(p.number || p.voucher_number) || "",
         referenceNo: p.referenceNo || p.reference_no || "",
         narration: p.narration || "",
         type: voucherType === "journal" ? "journal" : "stock-journal",
