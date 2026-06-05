@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Save, User, Shield, Phone, MapPin, CheckCircle, AlertCircle, Copy, Loader2 } from 'lucide-react';
 import type { DeductorDetails, Verification } from './types';
 import { useCompany } from '../../../../context/CompanyContext';
@@ -96,6 +97,8 @@ const findStateCode = (stateStr: string): string => {
 export const Form26QForm: React.FC<{ setReturnId: (id: number) => void }> = ({ setReturnId }) => {
   const { companyInfo } = useCompany();
   const formRef = useRef<HTMLFormElement>(null);
+  const [searchParams] = useSearchParams();
+  const editId = searchParams.get('editId');
 
   const [deductor, setDeductor] = useState<DeductorDetails>({
     quarter: 'Q4',
@@ -239,6 +242,64 @@ export const Form26QForm: React.FC<{ setReturnId: (id: number) => void }> = ({ s
       });
     }
   }, [companyInfo]);
+
+  useEffect(() => {
+    const fetchEditData = async () => {
+      if (!editId) return;
+      try {
+        const response = await axiosInstance.get(`/tds26q/${editId}`);
+        const data = response.data;
+        if (data) {
+          setDeductor(prev => ({
+            ...prev,
+            tan: data.tan || prev.tan,
+            assessmentYear: data.assessmentYear || prev.assessmentYear,
+            panOfDeductor: data.panOfDeductor || prev.panOfDeductor,
+            category: data.category || prev.category,
+            deductorName: data.deductorName || prev.deductorName,
+            branchSrlNo: data.branch_serial_no || '',
+            address: {
+              ...prev.address,
+              flatNo: data.deductor_flat_no || '',
+              premisesName: data.deductor_premises_name || '',
+              roadStreet: data.deductor_road_street || '',
+              area: data.deductor_area || '',
+              town: data.deductor_town_city || '',
+              state: data.deductor_state || 'JH',
+              country: data.deductor_country || 'India',
+              pinCode: data.deductor_pin_code || '',
+            },
+            stdCodeNo: data.deductor_std_code || '',
+            telephoneNo: data.deductor_telephone || '',
+            email: data.deductor_email || '',
+            responsiblePerson: {
+              ...prev.responsiblePerson,
+              status: data.resp_status || 'Deductor',
+              designation: data.resp_designation || '',
+              name: data.resp_name || '',
+              fatherName: data.resp_father_name || '',
+              pan: data.resp_pan || '',
+            }
+          }));
+
+          setVerification({
+            capacity: data.verification_capacity || 'Deductor',
+            declarationPlace: data.verification_place || '',
+            declarationDate: data.verification_date ? new Date(data.verification_date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+            fullName: data.verification_full_name || '',
+            designation: data.verification_designation || '',
+            signature: data.verification_signature || ''
+          });
+
+          setReturnId(Number(editId));
+        }
+      } catch (err) {
+        console.error("Error fetching edit data:", err);
+      }
+    };
+    
+    fetchEditData();
+  }, [editId]);
 
   useEffect(() => {
     if (!formRef.current) return;
@@ -409,7 +470,12 @@ export const Form26QForm: React.FC<{ setReturnId: (id: number) => void }> = ({ s
         assessmentYear: deductor.assessmentYear,
       };
 
-      const response = await axiosInstance.post('/tds26q', payload);
+      let response;
+      if (editId) {
+        response = await axiosInstance.put(`/tds26q/${editId}`, payload);
+      } else {
+        response = await axiosInstance.post('/tds26q', payload);
+      }
       
       if (response.data.success) {
         if (response.data.returnId) {

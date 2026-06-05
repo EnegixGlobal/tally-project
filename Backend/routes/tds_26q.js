@@ -169,7 +169,7 @@ router.get("/api/tds26q", async (req, res) => {
   try {
     const sql = `
       SELECT
-        r.id,
+        r.*,
         r.assessment_year AS assessmentYear,
         r.tan,
         r.pan_of_deductor AS panOfDeductor,
@@ -191,6 +191,34 @@ router.get("/api/tds26q", async (req, res) => {
     res.json(rows);
   } catch (error) {
     console.error("Error fetching Form 26Q returns:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+});
+
+// GET: Fetch a single Form 26Q return by ID
+router.get("/api/tds26q/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const sql = `
+      SELECT
+        r.*,
+        r.assessment_year AS assessmentYear,
+        r.tan,
+        r.pan_of_deductor AS panOfDeductor,
+        r.deductor_name AS deductorName,
+        r.deductor_category AS category
+      FROM tds_26q_returns r
+      WHERE r.id = ?
+    `;
+    const [rows] = await db.query(sql, [id]);
+    
+    if (rows.length === 0) {
+      return res.status(404).json({ error: "Form 26Q return not found." });
+    }
+
+    res.json(rows[0]);
+  } catch (error) {
+    console.error("Error fetching Form 26Q return:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 });
@@ -312,6 +340,68 @@ router.post("/api/tds26q_deductee", async (req, res) => {
     }
   } catch (err) {
     res.status(500).json({ error: "Database error", details: err.message });
+  }
+});
+
+// DELETE: Delete a specific Form 26Q return
+router.delete("/api/tds26q/:id", async (req, res) => {
+  const { id } = req.params;
+  try {
+    const conn = await db.getConnection();
+    await conn.query("DELETE FROM tds_26q_returns WHERE id = ?", [id]);
+    conn.release();
+    res.json({ success: true, message: "Form 26Q deleted successfully" });
+  } catch (err) {
+    console.error("Error deleting Form 26Q:", err);
+    res.status(500).json({ error: "Failed to delete Form 26Q", details: err.message });
+  }
+});
+
+// PUT: Update an existing Form 26Q return
+router.put("/api/tds26q/:id", async (req, res) => {
+  const { id } = req.params;
+  const { deductorDetails, assessmentYear, verification } = req.body;
+
+  if (!deductorDetails || !assessmentYear || !verification) {
+    return res.status(400).json({ error: "Missing required fields for update." });
+  }
+
+  try {
+    const conn = await db.getConnection();
+    try {
+      await conn.beginTransaction();
+
+      const updateSql = `
+        UPDATE tds_26q_returns SET
+          tan = ?, assessment_year = ?, pan_of_deductor = ?, deductor_category = ?, deductor_name = ?, branch_serial_no = ?,
+          deductor_flat_no = ?, deductor_premises_name = ?, deductor_road_street = ?, deductor_area = ?, deductor_town_city = ?, deductor_state = ?,
+          deductor_country = ?, deductor_pin_code = ?, deductor_std_code = ?, deductor_telephone = ?, deductor_email = ?,
+          resp_status = ?, resp_designation = ?, resp_name = ?, resp_father_name = ?, resp_pan = ?,
+          verification_capacity = ?, verification_place = ?, verification_date = ?, verification_full_name = ?, verification_designation = ?
+        WHERE id = ?
+      `;
+
+      await conn.query(updateSql, [
+        deductorDetails.tan, assessmentYear, deductorDetails.panOfDeductor, deductorDetails.category, deductorDetails.deductorName, deductorDetails.branchSrlNo || null,
+        deductorDetails.address.flatNo, deductorDetails.address.premisesName, deductorDetails.address.roadStreet, deductorDetails.address.area, deductorDetails.address.town, deductorDetails.address.state,
+        deductorDetails.address.country, deductorDetails.address.pinCode, deductorDetails.stdCodeNo, deductorDetails.telephoneNo, deductorDetails.email,
+        deductorDetails.respPerson.status, deductorDetails.respPerson.designation, deductorDetails.respPerson.name, deductorDetails.respPerson.fatherName, deductorDetails.respPerson.pan,
+        verification.capacity, verification.place, verification.date, verification.fullName, verification.designation,
+        id
+      ]);
+
+      await conn.commit();
+      conn.release();
+      res.json({ success: true, message: "Form 26Q updated successfully.", returnId: id });
+    } catch (err) {
+      await conn.rollback();
+      conn.release();
+      console.error("Error updating Form 26Q:", err);
+      res.status(500).json({ error: "Failed to update Form 26Q", details: err.message });
+    }
+  } catch (err) {
+    console.error("Database connection error:", err);
+    res.status(500).json({ error: "Database connection error", details: err.message });
   }
 });
 
