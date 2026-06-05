@@ -425,8 +425,8 @@ const SalesVoucher: React.FC = () => {
 
     // If both prefix and suffix are empty -> show only next number
     if (!prefix && !suffix) return String(nextNo);
-    // Format: prefix + suffix + "/" + nextNo
-    return `${prefix}${suffix}/${nextNo}`;
+    // Format: prefix + nextNo + suffix
+    return `${prefix}${nextNo}${suffix}`;
   }, [selectedSalesType, selectedSalesTypeId, formData.number]);
 
   // --- DRAFT PERSISTENCE (RESTORE) ---
@@ -948,7 +948,7 @@ const SalesVoucher: React.FC = () => {
     if (!prefix && !suffix) {
       voucherNo = String(nextNo);
     } else {
-      voucherNo = `${prefix}${suffix}/${nextNo}`;
+      voucherNo = `${prefix}${nextNo}${suffix}`;
     }
 
     setFormData((prev) => ({
@@ -2450,7 +2450,7 @@ const SalesVoucher: React.FC = () => {
                     const prefix = (newType.prefix || "").trim();
                     const suffix = (newType.suffix || "").trim();
                     const nextNo = Number(newType.current_no || 1);
-                    const voucherNo = (!prefix && !suffix) ? String(nextNo) : `${prefix}${suffix}/${nextNo}`;
+                    const voucherNo = (!prefix && !suffix) ? String(nextNo) : `${prefix}${nextNo}${suffix}`;
                     setFormData((prev) => ({ ...prev, number: voucherNo }));
                   }
                 }
