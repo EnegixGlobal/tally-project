@@ -1327,13 +1327,13 @@ const B2C: React.FC = () => {
                         <td className="p-3">₹{Number(sale.subtotal || 0).toFixed(2)}</td>
 
                         {/* IGST */}
-                        <td className="p-3">{sale.igstTotal || 0}</td>
+                        <td className="p-3">{Number(sale.igstTotal || 0).toFixed(2)}</td>
 
                         {/* CGST */}
-                        <td className="p-3">{sale.cgstTotal || 0}</td>
+                        <td className="p-3">{Number(sale.cgstTotal || 0).toFixed(2)}</td>
 
                         {/* SGST */}
-                        <td className="p-3">{sale.sgstTotal || 0}</td>
+                        <td className="p-3">{Number(sale.sgstTotal || 0).toFixed(2)}</td>
 
                         {/* Total Amount */}
                         <td className="p-3 font-semibold">₹{Number(sale.total || 0).toFixed(2)}</td>
@@ -1351,9 +1351,9 @@ const B2C: React.FC = () => {
                     <td className="p-3">{detailedTotals.qty || 0}</td>
                     <td className="p-3"></td>
                     <td className="p-3">₹{detailedTotals.subtotal.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
-                    <td className="p-3">{detailedTotals.igst || 0}</td>
-                    <td className="p-3">{detailedTotals.cgst || 0}</td>
-                    <td className="p-3">{detailedTotals.sgst || 0}</td>
+                    <td className="p-3">{Number(detailedTotals.igst || 0).toFixed(2)}</td>
+                    <td className="p-3">{Number(detailedTotals.cgst || 0).toFixed(2)}</td>
+                    <td className="p-3">{Number(detailedTotals.sgst || 0).toFixed(2)}</td>
                     <td className="p-3 font-semibold">₹{detailedTotals.total.toLocaleString("en-IN", { minimumFractionDigits: 2 })}</td>
                     <td className="p-3"></td>
                   </tr>
