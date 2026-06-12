@@ -608,9 +608,9 @@ router.post("/sales_import", async (req, res) => {
                 e.quantity,
                 e.rate,
                 e.amount,
-                e.cgstRate,
-                e.sgstRate,
-                e.igstRate,
+                e.cgstLedgerId || 0,
+                e.sgstLedgerId || 0,
+                e.gstLedgerId || 0,
                 0, // discount
                 "", // hsnCode
                 e.batchNumber || "", // batchNumber
@@ -1523,15 +1523,21 @@ router.post("/purchase_summary_import", async (req, res) => {
                     if (si) finalItemId = si.id;
                 }
 
+                const findGstLedger = (type, pct) => {
+                    let l = ledgers.find(ld => ld.name.toLowerCase().includes(type) && ld.name.includes(pct.toString()));
+                    if (!l) l = ledgers.find(ld => ld.name.toLowerCase().includes(type));
+                    return l ? l.id : 0;
+                };
+
                 processedItems.push({
                     itemId: finalItemId,
                     itemName: itemName,
                     quantity: parseFloat(item["Quantity"]) || 1,
                     rate: parseFloat(item["Item Rate (₹)"]) || taxable,
                     amount: taxable,
-                    cgstRate: cgst > 0 ? (rate / 2) : 0,
-                    sgstRate: sgst > 0 ? (rate / 2) : 0,
-                    igstRate: igst > 0 ? rate : 0,
+                    cgstRate: cgst > 0 ? findGstLedger('cgst', rate / 2) : 0,
+                    sgstRate: sgst > 0 ? findGstLedger('sgst', rate / 2) : 0,
+                    igstRate: igst > 0 ? findGstLedger('igst', rate) : 0,
                     hsnCode: item["HSN Code"] || "",
                     batchNo: item["Batch No"] || ""
                 });
@@ -1819,15 +1825,21 @@ router.post("/sales_summary_import", async (req, res) => {
                     if (si) finalItemId = si.id;
                 }
 
+                const findGstLedger = (type, pct) => {
+                    let l = ledgers.find(ld => ld.name.toLowerCase().includes(type) && ld.name.includes(pct.toString()));
+                    if (!l) l = ledgers.find(ld => ld.name.toLowerCase().includes(type));
+                    return l ? l.id : 0;
+                };
+
                 processedItems.push({
                     itemId: finalItemId,
                     itemName: itemName,
                     quantity: parseFloat(item["Quantity"]) || 1,
                     rate: parseFloat(item["Item Rate (₹)"]) || taxable,
                     amount: taxable,
-                    cgstRate: cgst > 0 ? (rate / 2) : 0,
-                    sgstRate: sgst > 0 ? (rate / 2) : 0,
-                    igstRate: igst > 0 ? rate : 0,
+                    cgstRate: cgst > 0 ? findGstLedger('cgst', rate / 2) : 0,
+                    sgstRate: sgst > 0 ? findGstLedger('sgst', rate / 2) : 0,
+                    igstRate: igst > 0 ? findGstLedger('igst', rate) : 0,
                     hsnCode: item["HSN Code"] || "",
                     batchNo: item["Batch No"] || ""
                 });
