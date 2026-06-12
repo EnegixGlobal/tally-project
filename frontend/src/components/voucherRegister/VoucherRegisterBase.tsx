@@ -129,6 +129,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   const [dateFilter, setDateFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [gstFilter, setGstFilter] = useState<"all" | "b2b" | "b2c">("all");
+  const [topPeriodFilter, setTopPeriodFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage] = useState(10);
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
@@ -924,7 +925,26 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           else if (gstFilter === "b2c") gstMatch = !hasGst;
         }
 
-        return searchMatch && dateMatch && statusMatch && gstMatch;
+        // Period filter logic
+        let periodMatch = true;
+        if (topPeriodFilter !== "all" && voucher.safeDate) {
+          const vDate = voucher.safeDate;
+          const today = new Date();
+          if (topPeriodFilter === "monthly") {
+            periodMatch = vDate.getMonth() === today.getMonth() && vDate.getFullYear() === today.getFullYear();
+          } else if (topPeriodFilter === "quarterly") {
+            const currentQuarter = Math.floor(today.getMonth() / 3);
+            const vQuarter = Math.floor(vDate.getMonth() / 3);
+            periodMatch = currentQuarter === vQuarter && vDate.getFullYear() === today.getFullYear();
+          } else if (topPeriodFilter === "yearly") {
+            periodMatch = vDate.getFullYear() === today.getFullYear();
+          } else if (topPeriodFilter.startsWith("month_")) {
+            const targetMonth = parseInt(topPeriodFilter.split("_")[1], 10);
+            periodMatch = vDate.getMonth() === targetMonth;
+          }
+        }
+
+        return searchMatch && dateMatch && statusMatch && gstMatch && periodMatch;
       });
 
       finalList.sort((a, b) => {
@@ -1470,6 +1490,37 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   <option value="all">All Vouchers</option>
                   <option value="b2b">B2B (GST)</option>
                   <option value="b2c">B2C (Non-GST)</option>
+                </select>
+              </div>
+            )}
+
+            {(voucherType === "sales" || voucherType === "purchase") && (
+              <div className="flex items-center">
+                <select
+                  id="period-filter"
+                  value={topPeriodFilter}
+                  onChange={(e) => setTopPeriodFilter(e.target.value as any)}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm cursor-pointer hover:border-gray-400 transition-colors"
+                  title="Filter by Period"
+                >
+                  <option value="all">All Time</option>
+                  <option value="monthly">Monthly</option>
+                  <option value="quarterly">Quarterly</option>
+                  <option value="yearly">Yearly</option>
+                  <optgroup label="Custom Months">
+                    <option value="month_0">January</option>
+                    <option value="month_1">February</option>
+                    <option value="month_2">March</option>
+                    <option value="month_3">April</option>
+                    <option value="month_4">May</option>
+                    <option value="month_5">June</option>
+                    <option value="month_6">July</option>
+                    <option value="month_7">August</option>
+                    <option value="month_8">September</option>
+                    <option value="month_9">October</option>
+                    <option value="month_10">November</option>
+                    <option value="month_11">December</option>
+                  </optgroup>
                 </select>
               </div>
             )}
