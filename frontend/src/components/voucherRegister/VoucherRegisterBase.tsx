@@ -930,9 +930,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         if (topPeriodFilter !== "all" && voucher.safeDate) {
           const vDate = voucher.safeDate;
           const today = new Date();
-          if (topPeriodFilter === "monthly") {
-            periodMatch = vDate.getMonth() === today.getMonth() && vDate.getFullYear() === today.getFullYear();
-          } else if (topPeriodFilter === "quarterly") {
+          if (topPeriodFilter === "quarterly") {
             const currentQuarter = Math.floor(today.getMonth() / 3);
             const vQuarter = Math.floor(vDate.getMonth() / 3);
             periodMatch = currentQuarter === vQuarter && vDate.getFullYear() === today.getFullYear();
@@ -1503,13 +1501,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   title="Filter by Period"
                 >
                   <option value="all">All Time</option>
-                  <option value="monthly">Monthly</option>
                   <option value="quarterly">Quarterly</option>
                   <option value="yearly">Yearly</option>
-                  <optgroup label="Custom Months">
-                    <option value="month_0">January</option>
-                    <option value="month_1">February</option>
-                    <option value="month_2">March</option>
+                  <optgroup label="Monthly">
                     <option value="month_3">April</option>
                     <option value="month_4">May</option>
                     <option value="month_5">June</option>
@@ -1519,6 +1513,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     <option value="month_9">October</option>
                     <option value="month_10">November</option>
                     <option value="month_11">December</option>
+                    <option value="month_0">January</option>
+                    <option value="month_1">February</option>
+                    <option value="month_2">March</option>
                   </optgroup>
                 </select>
               </div>
