@@ -1494,8 +1494,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               </div>
             )}
 
-            {(voucherType === "sales" || voucherType === "purchase") && (
-              <div className="flex items-center">
+            <div className="flex items-center">
                 <select
                   id="period-filter"
                   value={topPeriodFilter}
@@ -1523,7 +1522,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   </optgroup>
                 </select>
               </div>
-            )}
 
             <button
               onClick={() => setShowActions(!showActions)}
