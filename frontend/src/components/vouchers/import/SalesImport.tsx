@@ -629,9 +629,34 @@ const SalesImport: React.FC = () => {
                         voucherGroups[groupKey].errorMessage = (voucherGroups[groupKey].errorMessage || "") + (voucherGroups[groupKey].errorMessage ? " | " : "") + `Item '${row["Item Name"]}' not found`;
                     }
 
-                    const qty = Number(row["Quantity"] || 0);
-                    const rate = Number(row["Item Rate (₹)"] || 0);
-                    const taxableVal = Number(row["Taxable Value (₹)"] || 0) || (qty * rate);
+                    const rawQty = row["Quantity"];
+                    const rawRate = row["Item Rate (₹)"];
+                    const rawTaxable = row["Taxable Value (₹)"];
+
+                    const hasQty = rawQty !== undefined && rawQty !== null && String(rawQty).trim() !== "";
+                    const hasRate = rawRate !== undefined && rawRate !== null && String(rawRate).trim() !== "";
+                    const hasTaxable = rawTaxable !== undefined && rawTaxable !== null && String(rawTaxable).trim() !== "";
+
+                    let qty = Number(rawQty) || 0;
+                    let rate = Number(rawRate) || 0;
+                    let taxableVal = Number(rawTaxable) || 0;
+
+                    if (hasQty && hasTaxable && !hasRate) {
+                        rate = qty !== 0 ? Number((taxableVal / qty).toFixed(2)) : 0;
+                    } else if (hasRate && hasTaxable && !hasQty) {
+                        qty = rate !== 0 ? Number((taxableVal / rate).toFixed(2)) : 0;
+                    } else if (hasQty && hasRate && !hasTaxable) {
+                        taxableVal = Number((qty * rate).toFixed(2));
+                    } else if (!hasTaxable) {
+                        taxableVal = Number((qty * rate).toFixed(2));
+                    }
+                    
+                    // Ensure existing values are also properly formatted if needed,
+                    // but since they might be exactly as typed, we just ensure calculated fields are rounded.
+                    // To be safe, round all final outputs to 2 decimal places
+                    qty = Number(qty.toFixed(2));
+                    rate = Number(rate.toFixed(2));
+                    taxableVal = Number(taxableVal.toFixed(2));
                     const totalRate = Number(row["Rate (%)"] || 0);
 
                     let igst = 0, cgst = 0, sgst = 0;
