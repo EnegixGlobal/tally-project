@@ -177,6 +177,14 @@ const B2BPurchase: React.FC = () => {
   };
 
   const handleDateRangeChange = (range: string) => {
+    if (range === "custom") {
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: range,
+      }));
+      return;
+    }
+
     const today = new Date();
     let fromDate = new Date();
     let toDate = new Date();
@@ -253,7 +261,7 @@ const B2BPurchase: React.FC = () => {
   const [ledger, setLedger] = useState<any[]>([]);
   const [matchedLedgers, setMatchedLedgers] = useState<any[]>([]);
 
-  const [matchedSales, setMatchedSales] = useState<any[]>([]);
+  const [rawMatchedSales, setRawMatchedSales] = useState<any[]>([]);
 
   useEffect(() => {
     if (!companyId || !ownerType || !ownerId) return;
@@ -344,9 +352,25 @@ const B2BPurchase: React.FC = () => {
       matchedLedgerIdSet.has(s.partyId)
     );
 
-    setMatchedSales(filteredSales);
+    setRawMatchedSales(filteredSales);
 
   }, [partyIds, ledger, saleData]);
+
+  const matchedSales = useMemo(() => {
+    return rawMatchedSales.filter((s: any) => {
+      if (!s.date) return false;
+      const saleDate = new Date(s.date);
+      saleDate.setHours(0, 0, 0, 0);
+
+      const from = new Date(filters.fromDate);
+      from.setHours(0, 0, 0, 0);
+
+      const to = new Date(filters.toDate);
+      to.setHours(23, 59, 59, 999);
+
+      return saleDate >= from && saleDate <= to;
+    });
+  }, [rawMatchedSales, filters.fromDate, filters.toDate]);
 
   // 🔹 Fetch purchase history for QTY and Rate
   const [purchaseHistory, setPurchaseHistory] = useState<any[]>([]);
@@ -878,70 +902,38 @@ const B2BPurchase: React.FC = () => {
                 <option value="custom">Custom Range</option>
               </select>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Business Name
-              </label>
-              <input
-                type="text"
-                placeholder="Search business..."
-                value={filters.businessFilter}
-                onChange={(e) =>
-                  handleFilterChange("businessFilter", e.target.value)
-                }
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-white"
-                  : "bg-white border-gray-300 text-black"
-                  } outline-none`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">
-                Transaction Type
-              </label>
-              <select
-                value={filters.transactionType}
-                onChange={(e) =>
-                  handleFilterChange("transactionType", e.target.value)
-                }
-                title="Select transaction type"
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-white"
-                  : "bg-white border-gray-300 text-black"
-                  } outline-none`}
-              >
-                <option value="">All Types</option>
-                <option value="sale">Sales</option>
-                <option value="purchase">Purchases</option>
-                <option value="quote">Quotes</option>
-                <option value="order">Orders</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Status</label>
-              <select
-                value={filters.statusFilter}
-                onChange={(e) =>
-                  handleFilterChange("statusFilter", e.target.value)
-                }
-                title="Select status filter"
-                className={`w-full p-2 rounded border ${theme === "dark"
-                  ? "bg-gray-700 border-gray-600 text-white"
-                  : "bg-white border-gray-300 text-black"
-                  } outline-none`}
-              >
-                <option value="">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="shipped">Shipped</option>
-                <option value="delivered">Delivered</option>
-                <option value="paid">Paid</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
-            </div>
+            {filters.dateRange === "custom" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.fromDate}
+                    onChange={(e) => handleFilterChange("fromDate", e.target.value)}
+                    className={`w-full p-2 rounded border ${theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white"
+                      : "bg-white border-gray-300 text-black"
+                      } outline-none`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.toDate}
+                    onChange={(e) => handleFilterChange("toDate", e.target.value)}
+                    className={`w-full p-2 rounded border ${theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white"
+                      : "bg-white border-gray-300 text-black"
+                      } outline-none`}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

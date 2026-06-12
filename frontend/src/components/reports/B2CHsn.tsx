@@ -72,7 +72,7 @@ const B2CHsn: React.FC = () => {
   const [saleData, setSaleData] = useState<any[]>([]);
   const [partyIds, setPartyIds] = useState<number[]>([]);
   const [ledger, setLedger] = useState<any[]>([]);
-  const [matchedSales, setMatchedSales] = useState<any[]>([]);
+  const [rawMatchedSales, setRawMatchedSales] = useState<any[]>([]);
   const [salesHistory, setSalesHistory] = useState<any[]>([]);
   const [hsnSearch, setHsnSearch] = useState("");
 
@@ -321,8 +321,24 @@ const B2CHsn: React.FC = () => {
     );
 
     console.log("B2C filteredSales", filteredSales);
-    setMatchedSales(filteredSales);
+    setRawMatchedSales(filteredSales);
   }, [partyIds, ledger, saleData]);
+
+  const matchedSales = useMemo(() => {
+    return rawMatchedSales.filter((s: any) => {
+      if (!s.date) return false;
+      const saleDate = new Date(s.date);
+      saleDate.setHours(0, 0, 0, 0);
+
+      const from = new Date(filters.fromDate);
+      from.setHours(0, 0, 0, 0);
+
+      const to = new Date(filters.toDate);
+      to.setHours(23, 59, 59, 999);
+
+      return saleDate >= from && saleDate <= to;
+    });
+  }, [rawMatchedSales, filters.fromDate, filters.toDate]);
 
   // Ledger quick lookup (id → ledger)
   const ledgerMap = useMemo(() => {
@@ -500,6 +516,14 @@ const B2CHsn: React.FC = () => {
   };
 
   const handleDateRangeChange = (range: string) => {
+    if (range === "custom") {
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: range,
+      }));
+      return;
+    }
+
     const today = new Date();
     let fromDate = new Date();
     let toDate = new Date();
@@ -697,63 +721,38 @@ const B2CHsn: React.FC = () => {
                 <option value="custom">Custom Range</option>
               </select>
             </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Customer Name</label>
-              <input
-                type="text"
-                placeholder="Search customer..."
-                value={filters.customerFilter}
-                onChange={(e) => handleFilterChange('customerFilter', e.target.value)}
-                className={`w-full p-2 rounded border ${theme === 'dark'
-                    ? 'bg-gray-700 border-gray-600 text-white'
-                    : 'bg-white border-gray-300 text-black'
-                  } outline-none`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Payment Method</label>
-              <select
-                value={filters.paymentMethod}
-                onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
-                title="Select payment method"
-                className={`w-full p-2 rounded border ${theme === 'dark'
-                    ? 'bg-gray-700 border-gray-600 text-white'
-                    : 'bg-white border-gray-300 text-black'
-                  } outline-none`}
-              >
-                <option value="">All Methods</option>
-                <option value="card">Card</option>
-                <option value="upi">UPI</option>
-                <option value="netbanking">Net Banking</option>
-                <option value="wallet">Wallet</option>
-                <option value="cod">Cash on Delivery</option>
-                <option value="emi">EMI</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Order Status</label>
-              <select
-                value={filters.orderStatus}
-                onChange={(e) => handleFilterChange('orderStatus', e.target.value)}
-                title="Select order status"
-                className={`w-full p-2 rounded border ${theme === 'dark'
-                    ? 'bg-gray-700 border-gray-600 text-white'
-                    : 'bg-white border-gray-300 text-black'
-                  } outline-none`}
-              >
-                <option value="">All Status</option>
-                <option value="placed">Placed</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="packed">Packed</option>
-                <option value="shipped">Shipped</option>
-                <option value="delivered">Delivered</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="returned">Returned</option>
-              </select>
-            </div>
+            {filters.dateRange === "custom" && (
+              <>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    From Date
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.fromDate}
+                    onChange={(e) => handleFilterChange("fromDate", e.target.value)}
+                    className={`w-full p-2 rounded border ${theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white"
+                      : "bg-white border-gray-300 text-black"
+                      } outline-none`}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">
+                    To Date
+                  </label>
+                  <input
+                    type="date"
+                    value={filters.toDate}
+                    onChange={(e) => handleFilterChange("toDate", e.target.value)}
+                    className={`w-full p-2 rounded border ${theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white"
+                      : "bg-white border-gray-300 text-black"
+                      } outline-none`}
+                  />
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
