@@ -84,7 +84,7 @@ const B2CPurchase: React.FC = () => {
   const [purchaseData, setPurchaseData] = useState<any[]>([]);
   const [partyIds, setPartyIds] = useState<number[]>([]);
   const [ledger, setLedger] = useState<any[]>([]);
-  const [matchedPurchases, setMatchedPurchases] = useState<any[]>([]);
+  const [rawMatchedPurchases, setRawMatchedPurchases] = useState<any[]>([]);
   const [purchaseHistory, setPurchaseHistory] = useState<any[]>([]);
 
   // Get auth parameters from localStorage
@@ -352,8 +352,24 @@ const B2CPurchase: React.FC = () => {
       matchedLedgerIdSet.has(s.partyId)
     );
 
-    setMatchedPurchases(filteredPurchases);
+    setRawMatchedPurchases(filteredPurchases);
   }, [partyIds, ledger, purchaseData]);
+
+  const matchedPurchases = useMemo(() => {
+    return rawMatchedPurchases.filter((s: any) => {
+      if (!s.date) return false;
+      const purchaseDate = new Date(s.date);
+      purchaseDate.setHours(0, 0, 0, 0);
+
+      const from = new Date(filters.fromDate);
+      from.setHours(0, 0, 0, 0);
+
+      const to = new Date(filters.toDate);
+      to.setHours(23, 59, 59, 999);
+
+      return purchaseDate >= from && purchaseDate <= to;
+    });
+  }, [rawMatchedPurchases, filters.fromDate, filters.toDate]);
 
   // 🔹 Ledger quick lookup (id → ledger)
   const ledgerMap = useMemo(() => {
@@ -950,6 +966,14 @@ const B2CPurchase: React.FC = () => {
   };
 
   const handleDateRangeChange = (range: string) => {
+    if (range === "custom") {
+      setFilters((prev) => ({
+        ...prev,
+        dateRange: range,
+      }));
+      return;
+    }
+
     const today = new Date();
     let fromDate = new Date();
     let toDate = new Date();
@@ -1169,114 +1193,7 @@ const B2CPurchase: React.FC = () => {
               </>
             )}
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Supplier Name</label>
-              <input
-                type="text"
-                placeholder="Search supplier..."
-                value={filters.customerFilter}
-                onChange={(e) => handleFilterChange('customerFilter', e.target.value)}
-                className={`w-full p-2 rounded border ${theme === 'dark'
-                  ? 'bg-gray-700 border-gray-600 text-white'
-                  : 'bg-white border-gray-300 text-black'
-                  } outline-none`}
-              />
-            </div>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Payment Method</label>
-              <select
-                value={filters.paymentMethod}
-                onChange={(e) => handleFilterChange('paymentMethod', e.target.value)}
-                title="Select payment method"
-                className={`w-full p-2 rounded border ${theme === 'dark'
-                  ? 'bg-gray-700 border-gray-600 text-white'
-                  : 'bg-white border-gray-300 text-black'
-                  } outline-none`}
-              >
-                <option value="">All Methods</option>
-                <option value="card">Card</option>
-                <option value="upi">UPI</option>
-                <option value="netbanking">Net Banking</option>
-                <option value="wallet">Wallet</option>
-                <option value="cod">Cash on Delivery</option>
-                <option value="emi">EMI</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Order Status</label>
-              <select
-                value={filters.orderStatus}
-                onChange={(e) => handleFilterChange('orderStatus', e.target.value)}
-                title="Select order status"
-                className={`w-full p-2 rounded border ${theme === 'dark'
-                  ? 'bg-gray-700 border-gray-600 text-white'
-                  : 'bg-white border-gray-300 text-black'
-                  } outline-none`}
-              >
-                <option value="">All Status</option>
-                <option value="placed">Placed</option>
-                <option value="confirmed">Confirmed</option>
-                <option value="packed">Packed</option>
-                <option value="shipped">Shipped</option>
-                <option value="delivered">Delivered</option>
-                <option value="cancelled">Cancelled</option>
-                <option value="returned">Returned</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Source</label>
-              <select
-                value={filters.source}
-                onChange={(e) => handleFilterChange('source', e.target.value)}
-                title="Select source"
-                className={`w-full p-2 rounded border ${theme === 'dark'
-                  ? 'bg-gray-700 border-gray-600 text-white'
-                  : 'bg-white border-gray-300 text-black'
-                  } outline-none`}
-              >
-                <option value="">All Sources</option>
-                <option value="website">Website</option>
-                <option value="mobile_app">Mobile App</option>
-                <option value="marketplace">Marketplace</option>
-                <option value="social">Social Media</option>
-                <option value="referral">Referral</option>
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Min Amount (₹)</label>
-              <input
-                type="number"
-                placeholder="0"
-                value={filters.amountRangeMin}
-                onChange={(e) => handleFilterChange('amountRangeMin', e.target.value)}
-                min="0"
-                step="0.01"
-                className={`w-full p-2 rounded border ${theme === 'dark'
-                  ? 'bg-gray-700 border-gray-600 text-white'
-                  : 'bg-white border-gray-300 text-black'
-                  } outline-none`}
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium mb-1">Max Amount (₹)</label>
-              <input
-                type="number"
-                placeholder="No limit"
-                value={filters.amountRangeMax}
-                onChange={(e) => handleFilterChange('amountRangeMax', e.target.value)}
-                min="0"
-                step="0.01"
-                className={`w-full p-2 rounded border ${theme === 'dark'
-                  ? 'bg-gray-700 border-gray-600 text-white'
-                  : 'bg-white border-gray-300 text-black'
-                  } outline-none`}
-              />
-            </div>
           </div>
           <div className="mt-4 text-sm opacity-75">
             Showing {filteredTransactions.length} of {orders.length} purchases
