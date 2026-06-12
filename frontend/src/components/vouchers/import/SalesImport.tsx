@@ -31,6 +31,7 @@ interface ImportedItem {
     _matchedHsnId?: string | number;
     _matchedBatchFound?: boolean;
     calculationWarning?: string;
+    "Discount (₹)"?: number;
 }
 
 interface AccountingEntry {
@@ -247,7 +248,8 @@ const getFlatRows = (vouchers: GroupedVoucher[]): FlatRow[] => {
                     igst = item["Integrated Tax (₹)"] ?? 0;
                     cgst = item["Central Tax (₹)"] ?? 0;
                     sgst = item["State/UT tax (₹)"] ?? 0;
-                    rowTotal = taxableValue + igst + cgst + sgst;
+                    discount = item["Discount (₹)"] ?? 0;
+                    rowTotal = taxableValue + igst + cgst + sgst - discount;
                     calculationWarning = item.calculationWarning;
                     ledgerName = voucher["Sales Ledger"] || "";
                 }
@@ -640,11 +642,17 @@ const SalesImport: React.FC = () => {
                     let qty = Number(rawQty) || 0;
                     let rate = Number(rawRate) || 0;
                     let taxableVal = Number(rawTaxable) || 0;
+                    
+                    const discountRaw = String(row["Discount (%)"] || "").replace('%', '').trim();
+                    const discountPct = Number(discountRaw || 0);
+                    let discountAmt = (qty * rate * discountPct) / 100;
 
                     if (hasQty && hasTaxable && !hasRate) {
-                        rate = qty !== 0 ? Number((taxableVal / qty).toFixed(2)) : 0;
+                        rate = qty !== 0 && discountPct !== 100 ? Number((taxableVal / (qty * (1 - discountPct/100))).toFixed(2)) : 0;
+                        discountAmt = (qty * rate * discountPct) / 100;
                     } else if (hasRate && hasTaxable && !hasQty) {
-                        qty = rate !== 0 ? Number((taxableVal / rate).toFixed(2)) : 0;
+                        qty = rate !== 0 && discountPct !== 100 ? Number((taxableVal / (rate * (1 - discountPct/100))).toFixed(2)) : 0;
+                        discountAmt = (qty * rate * discountPct) / 100;
                     } else if (hasQty && hasRate && !hasTaxable) {
                         taxableVal = Number((qty * rate).toFixed(2));
                     } else if (!hasTaxable) {
@@ -657,6 +665,7 @@ const SalesImport: React.FC = () => {
                     qty = Number(qty.toFixed(2));
                     rate = Number(rate.toFixed(2));
                     taxableVal = Number(taxableVal.toFixed(2));
+                    discountAmt = Number(discountAmt.toFixed(2));
                     const totalRate = Number(row["Rate (%)"] || 0);
 
                     let igst = 0, cgst = 0, sgst = 0;
@@ -678,7 +687,7 @@ const SalesImport: React.FC = () => {
 
                     // Calculation Discrepancy checks
                     let calculationWarning = "";
-                    const expectedTaxable = qty * rate;
+                    const expectedTaxable = Number((qty * rate).toFixed(2));
                     if (qty > 0 && rate > 0 && Math.abs(expectedTaxable - taxableVal) > 0.1) {
                         calculationWarning = `Calculation Error: Qty (${qty}) * Rate (${rate}) should be ${expectedTaxable}. Found ${taxableVal}.`;
                     }
@@ -718,6 +727,8 @@ const SalesImport: React.FC = () => {
                             "Integrated Tax (₹)": igst,
                             "Central Tax (₹)": cgst,
                             "State/UT tax (₹)": sgst,
+                            "Discount (%)": discountPct,
+                            "Discount (₹)": discountAmt,
                             _matchedItemId: matchedItem?.id || null,
                             _matchedHsnId: matchedHsnId,
                             _matchedBatchFound: matchedBatchFound,
@@ -727,7 +738,8 @@ const SalesImport: React.FC = () => {
                         const currentItems = voucherGroups[groupKey].items;
                         const newSubtotal = currentItems.reduce((sum, it) => sum + it["Taxable Value (₹)"], 0);
                         const newTax = currentItems.reduce((sum, it) => sum + it["Integrated Tax (₹)"] + it["Central Tax (₹)"] + it["State/UT tax (₹)"], 0);
-                        const calcInvoiceVal = newSubtotal + newTax;
+                        const newDiscount = currentItems.reduce((sum, it) => sum + (it["Discount (₹)"] || 0), 0);
+                        const calcInvoiceVal = newSubtotal + newTax - newDiscount;
                         if (Math.abs(voucherGroups[groupKey]["Invoice Value (₹)"] - calcInvoiceVal) > 1 || voucherGroups[groupKey]["Invoice Value (₹)"] === 0) {
                             voucherGroups[groupKey]["Invoice Value (₹)"] = calcInvoiceVal;
                         }
@@ -1439,11 +1451,11 @@ const SalesImport: React.FC = () => {
     };
 
     const downloadTemplate = (mode: 'item' | 'accounting') => {
-        const itemH = ["GSTIN of Customer", "Trade/Legal name of the Customer", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Sales Ledger", "Item Name", "HSN Code", "Batch No", "Quantity", "Item Rate (₹)", "Rate (%)", "Taxable Value (₹)"];
+        const itemH = ["GSTIN of Customer", "Trade/Legal name of the Customer", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Sales Ledger", "Item Name", "HSN Code", "Batch No", "Quantity", "Item Rate (₹)", "Rate (%)", "Taxable Value (₹)", "Discount (%)"];
         const accH = ["GSTIN of Customer", "Trade/Legal name of the Customer", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Taxable Value (₹)", "GST Rate (%)", "Sales Ledger", "Discount (₹)"];
 
         const itemData = [
-            ["20AAAAA0000A1Z5", "ABC CUSTOMER CORP", "INV/25-26/101", "16-02-2026", 118000, "Jharkhand(20)", "18% Inter State Sales", "Biscute", "5555", "B-001", 100, 1000, 18, 100000],
+            ["20AAAAA0000A1Z5", "ABC CUSTOMER CORP", "INV/25-26/101", "16-02-2026", 118000, "Jharkhand(20)", "18% Inter State Sales", "Biscute", "5555", "B-001", 100, 1000, 18, 100000, 1],
         ];
         const accData = [
             ["20AAAAA0000A1Z5", "ABC CUSTOMER CORP", "INV/25-26/102", "30/03/2026", 11800, "jharkhand", 10000, 18, "18% intra state", 0],

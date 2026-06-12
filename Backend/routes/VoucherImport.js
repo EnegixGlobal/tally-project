@@ -608,9 +608,9 @@ router.post("/sales_import", async (req, res) => {
                 e.quantity,
                 e.rate,
                 e.amount,
-                e.cgstRate,
-                e.sgstRate,
-                e.igstRate,
+                e.cgstLedgerId || 0,
+                e.sgstLedgerId || 0,
+                e.gstLedgerId || 0,
                 0, // discount
                 "", // hsnCode
                 e.batchNumber || "", // batchNumber
@@ -1523,15 +1523,21 @@ router.post("/purchase_summary_import", async (req, res) => {
                     if (si) finalItemId = si.id;
                 }
 
+                const findGstLedger = (type, pct) => {
+                    let l = ledgers.find(ld => ld.name.toLowerCase().includes(type) && ld.name.includes(pct.toString()));
+                    if (!l) l = ledgers.find(ld => ld.name.toLowerCase().includes(type));
+                    return l ? l.id : 0;
+                };
+
                 processedItems.push({
                     itemId: finalItemId,
                     itemName: itemName,
                     quantity: parseFloat(item["Quantity"]) || 1,
                     rate: parseFloat(item["Item Rate (₹)"]) || taxable,
                     amount: taxable,
-                    cgstRate: cgst > 0 ? (rate / 2) : 0,
-                    sgstRate: sgst > 0 ? (rate / 2) : 0,
-                    igstRate: igst > 0 ? rate : 0,
+                    cgstRate: cgst > 0 ? findGstLedger('cgst', rate / 2) : 0,
+                    sgstRate: sgst > 0 ? findGstLedger('sgst', rate / 2) : 0,
+                    igstRate: igst > 0 ? findGstLedger('igst', rate) : 0,
                     hsnCode: item["HSN Code"] || "",
                     batchNo: item["Batch No"] || ""
                 });
@@ -1819,17 +1825,36 @@ router.post("/sales_summary_import", async (req, res) => {
                     if (si) finalItemId = si.id;
                 }
 
+                const findGstLedger = (type, pct) => {
+                    let l = ledgers.find(ld => ld.name.toLowerCase().includes(type) && ld.name.includes(pct.toString()));
+                    if (!l) l = ledgers.find(ld => ld.name.toLowerCase().includes(type));
+                    return l ? l.id : 0;
+                };
+
+                const discountPct = Number(item["Discount (%)"] || 0);
+                const discountAmt = Number(item["Discount (₹)"] || 0);
+
+                let discountLedgerId = 0;
+                if (discountAmt > 0) {
+                    discountTotal += discountAmt;
+                    let l = ledgers.find(ld => ld.name.toLowerCase().includes("discount") && ld.name.includes(discountPct.toString()));
+                    if (!l) l = ledgers.find(ld => ld.name.toLowerCase().includes("discount"));
+                    if (l) discountLedgerId = l.id;
+                }
+
                 processedItems.push({
                     itemId: finalItemId,
                     itemName: itemName,
                     quantity: parseFloat(item["Quantity"]) || 1,
                     rate: parseFloat(item["Item Rate (₹)"]) || taxable,
                     amount: taxable,
-                    cgstRate: cgst > 0 ? (rate / 2) : 0,
-                    sgstRate: sgst > 0 ? (rate / 2) : 0,
-                    igstRate: igst > 0 ? rate : 0,
+                    cgstRate: cgst > 0 ? findGstLedger('cgst', rate / 2) : 0,
+                    sgstRate: sgst > 0 ? findGstLedger('sgst', rate / 2) : 0,
+                    igstRate: igst > 0 ? findGstLedger('igst', rate) : 0,
                     hsnCode: item["HSN Code"] || "",
-                    batchNo: item["Batch No"] || ""
+                    batchNo: item["Batch No"] || "",
+                    discount: discountAmt,
+                    discountLedgerId: discountLedgerId
                 });
             }
         } else {
@@ -1927,11 +1952,11 @@ router.post("/sales_summary_import", async (req, res) => {
                 await db.execute(
                     `INSERT INTO sales_voucher_items (
                         voucherId, itemId, quantity, rate, amount, 
-                        cgstRate, sgstRate, igstRate, salesLedgerId, hsnCode, batchNumber
-                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                        cgstRate, sgstRate, igstRate, salesLedgerId, hsnCode, batchNumber, discount, discountLedgerId
+                    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
                     [
                         voucherId, pi.itemId, pi.quantity, pi.rate, pi.amount,
-                        pi.cgstRate, pi.sgstRate, pi.igstRate, salesLedgerId, pi.hsnCode, pi.batchNo
+                        pi.cgstRate, pi.sgstRate, pi.igstRate, salesLedgerId, pi.hsnCode, pi.batchNo, pi.discount, pi.discountLedgerId
                     ]
                 );
 
