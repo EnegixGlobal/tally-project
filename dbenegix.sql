@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Apr 07, 2026 at 10:19 AM
+-- Generation Time: Jun 12, 2026 at 09:07 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -38,7 +38,7 @@ CREATE TABLE `admin_settings` (
 --
 
 INSERT INTO `admin_settings` (`setting_key`, `setting_value`, `updated_at`) VALUES
-('trial_period_days', '20', '2026-03-19 06:59:18');
+('trial_period_days', '14', '2026-05-16 05:53:29');
 
 -- --------------------------------------------------------
 
@@ -108,13 +108,6 @@ CREATE TABLE `budgets` (
   `owner_type` varchar(50) NOT NULL,
   `owner_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `budgets`
---
-
-INSERT INTO `budgets` (`id`, `name`, `start_date`, `end_date`, `description`, `status`, `created_at`, `updated_at`, `company_id`, `owner_type`, `owner_id`) VALUES
-(2, 'First', '2025-12-05', '2025-12-05', 'asdfsdf', 'active', '2025-12-05 11:40:47', '2025-12-05 11:40:47', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -203,10 +196,7 @@ CREATE TABLE `company_subscriptions` (
 --
 
 INSERT INTO `company_subscriptions` (`id`, `company_id`, `plan_id`, `payment_id`, `plan`, `is_trial`, `status`, `start_date`, `end_date`, `created_at`, `updated_at`) VALUES
-(1, 2, 1, '65', 'Professional', 0, 'active', '2026-04-04 14:11:32', '2027-03-31 23:59:59', '2026-03-18 05:03:23', '2026-04-04 08:41:32'),
-(2, 11, 1, '58', 'trial', 1, 'active', '2026-04-04 00:00:00', '2027-03-31 00:00:00', '2026-03-18 06:59:44', '2026-04-04 06:15:56'),
-(4, 12, NULL, NULL, 'trial', 1, 'active', '2026-03-19 12:34:35', '2027-03-30 00:00:00', '2026-03-19 07:04:35', '2026-03-19 07:27:33'),
-(9, 14, 1, '52', 'trial', 0, 'active', '2026-03-31 17:15:54', '2026-03-31 23:59:59', '2026-03-31 11:42:35', '2026-03-31 11:45:54');
+(1, 1, NULL, NULL, 'trial', 0, 'active', '2026-04-01 00:00:00', '2027-03-31 00:00:00', '2026-05-01 07:14:19', '2026-05-16 05:53:51');
 
 -- --------------------------------------------------------
 
@@ -226,14 +216,6 @@ CREATE TABLE `cost_centers` (
   `owner_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `cost_centers`
---
-
-INSERT INTO `cost_centers` (`id`, `name`, `category`, `description`, `created_at`, `updated_at`, `company_id`, `owner_type`, `owner_id`) VALUES
-(1, 'First', 'asff', 'asdfsdf', '2025-12-05 12:27:08', NULL, 1, 'employee', 1),
-(2, 'First', 'asff', 'asdfsdf', '2025-12-05 12:27:34', NULL, 1, 'employee', 1);
-
 -- --------------------------------------------------------
 
 --
@@ -252,6 +234,13 @@ CREATE TABLE `credit_vouchers` (
   `owner_type` varchar(50) NOT NULL,
   `owner_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `credit_vouchers`
+--
+
+INSERT INTO `credit_vouchers` (`id`, `date`, `number`, `mode`, `partyId`, `narration`, `employee_id`, `company_id`, `owner_type`, `owner_id`) VALUES
+(1, '2026-06-01', 'CNV/26-27/000001', 'accounting-invoice', NULL, '{\"accountingEntries\":[{\"ledgerId\":35,\"type\":\"debit\",\"amount\":100},{\"ledgerId\":7,\"type\":\"credit\",\"amount\":100}],\"note\":\"\"}', NULL, 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -318,13 +307,6 @@ CREATE TABLE `currencies` (
   `owner_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `currencies`
---
-
-INSERT INTO `currencies` (`id`, `code`, `symbol`, `name`, `exchange_rate`, `is_base`, `created_at`, `company_id`, `owner_type`, `owner_id`) VALUES
-(1, 'INR', '$', 'Dollor', 1.00, 0, '2025-12-05 06:24:59', 1, 'employee', 1);
-
 -- --------------------------------------------------------
 
 --
@@ -362,6 +344,13 @@ CREATE TABLE `debit_note_vouchers` (
   `owner_type` varchar(50) NOT NULL,
   `owner_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `debit_note_vouchers`
+--
+
+INSERT INTO `debit_note_vouchers` (`id`, `date`, `number`, `mode`, `party_id`, `sales_ledger_id`, `narration`, `created_at`, `company_id`, `owner_type`, `owner_id`) VALUES
+(1, '2026-05-31', 'DNV/26-27/000001', 'accounting-invoice', NULL, NULL, '{\"accountingEntries\":[{\"ledgerId\":36,\"type\":\"debit\",\"amount\":100},{\"ledgerId\":7,\"type\":\"credit\",\"amount\":100}],\"note\":\"\"}', '2026-06-01 10:31:34', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -487,9 +476,8 @@ CREATE TABLE `godowns` (
 --
 
 INSERT INTO `godowns` (`id`, `name`, `address`, `description`, `company_id`, `owner_type`, `owner_id`) VALUES
-(1, 'Ayush', 'asdf', 'asdf', 1, 'employee', 1),
-(2, 'Primary', 'Primary', 'Primary\n', 1, 'employee', 1),
-(5, 'Dhanbad ', 'Sry', '', 2, 'employee', 2);
+(1, 'Dhanbad', 'vigyan vihar colony near hawai adda dhanbad', '', 1, 'employee', 1),
+(3, 'kadru', 'Kadru Ranchi', '', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -657,68 +645,42 @@ CREATE TABLE `ledgers` (
   `owner_id` int(11) NOT NULL,
   `closing_balance` decimal(15,2) DEFAULT 0.00,
   `state` varchar(100) DEFAULT '',
-  `district` varchar(100) DEFAULT ''
+  `district` varchar(100) DEFAULT '',
+  `pin_code` varchar(20) DEFAULT ''
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `ledgers`
 --
 
-INSERT INTO `ledgers` (`id`, `name`, `group_id`, `opening_balance`, `balance_type`, `address`, `email`, `phone`, `gst_number`, `pan_number`, `created_at`, `company_id`, `owner_type`, `owner_id`, `closing_balance`, `state`, `district`) VALUES
-(1, 'First', 3, 1.00, 'debit', 'asdff', 'ayushsingh0455@gmail.com', '1234567890', '27ABCDE1234F1Z5', 'ABCDE1234F', '2025-12-05 12:26:09', 1, 'employee', 1, 1.00, '', ''),
-(2, 'Sales', 1, 1.00, 'debit', 'sdfsdf', 'ayushsingh0455@gmail.com', '1234567890', '27ABCDE1234F1Z5', 'ABCDE1234F', '2025-12-05 12:32:34', 1, 'employee', 1, 0.00, '', ''),
-(4, 'A kumar capital a/c', -4, 0.00, 'credit', '', '', '', '', '', '2025-12-06 08:39:20', 2, 'employee', 2, 0.00, '', ''),
-(5, 'acc limited', 27, 0.00, 'credit', '', '', '', '', '', '2025-12-06 08:39:53', 2, 'employee', 2, 0.00, 'Jharkhand(20)', ''),
-(6, 'cash a/c', 32, 0.00, 'debit', '', '', '', '', '', '2025-12-06 08:40:20', 2, 'employee', 2, 0.00, '', ''),
-(8, 'furniture & fixture', -9, 0.00, 'debit', '', '', '', '', '', '2025-12-06 08:41:20', 2, 'employee', 2, 0.00, '', ''),
-(10, 'sec deposit acc ltd', 29, 0.00, 'debit', '', '', '', '', '', '2025-12-06 08:42:12', 2, 'employee', 2, 0.00, '', ''),
-(18, 'Bank charges', -10, 0.00, 'debit', '', '', '', '', '', '2025-12-06 10:18:23', 2, 'employee', 2, 0.00, '', ''),
-(19, 'manoj kumar', 31, 0.00, 'debit', '', '', '', '', '', '2025-12-06 10:26:26', 2, 'employee', 2, 0.00, '', ''),
-(24, 'AMAN KUMAR', 27, 0.00, 'credit', '', '', '', '20BDAPP6208H2ZY', '', '2025-12-09 12:57:12', 2, 'employee', 2, 0.00, 'Jharkhand(20)', 'giridih'),
-(27, 'AUDIT FEE', -10, 0.00, 'debit', '', '', '', '', '', '2025-12-09 13:59:57', 2, 'employee', 2, 0.00, '', ''),
-(36, 'Sbi', 42, 0.00, 'debit', '', '', '', '', '', '2025-12-11 06:07:04', 2, 'employee', 2, 0.00, '', ''),
-(38, 'Purchase', -15, 100.00, 'debit', '', '', '', '', '', '2025-12-17 12:16:26', 1, 'employee', 1, 0.00, '', ''),
-(39, 'Test Data', -4, 100.00, 'credit', '', '', '', '', '', '2025-12-17 12:17:31', 1, 'employee', 1, 0.00, '', ''),
-(43, 'Mohan', 31, 0.00, 'debit', '', '', '', '', '', '2025-12-23 12:16:29', 2, 'employee', 2, 100.00, '', ''),
-(48, 'Komal', -4, 0.00, 'debit', '', '', '', '', '', '2025-12-24 12:12:05', 2, 'employee', 2, 100.00, '', ''),
-(50, 'stationary ', -10, 0.00, 'debit', '', '', '', '', '', '2025-12-24 14:16:17', 2, 'employee', 2, 0.00, '', ''),
-(51, 'postage exp', -10, 0.00, 'debit', '', '', '', '', '', '2025-12-24 14:18:09', 2, 'employee', 2, 0.00, '', ''),
-(53, 'KHIRODHAR MAHTO', 31, 0.00, 'debit', 'GHAGHRA NAWABAD TOLA POST DONDLO THANA BAGODAR', 'KNMAHTO07@GMAIL.COM', '07324825468', '20BDAPP6208H2ZY', '', '2026-01-05 15:40:20', 2, 'employee', 2, 0.00, 'Jharkhand(20)', 'Giridih'),
-(54, 'nuvoco ltd', 27, 0.00, 'debit', '', '', '', '20BDAPP6208H2ZY', '', '2026-01-06 09:47:00', 2, 'employee', 2, 0.00, 'Jharkhand(20)', 'Giridih'),
-(60, 'acc', -1, 0.00, 'credit', 'jgjgjgj', 'example@gmail.com', '9756565656', '', 'ABCDE1234F', '2026-01-24 06:04:25', 8, 'employee', 5, 0.00, 'Jharkhand(20)', 'ranchi'),
-(66, '18% Intra Sales', -16, 0.00, 'debit', '', '', '', '', '', '2026-01-28 12:40:25', 2, 'employee', 2, 0.00, '', ''),
-(67, '9% Cgst', 25, 0.00, 'debit', '', '', '', '', '', '2026-01-28 12:40:47', 2, 'employee', 2, 0.00, '', ''),
-(68, '9% Sgst', 25, 0.00, 'debit', '', '', '', '', '', '2026-01-28 12:41:19', 2, 'employee', 2, 0.00, '', ''),
-(70, 'stock 18% goods', 28, 0.00, 'debit', '', '', '', '', '', '2026-01-29 16:01:21', 2, 'employee', 2, 0.00, '', ''),
-(72, 'loading and unloading exp', -7, 0.00, 'debit', '', '', '', '', '', '2026-01-31 14:04:05', 2, 'employee', 2, 0.00, '', ''),
-(86, 'Depreciation', -10, 0.00, 'debit', '', '', '', '', '', '2026-01-31 15:09:57', 2, 'employee', 2, 0.00, '', ''),
-(87, 'dividend', -11, 0.00, 'debit', '', '', '', '', '', '2026-01-31 16:05:26', 2, 'employee', 2, 0.00, '', ''),
-(88, 'interest from bank', -11, 0.00, 'debit', '', '', '', '', '', '2026-01-31 16:05:51', 2, 'employee', 2, 0.00, '', ''),
-(91, '18% Intra State Purchase', -15, 0.00, 'debit', '', '', '', '', '', '2026-02-10 11:52:55', 2, 'employee', 2, 0.00, '', ''),
-(92, '18% Inter Sales', -16, 0.00, 'debit', '', '', '', '', '', '2026-02-10 12:14:40', 2, 'employee', 2, 0.00, '', ''),
-(93, '18% Inter State purchase', -15, 0.00, 'debit', '', '', '', '', '', '2026-02-10 13:10:57', 2, 'employee', 2, 0.00, '', ''),
-(94, '5% inter state purchase ', -15, 0.00, 'debit', '', '', '', '', '', '2026-02-10 13:12:23', 2, 'employee', 2, 0.00, '', ''),
-(95, '5% inter state sales', -16, 0.00, 'credit', '', '', '', '', '', '2026-02-10 13:12:56', 2, 'employee', 2, 0.00, '', ''),
-(96, '5% intra state purchase', -15, 0.00, 'debit', '', '', '', '', '', '2026-02-10 13:14:53', 2, 'employee', 2, 0.00, '', ''),
-(100, 'sec acc ltd', 29, 0.00, 'debit', '', '', '', '', '', '2026-02-10 13:23:06', 2, 'employee', 2, 5000.00, '', ''),
-(101, 'Tds on salary payment', -19, 0.00, 'credit', '', '', '', '', '', '2026-02-10 13:31:06', 2, 'employee', 2, 0.00, '', ''),
-(102, 'Tds on payment other than Salary 1%', -19, 0.00, 'credit', '', '', '', '', '', '2026-02-10 13:32:39', 2, 'employee', 2, 0.00, '', ''),
-(103, 'Tds on payment on non-resident', -19, 0.00, 'credit', '', '', '', '', '', '2026-02-10 13:34:30', 2, 'employee', 2, 0.00, '', ''),
-(104, '3% intra state purchase', -15, 0.00, 'debit', '', '', '', '', '', '2026-02-10 13:36:44', 2, 'employee', 2, 0.00, '', ''),
-(105, '3% inter state purchase', -15, 0.00, 'debit', '', '', '', '', '', '2026-02-10 13:37:48', 2, 'employee', 2, 0.00, '', ''),
-(108, 'Dabur india', 27, 0.00, 'debit', '', '', '', '', '', '2026-02-10 15:16:00', 2, 'employee', 2, 0.00, 'Haryana(06)', ''),
-(109, 'abc ', 27, 0.00, 'credit', '', '', '', '', '', '2026-02-12 04:30:59', 2, 'employee', 2, 0.00, '', ''),
-(110, 'Discount to Customer 1%', -10, 0.00, 'debit', '', '', '', '', '', '2026-02-15 03:01:47', 2, 'employee', 2, 0.00, '', ''),
-(111, 'Rebate & Discount 20%', -11, 0.00, 'debit', '', '', '', '', '', '2026-02-15 03:02:31', 2, 'employee', 2, 0.00, '', ''),
-(112, 'Abc ltd ', 30, 0.00, 'debit', '', '', '', '', '', '2026-02-21 14:12:22', 2, 'employee', 2, 0.00, '', ''),
-(113, 'travelling exp', -10, 0.00, 'debit', '', '', '', '', '', '2026-03-02 08:09:52', 2, 'employee', 2, 0.00, '', ''),
-(114, 'Mukesh ', 31, 0.00, 'debit', '', '', '', '', '', '2026-03-07 14:42:38', 2, 'employee', 2, 0.00, '', ''),
-(115, 'Ayush', 27, 0.00, 'debit', '', '', '', '', '', '2026-03-13 04:36:15', 2, 'employee', 2, 0.00, 'Jharkhand(20)', ''),
-(116, 'Profit & Loss A/c', -18, 0.00, 'debit', '', '', '', '', '', '2026-03-13 05:08:35', 2, 'employee', 2, 0.00, '', ''),
-(117, 'Az', -8, 0.00, 'debit', '', '', '', '', '', '2026-03-13 12:10:56', 2, 'employee', 2, 0.00, '', ''),
-(118, '18% Igst', 25, 0.00, 'debit', '', '', '', '', '', '2026-03-17 11:29:04', 2, 'employee', 2, 0.00, '', ''),
-(119, 'amit', 31, 0.00, 'debit', '', '', '', '', '', '2026-04-06 10:45:37', 2, 'employee', 2, 0.00, 'Jharkhand(20)', ''),
-(120, 'ICICI LOMBARD GIC LTD', 31, 0.00, 'debit', '', '', '', '20AAACI7904G1Z1', '', '2026-04-06 10:46:20', 2, 'employee', 2, 0.00, 'Jharkhand(20)', '');
+INSERT INTO `ledgers` (`id`, `name`, `group_id`, `opening_balance`, `balance_type`, `address`, `email`, `phone`, `gst_number`, `pan_number`, `created_at`, `company_id`, `owner_type`, `owner_id`, `closing_balance`, `state`, `district`, `pin_code`) VALUES
+(2, '18% Inter Purchase', -15, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:15:07', 1, 'employee', 1, 0.00, '', '', ''),
+(3, '18% Inter Sales', -16, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:15:27', 1, 'employee', 1, 0.00, '', '', ''),
+(4, '18% Intra Sales', -16, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:15:39', 1, 'employee', 1, 0.00, '', '', ''),
+(5, '18% Igst', -103, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:15:53', 1, 'employee', 1, 0.00, '', '', ''),
+(6, '9% Cgst', -103, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:16:01', 1, 'employee', 1, 0.00, '', '', ''),
+(7, '9% Sgst', -103, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:16:10', 1, 'employee', 1, 0.00, '', '', ''),
+(8, 'AMAN KUMAR', -109, 0.00, 'debit', 'Ranchi Jharkhand Indian\n\n', 'aman@gmail.com', '1234567890', '20AAACL4159L1ZN', 'ABCDE1234F', '2026-05-01 07:16:23', 1, 'employee', 1, 0.00, 'Jharkhand(20)', 'Palamu', '822124'),
+(9, 'Sohna Kumar', -110, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:16:51', 1, 'employee', 1, 0.00, '', '', ''),
+(10, '18% intra state purchase', -15, 0.00, 'debit', '', '', '', '', '', '2026-05-02 07:40:34', 1, 'employee', 1, 0.00, '', '', ''),
+(16, 'Nuvoco vistas corporation ltd', -109, 0.00, 'credit', '', '', '', '20AAACL4159L1ZM', '', '2026-05-02 08:26:45', 1, 'employee', 1, 0.00, 'Jharkhand(20)', 'Palamu', ''),
+(18, 'Rebate & Discount ', -11, 0.00, 'debit', '', '', '', '', '', '2026-05-16 11:38:57', 1, 'employee', 1, 0.00, '', '', ''),
+(19, 'Tds 1%', -19, 0.00, 'debit', '', '', '', '', '', '2026-05-16 11:57:24', 1, 'employee', 1, 0.00, '', '', ''),
+(20, 'Ayush', -110, 0.00, 'debit', '', '', '', '', '', '2026-05-18 11:18:49', 1, 'employee', 1, 0.00, 'Odisha(21)', '', ''),
+(21, 'axis bank', -113, 0.00, 'debit', '', '', '', '', '', '2026-05-19 06:38:32', 1, 'employee', 1, 0.00, '', '', ''),
+(22, 'Discount to Customer', -10, 0.00, 'debit', '', '', '', '', '', '2026-05-19 11:08:33', 1, 'employee', 1, 0.00, '', '', ''),
+(23, 'Discount to Customer 1%', -10, 0.00, 'debit', '', '', '', '', '', '2026-05-19 11:18:11', 1, 'employee', 1, 0.00, '', '', ''),
+(24, 'B2B', 1, 0.00, 'debit', '', '', '', '', '', '2026-05-20 06:12:26', 1, 'employee', 1, 0.00, '', '', ''),
+(25, '19AAACL4159L1ZM', -109, 0.00, 'credit', '', '', '', '19AAACL4159L1ZM', '', '2026-05-20 07:14:41', 1, 'employee', 1, 0.00, 'West Bengal(19)', '', ''),
+(26, 'Sbi', -113, 0.00, 'debit', '', '', '', '', '', '2026-05-21 06:45:58', 1, 'employee', 1, 0.00, '', '', ''),
+(27, 'acc limited', -109, 0.00, 'debit', '', '', '', '', '', '2026-05-21 06:46:51', 1, 'employee', 1, 0.00, '', '', ''),
+(28, 'ARVIND KUMAR PANDEY', -110, 0.00, 'debit', '', '', '', '', '', '2026-05-21 07:25:17', 1, 'employee', 1, 0.00, '', '', ''),
+(29, 'SUSPENSE', -113, 0.00, 'debit', '', '', '', '', '', '2026-05-21 10:13:26', 1, 'employee', 1, 0.00, '', '', ''),
+(30, '19AAACL4159L1Z5', -109, 0.00, 'credit', '', '', '', '19AAACL4159L1Z5', '', '2026-05-23 06:24:52', 1, 'employee', 1, 0.00, 'West Bengal(19)', '', ''),
+(31, '20ADAPT1906B1ZD', -109, 0.00, 'credit', '', '', '', '20ADAPT1906B1ZD', '', '2026-05-23 06:24:52', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', ''),
+(32, 'cash a/c', -114, 0.00, 'debit', '', '', '', '20AAACL4159L1ZD', '', '2026-05-23 10:53:52', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', ''),
+(35, '18% intra state credit note', -16, 0.00, 'debit', '', '', '', '', '', '2026-06-01 10:36:01', 1, 'employee', 1, 0.00, '', '', ''),
+(36, '18% intra state debit note', -16, 0.00, 'debit', '', '', '', '', '', '2026-06-01 10:47:00', 1, 'employee', 1, 0.00, '', '', '');
 
 -- --------------------------------------------------------
 
@@ -757,24 +719,7 @@ CREATE TABLE `ledger_groups` (
 --
 
 INSERT INTO `ledger_groups` (`id`, `name`, `type`, `parent`, `created_at`, `alias`, `nature`, `behavesLikeSubLedger`, `nettBalancesForReporting`, `usedForCalculation`, `allocationMethod`, `setAlterHSNSAC`, `hsnSacClassificationId`, `hsnCode`, `setAlterGST`, `gstClassificationId`, `typeOfSupply`, `taxability`, `integratedTaxRate`, `cess`, `company_id`, `owner_type`, `owner_id`) VALUES
-(1, 'First', NULL, 0, '2025-12-05 11:38:24', 'abc', 'Assets', 0, 1, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 1, 'employee', 1),
-(3, 'Cash-in-Hand', NULL, 0, '2025-12-05 11:52:05', 'abc', 'Assets', 0, 1, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 1, 'employee', 1),
-(4, 'Fiasdf', NULL, 0, '2025-12-05 12:25:44', 'asdf', 'Assets', 0, 1, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 1, 'employee', 1),
-(21, 'Reserve & Surplus', NULL, -4, '2025-12-06 08:28:14', NULL, 'Liabilities', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(23, 'Unsecured Loans', NULL, -13, '2025-12-06 08:30:07', NULL, 'Liabilities', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(24, 'Secured Loan', NULL, -13, '2025-12-06 08:30:23', NULL, 'Liabilities', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(25, 'Duties & Taxes', NULL, -6, '2025-12-06 08:31:01', NULL, 'Liabilities', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(26, 'Provisions', NULL, -6, '2025-12-06 08:32:29', NULL, 'Liabilities', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(27, 'Sundry Creditors', NULL, -6, '2025-12-06 08:33:06', NULL, 'Liabilities', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(28, 'Stock-In-Hand', NULL, -5, '2025-12-06 08:33:50', NULL, 'Assets', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(29, 'Deposits (Assets)', NULL, -5, '2025-12-06 08:35:16', NULL, 'Assets', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(30, 'Loan and Advances', NULL, -5, '2025-12-06 08:35:49', NULL, 'Assets', 0, 0, 0, 'No Appropriation', 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(31, 'Sundry Debtors', NULL, -5, '2025-12-06 08:36:31', NULL, 'Assets', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(32, 'Cash In Hand', NULL, -5, '2025-12-06 08:36:49', NULL, 'Assets', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(39, 'Debit/Credit Note from Creditors', NULL, -15, '2026-01-31 16:18:25', NULL, 'Expenses', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, 0.00, 0.00, 2, 'employee', 2),
-(40, 'Debit/Credit Note to Debtors', NULL, -16, '2026-01-31 16:18:59', NULL, 'Income', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 2, 'employee', 2),
-(41, 'cd', NULL, -4, '2026-02-27 14:42:46', 'cd ', 'Liabilities', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 8, 'employee', 5),
-(42, 'Bank Accounts', NULL, -5, '2026-02-28 07:58:42', NULL, 'Assets', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 2, 'employee', 2);
+(1, 'B2B', NULL, -110, '2026-05-01 07:30:27', NULL, 'Assets', 0, 0, 0, NULL, 0, NULL, NULL, 0, NULL, NULL, NULL, NULL, NULL, 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -801,32 +746,6 @@ CREATE TABLE `payments` (
   `discount_amount` decimal(10,2) DEFAULT 0.00,
   `final_amount` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `payments`
---
-
-INSERT INTO `payments` (`id`, `order_id`, `user_id`, `company_id`, `plan_id`, `coupon_id`, `amount`, `currency`, `status`, `payment_gateway`, `razorpay_order_id`, `razorpay_payment_id`, `response_json`, `created_at`, `updated_at`, `discount_amount`, `final_amount`) VALUES
-(45, 'plan_1_1774941927044', 2, 2, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SXkZ4TiwxN6Wv5', 'pay_SXkZKEIreY9WC1', '{\"body\":{\"razorpay_payment_id\":\"pay_SXkZKEIreY9WC1\",\"razorpay_order_id\":\"order_SXkZ4TiwxN6Wv5\",\"razorpay_signature\":\"e5378442b603388f2f615d973df157ca427ae2b4f98dd29f182c57d814e80e71\"},\"paymentDetails\":{\"id\":\"pay_SXkZKEIreY9WC1\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SXkZ4TiwxN6Wv5\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"408054572400\",\"upi_transaction_id\":\"730B14777DF20FDF1C32F7803AF13032\"},\"created_at\":1774942048,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-03-31 12:55:27', '2026-03-31 12:55:59', 0.00, 1.00),
-(46, 'plan_1_1774944696814', 2, 2, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SXlLpvXK3jND51', 'pay_SXlM6KrFXzSE5G', '{\"body\":{\"razorpay_payment_id\":\"pay_SXlM6KrFXzSE5G\",\"razorpay_order_id\":\"order_SXlLpvXK3jND51\",\"razorpay_signature\":\"3cd6b6ed4ca9a935763a954f56591dabe0159030aedd3d14dc9094c4d5add5b4\"},\"paymentDetails\":{\"id\":\"pay_SXlM6KrFXzSE5G\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SXlLpvXK3jND51\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"784135527535\",\"upi_transaction_id\":\"FC93CED92CBDADF8AA33ABF5BC6E2F7A\"},\"created_at\":1774944818,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-03-31 13:41:37', '2026-03-31 13:42:09', 0.00, 1.00),
-(47, 'plan_1_1774945053218', 2, 2, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SXlS6iqQ6zTkjN', 'pay_SXlSN2R2yDODIB', '{\"body\":{\"razorpay_payment_id\":\"pay_SXlSN2R2yDODIB\",\"razorpay_order_id\":\"order_SXlS6iqQ6zTkjN\",\"razorpay_signature\":\"53fe1e2d96325d766533f1728e114b1c2629e46369b7bd2f35b1cbcb67e77fc3\"},\"paymentDetails\":{\"id\":\"pay_SXlSN2R2yDODIB\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SXlS6iqQ6zTkjN\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"598534115662\",\"upi_transaction_id\":\"FA37AF29F5739A5F47212AA310AA82ED\"},\"created_at\":1774945174,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-03-31 13:47:33', '2026-03-31 13:48:05', 0.00, 1.00),
-(48, 'plan_1_1774955419507', 2, 2, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SXoOcrFlnCIpDH', 'pay_SXoOqfeIpjII5c', '{\"body\":{\"razorpay_payment_id\":\"pay_SXoOqfeIpjII5c\",\"razorpay_order_id\":\"order_SXoOcrFlnCIpDH\",\"razorpay_signature\":\"1fe4d78b31037e47462e83fbafe4db7ca407735c086128c747a8107114280cd7\"},\"paymentDetails\":{\"id\":\"pay_SXoOqfeIpjII5c\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SXoOcrFlnCIpDH\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"220071857849\",\"upi_transaction_id\":\"A6554AE080BCD4573FE5644097C5414D\"},\"created_at\":1774955539,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-03-31 16:40:20', '2026-03-31 16:40:49', 0.00, 1.00),
-(50, 'plan_1_1774957505980', 15, 14, 1, NULL, 1.00, 'INR', 'created', NULL, 'order_SXozRnia2oEylj', NULL, NULL, '2026-03-31 17:15:11', '2026-03-31 17:15:11', 0.00, 1.00),
-(51, 'plan_1_1774957515544', 15, 14, 1, NULL, 1.00, 'INR', 'created', NULL, 'order_SXozWFm02S6FYi', NULL, NULL, '2026-03-31 17:15:15', '2026-03-31 17:15:15', 0.00, 1.00),
-(52, 'plan_1_1774957530356', 15, 14, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SXozmWq7PG68sa', 'pay_SXozud9tqD3xOI', '{\"body\":{\"razorpay_payment_id\":\"pay_SXozud9tqD3xOI\",\"razorpay_order_id\":\"order_SXozmWq7PG68sa\",\"razorpay_signature\":\"c514ca882e606def4afa92a6e5d83b3ebd5da61876fcfd897145ff0fa40ed9b5\"},\"paymentDetails\":{\"id\":\"pay_SXozud9tqD3xOI\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SXozmWq7PG68sa\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"z@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"927901523107\",\"upi_transaction_id\":\"F3C083374E94294277018DA59C63BFD9\"},\"created_at\":1774957644,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-03-31 17:15:30', '2026-03-31 17:15:54', 0.00, 1.00),
-(53, 'plan_1_1774957597348', 2, 2, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SXp0xfnkGnhFTu', 'pay_SXp181ryvlFCUQ', '{\"body\":{\"razorpay_payment_id\":\"pay_SXp181ryvlFCUQ\",\"razorpay_order_id\":\"order_SXp0xfnkGnhFTu\",\"razorpay_signature\":\"247b66afaa49621daa4499d3737d7b91323b37cf4eacdd0130d5ec06cf188199\"},\"paymentDetails\":{\"id\":\"pay_SXp181ryvlFCUQ\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SXp0xfnkGnhFTu\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"437925666856\",\"upi_transaction_id\":\"45A5F23DBAD8C5BC13C8D589CFEC0221\"},\"created_at\":1774957713,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-03-31 17:16:37', '2026-03-31 17:17:03', 0.00, 1.00),
-(54, 'plan_1_1775112778531', 2, 11, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SYX53qAmgasMy9', 'pay_SYX5Jgy6PMmEwj', '{\"body\":{\"razorpay_payment_id\":\"pay_SYX5Jgy6PMmEwj\",\"razorpay_order_id\":\"order_SYX53qAmgasMy9\",\"razorpay_signature\":\"af9e2c8b738f8d4e50c29bb0ee8f7f0a54e3f3b78cc3727251a81fe4917e2a00\"},\"paymentDetails\":{\"id\":\"pay_SYX5Jgy6PMmEwj\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SYX53qAmgasMy9\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"982669630399\",\"upi_transaction_id\":\"D7CED06CBAF677A7598A89DBCF22A62A\"},\"created_at\":1775112902,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-04-02 12:22:59', '2026-04-02 12:23:30', 0.00, 1.00),
-(55, 'plan_1_1775113768491', 2, 2, 1, NULL, 1.00, 'INR', 'created', NULL, 'order_SYXMUDxgiNCKvk', NULL, NULL, '2026-04-02 12:39:28', '2026-04-02 12:39:28', 0.00, 1.00),
-(56, 'plan_1_1775114356489', 2, 2, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SYXWq0A0WWUhxo', 'pay_SYXX3nAM2y5GlE', '{\"body\":{\"razorpay_payment_id\":\"pay_SYXX3nAM2y5GlE\",\"razorpay_order_id\":\"order_SYXWq0A0WWUhxo\",\"razorpay_signature\":\"31e778aeff311812a5ac508607781f72c189a7a8f5c3b563015a5caa85cb7bbb\"},\"paymentDetails\":{\"id\":\"pay_SYXX3nAM2y5GlE\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SYXWq0A0WWUhxo\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"756626797067\",\"upi_transaction_id\":\"F636624B57AE94EF82BD46EB8718FB4C\"},\"created_at\":1775114478,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-04-02 12:49:16', '2026-04-02 12:49:50', 0.00, 1.00),
-(57, 'plan_1_1775194781104', 2, 11, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SYuMmw1SiWD3L5', 'pay_SYuN2Klw6UgFK7', '{\"body\":{\"razorpay_payment_id\":\"pay_SYuN2Klw6UgFK7\",\"razorpay_order_id\":\"order_SYuMmw1SiWD3L5\",\"razorpay_signature\":\"7ddf4d39335281887c484fb74a9f2533a262704b38aa96df38209c8f8ea95369\"},\"paymentDetails\":{\"id\":\"pay_SYuN2Klw6UgFK7\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SYuMmw1SiWD3L5\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"458517066189\",\"upi_transaction_id\":\"D40347AE9283C439FE6AFA40ABEB4DC2\"},\"created_at\":1775194906,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-04-03 11:09:41', '2026-04-03 11:10:15', 0.00, 1.00),
-(58, 'plan_1_1775197872794', 2, 11, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SYvFDxd1EBsmje', 'pay_SYvFYOFu6RMhVv', '{\"body\":{\"razorpay_payment_id\":\"pay_SYvFYOFu6RMhVv\",\"razorpay_order_id\":\"order_SYvFDxd1EBsmje\",\"razorpay_signature\":\"ff50d5fbece5d711790c78bd7de192620a9a3dd1d8cfde51edbed3b9e43cab31\"},\"paymentDetails\":{\"id\":\"pay_SYvFYOFu6RMhVv\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SYvFDxd1EBsmje\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"295947779930\",\"upi_transaction_id\":\"0464C41B2A8AEBBF87D264D52F2C3C11\"},\"created_at\":1775198002,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-04-03 12:01:13', '2026-04-03 12:01:48', 0.00, 1.00),
-(59, 'plan_1_1775211658436', 2, 2, 1, NULL, 1.00, 'INR', 'created', NULL, 'order_SYz9wEIjc0RsET', NULL, NULL, '2026-04-03 15:50:59', '2026-04-03 15:50:59', 0.00, 1.00),
-(60, 'plan_3_1775281248236', 2, 2, 3, NULL, 3.00, 'INR', 'success', NULL, 'order_SZIt9eU6MzFt6V', 'pay_SZItU2DbPOag9Q', '{\"body\":{\"razorpay_payment_id\":\"pay_SZItU2DbPOag9Q\",\"razorpay_order_id\":\"order_SZIt9eU6MzFt6V\",\"razorpay_signature\":\"53450153be5d52fa7672da56388d752aa6bf8a89b6d6e2300bcab6a8489d7a4a\"},\"paymentDetails\":{\"id\":\"pay_SZItU2DbPOag9Q\",\"entity\":\"payment\",\"amount\":300,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SZIt9eU6MzFt6V\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Enterprise\",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":8,\"tax\":2,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"869903771645\",\"upi_transaction_id\":\"F076EF37EC4BE7522CAEFF791730ACD0\"},\"created_at\":1775281268,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-04-04 11:10:48', '2026-04-04 11:11:25', 0.00, 3.00),
-(61, 'plan_3_1775283634010', 2, 2, 3, NULL, 3.00, 'INR', 'success', NULL, 'order_SZJZ9i2pKTXGZ9', 'pay_SZJZQyVuqlNiQ0', '{\"body\":{\"razorpay_payment_id\":\"pay_SZJZQyVuqlNiQ0\",\"razorpay_order_id\":\"order_SZJZ9i2pKTXGZ9\",\"razorpay_signature\":\"2f852c99fcdc93ae30b3e836ffa941b2fe7403e311c9041838acf093fd4b8d30\"},\"paymentDetails\":{\"id\":\"pay_SZJZQyVuqlNiQ0\",\"entity\":\"payment\",\"amount\":300,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SZJZ9i2pKTXGZ9\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Enterprise\",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":8,\"tax\":2,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"377553093367\",\"upi_transaction_id\":\"AFC0BB5DE64C5BBF4B4F8BA145DA3E08\"},\"created_at\":1775283650,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-04-04 11:50:34', '2026-04-04 11:51:10', 0.00, 3.00),
-(62, 'plan_3_1775285778271', 2, 2, 3, NULL, 3.00, 'INR', 'success', NULL, 'order_SZKAu4wbg9fQng', 'pay_SZKB8HhugMz1Dq', '{\"body\":{\"razorpay_payment_id\":\"pay_SZKB8HhugMz1Dq\",\"razorpay_order_id\":\"order_SZKAu4wbg9fQng\",\"razorpay_signature\":\"c21ce47ec31fb269dfbbe3cd1f2f43905a53d3165f5e4e1314d2eb307d14609d\"},\"paymentDetails\":{\"id\":\"pay_SZKB8HhugMz1Dq\",\"entity\":\"payment\",\"amount\":300,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SZKAu4wbg9fQng\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Enterprise\",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":8,\"tax\":2,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"860593399502\",\"upi_transaction_id\":\"DBA370A1170D503D5A7B5CBCBC77BC5F\"},\"created_at\":1775285792,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-04-04 12:26:18', '2026-04-04 12:26:48', 0.00, 3.00),
-(63, 'plan_3_1775286697885', 2, 2, 3, NULL, 3.00, 'INR', 'success', NULL, 'order_SZKR5nq2qMDyKc', 'pay_SZKRQ38WjcY0BA', '{\"body\":{\"razorpay_payment_id\":\"pay_SZKRQ38WjcY0BA\",\"razorpay_order_id\":\"order_SZKR5nq2qMDyKc\",\"razorpay_signature\":\"b6fd0288b20765c4e16c01fd02cf84d4a19f0c7787fde8f3772bdaa42843dff1\"},\"paymentDetails\":{\"id\":\"pay_SZKRQ38WjcY0BA\",\"entity\":\"payment\",\"amount\":300,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SZKR5nq2qMDyKc\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Enterprise\",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":8,\"tax\":2,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"106361788809\",\"upi_transaction_id\":\"32FE3D1B8ED75BC0C971569E6C8C7865\"},\"created_at\":1775286717,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-04-04 12:41:38', '2026-04-04 12:42:12', 0.00, 3.00),
-(64, 'plan_1_1775291891574', 2, 2, 1, NULL, 1.00, 'INR', 'success', NULL, 'order_SZLuX4bKX45VBs', 'pay_SZLumCjCjitjW2', '{\"body\":{\"razorpay_payment_id\":\"pay_SZLumCjCjitjW2\",\"razorpay_order_id\":\"order_SZLuX4bKX45VBs\",\"razorpay_signature\":\"1da7656dd62f10214bc90d1a3271e5de25113fe561511d640a0025d5d644f292\"},\"paymentDetails\":{\"id\":\"pay_SZLumCjCjitjW2\",\"entity\":\"payment\",\"amount\":100,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SZLuX4bKX45VBs\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic \",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":2,\"tax\":0,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"230610295115\",\"upi_transaction_id\":\"455961BADE9757DF43F3FEC14CF132E5\"},\"created_at\":1775291906,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-04-04 14:08:12', '2026-04-04 14:08:41', 0.00, 1.00),
-(65, 'plan_1_1775292062917', 2, 2, 1, 2, 90.00, 'INR', 'success', NULL, 'order_SZLxXrAJJkaXD9', 'pay_SZLxlOH9FvjcJJ', '{\"body\":{\"razorpay_payment_id\":\"pay_SZLxlOH9FvjcJJ\",\"razorpay_order_id\":\"order_SZLxXrAJJkaXD9\",\"razorpay_signature\":\"03ac4eb923cd5aafa5d4144253ebcc32fd4aabc9e95585fef33bd13aa3f70d5a\"},\"paymentDetails\":{\"id\":\"pay_SZLxlOH9FvjcJJ\",\"entity\":\"payment\",\"amount\":9000,\"currency\":\"INR\",\"status\":\"captured\",\"order_id\":\"order_SZLxXrAJJkaXD9\",\"invoice_id\":null,\"international\":false,\"method\":\"upi\",\"amount_refunded\":0,\"refund_status\":null,\"captured\":true,\"description\":\"Subscription: Basic  (Coupon: OSDF4)\",\"card_id\":null,\"bank\":null,\"wallet\":null,\"vpa\":\"ansarymustak@fbl\",\"email\":\"arvind12601@gmail.com\",\"contact\":\"+917004625048\",\"notes\":[],\"fee\":212,\"tax\":32,\"error_code\":null,\"error_description\":null,\"error_source\":null,\"error_step\":null,\"error_reason\":null,\"acquirer_data\":{\"rrn\":\"473591385476\",\"upi_transaction_id\":\"F8DC0561C361BA21CD70D02727651D21\"},\"created_at\":1775292076,\"upi\":{\"vpa\":\"ansarymustak@fbl\",\"flow\":\"collect\"}}}', '2026-04-04 14:11:03', '2026-04-04 14:11:32', 10.00, 90.00);
 
 -- --------------------------------------------------------
 
@@ -856,7 +775,7 @@ CREATE TABLE `purchase_history` (
 --
 
 INSERT INTO `purchase_history` (`id`, `itemName`, `hsnCode`, `batchNumber`, `purchaseQuantity`, `purchaseDate`, `companyId`, `ownerType`, `ownerId`, `type`, `rate`, `voucherNumber`, `godownId`, `mrp`) VALUES
-(142, 'Mobile', '1111', NULL, 10, '2026-04-07', '2', 'employee', '2', 'purchase', 10.00, 'PRV/26-27/000001', NULL, NULL);
+(182, 'Biscute', '4444', NULL, 1000, '2026-06-02', '1', 'employee', '1', 'purchase', 2342.00, 'PRV/26-27/000001', NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -944,7 +863,7 @@ CREATE TABLE `purchase_vouchers` (
 --
 
 INSERT INTO `purchase_vouchers` (`id`, `number`, `date`, `supplierInvoiceDate`, `narration`, `partyId`, `referenceNo`, `dispatchDocNo`, `dispatchThrough`, `destination`, `purchaseLedgerId`, `subtotal`, `cgstTotal`, `sgstTotal`, `igstTotal`, `discountTotal`, `total`, `company_id`, `owner_type`, `owner_id`, `tdsTotal`, `mode`) VALUES
-(104, 'PRV/26-27/000001', '2026-04-07', '2026-04-07', NULL, 119, '1', NULL, NULL, NULL, NULL, 100.00, 9.00, 9.00, 0.00, 0.00, 118.00, 2, 'employee', 2, 0.00, 'item-invoice');
+(724, 'PRV/26-27/000001', '2026-06-02', '2026-06-02', NULL, 8, '1', NULL, NULL, NULL, NULL, 2342000.00, 210780.00, 210780.00, 0.00, 0.00, 2786980.00, 1, 'employee', 1, 23420.00, 'item-invoice');
 
 -- --------------------------------------------------------
 
@@ -974,7 +893,7 @@ CREATE TABLE `purchase_voucher_items` (
 --
 
 INSERT INTO `purchase_voucher_items` (`id`, `voucherId`, `itemId`, `quantity`, `rate`, `discount`, `cgstRate`, `sgstRate`, `igstRate`, `amount`, `godownId`, `purchaseLedgerId`, `tdsRate`, `discountLedgerId`) VALUES
-(144, 104, 39, 10.00, 10.00, 0.00, 67.00, 68.00, 0.00, 100.00, NULL, 93, 0.00, 0);
+(462, 724, 21, 1000.00, 2342.00, 0.00, 6.00, 7.00, 0.00, 2342000.00, NULL, 10, 19.00, 0);
 
 -- --------------------------------------------------------
 
@@ -1053,9 +972,8 @@ CREATE TABLE `sales_types` (
 --
 
 INSERT INTO `sales_types` (`id`, `sales_type`, `type`, `prefix`, `suffix`, `current_no`, `company_id`, `owner_type`, `owner_id`, `created_at`, `updated_at`) VALUES
-(6, 'B2b', 'Sales', 'omR', '25-26', 1, '2', 'employee', '2', '2026-01-21 15:26:34', '2026-02-18 14:06:51'),
-(7, 'B2c Sales ', 'Sales', 'Om', '25-26', 2, '2', 'employee', '2', '2026-02-03 02:56:52', '2026-04-06 10:44:27'),
-(8, 'b2b', 'Sales', 'ay', '26-27', 9, '2', 'employee', '2', '2026-04-04 05:01:36', '2026-04-07 06:47:12');
+(1, 'B2B', 'Sales', 'b2b/', '/26-27', 3, '1', 'employee', '1', '2026-05-01 08:21:24', '2026-06-05 07:10:42'),
+(2, 'B2C', 'Sales', 'b2c/', '/26-27', 1, '1', 'employee', '1', '2026-05-01 08:21:33', '2026-05-23 10:57:38');
 
 -- --------------------------------------------------------
 
@@ -1090,8 +1008,18 @@ CREATE TABLE `sales_vouchers` (
   `sales_type_id` int(11) DEFAULT NULL,
   `bill_no` varchar(100) DEFAULT NULL,
   `mode` varchar(50) DEFAULT 'item-invoice',
-  `approxDistance` varchar(50) DEFAULT NULL
+  `approxDistance` varchar(50) DEFAULT NULL,
+  `overallDiscountLedgerId` int(11) DEFAULT NULL,
+  `overallDiscountAmount` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `sales_vouchers`
+--
+
+INSERT INTO `sales_vouchers` (`id`, `number`, `date`, `narration`, `partyId`, `referenceNo`, `dispatchDocNo`, `dispatchThrough`, `destination`, `subtotal`, `cgstTotal`, `sgstTotal`, `igstTotal`, `discountTotal`, `total`, `createdAt`, `company_id`, `owner_type`, `owner_id`, `type`, `isQuotation`, `salesLedgerId`, `supplierInvoiceDate`, `sales_type_id`, `bill_no`, `mode`, `approxDistance`, `overallDiscountLedgerId`, `overallDiscountAmount`) VALUES
+(442, 'b2b//26-27/1', '2026-06-03', '', 4, '121212', NULL, NULL, NULL, 2500.00, 250.00, 250.00, 0.00, 0.00, 1500.00, '2026-06-05 04:30:44', '1', 'employee', '1', 'sales', 0, NULL, NULL, 1, 'b2b/3/26-27', 'accounting-invoice', NULL, NULL, 0.00),
+(443, 'b2b//26-27/2', '2026-06-05', '', 8, '33333', NULL, NULL, NULL, 1700.00, 153.00, 153.00, 0.00, 0.00, 2006.00, '2026-06-05 07:10:42', '1', 'employee', '1', 'sales', 0, NULL, NULL, 1, 'b2b/2/26-27', 'item-invoice', NULL, NULL, 0.00);
 
 -- --------------------------------------------------------
 
@@ -1122,8 +1050,7 @@ CREATE TABLE `sales_voucher_items` (
 --
 
 INSERT INTO `sales_voucher_items` (`id`, `voucherId`, `salesLedgerId`, `itemId`, `quantity`, `rate`, `amount`, `cgstRate`, `sgstRate`, `igstRate`, `discount`, `hsnCode`, `batchNumber`, `godownId`, `discountLedgerId`) VALUES
-(43, 21, 95, 26, 50.00, 250.00, 12500.00, 0.00, 0.00, 99.00, 0.00, '5555', '', '4', 0),
-(45, 22, 95, 28, 20.00, 2500.00, 50000.00, 0.00, 0.00, 99.00, 0.00, '9525', '', '5', 0);
+(206, 443, 4, 21, 5.00, 340.00, 1700.00, 6.00, 7.00, 0.00, 0.00, '4444', '', '1', 0);
 
 -- --------------------------------------------------------
 
@@ -1150,6 +1077,21 @@ CREATE TABLE `sale_history` (
   `voucherNumber` varchar(100) DEFAULT NULL,
   `godownId` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `sale_history`
+--
+
+INSERT INTO `sale_history` (`id`, `companyId`, `ownerType`, `ownerId`, `itemId`, `quantity`, `rate`, `value`, `movementType`, `movementDate`, `createdAt`, `itemName`, `hsnCode`, `batchNumber`, `qtyChange`, `voucherNumber`, `godownId`) VALUES
+(213, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-04 00:00:00', '2026-06-05 10:01:34', '-', '', NULL, 0, 'b2b//26-27/1', NULL),
+(214, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-04 00:00:00', '2026-06-05 10:01:34', '-', '', NULL, 0, 'b2b//26-27/1', NULL),
+(215, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-04 00:00:00', '2026-06-05 10:01:34', '-', '', NULL, 0, 'b2b//26-27/1', NULL),
+(216, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-04 00:00:00', '2026-06-05 10:01:34', '-', '', NULL, 0, 'b2b//26-27/1', NULL),
+(217, 1, 'employee', 1, NULL, 0.00, 340.00, 0.00, NULL, '2026-06-05 00:00:00', '2026-06-05 12:40:42', 'Biscute', '4444', NULL, -5, 'b2b/2/26-27', 1),
+(218, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-03 00:00:00', '2026-06-12 12:19:46', '-', '', NULL, 0, 'b2b/3/26-27', NULL),
+(219, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-03 00:00:00', '2026-06-12 12:19:46', '-', '', NULL, 0, 'b2b/3/26-27', NULL),
+(220, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-03 00:00:00', '2026-06-12 12:19:46', '-', '', NULL, 0, 'b2b/3/26-27', NULL),
+(221, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-03 00:00:00', '2026-06-12 12:19:46', '-', '', NULL, 0, 'b2b/3/26-27', NULL);
 
 -- --------------------------------------------------------
 
@@ -1192,13 +1134,6 @@ CREATE TABLE `set_profit` (
   `retailer_value` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `set_profit`
---
-
-INSERT INTO `set_profit` (`id`, `customer_type`, `method`, `value`, `owner_type`, `owner_id`, `created_at`, `wholesale_method`, `wholesale_value`, `retailer_method`, `retailer_value`) VALUES
-(1, 'retailer', 'profit_percentage', 3.00, 'employee', 2, '2025-12-09 13:42:39', 'profit_percentage', 57.00, 'profit_percentage', 13.00);
-
 -- --------------------------------------------------------
 
 --
@@ -1207,11 +1142,20 @@ INSERT INTO `set_profit` (`id`, `customer_type`, `method`, `value`, `owner_type`
 
 CREATE TABLE `stock_attributes` (
   `id` int(11) NOT NULL,
-  `stock_item_id` int(11) NOT NULL,
-  `attribute_id` int(11) NOT NULL,
-  `value` text DEFAULT NULL,
-  `is_active` tinyint(1) DEFAULT 1
+  `name` varchar(100) NOT NULL,
+  `value` text DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `stock_attributes`
+--
+
+INSERT INTO `stock_attributes` (`id`, `name`, `value`) VALUES
+(7, 'imei', NULL),
+(8, 'colour', NULL),
+(9, 'brand', NULL),
+(10, 'most', NULL),
+(11, 'gram', NULL);
 
 -- --------------------------------------------------------
 
@@ -1236,14 +1180,7 @@ CREATE TABLE `stock_categories` (
 --
 
 INSERT INTO `stock_categories` (`id`, `name`, `parent`, `description`, `created_at`, `updated_at`, `company_id`, `owner_type`, `owner_id`) VALUES
-('SC-1765010891928', 'cement', '7', NULL, '2025-12-06 08:48:15', '2025-12-07 06:06:44', 2, 'employee', 2),
-('SC-1765010907862', 'Bar ', '7', 'This is Bar.', '2025-12-06 08:48:31', '2025-12-26 12:33:45', 2, 'employee', 2),
-('SC-1765286010820', 'FMCG', '8', NULL, '2025-12-09 13:13:30', '2025-12-09 13:13:30', 2, 'employee', 2),
-('SC-1765972607794', 'Godown', '4', 'This is Godown\n', '2025-12-17 11:56:51', '2025-12-17 11:56:51', 1, 'employee', 1),
-('SC-1765972677218', 'Godown2', '11', 'This is Godown2\n', '2025-12-17 11:58:00', '2025-12-17 11:58:00', 1, 'employee', 1),
-('SC-1766023751037', 'chemical', '7', NULL, '2025-12-18 02:09:10', '2025-12-18 02:09:10', 2, 'employee', 2),
-('SC-1767713361869', 'Gold', '10', NULL, '2026-01-06 15:29:21', '2026-01-13 13:37:23', 2, 'employee', 2),
-('SC-1768315705996', 'ELECTRONIC', '7', NULL, '2026-01-13 14:48:25', '2026-01-13 14:48:25', 2, 'employee', 2);
+('SC-1777619861560', 'services', '1', NULL, '2026-05-01 07:17:41', '2026-05-01 07:17:41', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -1276,11 +1213,7 @@ CREATE TABLE `stock_groups` (
 --
 
 INSERT INTO `stock_groups` (`id`, `name`, `parent`, `should_quantities_be_added`, `set_alter_hsn`, `hsn_sac_classification_id`, `hsn_code`, `hsn_description`, `set_alter_gst`, `gst_classification_id`, `taxability`, `gst_rate`, `cess`, `created_at`, `company_id`, `owner_type`, `owner_id`) VALUES
-(7, '18% goods', NULL, 1, 0, NULL, NULL, NULL, 0, NULL, 'Taxable', 0.00, 0.00, '2025-12-06 08:47:28', 2, 'employee', 2),
-(8, '5% goods', '', 1, 0, '', '', '', 0, '', 'Taxable', 0.00, 0.00, '2025-12-06 08:47:40', 2, 'employee', 2),
-(9, 'EXEMPT', NULL, 1, 0, NULL, NULL, NULL, 0, NULL, 'Taxable', 0.00, 0.00, '2025-12-09 13:17:06', 2, 'employee', 2),
-(10, '3% GOODS', NULL, 1, 0, NULL, NULL, NULL, 0, NULL, 'Taxable', 0.00, 0.00, '2025-12-09 13:17:31', 2, 'employee', 2),
-(11, '18%', 'SC-1765972607794', 1, 0, NULL, NULL, NULL, 0, NULL, 'Taxable', 0.00, 0.00, '2025-12-17 11:57:28', 1, 'employee', 1);
+(1, '18% services', NULL, 1, 0, NULL, NULL, NULL, 0, NULL, 'Taxable', 0.00, 0.00, '2026-05-01 07:17:14', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -1291,23 +1224,11 @@ INSERT INTO `stock_groups` (`id`, `name`, `parent`, `should_quantities_be_added`
 CREATE TABLE `stock_items` (
   `id` int(11) NOT NULL,
   `name` varchar(255) NOT NULL,
-  `stockGroupId` int(11) DEFAULT NULL,
   `unit` varchar(50) DEFAULT NULL,
-  `openingBalance` decimal(10,2) DEFAULT 0.00,
-  `openingValue` decimal(10,2) DEFAULT 0.00,
   `hsnCode` varchar(50) DEFAULT NULL,
-  `gstRate` decimal(5,2) DEFAULT 0.00,
   `taxType` varchar(50) DEFAULT 'Taxable',
-  `standardPurchaseRate` decimal(10,2) DEFAULT 0.00,
-  `standardSaleRate` decimal(10,2) DEFAULT 0.00,
   `enableBatchTracking` tinyint(1) DEFAULT 0,
-  `allowNegativeStock` tinyint(1) DEFAULT 0,
-  `maintainInPieces` tinyint(1) DEFAULT 0,
-  `secondaryUnit` varchar(50) DEFAULT NULL,
   `createdAt` timestamp NOT NULL DEFAULT current_timestamp(),
-  `batchNumber` varchar(255) DEFAULT NULL,
-  `batchExpiryDate` date DEFAULT NULL,
-  `batchManufacturingDate` date DEFAULT NULL,
   `company_id` int(11) NOT NULL,
   `owner_type` varchar(50) NOT NULL,
   `owner_id` int(11) NOT NULL,
@@ -1319,15 +1240,23 @@ CREATE TABLE `stock_items` (
   `cgstLedgerId` int(11) DEFAULT NULL,
   `sgstLedgerId` int(11) DEFAULT NULL,
   `image` varchar(255) DEFAULT NULL,
-  `is_visible` tinyint(1) DEFAULT 1
-) ;
+  `is_visible` tinyint(1) DEFAULT 1,
+  `attributeId` int(11) DEFAULT NULL,
+  `gstRate` decimal(5,2) DEFAULT 0.00
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `stock_items`
 --
 
-INSERT INTO `stock_items` (`id`, `name`, `stockGroupId`, `unit`, `openingBalance`, `openingValue`, `hsnCode`, `gstRate`, `taxType`, `standardPurchaseRate`, `standardSaleRate`, `enableBatchTracking`, `allowNegativeStock`, `maintainInPieces`, `secondaryUnit`, `createdAt`, `batchNumber`, `batchExpiryDate`, `batchManufacturingDate`, `company_id`, `owner_type`, `owner_id`, `barcode`, `batches`, `type`, `categoryId`, `gstLedgerId`, `cgstLedgerId`, `sgstLedgerId`, `image`, `is_visible`) VALUES
-(39, 'Mobile', NULL, '6', 10.00, 0.00, '1111', 0.00, 'Taxable', 0.00, 0.00, 1, 1, 1, NULL, '2026-04-07 07:58:52', NULL, NULL, NULL, 2, 'employee', 2, '8902177967518', '[]', 'opening', 'SC-1768315705996', 118, 67, 68, NULL, 1);
+INSERT INTO `stock_items` (`id`, `name`, `unit`, `hsnCode`, `taxType`, `enableBatchTracking`, `createdAt`, `company_id`, `owner_type`, `owner_id`, `barcode`, `batches`, `type`, `categoryId`, `gstLedgerId`, `cgstLedgerId`, `sgstLedgerId`, `image`, `is_visible`, `attributeId`, `gstRate`) VALUES
+(14, 'Biscute', '2', '1111', 'Taxable', 1, '2026-05-23 09:34:33', 1, 'employee', 1, '8908375740717', '[]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
+(15, 'Mobile', '2', '4444', 'Taxable', 1, '2026-05-23 09:35:44', 1, 'employee', 1, '8906627161242', '[{\"batchName\":\"Oppo\",\"batchQuantity\":1000,\"openingRate\":50,\"openingValue\":50000,\"batchExpiryDate\":\"2026-05-24\",\"batchManufacturingDate\":\"2026-05-23\",\"mode\":\"opening\",\"mrp\":40},{\"batchName\":\"Vivo\",\"batchQuantity\":2000,\"openingRate\":30,\"openingValue\":60000,\"batchExpiryDate\":\"2026-05-24\",\"batchManufacturingDate\":\"2026-05-23\",\"mode\":\"opening\",\"mrp\":30}]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
+(16, 'Nuvoco cement psc', '2', '25232940', 'Taxable', 1, '2026-05-26 05:45:03', 1, 'employee', 1, '8909506983966', '[]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
+(17, 'Nuvoco cement crt', '2', '25232940', 'Taxable', 1, '2026-05-26 05:45:43', 1, 'employee', 1, '8901703133601', '[]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
+(18, 'Nuvoco cement Uno', '2', '25232940', 'Taxable', 1, '2026-05-26 05:46:08', 1, 'employee', 1, '8909264326197', '[]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
+(19, 'M S Bar', '2', '72142090', 'Taxable', 1, '2026-05-26 05:46:33', 1, 'employee', 1, '8904213420674', '[]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
+(21, 'Biscute', '2', '4444', 'Taxable', 1, '2026-06-02 10:49:01', 1, 'employee', 1, '8903654638563', '[{\"batchName\":null,\"batchQuantity\":1000,\"batchRate\":2342,\"batchExpiryDate\":null,\"mode\":\"purchase\",\"batchManufacturingDate\":null,\"mrp\":0}]', 'opening', 'SC-1780396454634', 5, 6, 7, NULL, 1, NULL, 0.00);
 
 -- --------------------------------------------------------
 
@@ -1338,11 +1267,22 @@ INSERT INTO `stock_items` (`id`, `name`, `stockGroupId`, `unit`, `openingBalance
 CREATE TABLE `stock_item_attributes` (
   `id` int(11) NOT NULL,
   `stock_item_id` int(11) NOT NULL,
-  `attribute_name` varchar(100) DEFAULT NULL,
-  `attribute_value` text DEFAULT NULL,
-  `is_active` tinyint(1) DEFAULT 1,
+  `attribute_id` int(11) NOT NULL,
+  `attribute_value` varchar(255) DEFAULT NULL,
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `stock_item_attributes`
+--
+
+INSERT INTO `stock_item_attributes` (`id`, `stock_item_id`, `attribute_id`, `attribute_value`, `created_at`) VALUES
+(15, 2, 7, NULL, '2026-05-19 10:44:04'),
+(16, 2, 8, NULL, '2026-05-19 10:44:04'),
+(18, 3, 11, '1', '2026-05-21 10:44:24'),
+(19, 1, 8, NULL, '2026-05-23 07:41:34'),
+(20, 1, 7, NULL, '2026-05-23 07:41:34'),
+(21, 1, 9, NULL, '2026-05-23 07:41:34');
 
 -- --------------------------------------------------------
 
@@ -1382,6 +1322,14 @@ CREATE TABLE `stock_journal_entries` (
   `batch_no` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `stock_journal_entries`
+--
+
+INSERT INTO `stock_journal_entries` (`id`, `voucher_id`, `ledger_id`, `type`, `quantity`, `rate`, `amount`, `batch_no`) VALUES
+(1, 1, 2, 'credit', 10.00, 10.00, 100.00, ''),
+(2, 1, NULL, 'debit', 0.00, 0.00, 0.00, '');
+
 -- --------------------------------------------------------
 
 --
@@ -1399,6 +1347,13 @@ CREATE TABLE `stock_journal_vouchers` (
   `owner_type` varchar(50) NOT NULL,
   `owner_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `stock_journal_vouchers`
+--
+
+INSERT INTO `stock_journal_vouchers` (`id`, `date`, `number`, `narration`, `employee_id`, `created_at`, `company_id`, `owner_type`, `owner_id`) VALUES
+(1, '2026-05-21', 'STKJ/26-27/000001', '', NULL, '2026-05-21 05:40:53', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -1432,17 +1387,6 @@ CREATE TABLE `stock_purchase` (
   `createdAt` timestamp NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `stock_purchase`
---
-
-INSERT INTO `stock_purchase` (`id`, `name`, `stockGroupId`, `categoryId`, `unit`, `openingBalance`, `openingValue`, `hsnCode`, `gstRate`, `taxType`, `standardPurchaseRate`, `standardSaleRate`, `enableBatchTracking`, `allowNegativeStock`, `maintainInPieces`, `secondaryUnit`, `barcode`, `company_id`, `owner_type`, `owner_id`, `batches`, `type`, `createdAt`) VALUES
-(1, 'Acc', NULL, NULL, '7', 0.00, 0.00, NULL, 0.00, 'Taxable', 0.00, 0.00, 0, 0, 0, NULL, NULL, 2, 'employee', 2, '[{\"batchName\": \"154522\", \"openingRate\": 0, \"openingValue\": 0, \"batchQuantity\": 0, \"batchExpiryDate\": null, \"batchManufacturingDate\": null}]', 'purchase', '2025-12-15 15:01:20'),
-(2, 'Acc', NULL, NULL, '7', 0.00, 0.00, NULL, 0.00, 'Taxable', 0.00, 0.00, 0, 0, 0, NULL, NULL, 2, 'employee', 2, '[{\"batchName\": \"150000\", \"openingRate\": 0, \"openingValue\": 0, \"batchQuantity\": 0, \"batchExpiryDate\": null, \"batchManufacturingDate\": null}]', 'purchase', '2025-12-15 15:01:46'),
-(3, 'Acc', NULL, NULL, '7', 0.00, 0.00, '1111', 0.00, 'Taxable', 0.00, 0.00, 0, 0, 0, NULL, NULL, 2, 'employee', 2, '[{\"batchName\": \"064400\", \"openingRate\": 0, \"openingValue\": 0, \"batchQuantity\": 0, \"batchExpiryDate\": null, \"batchManufacturingDate\": null}]', 'purchase', '2026-01-07 13:23:13'),
-(4, 'Acc', NULL, NULL, '7', 0.00, 0.00, '1111', 0.00, 'Taxable', 0.00, 0.00, 0, 0, 0, NULL, NULL, 2, 'employee', 2, '[{\"batchName\": null, \"openingRate\": 0, \"openingValue\": 0, \"batchQuantity\": 0, \"batchExpiryDate\": null, \"batchManufacturingDate\": null}]', 'purchase', '2026-01-08 06:40:48'),
-(5, 'Acc', NULL, NULL, '7', 0.00, 0.00, '1111', 0.00, 'Taxable', 0.00, 0.00, 0, 0, 0, NULL, NULL, 2, 'employee', 2, '[{\"batchName\": null, \"openingRate\": 0, \"openingValue\": 0, \"batchQuantity\": 0, \"batchExpiryDate\": null, \"batchManufacturingDate\": null}]', 'purchase', '2026-01-08 06:40:48');
-
 -- --------------------------------------------------------
 
 --
@@ -1464,12 +1408,9 @@ CREATE TABLE `stock_units` (
 --
 
 INSERT INTO `stock_units` (`id`, `name`, `symbol`, `created_at`, `company_id`, `owner_type`, `owner_id`) VALUES
-(5, 'Kilogram', 'Kg', '2025-12-06 11:30:17', 2, 'employee', 2),
-(6, 'bags', 'bag', '2025-12-07 06:08:26', 2, 'employee', 2),
-(7, 'CARTOON', 'CN', '2025-12-09 13:15:07', 2, 'employee', 2),
-(8, 'Kilo', '$', '2025-12-17 11:58:38', 1, 'employee', 1),
-(9, 'PCS', 'PIECIS', '2026-01-13 14:49:17', 2, 'employee', 2),
-(10, 'Gram', 'G', '2026-01-27 13:10:49', 2, 'employee', 2);
+(1, 'kg', 'KG', '2026-05-01 07:18:04', 1, 'employee', 1),
+(2, 'Bags', 'BG', '2026-05-19 10:24:37', 1, 'employee', 1),
+(4, '1 BG of 1 BG', 'BG of 1 BG', '2026-05-21 10:26:07', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -1490,13 +1431,6 @@ CREATE TABLE `subscription_coupons` (
   `createdAt` timestamp NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `subscription_coupons`
---
-
-INSERT INTO `subscription_coupons` (`id`, `code`, `discountType`, `discountValue`, `applicableDuration`, `expiryDate`, `maxUses`, `currentUses`, `isActive`, `createdAt`) VALUES
-(2, 'OSDF4', 'percentage', 10.00, 'all', '2026-04-05', 0, 0, 1, '2026-04-04 08:40:48');
-
 -- --------------------------------------------------------
 
 --
@@ -1512,15 +1446,6 @@ CREATE TABLE `subscription_plans` (
   `isActive` tinyint(1) DEFAULT 1,
   `createdAt` timestamp NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `subscription_plans`
---
-
-INSERT INTO `subscription_plans` (`id`, `name`, `price`, `duration`, `features`, `isActive`, `createdAt`) VALUES
-(1, 'Basic ', 100.00, 'yearly', '[\"500 voucher \"]', 1, '2026-03-26 12:13:28'),
-(2, 'Professional', 200.00, 'yearly', '[\"Up to 100 transactions/month\",\"Basic GST reports\",\"Single user access\"]', 1, '2026-03-26 12:20:10'),
-(3, 'Enterprise', 300.00, 'yearly', '[\"Everything in Professional\",\"Unlimited users\",\"Custom integrations\",\"Dedicated account manager\"]', 1, '2026-03-26 12:21:09');
 
 -- --------------------------------------------------------
 
@@ -1540,8 +1465,7 @@ CREATE TABLE `tbadmin` (
 --
 
 INSERT INTO `tbadmin` (`id`, `email`, `password`, `created_at`) VALUES
-(1, 'admin@tallyprime.com', '$2b$10$hF6UnAaSjwrRamxUYkZ0.O7NnE8/h7orZMVWs8qGP/Z9op4ZEFjSO', '2026-02-28 04:34:03'),
-(2, 'admin@apnabook.com', '$2b$10$AB92kPbJ1qZC/APaeyjZVePUMUavI.oetWk.fBczvU31emJE38Y2W', '2026-03-19 06:23:42');
+(1, 'admin@apnabook.com', '$2b$10$lNFCN1f9VP0foEsT73.afusVVxsofFimxX1jJOxYc3hvyAwWBvXQi', '2026-05-02 04:30:59');
 
 -- --------------------------------------------------------
 
@@ -1565,7 +1489,7 @@ CREATE TABLE `tbca` (
 --
 
 INSERT INTO `tbca` (`fdSiNo`, `fdname`, `fdphone`, `email`, `fdpassword`, `fdstatus`, `fdlast_login`, `fdterms_file`) VALUES
-(1, 'OM CA Ranchi', '1234567890', 'om@gmail.com', '$2b$10$oxmUCuDta8anJAvyCju57u4DAY07RGdHuegbjgn2XgufbkM5ZxjMW', 'active', '2026-03-02 11:41:31', NULL);
+(1, 'Ayush', '1234567890', 'ayush@gmail.com', '$2b$10$RMBaYC9U0eeF/nCZPkLUBO/DtbjpUq/8MEZQAPWpVdJhVdVmal3Wm', 'active', '2026-06-05 11:45:34', NULL);
 
 -- --------------------------------------------------------
 
@@ -1623,18 +1547,16 @@ CREATE TABLE `tbcompanies` (
   `vat_number` varchar(30) DEFAULT NULL,
   `fdAccountType` varchar(50) DEFAULT NULL,
   `fdAccountantName` varchar(100) DEFAULT NULL,
-  `tan_number` varchar(20) DEFAULT NULL
+  `tan_number` varchar(20) DEFAULT NULL,
+  `back_date_allowed` tinyint(1) DEFAULT 1
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbcompanies`
 --
 
-INSERT INTO `tbcompanies` (`id`, `name`, `financial_year`, `books_beginning_year`, `address`, `pin`, `phone_number`, `email`, `pan_number`, `gst_number`, `state`, `country`, `tax_type`, `employee_id`, `vault_password`, `created_at`, `vat_number`, `fdAccountType`, `fdAccountantName`, `tan_number`) VALUES
-(2, 'OM ENTERPRISES', '2025-26', '01-04-2025', 'BARWADDA DHANBAD', '826010', '7004625048', 'arvind12601@gmail.com', 'BDAPP6208H', '20BDAPP6208H2ZY', 'Jharkhand(20)', 'India', 'GST', 2, NULL, '2025-12-06 05:50:08', NULL, 'accountant', 'OM CA Ranchi', 'Rchc00337f'),
-(11, 'OmG', '2025-26', '2026', 'Ranchi ', '834001', '1234567890', 'arvind12601@gmail.com', 'BDAPP6208H', '27ABCDE1234F1Z5', 'Jharkhand(20)', 'India', 'GST', 2, NULL, '2026-03-18 06:59:44', NULL, 'self', NULL, 'ABCDE1234G'),
-(12, 'Dummy', '2025-26', '2026', 'ranchi', '834001', '1234567890', 'd@gmail.com', 'ABCDE1234M', '27ABCDE1234F1Z5', 'Jharkhand(20)', 'India', 'GST', 12, NULL, '2026-03-19 07:04:35', NULL, 'self', NULL, 'ABCDE1234G'),
-(14, 'aaaaa', '2025-26', '2026', 'Ranchi ', '834001', '1234567890', 'z@gmail.com', 'ABCDE1234F', '27ABCDE1234F1Z5', 'Jharkhand(20)', 'India', 'GST', 15, NULL, '2026-03-31 11:42:35', NULL, 'self', NULL, '');
+INSERT INTO `tbcompanies` (`id`, `name`, `financial_year`, `books_beginning_year`, `address`, `pin`, `phone_number`, `email`, `pan_number`, `gst_number`, `state`, `country`, `tax_type`, `employee_id`, `vault_password`, `created_at`, `vat_number`, `fdAccountType`, `fdAccountantName`, `tan_number`, `back_date_allowed`) VALUES
+(1, 'ApnoTax solutions', '2026', '2026-2027', 'vigyan vihar colony near hawai adda dhanbad', '826004', '1234567890', 'arvind12601@gmail.com', 'BDAPP6208H', '20BDAPP6208H2ZY', 'Jharkhand(20)', 'India', 'GST', 1, NULL, '2026-05-01 07:14:19', NULL, 'accountant', 'Ayush', 'ABCDE1234G', 1);
 
 -- --------------------------------------------------------
 
@@ -1665,10 +1587,7 @@ CREATE TABLE `tbemployees` (
 --
 
 INSERT INTO `tbemployees` (`id`, `firstName`, `lastName`, `pan`, `address`, `email`, `phoneNumber`, `password`, `token`, `created_at`, `userLimit`, `fdterms_file`, `trial_started_at`, `trial_expires_at`, `is_purchased`) VALUES
-(2, 'a', 'k', 'BDAPP6208H', 'Ranchi ,jharkhand', 'arvind12601@gmail.com', '7004625048', '$2b$10$RDmFPENR/2KXseWdGS6RMeK6vDAkmvnxPKBYWY8Vp5lDkM/koOqHC', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFydmluZDEyNjAxQGdtYWlsLmNvbSIsImlhdCI6MTc2NTAwMDExOCwiZXhwIjoxNzY1NjA0OTE4fQ.ZTtFe7TQ1cc0thccpWaFL_gGaNPrZS4w0VteOfiHCeA', '2025-12-06 05:48:38', 5, NULL, '2026-03-16 15:16:02', '2026-04-05 15:16:02', 0),
-(12, 'Damy', 'Data', 'ABCDE1234M', 'Ranchi', 'd@gmail.com', '1234567890', '$2b$10$qP/1mZvNBIPAxXxMUfjwg.uHoes0baBzHwtneZF6SFlLHmlX9XQbi', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImRAZ21haWwuY29tIiwiaWF0IjoxNzczOTAzODEzLCJleHAiOjE3NzQ1MDg2MTN9.CgklT5_cRoISNfVisZwkGQD6iSxmwPfVfjSbkPKDSGE', '2026-03-19 07:03:33', 1, NULL, NULL, NULL, 0),
-(14, 'Abc', 'Abc', 'ABCDE1234D', 'Ranchi', 'abc@gmail.com', '1234567890', '$2b$10$Fo4gx3PdIKXcC3IfXVGnT.ainywOm8WNweu5dZ1VtVm/p7dbM1cie', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFiY0BnbWFpbC5jb20iLCJpYXQiOjE3NzQ5MzM5ODMsImV4cCI6MTc3NTUzODc4M30.d4vvYwLhIQBfYCHsrvX9tzvmIkpQWwlDwfC3eI9-eIE', '2026-03-31 05:13:03', 1, NULL, NULL, NULL, 0),
-(15, 'zz', 'Data', 'ABCDE1234F', 'zzz', 'ayushsingh0455@gmail.com', '1234567890', '$2b$10$YM/k5R6n04QJt9wMgOsj4eG0yKJuKvgU.wUc3vxo4rQsjCYxwQJhi', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6InpAZ21haWwuY29tIiwiaWF0IjoxNzc0OTU3MDkxLCJleHAiOjE3NzU1NjE4OTF9.7eB2_zX9Lu6n6xk6-OY79xVjxm9xDVZEoezNBfQozbU', '2026-03-31 11:38:11', 1, NULL, NULL, NULL, 0);
+(1, 'A', 'k', 'BDAPP6208H', 'VIHYAN VIHAR COLONY DHANBAD 826004', 'arvind12601@gmail.com', '1234567890', '$2b$10$o0kxC43BqdN3ep1E5s25f.KnTA.rXecbiN2V2uERTVQv3Ki3N/uxm', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFydmluZDEyNjAxQGdtYWlsLmNvbSIsImlhdCI6MTc3NzYxOTU4MSwiZXhwIjoxNzc4MjI0MzgxfQ.jpG6xUTdWuTWKaeckgARWguvMY3Vc_PSkKqrkwZdNF4', '2026-05-01 07:13:01', 1, NULL, NULL, NULL, 0);
 
 -- --------------------------------------------------------
 
@@ -1815,14 +1734,6 @@ CREATE TABLE `tbusers` (
   `status` enum('active','inactive','suspended') DEFAULT 'active',
   `last_login` timestamp NULL DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `tbusers`
---
-
-INSERT INTO `tbusers` (`id`, `company_id`, `role_id`, `employee_id`, `email`, `username`, `password`, `created_at`, `phone`, `department`, `status`, `last_login`) VALUES
-(1, 9, 0, 7, 'dd@gmail.com', 'DD', '$2b$10$Cgy1seN54gJ45o90ROe4Vu/5p3Fy.awNZqAYi4Y2Ycy4amkeLZEHC', '2026-02-24 05:48:23', NULL, NULL, 'active', NULL),
-(4, 2, 0, 2, 'arvind12601@gmail.com', 'a@gmail.com', '$2b$10$08mIpqSf08chRvjZebXxpeOF7vuqlN0j1wRazGYD6y6Z52w2xGcHG', '2026-03-18 08:22:33', NULL, NULL, 'active', NULL);
 
 -- --------------------------------------------------------
 
@@ -2117,8 +2028,28 @@ CREATE TABLE `tds_26q_challans` (
   `fee` decimal(15,2) NOT NULL DEFAULT 0.00,
   `total_amount` decimal(15,2) NOT NULL DEFAULT 0.00,
   `transfer_voucher_no` varchar(50) DEFAULT NULL,
-  `status` enum('Deposited','Book Adjustment') NOT NULL DEFAULT 'Deposited'
+  `status` enum('Deposited','Book Adjustment') NOT NULL DEFAULT 'Deposited',
+  `company_id` int(11) DEFAULT NULL,
+  `last_bsr_code` varchar(20) DEFAULT NULL,
+  `last_date_of_deposit` date DEFAULT NULL,
+  `last_challan_serial_no` varchar(50) DEFAULT NULL,
+  `last_total_tax_deposited` decimal(15,2) DEFAULT 0.00,
+  `update_mode` varchar(20) DEFAULT 'Add',
+  `section_code` varchar(20) DEFAULT '94C',
+  `interest_allocated` decimal(15,2) DEFAULT 0.00,
+  `minor_head` varchar(20) DEFAULT '200',
+  `challan_balance` decimal(15,2) DEFAULT 0.00,
+  `cheque_dd_no` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tds_26q_challans`
+--
+
+INSERT INTO `tds_26q_challans` (`id`, `return_id`, `serial_no`, `bsr_code`, `date_of_deposit`, `challan_serial_no`, `tax`, `surcharge`, `education_cess`, `other_charges`, `interest`, `penalty`, `fee`, `total_amount`, `transfer_voucher_no`, `status`, `company_id`, `last_bsr_code`, `last_date_of_deposit`, `last_challan_serial_no`, `last_total_tax_deposited`, `update_mode`, `section_code`, `interest_allocated`, `minor_head`, `challan_balance`, `cheque_dd_no`) VALUES
+(8, 0, 1, '2222222', '2026-06-04', '11111', 11.00, 11.00, 11.00, 111.00, 11.00, 1.00, 11.00, 56.00, NULL, 'Deposited', 1, '2222222', '2026-06-04', '11111', 11.00, 'Add', '193', 111.00, '200', 111.00, '11'),
+(9, 0, 2, '3333333', '2026-06-04', '22222', 222.00, 22.00, 22.00, 22.00, 22.00, 22.00, 22.00, 332.00, NULL, 'Deposited', 1, '3333333', '2026-06-04', '22222', 22.00, 'Add', '94C', 1222.00, '200', 2222.00, '22'),
+(10, 0, 3, '4444444', '2026-06-05', '44444', 44.00, 44.00, 44.00, 440.00, 44.00, 44.00, 44.00, 264.00, NULL, 'Deposited', 1, '4444444', '2026-06-05', '44444', 44.00, 'Add', '94C', 444.00, '200', 444.00, '44');
 
 -- --------------------------------------------------------
 
@@ -2185,6 +2116,13 @@ CREATE TABLE `tds_26q_returns` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
+--
+-- Dumping data for table `tds_26q_returns`
+--
+
+INSERT INTO `tds_26q_returns` (`id`, `tan`, `assessment_year`, `pan_of_deductor`, `deductor_category`, `deductor_name`, `branch_serial_no`, `deductor_flat_no`, `deductor_premises_name`, `deductor_road_street`, `deductor_area`, `deductor_town_city`, `deductor_state`, `deductor_country`, `deductor_pin_code`, `deductor_std_code`, `deductor_telephone`, `deductor_email`, `resp_status`, `resp_designation`, `resp_name`, `resp_father_name`, `resp_pan`, `verification_capacity`, `verification_place`, `verification_date`, `verification_full_name`, `verification_designation`, `verification_signature`, `created_at`) VALUES
+(4, 'ABCDE1234G', '2026-27', 'BDAPP6208H', 'Individual/HUF', 'ApnoTax solutions', NULL, 'vigyan vihar colony near hawai adda dhanbad', '', '', '', '', 'JH', 'India', '826004', '', '1234567890', 'arvind12601@gmail.com', 'Deductor', '', 'ApnoTax solutions', '', 'BDAPP6208H', 'Deductor', '', '2026-06-05', '', '', '', '2026-06-05 05:25:07');
+
 -- --------------------------------------------------------
 
 --
@@ -2202,8 +2140,19 @@ CREATE TABLE `voucher_entries` (
   `cheque_number` varchar(255) DEFAULT NULL,
   `cost_centre_id` int(11) DEFAULT NULL,
   `item_id` int(11) DEFAULT NULL,
-  `ledger_name` varchar(255) DEFAULT NULL
+  `ledger_name` varchar(255) DEFAULT NULL,
+  `voucher_type` varchar(50) DEFAULT 'accounting'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `voucher_entries`
+--
+
+INSERT INTO `voucher_entries` (`id`, `voucher_id`, `ledger_id`, `amount`, `entry_type`, `narration`, `bank_name`, `cheque_number`, `cost_centre_id`, `item_id`, `ledger_name`, `voucher_type`) VALUES
+(2633, 442, 16, 1500.00, 'credit', NULL, NULL, NULL, NULL, NULL, NULL, 'accounting'),
+(2634, 442, 4, 1000.00, 'debit', NULL, NULL, NULL, NULL, NULL, NULL, 'accounting'),
+(2635, 442, 6, 250.00, 'debit', NULL, NULL, NULL, NULL, NULL, NULL, 'accounting'),
+(2636, 442, 7, 250.00, 'debit', NULL, NULL, NULL, NULL, NULL, NULL, 'accounting');
 
 -- --------------------------------------------------------
 
@@ -2245,13 +2194,6 @@ CREATE TABLE `voucher_main` (
   `owner_id` varchar(64) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `voucher_main`
---
-
-INSERT INTO `voucher_main` (`id`, `voucher_type`, `voucher_number`, `date`, `narration`, `reference_no`, `supplier_invoice_date`, `due_date`, `company_id`, `owner_type`, `owner_id`) VALUES
-(5, 'payment', 'PV/25-26/01/000001', '2026-01-24', NULL, '7768', '2026-01-24', NULL, '8', 'employee', '5');
-
 -- --------------------------------------------------------
 
 --
@@ -2286,29 +2228,6 @@ CREATE TABLE `voucher_sequences` (
   `updated_at` timestamp NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `voucher_sequences`
---
-
-INSERT INTO `voucher_sequences` (`id`, `company_id`, `owner_type`, `owner_id`, `voucher_type`, `financial_year`, `month`, `current_no`, `created_at`, `updated_at`) VALUES
-(1, 2, 'employee', 2, 'PRV', '25-26', 1, 19, '2026-01-09 15:21:29', '2026-01-30 15:32:02'),
-(2, 2, 'employee', 2, 'payment', '25-26', 1, 7, '2026-01-10 03:16:01', '2026-01-31 16:07:43'),
-(3, 8, 'employee', 5, 'payment', '25-26', 1, 1, '2026-01-24 06:07:21', '2026-01-24 06:07:21'),
-(4, 2, 'employee', 2, 'journal', '25-26', 1, 2, '2026-01-31 12:14:27', '2026-01-31 15:13:57'),
-(5, 2, 'employee', 2, 'payment', '25-26', 10, 1, '2026-01-31 16:02:59', '2026-01-31 16:02:59'),
-(6, 2, 'employee', 2, 'receipt', '25-26', 1, 1, '2026-01-31 16:06:55', '2026-01-31 16:06:55'),
-(7, 2, 'employee', 2, 'PRV', '25-26', 2, 21, '2026-02-02 15:58:59', '2026-02-19 07:06:21'),
-(8, 2, 'employee', 2, 'PRV', '25-26', 4, 2, '2026-02-05 16:46:25', '2026-02-05 16:46:37'),
-(9, 2, 'employee', 2, 'purchase', '23-24', 1, 1, '2026-02-18 15:03:53', '2026-02-18 15:03:53'),
-(10, 2, 'employee', 2, 'payment', '25-26', 2, 1, '2026-02-22 09:58:18', '2026-02-22 09:58:18'),
-(11, 2, 'employee', 2, 'payment', '25-26', 3, 2, '2026-03-02 08:10:53', '2026-03-11 02:31:17'),
-(12, 2, 'employee', 2, 'receipt', '25-26', 3, 1, '2026-03-11 02:33:54', '2026-03-11 02:33:54'),
-(13, 2, 'employee', 2, 'journal', '25-26', 3, 2, '2026-03-13 05:17:42', '2026-03-13 05:46:09'),
-(14, 2, 'employee', 2, 'journal', '25-26', 0, 7, '2026-03-13 06:56:30', '2026-03-18 07:50:00'),
-(15, 2, 'employee', 2, 'payment', '25-26', 0, 6, '2026-03-13 12:13:27', '2026-03-23 06:16:31'),
-(16, 2, 'employee', 2, 'receipt', '25-26', 0, 4, '2026-03-14 11:22:29', '2026-03-23 06:17:41'),
-(17, 2, 'employee', 2, 'payment', '24-25', 0, 1, '2026-03-17 11:23:03', '2026-03-17 11:23:03');
-
 -- --------------------------------------------------------
 
 --
@@ -2337,20 +2256,6 @@ CREATE TABLE `voucher_types` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
---
--- Dumping data for table `voucher_types`
---
-
-INSERT INTO `voucher_types` (`id`, `name`, `type`, `abbreviation`, `numbering_method`, `use_common_narration`, `print_after_saving`, `use_effective_dates`, `make_optional_default`, `restart_numbering_applicable`, `restart_numbering_starting_number`, `restart_numbering_particulars`, `prefix_details_applicable`, `prefix_details_particulars`, `suffix_details_applicable`, `suffix_details_particulars`, `narrations_for_each_entry`, `is_active`, `created_at`, `updated_at`) VALUES
-('ebe1165a-790d-11f0-92b7-b82a72d96170', 'Payment', 'payment', 'PAY', 'automatic', 0, 0, 0, 0, 1, 1, 'Financial Year', 0, '', 0, '', 1, 1, '2025-08-14 12:55:14', '2025-08-14 12:55:14'),
-('ebe11920-790d-11f0-92b7-b82a72d96170', 'Receipt', 'receipt', 'REC', 'automatic', 0, 0, 0, 0, 1, 1, 'Financial Year', 0, '', 0, '', 1, 1, '2025-08-14 12:55:14', '2025-08-14 12:55:14'),
-('ebe11a23-790d-11f0-92b7-b82a72d96170', 'Contra', 'contra', 'CON', 'automatic', 1, 0, 0, 0, 1, 1, 'Financial Year', 0, '', 0, '', 1, 1, '2025-08-14 12:55:14', '2025-08-14 12:55:14'),
-('ebe11abf-790d-11f0-92b7-b82a72d96170', 'Journal', 'journal', 'JOU', 'automatic', 0, 0, 0, 0, 1, 1, 'Financial Year', 0, '', 0, '', 1, 1, '2025-08-14 12:55:14', '2025-08-14 12:55:14'),
-('ebe11b4e-790d-11f0-92b7-b82a72d96170', 'Sales', 'sales', 'SAL', 'automatic', 0, 1, 0, 0, 1, 1, 'Financial Year', 1, 'INV', 0, '', 1, 1, '2025-08-14 12:55:14', '2025-08-14 12:55:14'),
-('ebe11be0-790d-11f0-92b7-b82a72d96170', 'Purchase', 'purchase', 'PUR', 'automatic', 0, 0, 0, 0, 1, 1, 'Financial Year', 0, '', 0, '', 1, 1, '2025-08-14 12:55:14', '2025-08-14 12:55:14'),
-('ebe11c70-790d-11f0-92b7-b82a72d96170', 'Credit Note', 'credit-note', 'CRN', 'automatic', 0, 1, 0, 0, 1, 1, 'Financial Year', 1, 'CN', 0, '', 1, 1, '2025-08-14 12:55:14', '2025-08-14 12:55:14'),
-('ebe11d59-790d-11f0-92b7-b82a72d96170', 'Debit Note', 'debit-note', 'DBN', 'automatic', 0, 1, 0, 0, 1, 1, 'Financial Year', 1, 'DN', 0, '', 1, 1, '2025-08-14 12:55:14', '2025-08-14 12:55:14');
 
 --
 -- Indexes for dumped tables
@@ -2608,7 +2513,8 @@ ALTER TABLE `purchase_vouchers`
   ADD PRIMARY KEY (`id`),
   ADD KEY `partyId` (`partyId`),
   ADD KEY `purchaseLedgerId` (`purchaseLedgerId`),
-  ADD KEY `idx_tenant` (`company_id`,`owner_type`,`owner_id`);
+  ADD KEY `idx_tenant` (`company_id`,`owner_type`,`owner_id`),
+  ADD KEY `idx_pv_tenant_date` (`company_id`,`owner_type`,`owner_id`,`date`);
 
 --
 -- Indexes for table `purchase_voucher_items`
@@ -2642,7 +2548,8 @@ ALTER TABLE `sales_types`
 --
 ALTER TABLE `sales_vouchers`
   ADD PRIMARY KEY (`id`),
-  ADD KEY `partyId` (`partyId`);
+  ADD KEY `partyId` (`partyId`),
+  ADD KEY `idx_sv_tenant_date` (`company_id`,`owner_type`,`owner_id`,`date`);
 
 --
 -- Indexes for table `sales_voucher_items`
@@ -2678,9 +2585,7 @@ ALTER TABLE `set_profit`
 -- Indexes for table `stock_attributes`
 --
 ALTER TABLE `stock_attributes`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `stock_item_id` (`stock_item_id`),
-  ADD KEY `attribute_id` (`attribute_id`);
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `stock_categories`
@@ -2712,8 +2617,7 @@ ALTER TABLE `stock_items`
 -- Indexes for table `stock_item_attributes`
 --
 ALTER TABLE `stock_item_attributes`
-  ADD PRIMARY KEY (`id`),
-  ADD KEY `stock_item_id` (`stock_item_id`);
+  ADD PRIMARY KEY (`id`);
 
 --
 -- Indexes for table `stock_item_batches`
@@ -2968,7 +2872,8 @@ ALTER TABLE `voucher_entries_old`
 -- Indexes for table `voucher_main`
 --
 ALTER TABLE `voucher_main`
-  ADD PRIMARY KEY (`id`);
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_vmain_tenant_type_date` (`company_id`,`owner_type`,`owner_id`,`voucher_type`,`date`);
 
 --
 -- Indexes for table `voucher_main_old`
@@ -3013,7 +2918,7 @@ ALTER TABLE `attributes`
 -- AUTO_INCREMENT for table `budgets`
 --
 ALTER TABLE `budgets`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `business_incomes`
@@ -3031,19 +2936,19 @@ ALTER TABLE `capital_gains`
 -- AUTO_INCREMENT for table `company_subscriptions`
 --
 ALTER TABLE `company_subscriptions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `cost_centers`
 --
 ALTER TABLE `cost_centers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `credit_vouchers`
 --
 ALTER TABLE `credit_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `credit_voucher_accounts`
@@ -3067,7 +2972,7 @@ ALTER TABLE `credit_voucher_items`
 -- AUTO_INCREMENT for table `currencies`
 --
 ALTER TABLE `currencies`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `debit_note_entries`
@@ -3079,7 +2984,7 @@ ALTER TABLE `debit_note_entries`
 -- AUTO_INCREMENT for table `debit_note_vouchers`
 --
 ALTER TABLE `debit_note_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `deductees`
@@ -3121,7 +3026,7 @@ ALTER TABLE `fifo_transactions`
 -- AUTO_INCREMENT for table `godowns`
 --
 ALTER TABLE `godowns`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
 
 --
 -- AUTO_INCREMENT for table `godown_allocations`
@@ -3157,25 +3062,25 @@ ALTER TABLE `itr_tax_payments`
 -- AUTO_INCREMENT for table `ledgers`
 --
 ALTER TABLE `ledgers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=121;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
 
 --
 -- AUTO_INCREMENT for table `ledger_groups`
 --
 ALTER TABLE `ledger_groups`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=44;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `payments`
 --
 ALTER TABLE `payments`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=66;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `purchase_history`
 --
 ALTER TABLE `purchase_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=143;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=183;
 
 --
 -- AUTO_INCREMENT for table `purchase_orders`
@@ -3193,13 +3098,13 @@ ALTER TABLE `purchase_order_items`
 -- AUTO_INCREMENT for table `purchase_vouchers`
 --
 ALTER TABLE `purchase_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=105;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=725;
 
 --
 -- AUTO_INCREMENT for table `purchase_voucher_items`
 --
 ALTER TABLE `purchase_voucher_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=145;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=463;
 
 --
 -- AUTO_INCREMENT for table `sales_orders`
@@ -3217,25 +3122,25 @@ ALTER TABLE `sales_order_items`
 -- AUTO_INCREMENT for table `sales_types`
 --
 ALTER TABLE `sales_types`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=9;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `sales_vouchers`
 --
 ALTER TABLE `sales_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=48;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=444;
 
 --
 -- AUTO_INCREMENT for table `sales_voucher_items`
 --
 ALTER TABLE `sales_voucher_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=82;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=207;
 
 --
 -- AUTO_INCREMENT for table `sale_history`
 --
 ALTER TABLE `sale_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=94;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=222;
 
 --
 -- AUTO_INCREMENT for table `scenarios`
@@ -3247,31 +3152,31 @@ ALTER TABLE `scenarios`
 -- AUTO_INCREMENT for table `set_profit`
 --
 ALTER TABLE `set_profit`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=10;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `stock_attributes`
 --
 ALTER TABLE `stock_attributes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
 
 --
 -- AUTO_INCREMENT for table `stock_groups`
 --
 ALTER TABLE `stock_groups`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `stock_items`
 --
 ALTER TABLE `stock_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- AUTO_INCREMENT for table `stock_item_attributes`
 --
 ALTER TABLE `stock_item_attributes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=7;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
 
 --
 -- AUTO_INCREMENT for table `stock_item_batches`
@@ -3283,43 +3188,43 @@ ALTER TABLE `stock_item_batches`
 -- AUTO_INCREMENT for table `stock_journal_entries`
 --
 ALTER TABLE `stock_journal_entries`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `stock_journal_vouchers`
 --
 ALTER TABLE `stock_journal_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `stock_purchase`
 --
 ALTER TABLE `stock_purchase`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `stock_units`
 --
 ALTER TABLE `stock_units`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `subscription_coupons`
 --
 ALTER TABLE `subscription_coupons`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `subscription_plans`
 --
 ALTER TABLE `subscription_plans`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tbadmin`
 --
 ALTER TABLE `tbadmin`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `tbca`
@@ -3343,13 +3248,13 @@ ALTER TABLE `tbcaemployees`
 -- AUTO_INCREMENT for table `tbcompanies`
 --
 ALTER TABLE `tbcompanies`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=15;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `tbemployees`
 --
 ALTER TABLE `tbemployees`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=16;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
 
 --
 -- AUTO_INCREMENT for table `tbgstr3breturns`
@@ -3391,7 +3296,7 @@ ALTER TABLE `tbscreens_old`
 -- AUTO_INCREMENT for table `tbusers`
 --
 ALTER TABLE `tbusers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
 -- AUTO_INCREMENT for table `tcs_27eq_challans`
@@ -3451,7 +3356,7 @@ ALTER TABLE `tds_24q_tax_details`
 -- AUTO_INCREMENT for table `tds_26q_challans`
 --
 ALTER TABLE `tds_26q_challans`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
 
 --
 -- AUTO_INCREMENT for table `tds_26q_deductees`
@@ -3463,13 +3368,13 @@ ALTER TABLE `tds_26q_deductees`
 -- AUTO_INCREMENT for table `tds_26q_returns`
 --
 ALTER TABLE `tds_26q_returns`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `voucher_entries`
 --
 ALTER TABLE `voucher_entries`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=226;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2637;
 
 --
 -- AUTO_INCREMENT for table `voucher_entries_old`
@@ -3481,7 +3386,7 @@ ALTER TABLE `voucher_entries_old`
 -- AUTO_INCREMENT for table `voucher_main`
 --
 ALTER TABLE `voucher_main`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=59;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=321;
 
 --
 -- AUTO_INCREMENT for table `voucher_main_old`
@@ -3493,7 +3398,7 @@ ALTER TABLE `voucher_main_old`
 -- AUTO_INCREMENT for table `voucher_sequences`
 --
 ALTER TABLE `voucher_sequences`
-  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=18;
+  MODIFY `id` bigint(20) NOT NULL AUTO_INCREMENT;
 
 --
 -- Constraints for dumped tables
@@ -3542,24 +3447,11 @@ ALTER TABLE `fifo_transactions`
   ADD CONSTRAINT `fifo_transactions_ibfk_1` FOREIGN KEY (`item_id`) REFERENCES `stock_items` (`id`) ON DELETE CASCADE;
 
 --
--- Constraints for table `stock_attributes`
---
-ALTER TABLE `stock_attributes`
-  ADD CONSTRAINT `stock_attributes_ibfk_1` FOREIGN KEY (`stock_item_id`) REFERENCES `stock_items` (`id`) ON DELETE CASCADE,
-  ADD CONSTRAINT `stock_attributes_ibfk_2` FOREIGN KEY (`attribute_id`) REFERENCES `attributes` (`id`) ON DELETE CASCADE;
-
---
 -- Constraints for table `tbcaemployeecompanies`
 --
 ALTER TABLE `tbcaemployeecompanies`
   ADD CONSTRAINT `tbCAEmployeeCompanies_ibfk_1` FOREIGN KEY (`ca_employee_id`) REFERENCES `tbcaemployees` (`id`),
   ADD CONSTRAINT `tbCAEmployeeCompanies_ibfk_2` FOREIGN KEY (`company_id`) REFERENCES `tbcompanies` (`id`);
-
---
--- Constraints for table `tbusers`
---
-ALTER TABLE `tbusers`
-  ADD CONSTRAINT `tbUsers_ibfk_1` FOREIGN KEY (`employee_id`) REFERENCES `tbemployees` (`id`);
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
