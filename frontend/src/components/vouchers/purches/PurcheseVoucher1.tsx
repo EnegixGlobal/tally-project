@@ -61,8 +61,8 @@ const getSelectClasses = (theme: string, hasError: boolean = false) => {
 };
 
 // 🔹 Remove (20) from state name
-const cleanState = (state: string = "") =>
-  state.replace(/\(.*?\)/g, "").trim().toLowerCase();
+const cleanState = (state: any) =>
+  String(state || "").replace(/\(.*?\)/g, "").trim().toLowerCase();
 
 const resolvePurchaseGst = (
   gstRate: number,
