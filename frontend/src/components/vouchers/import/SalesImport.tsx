@@ -83,6 +83,7 @@ interface GroupedVoucher {
     accSummaryRows?: AccSummaryRow[];
     _suggestedLedger?: any;
     _missingLedger?: boolean;
+    overallDiscount?: number;
 }
 
 const stateNameToCode: { [key: string]: string } = {
@@ -611,6 +612,7 @@ const SalesImport: React.FC = () => {
                         importMode: currentImportMode,
                         _suggestedLedger: suggestedLedger,
                         _missingLedger: !!(!matchedLedgerByName && !suggestedLedger && partyName),
+                        overallDiscount: Number(row["Overall all Discount (₹)"] || row["Overall all Discount"] || row["Overll all Discount"] || 0),
                     };
                 }
 
@@ -739,7 +741,8 @@ const SalesImport: React.FC = () => {
                         const newSubtotal = currentItems.reduce((sum, it) => sum + it["Taxable Value (₹)"], 0);
                         const newTax = currentItems.reduce((sum, it) => sum + it["Integrated Tax (₹)"] + it["Central Tax (₹)"] + it["State/UT tax (₹)"], 0);
                         const newDiscount = currentItems.reduce((sum, it) => sum + (it["Discount (₹)"] || 0), 0);
-                        const calcInvoiceVal = newSubtotal + newTax - newDiscount;
+                        const ovDiscount = voucherGroups[groupKey].overallDiscount || 0;
+                        const calcInvoiceVal = newSubtotal + newTax - newDiscount - ovDiscount;
                         if (Math.abs(voucherGroups[groupKey]["Invoice Value (₹)"] - calcInvoiceVal) > 1 || voucherGroups[groupKey]["Invoice Value (₹)"] === 0) {
                             voucherGroups[groupKey]["Invoice Value (₹)"] = calcInvoiceVal;
                         }
@@ -790,6 +793,9 @@ const SalesImport: React.FC = () => {
                             voucherGroups[groupKey].accountingEntries = [];
                         }
 
+                        const ovDiscount = voucherGroups[groupKey].overallDiscount || 0;
+                        // Adjust logic if invoice value is incrementally added
+                        // but overall discount applies per voucher. So we don't subtract here yet.
                         voucherGroups[groupKey]["Invoice Value (₹)"] += rowTotal;
 
                         let calculationWarning = "";
@@ -1451,8 +1457,8 @@ const SalesImport: React.FC = () => {
     };
 
     const downloadTemplate = (mode: 'item' | 'accounting') => {
-        const itemH = ["GSTIN of Customer", "Trade/Legal name of the Customer", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Sales Ledger", "Item Name", "HSN Code", "Batch No", "Quantity", "Item Rate (₹)", "Rate (%)", "Taxable Value (₹)", "Discount (%)"];
-        const accH = ["GSTIN of Customer", "Trade/Legal name of the Customer", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Taxable Value (₹)", "GST Rate (%)", "Sales Ledger", "Discount (₹)"];
+        const itemH = ["GSTIN of Customer", "Trade/Legal name of the Customer", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Sales Ledger", "Item Name", "HSN Code", "Batch No", "Quantity", "Item Rate (₹)", "Rate (%)", "Taxable Value (₹)", "Discount (%)", "Overall all Discount (₹)"];
+        const accH = ["GSTIN of Customer", "Trade/Legal name of the Customer", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Taxable Value (₹)", "GST Rate (%)", "Sales Ledger", "Discount (₹)", "Overall all Discount (₹)"];
 
         const itemData = [
             ["20AAAAA0000A1Z5", "ABC CUSTOMER CORP", "INV/25-26/101", "16-02-2026", 118000, "Jharkhand(20)", "18% Inter State Sales", "Biscute", "5555", "B-001", 100, 1000, 18, 100000, 1],
@@ -1656,6 +1662,7 @@ const SalesImport: React.FC = () => {
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">CGST (₹)</th>
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">SGST (₹)</th>
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">Discount (₹)</th>
+                                            <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100 min-w-[120px]">Overall all Discount</th>
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider text-right bg-gray-100">Total (₹)</th>
                                             <th className="px-3 py-2 text-[10px] font-bold text-gray-500 uppercase tracking-wider bg-gray-100 min-w-[200px]">Remarks / Actions</th>
                                         </tr>
@@ -1834,6 +1841,13 @@ const SalesImport: React.FC = () => {
                                                     <td className="px-3 py-2.5 text-xs text-gray-700 text-right font-medium text-red-500">
                                                         {row.discount ? `₹${row.discount.toLocaleString()}` : "-"}
                                                     </td>
+
+                                                    {/* Overall all Discount */}
+                                                    {row.isFirstInVoucher ? (
+                                                        <td rowSpan={row.rowCount} className="px-3 py-2.5 text-xs text-gray-700 text-right font-medium text-red-500 align-middle bg-white/70">
+                                                            {row.voucher.overallDiscount ? `₹${row.voucher.overallDiscount.toLocaleString()}` : "-"}
+                                                        </td>
+                                                    ) : null}
 
                                                     {/* Total (₹) */}
                                                     <td className="px-3 py-2.5 text-xs text-blue-600 text-right font-bold relative">

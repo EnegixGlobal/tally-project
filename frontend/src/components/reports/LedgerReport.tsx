@@ -280,6 +280,7 @@ const LedgerReport: React.FC = () => {
       ).padStart(2, "0")}`;
       setFromDate(firstDay);
       setToDate(lastDay);
+      setSelectedDateRange("custom");
     }
   }, [dailyBreakupMonth, dailyBreakupYear, viewMode]);
 
@@ -861,9 +862,12 @@ const LedgerReport: React.FC = () => {
             {["detailed", "monthly", "daily"].map((mode) => (
               <button
                 key={mode}
-                onClick={() =>
+                onClick={() => {
+                  if (mode === "monthly" && fromDate === toDate) {
+                    handleDateRangeChange("current-year");
+                  }
                   setViewMode(mode as "detailed" | "monthly" | "daily")
-                }
+                }}
                 className={`px-4 py-2 rounded-t-lg text-sm font-medium ${viewMode === mode
                   ? theme === "dark"
                     ? "bg-gray-800 text-white"
@@ -1032,6 +1036,25 @@ const LedgerReport: React.FC = () => {
                       );
                     })}
 
+                    {groupedByVoucher.length === 0 && (
+                      <tr>
+                        <td colSpan={8} className="px-4 py-8 text-center border-b border-gray-200 dark:border-gray-700">
+                          <p className="text-gray-500 mb-2">
+                            No transactions found for the selected period ({formatDate(fromDate)} to {formatDate(toDate)}).
+                          </p>
+                          <button
+                            onClick={(e) => {
+                              e.preventDefault();
+                              handleDateRangeChange("current-year");
+                            }}
+                            className="text-blue-600 dark:text-blue-400 hover:underline font-medium text-sm"
+                          >
+                            View Current Financial Year
+                          </button>
+                        </td>
+                      </tr>
+                    )}
+                    
                     {/* ================= Grand Total ================= */}
                     <tr
                       className={`border-t font-semibold ${theme === "dark"

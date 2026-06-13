@@ -4,7 +4,7 @@ import { useReactToPrint } from "react-to-print";
 import { useAppContext } from "../../../context/AppContext";
 import { useNavigate, useParams, useLocation } from "react-router-dom";
 import type { LedgerWithGroup, VoucherEntry } from "../../../types";
-import { Save, Plus, Trash2, ArrowLeft, Printer, Settings } from "lucide-react";
+import { Save, Plus, Trash2, ArrowLeft, Printer, Settings, Upload } from "lucide-react";
 import Swal from "sweetalert2";
 import type { StockItem } from "../../../types";
 import { useFinancialYear, getFinancialYearDefaults, useVoucherDateConfig } from "../../../hooks/useFinancialYear";
@@ -154,7 +154,7 @@ const calculateEntryValues = (
   const qty = Number(quantity || 0);
   const r = Number(rate || 0);
 
-  const baseAmount = qty * r;
+  const baseAmount = Number((qty * r).toFixed(2));
 
   const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(
     gstRate,
@@ -163,8 +163,7 @@ const calculateEntryValues = (
   );
 
   const totalTaxRate = cgstRate + sgstRate + igstRate;
-  const gstAmount = (baseAmount * totalTaxRate) / 100;
-
+  const gstAmount = Number(((baseAmount * totalTaxRate) / 100).toFixed(2));
 
   const totalAmount = baseAmount;
 
@@ -270,6 +269,7 @@ const PurchaseVoucher: React.FC = () => {
   const [barcodeInput, setBarcodeInput] = useState("");
   const [isBarcodeError, setIsBarcodeError] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [unmappedPartyName, setUnmappedPartyName] = useState<string | null>(null);
 
   // Helper to find stock item details
   const resolveStockItemDetails = (itemId: string) => {
@@ -530,6 +530,178 @@ const PurchaseVoucher: React.FC = () => {
     performBarcodeLookup(barcodeInput);
   };
 
+  const [isExtracting, setIsExtracting] = useState(false);
+
+  const handleBillUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsExtracting(true);
+    
+    try {
+      Swal.fire({
+        title: 'Extracting Bill Data...',
+        text: 'Please wait while AI processes the image.',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      const formDataPayload = new FormData();
+      formDataPayload.append('billImage', file);
+
+      const response = await fetch(`${import.meta.env.VITE_API_URL}/api/ai/extract-bill`, {
+        method: "POST",
+        body: formDataPayload
+      });
+
+      if (!response.ok) {
+         throw new Error(`API error: ${response.status}`);
+      }
+
+      const parsedData = await response.json();
+      
+      if (parsedData) {
+        let missingWarnings: string[] = [];
+          
+          const fuzzyMatch = (str1: string, str2: string) => {
+            if (!str1 || !str2) return false;
+            const s1 = str1.toLowerCase().replace(/[^a-z0-9]/g, '');
+            const s2 = str2.toLowerCase().replace(/[^a-z0-9]/g, '');
+            return s1.includes(s2) || s2.includes(s1);
+          };
+
+          setFormData((prev: any) => {
+            const updated = { ...prev };
+            if (parsedData.invoiceNumber) updated.referenceNo = parsedData.invoiceNumber;
+            if (parsedData.date) updated.supplierInvoiceDate = parsedData.date;
+            if (parsedData.tdsAmount) {
+              updated.tdsAmount = parsedData.tdsAmount;
+              if (tdsLedgers && tdsLedgers.length > 0) {
+                updated.tdsLedgerId = String(tdsLedgers[0].id);
+              }
+            }
+            if (parsedData.discountAmount) {
+              updated.discountAmount = parsedData.discountAmount;
+              if (discountLedgers && discountLedgers.length > 0) {
+                updated.discountLedgerId = String(discountLedgers[0].id);
+              }
+            }
+            
+            if (parsedData.supplierName) {
+               const match = partyLedgers.find((l: any) => fuzzyMatch(l.name, parsedData.supplierName));
+               if (match) {
+                 updated.partyId = String(match.id);
+                 setUnmappedPartyName(null);
+               } else {
+                 setUnmappedPartyName(parsedData.supplierName);
+                 missingWarnings.push(`Ledger not exist: ${parsedData.supplierName}`);
+               }
+            } else {
+               missingWarnings.push(`Ledger not found in bill.`);
+               setUnmappedPartyName(null);
+            }
+
+            if (parsedData.items && parsedData.items.length > 0) {
+               const newEntries = [...prev.entries];
+               parsedData.items.forEach((extractedItem: any) => {
+                 const matchItem = stockItems.find((i: any) => fuzzyMatch(i.name, extractedItem.name));
+                 
+                 const extractedHsn = extractedItem.hsnSac || extractedItem.hsnCode;
+                 if (!extractedHsn) {
+                   missingWarnings.push(`HSN/SAC missing for item: ${extractedItem.name}`);
+                 }
+
+                 if (matchItem) {
+                    const details = resolveStockItemDetails(String(matchItem.id));
+                    const gst = extractedItem.gstRate || Number(details.gstRate || 0);
+                    const qty = extractedItem.quantity || 1;
+                    const rate = extractedItem.rate || Number(details.standardPurchaseRate || 0);
+                    const discount = extractedItem.discount || 0;
+                    
+                    const calculated = calculateEntryValues(qty, rate, gst, companyState, supplierState);
+                    const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(gst, companyState, supplierState);
+                    
+                    const isIntra = companyState && supplierState && companyState === supplierState;
+                    const matchingPurchaseLedger = purchaseLedgers.find((l) => {
+                      const name = String(l.name).toLowerCase();
+                      const gstMatch = name.includes(`${gst}%`) || name.includes(`${gst} %`) || name.includes(`purchase ${gst}`) || name.includes(`@${gst}%`) || name.includes(`@ ${gst}%`);
+                      if (!gstMatch) return false;
+                      return isIntra ? name.includes("intra") || name.includes("local") : name.includes("inter") || name.includes("central");
+                    });
+
+                    const newEntry = {
+                       id: `e${Date.now()}_${Math.random()}`,
+                       itemId: String(matchItem.id),
+                       hsnCode: extractedHsn || details.hsnCode || "",
+                       unitName: details.unit || "",
+                       quantity: qty,
+                       rate: rate,
+                       discount: discount,
+                       amount: Number((extractedItem.taxableValue || calculated.amount).toFixed(2)),
+                       gstRate: gst,
+                       cgstRate, sgstRate, igstRate,
+                       gstLedgerId: details.gstLedgerId || "",
+                       sgstLedgerId: details.sgstLedgerId || "",
+                       cgstLedgerId: details.cgstLedgerId || "",
+                       igstLedgerId: details.igstLedgerId || "",
+                       batches: details.batches || [],
+                       batchNumber: "",
+                       godownId: "",
+                       purchaseLedgerId: matchingPurchaseLedger ? String(matchingPurchaseLedger.id) : (prev.purchaseLedgerId || ""),
+                       type: "debit",
+                    };
+                    
+                    const lastIndex = newEntries.length - 1;
+                    if (lastIndex >= 0 && !newEntries[lastIndex].itemId) {
+                      newEntries[lastIndex] = newEntry as any;
+                    } else {
+                      newEntries.push(newEntry as any);
+                    }
+                 } else {
+                    missingWarnings.push(`Item not exist: ${extractedItem.name}`);
+                    const newEntry = {
+                       id: `e${Date.now()}_${Math.random()}`,
+                       itemId: "",
+                       hsnCode: extractedHsn || "",
+                       unitName: extractedItem.unit || "",
+                       quantity: extractedItem.quantity || 1,
+                       rate: extractedItem.rate || 0,
+                       discount: extractedItem.discount || 0,
+                       amount: extractedItem.taxableValue || extractedItem.amount || 0,
+                       narration: `Extracted Item: ${extractedItem.name} | IGST: ${extractedItem.igstAmount || 0}`,
+                       type: "debit"
+                    };
+                    newEntries.push(newEntry as any);
+                 }
+               });
+               updated.entries = newEntries;
+            }
+            return updated;
+          });
+          
+          if (missingWarnings.length > 0) {
+            Swal.fire({
+              title: "Data Extracted with Warnings",
+              html: `<div class="text-left"><p>Some data could not be fully mapped:</p><ul class="list-disc pl-5 mt-2 text-sm text-red-600">${missingWarnings.map(w => `<li>${w}</li>`).join('')}</ul></div>`,
+              icon: "warning"
+            });
+          } else {
+            Swal.fire("Success", "Bill data extracted and filled successfully!", "success");
+          }
+        } else {
+           throw new Error("No extracted data");
+        }
+      } catch (err) {
+        console.error("Extraction error:", err);
+        Swal.fire("Error", "Failed to extract bill data. Please check the image and try again.", "error");
+      } finally {
+        setIsExtracting(false);
+        if (e.target) e.target.value = "";
+      }
+  };
+
   useEffect(() => {
     if (!id && !copyId) return;
 
@@ -578,9 +750,9 @@ const PurchaseVoucher: React.FC = () => {
                 id: "e" + (idx + 1),
 
                 itemId: e.itemId || "",
-                quantity: Math.round(e.quantity || 0),
-                rate: Math.round(e.rate || 0),
-                amount: Math.round(e.amount || (e.quantity || 0) * (e.rate || 0)),
+                quantity: Number(e.quantity || 0),
+                rate: Number(e.rate || 0),
+                amount: Number(e.amount || ((e.quantity || 0) * (e.rate || 0)).toFixed(2)),
 
                 // AUTO FILL: Prioritize saved data, fallback to Item Master if missing
                 hsnCode: e.hsnCode || stockItem?.hsnCode || "",
@@ -2686,7 +2858,10 @@ const PurchaseVoucher: React.FC = () => {
                     id="partyId"
                     name="partyId"
                     value={formData.partyId}
-                    onChange={handlePartyChange}
+                    onChange={(e) => {
+                      handlePartyChange(e);
+                      setUnmappedPartyName(null);
+                    }}
                     className={`${getSelectClasses(theme, !!errors.partyId)} font-semibold`}
                   >
                     <option value="">-- Select Party --</option>
@@ -2697,6 +2872,11 @@ const PurchaseVoucher: React.FC = () => {
                     ))}
                     <option value="add-new" className="text-blue-600 font-bold">+ Create New Ledger</option>
                   </select>
+                  {unmappedPartyName && (
+                    <div className="mt-1 text-xs text-orange-600 font-medium">
+                      Extracted Party: <b>{unmappedPartyName}</b> (Not found in masters)
+                    </div>
+                  )}
                   {selectedPartyLedger && (() => {
                     const partyState = selectedPartyLedger.state || selectedPartyLedger.state_name || selectedPartyLedger.State || "N/A";
                     return (
@@ -2814,8 +2994,8 @@ const PurchaseVoucher: React.FC = () => {
 
             {/* Barcode Input Section */}
             {formData.mode === "item-invoice" && (
-              <div className="mb-4">
-                <form onSubmit={handleBarcodeSubmit} className="relative group max-w-md">
+              <div className="mb-4 flex gap-2 items-center">
+                <form onSubmit={handleBarcodeSubmit} className="relative group max-w-md flex-1">
                   <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none text-gray-400 group-focus-within:text-blue-500 transition-colors">
                     <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M3 5v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2z"></path><path d="M7 7h1v10H7z"></path><path d="M10 7h2v10h-2z"></path><path d="M15 7h1v10h-1z"></path><path d="M18 7h1v10h-1z"></path></svg>
                   </div>
@@ -2835,6 +3015,12 @@ const PurchaseVoucher: React.FC = () => {
                       }`}
                   />
                 </form>
+                <div className="flex items-center">
+                  <input type="file" id="bill-upload" className="hidden" accept="image/*" onChange={handleBillUpload} disabled={isExtracting} />
+                  <label htmlFor="bill-upload" className={`cursor-pointer px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${isExtracting ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white`}>
+                    <Upload size={18} /> {isExtracting ? 'Processing...' : 'Upload Bill'}
+                  </label>
+                </div>
               </div>
             )}
 
