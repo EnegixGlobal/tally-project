@@ -557,7 +557,18 @@ const PurchaseVoucher: React.FC = () => {
       });
 
       if (!response.ok) {
-         throw new Error(`API error: ${response.status}`);
+         let errorData = null;
+         try {
+           errorData = await response.json();
+         } catch (e) {
+           // Ignore JSON parse errors
+         }
+         throw { 
+           isApiError: true, 
+           status: response.status, 
+           data: errorData,
+           message: `API error: ${response.status}` 
+         };
       }
 
       const parsedData = await response.json();
@@ -693,9 +704,40 @@ const PurchaseVoucher: React.FC = () => {
         } else {
            throw new Error("No extracted data");
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error("Extraction error:", err);
-        Swal.fire("Error", "Failed to extract bill data. Please check the image and try again.", "error");
+        
+        let errorTitle = "Error";
+        let errorMessage = "Failed to extract bill data. Please check the image and try again.";
+        
+        if (err.isApiError) {
+           if (err.status === 429) {
+              errorTitle = "Rate Limit Exceeded";
+              errorMessage = "The AI service is currently busy or you have exceeded your usage limit (API 429). Please try again after some time.";
+           } else if (err.status === 400) {
+              errorTitle = "Bad Request";
+              errorMessage = "There was an issue with the provided image or request format (API 400). Please make sure the image is clear and try again.";
+           } else if (err.status === 401 || err.status === 403) {
+              errorTitle = "Authentication Error";
+              errorMessage = "Failed to authenticate with the AI service. Please check your API keys.";
+           } else if (err.status === 500) {
+              errorTitle = "Server Error";
+              errorMessage = "The AI service encountered an internal error. Please try again later.";
+           } else if (err.status === 503) {
+              errorTitle = "Service Unavailable";
+              errorMessage = "The AI service is currently unavailable. Please try again later.";
+           } else if (err.data && err.data.error) {
+              errorMessage = err.data.error;
+           } else {
+              errorMessage = `An unexpected error occurred (API ${err.status}).`;
+           }
+        }
+        
+        Swal.fire({
+          title: errorTitle, 
+          html: errorMessage, 
+          icon: "error"
+        });
       } finally {
         setIsExtracting(false);
         if (e.target) e.target.value = "";
