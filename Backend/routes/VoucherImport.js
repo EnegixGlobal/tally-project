@@ -1889,8 +1889,8 @@ router.post("/sales_summary_import", async (req, res) => {
                 });
             }
         }
-
-        const totalVal = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal;
+        const overallDiscountAmt = Number(voucher.overallDiscount || 0);
+        const totalVal = subtotal + cgstTotal + sgstTotal + igstTotal - discountTotal - overallDiscountAmt;
 
         // 🔹 DETERMINE B2B VS B2C SALES TYPE ID Strictly Based on Excel Data
         const importGstin = voucher["GSTIN of supplier"] ? String(voucher["GSTIN of supplier"]).toUpperCase().replace(/\s+/g, "").trim() : "";
@@ -1931,17 +1931,27 @@ router.post("/sales_summary_import", async (req, res) => {
             companyId, ownerType, ownerId, voucherType: "sales", date, salesTypeId
         });
 
+        let overallDiscountLedgerId = null;
+        if (overallDiscountAmt > 0) {
+            let discountLedger = ledgers.find(ld => ld.name.toLowerCase() === "discount to customer") 
+                                 || ledgers.find(ld => ld.name.toLowerCase().includes("discount to customer"))
+                                 || ledgers.find(ld => ld.name.toLowerCase().includes("discount"));
+            overallDiscountLedgerId = discountLedger ? discountLedger.id : null;
+        }
+
         // INSERT MAIN
         const [mainResult] = await db.execute(
             `INSERT INTO sales_vouchers (
                 number, date, narration, partyId, referenceNo, 
                 subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total, 
-                company_id, owner_type, owner_id, mode, salesLedgerId, type, isQuotation, sales_type_id
-            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                company_id, owner_type, owner_id, mode, salesLedgerId, type, isQuotation, sales_type_id,
+                overallDiscountAmount, overallDiscountLedgerId
+            ) VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
             [
                 voucherNumber, date, voucher.narration || `Imported Sales ${importMode === 'item' ? 'Multi-item' : 'Accounting'}`, partyId, invoiceNo,
                 subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, totalVal,
-                companyId, ownerType, ownerId, importMode === 'item' ? 'item-invoice' : 'accounting-invoice', salesLedgerId, 'sales', 0, salesTypeId
+                companyId, ownerType, ownerId, importMode === 'item' ? 'item-invoice' : 'accounting-invoice', salesLedgerId, 'sales', 0, salesTypeId,
+                overallDiscountAmt, overallDiscountLedgerId
             ]
         );
 
@@ -2003,6 +2013,21 @@ router.post("/sales_summary_import", async (req, res) => {
                 );
             }
         }
+
+        if (overallDiscountAmt > 0) {
+            let discountLedger = ledgers.find(ld => ld.name.toLowerCase() === "discount to customer") 
+                                 || ledgers.find(ld => ld.name.toLowerCase().includes("discount to customer"))
+                                 || ledgers.find(ld => ld.name.toLowerCase().includes("discount"));
+            
+            const ledgerId = discountLedger ? discountLedger.id : null;
+            const ledgerName = discountLedger ? discountLedger.name : "Discount to Customer";
+
+            await db.execute(
+                `INSERT INTO voucher_entries (voucher_id, ledger_id, ledger_name, amount, entry_type, narration, bank_name, cheque_number, cost_centre_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [voucherId, ledgerId, ledgerName, overallDiscountAmt, "debit", null, null, null, null]
+            );
+        }
+
 
         if (salesTypeId) {
             try {
