@@ -47,7 +47,6 @@ router.post('/extract-bill', upload.single('billImage'), async (req, res) => {
 
     const cleanJson = extractedText.replace(/```json/gi, '').replace(/```/g, '').trim();
     const parsedData = JSON.parse(cleanJson);
-    console.log('data', parsedData);
 
     return res.status(200).json(parsedData);
 
