@@ -411,6 +411,23 @@ const B2B: React.FC = () => {
     return salesHistoryMap.get(voucherNo)?.rate || 0;
   };
 
+  const getRateFromItems = (items: any[]) => {
+    if (!items || !items.length) return 0;
+    let consistentRate = -1;
+    let isMixedRate = false;
+
+    items.forEach((i: any) => {
+      const rate = Number(i.rate || 0);
+      if (consistentRate === -1) {
+        consistentRate = rate;
+      } else if (consistentRate !== rate) {
+        isMixedRate = true;
+      }
+    });
+
+    return isMixedRate ? 0 : (consistentRate === -1 ? 0 : consistentRate);
+  };
+
 
   // 🔹 Ledger quick lookup (id → ledger)
   const ledgerMap = useMemo(() => {
@@ -529,6 +546,8 @@ const B2B: React.FC = () => {
       return row;
     });
 
+    rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
     return { headers: allDynamicCols, rows };
   }, [matchedSales, ledgerMap, columnarDrillDown]);
 
@@ -585,6 +604,7 @@ const B2B: React.FC = () => {
       });
     }
 
+    data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     return data;
   }, [matchedSales, selectedMonth, selectedParty]);
 
@@ -1146,7 +1166,13 @@ const B2B: React.FC = () => {
                         <td className="p-3">{formatAggregatedQuantities(sale.items, units)}</td>
 
                         {/* Rate */}
-                        <td className="p-3">{getRateByVoucher(sale.number)}</td>
+                        <td className="p-3">
+                          {getRateFromItems(sale.items) > 0
+                            ? getRateFromItems(sale.items).toLocaleString("en-IN", {
+                                minimumFractionDigits: 2,
+                              })
+                            : "-"}
+                        </td>
 
                         {/* Amount (Taxable) */}
                         <td className="p-3">₹{Number(sale.subtotal || 0).toFixed(2)}</td>

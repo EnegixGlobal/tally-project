@@ -194,9 +194,11 @@ const PurchaseReport1: React.FC = () => {
         const bValue = b[sortConfig.key] ?? "";
         if (aValue < bValue) return sortConfig.direction === "asc" ? -1 : 1;
         if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
-        // Tie-breaker: sort by ID ascendingly
-        return Number(a.id) - Number(b.id);
+        return 0;
       });
+    } else {
+      // Default Sort By date
+      data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
     return data;
   }, [salesVouchers, selectedMonth, selectedParty, sortConfig]);
@@ -691,6 +693,8 @@ const PurchaseReport1: React.FC = () => {
 
       return row;
     });
+
+    rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return { headers: allDynamicCols, rows };
   }, [filteredVouchers, columnarDrillDown]);
