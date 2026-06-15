@@ -2,7 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { useCompany } from "../../context/CompanyContext";
 import type { VoucherEntry } from "../../types";
-import { ArrowLeft, Download, Settings, Copy, Edit2, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, Settings, Copy, Edit2, Trash2, FileCode2 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import PrintOptions from "../vouchers/sales/PrintOptions";
 import SalesInvoiceDownloadModal from "../vouchers/sales/SalesInvoiceDownloadModal";
@@ -24,6 +24,8 @@ interface VoucherRegisterBaseProps {
   onView?: (voucher: VoucherEntry) => void;
   onCopy?: (voucher: VoucherEntry) => void;
   onExport?: (data: any) => void;
+  onGenerateXml?: (voucher: VoucherEntry) => void;
+  onGenerateAllXml?: (vouchers: VoucherEntry[]) => void;
 }
 
 interface PurchaseVoucher {
@@ -118,6 +120,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   onView,
   onCopy,
   onExport,
+  onGenerateXml,
+  onGenerateAllXml,
 }) => {
   const navigate = useNavigate();
   const { theme } = useAppContext();
@@ -1465,6 +1469,17 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
           {/* RIGHT SIDE */}
           <div className="flex items-center gap-3">
+            {onGenerateAllXml && (
+              <button
+                onClick={() => onGenerateAllXml(filteredVouchers as VoucherEntry[])}
+                className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-1.5 rounded-lg transition-colors flex items-center shadow-sm text-sm font-medium"
+                title="Generate XML for all visible vouchers"
+              >
+                <FileCode2 className="mr-2" size={16} />
+                Export All XML
+              </button>
+            )}
+
             {showActions && selectedVoucherIds.size > 0 && (
               <button
                 onClick={handleBulkDelete}
@@ -1997,6 +2012,16 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                               title="Edit"
                             >
                               <Edit2 size={16} />
+                            </button>
+                          )}
+
+                          {onGenerateXml && (
+                            <button
+                              onClick={() => onGenerateXml(voucher)}
+                              className="text-orange-500 hover:text-orange-700"
+                              title="Generate XML"
+                            >
+                              <FileCode2 size={16} />
                             </button>
                           )}
 
