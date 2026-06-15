@@ -9,6 +9,7 @@ import {
   Calendar,
   Eye,
 } from "lucide-react";
+import { useCompany } from "../../context/CompanyContext";
 
 interface DayBookEntry {
   id: string;
@@ -90,6 +91,7 @@ interface VoucherDetail {
 
 const LedgerReport: React.FC = () => {
   const { theme, ledgerGroups } = useAppContext();
+  const { companyInfo } = useCompany();
   const navigate = useNavigate();
   const { id } = useParams();
   const [searchParams] = useSearchParams();
@@ -589,7 +591,8 @@ const LedgerReport: React.FC = () => {
   };
 
   return (
-    <div className="pt-[56px] px-4 ">
+    <>
+    <div className="pt-[56px] px-4 print:hidden">
       <div className="flex items-center mb-6">
         <button
           type="button"
@@ -1409,7 +1412,144 @@ const LedgerReport: React.FC = () => {
           to refresh.
         </p>
       </div>
-    </div >
+    </div>
+
+      {/* Print Only UI */}
+      {ledgerId && ledgerData && (
+        <div className="hidden print:block w-full text-black bg-white font-sans text-sm print:px-6 print:py-4">
+          <style type="text/css" media="print">
+            {`
+              body { -webkit-print-color-adjust: exact; }
+              @page { size: auto; margin: 5mm; }
+            `}
+          </style>
+          <div className="text-center font-bold text-lg leading-tight uppercase mt-4">
+            {companyInfo?.name || "M P TRADERS"}
+          </div>
+          <div className="text-center text-sm leading-tight uppercase whitespace-pre-wrap">
+            {companyInfo?.address || ""}
+          </div>
+          <div className="text-center font-bold mt-4 text-base leading-tight uppercase">
+            {ledgerData?.ledger?.name || selectedLedgerData?.name}
+          </div>
+          <div className="text-center text-sm leading-tight whitespace-pre-wrap uppercase mt-1">
+            {[
+              ledgerData?.ledger?.address || selectedLedgerData?.address,
+              ledgerData?.ledger?.district || selectedLedgerData?.district,
+              ledgerData?.ledger?.state || selectedLedgerData?.state,
+              ledgerData?.ledger?.pinCode || selectedLedgerData?.pinCode
+            ].filter(Boolean).join(", ") || "Ledger Account"}
+          </div>
+          <div className="text-center text-sm mt-1">
+            {formatDate(fromDate)} to {formatDate(toDate)}
+          </div>
+          <div className="text-right text-xs mt-2">
+            Page 1
+          </div>
+
+          <table className="w-full mt-1 border-collapse text-sm">
+            <thead>
+              <tr className="border-t border-b border-black">
+                <th className="py-0.5 px-1 text-left font-normal w-24">Date</th>
+                <th className="py-0.5 px-1 text-left font-normal">Particulars</th>
+                <th className="py-0.5 px-1 text-left font-normal w-32">Vch Type</th>
+                <th className="py-0.5 px-1 text-left font-normal w-28">Vch No.</th>
+                <th className="py-0.5 px-1 text-right font-bold w-32">Debit</th>
+                <th className="py-0.5 px-1 text-right font-bold w-32">Credit</th>
+              </tr>
+            </thead>
+            <tbody>
+              {/* Opening Balance */}
+              {summaryTotals.openingBalance !== 0 && (
+                <tr className="align-top">
+                  <td className="py-0.5 px-1"></td>
+                  <td className="py-0.5 px-1">
+                    <span className="inline-block w-8 font-medium"></span>
+                    <span className="font-bold">Opening Balance</span>
+                  </td>
+                  <td className="py-0.5 px-1"></td>
+                  <td className="py-0.5 px-1"></td>
+                  <td className="py-0.5 px-1 text-right font-mono">
+                    {((summaryTotals.openingBalance > 0 && isDebitLedger) || (summaryTotals.openingBalance < 0 && !isDebitLedger)) 
+                      ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(Math.abs(summaryTotals.openingBalance)) 
+                      : ''}
+                  </td>
+                  <td className="py-0.5 px-1 text-right font-mono">
+                    {((summaryTotals.openingBalance < 0 && isDebitLedger) || (summaryTotals.openingBalance > 0 && !isDebitLedger)) 
+                      ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(Math.abs(summaryTotals.openingBalance)) 
+                      : ''}
+                  </td>
+                </tr>
+              )}
+
+              {/* Transactions */}
+              {ledgerTransactions.filter(t => !t.isOpening && !t.isClosing).map((txn, idx) => (
+                <tr key={idx} className="align-top">
+                  <td className="py-0.5 px-1 whitespace-nowrap">{formatDate(txn.date)}</td>
+                  <td className="py-0.5 px-1 align-top">
+                    <span className="float-left w-8 font-medium">{txn.debit > 0 ? 'Cr' : 'Dr'}</span>
+                    <span className="block ml-8 font-bold">{ledgerIdNameMap[String(txn.particulars)] || txn.particulars}</span>
+                  </td>
+                  <td className="py-0.5 px-1 uppercase">{txn.isQuotation ? "Quotation" : txn.voucherType}</td>
+                  <td className="py-0.5 px-1 whitespace-nowrap">{txn.voucherNo}</td>
+                  <td className="py-0.5 px-1 text-right font-mono">
+                    {txn.debit > 0 ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(txn.debit) : ''}
+                  </td>
+                  <td className="py-0.5 px-1 text-right font-mono">
+                    {txn.credit > 0 ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(txn.credit) : ''}
+                  </td>
+                </tr>
+              ))}
+
+              {/* Sub Totals */}
+              <tr className="border-t border-black">
+                <td colSpan={4}></td>
+                <td className="py-0.5 px-1 text-right font-mono">
+                  {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(summaryTotals.totalDebit)}
+                </td>
+                <td className="py-0.5 px-1 text-right font-mono">
+                  {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(summaryTotals.totalCredit)}
+                </td>
+              </tr>
+
+              {/* Closing Balance */}
+              {Math.abs(summaryTotals.totalDebit - summaryTotals.totalCredit) > 0 && (
+                <tr className="align-top">
+                  <td colSpan={1}></td>
+                  <td colSpan={3} className="py-0.5 px-1">
+                    <span className="inline-block w-8 font-medium">
+                      {summaryTotals.totalCredit > summaryTotals.totalDebit ? 'Cr' : 'Dr'}
+                    </span>
+                    <span className="font-bold">Closing Balance</span>
+                  </td>
+                  <td className="py-0.5 px-1 text-right font-mono">
+                    {summaryTotals.totalCredit > summaryTotals.totalDebit 
+                      ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(Math.abs(summaryTotals.totalDebit - summaryTotals.totalCredit)) 
+                      : ''}
+                  </td>
+                  <td className="py-0.5 px-1 text-right font-mono">
+                    {summaryTotals.totalDebit > summaryTotals.totalCredit 
+                      ? new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(Math.abs(summaryTotals.totalDebit - summaryTotals.totalCredit)) 
+                      : ''}
+                  </td>
+                </tr>
+              )}
+
+              {/* Grand Totals */}
+              <tr className="border-t border-b border-black font-bold">
+                <td colSpan={4}></td>
+                <td className="py-0.5 px-1 text-right font-mono">
+                  {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(Math.max(summaryTotals.totalDebit, summaryTotals.totalCredit))}
+                </td>
+                <td className="py-0.5 px-1 text-right font-mono">
+                  {new Intl.NumberFormat("en-IN", { minimumFractionDigits: 2 }).format(Math.max(summaryTotals.totalDebit, summaryTotals.totalCredit))}
+                </td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      )}
+    </>
   );
 };
 

@@ -99,7 +99,7 @@ const HorizontalMenu: React.FC<HorizontalMenuProps> = ({ sidebarOpen }) => {
 
   return (
     <div
-      className={`fixed top-14 z-40 h-10 overflow-x-auto whitespace-nowrap transition-all duration-300 ${sidebarOpen ? 'left-60' : 'left-16'
+      className={`print:hidden fixed top-14 z-40 h-10 overflow-x-auto whitespace-nowrap transition-all duration-300 ${sidebarOpen ? 'left-60' : 'left-16'
         } right-0 border-b scrollbar-thin scrollbar-thumb-rounded ${theme === 'dark'
           ? 'bg-gray-900 text-gray-200 border-gray-700 scrollbar-thumb-gray-700'
           : 'bg-blue-800 text-white border-blue-700 scrollbar-thumb-blue-700'

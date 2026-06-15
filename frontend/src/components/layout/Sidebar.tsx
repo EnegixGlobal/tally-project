@@ -50,7 +50,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
 
   return (
     <div
-      className={`${isOpen ? "w-60" : "w-16"
+      className={`print:hidden ${isOpen ? "w-60" : "w-16"
         } transition-width duration-300 ease-in-out h-full ${theme === "dark"
           ? "bg-gray-900 text-gray-200"
           : "bg-blue-800 text-white"
