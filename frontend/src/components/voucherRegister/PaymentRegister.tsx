@@ -51,6 +51,7 @@ const PaymentRegister: React.FC = () => {
     "Daily" | "Weekly" | "Fortnightly" | "Monthly" | "Quarterly" | "Half-yearly"
   >("Daily");
   const [selectedMonth, setSelectedMonth] = useState<string>("");
+  const [selectedQuarter, setSelectedQuarter] = useState<string>("");
   const [showMonthList, setShowMonthList] = useState(false);
   const companyId = localStorage.getItem("company_id") || "";
   const ownerType = localStorage.getItem("supplier") || "";
@@ -258,8 +259,20 @@ const PaymentRegister: React.FC = () => {
         break;
       }
       case "Quarterly": {
-        const currentQuarter = Math.floor(today.getMonth() / 3);
-        startDate = new Date(today.getFullYear(), currentQuarter * 3, 1);
+        if (selectedQuarter) {
+          return vouchers.filter((voucher) => {
+            const voucherDate = new Date(voucher.date);
+            const month = voucherDate.getMonth() + 1; // 1-12
+            if (selectedQuarter === "Q1") return month >= 4 && month <= 6;
+            if (selectedQuarter === "Q2") return month >= 7 && month <= 9;
+            if (selectedQuarter === "Q3") return month >= 10 && month <= 12;
+            if (selectedQuarter === "Q4") return month >= 1 && month <= 3;
+            return true;
+          });
+        } else {
+          const currentQuarter = Math.floor(today.getMonth() / 3);
+          startDate = new Date(today.getFullYear(), currentQuarter * 3, 1);
+        }
         break;
       }
       case "Half-yearly": {
@@ -271,7 +284,7 @@ const PaymentRegister: React.FC = () => {
         return vouchers;
     }
 
-    if (viewType !== "Monthly" || !selectedMonth) {
+    if ((viewType !== "Monthly" || !selectedMonth) && (viewType !== "Quarterly" || !selectedQuarter)) {
       return vouchers.filter((voucher) => {
         const voucherDate = new Date(voucher.date);
         return voucherDate >= startDate;
@@ -850,9 +863,14 @@ const PaymentRegister: React.FC = () => {
                 setViewType(newViewType);
                 if (newViewType === "Monthly") {
                   setShowMonthList(true);
+                  setSelectedQuarter("");
+                } else if (newViewType === "Quarterly") {
+                  setShowMonthList(false);
+                  setSelectedMonth("");
                 } else {
                   setShowMonthList(false);
                   setSelectedMonth("");
+                  setSelectedQuarter("");
                 }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -885,6 +903,28 @@ const PaymentRegister: React.FC = () => {
                     {month.label}
                   </option>
                 ))}
+              </select>
+            </div>
+          )}
+          {viewType === "Quarterly" && (
+            <div>
+              <label
+                htmlFor="quarter-select"
+                className="block text-sm font-medium text-gray-700 mb-1"
+              >
+                Select Quarter
+              </label>
+              <select
+                id="quarter-select"
+                value={selectedQuarter}
+                onChange={(e) => setSelectedQuarter(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+              >
+                <option value="">Current Quarter</option>
+                <option value="Q1">Apr - Jun</option>
+                <option value="Q2">Jul - Sep</option>
+                <option value="Q3">Oct - Dec</option>
+                <option value="Q4">Jan - Mar</option>
               </select>
             </div>
           )}
