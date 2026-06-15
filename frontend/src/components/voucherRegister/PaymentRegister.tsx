@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CreditCard, Download, Printer, Trash2, Settings } from "lucide-react";
+import { ArrowLeft, CreditCard, Download, Printer, Trash2, Settings, Edit, Copy, FileCode2, Eye } from "lucide-react";
 import Swal from "sweetalert2";
 import { useFinancialYear, filterByFinancialYear } from "../../hooks/useFinancialYear";
+import { useCompany } from "../../context/CompanyContext";
+import { generatePaymentXmlContent, generateBulkPaymentXmlContent } from "./paymentXmlGenerator";
 
 // Types - keeping everything in this file as requested
 interface VoucherEntryLine {
@@ -41,6 +43,8 @@ const PaymentRegister: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   const { selectedFinYear } = useFinancialYear();
+  const { activeCompany } = useCompany();
+  const [previewXml, setPreviewXml] = useState<{ content: string; filename: string } | null>(null);
 
   // New state for Change View functionality
   const [viewType, setViewType] = useState<
@@ -499,6 +503,94 @@ const PaymentRegister: React.FC = () => {
     navigate(`/app/vouchers/payment/edit/${id}`);
   };
 
+  const handleGenerateXml = async (voucher: any) => {
+    try {
+      Swal.fire({
+        title: 'Generating XML...',
+        text: 'Fetching details, please wait.',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // Fetch the full voucher details
+      const response = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/vouchers/${voucher.id}?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`
+      );
+      if (!response.ok) {
+        throw new Error("Failed to fetch full voucher details");
+      }
+      
+      const resData = await response.json();
+      const fullVoucher = resData.data || resData;
+      const companyName = activeCompany?.name || "M P Traders";
+      
+      // Generate XML content
+      const xmlContent = generatePaymentXmlContent(fullVoucher, companyName, ledgers);
+      
+      Swal.close();
+
+      // Set state to show preview modal
+      setPreviewXml({
+        content: xmlContent,
+        filename: `PaymentVoucher_${voucher.number || voucher.id}.xml`
+      });
+      
+    } catch (error) {
+      console.error("XML Generation Error", error);
+      Swal.close();
+      Swal.fire("Error", "Failed to generate XML", "error");
+    }
+  };
+
+  const handleGenerateAllXml = async (vouchers: any[]) => {
+    if (vouchers.length === 0) {
+      Swal.fire("Info", "No vouchers available to export.", "info");
+      return;
+    }
+
+    try {
+      Swal.fire({
+        title: 'Generating XML...',
+        text: 'Fetching details for all vouchers, please wait.',
+        allowOutsideClick: false,
+        didOpen: () => {
+          Swal.showLoading();
+        }
+      });
+
+      // Fetch all vouchers details concurrently
+      const fetchPromises = vouchers.map(voucher => 
+        fetch(`${import.meta.env.VITE_API_URL}/api/vouchers/${voucher.id}?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`)
+          .then(res => {
+            if (!res.ok) throw new Error("Failed to fetch full voucher details");
+            return res.json();
+          })
+      );
+
+      const fullVouchersRes = await Promise.all(fetchPromises);
+      const fullVouchers = fullVouchersRes.map((res: any) => res.data || res);
+      const companyName = activeCompany?.name || "M P Traders";
+      
+      // Generate bulk XML content
+      const xmlContent = generateBulkPaymentXmlContent(fullVouchers, companyName, ledgers);
+      
+      Swal.close();
+
+      // Set state to show preview modal
+      setPreviewXml({
+        content: xmlContent,
+        filename: `All_PaymentVouchers_${new Date().toISOString().split('T')[0]}.xml`
+      });
+      
+    } catch (error) {
+      console.error("Bulk XML Generation Error", error);
+      Swal.close();
+      Swal.fire("Error", "Failed to generate XML for all vouchers. Some vouchers might be inaccessible.", "error");
+    }
+  };
+
   const statusCounts = filteredVouchers.reduce((acc, voucher) => {
     const status = getVoucherStatus(voucher);
     acc[status] = (acc[status] || 0) + 1;
@@ -657,6 +749,14 @@ const PaymentRegister: React.FC = () => {
             </h1>
           </div>
           <div className="flex items-center gap-2">
+            <button
+              onClick={() => handleGenerateAllXml(filteredVouchers)}
+              className="bg-orange-500 hover:bg-orange-600 text-white px-3 py-2 rounded-lg transition-colors flex items-center shadow-md text-sm font-semibold"
+              title="Generate XML for all visible vouchers"
+            >
+              <FileCode2 className="mr-2" size={18} />
+              Export All XML
+            </button>
             <button
               onClick={() => setShowActions(!showActions)}
               className={`p-2 rounded-lg transition-colors ${
@@ -901,9 +1001,11 @@ const PaymentRegister: React.FC = () => {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                {showActions && (
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
+                )}
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
@@ -964,41 +1066,50 @@ const PaymentRegister: React.FC = () => {
                         {status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex space-x-2">
-                        {hasPermission("view") && (
+                    {showActions && (
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex space-x-3 items-center">
+                          {hasPermission("add") && (
+                            <button
+                              onClick={() =>
+                                navigate(`/app/vouchers/payment/create`, {
+                                  state: { copyId: voucher.id },
+                                })
+                              }
+                              className="text-blue-500 hover:text-blue-700 transition-colors"
+                              title="Copy voucher"
+                            >
+                              <Copy size={18} />
+                            </button>
+                          )}
+                          {hasPermission("edit") && (
+                            <button
+                              onClick={() => editHandler(voucher.id)}
+                              className="text-indigo-500 hover:text-indigo-700 transition-colors"
+                              title="Edit voucher"
+                            >
+                              <Edit size={18} />
+                            </button>
+                          )}
                           <button
-                            onClick={() =>
-                              navigate(`/app/vouchers/payment/create`, {
-                                state: { copyId: voucher.id },
-                              })
-                            }
-                            className="text-blue-600 hover:text-blue-900"
-                            title="Copy voucher"
+                            onClick={() => handleGenerateXml(voucher)}
+                            className="text-orange-500 hover:text-orange-700 transition-colors"
+                            title="Generate XML"
                           >
-                            Copy
+                            <FileCode2 size={18} />
                           </button>
-                        )}
-                        {hasPermission("edit") && (
-                          <button
-                            onClick={() => editHandler(voucher.id)}
-                            className="text-indigo-600 hover:text-indigo-900"
-                            title="Edit voucher"
-                          >
-                            Edit
-                          </button>
-                        )}
-                        {hasPermission("delete") && (
-                          <button
-                            onClick={() => deleteHandler(voucher.id)}
-                            className="text-red-600 hover:text-red-900"
-                            title="Delete voucher"
-                          >
-                            Delete
-                          </button>
-                        )}
-                      </div>
-                    </td>
+                          {hasPermission("delete") && (
+                            <button
+                              onClick={() => deleteHandler(voucher.id)}
+                              className="text-red-500 hover:text-red-700 transition-colors"
+                              title="Delete voucher"
+                            >
+                              <Trash2 size={18} />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    )}
                   </tr>
                 );
               })}
@@ -1015,7 +1126,7 @@ const PaymentRegister: React.FC = () => {
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
                   {formatCurrency(totalCredit)}
                 </td>
-                <td colSpan={2}></td>
+                <td colSpan={showActions ? 2 : 1}></td>
               </tr>
             </tfoot>
           </table>
@@ -1109,6 +1220,55 @@ const PaymentRegister: React.FC = () => {
           <p className="text-gray-400 text-sm mt-2">
             Try adjusting your filters or change the view type.
           </p>
+        </div>
+      )}
+
+      {/* XML Preview Modal */}
+      {previewXml && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-white/40 backdrop-blur-sm">
+          <div className="bg-white rounded-lg shadow-xl w-3/4 max-w-4xl flex flex-col h-[80vh]">
+            <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+              <h3 className="text-lg font-semibold text-gray-800">XML Preview: {previewXml.filename}</h3>
+              <button 
+                onClick={() => setPreviewXml(null)}
+                className="text-gray-500 hover:text-gray-700"
+              >
+                &times;
+              </button>
+            </div>
+            
+            <div className="flex-1 p-6 overflow-auto bg-gray-50">
+              <pre className="text-sm text-gray-800 whitespace-pre-wrap font-mono">
+                {previewXml.content}
+              </pre>
+            </div>
+            
+            <div className="px-6 py-4 border-t border-gray-200 flex justify-end gap-3 bg-white rounded-b-lg">
+              <button
+                onClick={() => setPreviewXml(null)}
+                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 hover:bg-gray-50 font-medium"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => {
+                  const blob = new Blob([previewXml.content], { type: "application/xml" });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement("a");
+                  a.href = url;
+                  a.download = previewXml.filename;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  setPreviewXml(null);
+                }}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-medium flex items-center gap-2"
+              >
+                Download XML
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>
