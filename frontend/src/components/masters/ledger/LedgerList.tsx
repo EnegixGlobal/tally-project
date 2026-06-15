@@ -1,6 +1,6 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Edit, Trash2, Plus, Search, ArrowLeft } from "lucide-react";
+import { Edit, Trash2, Plus, Search, ArrowLeft, Download } from "lucide-react";
 import { useAppContext } from "../../../context/AppContext";
 import type { Ledger, LedgerGroup } from "../../../types";
 import { formatGSTNumber } from "../../../utils/ledgerUtils";
@@ -178,6 +178,29 @@ const LedgerList: React.FC = () => {
     return sum;
   }, 0);
 
+  const handleExport = useCallback(async () => {
+    try {
+      const XLSX = await import("xlsx");
+      const exportData = filteredLedgers.map((row) => ({
+        "Name": row.name || "",
+        "Under Group": getGroupName(row.groupId),
+        "GST Number": row.gstNumber || "",
+        "Opening Balance": row.openingBalance || 0,
+        "Type": row.balanceType?.toUpperCase() || "N/A",
+        "GST/Category": row.gstNumber ? "B2B" : "B2C",
+      }));
+
+      const worksheet = XLSX.utils.json_to_sheet(exportData);
+      const workbook = XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(workbook, worksheet, "Ledgers");
+
+      XLSX.writeFile(workbook, "ledger_list.xlsx");
+    } catch (error) {
+      console.error("Export error", error);
+      Swal.fire("Error", "Failed to export Excel file", "error");
+    }
+  }, [filteredLedgers, ledgerGroups]);
+
   return (
     <>
       <div className="pt-[56px] px-4 ">
@@ -201,6 +224,17 @@ const LedgerList: React.FC = () => {
           </div>
 
           <div className="flex space-x-3">
+            <button
+              type="button"
+              onClick={handleExport}
+              className={`flex items-center px-4 py-2 rounded ${theme === "dark"
+                ? "bg-purple-600 hover:bg-purple-700 text-white"
+                : "bg-purple-600 hover:bg-purple-700 text-white"
+                }`}
+            >
+              <Download size={18} className="mr-1" />
+              Export
+            </button>
             <button
               type="button"
               onClick={() => navigate("/app/masters/ledger/bulk-create")}
