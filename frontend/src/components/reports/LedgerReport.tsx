@@ -10,6 +10,7 @@ import {
   Eye,
 } from "lucide-react";
 import { useCompany } from "../../context/CompanyContext";
+import * as XLSX from "xlsx";
 
 interface DayBookEntry {
   id: string;
@@ -113,6 +114,7 @@ const LedgerReport: React.FC = () => {
   ];
 
   const [showFilterPanel, setShowFilterPanel] = useState(true);
+  const [showDownloadDropdown, setShowDownloadDropdown] = useState(false);
   const [viewMode, setViewMode] = useState<"detailed" | "monthly" | "daily">(
     "detailed"
   );
@@ -169,15 +171,71 @@ const LedgerReport: React.FC = () => {
   };
 
   const handleDownload = () => {
-    console.log(
-      "Download report for:",
-      ledgerId,
-      "date range:",
-      selectedDateRange
-    );
+    setShowDownloadDropdown(!showDownloadDropdown);
   };
 
+  const exportToExcel = () => {
+    if (!ledgerTransactions || ledgerTransactions.length === 0) return;
 
+    const wsData: any[][] = [];
+
+    // Company Heading
+    wsData.push([companyInfo?.name || ""]);
+    wsData.push([companyInfo?.address || ""]);
+    wsData.push([]);
+    
+    // Report Title
+    wsData.push(["Ledger Report"]);
+    wsData.push([`Ledger: ${selectedLedgerData?.name || ""}`]);
+    wsData.push([`Address: ${selectedLedgerData?.address || ""}`]);
+    wsData.push([`Period: ${formatDate(fromDate)} to ${formatDate(toDate)}`]);
+    wsData.push([]);
+
+    // Headers
+    wsData.push(["Date", "Particulars", "Vch Type", "Vch No.", "Debit", "Credit"]);
+
+    // Opening Balance
+    if (summaryTotals.openingBalance !== 0) {
+      let debit = ((summaryTotals.openingBalance > 0 && isDebitLedger) || (summaryTotals.openingBalance < 0 && !isDebitLedger)) ? Math.abs(summaryTotals.openingBalance) : '';
+      let credit = ((summaryTotals.openingBalance < 0 && isDebitLedger) || (summaryTotals.openingBalance > 0 && !isDebitLedger)) ? Math.abs(summaryTotals.openingBalance) : '';
+      wsData.push(["", "Opening Balance", "", "", debit, credit]);
+    }
+
+    // Transactions
+    const filteredTxns = ledgerTransactions.filter(t => !t.isOpening && !t.isClosing);
+    filteredTxns.forEach(txn => {
+      wsData.push([
+        formatDate(txn.date),
+        ledgerIdNameMap[String(txn.particulars)] || txn.particulars,
+        txn.isQuotation ? "Quotation" : txn.voucherType,
+        txn.voucherNo,
+        txn.debit > 0 ? txn.debit : '',
+        txn.credit > 0 ? txn.credit : ''
+      ]);
+    });
+
+    // Sub Totals
+    wsData.push(["", "", "", "", summaryTotals.totalDebit, summaryTotals.totalCredit]);
+
+    // Closing Balance
+    if (Math.abs(summaryTotals.totalDebit - summaryTotals.totalCredit) > 0) {
+      let debit = summaryTotals.totalCredit > summaryTotals.totalDebit ? Math.abs(summaryTotals.totalDebit - summaryTotals.totalCredit) : '';
+      let credit = summaryTotals.totalDebit > summaryTotals.totalCredit ? Math.abs(summaryTotals.totalDebit - summaryTotals.totalCredit) : '';
+      wsData.push(["", "Closing Balance", "", "", debit, credit]);
+    }
+
+    // Grand Totals
+    const grandTotal = Math.max(summaryTotals.totalDebit, summaryTotals.totalCredit);
+    wsData.push(["", "", "", "", grandTotal, grandTotal]);
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ledger Report");
+    XLSX.writeFile(
+      wb,
+      `Ledger_Report_${selectedLedgerData?.name || "Report"}_${new Date().toISOString().split("T")[0]}.xlsx`
+    );
+  };
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-IN", {
@@ -623,15 +681,49 @@ const LedgerReport: React.FC = () => {
           >
             <Printer size={18} />
           </button>
-          <button
-            type="button"
-            title="Download Report"
-            onClick={handleDownload}
-            className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
-              }`}
-          >
-            <Download size={18} />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              title="Download Report"
+              onClick={handleDownload}
+              className={`p-2 rounded-md ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+                }`}
+            >
+              <Download size={18} />
+            </button>
+            {showDownloadDropdown && (
+              <div
+                className={`absolute right-0 mt-2 w-48 rounded-md shadow-lg z-10 ${
+                  theme === "dark" ? "bg-gray-800 border border-gray-700" : "bg-white border border-gray-200"
+                }`}
+              >
+                <div className="py-1">
+                  <button
+                    onClick={() => {
+                      setShowDownloadDropdown(false);
+                      exportToExcel();
+                    }}
+                    className={`block w-full text-left px-4 py-2 text-sm ${
+                      theme === "dark" ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    Download as Excel
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowDownloadDropdown(false);
+                      handlePrint();
+                    }}
+                    className={`block w-full text-left px-4 py-2 text-sm ${
+                      theme === "dark" ? "hover:bg-gray-700 text-gray-200" : "hover:bg-gray-100 text-gray-700"
+                    }`}
+                  >
+                    Download as PDF
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
 
@@ -787,7 +879,7 @@ const LedgerReport: React.FC = () => {
                   {selectedLedgerData?.name}
                 </h2>
                 <p className="text-sm text-gray-500">
-                  Group: {selectedLedgerGroup?.name} | Period:{" "}
+                  Address: {selectedLedgerData?.address || "N/A"} | Period:{" "}
                   {formatDate(fromDate)} to {formatDate(toDate)}
                 </p>
               </div>
