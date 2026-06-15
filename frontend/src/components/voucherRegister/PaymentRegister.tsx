@@ -778,15 +778,6 @@ const PaymentRegister: React.FC = () => {
                 Delete Selected ({selectedVoucherIds.size})
               </button>
             )}
-            {hasPermission("add") && (
-              <button
-                onClick={() => navigate("/app/vouchers/payment/create")}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors shadow-md text-sm font-semibold"
-                title="Add new payment voucher"
-              >
-                Add New Payment
-              </button>
-            )}
           </div>
         </div>
       </div>
