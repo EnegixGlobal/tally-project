@@ -164,8 +164,8 @@ const MainLayout: React.FC = () => {
       )}
       <div className="flex flex-1">
         <Sidebar isOpen={sidebarOpen} />
-        <main className={`flex-1 transition-all duration-300 ${sidebarOpen ? 'ml-60' : 'ml-16'} pt-12`}>
-          <div className="p-4 h-full">
+        <main className={`flex-1 transition-all duration-300 print:ml-0 print:pt-0 ${sidebarOpen ? 'ml-60' : 'ml-16'} pt-12`}>
+          <div className="p-4 print:p-0 h-full">
             <ErrorBoundary>
               <Outlet />
             </ErrorBoundary>

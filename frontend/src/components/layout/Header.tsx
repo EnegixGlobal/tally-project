@@ -40,7 +40,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
 
   return (
     <header
-      className={`fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-2 border-b h-14 ${
+      className={`print:hidden fixed top-0 left-0 right-0 z-50 flex items-center justify-between p-2 border-b h-14 ${
         theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-blue-900 border-blue-800'
       }`}
     >
