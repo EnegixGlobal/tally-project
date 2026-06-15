@@ -118,8 +118,23 @@ const PurchaseInvoiceMatching: React.FC = () => {
       };
     });
 
+    const sortByDateAndVoucher = (a: any, b: any) => {
+      const dateA = new Date(a.date || 0).getTime();
+      const dateB = new Date(b.date || 0).getTime();
+      if (dateA !== dateB) return dateA - dateB;
+
+      const getVchNum = (vch: string) => {
+        if (!vch) return 0;
+        const match = String(vch).match(/(?:\/|^)(\d+)(?:\/|$)/);
+        if (match) return parseInt(match[1], 10);
+        const anyNum = String(vch).match(/\d+/);
+        return anyNum ? parseInt(anyNum[0], 10) : 0;
+      };
+      return getVchNum(a.number) - getVchNum(b.number);
+    };
+
     if (importedData.length === 0) {
-      return { mergedData: baseRows, matchStats: null };
+      return { mergedData: baseRows.sort(sortByDateAndVoucher), matchStats: null };
     }
 
     // 2. Matching Logic
@@ -293,7 +308,7 @@ const PurchaseInvoiceMatching: React.FC = () => {
         } as any;
       });
 
-    const finalMerged = [...matchedRows, ...extraRows];
+    const finalMerged = [...matchedRows, ...extraRows].sort(sortByDateAndVoucher);
 
     return {
       mergedData: finalMerged,
