@@ -133,6 +133,7 @@ const LedgerReport: React.FC = () => {
   const fyEndDate = `${fyStartYear + 1}-03-31`;
 
   const [selectedDateRange, setSelectedDateRange] = useState(searchParams.get("fromDate") ? "custom" : "current-year");
+  const [selectedQuarter, setSelectedQuarter] = useState<string>("");
   const [fromDate, setFromDate] = useState(searchParams.get("fromDate") || fyStartDate);
   const [toDate, setToDate] = useState(searchParams.get("toDate") || fyEndDate);
   const [showClosingBalances, setShowClosingBalances] = useState(true);
@@ -279,22 +280,42 @@ const LedgerReport: React.FC = () => {
         );
         break;
       }
-      case "current-quarter": {
-        const quarterStart = new Date(
-          currentYear,
-          Math.floor(today.getMonth() / 3) * 3,
-          1
-        );
-        setFromDate(quarterStart.toISOString().split("T")[0]);
-        setToDate(today.toISOString().split("T")[0]);
-        break;
-      }
+
       case "current-year": {
         const startYear = today.getMonth() >= 3 ? currentYear : currentYear - 1;
         setFromDate(`${startYear}-04-01`);
         setToDate(`${startYear + 1}-03-31`);
         break;
       }
+      default:
+        break;
+    }
+  };
+
+  const handleQuarterChange = (q: string) => {
+    setSelectedQuarter(q);
+    const today = new Date();
+    const currentYear = today.getFullYear();
+    const currentMonth = today.getMonth();
+    const fyStartYear = currentMonth >= 3 ? currentYear : currentYear - 1;
+
+    switch (q) {
+      case "Q1":
+        setFromDate(`${fyStartYear}-04-01`);
+        setToDate(`${fyStartYear}-06-30`);
+        break;
+      case "Q2":
+        setFromDate(`${fyStartYear}-07-01`);
+        setToDate(`${fyStartYear}-09-30`);
+        break;
+      case "Q3":
+        setFromDate(`${fyStartYear}-10-01`);
+        setToDate(`${fyStartYear}-12-31`);
+        break;
+      case "Q4":
+        setFromDate(`${fyStartYear + 1}-01-01`);
+        setToDate(`${fyStartYear + 1}-03-31`);
+        break;
       default:
         break;
     }
@@ -792,7 +813,12 @@ const LedgerReport: React.FC = () => {
               <select
                 title="Select Date Range"
                 value={selectedDateRange}
-                onChange={(e) => handleDateRangeChange(e.target.value)}
+                onChange={(e) => {
+                  handleDateRangeChange(e.target.value);
+                  if (e.target.value !== "quarterly") {
+                    setSelectedQuarter("");
+                  }
+                }}
                 className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600"
                   : "bg-white border-gray-300"
@@ -800,11 +826,33 @@ const LedgerReport: React.FC = () => {
               >
                 <option value="current-month">Current Month</option>
                 <option value="previous-month">Previous Month</option>
-                <option value="current-quarter">Current Quarter</option>
+                <option value="quarterly">Quarterly</option>
                 <option value="current-year">Current Financial Year</option>
                 <option value="custom">Custom Period</option>
               </select>
             </div>
+            {selectedDateRange === "quarterly" && (
+              <div>
+                <label className="block text-sm font-medium mb-1">
+                  Select Quarter
+                </label>
+                <select
+                  title="Select Quarter"
+                  value={selectedQuarter}
+                  onChange={(e) => handleQuarterChange(e.target.value)}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600"
+                    : "bg-white border-gray-300"
+                    }`}
+                >
+                  <option value="">Select...</option>
+                  <option value="Q1">Apr - Jun</option>
+                  <option value="Q2">Jul - Sep</option>
+                  <option value="Q3">Oct - Dec</option>
+                  <option value="Q4">Jan - Mar</option>
+                </select>
+              </div>
+            )}
             <div className="flex items-center pt-6">
               <label className="flex items-center">
                 <input

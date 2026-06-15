@@ -148,6 +148,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
   const { selectedFinYear } = useFinancialYear();
 
+  const [groupBy, setGroupBy] = useState<"none" | "party" | "gst">("none");
+  const [selectedGroupValue, setSelectedGroupValue] = useState<string | null>(null);
+
   // New state for Change View functionality
   const [viewType, setViewType] = useState<
     "Daily" | "Weekly" | "Fortnightly" | "Monthly" | "Quarterly" | "Half-yearly"
@@ -887,7 +890,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   };
 
   // ---- FINAL FILTERING LOGIC ----
-  const filteredVouchers = (() => {
+  const { filteredVouchers, groupOptions } = (() => {
     try {
       // Convert raw data → VoucherEntry
       const converted = vouchers.map((v) => {
@@ -909,7 +912,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       const viewFiltered = filterVouchersByView(finYearFiltered);
 
       // Apply Search, Date, Status filters
-      let finalList = viewFiltered.filter((voucher) => {
+      let baseFilteredList = viewFiltered.filter((voucher) => {
         const safeNumber = (voucher.number || "").toLowerCase();
         const safeRef = (voucher.referenceNo || "").toLowerCase();
 
@@ -962,6 +965,50 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         return searchMatch && dateMatch && statusMatch && gstMatch && periodMatch;
       });
 
+      // Calculate groups
+      let gOptions: { value: string; count: number }[] = [];
+      if (voucherType === "sales" && groupBy !== "none") {
+        const counts = new Map<string, number>();
+        baseFilteredList.forEach((voucher) => {
+          const debitEntry = voucher.entries.find((e: any) => e.type === "debit");
+          const partyId = debitEntry?.ledgerId;
+          const party = ledgerList.find((l) => String(l.id) === String(partyId));
+          
+          let key = "";
+          if (groupBy === "party") {
+            key = party ? party.name : `Unknown (${partyId})`;
+          } else if (groupBy === "gst") {
+            key = party && (party.gstNumber || party.gst_number || party.gstin || party.gst_no) 
+              ? (party.gstNumber || party.gst_number || party.gstin || party.gst_no) 
+              : "Unregistered";
+          }
+          if (key) {
+             counts.set(key, (counts.get(key) || 0) + 1);
+          }
+        });
+        
+        gOptions = Array.from(counts.entries()).map(([value, count]) => ({ value, count })).sort((a, b) => b.count - a.count);
+      }
+
+      // Apply group filter
+      let finalList = baseFilteredList.filter((voucher) => {
+        if (voucherType !== "sales" || groupBy === "none" || !selectedGroupValue) return true;
+        
+        const debitEntry = voucher.entries.find((e: any) => e.type === "debit");
+        const partyId = debitEntry?.ledgerId;
+        const party = ledgerList.find((l) => String(l.id) === String(partyId));
+        
+        let key = "";
+        if (groupBy === "party") {
+          key = party ? party.name : `Unknown (${partyId})`;
+        } else if (groupBy === "gst") {
+          key = party && (party.gstNumber || party.gst_number || party.gstin || party.gst_no) 
+            ? (party.gstNumber || party.gst_number || party.gstin || party.gst_no) 
+            : "Unregistered";
+        }
+        return key === selectedGroupValue;
+      });
+
       finalList.sort((a, b) => {
         const da = a.safeDate ? a.safeDate.getTime() : 0;
         const db = b.safeDate ? b.safeDate.getTime() : 0;
@@ -969,10 +1016,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         return Number(a.id) - Number(b.id);
       });
 
-      return finalList;
+      return { filteredVouchers: finalList, groupOptions: gOptions };
     } catch (err) {
       console.error("Filter Error:", err);
-      return [];
+      return { filteredVouchers: [], groupOptions: [] };
     }
   })();
 
@@ -1491,6 +1538,44 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 <FileCode2 className="mr-2" size={16} />
                 Export All XML
               </button>
+            )}
+
+            {voucherType === "sales" && (
+              <div className="flex items-center gap-2">
+                <select
+                  value={groupBy}
+                  onChange={(e) => {
+                    setGroupBy(e.target.value as any);
+                    setSelectedGroupValue(null);
+                    setCurrentPage(1);
+                  }}
+                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm cursor-pointer hover:border-gray-400 transition-colors"
+                  title="Group By"
+                >
+                  <option value="none">Party Wise (None)</option>
+                  <option value="party">Party Name</option>
+                  <option value="gst">GST Number</option>
+                </select>
+
+                {groupBy !== "none" && (
+                  <select
+                    value={selectedGroupValue || ""}
+                    onChange={(e) => {
+                      setSelectedGroupValue(e.target.value || null);
+                      setCurrentPage(1);
+                    }}
+                    className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm cursor-pointer hover:border-gray-400 transition-colors max-w-[200px]"
+                    title={`Select ${groupBy === "party" ? "Party" : "GST Number"}`}
+                  >
+                    <option value="">All</option>
+                    {groupOptions.map((opt) => (
+                      <option key={opt.value} value={opt.value}>
+                        {opt.value} ({opt.count})
+                      </option>
+                    ))}
+                  </select>
+                )}
+              </div>
             )}
 
             {showActions && selectedVoucherIds.size > 0 && (
