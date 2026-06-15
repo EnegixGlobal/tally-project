@@ -200,6 +200,9 @@ const SalesReport: React.FC = () => {
         if (aValue > bValue) return sortConfig.direction === "asc" ? 1 : -1;
         return 0;
       });
+    } else {
+      // Default Sort By date
+      data.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
     }
     return data;
   }, [salesVouchers, selectedMonth, selectedParty, sortConfig, filters.fromDate, filters.toDate]);
@@ -695,6 +698,8 @@ const SalesReport: React.FC = () => {
 
       return row;
     });
+
+    rows.sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
 
     return { headers: allDynamicCols, rows };
   }, [filteredVouchers, columnarDrillDown]);
