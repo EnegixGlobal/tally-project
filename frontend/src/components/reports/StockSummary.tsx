@@ -13,6 +13,7 @@ import {
 } from "lucide-react";
 import { useAppContext } from "../../context/AppContext";
 import ReportTable from "./ReportTable";
+import { allSystemGroups } from "../../constants/ledgerGroups";
 
 const StockSummary: React.FC = () => {
   const { theme, units } = useAppContext();
@@ -72,23 +73,38 @@ const StockSummary: React.FC = () => {
           throw new Error("Failed to fetch ledger groups");
         }
 
-        const groupData = await groupRes.json();
+        const groupDataRes = await groupRes.json();
+        // console.log("groupDataRes:", groupDataRes);
 
-        const stockGroup = Array.isArray(groupData)
-          ? groupData.find(
-            (g: any) =>
-              typeof g?.name === "string" &&
-              g.name.toLowerCase() === "stock-in-hand"
-          )
-          : null;
+        const apiGroups = Array.isArray(groupDataRes) ? groupDataRes : (Array.isArray(groupDataRes?.data) ? groupDataRes.data : []);
+        const groupsArr = [...allSystemGroups, ...apiGroups];
+
+        const stockGroup = groupsArr.find(
+          (g: any) =>
+            typeof g?.name === "string" &&
+            g.name.toLowerCase() === "stock-in-hand"
+        );
+        // console.log("stockGroup:", stockGroup);
 
         if (!stockGroup) {
-          console.warn("Stock-in-hand group not found");
+          console.warn("Stock-in-hand group not found in groupsArr");
           setGroups([]);
           return;
         }
 
-        const stockGroupId = stockGroup.id;
+        const stockGroupId = Number(stockGroup.id);
+
+        const getDescendantGroups = (parentId: number, allGroups: any[]): number[] => {
+          const children = allGroups.filter((g) => Number(g.parent) === parentId).map((g) => Number(g.id));
+          let descendants = [...children];
+          children.forEach((childId) => {
+            descendants = [...descendants, ...getDescendantGroups(childId, allGroups)];
+          });
+          return descendants;
+        };
+
+        const stockGroupIds = [stockGroupId, ...getDescendantGroups(stockGroupId, groupsArr)];
+        // console.log("stockGroupIds:", stockGroupIds);
 
         const ledgerRes = await fetch(
           `${import.meta.env.VITE_API_URL
@@ -99,13 +115,14 @@ const StockSummary: React.FC = () => {
           throw new Error("Failed to fetch ledgers");
         }
 
-        const ledgerData = await ledgerRes.json();
+        const ledgerDataRes = await ledgerRes.json();
+        const ledgersArr = Array.isArray(ledgerDataRes) ? ledgerDataRes : (Array.isArray(ledgerDataRes?.data) ? ledgerDataRes.data : []);
+        // console.log("ledgersArr sample:", ledgersArr.slice(0, 5));
 
-        const filteredLedgers = Array.isArray(ledgerData)
-          ? ledgerData.filter(
-            (l: any) => Number(l.groupId) === Number(stockGroupId)
-          )
-          : [];
+        const filteredLedgers = ledgersArr.filter(
+          (l: any) => stockGroupIds.includes(Number(l.groupId))
+        );
+        // console.log("filteredLedgers:", filteredLedgers);
 
         setGroups(filteredLedgers);
       } catch (error) {
