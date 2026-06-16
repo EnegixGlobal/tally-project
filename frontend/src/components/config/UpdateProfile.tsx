@@ -60,6 +60,12 @@ const UpdateProfile: React.FC = () => {
                     Authorization: `Bearer ${token}`,
                 },
             });
+            if (res.status === 401) {
+                localStorage.removeItem("token");
+                localStorage.removeItem("user");
+                window.location.href = "/login";
+                return;
+            }
             const data = await res.json();
             if (data.success) {
                 setProfile(data.profile);
@@ -96,6 +102,13 @@ const UpdateProfile: React.FC = () => {
                     address: profile.address,
                 }),
             });
+
+            if (res.status === 401) {
+                localStorage.removeItem("token");
+                localStorage.removeItem("user");
+                window.location.href = "/login";
+                return;
+            }
 
             const data = await res.json();
             if (data.success) {

@@ -3,10 +3,34 @@ const router = express.Router();
 const db = require('../db');
 const authMiddleware = require('../middlewares/authMiddleware');
 
+const ensureAddressColumn = async (role) => {
+    let targetTable = 'tbemployees';
+    let afterColumn = 'pan';
+
+    if (role === 'ca') {
+        targetTable = 'tbca';
+        afterColumn = 'fdpan';
+    } else if (role === 'ca_employee') {
+        targetTable = 'tbcaemployees';
+        afterColumn = 'adhar';
+    }
+
+    try {
+        const [cols] = await db.query(`SHOW COLUMNS FROM ${targetTable} LIKE 'address'`);
+        if (cols.length === 0) {
+            await db.query(`ALTER TABLE ${targetTable} ADD COLUMN address TEXT AFTER ${afterColumn}`);
+        }
+    } catch (err) {
+        console.error(`Error ensuring address column in ${targetTable}:`, err.message);
+    }
+};
+
 // Get user profile
 router.get('/my-profile', authMiddleware, async (req, res) => {
     try {
         const { id, role } = req.user;
+
+        await ensureAddressColumn(role);
 
         let sql = '';
         let params = [id];
@@ -35,26 +59,7 @@ router.post('/update-profile', authMiddleware, async (req, res) => {
     try {
         const { id, role } = req.user;
 
-        // ✅ Ensure 'address' column exists in the active user's table when route is hit
-        let targetTable = 'tbemployees';
-        let afterColumn = 'pan';
-
-        if (role === 'ca') {
-            targetTable = 'tbca';
-            afterColumn = 'fdpan';
-        } else if (role === 'ca_employee') {
-            targetTable = 'tbcaemployees';
-            afterColumn = 'adhar';
-        }
-
-        try {
-            const [cols] = await db.query(`SHOW COLUMNS FROM ${targetTable} LIKE 'address'`);
-            if (cols.length === 0) {
-                await db.query(`ALTER TABLE ${targetTable} ADD COLUMN address TEXT AFTER ${afterColumn}`);
-            }
-        } catch (err) {
-            console.error(`Error ensuring address column in ${targetTable}:`, err.message);
-        }
+        await ensureAddressColumn(role);
 
         const { firstName, lastName, phoneNumber, pan, address } = req.body;
 
