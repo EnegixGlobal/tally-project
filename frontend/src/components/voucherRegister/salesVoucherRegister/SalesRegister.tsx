@@ -29,10 +29,22 @@ const SalesRegister: React.FC = () => {
       }
       
       const fullVoucher = await response.json();
+      
+      // Fetch DB ledgers instead of using AppContext defaults which might contain duplicate IDs
+      let dbLedgers = ledgers;
+      try {
+        const ledgersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+        if (ledgersRes.ok) {
+          dbLedgers = await ledgersRes.json();
+        }
+      } catch (err) {
+        console.error("Failed to fetch ledgers", err);
+      }
+      
       const companyName = activeCompany?.name || "M P Traders";
       
-      // Generate XML content
-      const xmlContent = generateSalesXmlContent(fullVoucher, companyName, ledgers);
+      // Generate XML content using dbLedgers
+      const xmlContent = generateSalesXmlContent(fullVoucher, companyName, dbLedgers);
       
       // Set state to show preview modal
       setPreviewXml({
@@ -76,10 +88,22 @@ const SalesRegister: React.FC = () => {
       );
 
       const fullVouchers = await Promise.all(fetchPromises);
+      
+      // Fetch DB ledgers instead of using AppContext defaults
+      let dbLedgers = ledgers;
+      try {
+        const ledgersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+        if (ledgersRes.ok) {
+          dbLedgers = await ledgersRes.json();
+        }
+      } catch (err) {
+        console.error("Failed to fetch ledgers", err);
+      }
+      
       const companyName = activeCompany?.name || "M P Traders";
       
       // Generate bulk XML content
-      const xmlContent = generateBulkSalesXmlContent(fullVouchers, companyName, ledgers);
+      const xmlContent = generateBulkSalesXmlContent(fullVouchers, companyName, dbLedgers);
       
       Swal.close();
 

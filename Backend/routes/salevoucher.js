@@ -869,9 +869,10 @@ router.get("/:id", async (req, res) => {
       // DEFAULT: item-invoice
       const [items] = await db.execute(
         `
-      SELECT *
-      FROM sales_voucher_items
-      WHERE voucherId = ?
+      SELECT svi.*, si.name as itemName
+      FROM sales_voucher_items svi
+      LEFT JOIN stock_items si ON svi.itemId = si.id
+      WHERE svi.voucherId = ?
       `,
         [voucherId]
       );
@@ -896,6 +897,7 @@ router.get("/:id", async (req, res) => {
         return {
           id: item.id,
           itemId: item.itemId,
+          itemName: item.itemName,
           quantity: item.quantity,
           rate: item.rate,
           discount: item.discount,
