@@ -1509,10 +1509,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   }
 
   return (
-    <div className="pt-[56px] px-4 min-h-screen">
+    <div className="pt-[56px] px-4 min-h-screen w-full max-w-full overflow-x-hidden box-border">
       {/* Header */}
       <div className="mb-6">
-        <div className="flex justify-between items-center">
+        <div className="flex flex-col xl:flex-row justify-between items-start xl:items-center gap-4">
 
           {/* LEFT SIDE */}
           <div className="flex items-center">
@@ -1528,7 +1528,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           </div>
 
           {/* RIGHT SIDE */}
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-3 w-full xl:w-auto">
             {onGenerateAllXml && (
               <button
                 onClick={() => onGenerateAllXml(filteredVouchers as VoucherEntry[])}
