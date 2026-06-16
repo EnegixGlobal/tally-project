@@ -537,10 +537,22 @@ const PaymentRegister: React.FC = () => {
       
       const resData = await response.json();
       const fullVoucher = resData.data || resData;
+      
+      // Fetch DB ledgers instead of using AppContext defaults
+      let dbLedgers = ledgers;
+      try {
+        const ledgersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+        if (ledgersRes.ok) {
+          dbLedgers = await ledgersRes.json();
+        }
+      } catch (err) {
+        console.error("Failed to fetch ledgers", err);
+      }
+      
       const companyName = activeCompany?.name || "M P Traders";
       
-      // Generate XML content
-      const xmlContent = generatePaymentXmlContent(fullVoucher, companyName, ledgers);
+      // Generate XML content using dbLedgers
+      const xmlContent = generatePaymentXmlContent(fullVoucher, companyName, dbLedgers);
       
       Swal.close();
 
@@ -584,10 +596,22 @@ const PaymentRegister: React.FC = () => {
 
       const fullVouchersRes = await Promise.all(fetchPromises);
       const fullVouchers = fullVouchersRes.map((res: any) => res.data || res);
+      
+      // Fetch DB ledgers instead of using AppContext defaults
+      let dbLedgers = ledgers;
+      try {
+        const ledgersRes = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+        if (ledgersRes.ok) {
+          dbLedgers = await ledgersRes.json();
+        }
+      } catch (err) {
+        console.error("Failed to fetch ledgers", err);
+      }
+      
       const companyName = activeCompany?.name || "M P Traders";
       
       // Generate bulk XML content
-      const xmlContent = generateBulkPaymentXmlContent(fullVouchers, companyName, ledgers);
+      const xmlContent = generateBulkPaymentXmlContent(fullVouchers, companyName, dbLedgers);
       
       Swal.close();
 
