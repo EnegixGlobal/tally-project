@@ -30,7 +30,7 @@ export const generateBulkSalesXmlContent = (vouchersData: any[], companyName: st
     
     // Find party ledger in ledgers array
     const partyLedger = ledgers.find((l: any) => String(l.id) === String(voucherData.partyId || voucherData.customerId));
-    const partyName = partyLedger?.name || voucherData.partyName || voucherData.customerName || "Cash";
+    const partyName = voucherData.partyName || partyLedger?.name || voucherData.customerName || "Cash";
     
     // Find Sales Ledger
     const salesLedgerIdObj = ledgers.find((l: any) => String(l.id) === String(voucherData.salesLedgerId || voucherData.salesLedger));

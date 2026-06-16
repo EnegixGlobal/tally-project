@@ -1035,9 +1035,10 @@ router.get("/:id", async (req, res) => {
     if (voucher.mode === "item-invoice" || !voucher.mode) {
       const [items] = await db.execute(
         `
-        SELECT *
-        FROM purchase_voucher_items
-        WHERE voucherId = ?
+        SELECT pvi.*, si.name as itemName
+        FROM purchase_voucher_items pvi
+        LEFT JOIN stock_items si ON pvi.itemId = si.id
+        WHERE pvi.voucherId = ?
         `,
         [voucherId]
       );
@@ -1083,6 +1084,7 @@ router.get("/:id", async (req, res) => {
           id: item.id,
 
           itemId: item.itemId,
+          itemName: item.itemName,
 
           quantity: item.quantity,
           rate: item.rate,

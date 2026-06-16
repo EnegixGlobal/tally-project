@@ -16,9 +16,9 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
     const voucherDate = formatTallyDate(voucherData.date);
     const guid = voucherData.guid || `voucher-${voucherData.id}`;
     
-    // Find party ledger in ledgers array
+    // Find party ledger in ledgers array as fallback
     const partyLedger = ledgers.find((l: any) => String(l.id) === String(voucherData.partyId));
-    const partyName = partyLedger?.name || voucherData.partyName || voucherData.party?.name || "";
+    const partyName = voucherData.partyName || partyLedger?.name || voucherData.party?.name || "";
     
     const narration = voucherData.narration || "";
     const voucherNumber = voucherData.number || voucherData.id;
@@ -38,21 +38,55 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
   `;
 
     // Debit the purchase ledger
-    const items = voucherData.items || [];
-    let itemAmountSum = 0;
+    // Debit the purchase ledger
+    const mode = voucherData.mode || "item-invoice";
+    const entries = voucherData.entries || voucherData.items || [];
     
-    if (items.length > 0) {
-      let itemXml = "";
-      items.forEach((item: any) => {
-        const amount = Number(item.amount) || 0;
-        itemAmountSum += amount;
-        const rate = item.rate || 0;
-        const qty = item.quantity || 0;
-        const unit = item.unit || "nos";
-        itemXml += `
+    if (mode === "accounting-invoice") {
+      // In accounting mode, entries are ledger entries, not items
+      entries.forEach((entry: any) => {
+        if (entry.entryType === "debit" || Number(entry.amount) > 0) {
+          const ledgerObj = ledgers.find((l: any) => String(l.id) === String(entry.ledgerId));
+          const ledgerName = ledgerObj?.name || "Purchase A/c";
+          const amt = Number(entry.amount) || 0;
+          
+          ledgerEntriesXml += `
+  <ALLLEDGERENTRIES.LIST>
+   <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
+   <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+   <LEDGERFROMITEM>No</LEDGERFROMITEM>
+   <LEDGERNAME>${ledgerName}</LEDGERNAME>
+   <AMOUNT>-${amt.toFixed(2)}</AMOUNT>
+  </ALLLEDGERENTRIES.LIST>`;
+        }
+      });
+    } else {
+      // Item invoice mode
+      const items = entries;
+      if (items.length > 0) {
+        // Group items by purchase ledger
+        const purchaseLedgerGroups: Record<string, { amount: number; xml: string; name: string }> = {};
+
+        items.forEach((item: any) => {
+          // Find purchase ledger name
+          const pLedgerId = item.purchaseLedgerId || voucherData.purchaseLedgerId;
+          const pLedger = ledgers.find((l: any) => String(l.id) === String(pLedgerId));
+          const pLedgerName = pLedger?.name || "Purchase A/c";
+
+          if (!purchaseLedgerGroups[pLedgerName]) {
+            purchaseLedgerGroups[pLedgerName] = { amount: 0, xml: "", name: pLedgerName };
+          }
+
+          const amount = Number(item.amount) || 0;
+          purchaseLedgerGroups[pLedgerName].amount += amount;
+          const rate = item.rate || 0;
+          const qty = item.quantity || 0;
+          const unit = item.unit || "nos";
+          
+          purchaseLedgerGroups[pLedgerName].xml += `
    <INVENTORYALLOCATIONS.LIST>
     <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-    <STOCKITEMNAME>${item.itemName || item.item?.name || ""}</STOCKITEMNAME>
+    <STOCKITEMNAME>${item.itemName || item.item?.name || item.name || ""}</STOCKITEMNAME>
     <AMOUNT>-${amount.toFixed(2)}</AMOUNT>
     <ACTUALQTY> ${qty} ${unit}</ACTUALQTY>
     <BILLEDQTY> ${qty} ${unit}</BILLEDQTY>
@@ -69,26 +103,35 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
      <ORDERNO/>
     </BATCHALLOCATIONS.LIST>
    </INVENTORYALLOCATIONS.LIST>`;
-      });
+        });
 
-      ledgerEntriesXml += `
+        // Add ALLLEDGERENTRIES for each purchase ledger group
+        for (const group of Object.values(purchaseLedgerGroups)) {
+          if (group.amount > 0) {
+            ledgerEntriesXml += `
   <ALLLEDGERENTRIES.LIST>
    <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
    <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
    <LEDGERFROMITEM>No</LEDGERFROMITEM>
-   <LEDGERNAME>Purchase A/c</LEDGERNAME>
-   <AMOUNT>-${itemAmountSum.toFixed(2)}</AMOUNT>${itemXml}
+   <LEDGERNAME>${group.name}</LEDGERNAME>
+   <AMOUNT>-${group.amount.toFixed(2)}</AMOUNT>${group.xml}
   </ALLLEDGERENTRIES.LIST>`;
-    } else {
-      // If no items, just add ledger entry
-      ledgerEntriesXml += `
+          }
+        }
+      } else {
+        // If no items, just add ledger entry
+        const pLedger = ledgers.find((l: any) => String(l.id) === String(voucherData.purchaseLedgerId));
+        const pLedgerName = pLedger?.name || "Purchase A/c";
+        
+        ledgerEntriesXml += `
   <ALLLEDGERENTRIES.LIST>
    <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
    <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
    <LEDGERFROMITEM>No</LEDGERFROMITEM>
-   <LEDGERNAME>Purchase A/c</LEDGERNAME>
+   <LEDGERNAME>${pLedgerName}</LEDGERNAME>
    <AMOUNT>-${Number(voucherData.subtotal).toFixed(2)}</AMOUNT>
   </ALLLEDGERENTRIES.LIST>`;
+      }
     }
 
     // Taxes
