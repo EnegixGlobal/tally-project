@@ -197,7 +197,7 @@ router.post("/", async (req, res) => {
     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
   `;
 
-    await db.execute(sql, [
+    const [result] = await db.execute(sql, [
       name,
       groupId,
       openingBalance || 0,
@@ -216,7 +216,20 @@ router.post("/", async (req, res) => {
       ownerId,
     ]);
 
-    res.status(201).json({ message: "Ledger created successfully" });
+    res.status(201).json({ 
+      message: "Ledger created successfully",
+      ledger: {
+        id: result.insertId,
+        name,
+        groupId,
+        gstNumber,
+        state,
+        address,
+        pinCode,
+        panNumber,
+        balanceType: balanceType || "debit"
+      }
+    });
   } catch (err) {
     console.error("Error creating ledger:", err);
     res.status(500).json({ message: "Failed to create ledger" });

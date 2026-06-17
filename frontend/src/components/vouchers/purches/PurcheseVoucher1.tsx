@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useReactToPrint } from "react-to-print";
-
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { allSystemGroups as baseGroups } from "../../../constants/ledgerGroups";
 import { useAppContext } from "../../../context/AppContext";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
 import type { LedgerWithGroup, VoucherEntry } from "../../../types";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings, Upload } from "lucide-react";
 import Swal from "sweetalert2";
@@ -541,7 +541,7 @@ const PurchaseVoucher: React.FC = () => {
     try {
       Swal.fire({
         title: 'Extracting Bill Data...',
-        text: 'Please wait while AI processes the image.',
+        text: 'Please wait while AI processes the file.',
         allowOutsideClick: false,
         didOpen: () => {
           Swal.showLoading();
@@ -583,6 +583,133 @@ const PurchaseVoucher: React.FC = () => {
             return s1.includes(s2) || s2.includes(s1);
           };
 
+          let foundPartyId = "";
+          let isPartyMissing = false;
+          let localSupplierState = supplierState;
+
+          if (parsedData.supplierName) {
+            const match = partyLedgers.find((l: any) => fuzzyMatch(l.name, parsedData.supplierName));
+            if (match) {
+              foundPartyId = String(match.id);
+              setUnmappedPartyName(null);
+              localSupplierState = match.state || "";
+            } else {
+              isPartyMissing = true;
+              setUnmappedPartyName(parsedData.supplierName);
+              missingWarnings.push(`Ledger not exist: ${parsedData.supplierName}`);
+            }
+          } else {
+            missingWarnings.push(`Ledger not found in bill.`);
+            setUnmappedPartyName(null);
+          }
+
+          if (isPartyMissing) {
+            const result = await Swal.fire({
+              title: "Party not exist",
+              text: `Party Name: ${parsedData.supplierName} does not exist. Do you want to save it automatically?`,
+              icon: "question",
+              showCancelButton: true,
+              confirmButtonText: "Yes, save it",
+              cancelButtonText: "No",
+            });
+            
+            if (result.isConfirmed) {
+              try {
+                const groupsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+                const groupsData = await groupsRes.json();
+                const fetchedGroups = Array.isArray(groupsData) ? groupsData : (groupsData.groups || []);
+                const groupsArray = [...fetchedGroups, ...baseGroups];
+                const sundryCreditorsGroup = groupsArray.find((g: any) => g.name.toLowerCase() === 'sundry creditors');
+
+                if (!sundryCreditorsGroup) {
+                  Swal.fire("Error", "Sundry Creditors group not found. Please create it manually.", "error");
+                } else {
+                  const statesList = [
+                    { code: "37", name: "Andhra Pradesh" }, { code: "12", name: "Arunachal Pradesh" },
+                    { code: "18", name: "Assam" }, { code: "10", name: "Bihar" },
+                    { code: "22", name: "Chhattisgarh" }, { code: "30", name: "Goa" },
+                    { code: "24", name: "Gujarat" }, { code: "06", name: "Haryana" },
+                    { code: "02", name: "Himachal Pradesh" }, { code: "20", name: "Jharkhand" },
+                    { code: "29", name: "Karnataka" }, { code: "32", name: "Kerala" },
+                    { code: "23", name: "Madhya Pradesh" }, { code: "27", name: "Maharashtra" },
+                    { code: "14", name: "Manipur" }, { code: "17", name: "Meghalaya" },
+                    { code: "15", name: "Mizoram" }, { code: "13", name: "Nagaland" },
+                    { code: "21", name: "Odisha" }, { code: "03", name: "Punjab" },
+                    { code: "08", name: "Rajasthan" }, { code: "11", name: "Sikkim" },
+                    { code: "33", name: "Tamil Nadu" }, { code: "36", name: "Telangana" },
+                    { code: "16", name: "Tripura" }, { code: "09", name: "Uttar Pradesh" },
+                    { code: "05", name: "Uttarakhand" }, { code: "19", name: "West Bengal" },
+                    { code: "07", name: "Delhi" }, { code: "01", name: "Jammu and Kashmir" },
+                    { code: "38", name: "Ladakh" }
+                  ];
+
+                  let resolvedState = "";
+                  
+                  if (parsedData.supplierGst && parsedData.supplierGst.length >= 2) {
+                    const stateCode = parsedData.supplierGst.substring(0, 2);
+                    const stateMatch = statesList.find(s => s.code === stateCode);
+                    if (stateMatch) {
+                      resolvedState = `${stateMatch.name}(${stateMatch.code})`;
+                    }
+                  }
+                  
+                  if (!resolvedState && parsedData.supplierState) {
+                    const extracted = String(parsedData.supplierState).trim().toLowerCase();
+                    const stateMatch = statesList.find(s => 
+                      s.name.toLowerCase() === extracted || 
+                      s.code === extracted
+                    );
+                    if (stateMatch) {
+                      resolvedState = `${stateMatch.name}(${stateMatch.code})`;
+                    } else {
+                      resolvedState = parsedData.supplierState;
+                    }
+                  }
+                  const newLedgerPayload = {
+                    name: parsedData.supplierName,
+                    groupId: sundryCreditorsGroup.id,
+                    companyId,
+                    ownerType,
+                    ownerId,
+                    gstNumber: parsedData.supplierGst || "",
+                    address: parsedData.supplierAddress || "",
+                    state: resolvedState,
+                    pinCode: parsedData.supplierPinCode || "",
+                    panNumber: parsedData.supplierPan || "",
+                    openingBalance: 0,
+                    balanceType: "credit"
+                  };
+                  
+                  const createRes = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(newLedgerPayload)
+                  });
+                  
+                  if (createRes.ok) {
+                    const createdLedgerData = await createRes.json();
+                    const newLedger = createdLedgerData.ledger || createdLedgerData;
+                    
+                    setLedgers((prev: any) => [...prev, newLedger]);
+                    foundPartyId = String(newLedger.id);
+                    isPartyMissing = false;
+                    missingWarnings = missingWarnings.filter(w => !w.startsWith("Ledger not exist: "));
+                    setUnmappedPartyName(null);
+                    localSupplierState = resolvedState;
+                    
+                    await Swal.fire("Success", "Party ledger created successfully!", "success");
+                  } else {
+                    const errText = await createRes.text();
+                    await Swal.fire("Error", `Failed to create party ledger: ${errText}`, "error");
+                  }
+                }
+              } catch (err: any) {
+                console.error("Auto ledger creation error:", err);
+                await Swal.fire("Error", `An error occurred while creating ledger: ${err.message}`, "error");
+              }
+            }
+          }
+
           setFormData((prev: any) => {
             const updated = { ...prev };
             if (parsedData.invoiceNumber) updated.referenceNo = parsedData.invoiceNumber;
@@ -600,41 +727,152 @@ const PurchaseVoucher: React.FC = () => {
               }
             }
             
-            if (parsedData.supplierName) {
-               const match = partyLedgers.find((l: any) => fuzzyMatch(l.name, parsedData.supplierName));
-               if (match) {
-                 updated.partyId = String(match.id);
-                 setUnmappedPartyName(null);
-               } else {
-                 setUnmappedPartyName(parsedData.supplierName);
-                 missingWarnings.push(`Ledger not exist: ${parsedData.supplierName}`);
-               }
-            } else {
-               missingWarnings.push(`Ledger not found in bill.`);
-               setUnmappedPartyName(null);
+            if (foundPartyId) {
+               updated.partyId = foundPartyId;
             }
+            return updated;
+          });
+          
+          setSupplierState(localSupplierState);
 
-            if (parsedData.items && parsedData.items.length > 0) {
+          // Pre-process items sequentially to allow async Swal popups
+          let resolvedItems: any[] = [];
+          if (parsedData.items && parsedData.items.length > 0) {
+            for (let i = 0; i < parsedData.items.length; i++) {
+              const extractedItem = parsedData.items[i];
+              let matchItem = stockItems.find((itm: any) => fuzzyMatch(itm.name, extractedItem.name));
+              const extractedHsn = extractedItem.hsnSac || extractedItem.hsnCode || "";
+
+              let derivedGst = extractedItem.gstRate || 0;
+              if (!derivedGst && extractedItem.igstRate) {
+                derivedGst = extractedItem.igstRate;
+              } else if (!derivedGst && extractedItem.cgstRate && extractedItem.sgstRate) {
+                derivedGst = extractedItem.cgstRate + extractedItem.sgstRate;
+              } else if (!derivedGst && extractedItem.cgstAmount && extractedItem.sgstAmount && extractedItem.taxableValue) {
+                 derivedGst = Math.round(((extractedItem.cgstAmount + extractedItem.sgstAmount) / extractedItem.taxableValue) * 100);
+              } else if (!derivedGst && extractedItem.igstAmount && extractedItem.taxableValue) {
+                 derivedGst = Math.round((extractedItem.igstAmount / extractedItem.taxableValue) * 100);
+              }
+              
+              derivedGst = Number(derivedGst) || 0;
+              extractedItem.gstRate = derivedGst;
+
+              if (!matchItem) {
+                const result = await Swal.fire({
+                  title: "Item not exist",
+                  text: `Item Name: ${extractedItem.name} does not exist. Do you want to save it automatically?`,
+                  icon: "question",
+                  showCancelButton: true,
+                  confirmButtonText: "Yes, save it",
+                  cancelButtonText: "No",
+                });
+
+                if (result.isConfirmed) {
+                  try {
+                    const generatedBarcode = Math.floor(100000000000 + Math.random() * 900000000000).toString();
+                    
+                    const cSgstRate = derivedGst / 2;
+                    let cgstLedgerId = "";
+                    let sgstLedgerId = "";
+                    let igstLedgerId = "";
+
+                    const findTaxLedger = (prefix: string, rate: number) => {
+                      return ledgers.find((l) => {
+                        const name = String(l.name).toLowerCase();
+                        return name.includes(prefix) && (name.includes(`${rate}%`) || name.includes(`${rate} %`) || name.includes(`@${rate}`) || name.includes(`@ ${rate}`));
+                      });
+                    };
+
+                    const matchedCgst = findTaxLedger("cgst", cSgstRate);
+                    if (matchedCgst) cgstLedgerId = String(matchedCgst.id);
+
+                    const matchedSgst = findTaxLedger("sgst", cSgstRate);
+                    if (matchedSgst) sgstLedgerId = String(matchedSgst.id);
+
+                    const matchedIgst = findTaxLedger("igst", derivedGst);
+                    if (matchedIgst) igstLedgerId = String(matchedIgst.id);
+
+                    const payload = {
+                      name: extractedItem.name,
+                      unit: extractedItem.unit || "NOS",
+                      taxType: "Taxable",
+                      hsnCode: extractedHsn,
+                      gstRate: derivedGst,
+                      openingBalance: 0,
+                      openingValue: 0,
+                      standardPurchaseRate: extractedItem.rate || 0,
+                      barcode: generatedBarcode,
+                      gstLedgerId: igstLedgerId,
+                      cgstLedgerId,
+                      sgstLedgerId,
+                      igstLedgerId,
+                      company_id: companyId,
+                      owner_type: ownerType,
+                      owner_id: ownerId,
+                    };
+
+                    const createRes = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload)
+                    });
+                    
+                    if (createRes.ok) {
+                      const resData = await createRes.json();
+                      matchItem = {
+                        id: resData.insertId || resData.id || Date.now(),
+                        name: extractedItem.name,
+                        unit: payload.unit,
+                        hsnCode: payload.hsnCode,
+                        gstRate: payload.gstRate,
+                        standardPurchaseRate: payload.standardPurchaseRate,
+                        gstLedgerId: payload.gstLedgerId,
+                        cgstLedgerId: payload.cgstLedgerId,
+                        sgstLedgerId: payload.sgstLedgerId,
+                        igstLedgerId: payload.igstLedgerId
+                      };
+                      setStockItems((prevItems: any) => [...prevItems, matchItem]);
+                      missingWarnings = missingWarnings.filter(w => !w.startsWith(`Item not exist: ${extractedItem.name}`));
+                      await Swal.fire("Success", `Stock item '${extractedItem.name}' created successfully!`, "success");
+                    } else {
+                      const errText = await createRes.text();
+                      await Swal.fire("Error", `Failed to create item: ${errText}`, "error");
+                    }
+                  } catch (err: any) {
+                    await Swal.fire("Error", `An error occurred while creating item: ${err.message}`, "error");
+                  }
+                }
+              }
+
+              if (!extractedHsn && !matchItem?.hsnCode) {
+                missingWarnings.push(`HSN/SAC missing for item: ${extractedItem.name}`);
+              }
+
+              if (!matchItem) {
+                missingWarnings.push(`Item not exist: ${extractedItem.name}`);
+              }
+
+              resolvedItems.push({ extractedItem, matchItem, extractedHsn });
+            }
+          }
+
+          setFormData((prev: any) => {
+            const updated = { ...prev };
+            if (resolvedItems.length > 0) {
                const newEntries = [...prev.entries];
-               parsedData.items.forEach((extractedItem: any) => {
-                 const matchItem = stockItems.find((i: any) => fuzzyMatch(i.name, extractedItem.name));
-                 
-                 const extractedHsn = extractedItem.hsnSac || extractedItem.hsnCode;
-                 if (!extractedHsn) {
-                   missingWarnings.push(`HSN/SAC missing for item: ${extractedItem.name}`);
-                 }
+               resolvedItems.forEach(({ extractedItem, matchItem, extractedHsn }) => {
 
                  if (matchItem) {
                     const details = resolveStockItemDetails(String(matchItem.id));
-                    const gst = extractedItem.gstRate || Number(details.gstRate || 0);
+                    const gst = extractedItem.gstRate || Number(details.gstRate || matchItem.gstRate || 0);
                     const qty = extractedItem.quantity || 1;
-                    const rate = extractedItem.rate || Number(details.standardPurchaseRate || 0);
+                    const rate = extractedItem.rate || Number(details.standardPurchaseRate || matchItem.standardPurchaseRate || 0);
                     const discount = extractedItem.discount || 0;
                     
-                    const calculated = calculateEntryValues(qty, rate, gst, companyState, supplierState);
-                    const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(gst, companyState, supplierState);
+                    const calculated = calculateEntryValues(qty, rate, gst, companyState, localSupplierState);
+                    const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(gst, companyState, localSupplierState);
                     
-                    const isIntra = companyState && supplierState && companyState === supplierState;
+                    const isIntra = companyState && localSupplierState && cleanState(companyState) === cleanState(localSupplierState);
                     const matchingPurchaseLedger = purchaseLedgers.find((l) => {
                       const name = String(l.name).toLowerCase();
                       const gstMatch = name.includes(`${gst}%`) || name.includes(`${gst} %`) || name.includes(`purchase ${gst}`) || name.includes(`@${gst}%`) || name.includes(`@ ${gst}%`);
@@ -645,18 +883,18 @@ const PurchaseVoucher: React.FC = () => {
                     const newEntry = {
                        id: `e${Date.now()}_${Math.random()}`,
                        itemId: String(matchItem.id),
-                       hsnCode: extractedHsn || details.hsnCode || "",
-                       unitName: details.unit || "",
+                       hsnCode: extractedHsn || details.hsnCode || matchItem.hsnCode || "",
+                       unitName: details.unit || matchItem.unit || extractedItem.unit || "",
                        quantity: qty,
                        rate: rate,
                        discount: discount,
                        amount: Number((extractedItem.taxableValue || calculated.amount).toFixed(2)),
                        gstRate: gst,
                        cgstRate, sgstRate, igstRate,
-                       gstLedgerId: details.gstLedgerId || "",
-                       sgstLedgerId: details.sgstLedgerId || "",
-                       cgstLedgerId: details.cgstLedgerId || "",
-                       igstLedgerId: details.igstLedgerId || "",
+                       gstLedgerId: details.gstLedgerId || matchItem.gstLedgerId || "",
+                       sgstLedgerId: details.sgstLedgerId || matchItem.sgstLedgerId || "",
+                       cgstLedgerId: details.cgstLedgerId || matchItem.cgstLedgerId || "",
+                       igstLedgerId: details.igstLedgerId || matchItem.igstLedgerId || "",
                        batches: details.batches || [],
                        batchNumber: "",
                        godownId: "",
@@ -670,8 +908,7 @@ const PurchaseVoucher: React.FC = () => {
                     } else {
                       newEntries.push(newEntry as any);
                     }
-                 } else {
-                    missingWarnings.push(`Item not exist: ${extractedItem.name}`);
+                  } else {
                     const newEntry = {
                        id: `e${Date.now()}_${Math.random()}`,
                        itemId: "",
@@ -691,7 +928,7 @@ const PurchaseVoucher: React.FC = () => {
             }
             return updated;
           });
-          
+
           if (missingWarnings.length > 0) {
             Swal.fire({
               title: "Data Extracted with Warnings",
@@ -3058,7 +3295,7 @@ const PurchaseVoucher: React.FC = () => {
                   />
                 </form>
                 <div className="flex items-center">
-                  <input type="file" id="bill-upload" className="hidden" accept="image/*" onChange={handleBillUpload} disabled={isExtracting} />
+                  <input type="file" id="bill-upload" className="hidden" accept="image/*,application/pdf" onChange={handleBillUpload} disabled={isExtracting} />
                   <label htmlFor="bill-upload" className={`cursor-pointer px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${isExtracting ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white`}>
                     <Upload size={18} /> {isExtracting ? 'Processing...' : 'Upload Bill'}
                   </label>
