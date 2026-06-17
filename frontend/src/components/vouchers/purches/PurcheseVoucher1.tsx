@@ -541,7 +541,7 @@ const PurchaseVoucher: React.FC = () => {
     try {
       Swal.fire({
         title: 'Extracting Bill Data...',
-        text: 'Please wait while AI processes the image.',
+        text: 'Please wait while AI processes the file.',
         allowOutsideClick: false,
         didOpen: () => {
           Swal.showLoading();
@@ -3295,7 +3295,7 @@ const PurchaseVoucher: React.FC = () => {
                   />
                 </form>
                 <div className="flex items-center">
-                  <input type="file" id="bill-upload" className="hidden" accept="image/*" onChange={handleBillUpload} disabled={isExtracting} />
+                  <input type="file" id="bill-upload" className="hidden" accept="image/*,application/pdf" onChange={handleBillUpload} disabled={isExtracting} />
                   <label htmlFor="bill-upload" className={`cursor-pointer px-4 py-2 rounded-lg flex items-center gap-2 transition-colors ${isExtracting ? 'bg-gray-400' : 'bg-green-600 hover:bg-green-700'} text-white`}>
                     <Upload size={18} /> {isExtracting ? 'Processing...' : 'Upload Bill'}
                   </label>
