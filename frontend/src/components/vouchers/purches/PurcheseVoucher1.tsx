@@ -585,12 +585,14 @@ const PurchaseVoucher: React.FC = () => {
 
           let foundPartyId = "";
           let isPartyMissing = false;
+          let localSupplierState = supplierState;
 
           if (parsedData.supplierName) {
             const match = partyLedgers.find((l: any) => fuzzyMatch(l.name, parsedData.supplierName));
             if (match) {
               foundPartyId = String(match.id);
               setUnmappedPartyName(null);
+              localSupplierState = match.state || "";
             } else {
               isPartyMissing = true;
               setUnmappedPartyName(parsedData.supplierName);
@@ -693,6 +695,7 @@ const PurchaseVoucher: React.FC = () => {
                     isPartyMissing = false;
                     missingWarnings = missingWarnings.filter(w => !w.startsWith("Ledger not exist: "));
                     setUnmappedPartyName(null);
+                    localSupplierState = resolvedState;
                     
                     await Swal.fire("Success", "Party ledger created successfully!", "success");
                   } else {
@@ -727,28 +730,149 @@ const PurchaseVoucher: React.FC = () => {
             if (foundPartyId) {
                updated.partyId = foundPartyId;
             }
+            return updated;
+          });
+          
+          setSupplierState(localSupplierState);
 
-            if (parsedData.items && parsedData.items.length > 0) {
+          // Pre-process items sequentially to allow async Swal popups
+          let resolvedItems: any[] = [];
+          if (parsedData.items && parsedData.items.length > 0) {
+            for (let i = 0; i < parsedData.items.length; i++) {
+              const extractedItem = parsedData.items[i];
+              let matchItem = stockItems.find((itm: any) => fuzzyMatch(itm.name, extractedItem.name));
+              const extractedHsn = extractedItem.hsnSac || extractedItem.hsnCode || "";
+
+              let derivedGst = extractedItem.gstRate || 0;
+              if (!derivedGst && extractedItem.igstRate) {
+                derivedGst = extractedItem.igstRate;
+              } else if (!derivedGst && extractedItem.cgstRate && extractedItem.sgstRate) {
+                derivedGst = extractedItem.cgstRate + extractedItem.sgstRate;
+              } else if (!derivedGst && extractedItem.cgstAmount && extractedItem.sgstAmount && extractedItem.taxableValue) {
+                 derivedGst = Math.round(((extractedItem.cgstAmount + extractedItem.sgstAmount) / extractedItem.taxableValue) * 100);
+              } else if (!derivedGst && extractedItem.igstAmount && extractedItem.taxableValue) {
+                 derivedGst = Math.round((extractedItem.igstAmount / extractedItem.taxableValue) * 100);
+              }
+              
+              derivedGst = Number(derivedGst) || 0;
+              extractedItem.gstRate = derivedGst;
+
+              if (!matchItem) {
+                const result = await Swal.fire({
+                  title: "Item not exist",
+                  text: `Item Name: ${extractedItem.name} does not exist. Do you want to save it automatically?`,
+                  icon: "question",
+                  showCancelButton: true,
+                  confirmButtonText: "Yes, save it",
+                  cancelButtonText: "No",
+                });
+
+                if (result.isConfirmed) {
+                  try {
+                    const generatedBarcode = Math.floor(100000000000 + Math.random() * 900000000000).toString();
+                    
+                    const cSgstRate = derivedGst / 2;
+                    let cgstLedgerId = "";
+                    let sgstLedgerId = "";
+                    let igstLedgerId = "";
+
+                    const findTaxLedger = (prefix: string, rate: number) => {
+                      return ledgers.find((l) => {
+                        const name = String(l.name).toLowerCase();
+                        return name.includes(prefix) && (name.includes(`${rate}%`) || name.includes(`${rate} %`) || name.includes(`@${rate}`) || name.includes(`@ ${rate}`));
+                      });
+                    };
+
+                    const matchedCgst = findTaxLedger("cgst", cSgstRate);
+                    if (matchedCgst) cgstLedgerId = String(matchedCgst.id);
+
+                    const matchedSgst = findTaxLedger("sgst", cSgstRate);
+                    if (matchedSgst) sgstLedgerId = String(matchedSgst.id);
+
+                    const matchedIgst = findTaxLedger("igst", derivedGst);
+                    if (matchedIgst) igstLedgerId = String(matchedIgst.id);
+
+                    const payload = {
+                      name: extractedItem.name,
+                      unit: extractedItem.unit || "NOS",
+                      taxType: "Taxable",
+                      hsnCode: extractedHsn,
+                      gstRate: derivedGst,
+                      openingBalance: 0,
+                      openingValue: 0,
+                      standardPurchaseRate: extractedItem.rate || 0,
+                      barcode: generatedBarcode,
+                      gstLedgerId: igstLedgerId,
+                      cgstLedgerId,
+                      sgstLedgerId,
+                      igstLedgerId,
+                      company_id: companyId,
+                      owner_type: ownerType,
+                      owner_id: ownerId,
+                    };
+
+                    const createRes = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items`, {
+                      method: "POST",
+                      headers: { "Content-Type": "application/json" },
+                      body: JSON.stringify(payload)
+                    });
+                    
+                    if (createRes.ok) {
+                      const resData = await createRes.json();
+                      matchItem = {
+                        id: resData.insertId || resData.id || Date.now(),
+                        name: extractedItem.name,
+                        unit: payload.unit,
+                        hsnCode: payload.hsnCode,
+                        gstRate: payload.gstRate,
+                        standardPurchaseRate: payload.standardPurchaseRate,
+                        gstLedgerId: payload.gstLedgerId,
+                        cgstLedgerId: payload.cgstLedgerId,
+                        sgstLedgerId: payload.sgstLedgerId,
+                        igstLedgerId: payload.igstLedgerId
+                      };
+                      setStockItems((prevItems: any) => [...prevItems, matchItem]);
+                      missingWarnings = missingWarnings.filter(w => !w.startsWith(`Item not exist: ${extractedItem.name}`));
+                      await Swal.fire("Success", `Stock item '${extractedItem.name}' created successfully!`, "success");
+                    } else {
+                      const errText = await createRes.text();
+                      await Swal.fire("Error", `Failed to create item: ${errText}`, "error");
+                    }
+                  } catch (err: any) {
+                    await Swal.fire("Error", `An error occurred while creating item: ${err.message}`, "error");
+                  }
+                }
+              }
+
+              if (!extractedHsn && !matchItem?.hsnCode) {
+                missingWarnings.push(`HSN/SAC missing for item: ${extractedItem.name}`);
+              }
+
+              if (!matchItem) {
+                missingWarnings.push(`Item not exist: ${extractedItem.name}`);
+              }
+
+              resolvedItems.push({ extractedItem, matchItem, extractedHsn });
+            }
+          }
+
+          setFormData((prev: any) => {
+            const updated = { ...prev };
+            if (resolvedItems.length > 0) {
                const newEntries = [...prev.entries];
-               parsedData.items.forEach((extractedItem: any) => {
-                 const matchItem = stockItems.find((i: any) => fuzzyMatch(i.name, extractedItem.name));
-                 
-                 const extractedHsn = extractedItem.hsnSac || extractedItem.hsnCode;
-                 if (!extractedHsn) {
-                   missingWarnings.push(`HSN/SAC missing for item: ${extractedItem.name}`);
-                 }
+               resolvedItems.forEach(({ extractedItem, matchItem, extractedHsn }) => {
 
                  if (matchItem) {
                     const details = resolveStockItemDetails(String(matchItem.id));
-                    const gst = extractedItem.gstRate || Number(details.gstRate || 0);
+                    const gst = extractedItem.gstRate || Number(details.gstRate || matchItem.gstRate || 0);
                     const qty = extractedItem.quantity || 1;
-                    const rate = extractedItem.rate || Number(details.standardPurchaseRate || 0);
+                    const rate = extractedItem.rate || Number(details.standardPurchaseRate || matchItem.standardPurchaseRate || 0);
                     const discount = extractedItem.discount || 0;
                     
-                    const calculated = calculateEntryValues(qty, rate, gst, companyState, supplierState);
-                    const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(gst, companyState, supplierState);
+                    const calculated = calculateEntryValues(qty, rate, gst, companyState, localSupplierState);
+                    const { cgstRate, sgstRate, igstRate } = resolvePurchaseGst(gst, companyState, localSupplierState);
                     
-                    const isIntra = companyState && supplierState && companyState === supplierState;
+                    const isIntra = companyState && localSupplierState && cleanState(companyState) === cleanState(localSupplierState);
                     const matchingPurchaseLedger = purchaseLedgers.find((l) => {
                       const name = String(l.name).toLowerCase();
                       const gstMatch = name.includes(`${gst}%`) || name.includes(`${gst} %`) || name.includes(`purchase ${gst}`) || name.includes(`@${gst}%`) || name.includes(`@ ${gst}%`);
@@ -759,18 +883,18 @@ const PurchaseVoucher: React.FC = () => {
                     const newEntry = {
                        id: `e${Date.now()}_${Math.random()}`,
                        itemId: String(matchItem.id),
-                       hsnCode: extractedHsn || details.hsnCode || "",
-                       unitName: details.unit || "",
+                       hsnCode: extractedHsn || details.hsnCode || matchItem.hsnCode || "",
+                       unitName: details.unit || matchItem.unit || extractedItem.unit || "",
                        quantity: qty,
                        rate: rate,
                        discount: discount,
                        amount: Number((extractedItem.taxableValue || calculated.amount).toFixed(2)),
                        gstRate: gst,
                        cgstRate, sgstRate, igstRate,
-                       gstLedgerId: details.gstLedgerId || "",
-                       sgstLedgerId: details.sgstLedgerId || "",
-                       cgstLedgerId: details.cgstLedgerId || "",
-                       igstLedgerId: details.igstLedgerId || "",
+                       gstLedgerId: details.gstLedgerId || matchItem.gstLedgerId || "",
+                       sgstLedgerId: details.sgstLedgerId || matchItem.sgstLedgerId || "",
+                       cgstLedgerId: details.cgstLedgerId || matchItem.cgstLedgerId || "",
+                       igstLedgerId: details.igstLedgerId || matchItem.igstLedgerId || "",
                        batches: details.batches || [],
                        batchNumber: "",
                        godownId: "",
@@ -784,8 +908,7 @@ const PurchaseVoucher: React.FC = () => {
                     } else {
                       newEntries.push(newEntry as any);
                     }
-                 } else {
-                    missingWarnings.push(`Item not exist: ${extractedItem.name}`);
+                  } else {
                     const newEntry = {
                        id: `e${Date.now()}_${Math.random()}`,
                        itemId: "",

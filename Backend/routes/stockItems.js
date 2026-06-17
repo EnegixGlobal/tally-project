@@ -598,6 +598,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     unit,
     hsnCode,
     taxType,
+    gstRate,
     gstLedgerId,
     cgstLedgerId,
     sgstLedgerId,
@@ -610,7 +611,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     owner_id,
     type,
     image
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
     const values = [
@@ -619,6 +620,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       sanitize(unit),
       sanitize(hsnCode),
       taxType,
+      Number(gstRate) || 0,
       sanitize(gstLedgerId),
       sanitize(cgstLedgerId),
       sanitize(sgstLedgerId),
