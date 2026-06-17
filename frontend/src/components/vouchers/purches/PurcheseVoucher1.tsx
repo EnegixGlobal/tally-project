@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef, useCallback, useMemo } from "react";
 import { useReactToPrint } from "react-to-print";
-
+import { Link, useLocation, useNavigate, useParams } from "react-router-dom";
+import { allSystemGroups as baseGroups } from "../../../constants/ledgerGroups";
 import { useAppContext } from "../../../context/AppContext";
-import { useNavigate, useParams, useLocation } from "react-router-dom";
 import type { LedgerWithGroup, VoucherEntry } from "../../../types";
 import { Save, Plus, Trash2, ArrowLeft, Printer, Settings, Upload } from "lucide-react";
 import Swal from "sweetalert2";
@@ -583,6 +583,130 @@ const PurchaseVoucher: React.FC = () => {
             return s1.includes(s2) || s2.includes(s1);
           };
 
+          let foundPartyId = "";
+          let isPartyMissing = false;
+
+          if (parsedData.supplierName) {
+            const match = partyLedgers.find((l: any) => fuzzyMatch(l.name, parsedData.supplierName));
+            if (match) {
+              foundPartyId = String(match.id);
+              setUnmappedPartyName(null);
+            } else {
+              isPartyMissing = true;
+              setUnmappedPartyName(parsedData.supplierName);
+              missingWarnings.push(`Ledger not exist: ${parsedData.supplierName}`);
+            }
+          } else {
+            missingWarnings.push(`Ledger not found in bill.`);
+            setUnmappedPartyName(null);
+          }
+
+          if (isPartyMissing) {
+            const result = await Swal.fire({
+              title: "Party not exist",
+              text: `Party Name: ${parsedData.supplierName} does not exist. Do you want to save it automatically?`,
+              icon: "question",
+              showCancelButton: true,
+              confirmButtonText: "Yes, save it",
+              cancelButtonText: "No",
+            });
+            
+            if (result.isConfirmed) {
+              try {
+                const groupsRes = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger-groups?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+                const groupsData = await groupsRes.json();
+                const fetchedGroups = Array.isArray(groupsData) ? groupsData : (groupsData.groups || []);
+                const groupsArray = [...fetchedGroups, ...baseGroups];
+                const sundryCreditorsGroup = groupsArray.find((g: any) => g.name.toLowerCase() === 'sundry creditors');
+
+                if (!sundryCreditorsGroup) {
+                  Swal.fire("Error", "Sundry Creditors group not found. Please create it manually.", "error");
+                } else {
+                  const statesList = [
+                    { code: "37", name: "Andhra Pradesh" }, { code: "12", name: "Arunachal Pradesh" },
+                    { code: "18", name: "Assam" }, { code: "10", name: "Bihar" },
+                    { code: "22", name: "Chhattisgarh" }, { code: "30", name: "Goa" },
+                    { code: "24", name: "Gujarat" }, { code: "06", name: "Haryana" },
+                    { code: "02", name: "Himachal Pradesh" }, { code: "20", name: "Jharkhand" },
+                    { code: "29", name: "Karnataka" }, { code: "32", name: "Kerala" },
+                    { code: "23", name: "Madhya Pradesh" }, { code: "27", name: "Maharashtra" },
+                    { code: "14", name: "Manipur" }, { code: "17", name: "Meghalaya" },
+                    { code: "15", name: "Mizoram" }, { code: "13", name: "Nagaland" },
+                    { code: "21", name: "Odisha" }, { code: "03", name: "Punjab" },
+                    { code: "08", name: "Rajasthan" }, { code: "11", name: "Sikkim" },
+                    { code: "33", name: "Tamil Nadu" }, { code: "36", name: "Telangana" },
+                    { code: "16", name: "Tripura" }, { code: "09", name: "Uttar Pradesh" },
+                    { code: "05", name: "Uttarakhand" }, { code: "19", name: "West Bengal" },
+                    { code: "07", name: "Delhi" }, { code: "01", name: "Jammu and Kashmir" },
+                    { code: "38", name: "Ladakh" }
+                  ];
+
+                  let resolvedState = "";
+                  
+                  if (parsedData.supplierGst && parsedData.supplierGst.length >= 2) {
+                    const stateCode = parsedData.supplierGst.substring(0, 2);
+                    const stateMatch = statesList.find(s => s.code === stateCode);
+                    if (stateMatch) {
+                      resolvedState = `${stateMatch.name}(${stateMatch.code})`;
+                    }
+                  }
+                  
+                  if (!resolvedState && parsedData.supplierState) {
+                    const extracted = String(parsedData.supplierState).trim().toLowerCase();
+                    const stateMatch = statesList.find(s => 
+                      s.name.toLowerCase() === extracted || 
+                      s.code === extracted
+                    );
+                    if (stateMatch) {
+                      resolvedState = `${stateMatch.name}(${stateMatch.code})`;
+                    } else {
+                      resolvedState = parsedData.supplierState;
+                    }
+                  }
+                  const newLedgerPayload = {
+                    name: parsedData.supplierName,
+                    groupId: sundryCreditorsGroup.id,
+                    companyId,
+                    ownerType,
+                    ownerId,
+                    gstNumber: parsedData.supplierGst || "",
+                    address: parsedData.supplierAddress || "",
+                    state: resolvedState,
+                    pinCode: parsedData.supplierPinCode || "",
+                    panNumber: parsedData.supplierPan || "",
+                    openingBalance: 0,
+                    balanceType: "credit"
+                  };
+                  
+                  const createRes = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger`, {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(newLedgerPayload)
+                  });
+                  
+                  if (createRes.ok) {
+                    const createdLedgerData = await createRes.json();
+                    const newLedger = createdLedgerData.ledger || createdLedgerData;
+                    
+                    setLedgers((prev: any) => [...prev, newLedger]);
+                    foundPartyId = String(newLedger.id);
+                    isPartyMissing = false;
+                    missingWarnings = missingWarnings.filter(w => !w.startsWith("Ledger not exist: "));
+                    setUnmappedPartyName(null);
+                    
+                    await Swal.fire("Success", "Party ledger created successfully!", "success");
+                  } else {
+                    const errText = await createRes.text();
+                    await Swal.fire("Error", `Failed to create party ledger: ${errText}`, "error");
+                  }
+                }
+              } catch (err: any) {
+                console.error("Auto ledger creation error:", err);
+                await Swal.fire("Error", `An error occurred while creating ledger: ${err.message}`, "error");
+              }
+            }
+          }
+
           setFormData((prev: any) => {
             const updated = { ...prev };
             if (parsedData.invoiceNumber) updated.referenceNo = parsedData.invoiceNumber;
@@ -600,18 +724,8 @@ const PurchaseVoucher: React.FC = () => {
               }
             }
             
-            if (parsedData.supplierName) {
-               const match = partyLedgers.find((l: any) => fuzzyMatch(l.name, parsedData.supplierName));
-               if (match) {
-                 updated.partyId = String(match.id);
-                 setUnmappedPartyName(null);
-               } else {
-                 setUnmappedPartyName(parsedData.supplierName);
-                 missingWarnings.push(`Ledger not exist: ${parsedData.supplierName}`);
-               }
-            } else {
-               missingWarnings.push(`Ledger not found in bill.`);
-               setUnmappedPartyName(null);
+            if (foundPartyId) {
+               updated.partyId = foundPartyId;
             }
 
             if (parsedData.items && parsedData.items.length > 0) {
@@ -691,7 +805,7 @@ const PurchaseVoucher: React.FC = () => {
             }
             return updated;
           });
-          
+
           if (missingWarnings.length > 0) {
             Swal.fire({
               title: "Data Extracted with Warnings",
