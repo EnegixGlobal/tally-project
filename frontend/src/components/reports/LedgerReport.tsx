@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { useCompany } from "../../context/CompanyContext";
 import * as XLSX from "xlsx";
+import BillMatchModal from "./BillMatchModal";
 
 interface DayBookEntry {
   id: string;
@@ -148,6 +149,7 @@ const LedgerReport: React.FC = () => {
   const [, setError] = useState<string | null>(null);
   const [ledgers, setLedgers] = useState<Ledger[]>([]);
   const [ledgerId, setLedgerId] = useState(id || ""); // default
+  const [isBillMatchModalOpen, setIsBillMatchModalOpen] = useState(false);
   const [dailyBreakupMonth, setDailyBreakupMonth] = useState<string>(
     String(new Date().getMonth() + 1).padStart(2, "0")
   );
@@ -923,9 +925,17 @@ const LedgerReport: React.FC = () => {
           >
             <div className="flex justify-between items-start">
               <div>
-                <h2 className="text-xl font-bold mb-1">
-                  {selectedLedgerData?.name}
-                </h2>
+                <div className="flex items-center mb-1">
+                  <h2 className="text-xl font-bold">
+                    {selectedLedgerData?.name}
+                  </h2>
+                  <button 
+                    onClick={() => setIsBillMatchModalOpen(true)}
+                    className="ml-12 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                  >
+                    Bill Match
+                  </button>
+                </div>
                 <p className="text-sm text-gray-500">
                   Address: {selectedLedgerData?.address || "N/A"} | Period:{" "}
                   {formatDate(fromDate)} to {formatDate(toDate)}
@@ -1688,6 +1698,15 @@ const LedgerReport: React.FC = () => {
             </tbody>
           </table>
         </div>
+      )}
+
+      {ledgerData?.transactions && selectedLedgerData && (
+        <BillMatchModal
+          isOpen={isBillMatchModalOpen}
+          onClose={() => setIsBillMatchModalOpen(false)}
+          ledgerName={selectedLedgerData.name}
+          ledgerTransactions={ledgerData.transactions}
+        />
       )}
     </>
   );
