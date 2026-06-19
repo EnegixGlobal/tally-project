@@ -125,6 +125,14 @@ const BillMatchModal: React.FC<BillMatchModalProps> = ({
     }
   };
 
+  const handleClearData = () => {
+    setExtractedData([]);
+    setMatchResults([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleDownloadUnmatched = () => {
     const unmatched = matchResults.filter(r => r.status === 'unmatched');
     if (unmatched.length === 0) return;
@@ -249,7 +257,17 @@ const BillMatchModal: React.FC<BillMatchModalProps> = ({
           <div className="w-1/2 flex flex-col bg-gray-50">
             <div className="p-3 bg-blue-50 text-blue-800 font-semibold text-center border-b border-blue-100 flex justify-between items-center px-4">
               <span>Extracted Bill Data (AI)</span>
-              <div>
+              <div className="flex gap-2">
+                {matchResults.length > 0 && (
+                  <button 
+                    onClick={handleClearData}
+                    disabled={isProcessing}
+                    className="flex items-center gap-1 px-3 py-1 bg-white text-gray-600 border border-gray-300 rounded text-sm hover:bg-gray-100 transition-colors disabled:opacity-50"
+                  >
+                    <X size={16} />
+                    Clear
+                  </button>
+                )}
                 <input
                   type="file"
                   accept=".pdf,image/png,image/jpeg,image/jpg"
