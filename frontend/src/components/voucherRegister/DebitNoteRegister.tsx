@@ -5,6 +5,7 @@ import { FilePlus } from 'lucide-react';
 const DebitNoteRegister: React.FC = () => {
   return (
     <VoucherRegisterBase
+      itemsPerPage={20}
       voucherType="debit_note"
       title="Debit Note Register"
       icon={<FilePlus className="w-5 h-5" />}

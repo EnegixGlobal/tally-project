@@ -171,6 +171,7 @@ const ReceiptRegister: React.FC = () => {
   return (
     <>
       <VoucherRegisterBase
+        itemsPerPage={20}
         voucherType="receipt"
         title="Receipt Register"
         icon={<Receipt className="w-6 h-6" />}

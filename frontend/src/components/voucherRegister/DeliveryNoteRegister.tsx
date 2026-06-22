@@ -5,6 +5,7 @@ import { Truck } from 'lucide-react';
 const DeliveryNoteRegister: React.FC = () => {
   return (
     <VoucherRegisterBase
+      itemsPerPage={20}
       voucherType="delivery_note"
       title="Delivery Note Register"
       icon={<Truck className="w-5 h-5" />}

@@ -51,6 +51,7 @@ const QuotationRegister: React.FC = () => {
 
   return (
     <VoucherRegisterBase
+      itemsPerPage={20}
       voucherType="quotation"
       title="Quotation Register"
       icon={<FileText className="w-5 h-5" />}

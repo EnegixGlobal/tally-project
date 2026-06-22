@@ -682,7 +682,7 @@ router.get("/next-number", async (req, res) => {
 
 // get sales vouchers
 router.get("/", async (req, res) => {
-  const { owner_type, owner_id, company_id, isQuotation } = req.query;
+  const { owner_type, owner_id, company_id, isQuotation, page, limit } = req.query;
 
   if (!owner_type || !owner_id) {
     return res.status(400).json({
@@ -718,10 +718,26 @@ router.get("/", async (req, res) => {
 
     sql += " ORDER BY id DESC";
 
-    const [voucherRows] = await db.execute(sql, params);
-
-
-    return res.status(200).json(voucherRows);
+    // Add pagination if limit is provided
+    const parsedLimit = parseInt(limit);
+    if (parsedLimit && parsedLimit > 0) {
+      const parsedPage = parseInt(page) || 1;
+      const offset = (parsedPage - 1) * parsedLimit;
+      
+      // Get total count first
+      const countSql = `SELECT COUNT(*) as total FROM (${sql}) as count_query`;
+      const [countRows] = await db.execute(countSql, params);
+      const totalCount = countRows[0].total;
+      
+      // Append limit and offset
+      sql += ` LIMIT ${parsedLimit} OFFSET ${offset}`;
+      const [voucherRows] = await db.execute(sql, params);
+      
+      return res.status(200).json({ data: voucherRows, total: totalCount, page: parsedPage, limit: parsedLimit });
+    } else {
+      const [voucherRows] = await db.execute(sql, params);
+      return res.status(200).json(voucherRows);
+    }
   } catch (err) {
     console.error("Failed to load sales vouchers:", err);
     return res.status(500).json({ message: err.message });

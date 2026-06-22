@@ -5,6 +5,7 @@ import { Package } from 'lucide-react';
 const StockJournalRegister: React.FC = () => {
   return (
     <VoucherRegisterBase
+      itemsPerPage={20}
       voucherType="stock_journal"
       title="Stock Journal Register"
       icon={<Package className="w-5 h-5" />}
