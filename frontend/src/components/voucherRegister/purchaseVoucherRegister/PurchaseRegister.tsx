@@ -137,6 +137,7 @@ const PurchaseRegister: React.FC = () => {
       }
       onGenerateXml={handleGenerateXml}
       onGenerateAllXml={handleGenerateAllXml}
+      itemsPerPage={20}
       onDelete={(id) => {
         Swal.fire({
           title: "Are you sure?",

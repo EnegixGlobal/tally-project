@@ -1338,7 +1338,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         // --- PURCHASE VOUCHERS ---
         else if (voucherType === "purchase") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+            }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
         } else if (voucherType === "sales_order") {
           url = `${import.meta.env.VITE_API_URL
             }/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;

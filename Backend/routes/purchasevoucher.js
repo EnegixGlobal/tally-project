@@ -626,6 +626,8 @@ router.get("/", async (req, res) => {
     const finalCompanyId = req.query.company_id || req.body?.companyId;
     const finalOwnerType = req.query.owner_type || req.body?.ownerType;
     const finalOwnerId = req.query.owner_id || req.body?.ownerId;
+    const page = parseInt(req.query.page) || 1;
+    const limit = parseInt(req.query.limit) || null;
 
     if (!finalCompanyId || !finalOwnerType || !finalOwnerId) {
       return res.status(401).json({
@@ -634,15 +636,25 @@ router.get("/", async (req, res) => {
       });
     }
 
-    const [rows] = await db.execute(
-      `SELECT *
+    let sql = `SELECT *
        FROM purchase_vouchers
        WHERE company_id = ?
          AND owner_type = ?
          AND owner_id = ?
-       ORDER BY date DESC`,
-      [finalCompanyId, finalOwnerType, finalOwnerId]
-    );
+       ORDER BY date DESC`;
+
+    let totalCount = 0;
+    if (limit && limit > 0) {
+      const offset = (page - 1) * limit;
+      const [countRows] = await db.execute(
+        `SELECT COUNT(*) as total FROM purchase_vouchers WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
+        [finalCompanyId, finalOwnerType, finalOwnerId]
+      );
+      totalCount = countRows[0].total;
+      sql += ` LIMIT ${limit} OFFSET ${offset}`;
+    }
+
+    const [rows] = await db.execute(sql, [finalCompanyId, finalOwnerType, finalOwnerId]);
 
     // 🏆 DYNAMIC TOTALS FIX FOR ACCOUNTING MODE (FOR REGISTER DISPLAY)
     if (rows.length > 0) {
@@ -712,7 +724,11 @@ router.get("/", async (req, res) => {
       }
     }
 
-    res.json({ success: true, data: rows });
+    if (limit && limit > 0) {
+      res.json({ success: true, data: rows, total: totalCount, page, limit });
+    } else {
+      res.json({ success: true, data: rows });
+    }
   } catch (err) {
     res.status(500).json({ success: false, error: err.message });
   }
