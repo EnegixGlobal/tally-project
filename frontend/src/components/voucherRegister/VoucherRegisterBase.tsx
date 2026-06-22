@@ -1341,22 +1341,22 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
         } else if (voucherType === "sales_order") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
+            }/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
         } else if (voucherType === "purchase_order") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}`;
+            }/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
         } else if (voucherType === "receipt") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=receipt`;
+            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=receipt&page=${currentPage}&limit=${itemsPerPage}`;
         } else if (voucherType === "contra") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=contra`;
+            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=contra&page=${currentPage}&limit=${itemsPerPage}`;
         } else if (voucherType === "journal") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=journal`;
+            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=journal&page=${currentPage}&limit=${itemsPerPage}`;
         } else if (voucherType === "stock_journal" || voucherType === "stock-journal") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/StockJournal?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+            }/api/StockJournal?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
         } else {
           console.warn("Unknown voucherType:", voucherType);
           return;
@@ -1369,6 +1369,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         // -- Handle different API response formats --
         if (json.total !== undefined) {
           setServerTotalCount(json.total);
+          if (json.data) setVouchers(json.data);
+        } else if (json.pagination && json.pagination.total !== undefined) {
+          setServerTotalCount(json.pagination.total);
           if (json.data) setVouchers(json.data);
         } else {
           setServerTotalCount(0);

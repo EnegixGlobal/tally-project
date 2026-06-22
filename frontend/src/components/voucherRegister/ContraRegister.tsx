@@ -64,6 +64,7 @@ const ContraRegister: React.FC = () => {
 
   return (
     <VoucherRegisterBase
+      itemsPerPage={20}
       voucherType="contra"
       title="Contra Register"
       icon={<ArrowLeftRight className="w-6 h-6" />}

@@ -5,6 +5,7 @@ import { RotateCcw } from 'lucide-react';
 const SalesReturnRegister: React.FC = () => {
   return (
     <VoucherRegisterBase
+      itemsPerPage={20}
       voucherType="sales_return"
       title="Sales Return Register"
       icon={<RotateCcw className="w-5 h-5" />}

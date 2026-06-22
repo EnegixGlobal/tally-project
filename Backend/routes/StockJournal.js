@@ -50,20 +50,32 @@ router.post('/', async (req, res) => {
 
 // Fetch stock journal vouchers (list) for a company/owner
 router.get('/', async (req, res) => {
-  const { company_id, owner_type, owner_id } = req.query;
+  const { company_id, owner_type, owner_id, page, limit } = req.query;
 
   if (!company_id || !owner_type || !owner_id) {
     return res.status(400).json({ success: false, message: 'company_id, owner_type and owner_id required' });
   }
 
   try {
-    const [rows] = await db.query(
-      `SELECT id, date, number, narration, company_id AS companyId, owner_type AS ownerType, owner_id AS ownerId
+    let sql = `SELECT id, date, number, narration, company_id AS companyId, owner_type AS ownerType, owner_id AS ownerId
        FROM stock_journal_vouchers
        WHERE company_id = ? AND owner_type = ? AND owner_id = ?
-       ORDER BY date DESC, id DESC`,
-      [company_id, owner_type, owner_id]
-    );
+       ORDER BY date DESC, id DESC`;
+
+    let totalCount = 0;
+    if (limit && parseInt(limit) > 0) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      const offset = (parsedPage - 1) * parsedLimit;
+      const [countRows] = await db.query(
+        `SELECT COUNT(*) as total FROM stock_journal_vouchers WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
+        [company_id, owner_type, owner_id]
+      );
+      totalCount = countRows[0].total;
+      sql += ` LIMIT ${parsedLimit} OFFSET ${offset}`;
+    }
+
+    const [rows] = await db.query(sql, [company_id, owner_type, owner_id]);
 
     if (rows.length > 0) {
       const voucherIds = rows.map(r => r.id);
@@ -89,7 +101,11 @@ router.get('/', async (req, res) => {
       });
     }
 
-    return res.json({ success: true, vouchers: rows });
+    if (limit && parseInt(limit) > 0) {
+      return res.json({ success: true, data: rows, total: totalCount, page: parseInt(page) || 1, limit: parseInt(limit) });
+    } else {
+      return res.json({ success: true, vouchers: rows, data: rows }); // Return data: rows for VoucherRegisterBase compatibility
+    }
   } catch (err) {
     console.error('Error fetching stock journal vouchers:', err);
     return res.status(500).json({ success: false, message: 'Internal server error' });

@@ -174,6 +174,8 @@ router.get("/", async (req, res) => {
   const voucherType = req.query.voucherType || req.query.voucher_type;
   // Accept both company_id and companyId for flexibility
   const company_id = req.query.company_id || req.query.companyId;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || null;
 
   if (!ownerType || !ownerId || !voucherType || !company_id) {
     return res.status(400).json({ message: "ownerType, ownerId, voucherType and company_id required" });
@@ -190,9 +192,7 @@ router.get("/", async (req, res) => {
       )
       .catch(() => { }); // ignore error if column already exists
 
-    // 1️⃣ Fetch vouchers
-    const [vouchers] = await db.execute(
-      `SELECT 
+    let sql = `SELECT 
         v.id, 
         v.voucher_number AS number, 
         v.voucher_type AS type, 
@@ -209,9 +209,21 @@ router.get("/", async (req, res) => {
      AND v.owner_id = ? 
      AND v.voucher_type = ?
      AND v.company_id = ?
-   ORDER BY v.date DESC, v.id DESC`,
-      [ownerType, ownerId, voucherType, company_id]
-    );
+   ORDER BY v.date DESC, v.id DESC`;
+
+    let totalCount = 0;
+    if (limit && limit > 0) {
+      const offset = (page - 1) * limit;
+      const [countRows] = await db.execute(
+        `SELECT COUNT(*) as total FROM voucher_main v WHERE v.owner_type = ? AND v.owner_id = ? AND v.voucher_type = ? AND v.company_id = ?`,
+        [ownerType, ownerId, voucherType, company_id]
+      );
+      totalCount = countRows[0].total;
+      sql += ` LIMIT ${limit} OFFSET ${offset}`;
+    }
+
+    // 1️⃣ Fetch vouchers
+    const [vouchers] = await db.execute(sql, [ownerType, ownerId, voucherType, company_id]);
 
     const voucherIds = vouchers.map((v) => v.id);
     let entries = [];
@@ -251,7 +263,11 @@ router.get("/", async (req, res) => {
         .map(({ voucher_id, ...rest }) => rest),
     }));
 
-    return res.json({ data: result });
+    if (limit && limit > 0) {
+      res.status(200).json({ success: true, data: result, total: totalCount, page, limit });
+    } else {
+      res.status(200).json({ data: result });
+    }
   } catch (error) {
     console.error("Error fetching vouchers:", error);
     return res

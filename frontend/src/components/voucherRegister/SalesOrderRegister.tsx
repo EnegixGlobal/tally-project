@@ -49,6 +49,7 @@ const SalesOrderRegister: React.FC = () => {
 
   return (
     <VoucherRegisterBase
+      itemsPerPage={20}
       voucherType="sales_order"
       title="Sales Order Register"
       icon={<ShoppingCart className="w-5 h-5" />}

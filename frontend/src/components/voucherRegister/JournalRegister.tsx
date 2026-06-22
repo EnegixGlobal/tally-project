@@ -182,6 +182,7 @@ const JournalRegister: React.FC = () => {
   return (
     <>
       <VoucherRegisterBase
+        itemsPerPage={20}
         voucherType="journal"
         title="Journal Register"
         icon={<BookOpen className="w-6 h-6" />}

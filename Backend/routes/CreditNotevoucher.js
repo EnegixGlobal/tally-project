@@ -91,7 +91,7 @@ router.post("/", async (req, res) => {
 ====================================================== */
 router.get("/", async (req, res) => {
   try {
-    const { companyId, ownerType, ownerId, fromDate, toDate } = req.query;
+    const { companyId, ownerType, ownerId, fromDate, toDate, page, limit } = req.query;
 
     let whereClause = "WHERE 1=1";
     const params = [];
@@ -117,8 +117,7 @@ router.get("/", async (req, res) => {
       params.push(toDate);
     }
 
-    const [rows] = await db.query(
-      `
+    let sql = `
       SELECT
         cv.id,
         cv.date,
@@ -129,9 +128,22 @@ router.get("/", async (req, res) => {
       FROM credit_vouchers cv
       ${whereClause}
       ORDER BY cv.date DESC, cv.id DESC
-      `,
-      params
-    );
+      `;
+
+    let totalCount = 0;
+    if (limit && parseInt(limit) > 0) {
+      const parsedLimit = parseInt(limit);
+      const parsedPage = parseInt(page) || 1;
+      const offset = (parsedPage - 1) * parsedLimit;
+      const [countRows] = await db.query(
+        `SELECT COUNT(*) as total FROM credit_vouchers cv ${whereClause}`,
+        params
+      );
+      totalCount = countRows[0].total;
+      sql += ` LIMIT ${parsedLimit} OFFSET ${offset}`;
+    }
+
+    const [rows] = await db.query(sql, params);
 
     const data = rows.map((r) => {
       let entries = [];
@@ -159,11 +171,21 @@ router.get("/", async (req, res) => {
       };
     });
 
-    res.json({
-      success: true,
-      data,
-      count: data.length,
-    });
+    if (limit && parseInt(limit) > 0) {
+      res.json({
+        success: true,
+        data,
+        total: totalCount,
+        page: parseInt(page) || 1,
+        limit: parseInt(limit)
+      });
+    } else {
+      res.json({
+        success: true,
+        data,
+        count: data.length,
+      });
+    }
   } catch (error) {
     console.error("Error fetching credit notes:", error);
     res.status(500).json({

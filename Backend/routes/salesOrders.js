@@ -134,6 +134,8 @@ router.post("/", async (req, res) => {
 // GET ALL SALES ORDERS  (GET /api/sales-orders)
 router.get("/", async (req, res) => {
   const { companyId, ownerType, ownerId } = req.query;
+  const page = parseInt(req.query.page) || 1;
+  const limit = parseInt(req.query.limit) || null;
 
   if (!companyId || !ownerType || !ownerId) {
     return res
@@ -142,8 +144,7 @@ router.get("/", async (req, res) => {
   }
 
   try {
-    const [rows] = await db.query(
-      `SELECT so.*, 
+    let sql = `SELECT so.*, 
               p.name AS partyName, 
               sl.name AS salesLedgerName,
               SUM(soi.amount) AS totalAmount,
@@ -159,11 +160,25 @@ router.get("/", async (req, res) => {
          AND so.owner_id = ?
        
        GROUP BY so.id
-       ORDER BY so.id DESC`,
-      [companyId, ownerType, ownerId]
-    );
+       ORDER BY so.id DESC`;
 
-    res.json({ success: true, data: rows });
+    let totalCount = 0;
+    if (limit && limit > 0) {
+      const offset = (page - 1) * limit;
+      const [countRows] = await db.query(
+        `SELECT COUNT(*) as total FROM sales_orders WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
+        [companyId, ownerType, ownerId]
+      );
+      totalCount = countRows[0].total;
+      sql += ` LIMIT ${limit} OFFSET ${offset}`;
+    }
+
+    const [rows] = await db.query(sql, [companyId, ownerType, ownerId]);
+    if (limit && limit > 0) {
+      res.json({ success: true, data: rows, total: totalCount, page, limit });
+    } else {
+      res.json({ success: true, data: rows });
+    }
   } catch (err) {
     console.error("Error fetching sales orders:", err);
     res.status(500).json({ success: false, message: "Error fetching orders" });

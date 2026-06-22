@@ -37,10 +37,11 @@ const PaymentRegister: React.FC = () => {
   const [dateFilter, setDateFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage] = useState(20);
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
   const [showActions, setShowActions] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [serverTotalCount, setServerTotalCount] = useState(0);
 
   const { selectedFinYear } = useFinancialYear();
   const { activeCompany } = useCompany();
@@ -304,15 +305,17 @@ const PaymentRegister: React.FC = () => {
 
     fetch(
       `${import.meta.env.VITE_API_URL
-      }/api/vouchers?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment`
+      }/api/vouchers?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&voucherType=payment&page=${currentPage}&limit=${itemsPerPage}`
     )
       .then((res) => res.json())
       .then((data) => {
-        if (data.data) {
-
-          setVouchers(data.data);
+        if (data.total !== undefined) {
+          setServerTotalCount(data.total);
+          if (data.data) setVouchers(data.data);
         } else {
-          setError("Invalid response from server");
+          setServerTotalCount(0);
+          if (data.data) setVouchers(data.data);
+          else if (Array.isArray(data)) setVouchers(data);
         }
         setLoading(false);
       })
@@ -320,7 +323,7 @@ const PaymentRegister: React.FC = () => {
         setError("Failed to load vouchers");
         setLoading(false);
       });
-  }, [companyId, ownerType, ownerId]);
+  }, [companyId, ownerType, ownerId, currentPage, itemsPerPage]);
 
   // Filter vouchers based on search, filters, and view type
   const filteredVouchers = (() => {
@@ -349,12 +352,19 @@ const PaymentRegister: React.FC = () => {
   })();
 
   // Pagination
-  const totalPages = Math.ceil(filteredVouchers.length / itemsPerPage);
-  const startIndex = (currentPage - 1) * itemsPerPage;
-  const paginatedVouchers = filteredVouchers.slice(
-    startIndex,
-    startIndex + itemsPerPage
+  const isServerPaginated = serverTotalCount > 0;
+  const totalItemsForPagination = isServerPaginated ? serverTotalCount : filteredVouchers.length;
+
+  const totalPages = Math.max(
+    1,
+    Math.ceil(totalItemsForPagination / itemsPerPage)
   );
+  const startIndex = Math.max(0, (currentPage - 1) * itemsPerPage);
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItemsForPagination);
+  
+  const paginatedVouchers = isServerPaginated 
+    ? filteredVouchers 
+    : filteredVouchers.slice(startIndex, endIndex);
 
   // Calculate summary statistics
   const totalDebit = filteredVouchers.reduce(
@@ -1173,7 +1183,7 @@ const PaymentRegister: React.FC = () => {
             <tfoot className="bg-gray-100">
               <tr className="bg-gray-50 font-bold">
                 <td colSpan={showActions ? 6 : 5} className="px-6 py-4 text-right text-sm text-gray-900">
-                  Total ({filteredVouchers.length} vouchers)
+                  Total ({totalItemsForPagination} vouchers)
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900 text-right">
                   {formatCurrency(totalDebit)}
@@ -1214,13 +1224,10 @@ const PaymentRegister: React.FC = () => {
                   Showing <span className="font-medium">{startIndex + 1}</span>{" "}
                   to{" "}
                   <span className="font-medium">
-                    {Math.min(
-                      startIndex + itemsPerPage,
-                      filteredVouchers.length
-                    )}
+                    {endIndex}
                   </span>{" "}
                   of{" "}
-                  <span className="font-medium">{filteredVouchers.length}</span>{" "}
+                  <span className="font-medium">{totalItemsForPagination}</span>{" "}
                   results
                 </p>
               </div>
