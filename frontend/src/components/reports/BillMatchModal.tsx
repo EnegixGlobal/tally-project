@@ -1,5 +1,5 @@
 import React, { useState, useRef, useMemo } from 'react';
-import { X, Upload, Download, Loader2, CheckCircle, AlertCircle, XCircle } from 'lucide-react';
+import { X, Upload, Download, Loader2, CheckCircle, AlertCircle, XCircle, Sparkles } from 'lucide-react';
 import Swal from 'sweetalert2';
 import * as XLSX from 'xlsx';
 import { performBillMatch } from '../../utils/billMatchLogic';
@@ -125,6 +125,14 @@ const BillMatchModal: React.FC<BillMatchModalProps> = ({
     }
   };
 
+  const handleClearData = () => {
+    setExtractedData([]);
+    setMatchResults([]);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
   const handleDownloadUnmatched = () => {
     const unmatched = matchResults.filter(r => r.status === 'unmatched');
     if (unmatched.length === 0) return;
@@ -169,7 +177,16 @@ const BillMatchModal: React.FC<BillMatchModalProps> = ({
         {/* Header */}
         <div className="flex justify-between items-center p-4 border-b bg-gray-50 text-black">
           <div>
-            <h2 className="text-xl font-bold">AI Bill Match: {ledgerName}</h2>
+            <div className="flex items-center gap-2">
+              <div className="p-1.5 bg-gradient-to-br from-blue-100 to-purple-100 rounded-lg shadow-sm border border-purple-200">
+                <Sparkles size={20} className="text-purple-600 animate-pulse" />
+              </div>
+              <h2 className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-purple-700">
+                AI Bill Match
+              </h2>
+              <span className="text-xl font-bold text-gray-700 mx-1">-</span>
+              <h2 className="text-xl font-semibold text-gray-800">{ledgerName}</h2>
+            </div>
             {matchResults.length > 0 && (
               <div className="flex gap-4 mt-2 text-sm font-medium">
                 <span className="text-gray-600">Total: {stats.total}</span>
@@ -249,7 +266,17 @@ const BillMatchModal: React.FC<BillMatchModalProps> = ({
           <div className="w-1/2 flex flex-col bg-gray-50">
             <div className="p-3 bg-blue-50 text-blue-800 font-semibold text-center border-b border-blue-100 flex justify-between items-center px-4">
               <span>Extracted Bill Data (AI)</span>
-              <div>
+              <div className="flex gap-2">
+                {matchResults.length > 0 && (
+                  <button 
+                    onClick={handleClearData}
+                    disabled={isProcessing}
+                    className="flex items-center gap-1 px-3 py-1 bg-white text-gray-600 border border-gray-300 rounded text-sm hover:bg-gray-100 transition-colors disabled:opacity-50"
+                  >
+                    <X size={16} />
+                    Clear
+                  </button>
+                )}
                 <input
                   type="file"
                   accept=".pdf,image/png,image/jpeg,image/jpg"
@@ -277,10 +304,22 @@ const BillMatchModal: React.FC<BillMatchModalProps> = ({
               )}
 
               {isProcessing && (
-                <div className="absolute inset-0 bg-white/80 flex flex-col items-center justify-center z-10">
-                  <Loader2 size={48} className="animate-spin text-blue-600 mb-4" />
-                  <p className="text-lg font-medium text-gray-700">Extracting AI Data...</p>
-                  <p className="text-sm text-gray-500">This may take a few seconds.</p>
+                <div className="absolute inset-0 bg-white/90 backdrop-blur-sm flex flex-col items-center justify-center z-10">
+                  <div className="relative flex items-center justify-center mb-8">
+                    {/* Outer animated rings */}
+                    <div className="absolute w-32 h-32 border-4 border-blue-100 border-t-blue-600 rounded-full animate-spin"></div>
+                    <div className="absolute w-24 h-24 border-4 border-purple-100 border-b-purple-600 rounded-full animate-[spin_2s_linear_reverse]"></div>
+                    {/* Inner glowing icon */}
+                    <div className="bg-gradient-to-br from-blue-600 to-purple-600 p-4 rounded-full shadow-lg shadow-purple-500/50 animate-pulse">
+                      <Sparkles size={32} className="text-white" />
+                    </div>
+                  </div>
+                  <h3 className="text-2xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-600 to-purple-600 mb-2">
+                    AI Engine is Scanning...
+                  </h3>
+                  <p className="text-sm text-gray-500 font-medium animate-pulse">
+                    Extracting tables & cross-referencing records. Please hold on.
+                  </p>
                 </div>
               )}
 
