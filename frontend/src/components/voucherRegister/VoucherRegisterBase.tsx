@@ -26,6 +26,7 @@ interface VoucherRegisterBaseProps {
   onExport?: (data: any) => void;
   onGenerateXml?: (voucher: VoucherEntry) => void;
   onGenerateAllXml?: (vouchers: VoucherEntry[]) => void;
+  itemsPerPage?: number;
 }
 
 interface PurchaseVoucher {
@@ -122,6 +123,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   onExport,
   onGenerateXml,
   onGenerateAllXml,
+  itemsPerPage: itemsPerPageProp = 10,
 }) => {
   const navigate = useNavigate();
   const { theme } = useAppContext();
@@ -135,7 +137,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   const [gstFilter, setGstFilter] = useState<"all" | "b2b" | "b2c">("all");
   const [topPeriodFilter, setTopPeriodFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
-  const [itemsPerPage] = useState(10);
+  const [itemsPerPage, setItemsPerPage] = useState(itemsPerPageProp);
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
   const [showPrintOptions, setShowPrintOptions] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherEntry | null>(
@@ -145,6 +147,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   const [stockItemList, setStockItemList] = useState<any[]>([]);
   // State for inline invoice download (sales only)
   const [downloadVoucherId, setDownloadVoucherId] = useState<string | null>(null);
+  const [serverTotalCount, setServerTotalCount] = useState(0);
 
   const { selectedFinYear } = useFinancialYear();
 
@@ -1024,12 +1027,15 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   })();
 
   // Pagination
+  const isServerPaginated = serverTotalCount > 0;
+  const totalItemsForPagination = isServerPaginated ? serverTotalCount : filteredVouchers.length;
+
   const totalPages = Math.max(
     1,
-    Math.ceil(filteredVouchers.length / itemsPerPage)
+    Math.ceil(totalItemsForPagination / itemsPerPage)
   );
   const startIndex = Math.max(0, (currentPage - 1) * itemsPerPage);
-  const endIndex = Math.min(startIndex + itemsPerPage, filteredVouchers.length);
+  const endIndex = Math.min(startIndex + itemsPerPage, totalItemsForPagination);
 
   // Reset to first page if current page is out of bounds
   useEffect(() => {
@@ -1320,13 +1326,13 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         // --- SALES VOUCHERS ---
         if (voucherType === "sales") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`;
+            }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
         }
 
         // --- QUOTATIONS ---
         else if (voucherType === "quotation") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&isQuotation=1`;
+            }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&isQuotation=1&page=${currentPage}&limit=${itemsPerPage}`;
         }
 
         // --- PURCHASE VOUCHERS ---
@@ -1361,11 +1367,17 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         console.log("data", json.data);
 
         // -- Handle different API response formats --
-        if (json.data) setVouchers(json.data);
-        else if (json.vouchers) setVouchers(json.vouchers);
-        else if (Array.isArray(json)) setVouchers(json);
-        else if (json.purchaseOrders) setVouchers(json.purchaseOrders);
-        else setVouchers([]);
+        if (json.total !== undefined) {
+          setServerTotalCount(json.total);
+          if (json.data) setVouchers(json.data);
+        } else {
+          setServerTotalCount(0);
+          if (json.data) setVouchers(json.data);
+          else if (json.vouchers) setVouchers(json.vouchers);
+          else if (Array.isArray(json)) setVouchers(json);
+          else if (json.purchaseOrders) setVouchers(json.purchaseOrders);
+          else setVouchers([]);
+        }
       } catch (err) {
         console.error("Failed to fetch vouchers:", err);
       } finally {
@@ -1374,7 +1386,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     };
 
     loadVouchers();
-  }, [voucherType, companyId, ownerType, ownerId]);
+  }, [voucherType, companyId, ownerType, ownerId, currentPage, itemsPerPage]);
 
   const printSingleVoucher = (voucher: VoucherEntry) => {
     try {
@@ -1958,7 +1970,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             </thead>
 
             <tbody className="bg-white divide-y divide-gray-200">
-              {(filteredVouchers as VoucherEntry[]).map((voucher) => {
+              {(isServerPaginated ? filteredVouchers : (filteredVouchers as VoucherEntry[]).slice(startIndex, endIndex)).map((voucher: any) => {
                 if (!voucher || !voucher.entries) return null; // Safety
                 const isSelected = selectedVoucherIds.has(voucher.id);
                 const debitEntry = voucher.entries.find(
@@ -2295,7 +2307,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 <p className="text-sm text-gray-700">
                   Showing <span className="font-medium">{startIndex + 1}</span>{" "}
                   to <span className="font-medium">{endIndex}</span> of{" "}
-                  <span className="font-medium">{filteredVouchers.length}</span>{" "}
+                  <span className="font-medium">{totalItemsForPagination}</span>{" "}
                   results
                 </p>
               </div>

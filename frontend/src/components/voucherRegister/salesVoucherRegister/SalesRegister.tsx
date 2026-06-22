@@ -186,6 +186,7 @@ const SalesRegister: React.FC = () => {
       onCopy={handleCopy}
       onGenerateXml={handleGenerateXml}
       onGenerateAllXml={handleGenerateAllXml}
+      itemsPerPage={20}
     />
 
       {/* XML Preview Modal */}
