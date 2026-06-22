@@ -5,6 +5,7 @@ import { useNavigate } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import { fetchAllVouchers } from '../../store/features/AllVoucher/allVoucher';
 import { useAuth } from '../../home/context/AuthContext';
+import { useFinancialYear, filterByFinancialYear } from '../../hooks/useFinancialYear';
 import type { RootState, AppDispatch } from '../../store/store';
 import {
   DollarSign, ArrowRightCircle, ArrowLeftCircle,
@@ -39,6 +40,7 @@ const VoucherRegisterIndex: React.FC = () => {
   const { companyId: authCompanyId, user } = useAuth();
   const navigate = useNavigate();
   const dispatch = useDispatch<AppDispatch>();
+  const { selectedFinYear } = useFinancialYear();
 
   // Use Redux state
   const voucherState = useSelector((state: RootState) => state.allVoucher);
@@ -71,19 +73,19 @@ const VoucherRegisterIndex: React.FC = () => {
   // Helper function to count vouchers by type using Redux state
   const getVoucherCount = (type: string): number => {
     switch (type) {
-      case 'payment': return voucherState.paymentVoucher.length;
-      case 'receipt': return voucherState.receiptVoucher.length;
-      case 'contra': return voucherState.contraVoucher.length;
-      case 'journal': return voucherState.journalVoucher.length;
-      case 'sales': return voucherState.saleVoucher.length;
-      case 'purchase': return voucherState.purchaseVoucher.length;
-      case 'sales-order': return voucherState.salesOrderVoucher.length;
-      case 'purchase-order': return voucherState.purchaseOrderVoucher.length;
-      case 'quotation': return voucherState.quotationVoucher.length;
-      case 'debit-note': return voucherState.debitNoteVoucher.length;
-      case 'credit-note': return voucherState.creditNoteVoucher.length;
-      case 'stock-journal': return voucherState.stockJournalVoucher.length;
-      case 'delivery-note': return voucherState.deliveryNoteVoucher.length;
+      case 'payment': return filterByFinancialYear(voucherState.paymentVoucher, 'date', selectedFinYear).length;
+      case 'receipt': return filterByFinancialYear(voucherState.receiptVoucher, 'date', selectedFinYear).length;
+      case 'contra': return filterByFinancialYear(voucherState.contraVoucher, 'date', selectedFinYear).length;
+      case 'journal': return filterByFinancialYear(voucherState.journalVoucher, 'date', selectedFinYear).length;
+      case 'sales': return filterByFinancialYear(voucherState.saleVoucher, 'date', selectedFinYear).length;
+      case 'purchase': return filterByFinancialYear(voucherState.purchaseVoucher, 'date', selectedFinYear).length;
+      case 'sales-order': return filterByFinancialYear(voucherState.salesOrderVoucher, 'date', selectedFinYear).length;
+      case 'purchase-order': return filterByFinancialYear(voucherState.purchaseOrderVoucher, 'date', selectedFinYear).length;
+      case 'quotation': return filterByFinancialYear(voucherState.quotationVoucher, 'date', selectedFinYear).length;
+      case 'debit-note': return filterByFinancialYear(voucherState.debitNoteVoucher, 'date', selectedFinYear).length;
+      case 'credit-note': return filterByFinancialYear(voucherState.creditNoteVoucher, 'date', selectedFinYear).length;
+      case 'stock-journal': return filterByFinancialYear(voucherState.stockJournalVoucher, 'date', selectedFinYear).length;
+      case 'delivery-note': return filterByFinancialYear(voucherState.deliveryNoteVoucher, 'date', selectedFinYear).length;
       default: return 0;
     }
   };
