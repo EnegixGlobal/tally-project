@@ -569,7 +569,7 @@ const BankStatementImport: React.FC = () => {
                 return;
             }
 
-            await parseStructuredPdf(pagesData);
+            await parseStructuredPdf(pagesData, pdf);
         } catch (err: any) {
             console.error("PDF Parsing Error:", err);
             Swal.fire("PDF Parse Error", err.message || "Failed to process PDF file", "error");
@@ -597,7 +597,7 @@ const BankStatementImport: React.FC = () => {
         return "";
     };
 
-    const parseStructuredPdf = async (pagesData: any[]) => {
+    const parseStructuredPdf = async (pagesData: any[], pdf: any) => {
         setProcessingStage("Analyzing columns and coordinates...");
         let allExtractedTxns: any[] = [];
         let detectedBank = "";
@@ -680,8 +680,8 @@ const BankStatementImport: React.FC = () => {
                     } else {
                         const last = merged[merged.length - 1];
                         const gap = item.x - (last.x + last.width);
-                        // Relaxed gap threshold to 15px to merge split digits/characters correctly
-                        if (gap <= 15) {
+                        // Relaxed gap threshold to 5px to merge split digits/characters without merging columns
+                        if (gap <= 5) {
                             last.text += " " + item.text;
                             last.width = (item.x + item.width) - last.x;
                         } else {
@@ -695,14 +695,15 @@ const BankStatementImport: React.FC = () => {
             let headerRowIndex = -1;
             let pageColumnCoords = { date: -1, particulars: -1, refNo: -1, debit: -1, credit: -1, balance: -1 };
 
-            for (let r = 0; r < Math.min(25, rowsByY.length); r++) {
+            for (let r = 0; r < Math.min(80, rowsByY.length); r++) {
                 const row = rowsByY[r];
                 let tempCoords = { date: -1, particulars: -1, refNo: -1, debit: -1, credit: -1, balance: -1 };
 
                 row.items.forEach(item => {
+                    const center = item.x + (item.width / 2);
                     const text = item.text.toLowerCase().replace(/[^a-z0-9]/g, "");
                     if (text.includes("date") || text === "dt") {
-                        tempCoords.date = item.x;
+                        tempCoords.date = center;
                     } else if (
                         text.includes("particular") || 
                         text.includes("description") || 
@@ -713,7 +714,7 @@ const BankStatementImport: React.FC = () => {
                         text === "txn" || 
                         text === "info"
                     ) {
-                        tempCoords.particulars = item.x;
+                        tempCoords.particulars = center;
                     } else if (
                         text.includes("debit") || 
                         text.includes("withdrawal") || 
@@ -721,16 +722,16 @@ const BankStatementImport: React.FC = () => {
                         text === "dr" || 
                         text.includes("withdrawn")
                     ) {
-                        tempCoords.debit = item.x;
+                        tempCoords.debit = center;
                     } else if (
                         text.includes("credit") || 
                         text.includes("deposit") || 
                         text.includes("receipt") || 
                         text === "cr"
                     ) {
-                        tempCoords.credit = item.x;
+                        tempCoords.credit = center;
                     } else if (text.includes("balance") || text === "bal" || text.includes("closing")) {
-                        tempCoords.balance = item.x;
+                        tempCoords.balance = center;
                     } else if (
                         text.includes("ref") || 
                         text.includes("cheque") || 
@@ -738,7 +739,7 @@ const BankStatementImport: React.FC = () => {
                         text.includes("instrument") || 
                         text.includes("doc")
                     ) {
-                        tempCoords.refNo = item.x;
+                        tempCoords.refNo = center;
                     }
                 });
 
@@ -771,12 +772,13 @@ const BankStatementImport: React.FC = () => {
                 continue;
             }
 
-            const getClosestColumn = (x: number) => {
+            const getClosestColumn = (item: any) => {
                 let closestCol = "";
                 let minDiff = Infinity;
-                Object.entries(coords).forEach(([colName, colX]: [string, any]) => {
-                    if (colX === -1) return;
-                    const diff = Math.abs(x - colX);
+                const itemCenter = item.x + (item.width / 2);
+                Object.entries(coords).forEach(([colName, colCenter]: [string, any]) => {
+                    if (colCenter === -1) return;
+                    const diff = Math.abs(itemCenter - colCenter);
                     if (diff < minDiff) {
                         minDiff = diff;
                         closestCol = colName;
@@ -787,6 +789,21 @@ const BankStatementImport: React.FC = () => {
 
             for (let r = startIdx; r < rowsByY.length; r++) {
                 const row = rowsByY[r];
+                const rowString = row.items.map(i => i.text).join(" ").toLowerCase();
+
+                if (
+                    rowString.includes("transaction total") ||
+                    rowString.includes("closing balance") ||
+                    rowString.includes("legends used") ||
+                    rowString.includes("page ") ||
+                    rowString.includes("end of statement") ||
+                    rowString.includes("statement between") ||
+                    rowString.includes("charge statement") ||
+                    rowString.includes("total charges")
+                ) {
+                    break;
+                }
+
                 const rowData = {
                     date: "",
                     particulars: "",
@@ -797,7 +814,7 @@ const BankStatementImport: React.FC = () => {
                 };
 
                 row.items.forEach(item => {
-                    const col = getClosestColumn(item.x);
+                    const col = getClosestColumn(item);
                     if (col) {
                         if (rowData[col as keyof typeof rowData]) {
                             rowData[col as keyof typeof rowData] += " " + item.text;
@@ -865,11 +882,29 @@ const BankStatementImport: React.FC = () => {
         }
 
         if (allExtractedTxns.length === 0) {
-            Swal.fire("Warning", "Could not extract any transaction rows. Please check file format.", "warning");
+            const result = await Swal.fire({
+                title: "Could not extract rows",
+                text: "We couldn't automatically read the table format. Would you like to try using the OCR fallback scanner?",
+                icon: "warning",
+                showCancelButton: true,
+                confirmButtonColor: "#2563eb",
+                confirmButtonText: "Yes, Try OCR",
+                cancelButtonText: "No, Cancel"
+            });
+            if (result.isConfirmed) {
+                await processPdfOcr(pdf);
+            }
             return;
         }
 
-        await mapAndSequenceRows(allExtractedTxns, detectedBank);
+        const validTxns = allExtractedTxns.filter(t => t.Debit > 0 || t.Credit > 0);
+
+        if (validTxns.length === 0) {
+            Swal.fire("Warning", "No valid transactions with debit or credit amounts were found.", "warning");
+            return;
+        }
+
+        await mapAndSequenceRows(validTxns, detectedBank);
     };
 
     const processPdfOcr = async (pdf: any) => {
@@ -990,8 +1025,8 @@ const BankStatementImport: React.FC = () => {
             const afterDate = cleanLine.substring(dateIndex + dateStr.length).trim();
             if (!afterDate) return;
             
-            // Extract numeric amounts at the end of the line
-            const numberRegex = /(-?\d{1,3}(?:,\d{3})*(?:\.\d{2})?|-?\d+(?:\.\d{2})?)/g;
+            // Extract numeric amounts at the end of the line (requiring decimals to avoid matching branch codes/account numbers)
+            const numberRegex = /(-?\d{1,3}(?:,\d{3})*(?:\.\d{2})|-?\d+(?:\.\d{2}))/g;
             const matches = afterDate.match(numberRegex);
             
             if (!matches || matches.length < 1) return;
