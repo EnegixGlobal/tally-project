@@ -8,6 +8,7 @@ import {
   Filter,
   Calendar,
   Eye,
+  Sparkles,
 } from "lucide-react";
 import { useCompany } from "../../context/CompanyContext";
 import * as XLSX from "xlsx";
@@ -931,9 +932,10 @@ const LedgerReport: React.FC = () => {
                   </h2>
                   <button 
                     onClick={() => setIsBillMatchModalOpen(true)}
-                    className="ml-12 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                    className="ml-12 px-4 py-1.5 text-sm font-semibold bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-md shadow-md hover:shadow-lg hover:from-blue-700 hover:to-purple-700 transition-all flex items-center gap-1.5 border border-purple-400"
                   >
-                    Bill Match
+                    <Sparkles size={16} className="animate-pulse" />
+                    AI Ledger Match
                   </button>
                 </div>
                 <p className="text-sm text-gray-500">

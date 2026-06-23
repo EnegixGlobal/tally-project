@@ -182,7 +182,7 @@ const BillMatchModal: React.FC<BillMatchModalProps> = ({
                 <Sparkles size={20} className="text-purple-600 animate-pulse" />
               </div>
               <h2 className="text-xl font-extrabold text-transparent bg-clip-text bg-gradient-to-r from-blue-700 to-purple-700">
-                AI Bill Match
+                AI Ledger Match
               </h2>
               <span className="text-xl font-bold text-gray-700 mx-1">-</span>
               <h2 className="text-xl font-semibold text-gray-800">{ledgerName}</h2>
