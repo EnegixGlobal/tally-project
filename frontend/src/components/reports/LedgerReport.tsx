@@ -933,7 +933,7 @@ const LedgerReport: React.FC = () => {
                     onClick={() => setIsBillMatchModalOpen(true)}
                     className="ml-12 px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
                   >
-                    Bill Match
+                    Ledger Match
                   </button>
                 </div>
                 <p className="text-sm text-gray-500">
