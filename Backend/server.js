@@ -165,6 +165,9 @@ app.use("/api/gst-rates", gstRatesRoutes);
 const aiRoutes = require("./routes/aiRoutes");
 app.use("/api/ai", aiRoutes);
 
+const bankStatementAiRoutes = require("./routes/bankStatementAiRoutes");
+app.use("/api/ai", bankStatementAiRoutes);
+
 // const stockSummaryRouter = require('./routes/stockSummary');
 // app.use('/api', stockSummaryRouter);
 
