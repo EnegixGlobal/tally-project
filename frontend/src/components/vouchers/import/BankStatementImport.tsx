@@ -99,6 +99,7 @@ const BankStatementImport: React.FC = () => {
   const [isAIProcessing, setIsAIProcessing] = useState(false);
   const [processingStage, setProcessingStage] = useState("");
   const [aiProcessingStage, setAiProcessingStage] = useState("");
+  const [aiProgress, setAiProgress] = useState(0);
   const [dragActive, setDragActive] = useState(false);
   const [aiDragActive, setAiDragActive] = useState(false);
   const [activeTab, setActiveTab] = useState<
@@ -715,6 +716,20 @@ const BankStatementImport: React.FC = () => {
   const processAIFile = async (file: File) => {
     setIsAIProcessing(true);
     setAiProcessingStage("AI is analyzing your document...");
+    setAiProgress(0);
+
+    // Simulate progress while waiting for AI
+    const progressInterval = setInterval(() => {
+      setAiProgress((prev) => {
+        if (prev >= 95) {
+          clearInterval(progressInterval);
+          return 95;
+        }
+        // Slower progression as it gets higher
+        const increment = prev > 80 ? 1 : prev > 50 ? 5 : 10;
+        return prev + increment;
+      });
+    }, 800);
 
     try {
       const formData = new FormData();
@@ -751,9 +766,17 @@ const BankStatementImport: React.FC = () => {
         };
       });
 
-      await mapAndSequenceRows(rawTxns, data.bankName || "Unknown Bank");
+      clearInterval(progressInterval);
+      setAiProgress(100);
+      
+      // Add slight delay so user sees 100%
+      setTimeout(async () => {
+        await mapAndSequenceRows(rawTxns, data.bankName || "Unknown Bank");
+      }, 500);
 
     } catch (err: any) {
+      clearInterval(progressInterval);
+      setAiProgress(0);
       console.error("AI Extraction Error:", err);
       
       let title = "AI Extraction Failed";
@@ -1967,7 +1990,7 @@ const BankStatementImport: React.FC = () => {
                   
                   {/* Progress bar simulation */}
                   <div className="w-full max-w-xs bg-indigo-950/50 rounded-full h-1.5 mt-2 overflow-hidden border border-indigo-800/50">
-                    <div className="bg-gradient-to-r from-purple-500 to-indigo-400 h-1.5 rounded-full animate-[pulse_2s_ease-in-out_infinite]" style={{ width: '60%' }}></div>
+                    <div className="bg-gradient-to-r from-purple-500 to-indigo-400 h-1.5 rounded-full transition-all duration-500 ease-out animate-[pulse_2s_ease-in-out_infinite]" style={{ width: `${aiProgress}%` }}></div>
                   </div>
                 </div>
               </div>
