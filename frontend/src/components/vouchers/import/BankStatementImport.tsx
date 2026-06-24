@@ -44,8 +44,9 @@ interface ImportedRow {
 }
 
 const isBankLedgerMatch = (ledgerName: string, bankName: string): boolean => {
-  const lName = ledgerName.toLowerCase().trim();
-  const bName = bankName.toLowerCase().trim();
+  if (!ledgerName || !bankName) return false;
+  const lName = String(ledgerName).toLowerCase().replace(/\s+/g, " ").trim();
+  const bName = String(bankName).toLowerCase().replace(/\s+/g, " ").trim();
 
   if (lName === bName) return true;
 
@@ -704,6 +705,13 @@ const BankStatementImport: React.FC = () => {
     }
   };
 
+  const getSuspenseLedgerName = () => {
+    const suspenseLedger = ledgers.find(
+      (l) => l.name.toUpperCase().includes("SUSPENSE")
+    );
+    return suspenseLedger ? suspenseLedger.name : "SUSPENSE";
+  };
+
   const processAIFile = async (file: File) => {
     setIsAIProcessing(true);
     setAiProcessingStage("AI is analyzing your document...");
@@ -730,7 +738,18 @@ const BankStatementImport: React.FC = () => {
 
       const rawTxns = data.rows.filter(
         (row: any) => Number(row.Debit || 0) > 0 || Number(row.Credit || 0) > 0
-      );
+      ).map((row: any) => {
+        let narrationText = row.Particulars || "";
+        if (row.Narration && row.Narration !== row.Particulars) {
+          narrationText = narrationText ? `${narrationText} ${row.Narration}` : row.Narration;
+        }
+        
+        return {
+          ...row,
+          Particulars: getSuspenseLedgerName(),
+          Narration: narrationText.trim()
+        };
+      });
 
       await mapAndSequenceRows(rawTxns, data.bankName || "Unknown Bank");
 
@@ -1116,7 +1135,7 @@ const BankStatementImport: React.FC = () => {
           if (currentTxn) {
             allExtractedTxns.push({
               Date: currentTxn.Date,
-              Particulars: "SUSPENSE",
+              Particulars: getSuspenseLedgerName(),
               Narration: currentTxn.Particulars,
               Debit: Number(currentTxn.Debit.replace(/[^\d.]/g, "")) || 0,
               Credit: Number(currentTxn.Credit.replace(/[^\d.]/g, "")) || 0,
@@ -1172,7 +1191,7 @@ const BankStatementImport: React.FC = () => {
     if (currentTxn) {
       allExtractedTxns.push({
         Date: currentTxn.Date,
-        Particulars: "SUSPENSE",
+        Particulars: getSuspenseLedgerName(),
         Narration: currentTxn.Particulars,
         Debit: Number(currentTxn.Debit.replace(/[^\d.]/g, "")) || 0,
         Credit: Number(currentTxn.Credit.replace(/[^\d.]/g, "")) || 0,
@@ -1314,7 +1333,7 @@ const BankStatementImport: React.FC = () => {
 
       const mappedOcrTxns = allOcrTxns.map((t) => ({
         Date: t.date,
-        Particulars: "SUSPENSE",
+        Particulars: getSuspenseLedgerName(),
         Narration: t.particulars,
         Debit: t.debit,
         Credit: t.credit,
@@ -1881,9 +1900,15 @@ const BankStatementImport: React.FC = () => {
                   <h3 className="text-2xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-purple-700 to-indigo-700 mb-3 tracking-tight">
                     AI Statement Extraction
                   </h3>
-                  <p className="text-gray-600 mb-6 max-w-md mx-auto text-sm leading-relaxed">
+                  <p className="text-gray-600 mb-4 max-w-md mx-auto text-sm leading-relaxed">
                     Upload any <span className="font-semibold text-purple-700">PDF or Image</span>. Our advanced AI instantly parses complex layouts, identifies tables, and accurately extracts your transactions.
                   </p>
+                  
+                  <div className="mb-6 flex justify-center">
+                    <span className="text-amber-700 font-semibold text-xs tracking-wider uppercase bg-amber-100/80 px-3 py-1.5 rounded-full border border-amber-200 flex items-center shadow-sm">
+                      <span className="mr-1">⚠️</span> NOTE:- AI TAKES SOME TIME, PLEASE BE PATIENT
+                    </span>
+                  </div>
                   
                   {selectedAIFile && (
                     <div className="mb-6 flex justify-center">
