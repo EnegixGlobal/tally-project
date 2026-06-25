@@ -249,6 +249,11 @@ const PurchaseVoucher: React.FC = () => {
   const [showTableConfig, setShowTableConfig] = useState(false);
   const [supplierState, setSupplierState] = useState("");
 
+  const [itemSelectionModal, setItemSelectionModal] = useState<{
+    isOpen: boolean;
+    index: number | null;
+  }>({ isOpen: false, index: null });
+
 
   const [visibleColumns, setVisibleColumns] = useState(
     {
@@ -1925,23 +1930,8 @@ const PurchaseVoucher: React.FC = () => {
   useEffect(() => {
     if (formData.mode !== "item-invoice") return;
 
-    const hasBatchItem = formData.entries.some((entry) => {
-      if (entry.batchNumber && entry.batchNumber.trim() !== "") return true;
-      if (!entry.itemId) return false;
-      const item = stockItems.find((i) => String(i.id) === String(entry.itemId));
-      return (
-        item?.enableBatchTracking ||
-        (item?.batches && item.batches.length > 0)
-      );
-    });
-
-    if (visibleColumns.batch !== hasBatchItem) {
-      setVisibleColumns((prev) => ({
-        ...prev,
-        batch: hasBatchItem,
-      }));
-    }
-  }, [formData.entries, stockItems, formData.mode, visibleColumns.batch]);
+    // Batch column auto-hide has been removed so user can manually control it.
+  }, [formData.entries, stockItems, formData.mode]);
 
 
   const addEntry = () => {
@@ -3318,8 +3308,8 @@ const PurchaseVoucher: React.FC = () => {
                       <th className={TABLE_STYLES.header}>Item</th>
                       {visibleColumns.hsn && <th>HSN/SAC</th>}
 
-                      {/* Batch column — only show when items have batches (same as Sales Voucher) */}
-                      {visibleColumns.batch && hasAnyBatch && (
+                      {/* Batch column */}
+                      {visibleColumns.batch && (
                         <th className={TABLE_STYLES.header}>Batch</th>
                       )}
 
@@ -3369,19 +3359,30 @@ const PurchaseVoucher: React.FC = () => {
 
                           {/* ITEM */}
                           <td className="px-1 py-2 min-w-[110px] align-top">
-                            <select
-                              name="itemId"
-                              value={entry.itemId}
-                              onChange={(e) => handleEntryChange(index, e)}
-                              className={`${TABLE_STYLES.select} min-w-[110px] text-xs`}
+                            <div
+                              onClick={() =>
+                                setItemSelectionModal({ isOpen: true, index })
+                              }
+                              className={`${TABLE_STYLES.select} text-xs min-w-[110px] cursor-pointer flex items-center min-h-[28px] overflow-hidden whitespace-nowrap`}
+                              title={
+                                entry.itemId
+                                  ? stockItems.find(
+                                      (i) =>
+                                        String(i.id) === String(entry.itemId)
+                                    )?.name || "Item"
+                                  : "Item"
+                              }
                             >
-                              <option value="">Item</option>
-                              {stockItems.map((item) => (
-                                <option key={item.id} value={item.id}>
-                                  {item.name}
-                                </option>
-                              ))}
-                            </select>
+                              {entry.itemId ? (
+                                stockItems.find(
+                                  (i) => String(i.id) === String(entry.itemId)
+                                )?.name || "Item"
+                              ) : (
+                                <span className="text-gray-400">
+                                  Item
+                                </span>
+                              )}
+                            </div>
 
                             {/* Item Attributes Display */}
                             {(() => {
@@ -3421,8 +3422,8 @@ const PurchaseVoucher: React.FC = () => {
                             </td>
                           )}
 
-                          {/* BATCH — only show when items have batches */}
-                          {visibleColumns.batch && hasAnyBatch && (
+                          {/* BATCH */}
+                          {visibleColumns.batch && (
                             <td className="px-1 py-2 min-w-[140px] flex items-center gap-2 align-top">
                               <select
                                 name="batchNumber"
@@ -4873,6 +4874,67 @@ const PurchaseVoucher: React.FC = () => {
           </div>
         </div>
       </div>
+
+      {/* Item Selection Modal */}
+      {itemSelectionModal.isOpen && (
+        <div className="fixed inset-0 bg-white/40 dark:bg-black/40 backdrop-blur-md flex items-center justify-center z-[100] p-4">
+          <div
+            className={`${
+              theme === "dark"
+                ? "bg-gray-800 text-white"
+                : "bg-white text-gray-800"
+            } rounded-lg shadow-2xl w-full max-w-4xl max-h-[90vh] flex flex-col border dark:border-gray-700`}
+          >
+            <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center">
+              <h2 className="text-2xl font-bold">Select Item</h2>
+              <button
+                onClick={() =>
+                  setItemSelectionModal({ isOpen: false, index: null })
+                }
+                className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 text-2xl"
+              >
+                &times;
+              </button>
+            </div>
+            <div className="p-4 flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-2">
+                {stockItems.map((item) => (
+                  <div
+                    key={item.id}
+                    onClick={() => {
+                      if (itemSelectionModal.index !== null) {
+                        handleEntryChange(itemSelectionModal.index, {
+                          target: {
+                            name: "itemId",
+                            value: String(item.id),
+                            type: "select-one",
+                          },
+                        } as any);
+                      }
+                      setItemSelectionModal({ isOpen: false, index: null });
+                    }}
+                    className={`px-4 py-3 rounded-lg cursor-pointer border hover:border-blue-500 transition-colors flex items-center justify-between shadow-sm ${
+                      theme === "dark"
+                        ? "bg-gray-700 border-gray-600 hover:bg-gray-600"
+                        : "bg-white border-gray-200 hover:bg-blue-50"
+                    }`}
+                  >
+                    <h3 className="text-lg font-medium break-words">
+                      {item.name}
+                    </h3>
+                  </div>
+                ))}
+                {stockItems.length === 0 && (
+                  <div className="col-span-full text-center py-12 text-gray-500">
+                    No items available
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         className={`mt-6 p-4 rounded ${theme === "dark" ? "bg-gray-800" : "bg-blue-50"
           }`}
