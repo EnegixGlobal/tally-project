@@ -162,10 +162,12 @@ const Ledgers: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  const filteredLedgers = ledgers.filter(ledger =>
-    ledger.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (ledger.company_name && ledger.company_name.toLowerCase().includes(searchTerm.toLowerCase()))
-  );
+  const filteredLedgers = ledgers
+    .filter(ledger =>
+      ledger.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (ledger.company_name && ledger.company_name.toLowerCase().includes(searchTerm.toLowerCase()))
+    )
+    .sort((a, b) => a.name.localeCompare(b.name));
 
   const formatCurrency = (value: string | number) => {
     const num = typeof value === 'string' ? parseFloat(value) : value;
