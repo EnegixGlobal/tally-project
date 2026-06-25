@@ -100,6 +100,7 @@ export type Ledger = {
   district?: string;
   closingBalance?: number;
   pinCode?: string;
+  ownerId?: number;
 };
 export interface LedgerWithGroup extends Ledger {
   groupName?: string;

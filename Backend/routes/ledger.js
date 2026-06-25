@@ -64,6 +64,7 @@ router.get("/", async (req, res) => {
         l.district,
         l.pin_code AS pinCode,
         l.created_at AS createdAt,
+        l.owner_id AS ownerId,
         g.name AS groupName,
         g.type AS groupType,
         g.nature AS groupNature

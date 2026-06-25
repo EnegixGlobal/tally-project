@@ -110,6 +110,7 @@ const LedgerList: React.FC = () => {
           (!ledger.gstNumber || ledger.gstNumber.trim().length === 0));
       return matchesSearch && matchesCategory;
     })
+    .sort((a, b) => (a.name || "").localeCompare(b.name || ""))
     : [];
 
   const handleDelete = async (id: string | number) => {
@@ -360,12 +361,23 @@ const LedgerList: React.FC = () => {
                 {filteredLedgers.map((ledger) => (
                   <tr
                     key={ledger.id}
-                    className={`hover:bg-opacity-10 hover:bg-blue-500 ${theme === "dark"
-                      ? "border-b border-gray-700"
-                      : "border-b border-gray-200"
-                      }`}
+                    className={`hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${
+                      ledger.ownerId === 0
+                        ? theme === "dark"
+                          ? "bg-blue-900/10 border-b border-blue-900/30"
+                          : "bg-blue-50/40 border-b border-blue-100"
+                        : theme === "dark"
+                          ? "border-b border-gray-700"
+                          : "border-b border-gray-200"
+                    }`}
                   >
-                    <td className="px-4 py-3">{ledger.name}</td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-2">
+                        <span className={ledger.ownerId === 0 ? "font-semibold text-blue-600 dark:text-blue-400" : ""}>
+                          {ledger.name}
+                        </span>
+                      </div>
+                    </td>
                     <td className="px-4 py-3">
                       {getGroupName(ledger.groupId)}
                     </td>
@@ -415,27 +427,37 @@ const LedgerList: React.FC = () => {
                       )}
                     </td>
                     <td className="px-4 py-3">
-                      <div className="flex justify-center space-x-2">
-                        <button
-                          onClick={() =>
-                            navigate(`/app/masters/ledger/edit/${ledger.id}`)
-                          }
-                          className={`p-1 rounded ${theme === "dark"
-                            ? "hover:bg-gray-700"
-                            : "hover:bg-gray-100"
-                            }`}
-                        >
-                          <Edit size={16} />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(ledger.id)}
-                          className={`p-1 rounded ${theme === "dark"
-                            ? "hover:bg-gray-700"
-                            : "hover:bg-gray-100"
-                            }`}
-                        >
-                          <Trash2 size={16} />
-                        </button>
+                      <div className="flex justify-center items-center space-x-2">
+                        {ledger.ownerId === 0 ? (
+                          <span className={`px-2 py-1 text-xs font-bold rounded uppercase tracking-wider ${
+                            theme === 'dark' 
+                              ? 'bg-blue-900/50 text-blue-300 border border-blue-800' 
+                              : 'bg-blue-100 text-blue-700 border border-blue-200'
+                          }`}>
+                            Admin
+                          </span>
+                        ) : (
+                          <>
+                            <button
+                              title="Edit Ledger"
+                              onClick={() => navigate(`/app/masters/ledger/edit/${ledger.id}`)}
+                              className={`p-1 rounded transition-all ${
+                                theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
+                              }`}
+                            >
+                              <Edit size={16} />
+                            </button>
+                            <button
+                              title="Delete Ledger"
+                              onClick={() => handleDelete(ledger.id)}
+                              className={`p-1 rounded transition-all ${
+                                theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
+                              }`}
+                            >
+                              <Trash2 size={16} />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </td>
                   </tr>

@@ -199,4 +199,170 @@ router.get('/dashboard-stats', authMiddleware, async (req, res) => {
   }
 });
 
+// ✅ Admin All Ledgers
+router.get('/all-ledgers', authMiddleware, async (req, res) => {
+  try {
+    const [ledgers] = await db.query(`
+      SELECT l.id, l.name, l.opening_balance, l.balance_type, l.created_at, l.company_id, l.owner_type, l.group_id, 'Global Admin' as company_name
+      FROM ledgers l
+      WHERE l.company_id = 0 AND l.owner_type = 'admin'
+      ORDER BY l.created_at DESC
+    `);
+    
+    res.json(ledgers);
+  } catch (err) {
+    console.error('Ledgers fetch error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  }
+});
+
+// ✅ Admin Create Global Ledger
+router.post('/create-global-ledger', authMiddleware, async (req, res) => {
+  const { name, groupId, openingBalance, balanceType } = req.body;
+
+  if (!name || !groupId) {
+    return res.status(400).json({ message: 'Name and Group ID are required' });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // 1. Save as Admin Template (company_id = 0, owner_type = 'admin', owner_id = 0)
+    const [adminTemplate] = await connection.execute(
+      `SELECT id FROM ledgers WHERE name = ? AND company_id = 0 AND owner_type = 'admin'`,
+      [name]
+    );
+
+    if (adminTemplate.length > 0) {
+      return res.status(400).json({ message: 'Global ledger with this name already exists' });
+    }
+
+    await connection.execute(
+      `INSERT INTO ledgers (name, group_id, opening_balance, balance_type, company_id, owner_type, owner_id)
+       VALUES (?, ?, ?, ?, 0, 'admin', 0)`,
+      [name, groupId, openingBalance || 0, balanceType || 'debit']
+    );
+
+    // 2. Fetch all companies
+    const [companies] = await connection.execute(`SELECT id FROM tbcompanies`);
+
+    // 3. Insert into all companies (if not already exists)
+    for (const company of companies) {
+      const [existing] = await connection.execute(
+        `SELECT id FROM ledgers WHERE name = ? AND company_id = ? AND owner_type = 'employee' AND owner_id = 0`,
+        [name, company.id]
+      );
+
+      if (existing.length === 0) {
+        await connection.execute(
+          `INSERT INTO ledgers (name, group_id, opening_balance, balance_type, company_id, owner_type, owner_id)
+           VALUES (?, ?, ?, ?, ?, 'employee', 0)`,
+          [name, groupId, openingBalance || 0, balanceType || 'debit', company.id]
+        );
+      }
+    }
+
+    await connection.commit();
+    res.status(201).json({ message: 'Global ledger created successfully and copied to all companies' });
+  } catch (err) {
+    await connection.rollback();
+    console.error('Global ledger creation error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// ✅ Admin Edit Global Ledger
+router.put('/global-ledger/:id', authMiddleware, async (req, res) => {
+  const ledgerId = req.params.id;
+  const { name, groupId, openingBalance, balanceType } = req.body;
+
+  if (!name || !groupId) {
+    return res.status(400).json({ message: 'Name and Group ID are required' });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // 1. Fetch old name
+    const [oldLedger] = await connection.execute(
+      `SELECT name FROM ledgers WHERE id = ? AND company_id = 0 AND owner_type = 'admin'`,
+      [ledgerId]
+    );
+
+    if (oldLedger.length === 0) {
+      return res.status(404).json({ message: 'Global ledger template not found' });
+    }
+    const oldName = oldLedger[0].name;
+
+    // 2. Update Admin Template
+    await connection.execute(
+      `UPDATE ledgers SET name = ?, group_id = ?, opening_balance = ?, balance_type = ? 
+       WHERE id = ? AND company_id = 0 AND owner_type = 'admin'`,
+      [name, groupId, openingBalance || 0, balanceType || 'debit', ledgerId]
+    );
+
+    // 3. Update copies in all companies (matching by old name and employee owner_type)
+    await connection.execute(
+      `UPDATE ledgers SET name = ?, group_id = ?, opening_balance = ?, balance_type = ? 
+       WHERE name = ? AND company_id > 0 AND owner_type = 'employee' AND owner_id = 0`,
+      [name, groupId, openingBalance || 0, balanceType || 'debit', oldName]
+    );
+
+    await connection.commit();
+    res.json({ message: 'Global ledger updated successfully across all companies' });
+  } catch (err) {
+    await connection.rollback();
+    console.error('Global ledger update error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  } finally {
+    connection.release();
+  }
+});
+
+// ✅ Admin Delete Global Ledger
+router.delete('/global-ledger/:id', authMiddleware, async (req, res) => {
+  const ledgerId = req.params.id;
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    // 1. Fetch old name
+    const [oldLedger] = await connection.execute(
+      `SELECT name FROM ledgers WHERE id = ? AND company_id = 0 AND owner_type = 'admin'`,
+      [ledgerId]
+    );
+
+    if (oldLedger.length === 0) {
+      return res.status(404).json({ message: 'Global ledger template not found' });
+    }
+    const oldName = oldLedger[0].name;
+
+    // 2. Delete copies from all companies (using IGNORE to prevent crashing if foreign keys block deletion)
+    await connection.execute(
+      `DELETE IGNORE FROM ledgers WHERE name = ? AND company_id > 0 AND owner_type = 'employee' AND owner_id = 0`,
+      [oldName]
+    );
+
+    // 3. Delete Admin Template
+    await connection.execute(
+      `DELETE FROM ledgers WHERE id = ? AND company_id = 0 AND owner_type = 'admin'`,
+      [ledgerId]
+    );
+
+    await connection.commit();
+    res.json({ message: 'Global ledger deleted successfully' });
+  } catch (err) {
+    await connection.rollback();
+    console.error('Global ledger deletion error:', err);
+    res.status(500).json({ message: 'Server error', error: err.message });
+  } finally {
+    connection.release();
+  }
+});
+
 module.exports = router;
