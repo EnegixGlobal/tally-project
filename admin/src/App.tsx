@@ -11,6 +11,7 @@ import ResetPassword from './components/Auth/ResetPassword';
 import Sidebar from './components/Layout/Sidebar';
 import Header from './components/Layout/Header';
 import Dashboard from './components/Dashboard/Dashboard';
+import Ledgers from './components/Ledgers/Ledgers';
 import UserManagement from './components/Users/UserManagement';
 import SubscriptionManagement from './components/Subscriptions/SubscriptionManagement';
 import PaymentHistory from './components/Payments/PaymentHistory';
@@ -39,6 +40,7 @@ const PageContent: React.FC = () => {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route element={<ProtectedRoute />}>
             <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/ledgers" element={<Ledgers />} />
             <Route path="/users" element={<UserManagement />} />
             <Route path="/trader" element={< Traders />} />
             <Route path="/trader/:id" element={<TraderDetail />} />
