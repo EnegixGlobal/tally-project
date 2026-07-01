@@ -977,8 +977,10 @@ router.get("/ledger", async (req, res) => {
       SELECT id, name
       FROM ledgers
       WHERE company_id = ?
-        AND owner_type = ?
-        AND owner_id = ?
+        AND (
+          (owner_type = ? AND owner_id = ?) 
+          OR owner_id = 0
+        )
         AND (
           LOWER(name) LIKE '%gst%'
           OR LOWER(name) LIKE '%cgst%'

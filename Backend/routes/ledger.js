@@ -12,7 +12,7 @@ router.get("/check-duplicate", async (req, res) => {
   }
 
   try {
-    let sql = `SELECT id, name FROM ledgers WHERE company_id = ? AND owner_type = ? AND owner_id = ?`;
+    let sql = `SELECT id, name FROM ledgers WHERE company_id = ? AND ((owner_type = ? AND owner_id = ?) OR owner_id = 0)`;
     const params = [company_id, owner_type, owner_id];
 
     if (name) {
@@ -71,8 +71,10 @@ router.get("/", async (req, res) => {
       FROM ledgers l
       LEFT JOIN ledger_groups g ON l.group_id = g.id
       WHERE l.company_id = ?
-        AND l.owner_type = ?
-        AND (l.owner_id = ? OR l.owner_id = 0)
+        AND (
+          (l.owner_type = ? AND l.owner_id = ?) 
+          OR l.owner_id = 0
+        )
       ORDER BY l.name`,
       [company_id, owner_type, owner_id]
     );
@@ -265,8 +267,10 @@ router.get("/cash-bank", async (req, res) => {
           LOWER(g.name) LIKE '%bank%'
         )
         AND l.company_id = ?
-        AND l.owner_type = ?
-        AND l.owner_id = ?
+        AND (
+          (l.owner_type = ? AND l.owner_id = ?) 
+          OR l.owner_id = 0
+        )
       ORDER BY l.name ASC
       `,
       [company_id, owner_type, owner_id]
@@ -436,10 +440,12 @@ router.get("/:id", async (req, res) => {
        FROM ledgers l
        LEFT JOIN ledger_groups g ON l.group_id = g.id
        WHERE l.id = ? 
-       AND l.owner_type = ?
-       AND l.owner_id = ?
-       AND l.company_id = ?`,
-      [ledgerId, owner_type, owner_id, company_id]
+       AND l.company_id = ?
+       AND (
+         (l.owner_type = ? AND l.owner_id = ?)
+         OR l.owner_id = 0
+       )`,
+      [ledgerId, company_id, owner_type, owner_id]
     );
 
     if (rows.length === 0) {
