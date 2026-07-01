@@ -210,7 +210,7 @@ const StockSummary: React.FC = () => {
             return [];
           })(),
         };
-      }).filter((item: any) => item.batches.length > 0 && item.batches.some((b: any) => Number(b.opening.qty) !== 0 || Number(b.opening.value) !== 0))
+      })
         : [];
 
 
@@ -2129,16 +2129,6 @@ const StockSummary: React.FC = () => {
                                  { openingQty: 0, openingValue: 0, inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 }
                                );
                                
-                               // Hide items that have absolutely no activity or balance
-                               if (
-                                 totals.openingQty === 0 && totals.openingValue === 0 &&
-                                 totals.inwardQty === 0 && totals.inwardValue === 0 &&
-                                 totals.outwardQty === 0 && totals.outwardValue === 0 &&
-                                 totals.closingQty === 0 && totals.closingValue === 0
-                               ) {
-                                 return null;
-                               }
-                               
                                const openingRate = totals.openingQty > 0 ? totals.openingValue / totals.openingQty : 0;
                                const inwardRate = totals.inwardQty > 0 ? totals.inwardValue / totals.inwardQty : 0;
                                const outwardRate = totals.outwardQty > 0 ? totals.outwardValue / totals.outwardQty : 0;
@@ -2244,16 +2234,6 @@ const StockSummary: React.FC = () => {
                             },
                             { openingQty: 0, openingValue: 0, inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 }
                           );
-
-                          // Hide items that have absolutely no activity or balance
-                          if (
-                            totals.openingQty === 0 && totals.openingValue === 0 &&
-                            totals.inwardQty === 0 && totals.inwardValue === 0 &&
-                            totals.outwardQty === 0 && totals.outwardValue === 0 &&
-                            totals.closingQty === 0 && totals.closingValue === 0
-                          ) {
-                            return null;
-                          }
 
                           const closingRate = totals.closingQty !== 0 ? Math.abs(totals.closingValue / totals.closingQty) : 0;
                           const openingRate = totals.openingQty > 0 ? totals.openingValue / totals.openingQty : 0;
