@@ -894,7 +894,8 @@ const StockSummary: React.FC = () => {
           });
         }
 
-        if (!batchesProcessed) {
+        // ✅ Handle Case: Item has Opening Balance but NO Batches (Non-Batched Item)
+        if (!batchesProcessed && (Number(item.openingBalance) > 0 || Number(item.quantity) > 0)) {
           if (!itemObj.batches["Default"]) {
             itemObj.batches["Default"] = {
               batchName: "Default",
@@ -904,15 +905,22 @@ const StockSummary: React.FC = () => {
               closing: { qty: 0, rate: 0, value: 0 },
             };
           }
+          const batch = itemObj.batches["Default"];
+          const opQty = Number(item.openingBalance || item.quantity || 0);
+          const opRate = Number(item.openingRate || item.rate || 0);
+
+          batch.opening.qty += opQty;
+          batch.opening.value += opQty * opRate;
+          batch.opening.rate = opRate;
         }
       });
 
       // 2️⃣ PURCHASE (INWARD)
       purchaseList.forEach((txn: any) => {
-        const lookupKey = txn.itemName.toLowerCase().trim();
-        if (!itemMap[lookupKey]) return;
+        const lookupKey = (txn.itemName || "").toLowerCase().trim();
+        if (!lookupKey || !itemMap[lookupKey]) return;
 
-        const batchName = txn.batchName || "Default";
+        const batchName = txn.batchNumber || "Default";
         if (!itemMap[lookupKey].batches[batchName]) {
           itemMap[lookupKey].batches[batchName] = {
             batchName: batchName,
@@ -924,8 +932,10 @@ const StockSummary: React.FC = () => {
         }
 
         const batch = itemMap[lookupKey].batches[batchName];
-        batch.inward.qty += Number(txn.qty || 0);
-        batch.inward.value += Number(txn.amount || 0);
+        const pQty = Number(txn.purchaseQuantity || 0);
+        const pRate = Number(txn.rate || txn.purchaseRate || 0);
+        batch.inward.qty += pQty;
+        batch.inward.value += pQty * pRate;
         batch.inward.rate = batch.inward.qty !== 0 ? batch.inward.value / batch.inward.qty : 0;
       });
 
@@ -942,10 +952,10 @@ const StockSummary: React.FC = () => {
 
       // 3️⃣ SALES (OUTWARD)
       salesList.forEach((txn: any) => {
-        const lookupKey = txn.itemName.toLowerCase().trim();
-        if (!itemMap[lookupKey]) return;
+        const lookupKey = (txn.itemName || "").toLowerCase().trim();
+        if (!lookupKey || !itemMap[lookupKey]) return;
 
-        const batchName = txn.batchName || "Default";
+        const batchName = txn.batchNumber || "Default";
         if (!itemMap[lookupKey].batches[batchName]) {
           itemMap[lookupKey].batches[batchName] = {
             batchName: batchName,
@@ -957,11 +967,12 @@ const StockSummary: React.FC = () => {
         }
 
         const batch = itemMap[lookupKey].batches[batchName];
-        batch.outward.qty += Number(txn.qty || 0);
+        const qty = Math.abs(Number(txn.qtyChange || 0));
+        batch.outward.qty += qty;
 
         // Sales value logic uses purchase rate if available to calculate actual cost of goods sold.
-        const effectiveRate = batch.inward.rate > 0 ? batch.inward.rate : batch.opening.rate;
-        batch.outward.value += Number(txn.qty || 0) * effectiveRate;
+        const effectiveRate = txn.rate ? Number(txn.rate) : (batch.inward.rate > 0 ? batch.inward.rate : batch.opening.rate);
+        batch.outward.value += qty * effectiveRate;
         batch.outward.rate = effectiveRate;
       });
 
