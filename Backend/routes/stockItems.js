@@ -37,7 +37,8 @@ router.get("/", async (req, res) => {
       SELECT 
         s.id,
         s.name,
-        NULL AS stockGroupId,
+        c.parent AS stockGroupId,
+        s.categoryId,
         NULL AS stockGroupName,
         s.unit,
         u.name AS unitName,
@@ -58,6 +59,7 @@ router.get("/", async (req, res) => {
         s.owner_type,
         s.owner_id
       FROM stock_items s
+      LEFT JOIN stock_categories c ON s.categoryId = c.id
       LEFT JOIN stock_units u ON s.unit = u.id
       LEFT JOIN ledgers gl ON s.gstLedgerId = gl.id
       WHERE 1 = 1
@@ -975,8 +977,10 @@ router.get("/ledger", async (req, res) => {
       SELECT id, name
       FROM ledgers
       WHERE company_id = ?
-        AND owner_type = ?
-        AND owner_id = ?
+        AND (
+          (owner_type = ? AND owner_id = ?) 
+          OR owner_id = 0
+        )
         AND (
           LOWER(name) LIKE '%gst%'
           OR LOWER(name) LIKE '%cgst%'

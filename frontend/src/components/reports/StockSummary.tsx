@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from "react";
+import React, { useState, useEffect, useMemo, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
@@ -24,6 +24,19 @@ const StockSummary: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandedCategories, setExpandedCategories] = useState<Set<string>>(new Set());
+  const [drillPath, setDrillPath] = useState<Array<{ id: string, name: string, type: 'root' | 'group' | 'category' | 'month' | 'item', data?: any }>>(() => {
+    const saved = sessionStorage.getItem("stock_drill_path");
+    if (saved) {
+      try {
+        return JSON.parse(saved);
+      } catch (e) {}
+    }
+    return [{ id: 'root', name: 'Stock Groups', type: 'root' }];
+  });
+  const [categoryVouchers, setCategoryVouchers] = useState<{ purchase: any[], sales: any[] } | null>(null);
+  const [categoryVouchersLoading, setCategoryVouchersLoading] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [editLedgerId, setEditLedgerId] = useState<number | null>(null);
   const [editClosingBalance, setEditClosingBalance] = useState<string>("");
@@ -33,7 +46,7 @@ const StockSummary: React.FC = () => {
   );
 
   const [reportView, setReportView] = useState<
-    "Opening" | "Purchase" | "Sales" | "Closing" | "All"
+    "Opening" | "Purchase" | "Sales" | "Closing" | "All" | "Categories"
   >(() => (localStorage.getItem("stock_report_view") as any) || "Opening");
 
   useEffect(() => {
@@ -55,6 +68,10 @@ const StockSummary: React.FC = () => {
 
   //get all ledger-group
   const [groups, setGroups] = useState<any[]>([]);
+
+  useEffect(() => {
+    sessionStorage.setItem("stock_drill_path", JSON.stringify(drillPath));
+  }, [drillPath]);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -193,7 +210,7 @@ const StockSummary: React.FC = () => {
             return [];
           })(),
         };
-      })
+      }).filter((item: any) => item.batches.length > 0 && item.batches.some((b: any) => Number(b.opening.qty) !== 0 || Number(b.opening.value) !== 0))
         : [];
 
 
@@ -514,14 +531,14 @@ const StockSummary: React.FC = () => {
     }
   };
 
-  const loadAllData = async () => {
+  const loadCategoriesData = async () => {
     setLoading(true);
     setError(null);
 
     try {
       const params = new URLSearchParams({ company_id, owner_type, owner_id });
 
-      const [stockItemsRes, purchaseRes, salesRes] = await Promise.all([
+      const [stockItemsRes, purchaseRes, salesRes, groupsRes, categoriesRes] = await Promise.all([
         fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params}`),
         fetch(
           `${import.meta.env.VITE_API_URL
@@ -531,17 +548,24 @@ const StockSummary: React.FC = () => {
           `${import.meta.env.VITE_API_URL
           }/api/sales-vouchers/sale-history?${params}`
         ),
+        fetch(`${import.meta.env.VITE_API_URL}/api/stock-groups/list?${params}`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/stock-categories?${params}`)
       ]);
 
       const stockItemsData = await stockItemsRes.json();
       const purchaseData = await purchaseRes.json();
       const salesData = await salesRes.json();
+      const groupsData = await groupsRes.json();
+      const categoriesData = await categoriesRes.json();
 
       const itemMap: Record<string, any> = {};
 
       const stockItemsList = Array.isArray(stockItemsData?.data) ? stockItemsData.data : [];
       const purchaseList = Array.isArray(purchaseData?.data) ? purchaseData.data : [];
       const salesList = Array.isArray(salesData?.data) ? salesData.data : [];
+      
+      const stockGroupsList = Array.isArray(groupsData) ? groupsData : [];
+      const stockCategoriesList = Array.isArray(categoriesData) ? categoriesData : [];
 
       // 1️⃣ OPENING STOCK (BATCH-WISE)
       stockItemsList.forEach((item: any) => {
@@ -561,6 +585,8 @@ const StockSummary: React.FC = () => {
         const itemObj = {
           itemName: itemName,
           unitName: matchedUnitName,
+          stockGroupId: item.stockGroupId,
+          categoryId: item.categoryId,
           batches: {},
         };
         itemMap[lookupKey] = itemObj;
@@ -715,6 +741,252 @@ const StockSummary: React.FC = () => {
         });
       });
 
+      // 5️⃣ FINAL ARRAY & HIERARCHY
+      const allItems = Object.values(itemMap).map((item: any) => ({
+        ...item,
+        batches: Object.values(item.batches),
+      }));
+
+      const groupMap: Record<string, any> = {};
+
+      allItems.forEach((item: any) => {
+        const groupId = item.stockGroupId || "uncategorized_group";
+        const categoryId = item.categoryId || "uncategorized_category";
+
+        if (!groupMap[groupId]) {
+          const groupInfo = stockGroupsList.find((g: any) => String(g.id) === String(groupId));
+          groupMap[groupId] = {
+            isGroup: true,
+            id: groupId,
+            name: groupInfo ? groupInfo.name : (groupId === "uncategorized_group" ? "Primary" : "Unknown Group"),
+            categories: {},
+            totals: { openingQty: 0, openingValue: 0, inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 }
+          };
+        }
+
+        if (!groupMap[groupId].categories[categoryId]) {
+          const categoryInfo = stockCategoriesList.find((c: any) => String(c.id) === String(categoryId));
+          groupMap[groupId].categories[categoryId] = {
+            isCategory: true,
+            id: categoryId,
+            name: categoryInfo ? categoryInfo.name : (categoryId === "uncategorized_category" ? "General" : "Unknown Category"),
+            items: [],
+            totals: { openingQty: 0, openingValue: 0, inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 }
+          };
+        }
+
+        const category = groupMap[groupId].categories[categoryId];
+        category.items.push(item);
+
+        // Sum up item totals to category and group
+        item.batches.forEach((b: any) => {
+          const addTotals = (target: any) => {
+            target.openingQty += b.opening?.qty || 0;
+            target.openingValue += b.opening?.value || 0;
+            target.inwardQty += b.inward?.qty || 0;
+            target.inwardValue += b.inward?.value || 0;
+            target.outwardQty += b.outward?.qty || 0;
+            target.outwardValue += b.outward?.value || 0;
+            target.closingQty += b.closing?.qty || 0;
+            target.closingValue += b.closing?.value || 0;
+          };
+          addTotals(category.totals);
+          addTotals(groupMap[groupId].totals);
+        });
+      });
+
+      const finalData = Object.values(groupMap).map((group: any) => ({
+        ...group,
+        categories: Object.values(group.categories).sort((a: any, b: any) => a.name.localeCompare(b.name))
+      })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+
+      setData(finalData);
+    } catch (err: any) {
+      setError(err.message);
+      setData([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadAllData = async () => {
+    setLoading(true);
+    setError(null);
+
+    try {
+      const params = new URLSearchParams({ company_id, owner_type, owner_id });
+
+      const [stockItemsRes, purchaseRes, salesRes] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params}`),
+        fetch(
+          `${import.meta.env.VITE_API_URL
+          }/api/purchase-vouchers/purchase-history?${params}`
+        ),
+        fetch(
+          `${import.meta.env.VITE_API_URL
+          }/api/sales-vouchers/sale-history?${params}`
+        ),
+      ]);
+
+      const stockItemsData = await stockItemsRes.json();
+      const purchaseData = await purchaseRes.json();
+      const salesData = await salesRes.json();
+
+      const itemMap: Record<string, any> = {};
+
+      const stockItemsList = Array.isArray(stockItemsData?.data) ? stockItemsData.data : [];
+      const purchaseList = Array.isArray(purchaseData?.data) ? purchaseData.data : [];
+      const salesList = Array.isArray(salesData?.data) ? salesData.data : [];
+
+      // 1️⃣ OPENING STOCK (BATCH-WISE)
+      stockItemsList.forEach((item: any) => {
+        const itemName = item.name;
+        const lookupKey = itemName.toLowerCase().trim();
+
+        let matchedUnitName = item.unitName || "";
+        if (!matchedUnitName) {
+          const matchedUnit = units.find((u) => String(u.id) === String(item.unit));
+          if (matchedUnit && matchedUnit.name) {
+            matchedUnitName = matchedUnit.name;
+          } else if (item.unit && isNaN(Number(item.unit))) {
+            matchedUnitName = item.unit;
+          }
+        }
+
+        const itemObj = {
+          itemName: itemName,
+          unitName: matchedUnitName,
+          batches: {},
+        };
+        itemMap[lookupKey] = itemObj;
+
+        let batchesProcessed = false;
+
+        if (item.batches && item.batches.length > 0) {
+          item.batches.forEach((b: any) => {
+            const batchName = b.batchName || "Default";
+
+            if (!itemObj.batches[batchName]) {
+              itemObj.batches[batchName] = {
+                batchName: batchName,
+                opening: { qty: 0, rate: 0, value: 0 },
+                inward: { qty: 0, rate: 0, value: 0 },
+                outward: { qty: 0, rate: 0, value: 0 },
+                closing: { qty: 0, rate: 0, value: 0 },
+              };
+            }
+
+            const batch = itemObj.batches[batchName];
+
+            if (b.mode === "purchase") {
+              // Store imported purchase batch data so we can backfill if purchase_history is missing it
+              batch.importedInward = {
+                qty: Number(b.batchQuantity || 0),
+                value: Number(b.openingValue || (Number(b.batchQuantity || 0) * Number(b.openingRate || 0))),
+                rate: Number(b.openingRate || 0),
+              };
+            } else if (!b.mode || b.mode === "opening") {
+              batch.opening.qty += Number(b.batchQuantity || 0);
+              batch.opening.value += Number(b.batchQuantity || 0) * Number(b.openingRate || 0);
+              batch.opening.rate = batch.opening.qty !== 0 ? batch.opening.value / batch.opening.qty : 0;
+              batchesProcessed = true;
+            }
+          });
+        }
+
+        if (!batchesProcessed) {
+          if (!itemObj.batches["Default"]) {
+            itemObj.batches["Default"] = {
+              batchName: "Default",
+              opening: { qty: 0, rate: 0, value: 0 },
+              inward: { qty: 0, rate: 0, value: 0 },
+              outward: { qty: 0, rate: 0, value: 0 },
+              closing: { qty: 0, rate: 0, value: 0 },
+            };
+          }
+        }
+      });
+
+      // 2️⃣ PURCHASE (INWARD)
+      purchaseList.forEach((txn: any) => {
+        const lookupKey = txn.itemName.toLowerCase().trim();
+        if (!itemMap[lookupKey]) return;
+
+        const batchName = txn.batchName || "Default";
+        if (!itemMap[lookupKey].batches[batchName]) {
+          itemMap[lookupKey].batches[batchName] = {
+            batchName: batchName,
+            opening: { qty: 0, rate: 0, value: 0 },
+            inward: { qty: 0, rate: 0, value: 0 },
+            outward: { qty: 0, rate: 0, value: 0 },
+            closing: { qty: 0, rate: 0, value: 0 },
+          };
+        }
+
+        const batch = itemMap[lookupKey].batches[batchName];
+        batch.inward.qty += Number(txn.qty || 0);
+        batch.inward.value += Number(txn.amount || 0);
+        batch.inward.rate = batch.inward.qty !== 0 ? batch.inward.value / batch.inward.qty : 0;
+      });
+
+      // Backfill missing inward batches from imported data if purchase history was wiped
+      Object.values(itemMap).forEach((itemObj: any) => {
+        Object.values(itemObj.batches).forEach((batch: any) => {
+          if (batch.importedInward && batch.inward.qty === 0) {
+            batch.inward.qty = batch.importedInward.qty;
+            batch.inward.value = batch.importedInward.value;
+            batch.inward.rate = batch.importedInward.rate;
+          }
+        });
+      });
+
+      // 3️⃣ SALES (OUTWARD)
+      salesList.forEach((txn: any) => {
+        const lookupKey = txn.itemName.toLowerCase().trim();
+        if (!itemMap[lookupKey]) return;
+
+        const batchName = txn.batchName || "Default";
+        if (!itemMap[lookupKey].batches[batchName]) {
+          itemMap[lookupKey].batches[batchName] = {
+            batchName: batchName,
+            opening: { qty: 0, rate: 0, value: 0 },
+            inward: { qty: 0, rate: 0, value: 0 },
+            outward: { qty: 0, rate: 0, value: 0 },
+            closing: { qty: 0, rate: 0, value: 0 },
+          };
+        }
+
+        const batch = itemMap[lookupKey].batches[batchName];
+        batch.outward.qty += Number(txn.qty || 0);
+
+        // Sales value logic uses purchase rate if available to calculate actual cost of goods sold.
+        const effectiveRate = batch.inward.rate > 0 ? batch.inward.rate : batch.opening.rate;
+        batch.outward.value += Number(txn.qty || 0) * effectiveRate;
+        batch.outward.rate = effectiveRate;
+      });
+
+      // 4️⃣ CLOSING (TALLY LOGIC) – FIXED
+      Object.values(itemMap).forEach((item: any) => {
+        Object.values(item.batches).forEach((b: any) => {
+          b.closing.qty = b.opening.qty + b.inward.qty - b.outward.qty;
+
+          const totalInQty = b.opening.qty + b.inward.qty;
+          const totalInValue = b.opening.value + b.inward.value;
+
+          if (totalInQty > 0) {
+            b.closing.rate = totalInValue / totalInQty;
+          } else {
+            b.closing.rate = b.outward.qty > 0 ? b.outward.value / b.outward.qty : 0;
+          }
+          b.closing.value = b.closing.qty * b.closing.rate;
+
+          if (Math.abs(b.opening.qty) < 0.001) b.opening.qty = 0;
+          if (Math.abs(b.opening.value) < 0.01) b.opening.value = 0;
+          if (Math.abs(b.closing.qty) < 0.001) b.closing.qty = 0;
+          if (Math.abs(b.closing.value) < 0.01) b.closing.value = 0;
+        });
+      });
+
       // 5️⃣ FINAL ARRAY
       const finalData = Object.values(itemMap).map((item: any) => ({
         ...item,
@@ -730,14 +1002,50 @@ const StockSummary: React.FC = () => {
     }
   };
 
+
+  useEffect(() => {
+    const fetchCategoryVouchers = async () => {
+      const currentDrill = drillPath[drillPath.length - 1];
+      if (currentDrill.type === "category" && !categoryVouchers && !categoryVouchersLoading) {
+        setCategoryVouchersLoading(true);
+        try {
+          const params = new URLSearchParams({ company_id, owner_type, owner_id });
+          const [purchaseRes, salesRes] = await Promise.all([
+            fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?${params}`),
+            fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers/sale-history?${params}`)
+          ]);
+          const purchaseData = (await purchaseRes.json()).data || [];
+          const salesData = (await salesRes.json()).data || [];
+          setCategoryVouchers({ purchase: purchaseData, sales: salesData });
+        } catch (err) {
+          console.error("Error fetching category vouchers", err);
+        } finally {
+          setCategoryVouchersLoading(false);
+        }
+      }
+    };
+    fetchCategoryVouchers();
+  }, [drillPath, company_id, owner_type, owner_id]);
+
+  const prevReportViewRef = useRef(reportView);
+
   useEffect(() => {
     if (integrate === "new") return;
-    setExpandedItems(new Set()); // Reset expanded items when view changes
+    
+    if (prevReportViewRef.current !== reportView) {
+      setExpandedItems(new Set()); // Reset expanded items when view changes
+      setExpandedGroups(new Set());
+      setExpandedCategories(new Set());
+      setDrillPath([{ id: 'root', name: 'Stock Groups', type: 'root' }]);
+      prevReportViewRef.current = reportView;
+    }
+    
     if (reportView === "Opening") loadOpeningStock();
     else if (reportView === "Purchase") loadPurchaseData();
     else if (reportView === "Sales") loadSalesData();
     else if (reportView === "Closing") loadClosingData();
     else if (reportView === "All") loadAllData();
+    else if (reportView === "Categories") loadCategoriesData();
   }, [reportView, integrate]);
 
   // Group data by item name for Purchase, Sales, Closing views
@@ -745,8 +1053,8 @@ const StockSummary: React.FC = () => {
   const groupedData = useMemo(() => {
     if (reportView === "Opening") return data;
 
-    if (reportView === "All") {
-      // Data is already grouped by item with batches from loadAllData
+    if (reportView === "All" || reportView === "Categories") {
+      // Data is already grouped by item with batches from loadAllData / loadCategoriesData
       return data;
     }
 
@@ -800,6 +1108,24 @@ const StockSummary: React.FC = () => {
       } else {
         newSet.add(itemName);
       }
+      return newSet;
+    });
+  };
+
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(groupId)) newSet.delete(groupId);
+      else newSet.add(groupId);
+      return newSet;
+    });
+  };
+
+  const toggleCategory = (categoryId: string) => {
+    setExpandedCategories((prev) => {
+      const newSet = new Set(prev);
+      if (newSet.has(categoryId)) newSet.delete(categoryId);
+      else newSet.add(categoryId);
       return newSet;
     });
   };
@@ -1020,6 +1346,312 @@ const StockSummary: React.FC = () => {
     }
   };
 
+  const getFinancialMonths = () => [
+    "April", "May", "June", "July", "August", "September",
+    "October", "November", "December", "January", "February", "March",
+  ];
+
+  const calculateCategoryMonthlySummary = useMemo(() => {
+    return (categoryId: string) => {
+      if (!categoryVouchers) return [];
+      
+      const group = data.find((g: any) => g.categories?.some((c: any) => c.id === categoryId));
+      const category = group?.categories.find((c: any) => c.id === categoryId);
+      if (!category) return [];
+
+      const itemsInCat = category.items || [];
+      const itemNames = itemsInCat.map((i: any) => (i.itemName || "").toLowerCase().trim());
+
+      let baseOpeningQty = 0;
+      let baseOpeningValue = 0;
+
+      itemsInCat.forEach((item: any) => {
+        if (item.batches && Array.isArray(item.batches)) {
+          item.batches.forEach((b: any) => {
+            if (b.mode === 'opening' || (b.opening && b.opening.qty)) {
+               baseOpeningQty += Number(b.opening?.qty || b.batchQuantity || 0);
+               baseOpeningValue += Number(b.opening?.value || ((b.batchQuantity || 0) * (b.openingRate || 0)) || 0);
+            }
+          });
+        }
+      });
+
+      const purchases = categoryVouchers.purchase.filter((p: any) => {
+        const pName = p.itemName ? p.itemName.toLowerCase().trim() : "";
+        return itemNames.includes(pName);
+      });
+
+      const sales = categoryVouchers.sales.filter((s: any) => {
+        const sName = s.itemName ? s.itemName.toLowerCase().trim() : "";
+        return itemNames.includes(sName);
+      });
+
+      const monthMap: Record<string, any> = {};
+      const months = getFinancialMonths();
+
+      const baseYear = purchases[0]?.purchaseDate || sales[0]?.movementDate || new Date().toISOString();
+      const fyStartYear = new Date(baseYear).getMonth() >= 3 ? new Date(baseYear).getFullYear() : new Date(baseYear).getFullYear() - 1;
+
+      months.forEach((m, index) => {
+        const year = index <= 8 ? fyStartYear : fyStartYear + 1;
+        const key = `${m} ${year}`;
+        monthMap[key] = {
+           monthName: m,
+           year: year,
+           key: key,
+           inQty: 0, inValue: 0, 
+           outQty: 0, outValue: 0 
+        };
+      });
+
+      const getMonthKey = (date: string) => {
+        const d = new Date(date);
+        const month = d.toLocaleString("en-IN", { month: "long" });
+        const year = d.getFullYear();
+        return `${month} ${year}`;
+      };
+
+      purchases.forEach((p: any) => {
+        const key = getMonthKey(p.purchaseDate);
+        if (monthMap[key]) {
+          monthMap[key].inQty += Number(p.purchaseQuantity || 0);
+          monthMap[key].inValue += Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
+        }
+      });
+
+      sales.forEach((s: any) => {
+        const key = getMonthKey(s.movementDate);
+        if (monthMap[key]) {
+          monthMap[key].outQty += Math.abs(Number(s.qtyChange || 0));
+          monthMap[key].outValue += Math.abs(Number(s.qtyChange || 0)) * Number(s.rate || 0);
+        }
+      });
+
+      const monthlyData: any[] = [];
+      let currentOpeningQty = baseOpeningQty;
+      let currentOpeningValue = baseOpeningValue;
+
+      months.forEach((m, index) => {
+        const year = index <= 8 ? fyStartYear : fyStartYear + 1;
+        const key = `${m} ${year}`;
+        const monthTotals = monthMap[key];
+
+        const closingQty = currentOpeningQty + monthTotals.inQty - monthTotals.outQty;
+        const closingValue = currentOpeningValue + monthTotals.inValue - monthTotals.outValue;
+
+        monthlyData.push({
+           ...monthTotals,
+           openingQty: currentOpeningQty,
+           openingValue: currentOpeningValue,
+           closingQty: closingQty,
+           closingValue: closingValue
+        });
+
+        currentOpeningQty = closingQty;
+        currentOpeningValue = closingValue;
+      });
+
+      return monthlyData;
+    };
+  }, [categoryVouchers, data]);
+
+  const calculateItemMonthsSummary = useMemo(() => {
+    return (itemName: string, categoryId: string) => {
+      if (!categoryVouchers) return [];
+      
+      const group = data.find((g: any) => g.categories?.some((c: any) => c.id === categoryId));
+      const category = group?.categories.find((c: any) => c.id === categoryId);
+      if (!category) return [];
+
+      const item = category.items?.find((i: any) => i.itemName === itemName);
+      if (!item) return [];
+
+      const iName = (itemName || "").toLowerCase().trim();
+
+      let baseOpeningQty = 0;
+      let baseOpeningValue = 0;
+      if (item.batches && Array.isArray(item.batches)) {
+        item.batches.forEach((b: any) => {
+          if (b.mode === 'opening' || (b.opening && b.opening.qty)) {
+             baseOpeningQty += Number(b.opening?.qty || b.batchQuantity || 0);
+             baseOpeningValue += Number(b.opening?.value || ((b.batchQuantity || 0) * (b.openingRate || 0)) || 0);
+          }
+        });
+      }
+
+      const purchases = categoryVouchers.purchase.filter((p: any) => {
+        return (p.itemName || "").toLowerCase().trim() === iName;
+      });
+
+      const sales = categoryVouchers.sales.filter((s: any) => {
+        return (s.itemName || "").toLowerCase().trim() === iName;
+      });
+
+      const monthMap: Record<string, any> = {};
+      const months = getFinancialMonths();
+
+      const baseYear = purchases[0]?.purchaseDate || sales[0]?.movementDate || new Date().toISOString();
+      const fyStartYear = new Date(baseYear).getMonth() >= 3 ? new Date(baseYear).getFullYear() : new Date(baseYear).getFullYear() - 1;
+
+      months.forEach((m, index) => {
+        const year = index <= 8 ? fyStartYear : fyStartYear + 1;
+        const key = `${m} ${year}`;
+        monthMap[key] = {
+           monthName: m,
+           year: year,
+           key: key,
+           inQty: 0, inValue: 0, 
+           outQty: 0, outValue: 0 
+        };
+      });
+
+      const getMonthKey = (date: string) => {
+        const d = new Date(date);
+        return `${d.toLocaleString("en-IN", { month: "long" })} ${d.getFullYear()}`;
+      };
+
+      purchases.forEach((p: any) => {
+        const key = getMonthKey(p.purchaseDate);
+        if (monthMap[key]) {
+          monthMap[key].inQty += Number(p.purchaseQuantity || 0);
+          monthMap[key].inValue += Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
+        }
+      });
+
+      sales.forEach((s: any) => {
+        const key = getMonthKey(s.movementDate);
+        if (monthMap[key]) {
+          monthMap[key].outQty += Math.abs(Number(s.qtyChange || 0));
+          monthMap[key].outValue += Math.abs(Number(s.qtyChange || 0)) * Number(s.rate || 0);
+        }
+      });
+
+      const monthlyData: any[] = [];
+      let currentOpeningQty = baseOpeningQty;
+      let currentOpeningValue = baseOpeningValue;
+
+      months.forEach((m, index) => {
+        const year = index <= 8 ? fyStartYear : fyStartYear + 1;
+        const key = `${m} ${year}`;
+        const monthTotals = monthMap[key];
+
+        const closingQty = currentOpeningQty + monthTotals.inQty - monthTotals.outQty;
+        const closingValue = currentOpeningValue + monthTotals.inValue - monthTotals.outValue;
+
+        monthlyData.push({
+           ...monthTotals,
+           openingQty: currentOpeningQty,
+           openingValue: currentOpeningValue,
+           closingQty: closingQty,
+           closingValue: closingValue
+        });
+
+        currentOpeningQty = closingQty;
+        currentOpeningValue = closingValue;
+      });
+
+      return monthlyData;
+    };
+  }, [categoryVouchers, data]);
+
+  const calculateMonthItemsSummary = useMemo(() => {
+    return (monthKey: string, categoryId: string) => {
+      if (!categoryVouchers) return [];
+      
+      const group = data.find((g: any) => g.categories?.some((c: any) => c.id === categoryId));
+      const category = group?.categories.find((c: any) => c.id === categoryId);
+      if (!category) return [];
+
+      const itemsInCat = category.items || [];
+      const itemNames = itemsInCat.map((i: any) => (i.itemName || "").toLowerCase().trim());
+
+      const getMonthKey = (date: string) => {
+        const d = new Date(date);
+        return `${d.toLocaleString("en-IN", { month: "long" })} ${d.getFullYear()}`;
+      };
+
+      // We need to calculate opening balance for this month for EACH item
+      // This means summing opening balance + all previous months' inwards - outwards
+      const months = getFinancialMonths();
+      const baseYear = categoryVouchers.purchase[0]?.purchaseDate || categoryVouchers.sales[0]?.movementDate || new Date().toISOString();
+      const fyStartYear = new Date(baseYear).getMonth() >= 3 ? new Date(baseYear).getFullYear() : new Date(baseYear).getFullYear() - 1;
+
+      const orderedMonthKeys = months.map((m, i) => `${m} ${i <= 8 ? fyStartYear : fyStartYear + 1}`);
+      const monthIndex = orderedMonthKeys.indexOf(monthKey);
+
+      return itemsInCat.map((item: any) => {
+        const iName = (item.itemName || "").toLowerCase().trim();
+        
+        let openingQty = 0;
+        let openingValue = 0;
+        if (item.batches && Array.isArray(item.batches)) {
+          item.batches.forEach((b: any) => {
+            if (b.mode === 'opening' || (b.opening && b.opening.qty)) {
+               openingQty += Number(b.opening?.qty || b.batchQuantity || 0);
+               openingValue += Number(b.opening?.value || ((b.batchQuantity || 0) * (b.openingRate || 0)) || 0);
+            }
+          });
+        }
+
+        // Add previous months
+        for (let i = 0; i < monthIndex; i++) {
+           const prevKey = orderedMonthKeys[i];
+           const prevPurchases = categoryVouchers.purchase.filter((p: any) => 
+             (p.itemName || "").toLowerCase().trim() === iName && getMonthKey(p.purchaseDate) === prevKey
+           );
+           const prevSales = categoryVouchers.sales.filter((s: any) => 
+             (s.itemName || "").toLowerCase().trim() === iName && getMonthKey(s.movementDate) === prevKey
+           );
+           
+           prevPurchases.forEach((p: any) => {
+             openingQty += Number(p.purchaseQuantity || 0);
+             openingValue += Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
+           });
+           prevSales.forEach((s: any) => {
+             openingQty -= Math.abs(Number(s.qtyChange || 0));
+             openingValue -= Math.abs(Number(s.qtyChange || 0)) * Number(s.rate || 0);
+           });
+        }
+
+        // Current month
+        let inQty = 0; let inValue = 0;
+        let outQty = 0; let outValue = 0;
+
+        const currPurchases = categoryVouchers.purchase.filter((p: any) => 
+          (p.itemName || "").toLowerCase().trim() === iName && getMonthKey(p.purchaseDate) === monthKey
+        );
+        const currSales = categoryVouchers.sales.filter((s: any) => 
+          (s.itemName || "").toLowerCase().trim() === iName && getMonthKey(s.movementDate) === monthKey
+        );
+
+        currPurchases.forEach((p: any) => {
+          inQty += Number(p.purchaseQuantity || 0);
+          inValue += Number(p.purchaseQuantity || 0) * Number(p.rate || 0);
+        });
+        currSales.forEach((s: any) => {
+          outQty += Math.abs(Number(s.qtyChange || 0));
+          outValue += Math.abs(Number(s.qtyChange || 0)) * Number(s.rate || 0);
+        });
+
+        const closingQty = openingQty + inQty - outQty;
+        const closingValue = openingValue + inValue - outValue;
+
+        return {
+          ...item,
+          totals: {
+            openingQty, openingValue,
+            inwardQty: inQty, inwardValue: inValue,
+            outwardQty: outQty, outwardValue: outValue,
+            closingQty, closingValue
+          }
+        };
+      }).filter((item: any) => 
+         item.totals.openingQty !== 0 || item.totals.inwardQty !== 0 || 
+         item.totals.outwardQty !== 0 || item.totals.closingQty !== 0
+      );
+    };
+  }, [categoryVouchers, data]);
+
   return (
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
@@ -1089,7 +1721,7 @@ const StockSummary: React.FC = () => {
           {/* Report Views */}
           {integrate === "integrated" && (
             <div className="mt-5 flex justify-center gap-8 ">
-              {["Opening", "Purchase", "Sales", "Closing", "All"].map(
+              {["Opening", "Purchase", "Sales", "Closing", "All", "Categories"].map(
                 (view) => (
                   <label key={view} className="flex items-center gap-2">
                     <input
@@ -1304,8 +1936,32 @@ const StockSummary: React.FC = () => {
                     </tbody>
                   </table>
                 </div>
-              ) : reportView === "All" ? (
-                <div className="overflow-x-auto">
+              ) : reportView === "All" || reportView === "Categories" ? (
+                <div className="flex flex-col gap-4">
+                  {reportView === "Categories" && drillPath.length > 1 && (
+                    <div className={`flex items-center gap-2 p-2 rounded-md ${theme === "dark" ? "bg-gray-800" : "bg-gray-100"}`}>
+                      <button
+                        onClick={() => setDrillPath(prev => prev.slice(0, prev.length - 1))}
+                        className="px-3 py-1 bg-blue-500 text-white rounded hover:bg-blue-600 flex items-center gap-1 text-sm font-semibold"
+                      >
+                        <ArrowLeft size={16} /> Back
+                      </button>
+                      <div className="flex items-center gap-2 text-sm font-semibold ml-4">
+                        {drillPath.map((step, idx) => (
+                          <React.Fragment key={idx}>
+                            {idx > 0 && <span>/</span>}
+                            <span 
+                              className={`cursor-pointer hover:underline ${idx === drillPath.length - 1 ? "text-blue-600 dark:text-blue-400" : ""}`}
+                              onClick={() => setDrillPath(prev => prev.slice(0, idx + 1))}
+                            >
+                              {step.name}
+                            </span>
+                          </React.Fragment>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+                  <div className="overflow-x-auto">
                   <table className="w-full border-collapse text-sm">
                     <thead>
                       <tr
@@ -1325,33 +1981,37 @@ const StockSummary: React.FC = () => {
                         >
                           Particulars
                         </th>
-                        <th
-                          colSpan={3}
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center font-semibold`}
-                        >
-                          Opening Balance
-                        </th>
-                        <th
-                          colSpan={3}
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center font-semibold`}
-                        >
-                          Inwards
-                        </th>
-                        <th
-                          colSpan={3}
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center font-semibold`}
-                        >
-                          Outwards
-                        </th>
+                        {(reportView === "All" || (reportView === "Categories" && (drillPath[drillPath.length - 1].type === "category" || drillPath[drillPath.length - 1].type === "item" || drillPath[drillPath.length - 1].type === "month"))) && (
+                          <>
+                            <th
+                              colSpan={3}
+                              className={`border ${theme === "dark"
+                                ? "border-gray-500"
+                                : "border-gray-400"
+                                } p-1 text-center font-semibold`}
+                            >
+                              Opening Balance
+                            </th>
+                            <th
+                              colSpan={3}
+                              className={`border ${theme === "dark"
+                                ? "border-gray-500"
+                                : "border-gray-400"
+                                } p-1 text-center font-semibold`}
+                            >
+                              Inwards
+                            </th>
+                            <th
+                              colSpan={3}
+                              className={`border ${theme === "dark"
+                                ? "border-gray-500"
+                                : "border-gray-400"
+                                } p-1 text-center font-semibold`}
+                            >
+                              Outwards
+                            </th>
+                          </>
+                        )}
                         <th
                           colSpan={3}
                           className={`border ${theme === "dark"
@@ -1370,333 +2030,298 @@ const StockSummary: React.FC = () => {
                             : "bg-gray-200 text-black"
                         }
                       >
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Quantity
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Rate
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Value
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Quantity
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Rate
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Value
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Quantity
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Rate
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Value
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Quantity
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Rate
-                        </th>
-                        <th
-                          className={`border ${theme === "dark"
-                            ? "border-gray-500"
-                            : "border-gray-400"
-                            } p-1 text-center`}
-                        >
-                          Value
-                        </th>
+                        {(reportView === "All" || (reportView === "Categories" && (drillPath[drillPath.length - 1].type === "category" || drillPath[drillPath.length - 1].type === "item" || drillPath[drillPath.length - 1].type === "month"))) && (
+                          <>
+                            {/* Opening */}
+                            <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Quantity</th>
+                            <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Rate</th>
+                            <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Value</th>
+
+                            {/* Inward */}
+                            <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Quantity</th>
+                            <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Rate</th>
+                            <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Value</th>
+
+                            {/* Outward */}
+                            <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Quantity</th>
+                            <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Rate</th>
+                            <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Value</th>
+                          </>
+                        )}
+
+                        {/* Closing */}
+                        <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Quantity</th>
+                        <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Rate</th>
+                        <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Value</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {data.map((item: any, idx: number) => {
-                        const isExpanded = expandedItems.has(item.itemName);
+                      {reportView === "Categories" ? (
+                        (() => {
+                           const currentDrill = drillPath[drillPath.length - 1];
 
-                        // ✅ CALCULATE TOTALS FROM BATCHES
-                        // const totals = item.batches.reduce(
-                        //   (acc: any, b: any) => {
-                        //     acc.openingQty += b.opening.qty;
-                        //     acc.openingValue += b.opening.value;
+                           if (currentDrill.type === 'root') {
+                             return data.map((group: any, gIdx: number) => {
+                               if (!group.isGroup) return null;
+                               const groupTotals = group.totals || { openingQty: 0, openingValue: 0, inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 };
+                               const groupClRate = groupTotals.closingQty ? Math.abs(groupTotals.closingValue / groupTotals.closingQty) : 0;
+                               return (
+                                 <React.Fragment key={`g-${gIdx}`}>
+                                   <tr
+                                     className={`cursor-pointer font-bold ${theme === "dark" ? "bg-gray-800 text-white hover:bg-gray-700" : "bg-gray-200 hover:bg-gray-300"}`}
+                                     onClick={() => setDrillPath([...drillPath, { id: group.id, name: group.name, type: 'group' }])}
+                                   >
+                                     <td className="border p-2">
+                                       <div className="flex items-center gap-2">
+                                         {group.name}
+                                       </div>
+                                     </td>
+                                     <td className="border p-2 text-right align-middle">{groupTotals.closingQty || ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(groupClRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(groupTotals.closingValue)}</td>
+                                   </tr>
+                                 </React.Fragment>
+                               );
+                             });
+                           } else if (currentDrill.type === 'group') {
+                             const group = data.find((g: any) => g.id === currentDrill.id);
+                             if (!group) return null;
+                             return group.categories.map((category: any, cIdx: number) => {
+                               const catTotals = category.totals;
+                               const catClRate = catTotals.closingQty ? Math.abs(catTotals.closingValue / catTotals.closingQty) : 0;
+                               return (
+                                 <React.Fragment key={`c-${cIdx}`}>
+                                   <tr
+                                     className={`cursor-pointer font-semibold ${theme === "dark" ? "bg-gray-700 text-white hover:bg-gray-600" : "bg-gray-100 hover:bg-gray-200"}`}
+                                     onClick={() => setDrillPath([...drillPath, { id: category.id, name: category.name, type: 'category' }])}
+                                   >
+                                     <td className="border p-2">
+                                       <div className="flex items-center gap-2">
+                                         {category.name}
+                                       </div>
+                                     </td>
+                                     <td className="border p-2 text-right align-middle">{catTotals.closingQty || ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(catClRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(catTotals.closingValue)}</td>
+                                   </tr>
+                                 </React.Fragment>
+                               );
+                             });
+                           } else if (currentDrill.type === 'category') {
+                             const group = data.find((g: any) => g.categories?.some((c: any) => c.id === currentDrill.id));
+                             const category = group?.categories.find((c: any) => c.id === currentDrill.id);
+                             if (!category) return null;
+                             
+                             return category.items.map((item: any, iIdx: number) => {
+                               const batches = Array.isArray(item.batches) ? item.batches : [];
+                               const totals = batches.reduce(
+                                 (acc: any, b: any) => {
+                                   acc.openingQty += b.opening?.qty || 0;
+                                   acc.openingValue += b.opening?.value || 0;
+                                   acc.inwardQty += b.inward?.qty || 0;
+                                   acc.inwardValue += b.inward?.value || 0;
+                                   acc.outwardQty += b.outward?.qty || 0;
+                                   acc.outwardValue += b.outward?.value || 0;
+                                   acc.closingQty += b.closing?.qty || 0;
+                                   acc.closingValue += b.closing?.value || 0;
+                                   return acc;
+                                 },
+                                 { openingQty: 0, openingValue: 0, inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 }
+                               );
+                               
+                               // Hide items that have absolutely no activity or balance
+                               if (
+                                 totals.openingQty === 0 && totals.openingValue === 0 &&
+                                 totals.inwardQty === 0 && totals.inwardValue === 0 &&
+                                 totals.outwardQty === 0 && totals.outwardValue === 0 &&
+                                 totals.closingQty === 0 && totals.closingValue === 0
+                               ) {
+                                 return null;
+                               }
+                               
+                               const openingRate = totals.openingQty > 0 ? totals.openingValue / totals.openingQty : 0;
+                               const inwardRate = totals.inwardQty > 0 ? totals.inwardValue / totals.inwardQty : 0;
+                               const outwardRate = totals.outwardQty > 0 ? totals.outwardValue / totals.outwardQty : 0;
+                               const closingRate = totals.closingQty !== 0 ? Math.abs(totals.closingValue / totals.closingQty) : 0;
+                               
+                               return (
+                                 <React.Fragment key={`i-${iIdx}`}>
+                                   <tr
+                                     className={`cursor-pointer ${theme === "dark" ? "bg-gray-900 text-gray-300 hover:bg-gray-800" : "bg-white hover:bg-gray-50"}`}
+                                     onClick={() => {
+                                       navigate(`/app/reports/item-monthly-summary?item=${item.itemName}`);
+                                     }}
+                                   >
+                                     <td className="border p-2">
+                                       <div className="flex items-center gap-2">
+                                         {item.itemName}
+                                       </div>
+                                     </td>
+                                     <td className="border p-2 text-right align-middle">{totals.openingQty ? `${totals.openingQty} ${item.unitName}`.trim() : ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(openingRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(totals.openingValue)}</td>
 
-                        //     acc.inwardQty += b.inward.qty;
-                        //     acc.inwardValue += b.inward.value;
+                                     <td className="border p-2 text-right align-middle">{totals.inwardQty ? `${totals.inwardQty} ${item.unitName}`.trim() : ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(inwardRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(totals.inwardValue)}</td>
 
-                        //     acc.outwardQty += b.outward.qty;
-                        //     acc.outwardValue += b.outward.value;
+                                     <td className="border p-2 text-right align-middle">{totals.outwardQty ? `${totals.outwardQty} ${item.unitName}`.trim() : ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(outwardRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(totals.outwardValue)}</td>
 
-                        //     acc.closingQty += b.closing.qty;
-                        //     acc.closingValue += b.closing.value;
-                        //     return acc;
-                        //   },
-                        //   {
-                        //     openingQty: 0,
-                        //     openingValue: 0,
-                        //     inwardQty: 0,
-                        //     inwardValue: 0,
-                        //     outwardQty: 0,
-                        //     outwardValue: 0,
-                        //     closingQty: 0,
-                        //     closingValue: 0,
-                        //   }
-                        // );
+                                     <td className="border p-2 text-right align-middle">{totals.closingQty ? `${totals.closingQty} ${item.unitName}`.trim() : ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(closingRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(totals.closingValue)}</td>
+                                   </tr>
+                                 </React.Fragment>
+                               );
+                             });
+                           } else if (currentDrill.type === 'item') {
+                             if (categoryVouchersLoading) {
+                               return <tr><td colSpan={13} className="text-center p-4">Loading monthly summary...</td></tr>;
+                             }
+                             const itemData = (currentDrill as any).data;
+                             const itemMonthsData = calculateItemMonthsSummary(itemData.itemName, itemData.categoryId);
 
-                        const batches = Array.isArray(item.batches)
-                          ? item.batches
-                          : [];
+                             return itemMonthsData.map((m: any, mIdx: number) => {
+                               const opRate = m.openingQty ? m.openingValue / m.openingQty : 0;
+                               const inRate = m.inQty ? m.inValue / m.inQty : 0;
+                               const outRate = m.outQty ? m.outValue / m.outQty : 0;
+                               const clRate = m.closingQty ? Math.abs(m.closingValue / m.closingQty) : 0;
+                               
+                               return (
+                                 <React.Fragment key={`m-${mIdx}`}>
+                                   <tr
+                                     className={`cursor-pointer ${theme === "dark" ? "bg-gray-900 text-gray-300 hover:bg-gray-800" : "bg-white hover:bg-gray-50"}`}
+                                     onClick={() => {
+                                       navigate(`/app/reports/item-monthly-summary?item=${itemData.itemName}`);
+                                     }}
+                                   >
+                                     <td className="border p-2 font-semibold">
+                                       <div className="flex items-center gap-2">
+                                         {m.monthName}
+                                       </div>
+                                     </td>
+                                     <td className="border p-2 text-right align-middle">{m.openingQty || ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(opRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(m.openingValue)}</td>
 
-                        const totals = batches.reduce(
-                          (acc: any, b: any) => {
-                            acc.openingQty += b.opening?.qty || 0;
-                            acc.openingValue += b.opening?.value || 0;
-                            acc.inwardQty += b.inward?.qty || 0;
-                            acc.inwardValue += b.inward?.value || 0;
-                            acc.outwardQty += b.outward?.qty || 0;
-                            acc.outwardValue += b.outward?.value || 0;
-                            acc.closingQty += b.closing?.qty || 0;
-                            acc.closingValue += b.closing?.value || 0;
-                            return acc;
-                          },
-                          {
-                            openingQty: 0,
-                            openingValue: 0,
-                            inwardQty: 0,
-                            inwardValue: 0,
-                            outwardQty: 0,
-                            outwardValue: 0,
-                            closingQty: 0,
-                            closingValue: 0,
+                                     <td className="border p-2 text-right align-middle">{m.inQty || ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(inRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(m.inValue)}</td>
+
+                                     <td className="border p-2 text-right align-middle">{m.outQty || ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(outRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(m.outValue)}</td>
+
+                                     <td className="border p-2 text-right align-middle">{m.closingQty || ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(clRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(m.closingValue)}</td>
+                                   </tr>
+                                 </React.Fragment>
+                               );
+                             });
+                           }
+                           return null;
+                        })()
+                      ) : (
+                        data.map((item: any, idx: number) => {
+                          if (item.isGroup) return null; // Wait for data to load
+                          const isExpanded = expandedItems.has(item.itemName);
+                          const batches = Array.isArray(item.batches) ? item.batches : [];
+
+                          const totals = batches.reduce(
+                            (acc: any, b: any) => {
+                              acc.openingQty += b.opening?.qty || 0;
+                              acc.openingValue += b.opening?.value || 0;
+                              acc.inwardQty += b.inward?.qty || 0;
+                              acc.inwardValue += b.inward?.value || 0;
+                              acc.outwardQty += b.outward?.qty || 0;
+                              acc.outwardValue += b.outward?.value || 0;
+                              acc.closingQty += b.closing?.qty || 0;
+                              acc.closingValue += b.closing?.value || 0;
+                              return acc;
+                            },
+                            { openingQty: 0, openingValue: 0, inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 }
+                          );
+
+                          // Hide items that have absolutely no activity or balance
+                          if (
+                            totals.openingQty === 0 && totals.openingValue === 0 &&
+                            totals.inwardQty === 0 && totals.inwardValue === 0 &&
+                            totals.outwardQty === 0 && totals.outwardValue === 0 &&
+                            totals.closingQty === 0 && totals.closingValue === 0
+                          ) {
+                            return null;
                           }
-                        );
 
-                        const closingRate =
-                          totals.closingQty !== 0
-                            ? Math.abs(totals.closingValue / totals.closingQty)
-                            : 0;
+                          const closingRate = totals.closingQty !== 0 ? Math.abs(totals.closingValue / totals.closingQty) : 0;
+                          const openingRate = totals.openingQty > 0 ? totals.openingValue / totals.openingQty : 0;
+                          const inwardRate = totals.inwardQty > 0 ? totals.inwardValue / totals.inwardQty : 0;
+                          const outwardRate = totals.outwardQty > 0 ? totals.outwardValue / totals.outwardQty : 0;
 
-                        const openingRate =
-                          totals.openingQty > 0
-                            ? totals.openingValue / totals.openingQty
-                            : 0;
+                          return (
+                            <React.Fragment key={idx}>
+                              <tr
+                                className={`cursor-pointer font-semibold ${theme === "dark" ? "bg-gray-800 text-white hover:bg-gray-700" : "bg-gray-50 hover:bg-gray-100"}`}
+                                onClick={() => {
+                                  if (batches.length === 1 && batches[0]?.batchName === "Default") {
+                                    navigate(`/app/reports/item-monthly-summary?item=${item.itemName}&batch=Default`);
+                                  } else {
+                                    toggleItem(item.itemName);
+                                  }
+                                }}
+                              >
+                                <td className="border p-2">
+                                  <div className="flex items-center gap-2">
+                                    {(batches.length === 1 && batches[0]?.batchName === "Default") ? null :
+                                      isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                    {item.itemName}
+                                  </div>
+                                </td>
+                                <td className="border p-2 text-right align-middle">{totals.openingQty ? `${totals.openingQty} ${item.unitName}`.trim() : ""}</td>
+                                <td className="border p-2 text-right align-middle">{formatCurrency(openingRate)}</td>
+                                <td className="border p-2 text-right align-middle">{formatCurrency(totals.openingValue)}</td>
 
-                        const inwardRate =
-                          totals.inwardQty > 0
-                            ? totals.inwardValue / totals.inwardQty
-                            : 0;
+                                <td className="border p-2 text-right align-middle">{totals.inwardQty ? `${totals.inwardQty} ${item.unitName}`.trim() : ""}</td>
+                                <td className="border p-2 text-right align-middle">{formatCurrency(inwardRate)}</td>
+                                <td className="border p-2 text-right align-middle">{formatCurrency(totals.inwardValue)}</td>
 
-                        const outwardRate =
-                          totals.outwardQty > 0
-                            ? totals.outwardValue / totals.outwardQty
-                            : 0;
+                                <td className="border p-2 text-right align-middle">{totals.outwardQty ? `${totals.outwardQty} ${item.unitName}`.trim() : ""}</td>
+                                <td className="border p-2 text-right align-middle">{formatCurrency(outwardRate)}</td>
+                                <td className="border p-2 text-right align-middle">{formatCurrency(totals.outwardValue)}</td>
 
-                        return (
-                          <React.Fragment key={idx}>
-                            {/* ITEM ROW */}
-                            <tr
-                              className={`cursor-pointer font-semibold ${theme === "dark"
-                                ? "bg-gray-800 text-white hover:bg-gray-700"
-                                : "bg-gray-50 hover:bg-gray-100"
-                                }`}
-                              onClick={() => {
-                                if (batches.length === 1 && batches[0]?.batchName === "Default") {
-                                  navigate(
-                                    `/app/reports/item-monthly-summary?item=${item.itemName}&batch=Default`
-                                  );
-                                } else {
-                                  toggleItem(item.itemName);
-                                }
-                              }}
-                            >
-                              <td className="border p-2">
-                                <div className="flex items-center gap-2">
-                                  {/* Hide Chevron if Single Default Batch (Direct Navigation) */
-                                    (batches.length === 1 && batches[0]?.batchName === "Default") ? null :
-                                      isExpanded ? (
-                                        <ChevronDown size={16} />
-                                      ) : (
-                                        <ChevronRight size={16} />
-                                      )}
-                                  {item.itemName}
-                                </div>
-                              </td>
+                                <td className="border p-2 text-right align-middle">{totals.closingQty ? `${totals.closingQty} ${item.unitName}`.trim() : ""}</td>
+                                <td className="border p-2 text-right align-middle">{formatCurrency(closingRate)}</td>
+                                <td className="border p-2 text-right align-middle">{formatCurrency(totals.closingValue)}</td>
+                              </tr>
 
-                              <td className="border p-2 text-right align-middle">
-                                {totals.openingQty ? `${totals.openingQty} ${item.unitName}`.trim() : ""}
-                              </td>
-                              <td className="border p-2 text-right align-middle">
-                                {formatCurrency(openingRate)}
-                              </td>
-                              <td className="border p-2 text-right align-middle">
-                                {formatCurrency(totals.openingValue)}
-                              </td>
-
-                              <td className="border p-2 text-right align-middle">
-                                {totals.inwardQty ? `${totals.inwardQty} ${item.unitName}`.trim() : ""}
-                              </td>
-                              <td className="border p-2 text-right align-middle">
-                                {formatCurrency(inwardRate)}
-                              </td>
-                              <td className="border p-2 text-right align-middle">
-                                {formatCurrency(totals.inwardValue)}
-                              </td>
-
-                              <td className="border p-2 text-right align-middle">
-                                {totals.outwardQty ? `${totals.outwardQty} ${item.unitName}`.trim() : ""}
-                              </td>
-                              <td className="border p-2 text-right align-middle">
-                                {formatCurrency(outwardRate)}
-                              </td>
-                              <td className="border p-2 text-right align-middle">
-                                {formatCurrency(totals.outwardValue)}
-                              </td>
-
-                              <td className="border p-2 text-right align-middle">
-                                {totals.closingQty ? `${totals.closingQty} ${item.unitName}`.trim() : ""}
-                              </td>
-                              <td className="border p-2 text-right align-middle">
-                                {formatCurrency(closingRate)}
-                              </td>
-                              <td className="border p-2 text-right align-middle">
-                                {formatCurrency(totals.closingValue)}
-                              </td>
-                            </tr>
-
-                            {/* 🔽 BATCH ROWS - Hide if only one batch and it's Default */}
-                            {isExpanded && batches.length > 0 && (batches.length > 1 || (batches[0]?.batchName !== "Default")) &&
-                              batches.map((b: any, bIdx: number) => {
-                                // Optional: Hide completely empty Default batches if desired, 
-                                // but usually we want to see them if they have data.
-                                // if (b.batchName === "Default" && b.opening.qty === 0 && b.inward.qty === 0 && b.outward.qty === 0 && b.closing.qty === 0) return null;
-
-                                return (
+                              {isExpanded && batches.length > 0 && (batches.length > 1 || batches[0]?.batchName !== "Default") &&
+                                batches.map((b: any, bIdx: number) => (
                                   <tr
                                     key={bIdx}
-                                    className={`cursor-pointer ${theme === "dark"
-                                      ? "bg-gray-900"
-                                      : "bg-white"
-                                      } hover:bg-yellow-100`}
-                                    onClick={() =>
-                                      navigate(
-                                        `/app/reports/item-monthly-summary?item=${item.itemName}&batch=${b.batchName}`
-                                      )
-                                    }
+                                    className={`cursor-pointer ${theme === "dark" ? "bg-gray-900 text-gray-400 hover:bg-gray-800" : "bg-white hover:bg-yellow-100"}`}
+                                    onClick={() => navigate(`/app/reports/item-monthly-summary?item=${item.itemName}&batch=${b.batchName}`)}
                                   >
-                                    <td className="border pl-8 italic">
-                                      {b.batchName}
-                                    </td>
-
-                                    <td className="border p-2 text-right align-middle">
-                                      {b.opening.qty ? `${b.opening.qty} ${item.unitName}`.trim() : ""}
-                                    </td>
-                                    <td className="border p-2 text-right align-middle">
-                                      {formatCurrency(b.opening.rate)}
-                                    </td>
-                                    <td className="border p-2 text-right align-middle">
-                                      {formatCurrency(b.opening.value)}
-                                    </td>
-
-                                    <td className="border p-2 text-right align-middle">
-                                      {b.inward.qty ? `${b.inward.qty} ${item.unitName}`.trim() : ""}
-                                    </td>
-                                    <td className="border p-2 text-right align-middle">
-                                      {b.inward.rate
-                                        ? formatCurrency(b.inward.rate)
-                                        : ""}
-                                    </td>
-                                    <td className="border p-2 text-right align-middle">
-                                      {b.inward.value
-                                        ? formatCurrency(b.inward.value)
-                                        : ""}
-                                    </td>
-
-                                    <td className="border p-2 text-right align-middle">
-                                      {b.outward.qty ? `${b.outward.qty} ${item.unitName}`.trim() : ""}
-                                    </td>
-                                    <td className="border p-2 text-right align-middle">
-                                      {b.outward.rate
-                                        ? formatCurrency(b.outward.rate)
-                                        : ""}
-                                    </td>
-                                    <td className="border p-2 text-right align-middle">
-                                      {b.outward.value
-                                        ? formatCurrency(b.outward.value)
-                                        : ""}
-                                    </td>
-
-                                    <td className="border p-2 text-right align-middle">
-                                      {b.closing.qty ? `${b.closing.qty} ${item.unitName}`.trim() : ""}
-                                    </td>
-                                    <td className="border p-2 text-right align-middle">
-                                      {formatCurrency(b.closing.rate)}
-                                    </td>
-                                    <td className="border p-2 text-right align-middle">
-                                      {formatCurrency(b.closing.value)}
-                                    </td>
+                                    <td className="border pl-8 italic">{b.batchName}</td>
+                                    <td className="border p-2 text-right align-middle">{b.opening.qty ? `${b.opening.qty} ${item.unitName}`.trim() : ""}</td>
+                                    <td className="border p-2 text-right align-middle">{formatCurrency(b.opening.rate)}</td>
+                                    <td className="border p-2 text-right align-middle">{formatCurrency(b.opening.value)}</td>
+                                    <td className="border p-2 text-right align-middle">{b.inward.qty ? `${b.inward.qty} ${item.unitName}`.trim() : ""}</td>
+                                    <td className="border p-2 text-right align-middle">{b.inward.rate ? formatCurrency(b.inward.rate) : ""}</td>
+                                    <td className="border p-2 text-right align-middle">{b.inward.value ? formatCurrency(b.inward.value) : ""}</td>
+                                    <td className="border p-2 text-right align-middle">{b.outward.qty ? `${b.outward.qty} ${item.unitName}`.trim() : ""}</td>
+                                    <td className="border p-2 text-right align-middle">{b.outward.rate ? formatCurrency(b.outward.rate) : ""}</td>
+                                    <td className="border p-2 text-right align-middle">{b.outward.value ? formatCurrency(b.outward.value) : ""}</td>
+                                    <td className="border p-2 text-right align-middle">{b.closing.qty ? `${b.closing.qty} ${item.unitName}`.trim() : ""}</td>
+                                    <td className="border p-2 text-right align-middle">{formatCurrency(b.closing.rate)}</td>
+                                    <td className="border p-2 text-right align-middle">{formatCurrency(b.closing.value)}</td>
                                   </tr>
-                                )
-                              })}
-                          </React.Fragment>
-                        );
-                      })}
+                                ))}
+                            </React.Fragment>
+                          );
+                        })
+                      )}
 
                       {/* ✅ GRAND TOTAL */}
                       {(() => {
@@ -1712,24 +2337,54 @@ const StockSummary: React.FC = () => {
                         //   },
                         //   { opening: 0, inward: 0, outward: 0, closing: 0 }
                         // );
-                        const grand = data.reduce(
-                          (acc: any, item: any) => {
-                            const batches = Array.isArray(item.batches)
-                              ? item.batches
-                              : [];
-                            batches.forEach((b: any) => {
-                              acc.openingQty += b.opening?.qty || 0;
-                              acc.openingValue += b.opening?.value || 0;
+                        let itemsToAggregate: any[] = data;
+                        if (reportView === "Categories") {
+                          const currentDrill = drillPath[drillPath.length - 1];
+                          if (currentDrill.type === 'group') {
+                            const group = data.find((g: any) => g.id === currentDrill.id);
+                            itemsToAggregate = group ? group.categories.map((c: any) => ({ isGroup: true, totals: c.totals })) : [];
+                          } else if (currentDrill.type === 'category') {
+                            const group = data.find((g: any) => g.categories?.some((c: any) => c.id === currentDrill.id));
+                            const category = group?.categories.find((c: any) => c.id === currentDrill.id);
+                            itemsToAggregate = category ? category.items.map((i: any) => ({ isGroup: false, batches: i.batches })) : [];
+                          } else if (currentDrill.type === 'item') {
+                            const itemData = (currentDrill as any).data;
+                            itemsToAggregate = itemData ? [{ isGroup: false, batches: itemData.batches }] : [];
+                          } else if (currentDrill.type === 'month') {
+                            const monthData = (currentDrill as any).data;
+                            const monthItemsData = calculateMonthItemsSummary(monthData.key, monthData.categoryId);
+                            itemsToAggregate = monthItemsData.map((i: any) => ({ isGroup: true, totals: i.totals }));
+                          }
+                        }
 
-                              acc.inwardQty += b.inward?.qty || 0;
-                              acc.inwardValue += b.inward?.value || 0;
+                        const grand = itemsToAggregate.reduce(
+                          (acc: any, group: any) => {
+                            if (group.isGroup && group.totals) {
+                              acc.openingQty += group.totals.openingQty || 0;
+                              acc.openingValue += group.totals.openingValue || 0;
 
-                              acc.outwardQty += b.outward?.qty || 0;
-                              acc.outwardValue += b.outward?.value || 0;
+                              acc.inwardQty += group.totals.inwardQty || 0;
+                              acc.inwardValue += group.totals.inwardValue || 0;
 
-                              acc.closingQty += b.closing?.qty || 0;
-                              acc.closingValue += b.closing?.value || 0;
-                            });
+                              acc.outwardQty += group.totals.outwardQty || 0;
+                              acc.outwardValue += group.totals.outwardValue || 0;
+
+                              acc.closingQty += group.totals.closingQty || 0;
+                              acc.closingValue += group.totals.closingValue || 0;
+                            } else if (!group.isGroup && group.batches) {
+                              // Fallback for non-hierarchical view (Opening, Closing, etc.)
+                              const batches = Array.isArray(group.batches) ? group.batches : [];
+                              batches.forEach((b: any) => {
+                                acc.openingQty += b.opening?.qty || 0;
+                                acc.openingValue += b.opening?.value || 0;
+                                acc.inwardQty += b.inward?.qty || 0;
+                                acc.inwardValue += b.inward?.value || 0;
+                                acc.outwardQty += b.outward?.qty || 0;
+                                acc.outwardValue += b.outward?.value || 0;
+                                acc.closingQty += b.closing?.qty || 0;
+                                acc.closingValue += b.closing?.value || 0;
+                              });
+                            }
                             return acc;
                           },
                           {
@@ -1752,38 +2407,42 @@ const StockSummary: React.FC = () => {
                           <tr className="font-bold bg-gray-200">
                             <td className="border p-2">Grand Total</td>
 
-                            {/* Opening */}
-                            <td className="border p-2 text-right align-middle">
-                              {grand.openingQty || ""}
-                            </td>
-                            <td className="border p-2 text-right align-middle">
-                              {/* Rate */}
-                            </td>
-                            <td className="border p-2 text-right align-middle">
-                              {formatCurrency(grand.openingValue)}
-                            </td>
+                            {(reportView === "All" || (reportView === "Categories" && (drillPath[drillPath.length - 1].type === "category" || drillPath[drillPath.length - 1].type === "item" || drillPath[drillPath.length - 1].type === "month"))) && (
+                              <>
+                                {/* Opening */}
+                                <td className="border p-2 text-right align-middle">
+                                  {grand.openingQty || ""}
+                                </td>
+                                <td className="border p-2 text-right align-middle">
+                                  {/* Rate */}
+                                </td>
+                                <td className="border p-2 text-right align-middle">
+                                  {formatCurrency(grand.openingValue)}
+                                </td>
 
-                            {/* Inward */}
-                            <td className="border p-2 text-right align-middle">
-                              {grand.inwardQty || ""}
-                            </td>
-                            <td className="border p-2 text-right align-middle">
-                              {/* Rate */}
-                            </td>
-                            <td className="border p-2 text-right align-middle">
-                              {formatCurrency(grand.inwardValue)}
-                            </td>
+                                {/* Inward */}
+                                <td className="border p-2 text-right align-middle">
+                                  {grand.inwardQty || ""}
+                                </td>
+                                <td className="border p-2 text-right align-middle">
+                                  {/* Rate */}
+                                </td>
+                                <td className="border p-2 text-right align-middle">
+                                  {formatCurrency(grand.inwardValue)}
+                                </td>
 
-                            {/* Outward */}
-                            <td className="border p-2 text-right align-middle">
-                              {grand.outwardQty || ""}
-                            </td>
-                            <td className="border p-2 text-right align-middle">
-                              {/* Rate */}
-                            </td>
-                            <td className="border p-2 text-right align-middle">
-                              {formatCurrency(grand.outwardValue)}
-                            </td>
+                                {/* Outward */}
+                                <td className="border p-2 text-right align-middle">
+                                  {grand.outwardQty || ""}
+                                </td>
+                                <td className="border p-2 text-right align-middle">
+                                  {/* Rate */}
+                                </td>
+                                <td className="border p-2 text-right align-middle">
+                                  {formatCurrency(grand.outwardValue)}
+                                </td>
+                              </>
+                            )}
 
                             {/* Closing */}
                             <td className="border p-2 text-right align-middle">
@@ -1800,6 +2459,7 @@ const StockSummary: React.FC = () => {
                       })()}
                     </tbody>
                   </table>
+                  </div>
                 </div>
               ) : (
                 <div className="overflow-x-auto">

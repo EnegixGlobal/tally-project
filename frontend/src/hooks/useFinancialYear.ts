@@ -1,6 +1,15 @@
 import { useState, useEffect, useMemo } from "react";
 import { useCompany } from "../context/CompanyContext";
 
+export const normalizeFinYear = (yearStr: string) => {
+    if (!yearStr) return "";
+    const match = yearStr.match(/^(\d{4})-\d{2}(\d{2})$/);
+    if (match) {
+        return `${match[1]}-${match[2]}`; // Converts 2026-2027 to 2026-27
+    }
+    return yearStr;
+};
+
 export const getFinancialYearRange = (yearStr: string) => {
     const match = yearStr.match(/\d{4}/);
     const year = match ? parseInt(match[0], 10) : new Date().getFullYear();
@@ -74,10 +83,21 @@ export const useFinancialYear = () => {
     });
 
     useEffect(() => {
-        const storedFinYear = localStorage.getItem("selectedFinYear");
+        let storedFinYear = localStorage.getItem("selectedFinYear");
+        if (storedFinYear) {
+            // Normalize existing stored fin year in case it was stored as YYYY-YYYY
+            const normalized = normalizeFinYear(storedFinYear);
+            if (normalized !== storedFinYear) {
+                localStorage.setItem("selectedFinYear", normalized);
+                storedFinYear = normalized;
+                setFinYear(normalized);
+            }
+        }
+
         if (storedFinYear === null && companyInfo?.financialYear) {
-            setFinYear(companyInfo.financialYear);
-            localStorage.setItem("selectedFinYear", companyInfo.financialYear);
+            const normalized = normalizeFinYear(companyInfo.financialYear);
+            setFinYear(normalized);
+            localStorage.setItem("selectedFinYear", normalized);
         } else if (storedFinYear === null) {
             const currentYear = new Date().getFullYear();
             const isPastMarch = new Date().getMonth() >= 3;

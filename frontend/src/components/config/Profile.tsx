@@ -344,10 +344,12 @@ const Profile: React.FC = () => {
 
     // Required fields
     if (!company.name.trim()) newErrors.name = "Company name is required";
-    if (!company.financialYear.trim())
+    if (!company.financialYear.trim()) {
       newErrors.financialYear = "Financial year is required";
-    if (!company.booksBeginningYear.trim())
-      newErrors.booksBeginningYear = "Books beginning year is required";
+    } else if (!/^\d{4}-\d{2}$/.test(company.financialYear.trim())) {
+      newErrors.financialYear = "Format must be YYYY-YY (e.g., 2024-25)";
+    }
+    if (!company.booksBeginningYear.trim()) newErrors.booksBeginningYear = "Books beginning year is required";
     if (!company.state) newErrors.state = "State is required";
     if (!company.panNumber.trim())
       newErrors.panNumber = "PAN number is required";
@@ -648,6 +650,7 @@ const Profile: React.FC = () => {
                   id="booksBeginningYear"
                   name="booksBeginningYear"
                   label="Books Beginning From *"
+                  type="date"
                   value={company.booksBeginningYear}
                   onChange={handleChange}
                   required
