@@ -156,8 +156,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
   // New state for Change View functionality
   const [viewType, setViewType] = useState<
-    "Daily" | "Weekly" | "Fortnightly" | "Monthly" | "Quarterly" | "Half-yearly"
+    "Daily" | "Weekly" | "Fortnightly" | "Monthly" | "Quarterly" | "Custom Date"
   >("Daily");
+  const [customStartDate, setCustomStartDate] = useState<string>("");
+  const [customEndDate, setCustomEndDate] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [selectedQuarter, setSelectedQuarter] = useState<string>("");
   const [showMonthList, setShowMonthList] = useState(false);
@@ -488,16 +490,22 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         }
         break;
       }
-      case "Half-yearly": {
-        const currentHalf = Math.floor(today.getMonth() / 6);
-        startDate = new Date(today.getFullYear(), currentHalf * 6, 1);
-        break;
+      case "Custom Date": {
+        if (customStartDate && customEndDate) {
+          return vouchers.filter((voucher) => {
+            const voucherDate = new Date(voucher.date);
+            const start = new Date(customStartDate);
+            const end = new Date(customEndDate);
+            return voucherDate >= start && voucherDate <= end;
+          });
+        }
+        return vouchers;
       }
       default:
         return vouchers;
     }
 
-    if ((viewType !== "Monthly" || !selectedMonth) && (viewType !== "Quarterly" || !selectedQuarter)) {
+    if ((viewType !== "Monthly" || !selectedMonth) && (viewType !== "Quarterly" || !selectedQuarter) && viewType !== "Custom Date") {
       return vouchers.filter((voucher) => {
         const voucherDate = new Date(voucher.date);
         return voucherDate >= startDate;
@@ -1765,6 +1773,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   setSelectedMonth("");
                   setSelectedQuarter("");
                 }
+                if (newViewType !== "Custom Date") {
+                  setCustomStartDate("");
+                  setCustomEndDate("");
+                }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
@@ -1773,7 +1785,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               <option value="Fortnightly">Fortnightly</option>
               <option value="Monthly">Monthly</option>
               <option value="Quarterly">Quarterly</option>
-              <option value="Half-yearly">Half-yearly</option>
+              <option value="Custom Date">Custom Date</option>
             </select>
           </div>
           {viewType === "Monthly" && showMonthList && (
@@ -1820,6 +1832,40 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 <option value="Q4">Jan - Mar</option>
               </select>
             </div>
+          )}
+          {viewType === "Custom Date" && (
+            <>
+              <div>
+                <label
+                  htmlFor="custom-start-date"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Start Date
+                </label>
+                <input
+                  id="custom-start-date"
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="custom-end-date"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  End Date
+                </label>
+                <input
+                  id="custom-end-date"
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </>
           )}
           <div>
             <label
