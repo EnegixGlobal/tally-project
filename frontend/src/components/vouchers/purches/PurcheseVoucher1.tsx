@@ -2065,11 +2065,11 @@ const PurchaseVoucher: React.FC = () => {
   };
 
 
-  // 🔹 Intra / Inter State Check
+  // 📍 Intra / Inter State Check
   const isIntraState =
-    cleanState(companyState) &&
-    cleanState(supplierState) && // Changed from partyState to supplierState
-    cleanState(companyState) === cleanState(supplierState); // Changed from partyState to supplierState
+    !cleanState(companyState) ||
+    !cleanState(supplierState) ||
+    cleanState(companyState) === cleanState(supplierState);
 
   const calculateTotals = () => {
     if (formData.mode === "item-invoice") {
