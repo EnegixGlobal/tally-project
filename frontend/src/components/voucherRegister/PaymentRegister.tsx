@@ -49,7 +49,7 @@ const PaymentRegister: React.FC = () => {
 
   // New state for Change View functionality
   const [viewType, setViewType] = useState<
-    "Daily" | "Weekly" | "Fortnightly" | "Monthly" | "Quarterly" | "Custom Date"
+    "Daily" | "Monthly" | "Quarterly" | "Custom Date"
   >("Daily");
   const [customStartDate, setCustomStartDate] = useState<string>("");
   const [customEndDate, setCustomEndDate] = useState<string>("");
@@ -922,8 +922,6 @@ const PaymentRegister: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Daily">Daily</option>
-              <option value="Weekly">Weekly</option>
-              <option value="Fortnightly">Fortnightly</option>
               <option value="Monthly">Monthly</option>
               <option value="Quarterly">Quarterly</option>
               <option value="Custom Date">Custom Date</option>
@@ -1009,7 +1007,8 @@ const PaymentRegister: React.FC = () => {
               </div>
             </>
           )}
-          <div>
+          {viewType === "Daily" && (
+            <div>
             <label
               htmlFor="date-filter"
               className="block text-sm font-medium text-gray-700 mb-1"
@@ -1024,6 +1023,7 @@ const PaymentRegister: React.FC = () => {
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          )}
           <div>
             <label
               htmlFor="status-filter"
