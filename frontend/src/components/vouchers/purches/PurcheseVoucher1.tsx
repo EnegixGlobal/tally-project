@@ -4922,6 +4922,46 @@ const PurchaseVoucher: React.FC = () => {
                     <h3 className="text-lg font-medium break-words">
                       {item.name}
                     </h3>
+                    {(() => {
+                      let qty = 0;
+                      if (item.batches) {
+                        try {
+                          const parsed =
+                            typeof item.batches === "string"
+                              ? JSON.parse(item.batches)
+                              : item.batches;
+                          if (Array.isArray(parsed)) {
+                            qty = parsed.reduce(
+                              (sum: number, b: any) =>
+                                sum +
+                                Number(
+                                  b.batchQuantity ||
+                                  b.quantity ||
+                                  b.openingQuantity ||
+                                  0
+                                ),
+                              0
+                            );
+                          }
+                        } catch (e) {}
+                      }
+
+                      if (qty === 0) {
+                        qty =
+                          (item as any).closingBalance ??
+                          (item as any).closing_balance ??
+                          item.openingBalance ??
+                          (item as any).opening_balance ??
+                          (item as any).stock ??
+                          0;
+                      }
+
+                      return (
+                        <h3 className="text-lg font-medium break-words">
+                          {qty} {item.unitName || item.unit || ""}
+                        </h3>
+                      );
+                    })()}
                   </div>
                 ))}
                 {stockItems.length === 0 && (

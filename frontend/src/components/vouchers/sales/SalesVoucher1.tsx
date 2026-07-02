@@ -4282,44 +4282,43 @@ const SalesVoucher: React.FC = () => {
                         {item.name}
                       </h3>
                       {(() => {
-                        let rateToDisplay =
-                          (item as any).standardSaleRate ||
-                          (item as any).sellingRate ||
-                          (item as any).sellingPrice ||
-                          (item as any).saleRate ||
-                          (item as any).rate ||
-                          (item as any).mrp ||
-                          (item as any).MRP ||
-                          0;
-
-                        if (
-                          !rateToDisplay &&
-                          item.batches &&
-                          item.batches.length > 0
-                        ) {
-                          const defaultBatch = item.batches.find(
-                            (b: any) => !b.batchName
-                          );
-                          if (defaultBatch) {
-                            rateToDisplay =
-                              defaultBatch.openingRate ||
-                              defaultBatch.batchRate ||
-                              defaultBatch.rate ||
-                              defaultBatch.sellingPrice ||
-                              defaultBatch.sellingRate ||
-                              defaultBatch.standardSaleRate ||
-                              defaultBatch.mrp ||
-                              defaultBatch.MRP ||
-                              0;
-                          }
+                        let qty = 0;
+                        if (item.batches) {
+                          try {
+                            const parsed =
+                              typeof item.batches === "string"
+                                ? JSON.parse(item.batches)
+                                : item.batches;
+                            if (Array.isArray(parsed)) {
+                              qty = parsed.reduce(
+                                (sum: number, b: any) =>
+                                  sum +
+                                  Number(
+                                    b.batchQuantity ||
+                                    b.quantity ||
+                                    b.openingQuantity ||
+                                    0
+                                  ),
+                                0
+                              );
+                            }
+                          } catch (e) {}
                         }
 
-                        return rateToDisplay ? (
-                          <span className="text-md font-semibold text-gray-700">
-                            ₹{rateToDisplay}
-                          </span>
-                        ) : (
-                          <span />
+                        if (qty === 0) {
+                          qty =
+                            (item as any).closingBalance ??
+                            (item as any).closing_balance ??
+                            item.openingBalance ??
+                            (item as any).opening_balance ??
+                            (item as any).stock ??
+                            0;
+                        }
+
+                        return (
+                          <h3 className="text-lg font-medium break-words">
+                            {qty} {item.unitName || item.unit || ""}
+                          </h3>
                         );
                       })()}
                     </div>
