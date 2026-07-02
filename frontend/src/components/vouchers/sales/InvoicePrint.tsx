@@ -1,7 +1,9 @@
 import React, { useState, useRef, useEffect } from "react";
 import { useReactToPrint } from "react-to-print";
-import { Printer, X, MapPin } from "lucide-react";
+import { Printer, X, MapPin, Download } from "lucide-react";
 import type { VoucherEntry } from "../../../types";
+import domtoimage from "dom-to-image-more";
+import jsPDF from "jspdf";
 
 // Helper: extract numeric GST % from ledger name e.g. "CGST 9%" → 9
 const extractGstPercent = (name = "") => {
@@ -332,6 +334,32 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
     `,
   });
 
+  const handleDownloadPdf = async () => {
+    if (!printRef.current) return;
+    try {
+      const element = printRef.current;
+      const scale = 4; // Increased from 2 to 4 for much higher resolution (crystal clear text)
+      const imgData = await domtoimage.toPng(element, {
+        bgcolor: '#ffffff',
+        width: element.clientWidth * scale,
+        height: element.clientHeight * scale,
+        style: {
+          transform: `scale(${scale})`,
+          transformOrigin: 'top left'
+        }
+      });
+      const pdf = new jsPDF("p", "mm", "a4");
+      const pdfWidth = pdf.internal.pageSize.getWidth();
+      const pdfHeight = (element.clientHeight * pdfWidth) / element.clientWidth;
+      pdf.addImage(imgData, "PNG", 0, 0, pdfWidth, pdfHeight);
+      const partyName = partyLedger?.name ? partyLedger.name.replace(/[^a-zA-Z0-9 ]/g, "").trim() : "Unknown_Party";
+      pdf.save(`${partyName}_${isQuotation ? "Quotation" : "Invoice"}_${voucherData.number}.pdf`);
+    } catch (error) {
+      console.error("Error generating PDF:", error);
+      alert("Failed to download PDF.");
+    }
+  };
+
   const totals = calculateTotals();
   const { subtotal, cgstTotal, sgstTotal, igstTotal, discountTotal, total } =
     totals;
@@ -396,6 +424,13 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
               >
                 <Printer size={16} className="mr-2" />
                 Print Invoice
+              </button>
+              <button
+                onClick={handleDownloadPdf}
+                className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded flex items-center"
+              >
+                <Download size={16} className="mr-2" />
+                Download PDF
               </button>
               <button
                 title="Close Print Preview"
