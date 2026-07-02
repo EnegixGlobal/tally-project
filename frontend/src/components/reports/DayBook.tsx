@@ -8,6 +8,7 @@ import {
   Filter,
   Calendar,
   Eye,
+  Edit,
 } from "lucide-react";
 import { useFinancialYear, filterByFinancialYear } from "../../hooks/useFinancialYear";
 
@@ -924,7 +925,7 @@ const DayBook: React.FC = () => {
                         );
                       })()}
 
-                      <td className="px-4 py-3 text-center">
+                      <td className="px-4 py-3 flex items-center justify-center space-x-2">
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
@@ -937,6 +938,23 @@ const DayBook: React.FC = () => {
                           title="View Details"
                         >
                           <Eye size={16} />
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            // voucherType might have spaces or cases depending on data, but usually lower case works if matched in routes
+                            // we remove spaces and convert to lowercase just in case
+                            const vType = voucher.voucherType.toLowerCase().replace(/\s+/g, '');
+                            const rawId = voucher.voucherId.includes('-') ? voucher.voucherId.split('-').pop() : voucher.voucherId;
+                            navigate(`/app/vouchers/${vType}/edit/${rawId}?returnUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+                          }}
+                          className={`p-1 rounded text-blue-600 ${theme === "dark"
+                            ? "hover:bg-gray-600 text-blue-400"
+                            : "hover:bg-gray-200"
+                            }`}
+                          title="Edit Voucher"
+                        >
+                          <Edit size={16} />
                         </button>
                       </td>
                     </tr>

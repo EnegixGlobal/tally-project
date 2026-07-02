@@ -1771,7 +1771,7 @@ const BankStatementImport: React.FC = () => {
           <button
             title="Back to Vouchers"
             type="button"
-            onClick={() => navigate("/app/vouchers")}
+            onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
             className="mr-4 p-2 rounded-full hover:bg-gray-200"
           >
             <ArrowLeft size={20} />
@@ -2600,3 +2600,4 @@ const BankStatementImport: React.FC = () => {
 };
 
 export default BankStatementImport;
+

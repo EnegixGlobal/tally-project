@@ -1535,7 +1535,7 @@ const PurchaseImport: React.FC = () => {
             <div className="w-full xl:w-[98%] mx-auto">
                 <div className="mb-8">
                     <div className="flex items-center mb-4">
-                        <button onClick={() => navigate("/app/vouchers")} className="mr-4 p-2 rounded-full hover:bg-gray-200 transition-colors">
+                        <button onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")} className="mr-4 p-2 rounded-full hover:bg-gray-200 transition-colors">
                             <ArrowLeft size={20} />
                         </button>
                         <h2 className="text-2xl font-bold text-gray-900 flex items-center">
@@ -2025,3 +2025,4 @@ const PurchaseImport: React.FC = () => {
 };
 
 export default PurchaseImport;
+

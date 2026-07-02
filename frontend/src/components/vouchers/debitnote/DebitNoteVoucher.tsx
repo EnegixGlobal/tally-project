@@ -697,7 +697,7 @@ const DebitNoteVoucher: React.FC = () => {
           <div className="flex justify-end space-x-4">
             <button
               type="button"
-              onClick={() => navigate("/app/vouchers")}
+              onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
               className={`px-4 py-2 rounded ${theme === "dark"
                 ? "bg-gray-700 hover:bg-gray-600"
                 : "bg-gray-200 hover:bg-gray-300"
@@ -793,3 +793,4 @@ const DebitNoteVoucher: React.FC = () => {
 };
 
 export default DebitNoteVoucher;
+

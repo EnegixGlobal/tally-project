@@ -2516,7 +2516,7 @@ const SalesVoucher: React.FC = () => {
           ? "Voucher updated successfully"
           : "Voucher saved successfully",
       }).then(() => {
-        navigate("/app/vouchers");
+        navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers");
       });
     } catch (err) {
       console.error("Submit error:", err);
@@ -2671,7 +2671,7 @@ const SalesVoucher: React.FC = () => {
           <div className="flex items-center">
             <button
               type="button"
-              onClick={() => navigate("/app/vouchers")}
+              onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
               className="mr-4 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
             >
               <ArrowLeft size={20} />
@@ -4048,7 +4048,7 @@ const SalesVoucher: React.FC = () => {
               <button
                 title="Cancel (Esc)"
                 type="button"
-                onClick={() => navigate("/app/vouchers")}
+                onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
                 className={`px-4 py-2 rounded ${
                   theme === "dark"
                     ? "bg-gray-700 hover:bg-gray-600"
@@ -4346,3 +4346,4 @@ const SalesVoucher: React.FC = () => {
 };
 
 export default SalesVoucher;
+

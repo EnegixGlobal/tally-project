@@ -1539,7 +1539,7 @@ const PurchaseVoucher: React.FC = () => {
           break;
         case "Escape":
           e.preventDefault();
-          navigate("/app/vouchers");
+          navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers");
           break;
       }
     },
@@ -2489,7 +2489,7 @@ const PurchaseVoucher: React.FC = () => {
         "success"
       );
 
-      navigate("/app/vouchers");
+      navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers");
     } catch (err) {
       console.error("Submit error:", err);
       Swal.fire("Error", "Network or server issue", "error");
@@ -2896,7 +2896,7 @@ const PurchaseVoucher: React.FC = () => {
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
         <button
-          onClick={() => navigate("/app/vouchers")}
+          onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
           className="mr-4 p-2 rounded-full"
         >
           <ArrowLeft size={20} />
@@ -4244,7 +4244,7 @@ const PurchaseVoucher: React.FC = () => {
             <button
               title="Cancel (Esc)"
               type="button"
-              onClick={() => navigate("/app/vouchers")}
+              onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
               className={`px-4 py-2 rounded ${theme === "dark"
                 ? "bg-gray-700 hover:bg-gray-600"
                 : "bg-gray-200 hover:bg-gray-300"
@@ -4950,3 +4950,4 @@ const PurchaseVoucher: React.FC = () => {
 };
 
 export default PurchaseVoucher;
+
