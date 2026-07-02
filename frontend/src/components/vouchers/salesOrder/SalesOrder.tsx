@@ -554,7 +554,7 @@ const SalesOrder: React.FC = () => {
             text: `Sales Order ${isEditMode ? "updated" : "created"
               } successfully`,
           }).then(() => {
-            navigate("/app/vouchers");
+            navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers");
           });
         } else {
           Swal.fire("Error", data.message || "Something went wrong", "error");
@@ -740,7 +740,7 @@ const SalesOrder: React.FC = () => {
         <button
           title="Back to Vouchers"
           type="button"
-          onClick={() => navigate("/app/vouchers")}
+          onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
           className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
             }`}
         >
@@ -1487,3 +1487,4 @@ const SalesOrder: React.FC = () => {
 };
 
 export default SalesOrder;
+

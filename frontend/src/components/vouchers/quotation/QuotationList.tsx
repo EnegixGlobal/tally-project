@@ -420,7 +420,7 @@ const QuotationList: React.FC = () => {
       <div className="flex items-center mb-6">
         <button
           title='Back to Vouchers'
-          onClick={() => navigate('/app/vouchers')}
+          onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
           className={`mr-4 p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'}`}
         >
           <ArrowLeft size={20} />
@@ -1152,3 +1152,4 @@ const QuotationList: React.FC = () => {
 };
 
 export default QuotationList;
+

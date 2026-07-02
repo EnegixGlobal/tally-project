@@ -1539,7 +1539,7 @@ const PurchaseVoucher: React.FC = () => {
           break;
         case "Escape":
           e.preventDefault();
-          navigate("/app/vouchers");
+          navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers");
           break;
       }
     },
@@ -2065,11 +2065,11 @@ const PurchaseVoucher: React.FC = () => {
   };
 
 
-  // 🔹 Intra / Inter State Check
+  // 📍 Intra / Inter State Check
   const isIntraState =
-    cleanState(companyState) &&
-    cleanState(supplierState) && // Changed from partyState to supplierState
-    cleanState(companyState) === cleanState(supplierState); // Changed from partyState to supplierState
+    !cleanState(companyState) ||
+    !cleanState(supplierState) ||
+    cleanState(companyState) === cleanState(supplierState);
 
   const calculateTotals = () => {
     if (formData.mode === "item-invoice") {
@@ -2489,7 +2489,7 @@ const PurchaseVoucher: React.FC = () => {
         "success"
       );
 
-      navigate("/app/vouchers");
+      navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers");
     } catch (err) {
       console.error("Submit error:", err);
       Swal.fire("Error", "Network or server issue", "error");
@@ -2896,7 +2896,7 @@ const PurchaseVoucher: React.FC = () => {
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
         <button
-          onClick={() => navigate("/app/vouchers")}
+          onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
           className="mr-4 p-2 rounded-full"
         >
           <ArrowLeft size={20} />
@@ -4244,7 +4244,7 @@ const PurchaseVoucher: React.FC = () => {
             <button
               title="Cancel (Esc)"
               type="button"
-              onClick={() => navigate("/app/vouchers")}
+              onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
               className={`px-4 py-2 rounded ${theme === "dark"
                 ? "bg-gray-700 hover:bg-gray-600"
                 : "bg-gray-200 hover:bg-gray-300"
@@ -4922,6 +4922,46 @@ const PurchaseVoucher: React.FC = () => {
                     <h3 className="text-lg font-medium break-words">
                       {item.name}
                     </h3>
+                    {(() => {
+                      let qty = 0;
+                      if (item.batches) {
+                        try {
+                          const parsed =
+                            typeof item.batches === "string"
+                              ? JSON.parse(item.batches)
+                              : item.batches;
+                          if (Array.isArray(parsed)) {
+                            qty = parsed.reduce(
+                              (sum: number, b: any) =>
+                                sum +
+                                Number(
+                                  b.batchQuantity ||
+                                  b.quantity ||
+                                  b.openingQuantity ||
+                                  0
+                                ),
+                              0
+                            );
+                          }
+                        } catch (e) {}
+                      }
+
+                      if (qty === 0) {
+                        qty =
+                          (item as any).closingBalance ??
+                          (item as any).closing_balance ??
+                          item.openingBalance ??
+                          (item as any).opening_balance ??
+                          (item as any).stock ??
+                          0;
+                      }
+
+                      return (
+                        <h3 className="text-lg font-medium break-words">
+                          {qty} {item.unitName || item.unit || ""}
+                        </h3>
+                      );
+                    })()}
                   </div>
                 ))}
                 {stockItems.length === 0 && (
@@ -4950,3 +4990,4 @@ const PurchaseVoucher: React.FC = () => {
 };
 
 export default PurchaseVoucher;
+

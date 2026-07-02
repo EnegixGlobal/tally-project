@@ -992,26 +992,31 @@ const SalesVoucher: React.FC = () => {
             return 0;
           };
 
-          if (entry.cgstLedgerId) {
-            const r = extract(entry.cgstLedgerId);
-            if (r !== updatedEntry.cgstRate) {
-              updatedEntry.cgstRate = r;
-              entryChanged = true;
+          let cRate = entry.cgstLedgerId ? extract(entry.cgstLedgerId) : 0;
+          let sRate = entry.sgstLedgerId ? extract(entry.sgstLedgerId) : 0;
+          let iRate = entry.igstLedgerId ? extract(entry.igstLedgerId) : 0;
+
+          // Fallback to item GST rate if missing or extract failed
+          if (itemsLoaded && entry.itemId) {
+            const details = getItemDetails(entry.itemId);
+            if (details.gstRate > 0) {
+              if (cRate === 0) cRate = details.gstRate / 2;
+              if (sRate === 0) sRate = details.gstRate / 2;
+              if (iRate === 0) iRate = details.gstRate;
             }
           }
-          if (entry.sgstLedgerId) {
-            const r = extract(entry.sgstLedgerId);
-            if (r !== updatedEntry.sgstRate) {
-              updatedEntry.sgstRate = r;
-              entryChanged = true;
-            }
+
+          if (cRate !== updatedEntry.cgstRate) {
+            updatedEntry.cgstRate = cRate;
+            entryChanged = true;
           }
-          if (entry.igstLedgerId) {
-            const r = extract(entry.igstLedgerId);
-            if (r !== updatedEntry.igstRate) {
-              updatedEntry.igstRate = r;
-              entryChanged = true;
-            }
+          if (sRate !== updatedEntry.sgstRate) {
+            updatedEntry.sgstRate = sRate;
+            entryChanged = true;
+          }
+          if (iRate !== updatedEntry.igstRate) {
+            updatedEntry.igstRate = iRate;
+            entryChanged = true;
           }
 
           // --- 3. Hydrate Discount Ledger (if discount amount exists but no ledger) ---
@@ -1217,10 +1222,7 @@ const SalesVoucher: React.FC = () => {
           setFormData((prev) => {
             const companyState = safeCompanyInfo?.state || "";
             const statesMatch = Boolean(
-              companyState &&
-                partyState &&
-                companyState.toLowerCase().trim() ===
-                  partyState.toLowerCase().trim()
+              (!companyState || !partyState || companyState.toLowerCase().trim() === partyState.toLowerCase().trim())
             );
 
             // ✅ Extract GST % from ledger names
@@ -1241,12 +1243,24 @@ const SalesVoucher: React.FC = () => {
 
                 const itemDetails = getItemDetails(entry.itemId);
 
+                let cRate = extractGstPercent(itemDetails.cgstLedgerId);
+                let sRate = extractGstPercent(itemDetails.sgstLedgerId);
+                let iRate = extractGstPercent(
+                  itemDetails.gstLedgerId || itemDetails.igstLedgerId
+                );
+
+                if (itemDetails.gstRate > 0) {
+                  if (cRate === 0) cRate = itemDetails.gstRate / 2;
+                  if (sRate === 0) sRate = itemDetails.gstRate / 2;
+                  if (iRate === 0) iRate = itemDetails.gstRate;
+                }
+
                 if (statesMatch) {
                   // Same state: CGST + SGST (extract from ledger names)
                   return {
                     ...entry,
-                    cgstRate: extractGstPercent(itemDetails.cgstLedgerId),
-                    sgstRate: extractGstPercent(itemDetails.sgstLedgerId),
+                    cgstRate: cRate,
+                    sgstRate: sRate,
                     igstRate: 0,
                     // ✅ Update ledger IDs for intra-state
                     cgstLedgerId: itemDetails.cgstLedgerId || "",
@@ -1255,19 +1269,13 @@ const SalesVoucher: React.FC = () => {
                     igstLedgerId: "",
                   };
                 } else {
-                  // Different state: IGST (extract from ledger name)
+                  // Different state: IGST
                   return {
                     ...entry,
                     cgstRate: 0,
                     sgstRate: 0,
-                    igstRate: extractGstPercent(
-                      itemDetails.gstLedgerId || itemDetails.igstLedgerId
-                    ),
+                    igstRate: iRate,
                     // ✅ Update ledger IDs for inter-state
-                    gstLedgerId:
-                      itemDetails.gstLedgerId || itemDetails.igstLedgerId || "",
-                    igstLedgerId:
-                      itemDetails.igstLedgerId || itemDetails.gstLedgerId || "",
                     cgstLedgerId: "",
                     sgstLedgerId: "",
                   };
@@ -1423,10 +1431,7 @@ const SalesVoucher: React.FC = () => {
         const companyState = safeCompanyInfo?.state || "";
         const partyState = selectedPartyState || "";
         const statesMatch = Boolean(
-          companyState &&
-            partyState &&
-            companyState.toLowerCase().trim() ===
-              partyState.toLowerCase().trim()
+          (!companyState || !partyState || companyState.toLowerCase().trim() === partyState.toLowerCase().trim())
         );
 
         // ✅ Extract GST % from ledger names (do this once)
@@ -1441,11 +1446,18 @@ const SalesVoucher: React.FC = () => {
         };
 
         // Extract rates once
-        const extractedCgst = extractGstPercent(details.cgstLedgerId);
-        const extractedSgst = extractGstPercent(details.sgstLedgerId);
-        const extractedIgst = extractGstPercent(
+        let extractedCgst = extractGstPercent(details.cgstLedgerId);
+        let extractedSgst = extractGstPercent(details.sgstLedgerId);
+        let extractedIgst = extractGstPercent(
           details.gstLedgerId || details.igstLedgerId
         );
+
+        // Fallback to item's gstRate if extracting from ledger fails or ledgers are missing
+        if (details.gstRate > 0) {
+          if (extractedCgst === 0) extractedCgst = details.gstRate / 2;
+          if (extractedSgst === 0) extractedSgst = details.gstRate / 2;
+          if (extractedIgst === 0) extractedIgst = details.gstRate;
+        }
 
         // Set GST rates based on state matching
         let cgstRate = 0;
@@ -1862,17 +1874,20 @@ const SalesVoucher: React.FC = () => {
           const companyState = safeCompanyInfo?.state || "";
           const partyState = selectedPartyState || "";
           const statesMatch = Boolean(
-            companyState &&
-              partyState &&
-              companyState.toLowerCase().trim() ===
-                partyState.toLowerCase().trim()
+            (!companyState || !partyState || companyState.toLowerCase().trim() === partyState.toLowerCase().trim())
           );
 
-          const extractedCgst = extractGstPercent(details.cgstLedgerId);
-          const extractedSgst = extractGstPercent(details.sgstLedgerId);
-          const extractedIgst = extractGstPercent(
+          let extractedCgst = extractGstPercent(details.cgstLedgerId);
+          let extractedSgst = extractGstPercent(details.sgstLedgerId);
+          let extractedIgst = extractGstPercent(
             details.gstLedgerId || details.igstLedgerId
           );
+
+          if (details.gstRate > 0) {
+            if (extractedCgst === 0) extractedCgst = details.gstRate / 2;
+            if (extractedSgst === 0) extractedSgst = details.gstRate / 2;
+            if (extractedIgst === 0) extractedIgst = details.gstRate;
+          }
 
           let cgstRate = 0,
             sgstRate = 0,
@@ -2516,7 +2531,7 @@ const SalesVoucher: React.FC = () => {
           ? "Voucher updated successfully"
           : "Voucher saved successfully",
       }).then(() => {
-        navigate("/app/vouchers");
+        navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers");
       });
     } catch (err) {
       console.error("Submit error:", err);
@@ -2671,7 +2686,7 @@ const SalesVoucher: React.FC = () => {
           <div className="flex items-center">
             <button
               type="button"
-              onClick={() => navigate("/app/vouchers")}
+              onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
               className="mr-4 p-2 rounded-full hover:bg-gray-200 dark:hover:bg-gray-700"
             >
               <ArrowLeft size={20} />
@@ -3196,10 +3211,7 @@ const SalesVoucher: React.FC = () => {
 
                             const statesMatch =
                               hasParty &&
-                              companyState &&
-                              partyState &&
-                              companyState.toLowerCase().trim() ===
-                                partyState.toLowerCase().trim();
+                              (!companyState || !partyState || companyState.toLowerCase().trim() === partyState.toLowerCase().trim());
 
                             // ❌ No party selected → show nothing
                             if (!hasParty) {
@@ -3268,10 +3280,7 @@ const SalesVoucher: React.FC = () => {
                         const partyState = selectedPartyState || "";
                         const statesMatch =
                           hasParty &&
-                          companyState &&
-                          partyState &&
-                          companyState.toLowerCase().trim() ===
-                            partyState.toLowerCase().trim();
+                          (!companyState || !partyState || companyState.toLowerCase().trim() === partyState.toLowerCase().trim());
 
                         return (
                           <tr
@@ -3609,10 +3618,7 @@ const SalesVoucher: React.FC = () => {
                         const partyState = selectedPartyState || "";
                         const statesMatch =
                           hasParty &&
-                          companyState &&
-                          partyState &&
-                          companyState.toLowerCase().trim() ===
-                            partyState.toLowerCase().trim();
+                          (!companyState || !partyState || companyState.toLowerCase().trim() === partyState.toLowerCase().trim());
 
                         // Calculate total columns dynamically
                         let totalCols = 7; // S.No, Item, HSN, Quantity, Unit, Rate, Amount
@@ -4048,7 +4054,7 @@ const SalesVoucher: React.FC = () => {
               <button
                 title="Cancel (Esc)"
                 type="button"
-                onClick={() => navigate("/app/vouchers")}
+                onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
                 className={`px-4 py-2 rounded ${
                   theme === "dark"
                     ? "bg-gray-700 hover:bg-gray-600"
@@ -4276,44 +4282,43 @@ const SalesVoucher: React.FC = () => {
                         {item.name}
                       </h3>
                       {(() => {
-                        let rateToDisplay =
-                          (item as any).standardSaleRate ||
-                          (item as any).sellingRate ||
-                          (item as any).sellingPrice ||
-                          (item as any).saleRate ||
-                          (item as any).rate ||
-                          (item as any).mrp ||
-                          (item as any).MRP ||
-                          0;
-
-                        if (
-                          !rateToDisplay &&
-                          item.batches &&
-                          item.batches.length > 0
-                        ) {
-                          const defaultBatch = item.batches.find(
-                            (b: any) => !b.batchName
-                          );
-                          if (defaultBatch) {
-                            rateToDisplay =
-                              defaultBatch.openingRate ||
-                              defaultBatch.batchRate ||
-                              defaultBatch.rate ||
-                              defaultBatch.sellingPrice ||
-                              defaultBatch.sellingRate ||
-                              defaultBatch.standardSaleRate ||
-                              defaultBatch.mrp ||
-                              defaultBatch.MRP ||
-                              0;
-                          }
+                        let qty = 0;
+                        if (item.batches) {
+                          try {
+                            const parsed =
+                              typeof item.batches === "string"
+                                ? JSON.parse(item.batches)
+                                : item.batches;
+                            if (Array.isArray(parsed)) {
+                              qty = parsed.reduce(
+                                (sum: number, b: any) =>
+                                  sum +
+                                  Number(
+                                    b.batchQuantity ||
+                                    b.quantity ||
+                                    b.openingQuantity ||
+                                    0
+                                  ),
+                                0
+                              );
+                            }
+                          } catch (e) {}
                         }
 
-                        return rateToDisplay ? (
-                          <span className="text-md font-semibold text-gray-700">
-                            ₹{rateToDisplay}
-                          </span>
-                        ) : (
-                          <span />
+                        if (qty === 0) {
+                          qty =
+                            (item as any).closingBalance ??
+                            (item as any).closing_balance ??
+                            item.openingBalance ??
+                            (item as any).opening_balance ??
+                            (item as any).stock ??
+                            0;
+                        }
+
+                        return (
+                          <h3 className="text-lg font-medium break-words">
+                            {qty} {item.unitName || item.unit || ""}
+                          </h3>
                         );
                       })()}
                     </div>
@@ -4346,3 +4351,4 @@ const SalesVoucher: React.FC = () => {
 };
 
 export default SalesVoucher;
+

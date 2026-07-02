@@ -292,7 +292,7 @@ const JournalVoucher: React.FC = () => {
 
       if (res.ok) {
         Swal.fire("Success", data.message, "success").then(() => {
-          navigate("/app/vouchers");
+          navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers");
         });
       } else {
         Swal.fire("Error", data.message, "error");
@@ -410,7 +410,7 @@ const JournalVoucher: React.FC = () => {
         e.preventDefault();
         setShowConfigPanel(!showConfigPanel);
       } else if (e.key === "Escape") {
-        navigate("/app/vouchers");
+        navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers");
       }
     },
     [showConfigPanel, navigate, handleSubmit, handlePrint]
@@ -438,7 +438,7 @@ const JournalVoucher: React.FC = () => {
         <button
           title="Back to Vouchers"
           type="button"
-          onClick={() => navigate("/app/vouchers")}
+          onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
           className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
             }`}
         >
@@ -961,3 +961,4 @@ const JournalVoucher: React.FC = () => {
 };
 
 export default JournalVoucher;
+

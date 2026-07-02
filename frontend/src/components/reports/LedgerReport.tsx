@@ -9,6 +9,7 @@ import {
   Calendar,
   Eye,
   Sparkles,
+  Edit,
 } from "lucide-react";
 import { useCompany } from "../../context/CompanyContext";
 import * as XLSX from "xlsx";
@@ -1110,7 +1111,7 @@ const LedgerReport: React.FC = () => {
                         Closing Balance
                       </th>
                       <th className="px-4 py-3 text-center text-xs font-semibold uppercase tracking-wider">
-                        View
+                        Action
                       </th>
                     </tr>
                   </thead>
@@ -1170,7 +1171,7 @@ const LedgerReport: React.FC = () => {
                                     : ""}
                               </td>
 
-                              <td className="px-4 py-3 text-center">
+                              <td className="px-4 py-3 flex items-center justify-center space-x-2">
                                 <button
                                   onClick={(e) => {
                                     e.stopPropagation();
@@ -1183,6 +1184,21 @@ const LedgerReport: React.FC = () => {
                                   title="View Details"
                                 >
                                   <Eye size={16} />
+                                </button>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    const vType = (txn.isQuotation ? "quotation" : txn.voucherType).toLowerCase().replace(/\s+/g, '-');
+                                    const rawId = txn.id.includes('-') ? txn.id.split('-').pop() : txn.id;
+                                    navigate(`/app/vouchers/${vType}/edit/${rawId}?returnUrl=${encodeURIComponent(window.location.pathname + window.location.search)}`);
+                                  }}
+                                  className={`p-1 rounded text-blue-600 ${theme === "dark"
+                                    ? "hover:bg-gray-600 text-blue-400"
+                                    : "hover:bg-gray-200"
+                                    }`}
+                                  title="Edit Voucher"
+                                >
+                                  <Edit size={16} />
                                 </button>
                               </td>
                             </tr>

@@ -84,7 +84,7 @@ const PurchaseVoucher: React.FC = () => {
       };
 
       addVoucher(newVoucher);
-      navigate("/app/vouchers");
+      navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers");
     } finally {
       setIsSubmitting(false);
     }
@@ -95,7 +95,7 @@ const PurchaseVoucher: React.FC = () => {
       <div className="flex items-center mb-6">
         <button
           title='Back to Vouchers'
-          onClick={() => navigate('/app/vouchers')}
+          onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
           className={`mr-4 p-2 rounded-full ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-200'
             }`}
         >
@@ -301,7 +301,7 @@ const PurchaseVoucher: React.FC = () => {
             <button
               title='Cancel'
               type="button"
-              onClick={() => navigate('/app/vouchers')}
+              onClick={() => navigate(new URLSearchParams(window.location.search).get("returnUrl") || "/app/vouchers")}
               className={`px-4 py-2 rounded ${theme === 'dark'
                   ? 'bg-gray-700 hover:bg-gray-600'
                   : 'bg-gray-200 hover:bg-gray-300'
@@ -338,3 +338,4 @@ const PurchaseVoucher: React.FC = () => {
 };
 
 export default PurchaseVoucher;
+

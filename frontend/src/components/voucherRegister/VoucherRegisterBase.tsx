@@ -135,7 +135,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   const [dateFilter, setDateFilter] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [gstFilter, setGstFilter] = useState<"all" | "b2b" | "b2c">("all");
-  const [topPeriodFilter, setTopPeriodFilter] = useState<string>("all");
   const [currentPage, setCurrentPage] = useState(1);
   const [itemsPerPage, setItemsPerPage] = useState(itemsPerPageProp);
   const [selectedVoucherIds, setSelectedVoucherIds] = useState<Set<string>>(new Set());
@@ -156,8 +155,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
   // New state for Change View functionality
   const [viewType, setViewType] = useState<
-    "Daily" | "Weekly" | "Fortnightly" | "Monthly" | "Quarterly" | "Half-yearly"
+    "Daily" | "Monthly" | "Quarterly" | "Custom Date"
   >("Daily");
+  const [customStartDate, setCustomStartDate] = useState<string>("");
+  const [customEndDate, setCustomEndDate] = useState<string>("");
   const [selectedMonth, setSelectedMonth] = useState<string>("");
   const [selectedQuarter, setSelectedQuarter] = useState<string>("");
   const [showMonthList, setShowMonthList] = useState(false);
@@ -445,18 +446,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     let startDate: Date;
 
     switch (viewType) {
-      case "Weekly": {
-        const weekAgo = new Date(today);
-        weekAgo.setDate(weekAgo.getDate() - 7);
-        startDate = weekAgo;
-        break;
-      }
-      case "Fortnightly": {
-        const fortnightAgo = new Date(today);
-        fortnightAgo.setDate(fortnightAgo.getDate() - 14);
-        startDate = fortnightAgo;
-        break;
-      }
       case "Monthly": {
         if (selectedMonth) {
           // Filter by selected month
@@ -488,16 +477,22 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         }
         break;
       }
-      case "Half-yearly": {
-        const currentHalf = Math.floor(today.getMonth() / 6);
-        startDate = new Date(today.getFullYear(), currentHalf * 6, 1);
-        break;
+      case "Custom Date": {
+        if (customStartDate && customEndDate) {
+          return vouchers.filter((voucher) => {
+            const voucherDate = new Date(voucher.date);
+            const start = new Date(customStartDate);
+            const end = new Date(customEndDate);
+            return voucherDate >= start && voucherDate <= end;
+          });
+        }
+        return vouchers;
       }
       default:
         return vouchers;
     }
 
-    if ((viewType !== "Monthly" || !selectedMonth) && (viewType !== "Quarterly" || !selectedQuarter)) {
+    if ((viewType !== "Monthly" || !selectedMonth) && (viewType !== "Quarterly" || !selectedQuarter) && viewType !== "Custom Date") {
       return vouchers.filter((voucher) => {
         const voucherDate = new Date(voucher.date);
         return voucherDate >= startDate;
@@ -949,23 +944,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         }
 
         // Period filter logic
-        let periodMatch = true;
-        if (topPeriodFilter !== "all" && voucher.safeDate) {
-          const vDate = voucher.safeDate;
-          const today = new Date();
-          if (topPeriodFilter === "quarterly") {
-            const currentQuarter = Math.floor(today.getMonth() / 3);
-            const vQuarter = Math.floor(vDate.getMonth() / 3);
-            periodMatch = currentQuarter === vQuarter && vDate.getFullYear() === today.getFullYear();
-          } else if (topPeriodFilter === "yearly") {
-            periodMatch = vDate.getFullYear() === today.getFullYear();
-          } else if (topPeriodFilter.startsWith("month_")) {
-            const targetMonth = parseInt(topPeriodFilter.split("_")[1], 10);
-            periodMatch = vDate.getMonth() === targetMonth;
-          }
-        }
-
-        return searchMatch && dateMatch && statusMatch && gstMatch && periodMatch;
+        return searchMatch && dateMatch && statusMatch && gstMatch;
       });
 
       // Calculate groups
@@ -1619,35 +1598,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 </select>
               </div>
             )}
-
-            <div className="flex items-center">
-                <select
-                  id="period-filter"
-                  value={topPeriodFilter}
-                  onChange={(e) => setTopPeriodFilter(e.target.value as any)}
-                  className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm font-medium focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white shadow-sm cursor-pointer hover:border-gray-400 transition-colors"
-                  title="Filter by Period"
-                >
-                  <option value="all">All Time</option>
-                  <option value="quarterly">Quarterly</option>
-                  <option value="yearly">Yearly</option>
-                  <optgroup label="Monthly">
-                    <option value="month_3">April</option>
-                    <option value="month_4">May</option>
-                    <option value="month_5">June</option>
-                    <option value="month_6">July</option>
-                    <option value="month_7">August</option>
-                    <option value="month_8">September</option>
-                    <option value="month_9">October</option>
-                    <option value="month_10">November</option>
-                    <option value="month_11">December</option>
-                    <option value="month_0">January</option>
-                    <option value="month_1">February</option>
-                    <option value="month_2">March</option>
-                  </optgroup>
-                </select>
-              </div>
-
             <button
               onClick={() => setShowActions(!showActions)}
               className={`p-2 rounded-lg transition-colors ${showActions
@@ -1765,15 +1715,17 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   setSelectedMonth("");
                   setSelectedQuarter("");
                 }
+                if (newViewType !== "Custom Date") {
+                  setCustomStartDate("");
+                  setCustomEndDate("");
+                }
               }}
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="Daily">Daily</option>
-              <option value="Weekly">Weekly</option>
-              <option value="Fortnightly">Fortnightly</option>
               <option value="Monthly">Monthly</option>
               <option value="Quarterly">Quarterly</option>
-              <option value="Half-yearly">Half-yearly</option>
+              <option value="Custom Date">Custom Date</option>
             </select>
           </div>
           {viewType === "Monthly" && showMonthList && (
@@ -1821,7 +1773,42 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               </select>
             </div>
           )}
-          <div>
+          {viewType === "Custom Date" && (
+            <>
+              <div>
+                <label
+                  htmlFor="custom-start-date"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  Start Date
+                </label>
+                <input
+                  id="custom-start-date"
+                  type="date"
+                  value={customStartDate}
+                  onChange={(e) => setCustomStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+              <div>
+                <label
+                  htmlFor="custom-end-date"
+                  className="block text-sm font-medium text-gray-700 mb-1"
+                >
+                  End Date
+                </label>
+                <input
+                  id="custom-end-date"
+                  type="date"
+                  value={customEndDate}
+                  onChange={(e) => setCustomEndDate(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </>
+          )}
+          {viewType === "Daily" && (
+            <div>
             <label
               htmlFor="date-filter"
               className="block text-sm font-medium text-gray-700 mb-1"
@@ -1836,6 +1823,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
+          )}
           <div>
             <label
               htmlFor="status-filter"
