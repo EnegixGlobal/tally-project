@@ -184,6 +184,47 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   };
   // Initialize mock data
 
+  const getLedgerNameById = (ledgerId?: number | string) => {
+    if (!ledgerId) return "-";
+
+    if (voucherType === "stock_journal" || voucherType === "stock-journal") {
+      const item = stockItemList?.find((i: any) => String(i.id) === String(ledgerId));
+      if (item) return item.name;
+    }
+
+    const ledger = ledgerList.find((l) => String(l.id) === String(ledgerId));
+
+    return ledger ? ledger.name : `Unknown (${ledgerId})`;
+  };
+
+  const isFilterActive = !!(
+    searchTerm ||
+    dateFilter ||
+    statusFilter ||
+    (gstFilter !== "all") ||
+    (groupBy !== "none") ||
+    (viewType !== "Daily" && viewType !== "Custom Date") ||
+    (viewType === "Custom Date" && customStartDate && customEndDate)
+  );
+
+  // Reset page to 1 when any filter changes
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [
+    searchTerm,
+    dateFilter,
+    statusFilter,
+    gstFilter,
+    groupBy,
+    viewType,
+    selectedMonth,
+    selectedQuarter,
+    customStartDate,
+    customEndDate
+  ]);
+
+  const lastFetchedWithFilterRef = React.useRef(false);
+
   const getLedgerName = (ledgerId?: number | string) => {
     if (!ledgerId) return "Unknown (-)";
 
@@ -368,56 +409,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       .reduce((sum, entry) => sum + entry.amount, 0);
     return { debit, credit };
   };
-
-  //   if (voucherType === 'sales') {
-  //     // For sales register, show customer/party names (debit entries in sales)
-  //     const customerEntries = voucher.entries.filter(entry => entry.type === 'debit');
-  //     const customerNames = customerEntries.map(entry => {
-  //       if (!entry.ledgerId) return 'Cash Customer';
-
-  //       const parts = entry.ledgerId.split('-');
-  //       const ledgerType = parts[0] || 'Customer';
-  //       const ledgerNumber = parts[1] || '0';
-
-  //       // Customer names for sales vouchers
-  //       const customerNamesList = [
-  //         'ABC Enterprises', 'XYZ Pvt Ltd', 'Mahindra Corp', 'Tata Industries', 'Reliance Co',
-  //         'Bharti Telecom', 'HDFC Bank', 'ICICI Ltd', 'Bajaj Finance', 'L&T Construction',
-  //         'Wipro Systems', 'Infosys Ltd', 'TCS Solutions', 'HCL Tech', 'Tech Mahindra',
-  //         'Aditya Birla', 'ITC Limited', 'Hindustan Unilever', 'Asian Paints', 'UltraTech Cement',
-  //         'Maruti Suzuki', 'Hero MotoCorp', 'Bajaj Auto', 'TVS Motors', 'Royal Enfield'
-  //       ];
-
-  //       // For sales, show actual customer names
-  //       if (ledgerType.toLowerCase() === 'customer') {
-  //         const customerIndex = parseInt(ledgerNumber) - 1;
-  //         return customerNamesList[customerIndex % customerNamesList.length] || `Customer ${ledgerNumber}`;
-  //       } else if (ledgerType.toLowerCase() === 'cash') {
-  //         return 'Cash Sale';
-  //       } else {
-  //         const formattedType = ledgerType.charAt(0).toUpperCase() + ledgerType.slice(1);
-  //         return `${formattedType} ${ledgerNumber}`;
-  //       }
-  //     });
-
-  //     return customerNames.length > 0 ? customerNames.join(' / ') : 'Cash Sale';
-  //   } else {
-  //     // For other voucher types, show all ledger names
-  //     const ledgerNames = voucher.entries.map(entry => {
-  //       if (!entry.ledgerId) return 'Unknown Account';
-
-  //       const parts = entry.ledgerId.split('-');
-  //       const ledgerType = parts[0] || 'Unknown';
-  //       const ledgerNumber = parts[1] || '0';
-
-  //       // Capitalize first letter and format properly
-  //       const formattedType = ledgerType.charAt(0).toUpperCase() + ledgerType.slice(1);
-  //       return `${formattedType} A/c ${ledgerNumber}`;
-  //     });
-
-  //     return ledgerNames.join(' / ');
-  //   }
-  // };
 
   // Helper function to get available months from vouchers
   const getAvailableMonths = (): { value: string; label: string }[] => {
@@ -1283,59 +1274,53 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       fetchStockItems();
     }
   }, [companyId, ownerType, ownerId]);
-  //helper function to fetch party name/ ledger name
-  const getLedgerNameById = (ledgerId?: number | string) => {
-    if (!ledgerId) return "-";
-
-    if (voucherType === "stock_journal" || voucherType === "stock-journal") {
-      const item = stockItemList?.find((i: any) => String(i.id) === String(ledgerId));
-      if (item) return item.name;
-    }
-
-    const ledger = ledgerList.find((l) => String(l.id) === String(ledgerId));
-
-    return ledger ? ledger.name : `Unknown (${ledgerId})`;
-  };
 
   useEffect(() => {
     const loadVouchers = async () => {
       try {
+        if (isFilterActive && lastFetchedWithFilterRef.current) {
+          // We already have all data, and we are still filtering. No need to refetch on page change.
+          setLoading(false);
+          return;
+        }
+
         let url = "";
+        const paginationParams = isFilterActive ? "" : `&page=${currentPage}&limit=${itemsPerPage}`;
 
         // --- SALES VOUCHERS ---
         if (voucherType === "sales") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
+            }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}${paginationParams}`;
         }
 
         // --- QUOTATIONS ---
         else if (voucherType === "quotation") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&isQuotation=1&page=${currentPage}&limit=${itemsPerPage}`;
+            }/api/sales-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&isQuotation=1${paginationParams}`;
         }
 
         // --- PURCHASE VOUCHERS ---
         else if (voucherType === "purchase") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
+            }/api/purchase-vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}${paginationParams}`;
         } else if (voucherType === "sales_order") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
+            }/api/sales-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}${paginationParams}`;
         } else if (voucherType === "purchase_order") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
+            }/api/purchase-orders?companyId=${companyId}&ownerType=${ownerType}&ownerId=${ownerId}${paginationParams}`;
         } else if (voucherType === "receipt") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=receipt&page=${currentPage}&limit=${itemsPerPage}`;
+            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=receipt${paginationParams}`;
         } else if (voucherType === "contra") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=contra&page=${currentPage}&limit=${itemsPerPage}`;
+            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=contra${paginationParams}`;
         } else if (voucherType === "journal") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=journal&page=${currentPage}&limit=${itemsPerPage}`;
+            }/api/vouchers?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&voucherType=journal${paginationParams}`;
         } else if (voucherType === "stock_journal" || voucherType === "stock-journal") {
           url = `${import.meta.env.VITE_API_URL
-            }/api/StockJournal?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&page=${currentPage}&limit=${itemsPerPage}`;
+            }/api/StockJournal?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}${paginationParams}`;
         } else {
           console.warn("Unknown voucherType:", voucherType);
           return;
@@ -1360,6 +1345,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           else if (json.purchaseOrders) setVouchers(json.purchaseOrders);
           else setVouchers([]);
         }
+        lastFetchedWithFilterRef.current = isFilterActive;
       } catch (err) {
         console.error("Failed to fetch vouchers:", err);
       } finally {
@@ -1368,7 +1354,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     };
 
     loadVouchers();
-  }, [voucherType, companyId, ownerType, ownerId, currentPage, itemsPerPage]);
+  }, [voucherType, companyId, ownerType, ownerId, currentPage, itemsPerPage, isFilterActive]);
 
   const printSingleVoucher = (voucher: VoucherEntry) => {
     try {
