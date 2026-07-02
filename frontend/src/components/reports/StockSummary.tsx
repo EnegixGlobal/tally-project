@@ -777,6 +777,8 @@ const StockSummary: React.FC = () => {
 
         const category = groupMap[groupId].categories[categoryId];
         category.items.push(item);
+        if (!category.unitName && item.unitName) category.unitName = item.unitName;
+        if (!groupMap[groupId].unitName && item.unitName) groupMap[groupId].unitName = item.unitName;
 
         // Sum up item totals to category and group
         item.batches.forEach((b: any) => {
@@ -1992,7 +1994,7 @@ const StockSummary: React.FC = () => {
                         >
                           Particulars
                         </th>
-                        {(reportView === "All" || (reportView === "Categories" && (drillPath[drillPath.length - 1].type === "category" || drillPath[drillPath.length - 1].type === "item" || drillPath[drillPath.length - 1].type === "month"))) && (
+                        {(reportView === "All" || reportView === "Categories") && (
                           <>
                             <th
                               colSpan={3}
@@ -2041,7 +2043,7 @@ const StockSummary: React.FC = () => {
                             : "bg-gray-200 text-black"
                         }
                       >
-                        {(reportView === "All" || (reportView === "Categories" && (drillPath[drillPath.length - 1].type === "category" || drillPath[drillPath.length - 1].type === "item" || drillPath[drillPath.length - 1].type === "month"))) && (
+                        {(reportView === "All" || reportView === "Categories") && (
                           <>
                             {/* Opening */}
                             <th className={`border ${theme === "dark" ? "border-gray-500" : "border-gray-400"} p-1 text-center`}>Quantity</th>
@@ -2075,6 +2077,9 @@ const StockSummary: React.FC = () => {
                              return data.map((group: any, gIdx: number) => {
                                if (!group.isGroup) return null;
                                const groupTotals = group.totals || { openingQty: 0, openingValue: 0, inwardQty: 0, inwardValue: 0, outwardQty: 0, outwardValue: 0, closingQty: 0, closingValue: 0 };
+                               const groupOpRate = groupTotals.openingQty > 0 ? groupTotals.openingValue / groupTotals.openingQty : 0;
+                               const groupInRate = groupTotals.inwardQty > 0 ? groupTotals.inwardValue / groupTotals.inwardQty : 0;
+                               const groupOutRate = groupTotals.outwardQty > 0 ? groupTotals.outwardValue / groupTotals.outwardQty : 0;
                                const groupClRate = groupTotals.closingQty ? Math.abs(groupTotals.closingValue / groupTotals.closingQty) : 0;
                                return (
                                  <React.Fragment key={`g-${gIdx}`}>
@@ -2087,7 +2092,16 @@ const StockSummary: React.FC = () => {
                                          {group.name}
                                        </div>
                                      </td>
-                                     <td className="border p-2 text-right align-middle">{groupTotals.closingQty || ""}</td>
+                                     <td className="border p-2 text-right align-middle">{groupTotals.openingQty ? `${groupTotals.openingQty} ${group.unitName || ""}`.trim() : ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(groupOpRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(groupTotals.openingValue)}</td>
+                                     <td className="border p-2 text-right align-middle">{groupTotals.inwardQty ? `${groupTotals.inwardQty} ${group.unitName || ""}`.trim() : ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(groupInRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(groupTotals.inwardValue)}</td>
+                                     <td className="border p-2 text-right align-middle">{groupTotals.outwardQty ? `${groupTotals.outwardQty} ${group.unitName || ""}`.trim() : ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(groupOutRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(groupTotals.outwardValue)}</td>
+                                     <td className="border p-2 text-right align-middle">{groupTotals.closingQty ? `${groupTotals.closingQty} ${group.unitName || ""}`.trim() : ""}</td>
                                      <td className="border p-2 text-right align-middle">{formatCurrency(groupClRate)}</td>
                                      <td className="border p-2 text-right align-middle">{formatCurrency(groupTotals.closingValue)}</td>
                                    </tr>
@@ -2099,6 +2113,9 @@ const StockSummary: React.FC = () => {
                              if (!group) return null;
                              return group.categories.map((category: any, cIdx: number) => {
                                const catTotals = category.totals;
+                               const catOpRate = catTotals.openingQty > 0 ? catTotals.openingValue / catTotals.openingQty : 0;
+                               const catInRate = catTotals.inwardQty > 0 ? catTotals.inwardValue / catTotals.inwardQty : 0;
+                               const catOutRate = catTotals.outwardQty > 0 ? catTotals.outwardValue / catTotals.outwardQty : 0;
                                const catClRate = catTotals.closingQty ? Math.abs(catTotals.closingValue / catTotals.closingQty) : 0;
                                return (
                                  <React.Fragment key={`c-${cIdx}`}>
@@ -2111,7 +2128,16 @@ const StockSummary: React.FC = () => {
                                          {category.name}
                                        </div>
                                      </td>
-                                     <td className="border p-2 text-right align-middle">{catTotals.closingQty || ""}</td>
+                                     <td className="border p-2 text-right align-middle">{catTotals.openingQty ? `${catTotals.openingQty} ${category.unitName || ""}`.trim() : ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(catOpRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(catTotals.openingValue)}</td>
+                                     <td className="border p-2 text-right align-middle">{catTotals.inwardQty ? `${catTotals.inwardQty} ${category.unitName || ""}`.trim() : ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(catInRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(catTotals.inwardValue)}</td>
+                                     <td className="border p-2 text-right align-middle">{catTotals.outwardQty ? `${catTotals.outwardQty} ${category.unitName || ""}`.trim() : ""}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(catOutRate)}</td>
+                                     <td className="border p-2 text-right align-middle">{formatCurrency(catTotals.outwardValue)}</td>
+                                     <td className="border p-2 text-right align-middle">{catTotals.closingQty ? `${catTotals.closingQty} ${category.unitName || ""}`.trim() : ""}</td>
                                      <td className="border p-2 text-right align-middle">{formatCurrency(catClRate)}</td>
                                      <td className="border p-2 text-right align-middle">{formatCurrency(catTotals.closingValue)}</td>
                                    </tr>
@@ -2393,16 +2419,17 @@ const StockSummary: React.FC = () => {
                         // Calculate average rates
                         const safeRate = (val: number, qty: number) =>
                           qty !== 0 ? val / qty : 0;
+                        const repUnit = data[0]?.unitName || (data[0]?.categories?.[0]?.unitName) || "";
 
                         return (
                           <tr className="font-bold bg-gray-200">
                             <td className="border p-2">Grand Total</td>
 
-                            {(reportView === "All" || (reportView === "Categories" && (drillPath[drillPath.length - 1].type === "category" || drillPath[drillPath.length - 1].type === "item" || drillPath[drillPath.length - 1].type === "month"))) && (
+                            {(reportView === "All" || reportView === "Categories") && (
                               <>
                                 {/* Opening */}
                                 <td className="border p-2 text-right align-middle">
-                                  {grand.openingQty || ""}
+                                  {grand.openingQty ? `${grand.openingQty} ${repUnit}`.trim() : ""}
                                 </td>
                                 <td className="border p-2 text-right align-middle">
                                   {/* Rate */}
@@ -2413,7 +2440,7 @@ const StockSummary: React.FC = () => {
 
                                 {/* Inward */}
                                 <td className="border p-2 text-right align-middle">
-                                  {grand.inwardQty || ""}
+                                  {grand.inwardQty ? `${grand.inwardQty} ${repUnit}`.trim() : ""}
                                 </td>
                                 <td className="border p-2 text-right align-middle">
                                   {/* Rate */}
@@ -2424,7 +2451,7 @@ const StockSummary: React.FC = () => {
 
                                 {/* Outward */}
                                 <td className="border p-2 text-right align-middle">
-                                  {grand.outwardQty || ""}
+                                  {grand.outwardQty ? `${grand.outwardQty} ${repUnit}`.trim() : ""}
                                 </td>
                                 <td className="border p-2 text-right align-middle">
                                   {/* Rate */}
@@ -2437,7 +2464,7 @@ const StockSummary: React.FC = () => {
 
                             {/* Closing */}
                             <td className="border p-2 text-right align-middle">
-                              {grand.closingQty || ""}
+                              {grand.closingQty ? `${grand.closingQty} ${repUnit}`.trim() : ""}
                             </td>
                             <td className="border p-2 text-right align-middle">
                               {/* Rate */}
