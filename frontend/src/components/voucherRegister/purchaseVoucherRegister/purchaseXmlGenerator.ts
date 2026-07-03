@@ -118,52 +118,112 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
           }
         }
       } else {
-        // If no items, just add ledger entry
-        const pLedger = ledgers.find((l: any) => String(l.id) === String(voucherData.purchaseLedgerId));
-        const pLedgerName = pLedger?.name || "Purchase A/c";
-        
-        ledgerEntriesXml += `
-            <!-- Purchase -->
+        // Accounting Invoice mode: Use voucherData.entries directly
+        const entries = voucherData.entries || [];
+        entries.forEach((entry: any) => {
+            const l = ledgers.find((ld: any) => String(ld.id) === String(entry.ledgerId));
+            const lName = l?.name || "Unknown Ledger";
+            if (lName === partyName) return; // Party is already handled
+
+            const isDebit = entry.entryType === 'debit' || entry.type === 'debit';
+            const amt = Number(entry.amount) || 0;
+            
+            ledgerEntriesXml += `
+            <!-- Accounting Entry -->
             <ALLLEDGERENTRIES.LIST>
-                <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-                <LEDGERNAME>${pLedgerName}</LEDGERNAME>
-                <AMOUNT>-${Number(voucherData.subtotal).toFixed(2)}</AMOUNT>
+                <ISDEEMEDPOSITIVE>${isDebit ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
+                <LEDGERNAME>${lName}</LEDGERNAME>
+                <AMOUNT>${isDebit ? '-' : ''}${amt.toFixed(2)}</AMOUNT>
             </ALLLEDGERENTRIES.LIST>`;
+        });
       }
     }
 
-    // Taxes
-    const cgst = Number(voucherData.cgstTotal) || 0;
-    if (cgst > 0) {
-      ledgerEntriesXml += `
+    // Taxes (Only for item-invoice, as accounting-invoice handles it via entries)
+    if (voucherData.items && voucherData.items.length > 0) {
+      let cgstName = "Cgst";
+      let sgstName = "Sgst";
+      let igstName = "Igst";
+      
+      let cgstRate = 0;
+      let sgstRate = 0;
+      let igstRate = 0;
+      
+      const allEntries = [...(voucherData.items || []), ...(voucherData.entries || [])];
+      for (const item of allEntries) {
+        if (item.cgstRate) cgstRate = Number(item.cgstRate);
+        if (item.sgstRate) sgstRate = Number(item.sgstRate);
+        if (item.igstRate) igstRate = Number(item.igstRate);
+
+        if (item.cgstLedgerId && cgstName === "Cgst") {
+          const l = ledgers.find((ld: any) => String(ld.id) === String(item.cgstLedgerId));
+          if (l) cgstName = l.name;
+        }
+        if (item.sgstLedgerId && sgstName === "Sgst") {
+          const l = ledgers.find((ld: any) => String(ld.id) === String(item.sgstLedgerId));
+          if (l) sgstName = l.name;
+        }
+        if (item.igstLedgerId && igstName === "Igst") {
+          const l = ledgers.find((ld: any) => String(ld.id) === String(item.igstLedgerId));
+          if (l) igstName = l.name;
+        }
+      }
+      
+      if (cgstRate === 0 && Number(voucherData.cgstTotal) > 0 && Number(voucherData.subtotal) > 0) {
+        cgstRate = Math.round((Number(voucherData.cgstTotal) / Number(voucherData.subtotal)) * 100);
+      }
+      if (sgstRate === 0 && Number(voucherData.sgstTotal) > 0 && Number(voucherData.subtotal) > 0) {
+        sgstRate = Math.round((Number(voucherData.sgstTotal) / Number(voucherData.subtotal)) * 100);
+      }
+      if (igstRate === 0 && Number(voucherData.igstTotal) > 0 && Number(voucherData.subtotal) > 0) {
+        igstRate = Math.round((Number(voucherData.igstTotal) / Number(voucherData.subtotal)) * 100);
+      }
+      
+      if (cgstName === "Cgst" && cgstRate > 0) {
+        const match = ledgers.find((l: any) => l.name.toLowerCase().includes('cgst') && l.name.includes(String(cgstRate)));
+        cgstName = match ? match.name : `${cgstRate}% Cgst`;
+      }
+      if (sgstName === "Sgst" && sgstRate > 0) {
+        const match = ledgers.find((l: any) => l.name.toLowerCase().includes('sgst') && l.name.includes(String(sgstRate)));
+        sgstName = match ? match.name : `${sgstRate}% Sgst`;
+      }
+      if (igstName === "Igst" && igstRate > 0) {
+        const match = ledgers.find((l: any) => l.name.toLowerCase().includes('igst') && l.name.includes(String(igstRate)));
+        igstName = match ? match.name : `${igstRate}% Igst`;
+      }
+
+      const cgst = Number(voucherData.cgstTotal) || 0;
+      if (cgst > 0) {
+        ledgerEntriesXml += `
             <!-- CGST -->
             <ALLLEDGERENTRIES.LIST>
                 <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-                <LEDGERNAME>CGST</LEDGERNAME>
+                <LEDGERNAME>${cgstName}</LEDGERNAME>
                 <AMOUNT>-${cgst.toFixed(2)}</AMOUNT>
             </ALLLEDGERENTRIES.LIST>`;
-    }
+      }
 
-    const sgst = Number(voucherData.sgstTotal) || 0;
-    if (sgst > 0) {
-      ledgerEntriesXml += `
+      const sgst = Number(voucherData.sgstTotal) || 0;
+      if (sgst > 0) {
+        ledgerEntriesXml += `
             <!-- SGST -->
             <ALLLEDGERENTRIES.LIST>
                 <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-                <LEDGERNAME>SGST</LEDGERNAME>
+                <LEDGERNAME>${sgstName}</LEDGERNAME>
                 <AMOUNT>-${sgst.toFixed(2)}</AMOUNT>
             </ALLLEDGERENTRIES.LIST>`;
-    }
-    
-    const igst = Number(voucherData.igstTotal) || 0;
-    if (igst > 0) {
-      ledgerEntriesXml += `
+      }
+      
+      const igst = Number(voucherData.igstTotal) || 0;
+      if (igst > 0) {
+        ledgerEntriesXml += `
             <!-- IGST -->
             <ALLLEDGERENTRIES.LIST>
                 <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-                <LEDGERNAME>IGST</LEDGERNAME>
+                <LEDGERNAME>${igstName}</LEDGERNAME>
                 <AMOUNT>-${igst.toFixed(2)}</AMOUNT>
             </ALLLEDGERENTRIES.LIST>`;
+      }
     }
 
     tallyMessages += `
