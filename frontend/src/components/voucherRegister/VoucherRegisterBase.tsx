@@ -413,9 +413,6 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   // Helper function to get available months from vouchers
   const getAvailableMonths = (): { value: string; label: string }[] => {
     const months = [
-      { value: "01", label: "January" },
-      { value: "02", label: "February" },
-      { value: "03", label: "March" },
       { value: "04", label: "April" },
       { value: "05", label: "May" },
       { value: "06", label: "June" },
@@ -425,6 +422,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       { value: "10", label: "October" },
       { value: "11", label: "November" },
       { value: "12", label: "December" },
+      { value: "01", label: "January" },
+      { value: "02", label: "February" },
+      { value: "03", label: "March" },
     ];
     return months;
   };
