@@ -839,8 +839,15 @@ const SalesVoucher: React.FC = () => {
         }
 
         // 🔥 DIRECT FROM BACKEND
+        const toLocalDateStr = (isoString: string) => {
+          if (!isoString) return "";
+          const d = new Date(isoString);
+          if (isNaN(d.getTime())) return "";
+          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+        };
+
         setFormData({
-          date: data.date?.split("T")[0] || "",
+          date: toLocalDateStr(data.date) || "",
 
           number: data.number || "",
 

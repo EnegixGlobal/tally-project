@@ -991,6 +991,13 @@ const PurchaseVoucher: React.FC = () => {
 
     const fetchId = id || copyId;
 
+    const toLocalDateStr = (isoString: string) => {
+      if (!isoString) return "";
+      const d = new Date(isoString);
+      if (isNaN(d.getTime())) return "";
+      return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    };
+
     fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/${fetchId}`)
       .then((res) => res.json())
       .then((data) => {
@@ -999,9 +1006,9 @@ const PurchaseVoucher: React.FC = () => {
           ...prev,
 
           // MAIN FIELDS
-          date: id ? (data.date ? data.date.split("T")[0] : "") : defaultDate,
+          date: id ? (data.date ? toLocalDateStr(data.date) : "") : defaultDate,
           supplierInvoiceDate: data.supplierInvoiceDate
-            ? data.supplierInvoiceDate.split("T")[0]
+            ? toLocalDateStr(data.supplierInvoiceDate)
             : "",
           referenceNo: data.referenceNo || "",
           partyId: data.partyId || "",
