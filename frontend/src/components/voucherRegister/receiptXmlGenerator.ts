@@ -38,55 +38,44 @@ export const generateBulkReceiptXmlContent = (vouchersData: any[], companyName: 
       const amount = Number(entry.amount) || 0;
       
       ledgerEntriesXml += `
-  <ALLLEDGERENTRIES.LIST>
-   <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
-   <ISDEEMEDPOSITIVE>${isDebit ? "Yes" : "No"}</ISDEEMEDPOSITIVE>
-   <LEDGERFROMITEM>No</LEDGERFROMITEM>
-   <LEDGERNAME>${ledgerName}</LEDGERNAME>
-   <AMOUNT>${isDebit ? "-" + amount.toFixed(2) : amount.toFixed(2)}</AMOUNT>
-  </ALLLEDGERENTRIES.LIST>`;
+            <ALLLEDGERENTRIES.LIST>
+                <ISDEEMEDPOSITIVE>${isDebit ? "Yes" : "No"}</ISDEEMEDPOSITIVE>
+                <LEDGERNAME>${ledgerName}</LEDGERNAME>
+                <AMOUNT>${isDebit ? "-" : ""}${amount.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>`;
     });
 
+    const narration = voucherData.narration || "Imported From Software";
+    
     tallyMessages += `
-<TALLYMESSAGE xmlns:UDF="TallyUDF">
- <VOUCHER REMOTEID="${guid}" VCHTYPE="${vchTypeName}" ACTION="Create">
-  <ISOPTIONAL>No</ISOPTIONAL>
-  <USEFORGAINLOSS>No</USEFORGAINLOSS>
-  <USEFORCOMPOUND>No</USEFORCOMPOUND>
-  <VOUCHERTYPENAME>${vchTypeName}</VOUCHERTYPENAME>
-  <DATE>${voucherDate}</DATE>
-  <EFFECTIVEDATE>${voucherDate}</EFFECTIVEDATE>
-  <ISCANCELLED>No</ISCANCELLED>
-  <USETRACKINGNUMBER>No</USETRACKINGNUMBER>
-  <ISPOSTDATED>No</ISPOSTDATED>
-  <ISINVOICE>No</ISINVOICE>
-  <DIFFACTUALQTY>No</DIFFACTUALQTY>
-  <VOUCHERNUMBER>${voucherNumber}</VOUCHERNUMBER>
-  <PARTYLEDGERNAME>${partyLedgerName}</PARTYLEDGERNAME>
-  <ASPAYSLIP>No</ASPAYSLIP>
-  <GUID>${guid}</GUID>
-  <ALTERID> ${voucherData.id}</ALTERID>
-  <UDF:HARYANAVAT.LIST DESC="\`HARYANAVAT\`">
-  </UDF:HARYANAVAT.LIST>${ledgerEntriesXml}
- </VOUCHER>
-</TALLYMESSAGE>`;
+        <TALLYMESSAGE xmlns:UDF="TallyUDF">
+          <VOUCHER VCHTYPE="${vchTypeName}" ACTION="Create">
+            <VOUCHERTYPENAME>${vchTypeName}</VOUCHERTYPENAME>
+            <DATE>${voucherDate}</DATE>
+            <EFFECTIVEDATE>${voucherDate}</EFFECTIVEDATE>
+            <VOUCHERNUMBER>${voucherNumber}</VOUCHERNUMBER>
+            <PARTYNAME>${partyLedgerName}</PARTYNAME>
+            <PARTYLEDGERNAME>${partyLedgerName}</PARTYLEDGERNAME>
+            <NARRATION>${narration}</NARRATION>${ledgerEntriesXml}
+          </VOUCHER>
+        </TALLYMESSAGE>`;
   }
 
   return `<ENVELOPE>
-<HEADER>
-<TALLYREQUEST>Import Data</TALLYREQUEST>
-</HEADER>
-<BODY>
-<IMPORTDATA>
-<REQUESTDESC>
-<REPORTNAME>All Masters</REPORTNAME>
-<STATICVARIABLES>
-<SVCURRENTCOMPANY>${companyName}</SVCURRENTCOMPANY>
-</STATICVARIABLES>
-</REQUESTDESC>
-<REQUESTDATA>${tallyMessages}
-</REQUESTDATA>
-</IMPORTDATA>
-</BODY>
+  <HEADER>
+    <TALLYREQUEST>Import Data</TALLYREQUEST>
+  </HEADER>
+  <BODY>
+    <IMPORTDATA>
+      <REQUESTDESC>
+        <REPORTNAME>Vouchers</REPORTNAME>
+        <STATICVARIABLES>
+          <SVCURRENTCOMPANY>${companyName}</SVCURRENTCOMPANY>
+        </STATICVARIABLES>
+      </REQUESTDESC>
+      <REQUESTDATA>${tallyMessages}
+      </REQUESTDATA>
+    </IMPORTDATA>
+  </BODY>
 </ENVELOPE>`;
 };
