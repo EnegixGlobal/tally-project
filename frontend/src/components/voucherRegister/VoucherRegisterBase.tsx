@@ -912,8 +912,9 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           safeRef.includes(searchTerm.toLowerCase());
 
         // Date filter
-        const formattedVoucherDate =
-          voucher.safeDate?.toISOString().slice(0, 10) || "";
+        const formattedVoucherDate = voucher.safeDate
+          ? `${voucher.safeDate.getFullYear()}-${String(voucher.safeDate.getMonth() + 1).padStart(2, "0")}-${String(voucher.safeDate.getDate()).padStart(2, "0")}`
+          : "";
         const dateMatch = !dateFilter || formattedVoucherDate === dateFilter;
 
         // Status filter
