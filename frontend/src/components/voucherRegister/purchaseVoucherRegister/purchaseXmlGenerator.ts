@@ -14,13 +14,12 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
 
   for (const voucherData of vouchersData) {
     const voucherDate = formatTallyDate(voucherData.date);
-    const guid = voucherData.guid || `voucher-${voucherData.id}`;
     
     // Find party ledger in ledgers array as fallback
     const partyLedger = ledgers.find((l: any) => String(l.id) === String(voucherData.partyId));
     const partyName = voucherData.partyName || partyLedger?.name || voucherData.party?.name || "";
     
-    const narration = voucherData.narration || "";
+    const narration = voucherData.narration || "Imported From Software";
     const voucherNumber = voucherData.number || voucherData.id;
 
     // Let's build the ledger entries
@@ -28,16 +27,13 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
     
     // Credit the party
     ledgerEntriesXml += `
-  <ALLLEDGERENTRIES.LIST>
-   <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
-   <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
-   <LEDGERFROMITEM>No</LEDGERFROMITEM>
-   <LEDGERNAME>${partyName}</LEDGERNAME>
-   <AMOUNT>${voucherData.total}</AMOUNT>
-  </ALLLEDGERENTRIES.LIST>
-  `;
+            <!-- Party Ledger -->
+            <ALLLEDGERENTRIES.LIST>
+                <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>
+                <LEDGERNAME>${partyName}</LEDGERNAME>
+                <AMOUNT>${voucherData.total}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>`;
 
-    // Debit the purchase ledger
     // Debit the purchase ledger
     const mode = voucherData.mode || "item-invoice";
     const entries = voucherData.entries || voucherData.items || [];
@@ -45,19 +41,23 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
     if (mode === "accounting-invoice") {
       // In accounting mode, entries are ledger entries, not items
       entries.forEach((entry: any) => {
+        // Skip party ledger to avoid duplicate since we already generated it above
+        if (String(entry.ledgerId) === String(voucherData.partyId)) {
+          return;
+        }
+        
         if (entry.entryType === "debit" || Number(entry.amount) > 0) {
           const ledgerObj = ledgers.find((l: any) => String(l.id) === String(entry.ledgerId));
           const ledgerName = ledgerObj?.name || "Purchase A/c";
           const amt = Number(entry.amount) || 0;
           
           ledgerEntriesXml += `
-  <ALLLEDGERENTRIES.LIST>
-   <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
-   <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-   <LEDGERFROMITEM>No</LEDGERFROMITEM>
-   <LEDGERNAME>${ledgerName}</LEDGERNAME>
-   <AMOUNT>-${amt.toFixed(2)}</AMOUNT>
-  </ALLLEDGERENTRIES.LIST>`;
+            <!-- Purchase -->
+            <ALLLEDGERENTRIES.LIST>
+                <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                <LEDGERNAME>${ledgerName}</LEDGERNAME>
+                <AMOUNT>-${amt.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>`;
         }
       });
     } else {
@@ -84,134 +84,178 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
           const unit = item.unit || "nos";
           
           purchaseLedgerGroups[pLedgerName].xml += `
-   <INVENTORYALLOCATIONS.LIST>
-    <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-    <STOCKITEMNAME>${item.itemName || item.item?.name || item.name || ""}</STOCKITEMNAME>
-    <AMOUNT>-${amount.toFixed(2)}</AMOUNT>
-    <ACTUALQTY> ${qty} ${unit}</ACTUALQTY>
-    <BILLEDQTY> ${qty} ${unit}</BILLEDQTY>
-    <RATE>${rate}/${unit}</RATE>
-    <BATCHALLOCATIONS.LIST>
-     <TRACKINGNUMBER/>
-     <BATCHNAME>Primary Batch</BATCHNAME>
-     <GODOWNNAME>Main Location</GODOWNNAME>
-     <MFDON>${voucherDate}</MFDON>
-     <EXPIRYPERIOD/>
-     <AMOUNT>-${amount.toFixed(2)}</AMOUNT>
-     <ACTUALQTY> ${qty} ${unit}</ACTUALQTY>
-     <BILLEDQTY> ${qty} ${unit}</BILLEDQTY>
-     <ORDERNO/>
-    </BATCHALLOCATIONS.LIST>
-   </INVENTORYALLOCATIONS.LIST>`;
+                <INVENTORYALLOCATIONS.LIST>
+                    <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                    <STOCKITEMNAME>${item.itemName || item.item?.name || item.name || ""}</STOCKITEMNAME>
+                    <AMOUNT>-${amount.toFixed(2)}</AMOUNT>
+                    <ACTUALQTY> ${qty} ${unit}</ACTUALQTY>
+                    <BILLEDQTY> ${qty} ${unit}</BILLEDQTY>
+                    <RATE>${rate}/${unit}</RATE>
+                    <BATCHALLOCATIONS.LIST>
+                        <TRACKINGNUMBER/>
+                        <BATCHNAME>Primary Batch</BATCHNAME>
+                        <GODOWNNAME>Main Location</GODOWNNAME>
+                        <MFDON>${voucherDate}</MFDON>
+                        <EXPIRYPERIOD/>
+                        <AMOUNT>-${amount.toFixed(2)}</AMOUNT>
+                        <ACTUALQTY> ${qty} ${unit}</ACTUALQTY>
+                        <BILLEDQTY> ${qty} ${unit}</BILLEDQTY>
+                        <ORDERNO/>
+                    </BATCHALLOCATIONS.LIST>
+                </INVENTORYALLOCATIONS.LIST>`;
         });
 
         // Add ALLLEDGERENTRIES for each purchase ledger group
         for (const group of Object.values(purchaseLedgerGroups)) {
           if (group.amount > 0) {
             ledgerEntriesXml += `
-  <ALLLEDGERENTRIES.LIST>
-   <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
-   <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-   <LEDGERFROMITEM>No</LEDGERFROMITEM>
-   <LEDGERNAME>${group.name}</LEDGERNAME>
-   <AMOUNT>-${group.amount.toFixed(2)}</AMOUNT>${group.xml}
-  </ALLLEDGERENTRIES.LIST>`;
+            <!-- Purchase -->
+            <ALLLEDGERENTRIES.LIST>
+                <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                <LEDGERNAME>${group.name}</LEDGERNAME>
+                <AMOUNT>-${group.amount.toFixed(2)}</AMOUNT>${group.xml}
+            </ALLLEDGERENTRIES.LIST>`;
           }
         }
       } else {
-        // If no items, just add ledger entry
-        const pLedger = ledgers.find((l: any) => String(l.id) === String(voucherData.purchaseLedgerId));
-        const pLedgerName = pLedger?.name || "Purchase A/c";
-        
-        ledgerEntriesXml += `
-  <ALLLEDGERENTRIES.LIST>
-   <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
-   <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-   <LEDGERFROMITEM>No</LEDGERFROMITEM>
-   <LEDGERNAME>${pLedgerName}</LEDGERNAME>
-   <AMOUNT>-${Number(voucherData.subtotal).toFixed(2)}</AMOUNT>
-  </ALLLEDGERENTRIES.LIST>`;
+        // Accounting Invoice mode: Use voucherData.entries directly
+        const entries = voucherData.entries || [];
+        entries.forEach((entry: any) => {
+            const l = ledgers.find((ld: any) => String(ld.id) === String(entry.ledgerId));
+            const lName = l?.name || "Unknown Ledger";
+            if (lName === partyName) return; // Party is already handled
+
+            const isDebit = entry.entryType === 'debit' || entry.type === 'debit';
+            const amt = Number(entry.amount) || 0;
+            
+            ledgerEntriesXml += `
+            <!-- Accounting Entry -->
+            <ALLLEDGERENTRIES.LIST>
+                <ISDEEMEDPOSITIVE>${isDebit ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
+                <LEDGERNAME>${lName}</LEDGERNAME>
+                <AMOUNT>${isDebit ? '-' : ''}${amt.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>`;
+        });
       }
     }
 
-    // Taxes
-    const cgst = Number(voucherData.cgstTotal) || 0;
-    if (cgst > 0) {
-      ledgerEntriesXml += `
-  <ALLLEDGERENTRIES.LIST>
-   <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
-   <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-   <LEDGERFROMITEM>No</LEDGERFROMITEM>
-   <LEDGERNAME>CGST</LEDGERNAME>
-   <AMOUNT>-${cgst.toFixed(2)}</AMOUNT>
-  </ALLLEDGERENTRIES.LIST>`;
-    }
+    // Taxes (Only for item-invoice, as accounting-invoice handles it via entries)
+    if (voucherData.items && voucherData.items.length > 0) {
+      let cgstName = "Cgst";
+      let sgstName = "Sgst";
+      let igstName = "Igst";
+      
+      let cgstRate = 0;
+      let sgstRate = 0;
+      let igstRate = 0;
+      
+      const allEntries = [...(voucherData.items || []), ...(voucherData.entries || [])];
+      for (const item of allEntries) {
+        if (item.cgstRate) cgstRate = Number(item.cgstRate);
+        if (item.sgstRate) sgstRate = Number(item.sgstRate);
+        if (item.igstRate) igstRate = Number(item.igstRate);
 
-    const sgst = Number(voucherData.sgstTotal) || 0;
-    if (sgst > 0) {
-      ledgerEntriesXml += `
-  <ALLLEDGERENTRIES.LIST>
-   <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
-   <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-   <LEDGERFROMITEM>No</LEDGERFROMITEM>
-   <LEDGERNAME>SGST</LEDGERNAME>
-   <AMOUNT>-${sgst.toFixed(2)}</AMOUNT>
-  </ALLLEDGERENTRIES.LIST>`;
-    }
-    
-    const igst = Number(voucherData.igstTotal) || 0;
-    if (igst > 0) {
-      ledgerEntriesXml += `
-  <ALLLEDGERENTRIES.LIST>
-   <REMOVEZEROENTRIES>No</REMOVEZEROENTRIES>
-   <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
-   <LEDGERFROMITEM>No</LEDGERFROMITEM>
-   <LEDGERNAME>IGST</LEDGERNAME>
-   <AMOUNT>-${igst.toFixed(2)}</AMOUNT>
-  </ALLLEDGERENTRIES.LIST>`;
+        if (item.cgstLedgerId && cgstName === "Cgst") {
+          const l = ledgers.find((ld: any) => String(ld.id) === String(item.cgstLedgerId));
+          if (l) cgstName = l.name;
+        }
+        if (item.sgstLedgerId && sgstName === "Sgst") {
+          const l = ledgers.find((ld: any) => String(ld.id) === String(item.sgstLedgerId));
+          if (l) sgstName = l.name;
+        }
+        if (item.igstLedgerId && igstName === "Igst") {
+          const l = ledgers.find((ld: any) => String(ld.id) === String(item.igstLedgerId));
+          if (l) igstName = l.name;
+        }
+      }
+      
+      if (cgstRate === 0 && Number(voucherData.cgstTotal) > 0 && Number(voucherData.subtotal) > 0) {
+        cgstRate = Math.round((Number(voucherData.cgstTotal) / Number(voucherData.subtotal)) * 100);
+      }
+      if (sgstRate === 0 && Number(voucherData.sgstTotal) > 0 && Number(voucherData.subtotal) > 0) {
+        sgstRate = Math.round((Number(voucherData.sgstTotal) / Number(voucherData.subtotal)) * 100);
+      }
+      if (igstRate === 0 && Number(voucherData.igstTotal) > 0 && Number(voucherData.subtotal) > 0) {
+        igstRate = Math.round((Number(voucherData.igstTotal) / Number(voucherData.subtotal)) * 100);
+      }
+      
+      if (cgstName === "Cgst" && cgstRate > 0) {
+        const match = ledgers.find((l: any) => l.name.toLowerCase().includes('cgst') && l.name.includes(String(cgstRate)));
+        cgstName = match ? match.name : `${cgstRate}% Cgst`;
+      }
+      if (sgstName === "Sgst" && sgstRate > 0) {
+        const match = ledgers.find((l: any) => l.name.toLowerCase().includes('sgst') && l.name.includes(String(sgstRate)));
+        sgstName = match ? match.name : `${sgstRate}% Sgst`;
+      }
+      if (igstName === "Igst" && igstRate > 0) {
+        const match = ledgers.find((l: any) => l.name.toLowerCase().includes('igst') && l.name.includes(String(igstRate)));
+        igstName = match ? match.name : `${igstRate}% Igst`;
+      }
+
+      const cgst = Number(voucherData.cgstTotal) || 0;
+      if (cgst > 0) {
+        ledgerEntriesXml += `
+            <!-- CGST -->
+            <ALLLEDGERENTRIES.LIST>
+                <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                <LEDGERNAME>${cgstName}</LEDGERNAME>
+                <AMOUNT>-${cgst.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>`;
+      }
+
+      const sgst = Number(voucherData.sgstTotal) || 0;
+      if (sgst > 0) {
+        ledgerEntriesXml += `
+            <!-- SGST -->
+            <ALLLEDGERENTRIES.LIST>
+                <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                <LEDGERNAME>${sgstName}</LEDGERNAME>
+                <AMOUNT>-${sgst.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>`;
+      }
+      
+      const igst = Number(voucherData.igstTotal) || 0;
+      if (igst > 0) {
+        ledgerEntriesXml += `
+            <!-- IGST -->
+            <ALLLEDGERENTRIES.LIST>
+                <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                <LEDGERNAME>${igstName}</LEDGERNAME>
+                <AMOUNT>-${igst.toFixed(2)}</AMOUNT>
+            </ALLLEDGERENTRIES.LIST>`;
+      }
     }
 
     tallyMessages += `
-<TALLYMESSAGE xmlns:UDF="TallyUDF">
- <VOUCHER REMOTEID="${guid}" VCHTYPE="Purchase" ACTION="Create">
-  <ISOPTIONAL>No</ISOPTIONAL>
-  <USEFORGAINLOSS>No</USEFORGAINLOSS>
-  <USEFORCOMPOUND>No</USEFORCOMPOUND>
-  <VOUCHERTYPENAME>Purchase</VOUCHERTYPENAME>
-  <DATE>${voucherDate}</DATE>
-  <EFFECTIVEDATE>${voucherDate}</EFFECTIVEDATE>
-  <ISCANCELLED>No</ISCANCELLED>
-  <USETRACKINGNUMBER>No</USETRACKINGNUMBER>
-  <ISPOSTDATED>No</ISPOSTDATED>
-  <ISINVOICE>No</ISINVOICE>
-  <DIFFACTUALQTY>No</DIFFACTUALQTY>
-  <VOUCHERNUMBER>${voucherNumber}</VOUCHERNUMBER>
-  <PARTYNAME>${partyName}</PARTYNAME>
-  <PARTYLEDGERNAME>${partyName}</PARTYLEDGERNAME>
-  <NARRATION>${narration}</NARRATION>
-  <ASPAYSLIP>No</ASPAYSLIP>
-  <GUID>${guid}</GUID>
-  <ALTERID> ${voucherData.id}</ALTERID>${ledgerEntriesXml}
- </VOUCHER>
-</TALLYMESSAGE>`;
+        <TALLYMESSAGE xmlns:UDF="TallyUDF">
+          <VOUCHER VCHTYPE="Purchase" ACTION="Create">
+            <VOUCHERTYPENAME>Purchase</VOUCHERTYPENAME>
+            <DATE>${voucherDate}</DATE>
+            <EFFECTIVEDATE>${voucherDate}</EFFECTIVEDATE>
+            <VOUCHERNUMBER>${voucherNumber}</VOUCHERNUMBER>
+            <PARTYNAME>${partyName}</PARTYNAME>
+            <PARTYLEDGERNAME>${partyName}</PARTYLEDGERNAME>
+            <NARRATION>${narration}</NARRATION>${ledgerEntriesXml}
+          </VOUCHER>
+        </TALLYMESSAGE>`;
   }
 
-
   return `<ENVELOPE>
-<HEADER>
-<TALLYREQUEST>Import Data</TALLYREQUEST>
-</HEADER>
-<BODY>
-<IMPORTDATA>
-<REQUESTDESC>
-<REPORTNAME>All Masters</REPORTNAME>
-<STATICVARIABLES>
-<SVCURRENTCOMPANY>${companyName}</SVCURRENTCOMPANY>
-</STATICVARIABLES>
-</REQUESTDESC>
-<REQUESTDATA>${tallyMessages}
-</REQUESTDATA>
-</IMPORTDATA>
-</BODY>
+  <HEADER>
+    <TALLYREQUEST>Import Data</TALLYREQUEST>
+  </HEADER>
+  <BODY>
+    <IMPORTDATA>
+      <REQUESTDESC>
+        <REPORTNAME>Vouchers</REPORTNAME>
+        <STATICVARIABLES>
+          <SVCURRENTCOMPANY>${companyName}</SVCURRENTCOMPANY>
+        </STATICVARIABLES>
+      </REQUESTDESC>
+      <REQUESTDATA>${tallyMessages}
+      </REQUESTDATA>
+    </IMPORTDATA>
+  </BODY>
 </ENVELOPE>`;
 };
+
