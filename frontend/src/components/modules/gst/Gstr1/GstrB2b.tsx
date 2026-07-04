@@ -180,6 +180,27 @@ const Gstr2B2b = () => {
     });
   };
 
+  const formatDateForGST = (dateString: string) => {
+    if (!dateString) return "-";
+    const date = new Date(dateString);
+    const day = String(date.getDate()).padStart(2, '0');
+    const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+    const month = monthNames[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day}-${month}-${year}`;
+  };
+
+  const formatPOS = (pos: string) => {
+    if (!pos) return "";
+    const match = pos.match(/^(.*)\((\d+)\)$/);
+    if (match) {
+      const stateName = match[1].trim();
+      const stateCode = match[2].trim();
+      return `${stateCode}-${stateName}`;
+    }
+    return pos;
+  };
+
   const totals = useMemo(() => {
     return matchedSales.reduce(
       (acc, item) => ({
@@ -203,17 +224,19 @@ const Gstr2B2b = () => {
     const b2bDataForExcel = matchedSales.map((row: any) => {
       const ledger = row.ledger;
       return {
-        "GSTIN of Recipient": ledger?.gstNumber || "-",
+        "GSTIN/UIN of Recipient": ledger?.gstNumber || "-",
         "Receiver Name": ledger?.name || "-",
         "Invoice Number": row.number,
-        "Invoice Date": formatDate(row.date),
+        "Invoice date": formatDateForGST(row.date),
         "Invoice Value": Number(row.total) || 0,
-        "Place of Supply": ledger?.state || "-",
+        "Place Of Supply": formatPOS(ledger?.state || ""),
         "Reverse Charge": "N",
-        "Invoice Type": "Regular",
+        "Applicable % of Tax Rate": "",
+        "Invoice Type": "Regular B2B",
         "E-Commerce GSTIN": "",
+        "Rate": getTaxRate(Number(row.igstTotal || 0) + Number(row.cgstTotal || 0) + Number(row.sgstTotal || 0), row.subtotal),
         "Taxable Value": Number(row.subtotal) || 0,
-        "IGST Rate": `${getTaxRate(row.igstTotal, row.subtotal)}%`,
+        "Cess Amount": 0,
         "IGST Amount": Number(row.igstTotal) || 0,
         "CGST Rate": `${getTaxRate(row.cgstTotal, row.subtotal)}%`,
         "CGST Amount": Number(row.cgstTotal) || 0,
@@ -237,7 +260,7 @@ const Gstr2B2b = () => {
 
     XLSX.writeFile(
       wb,
-      `B2B_${filters.fromDate}_to_${filters.toDate}.xlsx`
+      `B2B_${filters.fromDate}_to_${filters.toDate}.csv`
     );
   };
 
@@ -428,6 +451,73 @@ const Gstr2B2b = () => {
     generateFullJSON(monthB2B, fromStr, toStr);
   };
 
+  const handleMonthExcelDownload = (monthIndex: number) => {
+    // Current FY start year
+    const startYear = new Date(filters.fromDate).getFullYear();
+    const isNextYear = monthIndex < 3; // Jan, Feb, Mar are index 0, 1, 2
+    const actualYear = isNextYear ? startYear + 1 : startYear;
+
+    const monthNames = ["January", "February", "March", "April", "May", "June", "July", "August", "September", "October", "November", "December"];
+
+    const startDate = new Date(actualYear, monthIndex, 1);
+    const endDate = new Date(actualYear, monthIndex + 1, 0);
+
+    const fromStr = `${actualYear}-${String(monthIndex + 1).padStart(2, "0")}-01`;
+    const toStr = `${actualYear}-${String(monthIndex + 1).padStart(2, "0")}-${String(endDate.getDate()).padStart(2, "0")}`;
+
+    // Filter allSales for this month and only GST-enabled ledgers
+    const monthSales = allSales.filter((s: any) => {
+      if (!s.date) return false;
+      const d = new Date(s.date);
+      if (isNaN(d.getTime())) return false;
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, "0");
+      const day = String(d.getDate()).padStart(2, "0");
+      const voucherDateStr = `${year}-${month}-${day}`;
+      return voucherDateStr >= fromStr && voucherDateStr <= toStr;
+    });
+
+    const monthB2B = monthSales.map((s) => {
+      const l = ledger.find((gl) => gl.id === s.partyId && gl.gstNumber);
+      return l ? { ...s, ledger: l } : null;
+    }).filter(Boolean);
+
+    if (monthB2B.length === 0) {
+      alert(`No B2B data found for ${monthNames[monthIndex]} ${actualYear}`);
+      return;
+    }
+
+    const wb = XLSX.utils.book_new();
+
+    const b2bDataForExcel = monthB2B.map((row: any) => {
+      const ledger = row.ledger;
+      const taxRate = getTaxRate(Number(row.igstTotal || 0) + Number(row.cgstTotal || 0) + Number(row.sgstTotal || 0), row.subtotal);
+      return {
+        "GSTIN/UIN of Recipient": ledger?.gstNumber || "-",
+        "Receiver Name": ledger?.name || "-",
+        "Invoice Number": row.number,
+        "Invoice date": formatDateForGST(row.date),
+        "Invoice Value": Number(row.total) || 0,
+        "Place Of Supply": formatPOS(ledger?.state || ""),
+        "Reverse Charge": "N",
+        "Applicable % of Tax Rate": "",
+        "Invoice Type": "Regular B2B",
+        "E-Commerce GSTIN": "",
+        "Rate": taxRate,
+        "Taxable Value": Number(row.subtotal) || 0,
+        "Cess Amount": 0
+      };
+    });
+
+    const ws = XLSX.utils.json_to_sheet(b2bDataForExcel);
+    XLSX.utils.book_append_sheet(wb, ws, "B2B Supplies");
+
+    XLSX.writeFile(
+      wb,
+      `B2B_Excel_${fromStr}_to_${toStr}.csv`
+    );
+  };
+
   const getActivePeriodLabel = () => {
     if (filters.fromDate === "2000-01-01" && filters.toDate === "2099-12-31") {
       return "All Months (Cumulative Total)";
@@ -470,6 +560,25 @@ const Gstr2B2b = () => {
         <h1 className="text-2xl font-bold">4A - B2B Supplies</h1>
         <div className="ml-auto flex space-x-2">
           <div className="flex items-center no-print mr-2">
+            <select
+              title="Download Excel by Month"
+              onChange={(e) => {
+                if (e.target.value) {
+                  handleMonthExcelDownload(Number(e.target.value));
+                  e.target.value = ""; // Reset
+                }
+              }}
+              className={`text-xs p-1 rounded border outline-none mr-2 ${theme === "dark"
+                ? "bg-gray-700 border-gray-600 text-white"
+                : "bg-white border-gray-300 text-gray-700"
+                }`}
+            >
+              <option value="">Download Excel (Month)</option>
+              {[3, 4, 5, 6, 7, 8, 9, 10, 11, 0, 1, 2].map((m) => {
+                const monthNames = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+                return <option key={m} value={m}>{monthNames[m]}</option>;
+              })}
+            </select>
             <select
               title="Download JSON by Month"
               onChange={(e) => {
@@ -708,7 +817,7 @@ const Gstr2B2b = () => {
                       }`}
                   >
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      GSTIN of Recipient
+                      GSTIN/UIN of Recipient
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Receiver Name
@@ -717,19 +826,19 @@ const Gstr2B2b = () => {
                       Invoice Number
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Invoice Date
+                      Invoice date
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-right">
                       Invoice Value
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
-                      Place of Supply
+                      Place Of Supply
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-center">
                       Reverse Charge
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-center">
-                      Application of Tax Rate
+                      Applicable % of Tax Rate
                     </th>
                     <th className="border border-gray-300 p-2 text-xs font-bold text-left">
                       Invoice Type
@@ -785,7 +894,7 @@ const Gstr2B2b = () => {
                           {/* {taxRate}% */}
                         </td>
                         <td className="border border-gray-300 p-2 text-xs">
-                          Regular
+                          Regular B2B
                         </td>
                         <td className="border border-gray-300 p-2 text-xs font-mono">
                           {/* - */}
