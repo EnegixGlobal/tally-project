@@ -33,14 +33,15 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
                 <LEDGERNAME>${partyName}</LEDGERNAME>
                 <AMOUNT>${voucherData.total}</AMOUNT>
             </ALLLEDGERENTRIES.LIST>`;
-
-    // Debit the purchase ledger
-    const mode = voucherData.mode || "item-invoice";
-    const entries = voucherData.entries || voucherData.items || [];
+    // Detect mode and entries
+    const rawEntries = voucherData.entries || voucherData.items || [];
+    const isItemInvoice = voucherData.mode === "item-invoice" || (!voucherData.mode && rawEntries.some((e: any) => e.itemId));
+    const items = isItemInvoice ? rawEntries : [];
+    const accEntries = isItemInvoice ? [] : rawEntries;
     
-    if (mode === "accounting-invoice") {
-      // In accounting mode, entries are ledger entries, not items
-      entries.forEach((entry: any) => {
+    if (!isItemInvoice) {
+      // Accounting Invoice mode: Use accEntries directly
+      accEntries.forEach((entry: any) => {
         // Skip party ledger to avoid duplicate since we already generated it above
         if (String(entry.ledgerId) === String(voucherData.partyId)) {
           return;
@@ -62,7 +63,6 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
       });
     } else {
       // Item invoice mode
-      const items = entries;
       if (items.length > 0) {
         // Group items by purchase ledger
         const purchaseLedgerGroups: Record<string, { amount: number; xml: string; name: string }> = {};
@@ -118,29 +118,22 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
           }
         }
       } else {
-        // Accounting Invoice mode: Use voucherData.entries directly
-        const entries = voucherData.entries || [];
-        entries.forEach((entry: any) => {
-            const l = ledgers.find((ld: any) => String(ld.id) === String(entry.ledgerId));
-            const lName = l?.name || "Unknown Ledger";
-            if (lName === partyName) return; // Party is already handled
-
-            const isDebit = entry.entryType === 'debit' || entry.type === 'debit';
-            const amt = Number(entry.amount) || 0;
-            
-            ledgerEntriesXml += `
-            <!-- Accounting Entry -->
+        // Fallback if no items but mode is item-invoice
+        const pLedger = ledgers.find((l: any) => String(l.id) === String(voucherData.purchaseLedgerId));
+        const pLedgerName = pLedger?.name || "Purchase A/c";
+        
+        ledgerEntriesXml += `
+            <!-- Purchase -->
             <ALLLEDGERENTRIES.LIST>
-                <ISDEEMEDPOSITIVE>${isDebit ? 'Yes' : 'No'}</ISDEEMEDPOSITIVE>
-                <LEDGERNAME>${lName}</LEDGERNAME>
-                <AMOUNT>${isDebit ? '-' : ''}${amt.toFixed(2)}</AMOUNT>
+                <ISDEEMEDPOSITIVE>Yes</ISDEEMEDPOSITIVE>
+                <LEDGERNAME>${pLedgerName}</LEDGERNAME>
+                <AMOUNT>-${Number(voucherData.subtotal).toFixed(2)}</AMOUNT>
             </ALLLEDGERENTRIES.LIST>`;
-        });
       }
     }
 
     // Taxes (Only for item-invoice, as accounting-invoice handles it via entries)
-    if (voucherData.items && voucherData.items.length > 0) {
+    if (isItemInvoice && items.length > 0) {
       let cgstName = "Cgst";
       let sgstName = "Sgst";
       let igstName = "Igst";
@@ -149,8 +142,7 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
       let sgstRate = 0;
       let igstRate = 0;
       
-      const allEntries = [...(voucherData.items || []), ...(voucherData.entries || [])];
-      for (const item of allEntries) {
+      for (const item of items) {
         if (item.cgstRate) cgstRate = Number(item.cgstRate);
         if (item.sgstRate) sgstRate = Number(item.sgstRate);
         if (item.igstRate) igstRate = Number(item.igstRate);
@@ -224,8 +216,8 @@ export const generateBulkPurchaseXmlContent = (vouchersData: any[], companyName:
                 <AMOUNT>-${igst.toFixed(2)}</AMOUNT>
             </ALLLEDGERENTRIES.LIST>`;
       }
-    }
-
+    } // Closes if (isItemInvoice && items.length > 0)
+    // Duplicate narration declaration removed
     tallyMessages += `
         <TALLYMESSAGE xmlns:UDF="TallyUDF">
           <VOUCHER VCHTYPE="Purchase" ACTION="Create">

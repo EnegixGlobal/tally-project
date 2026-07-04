@@ -47,6 +47,11 @@ export const generateBulkSalesXmlContent = (vouchersData: any[], companyName: st
                 <AMOUNT>-${Number(voucherData.total).toFixed(2)}</AMOUNT>
             </ALLLEDGERENTRIES.LIST>`;
 
+    const rawEntries = voucherData.entries || [];
+    const isItemInvoice = voucherData.mode === "item-invoice" || (!voucherData.mode && rawEntries.some((e: any) => e.itemId));
+    const items = isItemInvoice ? rawEntries : [];
+    const accEntries = isItemInvoice ? [] : rawEntries;
+
     // Tax Credit Entries
     let cgstName = "Cgst";
     let sgstName = "Sgst";
@@ -56,7 +61,7 @@ export const generateBulkSalesXmlContent = (vouchersData: any[], companyName: st
     let sgstRate = 0;
     let igstRate = 0;
     
-    const allEntries = [...(voucherData.items || []), ...(voucherData.entries || [])];
+    const allEntries = rawEntries;
     for (const item of allEntries) {
       if (item.cgstRate) cgstRate = Number(item.cgstRate);
       if (item.sgstRate) sgstRate = Number(item.sgstRate);
@@ -111,7 +116,7 @@ export const generateBulkSalesXmlContent = (vouchersData: any[], companyName: st
     }
     
     // Tax Credit Entries (Only for item-invoice, as accounting-invoice handles it via entries)
-    if (voucherData.items && voucherData.items.length > 0) {
+    if (items.length > 0) {
       const cgst = Number(voucherData.cgstTotal) || 0;
       if (cgst > 0) {
       ledgerEntriesXml += `
@@ -148,8 +153,6 @@ export const generateBulkSalesXmlContent = (vouchersData: any[], companyName: st
 
     // Inventory Entries
     let inventoryEntriesXml = "";
-    const items = voucherData.items || [];
-    
     if (items.length > 0) {
       items.forEach((item: any) => {
         const amount = Number(item.amount) || 0;
@@ -185,9 +188,8 @@ export const generateBulkSalesXmlContent = (vouchersData: any[], companyName: st
             </ALLINVENTORYENTRIES.LIST>`;
       });
     } else {
-        // Accounting Invoice mode: Use voucherData.entries directly
-        const entries = voucherData.entries || [];
-        entries.forEach((entry: any) => {
+        // Accounting Invoice mode: Use accEntries directly
+        accEntries.forEach((entry: any) => {
             const l = ledgers.find((ld: any) => String(ld.id) === String(entry.ledgerId));
             const lName = l?.name || "Unknown Ledger";
             if (lName === partyName) return; // Party is already handled
