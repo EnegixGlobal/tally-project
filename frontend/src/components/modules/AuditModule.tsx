@@ -15,7 +15,6 @@ const AuditModule: React.FC = () => {
         { icon: <Activity size={20} />, name: '3CB', path: '/app/audit/3-Cb' },
         { icon: <Activity size={20} />, name: '3CD', path: '/app/audit/3-cd' },
         { icon: <Activity size={20} />, name: '3CA', path: '/app/audit/3-ca' },
-        { icon: <Activity size={20} />, name: '3CB', path: '/app/audit/3-cb' },
         // { icon: <Activity size={20} />, name: 'Transaction Log', path: '/app/audit/transaction-log' },
         // { icon: <Users size={20} />, name: 'User Activity', path: '/app/audit/user-activity' },
         // { icon: <Clock size={20} />, name: 'Login History', path: '/app/audit/login-history' },

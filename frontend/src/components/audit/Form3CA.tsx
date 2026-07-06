@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAppContext } from '../../context/AppContext';
+import { useCompany } from '../../context/CompanyContext';
+import { useAuth } from '../../home/context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { 
   ArrowLeft, 
@@ -59,6 +61,8 @@ interface Form3CAData {
 
 const Form3CA: React.FC = () => {
   const { theme } = useAppContext();
+  const { companyInfo } = useCompany();
+  const { user } = useAuth();
   const navigate = useNavigate();
   
   const [formData, setFormData] = useState<Form3CAData>({
@@ -108,6 +112,53 @@ const Form3CA: React.FC = () => {
     dateOfSigning: ''
   });
   
+  useEffect(() => {
+    if (companyInfo) {
+      setFormData(prev => {
+        let fyFrom = prev.financialYearFrom;
+        let fyTo = prev.financialYearTo;
+        let period = prev.periodOfAudit;
+
+        let fy = companyInfo.financialYear || (companyInfo as any).financial_year;
+        
+        if (!fy && companyInfo.booksBeginningYear) {
+           const startYear = String(companyInfo.booksBeginningYear).substring(0, 4);
+           if (startYear.length === 4 && !isNaN(Number(startYear))) {
+             fy = `${startYear}-${(parseInt(startYear) + 1).toString().substring(2)}`;
+           }
+        }
+
+        if (fy) {
+          fy = fy.trim();
+          period = `Financial Year ${fy}`;
+          
+          const parts = fy.split('-');
+          if (parts.length === 2) {
+            const startYear = parts[0];
+            let endYear = parts[1];
+            if (endYear.length === 2 && startYear.length === 4) {
+               endYear = startYear.substring(0, 2) + endYear;
+            }
+            if (startYear.length === 4 && endYear.length === 4) {
+              fyFrom = `${startYear}-04-01`;
+              fyTo = `${endYear}-03-31`;
+            }
+          }
+        }
+
+        return {
+          ...prev,
+          nameOfAssessee: companyInfo.name || prev.nameOfAssessee,
+          panOfAssessee: user?.pan || companyInfo.panNumber || (companyInfo as any).pan || (companyInfo as any).pan_number || (companyInfo as any).pan_no || prev.panOfAssessee,
+          addressOfAssessee: companyInfo.address || prev.addressOfAssessee,
+          periodOfAudit: period,
+          financialYearFrom: fyFrom,
+          financialYearTo: fyTo
+        };
+      });
+    }
+  }, [companyInfo, user]);
+
   const handleInputChange = (field: keyof Form3CAData, value: string) => {
     setFormData(prev => ({
       ...prev,
