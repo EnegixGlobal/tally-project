@@ -248,6 +248,9 @@ app.use(permissionsRouter);
 const roleManagementRouter = require("./routes/roleManagement");
 app.use("/api", roleManagementRouter);
 
+const caManagementRouter = require("./routes/caManagement");
+app.use("/api/ca", caManagementRouter);
+
 const userAccountsRouter = require("./routes/userAccounts");
 app.use("/api", userAccountsRouter);
 
