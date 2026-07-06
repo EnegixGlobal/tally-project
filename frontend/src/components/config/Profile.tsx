@@ -186,7 +186,7 @@ const Profile: React.FC = () => {
     taxType: "GST",
     maintainBy: "self",
     accountantName: "",
-    caName: "",
+    caId: "",
   });
 
   // Security & Access Control States
@@ -241,6 +241,7 @@ const Profile: React.FC = () => {
           taxType: data.taxType || "GST",
           maintainBy: data.maintainBy || "self",
           accountantName: data.accountantName || "",
+          caId: data.caId || "",
         });
 
         // Set Security States
@@ -938,15 +939,15 @@ const Profile: React.FC = () => {
                 <div>
                   <label
                     className="block text-sm font-medium mb-1"
-                    htmlFor="caName"
+                    htmlFor="caId"
                   >
                     <User size={16} className="inline mr-1" />
                     Select CA
                   </label>
                   <select
-                    id="caName"
-                    name="caName"
-                    value={company.caName || ""}
+                    id="caId"
+                    name="caId"
+                    value={company.caId || ""}
                     onChange={handleChange}
                     className={`w-full p-2 rounded border ${theme === "dark"
                       ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
@@ -955,7 +956,7 @@ const Profile: React.FC = () => {
                   >
                     <option value="">-- Select CA --</option>
                     {caList.map((ca) => (
-                      <option key={ca.id} value={ca.name}>
+                      <option key={ca.id} value={ca.id}>
                         {ca.name}
                       </option>
                     ))}
