@@ -43,6 +43,14 @@ router.post('/', async (req, res) => {
         passwordField: 'password',
         idField: 'id',
         nameField: (u) => u.name,
+      },
+      {
+        table: 'ca_users',
+        role: 'new_ca',
+        supplier: 'ca',
+        passwordField: 'password',
+        idField: 'id',
+        nameField: (u) => u.name,
       }
     ];
 
@@ -95,6 +103,20 @@ router.post('/', async (req, res) => {
           companyRow = assignedCompanies[0];
           user.assignedCompanies = assignedCompanies;
           // Set employeeId to the company's owner ID so dashboard fetches their data
+          if (companyRow.employee_id) {
+            employeeId = companyRow.employee_id;
+          }
+        }
+      } else if (role === 'new_ca') {
+        const [assignedCompanies] = await db.query(
+          `SELECT c.* FROM tbcompanies c
+           INNER JOIN ca_company cc ON c.id = cc.company_id
+           WHERE cc.ca_id = ?`,
+          [user[idField]]
+        );
+        companyRow = assignedCompanies.length > 0 ? assignedCompanies[0] : null;
+        if (assignedCompanies.length > 0) {
+          user.assignedCompanies = assignedCompanies;
           if (companyRow.employee_id) {
             employeeId = companyRow.employee_id;
           }

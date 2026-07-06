@@ -13,6 +13,7 @@ import Header from './components/Layout/Header';
 import Dashboard from './components/Dashboard/Dashboard';
 import Ledgers from './components/Ledgers/Ledgers';
 import UserManagement from './components/Users/UserManagement';
+import CAManagement from './components/Users/CAManagement';
 import SubscriptionManagement from './components/Subscriptions/SubscriptionManagement';
 import PaymentHistory from './components/Payments/PaymentHistory';
 import Settings from './components/Settings/Settings';
@@ -42,6 +43,7 @@ const PageContent: React.FC = () => {
             <Route path="/dashboard" element={<Dashboard />} />
             <Route path="/ledgers" element={<Ledgers />} />
             <Route path="/users" element={<UserManagement />} />
+            <Route path="/ca-management" element={<CAManagement />} />
             <Route path="/trader" element={< Traders />} />
             <Route path="/trader/:id" element={<TraderDetail />} />
             <Route path="/subscriptions" element={<SubscriptionManagement />} />

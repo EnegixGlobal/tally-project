@@ -26,7 +26,8 @@ router.post('/company', async (req, res) => {
     password,
     employeeId,
     maintainBy,
-    accountantName
+    accountantName,
+    caId
   } = req.body;
 
   const connection = await db.getConnection();
@@ -63,7 +64,6 @@ router.post('/company', async (req, res) => {
         ALTER TABLE tbcompanies
         ADD COLUMN tan_number VARCHAR(20)
       `);
-
       console.log("✅ tan_number column created");
     }
 
@@ -95,7 +95,7 @@ router.post('/company', async (req, res) => {
         fdAccountantName,
         back_date_allowed
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       name,
       financialYear,
@@ -119,6 +119,13 @@ router.post('/company', async (req, res) => {
     ]);
 
     const companyId = companyResult.insertId;
+
+    if (caId) {
+      await connection.query(
+        `INSERT INTO ca_company (ca_id, company_id) VALUES (?, ?)`,
+        [caId, companyId]
+      );
+    }
 
     // --- Ensure company_subscriptions table exists (for trials/subscriptions) ---
     const [subscriptionTable] = await connection.query(
@@ -245,7 +252,8 @@ router.put('/company/:companyId', async (req, res) => {
     password,
     employeeId,
     maintainBy,
-    accountantName
+    accountantName,
+    caId
   } = req.body;
 
   const connection = await db.getConnection();
@@ -322,6 +330,14 @@ router.put('/company/:companyId', async (req, res) => {
       req.body.backDateAllowed !== undefined ? (req.body.backDateAllowed ? 1 : 0) : 1,
       companyId
     ]);
+
+    await connection.query(`DELETE FROM ca_company WHERE company_id = ?`, [companyId]);
+    if (caId) {
+      await connection.query(
+        `INSERT INTO ca_company (ca_id, company_id) VALUES (?, ?)`,
+        [caId, companyId]
+      );
+    }
 
     if (accessControlEnabled && username) {
 
@@ -451,9 +467,11 @@ router.get('/company/:companyId', async (req, res) => {
         c.vault_password IS NOT NULL as vaultEnabled,
         c.back_date_allowed as backDateAllowed,
         u.username,
-        (u.id IS NOT NULL) as accessControlEnabled
+        (u.id IS NOT NULL) as accessControlEnabled,
+        cc.ca_id AS caId
       FROM tbcompanies c
       LEFT JOIN tbusers u ON c.id = u.company_id
+      LEFT JOIN ca_company cc ON c.id = cc.company_id
       WHERE c.id = ?
       LIMIT 1
     `, [companyId]);

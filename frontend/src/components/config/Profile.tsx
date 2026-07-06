@@ -186,6 +186,7 @@ const Profile: React.FC = () => {
     taxType: "GST",
     maintainBy: "self",
     accountantName: "",
+    caId: "",
   });
 
   // Security & Access Control States
@@ -199,6 +200,7 @@ const Profile: React.FC = () => {
   const [showConfirmPassword, setShowConfirmPassword] =
     useState<boolean>(false);
   const [accountantsList, setAccountantsList] = useState<Accountant[]>([]);
+  const [caList, setCaList] = useState<any[]>([]);
   const [initialAccessControl, setInitialAccessControl] = useState<boolean>(false);
   const [vaultEnabled, setVaultEnabled] = useState<boolean>(false);
   const [vaultPassword, setVaultPassword] = useState<string>("");
@@ -239,6 +241,7 @@ const Profile: React.FC = () => {
           taxType: data.taxType || "GST",
           maintainBy: data.maintainBy || "self",
           accountantName: data.accountantName || "",
+          caId: data.caId || "",
         });
 
         // Set Security States
@@ -290,8 +293,23 @@ const Profile: React.FC = () => {
       }
     };
 
+    const fetchCAs = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ca`);
+        const data = await res.json();
+        if (res.ok) {
+          setCaList(data);
+        } else {
+          console.error("Failed to fetch CAs:", data.message);
+        }
+      } catch (err) {
+        console.error("Network error while fetching CAs:", err);
+      }
+    };
+
     if (company.maintainBy === "accountant") {
       fetchAccountants();
+      fetchCAs();
     }
   }, [company.maintainBy]);
 
@@ -915,6 +933,34 @@ const Profile: React.FC = () => {
                       {errors.accountantName}
                     </p>
                   )}
+                </div>
+              )}
+              {company.maintainBy === "accountant" && (
+                <div>
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    htmlFor="caId"
+                  >
+                    <User size={16} className="inline mr-1" />
+                    Select CA
+                  </label>
+                  <select
+                    id="caId"
+                    name="caId"
+                    value={company.caId || ""}
+                    onChange={handleChange}
+                    className={`w-full p-2 rounded border ${theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                      : "bg-white border-gray-300 text-black focus:border-blue-500"
+                      } outline-none transition-colors`}
+                  >
+                    <option value="">-- Select CA --</option>
+                    {caList.map((ca) => (
+                      <option key={ca.id} value={ca.id}>
+                        {ca.name}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
             </div>
