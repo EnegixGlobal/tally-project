@@ -26,7 +26,7 @@ const uploadToCloudinary = (fileBuffer, folder = 'stamp') => {
 // GET all CAs
 router.get('/', async (req, res) => {
     try {
-        const query = 'SELECT id, name, email, phone, firm_name, registration_number, designation, membership_number, pan_number, udin, stamp_url, status, created_at, updated_at FROM ca_users ORDER BY id DESC';
+        const query = 'SELECT id, name, email, phone, firm_name, registration_number, designation, membership_number, pan_number, udin, stamp_url, status, created_at, updated_at FROM ca_users ORDER BY id ASC';
         const [results] = await db.query(query);
         res.status(200).json(results);
     } catch (error) {

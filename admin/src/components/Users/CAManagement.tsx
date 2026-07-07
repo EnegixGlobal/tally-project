@@ -473,7 +473,7 @@ const CAManagement: React.FC = () => {
                     </div>
                     {(newCA.stamp_file || newCA.stamp_url) && !newCA.removeStamp && (
                       <div className="relative group shrink-0">
-                        <div className="w-20 h-20 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+                        <div className="w-20 h-20 rounded-lg border border-gray-200/50 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/30 flex items-center justify-center overflow-hidden">
                           <img 
                             src={newCA.stamp_file ? URL.createObjectURL(newCA.stamp_file) : newCA.stamp_url} 
                             alt="Stamp" 
@@ -582,42 +582,75 @@ const CAManagement: React.FC = () => {
           ) : caList.length > 0 ? (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className={`${theme === 'dark' ? 'bg-gray-700/50' : 'bg-gray-50'}`}>
+                <thead className={`${theme === 'dark' ? 'bg-gray-800/80 text-gray-400 border-gray-700' : 'bg-gray-50/80 text-gray-500 border-gray-200'} border-b backdrop-blur-sm sticky top-0 z-10`}>
                   <tr>
-                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>ID</th>
-                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Name</th>
-                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Firm Name</th>
-                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Firm Reg. No.</th>
-                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Membership No.</th>
-                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>PAN</th>
-                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Email</th>
-                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Status</th>
-                    <th className={`px-6 py-4 text-right font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Actions</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">ID</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Name</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Designation</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Email</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Phone</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Firm Name</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Firm Reg. No.</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Membership No.</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">PAN</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">UDIN</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Stamp</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
-                <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-200'}`}>
+                <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700/50' : 'divide-gray-100'}`}>
                   {caList.map((ca) => (
-                    <tr key={ca.id} className={`${theme === 'dark' ? 'hover:bg-gray-700/50' : 'hover:bg-blue-50/30'} transition-colors`}>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm`}>
-                        {ca.id}
+                    <tr key={ca.id} className={`${theme === 'dark' ? 'hover:bg-gray-700/30' : 'hover:bg-blue-50/40'} transition-all duration-200`}>
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm font-medium`}>
+                        #{ca.id}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'} font-medium`}>
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'} font-semibold`}>
                         {ca.name}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm`}>
+                        {ca.designation || '-'}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm`}>
+                        {ca.email}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm`}>
+                        {ca.phone || '-'}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm font-medium`}>
                         {ca.firm_name}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm`}>
                         {ca.registration_number}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm`}>
                         {ca.membership_number || '-'}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm font-mono`}>
                         {ca.pan_number || '-'}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                        {ca.email}
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm font-mono`}>
+                        {ca.udin || '-'}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap`}>
+                        {ca.stamp_url ? (
+                          <div className="w-16 h-16 rounded border border-gray-200/50 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/30 flex items-center justify-center p-1 overflow-hidden">
+                            <img src={ca.stamp_url} alt="Stamp" className="max-w-full max-h-full object-contain cursor-pointer hover:opacity-80 transition-opacity" onClick={() => {
+                              Swal.fire({
+                                imageUrl: ca.stamp_url,
+                                imageAlt: 'Stamp',
+                                showConfirmButton: false,
+                                showCloseButton: true,
+                                width: 'auto',
+                                padding: '1em',
+                                background: theme === 'dark' ? '#1f2937' : '#ffffff',
+                                backdrop: `rgba(0,0,0,0.8)`
+                              });
+                            }}/>
+                          </div>
+                        ) : (
+                          <span className={`text-xs italic ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>-</span>
+                        )}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 text-xs font-bold rounded-full ${getStatusBadge(ca.status)} shadow-sm`}>
