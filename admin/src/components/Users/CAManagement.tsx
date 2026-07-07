@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { Users, Plus, Edit, Trash2 } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Building, Shield, User, FileText, Mail, Phone, Lock, CreditCard, Hash, Briefcase, Badge } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../services/api';
 
@@ -239,163 +239,225 @@ const CAManagement: React.FC = () => {
             {editingCA ? <Edit className="w-5 h-5 mr-2 text-primary" /> : <Users className="w-5 h-5 mr-2 text-primary" />}
             {editingCA ? 'Edit CA Profile' : 'Create New CA'}
           </h3>
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Full Name *
-              </label>
-              <input
-                type="text"
-                value={newCA.name}
-                onChange={(e) => setNewCA({ ...newCA, name: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="Enter full name..."
-              />
-            </div>
-            
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Email Address *
-              </label>
-              <input
-                type="email"
-                value={newCA.email}
-                onChange={(e) => setNewCA({ ...newCA, email: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="Enter email address..."
-              />
+          <div className="space-y-8">
+            {/* Personal Information */}
+            <div className={`p-5 rounded-xl border ${theme === 'dark' ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50/50 border-gray-100'}`}>
+              <h4 className={`text-md font-semibold mb-4 flex items-center ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
+                <User className="w-5 h-5 mr-2 text-primary" />
+                Personal Information
+              </h4>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Full Name *
+                  </label>
+                  <div className="relative">
+                    <User className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="text"
+                      value={newCA.name}
+                      onChange={(e) => setNewCA({ ...newCA, name: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder="Enter full name..."
+                    />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Email Address *
+                  </label>
+                  <div className="relative">
+                    <Mail className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="email"
+                      value={newCA.email}
+                      onChange={(e) => setNewCA({ ...newCA, email: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder="Enter email address..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Phone Number *
+                  </label>
+                  <div className="relative">
+                    <Phone className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="text"
+                      value={newCA.phone}
+                      onChange={(e) => setNewCA({ ...newCA, phone: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder="Enter phone number..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Designation
+                  </label>
+                  <div className="relative">
+                    <Briefcase className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="text"
+                      value={newCA.designation || ''}
+                      onChange={(e) => setNewCA({ ...newCA, designation: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder="e.g. Proprietor"
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Phone Number *
-              </label>
-              <input
-                type="text"
-                value={newCA.phone}
-                onChange={(e) => setNewCA({ ...newCA, phone: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="Enter phone number..."
-              />
+            {/* Professional & Firm Details */}
+            <div className={`p-5 rounded-xl border ${theme === 'dark' ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50/50 border-gray-100'}`}>
+              <h4 className={`text-md font-semibold mb-4 flex items-center ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
+                <Building className="w-5 h-5 mr-2 text-primary" />
+                Firm & Professional Details
+              </h4>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Firm Name *
+                  </label>
+                  <div className="relative">
+                    <Building className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="text"
+                      value={newCA.firm_name}
+                      onChange={(e) => setNewCA({ ...newCA, firm_name: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder="Enter firm name..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Firm Registration Number *
+                  </label>
+                  <div className="relative">
+                    <FileText className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="text"
+                      value={newCA.registration_number}
+                      onChange={(e) => setNewCA({ ...newCA, registration_number: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder="Enter firm registration number..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Membership Number
+                  </label>
+                  <div className="relative">
+                    <Badge className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="text"
+                      value={newCA.membership_number || ''}
+                      onChange={(e) => setNewCA({ ...newCA, membership_number: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder="Enter membership number..."
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    PAN Number
+                  </label>
+                  <div className="relative">
+                    <CreditCard className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="text"
+                      value={newCA.pan_number || ''}
+                      onChange={(e) => setNewCA({ ...newCA, pan_number: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder="Enter PAN number..."
+                    />
+                  </div>
+                </div>
+
+                <div className="lg:col-span-2">
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    UDIN
+                  </label>
+                  <div className="relative">
+                    <Hash className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="text"
+                      value={newCA.udin || ''}
+                      onChange={(e) => setNewCA({ ...newCA, udin: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder="Enter UDIN..."
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
 
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Firm Name *
-              </label>
-              <input
-                type="text"
-                value={newCA.firm_name}
-                onChange={(e) => setNewCA({ ...newCA, firm_name: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="Enter firm name..."
-              />
-            </div>
+            {/* Account & Security */}
+            <div className={`p-5 rounded-xl border ${theme === 'dark' ? 'bg-gray-800/50 border-gray-700' : 'bg-gray-50/50 border-gray-100'}`}>
+              <h4 className={`text-md font-semibold mb-4 flex items-center ${theme === 'dark' ? 'text-white' : 'text-gray-800'}`}>
+                <Shield className="w-5 h-5 mr-2 text-primary" />
+                Account & Security
+              </h4>
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6">
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Account Status
+                  </label>
+                  <select
+                    value={newCA.status}
+                    onChange={(e) => setNewCA({ ...newCA, status: e.target.value as any })}
+                    className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                  >
+                    <option value="active">Active</option>
+                    <option value="suspended">Suspended</option>
+                    <option value="pending">Pending</option>
+                  </select>
+                </div>
 
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Firm Registration Number *
-              </label>
-              <input
-                type="text"
-                value={newCA.registration_number}
-                onChange={(e) => setNewCA({ ...newCA, registration_number: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="Enter firm registration number..."
-              />
-            </div>
+                <div className="hidden lg:block"></div>
 
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Designation
-              </label>
-              <input
-                type="text"
-                value={newCA.designation || ''}
-                onChange={(e) => setNewCA({ ...newCA, designation: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="e.g. Proprietor"
-              />
-            </div>
+                <div>
+                  <label className={`block text-sm font-medium mb-2 flex items-center justify-between ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    <span>Password {editingCA && <span className="text-xs text-gray-400 font-normal ml-2">(Leave blank to keep current)</span>}</span>
+                  </label>
+                  <div className="relative">
+                    <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="password"
+                      value={newCA.password}
+                      onChange={(e) => setNewCA({ ...newCA, password: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder={editingCA ? "Enter new password to change..." : "Enter password..."}
+                    />
+                  </div>
+                </div>
 
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Membership Number
-              </label>
-              <input
-                type="text"
-                value={newCA.membership_number || ''}
-                onChange={(e) => setNewCA({ ...newCA, membership_number: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="Enter membership number..."
-              />
-            </div>
-
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                PAN Number
-              </label>
-              <input
-                type="text"
-                value={newCA.pan_number || ''}
-                onChange={(e) => setNewCA({ ...newCA, pan_number: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="Enter PAN number..."
-              />
-            </div>
-
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                UDIN
-              </label>
-              <input
-                type="text"
-                value={newCA.udin || ''}
-                onChange={(e) => setNewCA({ ...newCA, udin: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="Enter UDIN..."
-              />
-            </div>
-
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Account Status
-              </label>
-              <select
-                value={newCA.status}
-                onChange={(e) => setNewCA({ ...newCA, status: e.target.value as any })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-              >
-                <option value="active">Active</option>
-                <option value="suspended">Suspended</option>
-                <option value="pending">Pending</option>
-              </select>
-            </div>
-
-            <div>
-              <label className={`block text-sm font-medium mb-2 flex items-center justify-between ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                <span>Password {editingCA && <span className="text-xs text-gray-400 font-normal ml-2">(Leave blank to keep current)</span>}</span>
-              </label>
-              <input
-                type="password"
-                value={newCA.password}
-                onChange={(e) => setNewCA({ ...newCA, password: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder={editingCA ? "Enter new password to change..." : "Enter password..."}
-              />
-            </div>
-
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                Confirm Password
-              </label>
-              <input
-                type="password"
-                value={newCA.confirmPassword}
-                onChange={(e) => setNewCA({ ...newCA, confirmPassword: e.target.value })}
-                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="Confirm password..."
-              />
+                <div>
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Confirm Password
+                  </label>
+                  <div className="relative">
+                    <Lock className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                    <input
+                      type="password"
+                      value={newCA.confirmPassword}
+                      onChange={(e) => setNewCA({ ...newCA, confirmPassword: e.target.value })}
+                      className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      placeholder="Confirm password..."
+                    />
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
           
