@@ -584,57 +584,57 @@ const CAManagement: React.FC = () => {
               <table className="w-full text-sm">
                 <thead className={`${theme === 'dark' ? 'bg-gray-800/80 text-gray-400 border-gray-700' : 'bg-gray-50/80 text-gray-500 border-gray-200'} border-b backdrop-blur-sm sticky top-0 z-10`}>
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">ID</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Name</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Designation</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Email</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Phone</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Firm Name</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Firm Reg. No.</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Membership No.</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">PAN</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">UDIN</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Stamp</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider">Actions</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">ID</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">Name</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">Designation</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">Email</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">Phone</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">Firm Name</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">Firm Reg. No.</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">Membership No.</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">PAN</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">UDIN</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">Stamp</th>
+                    <th className="px-2 py-3 text-left text-xs font-bold uppercase tracking-wider">Status</th>
+                    <th className="px-2 py-3 text-right text-xs font-bold uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700/50' : 'divide-gray-100'}`}>
                   {caList.map((ca) => (
                     <tr key={ca.id} className={`${theme === 'dark' ? 'hover:bg-gray-700/30' : 'hover:bg-blue-50/40'} transition-all duration-200`}>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'} text-sm font-medium`}>
+                      <td className={`px-2 py-3 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-xs font-bold`}>
                         #{ca.id}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-white' : 'text-gray-900'} font-semibold`}>
+                      <td className={`px-2 py-3 whitespace-normal break-words min-w-[100px] ${theme === 'dark' ? 'text-white' : 'text-gray-900'} font-bold text-xs`}>
                         {ca.name}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm`}>
+                      <td className={`px-2 py-3 whitespace-normal break-words min-w-[90px] ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} text-xs font-medium`}>
                         {ca.designation || '-'}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm`}>
+                      <td className={`px-2 py-3 whitespace-normal break-all min-w-[120px] ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} text-xs font-medium`}>
                         {ca.email}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm`}>
+                      <td className={`px-2 py-3 whitespace-nowrap ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} text-xs font-medium`}>
                         {ca.phone || '-'}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm font-medium`}>
+                      <td className={`px-2 py-3 whitespace-normal break-words min-w-[100px] ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} text-xs font-bold`}>
                         {ca.firm_name}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm`}>
+                      <td className={`px-2 py-3 whitespace-nowrap ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} text-xs font-medium`}>
                         {ca.registration_number}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm`}>
+                      <td className={`px-2 py-3 whitespace-nowrap ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} text-xs font-medium`}>
                         {ca.membership_number || '-'}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm font-mono`}>
+                      <td className={`px-2 py-3 whitespace-nowrap ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} text-xs font-bold font-mono tracking-wide`}>
                         {ca.pan_number || '-'}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'} text-sm font-mono`}>
+                      <td className={`px-2 py-3 whitespace-nowrap ${theme === 'dark' ? 'text-gray-200' : 'text-gray-800'} text-xs font-bold font-mono tracking-wide`}>
                         {ca.udin || '-'}
                       </td>
-                      <td className={`px-6 py-4 whitespace-nowrap`}>
+                      <td className={`px-2 py-3 whitespace-nowrap`}>
                         {ca.stamp_url ? (
-                          <div className="w-16 h-16 rounded border border-gray-200/50 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/30 flex items-center justify-center p-1 overflow-hidden">
+                          <div className="w-10 h-10 rounded border border-gray-200/50 dark:border-gray-700/50 bg-gray-50/50 dark:bg-gray-800/30 flex items-center justify-center p-0.5 overflow-hidden">
                             <img src={ca.stamp_url} alt="Stamp" className="max-w-full max-h-full object-contain cursor-pointer hover:opacity-80 transition-opacity" onClick={() => {
                               Swal.fire({
                                 imageUrl: ca.stamp_url,
@@ -649,29 +649,29 @@ const CAManagement: React.FC = () => {
                             }}/>
                           </div>
                         ) : (
-                          <span className={`text-xs italic ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>-</span>
+                          <span className={`text-[11px] italic ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>-</span>
                         )}
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`px-3 py-1 text-xs font-bold rounded-full ${getStatusBadge(ca.status)} shadow-sm`}>
+                      <td className="px-2 py-3 whitespace-nowrap">
+                        <span className={`px-2 py-1 text-[10px] font-bold rounded-full ${getStatusBadge(ca.status)} shadow-sm`}>
                           {ca.status.toUpperCase()}
                         </span>
                       </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right">
-                        <div className="flex items-center justify-end gap-3">
+                      <td className="px-2 py-3 whitespace-nowrap text-right">
+                        <div className="flex items-center justify-end gap-1.5">
                           <button
                             title="Edit CA"
                             onClick={() => handleEditClick(ca)}
-                            className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-600 hover:text-white transition-all transform hover:scale-110 shadow-sm"
+                            className="p-1.5 bg-blue-100 text-blue-600 rounded hover:bg-blue-600 hover:text-white transition-all transform hover:scale-105 shadow-sm"
                           >
-                            <Edit className="w-4 h-4" />
+                            <Edit className="w-3.5 h-3.5" />
                           </button>
                           <button
                             title="Delete CA"
                             onClick={() => ca.id && handleDelete(ca.id)}
-                            className="p-2 bg-red-100 text-red-600 rounded-lg hover:bg-red-600 hover:text-white transition-all transform hover:scale-110 shadow-sm"
+                            className="p-1.5 bg-red-100 text-red-600 rounded hover:bg-red-600 hover:text-white transition-all transform hover:scale-105 shadow-sm"
                           >
-                            <Trash2 className="w-4 h-4" />
+                            <Trash2 className="w-3.5 h-3.5" />
                           </button>
                         </div>
                       </td>
