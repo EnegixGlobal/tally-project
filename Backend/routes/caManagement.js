@@ -6,7 +6,7 @@ const bcrypt = require('bcryptjs');
 // GET all CAs
 router.get('/', async (req, res) => {
     try {
-        const query = 'SELECT id, name, email, phone, firm_name, registration_number, status, created_at, updated_at FROM ca_users ORDER BY id DESC';
+        const query = 'SELECT id, name, email, phone, firm_name, registration_number, designation, membership_number, pan_number, udin, status, created_at, updated_at FROM ca_users ORDER BY id DESC';
         const [results] = await db.query(query);
         res.status(200).json(results);
     } catch (error) {
@@ -20,7 +20,7 @@ router.get('/', async (req, res) => {
 
 // POST a new CA
 router.post('/', async (req, res) => {
-    const { name, email, phone, firmName, registrationNumber, status, password } = req.body;
+    const { name, email, phone, firmName, registrationNumber, designation, membershipNumber, panNumber, udin, status, password } = req.body;
 
     if (!name || !email || !phone || !firmName || !registrationNumber || !password) {
         return res.status(400).json({ error: 'Please provide all mandatory fields' });
@@ -34,11 +34,11 @@ router.post('/', async (req, res) => {
 
         const query = `
             INSERT INTO ca_users 
-            (name, email, phone, firm_name, registration_number, password, status) 
-            VALUES (?, ?, ?, ?, ?, ?, ?)
+            (name, email, phone, firm_name, registration_number, designation, membership_number, pan_number, udin, password, status) 
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         `;
         
-        const [results] = await db.query(query, [name, email, phone, firmName, registrationNumber, hashedPassword, status || 'active']);
+        const [results] = await db.query(query, [name, email, phone, firmName, registrationNumber, designation || null, membershipNumber || null, panNumber || null, udin || null, hashedPassword, status || 'active']);
         res.status(201).json({ message: 'CA created successfully', id: results.insertId });
     } catch (error) {
         console.error('Server error creating CA:', error);
@@ -52,7 +52,7 @@ router.post('/', async (req, res) => {
 // PUT update CA
 router.put('/:id', async (req, res) => {
     const { id } = req.params;
-    const { name, email, phone, firmName, registrationNumber, status, password } = req.body;
+    const { name, email, phone, firmName, registrationNumber, designation, membershipNumber, panNumber, udin, status, password } = req.body;
 
     if (!name || !email || !phone || !firmName || !registrationNumber) {
         return res.status(400).json({ error: 'Please provide all mandatory fields' });
@@ -61,9 +61,9 @@ router.put('/:id', async (req, res) => {
     try {
         let query = `
             UPDATE ca_users 
-            SET name = ?, email = ?, phone = ?, firm_name = ?, registration_number = ?, status = ?
+            SET name = ?, email = ?, phone = ?, firm_name = ?, registration_number = ?, designation = ?, membership_number = ?, pan_number = ?, udin = ?, status = ?
         `;
-        const queryParams = [name, email, phone, firmName, registrationNumber, status || 'active'];
+        const queryParams = [name, email, phone, firmName, registrationNumber, designation || null, membershipNumber || null, panNumber || null, udin || null, status || 'active'];
 
         if (password) {
             let hashedPassword = password;
