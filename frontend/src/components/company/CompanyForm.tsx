@@ -193,6 +193,7 @@ const CompanyForm: React.FC = () => {
     taxType: "GST",
     maintainBy: "self",
     accountantName: "",
+    caId: "",
   });
 
   // Security & Access Control States
@@ -207,6 +208,7 @@ const CompanyForm: React.FC = () => {
   const [showPassword, setShowPassword] = useState<boolean>(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
   const [accountantsList, setAccountantsList] = useState<Accountant[]>([]);
+  const [caList, setCaList] = useState<any[]>([]);
   const [vaultEnabled, setVaultEnabled] = useState<boolean>(false);
   const [vaultPassword, setVaultPassword] = useState<string>("");
   const [showVaultPassword, setShowVaultPassword] = useState<boolean>(false);
@@ -271,6 +273,22 @@ const CompanyForm: React.FC = () => {
         console.error("Network error while fetching accountants:", err);
       }
     };
+
+    const fetchCAs = async () => {
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ca`);
+        const data = await res.json();
+        if (res.ok) {
+          setCaList(data);
+        } else {
+          console.error("Failed to fetch CAs:", data.message);
+        }
+      } catch (err) {
+        console.error("Network error while fetching CAs:", err);
+      }
+    };
+
+    fetchCAs();
 
     if (company.maintainBy === "accountant") {
       fetchAccountants();
@@ -914,6 +932,32 @@ const CompanyForm: React.FC = () => {
                   )}
                 </div>
               )}
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="caId"
+                >
+                  <User size={16} className="inline mr-1" />
+                  Select CA
+                </label>
+                <select
+                  id="caId"
+                  name="caId"
+                  value={company.caId || ""}
+                  onChange={handleChange}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                    : "bg-white border-gray-300 text-black focus:border-blue-500"
+                    } outline-none transition-colors`}
+                >
+                  <option value="">-- Select CA --</option>
+                  {caList.map((ca) => (
+                    <option key={ca.id} value={ca.id}>
+                      {ca.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
           {/* Tally Vault Security */}
