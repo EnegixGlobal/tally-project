@@ -254,6 +254,7 @@ import PurchaseOrderRegister from "./components/voucherRegister/PurchaseOrderReg
 import DebitNoteRegiser from "./components/voucherRegister/DebitNoteRegiser";
 import AllSaleHsn from "./components/reports/AllSaleHsn";
 import AllHsnPurachase from "./components/reports/AllHsnPurachase";
+import NoCompanyAssigned from "./components/dashboard/NoCompanyAssigned";
 
 function App() {
   // Add keyboard shortcut listener for Alt+F1 for company selection
@@ -294,6 +295,7 @@ function App() {
               <Route path="/app" element={<MainLayout />}>
                 <Route index element={<Dashboard />} />
                 <Route path="company" element={<CompanyForm />} />
+                <Route path="no-company" element={<NoCompanyAssigned />} />
                 <Route
                   path="pricing"
                   element={

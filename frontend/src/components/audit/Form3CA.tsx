@@ -146,18 +146,21 @@ const Form3CA: React.FC = () => {
           }
         }
 
+        const newPan = user?.pan || companyInfo.panNumber || (companyInfo as any).pan || (companyInfo as any).pan_number || (companyInfo as any).pan_no || '';
+
+        // Only overwrite if the current value is empty or hasn't been changed from default
         return {
           ...prev,
-          nameOfAssessee: companyInfo.name || prev.nameOfAssessee,
-          panOfAssessee: user?.pan || companyInfo.panNumber || (companyInfo as any).pan || (companyInfo as any).pan_number || (companyInfo as any).pan_no || prev.panOfAssessee,
-          addressOfAssessee: companyInfo.address || prev.addressOfAssessee,
-          periodOfAudit: period,
-          financialYearFrom: fyFrom,
-          financialYearTo: fyTo
+          nameOfAssessee: prev.nameOfAssessee ? prev.nameOfAssessee : (companyInfo.name || ''),
+          panOfAssessee: prev.panOfAssessee ? prev.panOfAssessee : newPan,
+          addressOfAssessee: prev.addressOfAssessee ? prev.addressOfAssessee : (companyInfo.address || ''),
+          periodOfAudit: prev.periodOfAudit ? prev.periodOfAudit : period,
+          financialYearFrom: (prev.financialYearFrom && prev.financialYearFrom !== '2023-04-01') ? prev.financialYearFrom : fyFrom,
+          financialYearTo: (prev.financialYearTo && prev.financialYearTo !== '2024-03-31') ? prev.financialYearTo : fyTo
         };
       });
     }
-  }, [companyInfo, user]);
+  }, [companyInfo?.id, user?.id]); // Using IDs to prevent unnecessary deep-object reference triggers
 
   const handleInputChange = (field: keyof Form3CAData, value: string) => {
     setFormData(prev => ({

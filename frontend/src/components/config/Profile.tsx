@@ -309,8 +309,8 @@ const Profile: React.FC = () => {
 
     if (company.maintainBy === "accountant") {
       fetchAccountants();
-      fetchCAs();
     }
+    fetchCAs();
   }, [company.maintainBy]);
 
   // Form validation errors
@@ -414,14 +414,7 @@ const Profile: React.FC = () => {
       newErrors.pin = "PIN code must be exactly 6 digits";
     }
 
-    // Accountant name validation
-    if (
-      company.maintainBy === "accountant" &&
-      !company.accountantName?.trim()
-    ) {
-      newErrors.accountantName =
-        "Accountant name is required when maintained by accountant";
-    }
+    // Accountant name validation (made optional)
 
     // Vault password validation
     if (vaultEnabled && !vaultPassword.trim()) {
@@ -935,34 +928,32 @@ const Profile: React.FC = () => {
                   )}
                 </div>
               )}
-              {company.maintainBy === "accountant" && (
-                <div>
-                  <label
-                    className="block text-sm font-medium mb-1"
-                    htmlFor="caId"
-                  >
-                    <User size={16} className="inline mr-1" />
-                    Select CA
-                  </label>
-                  <select
-                    id="caId"
-                    name="caId"
-                    value={company.caId || ""}
-                    onChange={handleChange}
-                    className={`w-full p-2 rounded border ${theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                      : "bg-white border-gray-300 text-black focus:border-blue-500"
-                      } outline-none transition-colors`}
-                  >
-                    <option value="">-- Select CA --</option>
-                    {caList.map((ca) => (
-                      <option key={ca.id} value={ca.id}>
-                        {ca.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-              )}
+              <div>
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="caId"
+                >
+                  <User size={16} className="inline mr-1" />
+                  Select CA
+                </label>
+                <select
+                  id="caId"
+                  name="caId"
+                  value={company.caId || ""}
+                  onChange={handleChange}
+                  className={`w-full p-2 rounded border ${theme === "dark"
+                    ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                    : "bg-white border-gray-300 text-black focus:border-blue-500"
+                    } outline-none transition-colors`}
+                >
+                  <option value="">-- Select CA --</option>
+                  {caList.map((ca) => (
+                    <option key={ca.id} value={ca.id}>
+                      {ca.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
             </div>
           </div>
           {/* Tally Vault Security */}

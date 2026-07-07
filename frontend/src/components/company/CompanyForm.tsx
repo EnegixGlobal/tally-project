@@ -384,10 +384,7 @@ const CompanyForm: React.FC = () => {
       newErrors.pin = "PIN code must be exactly 6 digits";
     }
 
-    // Accountant name validation
-    if (company.maintainBy === "accountant" && !company.accountantName?.trim()) {
-      newErrors.accountantName = "Accountant name is required when maintained by accountant";
-    }
+    // Accountant name validation (made optional)
 
     // Vault password validation
     if (vaultEnabled && !vaultPassword.trim()) {

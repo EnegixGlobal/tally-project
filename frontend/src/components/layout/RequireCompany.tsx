@@ -8,7 +8,7 @@ interface RequireCompanyProps {
 }
 
 const RequireCompany: React.FC<RequireCompanyProps> = ({ children }) => {
-  const { hasCompany, isLoading: authLoading, isAuthenticated } = useAuth();
+  const { hasCompany, isLoading: authLoading, isAuthenticated, user } = useAuth();
   const { isLoading: companyLoading } = useCompany();
   const navigate = useNavigate();
   const location = useLocation();
@@ -18,10 +18,15 @@ const RequireCompany: React.FC<RequireCompanyProps> = ({ children }) => {
   React.useEffect(() => {
     if (!isLoading && isAuthenticated) {
       if (!hasCompany) {
-        navigate('/app/company');
+        const isOwner = user?.userType === 'employee';
+        if (isOwner) {
+          navigate('/app/company');
+        } else {
+          navigate('/app/no-company');
+        }
       }
     }
-  }, [isLoading, isAuthenticated, hasCompany, navigate, location.pathname]);
+  }, [isLoading, isAuthenticated, hasCompany, navigate, location.pathname, user]);
 
   if (isLoading) {
     return (
@@ -38,17 +43,27 @@ const RequireCompany: React.FC<RequireCompanyProps> = ({ children }) => {
 
   // If no company, show message
   if (!hasCompany) {
+    const isOwner = user?.userType === 'employee';
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center">
-          <h2 className="text-xl font-semibold mb-2">Company Required</h2>
-          <p className="text-gray-600 mb-4">Please create a company first to access this feature.</p>
-          <button
-            onClick={() => navigate('/app/company')}
-            className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
-          >
-            Create Company
-          </button>
+          {isOwner ? (
+            <>
+              <h2 className="text-xl font-semibold mb-2">Company Required</h2>
+              <p className="text-gray-600 mb-4">Please create a company first to access this feature.</p>
+              <button
+                onClick={() => navigate('/app/company')}
+                className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700"
+              >
+                Create Company
+              </button>
+            </>
+          ) : (
+            <>
+              <h2 className="text-xl font-semibold mb-2 text-red-600">Access Denied</h2>
+              <p className="text-gray-600 mb-4">No Company Assigned. Please contact your administrator.</p>
+            </>
+          )}
         </div>
       </div>
     );

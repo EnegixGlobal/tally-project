@@ -30,17 +30,39 @@ const MainLayout: React.FC = () => {
       return;
     }
 
-    // If authenticated but no company, force user to company creation page
-    // Allow access to the company creation route itself to avoid redirect loop
+    // If authenticated but no company, handle routing based on role
     if (!isLoading && isAuthenticated && !hasCompany) {
-      if (!location.pathname.startsWith('/app/company')) {
-        navigate('/app/company');
-        return;
+      const isOwner = user?.userType === 'employee';
+      if (isOwner) {
+        if (!location.pathname.startsWith('/app/company')) {
+          navigate('/app/company');
+          return;
+        }
+      } else {
+        if (!location.pathname.startsWith('/app/no-company')) {
+          navigate('/app/no-company');
+          return;
+        }
       }
     }
 
     // Role-based route protection
     if (!isLoading && isAuthenticated) {
+      const isOwner = user?.userType === 'employee';
+      
+      // Block accountants from owner-only routes
+      if (!isOwner) {
+        if (location.pathname.startsWith('/app/company') || location.pathname.startsWith('/app/config')) {
+          console.warn(`Access denied to ${location.pathname} for non-owner role`);
+          if (hasCompany) {
+            navigate('/app');
+          } else {
+            navigate('/app/no-company');
+          }
+          return;
+        }
+      }
+
       const isCa = user?.userType === 'ca';
       if (isCa) {
         const caRestrictedPaths = [
