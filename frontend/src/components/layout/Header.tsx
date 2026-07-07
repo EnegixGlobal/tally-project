@@ -87,6 +87,15 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
         <span className="text-white text-xs hidden md:inline-block">
           F1: Help | F2: Period | Alt+F1: Company
         </span>
+        {localStorage.getItem('userType') !== 'employee' ? (
+          <span className="ml-4 px-3 py-1 bg-yellow-500 text-yellow-900 text-sm font-bold rounded shadow-sm">
+            Accountant
+          </span>
+        ) : (
+          <span className="ml-4 px-3 py-1 bg-blue-500 text-white text-sm font-bold rounded shadow-sm border border-blue-400">
+            Trader
+          </span>
+        )}
       </div>
     </header>
   );
