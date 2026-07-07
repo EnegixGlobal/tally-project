@@ -11,6 +11,10 @@ interface CAUser {
   phone: string;
   firm_name: string;
   registration_number: string;
+  designation?: string;
+  membership_number?: string;
+  pan_number?: string;
+  udin?: string;
   password?: string;
   confirmPassword?: string;
   status: 'active' | 'suspended' | 'pending';
@@ -30,6 +34,10 @@ const CAManagement: React.FC = () => {
     phone: '',
     firm_name: '',
     registration_number: '',
+    designation: '',
+    membership_number: '',
+    pan_number: '',
+    udin: '',
     password: '',
     confirmPassword: '',
     status: 'active'
@@ -65,6 +73,10 @@ const CAManagement: React.FC = () => {
       phone: '',
       firm_name: '',
       registration_number: '',
+      designation: '',
+      membership_number: '',
+      pan_number: '',
+      udin: '',
       password: '',
       confirmPassword: '',
       status: 'active'
@@ -147,6 +159,10 @@ const CAManagement: React.FC = () => {
         phone: newCA.phone,
         firmName: newCA.firm_name,
         registrationNumber: newCA.registration_number,
+        designation: newCA.designation,
+        membershipNumber: newCA.membership_number,
+        panNumber: newCA.pan_number,
+        udin: newCA.udin,
         password: newCA.password,
         status: newCA.status
       };
@@ -278,14 +294,66 @@ const CAManagement: React.FC = () => {
 
             <div>
               <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                CA Registration Number *
+                Firm Registration Number *
               </label>
               <input
                 type="text"
                 value={newCA.registration_number}
                 onChange={(e) => setNewCA({ ...newCA, registration_number: e.target.value })}
                 className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
-                placeholder="Enter registration number..."
+                placeholder="Enter firm registration number..."
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                Designation
+              </label>
+              <input
+                type="text"
+                value={newCA.designation || ''}
+                onChange={(e) => setNewCA({ ...newCA, designation: e.target.value })}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
+                placeholder="e.g. Proprietor"
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                Membership Number
+              </label>
+              <input
+                type="text"
+                value={newCA.membership_number || ''}
+                onChange={(e) => setNewCA({ ...newCA, membership_number: e.target.value })}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
+                placeholder="Enter membership number..."
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                PAN Number
+              </label>
+              <input
+                type="text"
+                value={newCA.pan_number || ''}
+                onChange={(e) => setNewCA({ ...newCA, pan_number: e.target.value })}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
+                placeholder="Enter PAN number..."
+              />
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                UDIN
+              </label>
+              <input
+                type="text"
+                value={newCA.udin || ''}
+                onChange={(e) => setNewCA({ ...newCA, udin: e.target.value })}
+                className={`w-full px-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-gray-50 text-gray-900'}`}
+                placeholder="Enter UDIN..."
               />
             </div>
 
@@ -363,9 +431,10 @@ const CAManagement: React.FC = () => {
                     <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>ID</th>
                     <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Name</th>
                     <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Firm Name</th>
-                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Reg. No.</th>
+                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Firm Reg. No.</th>
+                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Membership No.</th>
+                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>PAN</th>
                     <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Email</th>
-                    <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Phone</th>
                     <th className={`px-6 py-4 text-left font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Status</th>
                     <th className={`px-6 py-4 text-right font-semibold uppercase tracking-wider ${theme === 'dark' ? 'text-gray-300' : 'text-gray-600'}`}>Actions</th>
                   </tr>
@@ -386,10 +455,13 @@ const CAManagement: React.FC = () => {
                         {ca.registration_number}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                        {ca.email}
+                        {ca.membership_number || '-'}
                       </td>
                       <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                        {ca.phone}
+                        {ca.pan_number || '-'}
+                      </td>
+                      <td className={`px-6 py-4 whitespace-nowrap ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                        {ca.email}
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
                         <span className={`px-3 py-1 text-xs font-bold rounded-full ${getStatusBadge(ca.status)} shadow-sm`}>
