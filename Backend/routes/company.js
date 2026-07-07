@@ -67,6 +67,12 @@ router.post('/company', async (req, res) => {
       console.log("✅ tan_number column created");
     }
 
+    const [bdCols] = await connection.query(`SHOW COLUMNS FROM tbcompanies LIKE 'back_date_allowed'`);
+    if (bdCols.length === 0) {
+      await connection.query(`ALTER TABLE tbcompanies ADD COLUMN back_date_allowed TINYINT(1) DEFAULT 0`);
+      console.log("✅ back_date_allowed column created");
+    }
+
     let hashedVaultPassword = null;
 
     if (vaultPassword) {
