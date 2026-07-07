@@ -71,14 +71,14 @@ const LoginPage: React.FC = () => {
         const hasCompanyRaw = localStorage.getItem('company');
         const hasCompany = hasCompanyRaw === 'true' || hasCompanyRaw === '1' || hasCompanyRaw === 'True';
 
-        if (userType === 'employee') {
-          if (hasCompany) {
-            navigate('/app');
-          } else {
-            navigate('/app/company');
-          }
-        } else {
+        if (hasCompany) {
           navigate('/app');
+        } else {
+          if (userType === 'employee') {
+            navigate('/app/company');
+          } else {
+            navigate('/app/no-company');
+          }
         }
       } else {
         setErrors({ submit: 'Invalid email or password' });
