@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useTheme } from '../../context/ThemeContext';
-import { Users, Plus, Edit, Trash2, Building, Shield, User, FileText, Mail, Phone, Lock, CreditCard, Hash, Briefcase, Badge } from 'lucide-react';
+import { Users, Plus, Edit, Trash2, Building, Shield, User, FileText, Mail, Phone, Lock, CreditCard, Hash, Briefcase, Badge, Upload, X } from 'lucide-react';
 import Swal from 'sweetalert2';
 import api from '../../services/api';
 
@@ -15,6 +15,9 @@ interface CAUser {
   membership_number?: string;
   pan_number?: string;
   udin?: string;
+  stamp_url?: string;
+  stamp_file?: File | null;
+  removeStamp?: boolean;
   password?: string;
   confirmPassword?: string;
   status: 'active' | 'suspended' | 'pending';
@@ -38,6 +41,9 @@ const CAManagement: React.FC = () => {
     membership_number: '',
     pan_number: '',
     udin: '',
+    stamp_url: '',
+    stamp_file: null,
+    removeStamp: false,
     password: '',
     confirmPassword: '',
     status: 'active'
@@ -77,6 +83,9 @@ const CAManagement: React.FC = () => {
       membership_number: '',
       pan_number: '',
       udin: '',
+      stamp_url: '',
+      stamp_file: null,
+      removeStamp: false,
       password: '',
       confirmPassword: '',
       status: 'active'
@@ -153,29 +162,30 @@ const CAManagement: React.FC = () => {
         }
       });
 
-      const payload = {
-        name: newCA.name,
-        email: newCA.email,
-        phone: newCA.phone,
-        firmName: newCA.firm_name,
-        registrationNumber: newCA.registration_number,
-        designation: newCA.designation,
-        membershipNumber: newCA.membership_number,
-        panNumber: newCA.pan_number,
-        udin: newCA.udin,
-        password: newCA.password,
-        status: newCA.status
-      };
+      const formData = new FormData();
+      formData.append('name', newCA.name);
+      formData.append('email', newCA.email);
+      formData.append('phone', newCA.phone);
+      formData.append('firmName', newCA.firm_name);
+      formData.append('registrationNumber', newCA.registration_number);
+      if (newCA.designation) formData.append('designation', newCA.designation);
+      if (newCA.membership_number) formData.append('membershipNumber', newCA.membership_number);
+      if (newCA.pan_number) formData.append('panNumber', newCA.pan_number);
+      if (newCA.udin) formData.append('udin', newCA.udin);
+      if (newCA.password) formData.append('password', newCA.password);
+      formData.append('status', newCA.status);
+      if (newCA.stamp_file) formData.append('stamp_image', newCA.stamp_file);
+      if (newCA.removeStamp) formData.append('removeStamp', 'true');
 
       if (editingCA) {
-        await api.put(`/api/ca/${editingCA.id}`, payload);
+        await api.put(`/api/ca/${editingCA.id}`, formData);
         Swal.fire({
           icon: 'success',
           title: 'Success',
           text: 'CA updated successfully!',
         });
       } else {
-        await api.post('/api/ca', payload);
+        await api.post('/api/ca', formData);
         Swal.fire({
           icon: 'success',
           title: 'Success',
@@ -191,6 +201,52 @@ const CAManagement: React.FC = () => {
         icon: 'error',
         title: 'Failed',
         text: error.response?.data?.error || 'An error occurred while saving CA',
+      });
+    }
+  };
+
+  const handleRemoveStamp = async (e: React.MouseEvent) => {
+    e.preventDefault();
+    if (editingCA && newCA.stamp_url && !newCA.stamp_file) {
+      const result = await Swal.fire({
+        title: 'Remove Stamp?',
+        text: 'This will instantly delete the image from the server. Are you sure?',
+        icon: 'warning',
+        showCancelButton: true,
+        confirmButtonColor: '#ef4444',
+        cancelButtonColor: '#3b82f6',
+        confirmButtonText: 'Yes, delete it!'
+      });
+
+      if (result.isConfirmed) {
+        try {
+          Swal.fire({ title: 'Deleting...', allowOutsideClick: false, didOpen: () => Swal.showLoading() });
+          await api.delete(`/api/ca/${editingCA.id}/stamp`);
+          setNewCA({ ...newCA, stamp_url: '', stamp_file: null, removeStamp: false });
+          Swal.fire('Deleted!', 'The stamp has been permanently removed.', 'success');
+          fetchCAs();
+        } catch (error) {
+          console.error('Error deleting stamp:', error);
+          Swal.fire('Error', 'Failed to remove stamp from server', 'error');
+        }
+      }
+    } else {
+      setNewCA({ ...newCA, stamp_file: null, removeStamp: true });
+    }
+  };
+
+  const handlePreviewImage = () => {
+    const src = newCA.stamp_file ? URL.createObjectURL(newCA.stamp_file) : newCA.stamp_url;
+    if (src) {
+      Swal.fire({
+        imageUrl: src,
+        imageAlt: 'Stamp Preview',
+        showConfirmButton: false,
+        showCloseButton: true,
+        width: 'auto',
+        padding: '1em',
+        background: theme === 'dark' ? '#1f2937' : '#ffffff',
+        backdrop: `rgba(0,0,0,0.8)`
       });
     }
   };
@@ -384,7 +440,7 @@ const CAManagement: React.FC = () => {
                   </div>
                 </div>
 
-                <div className="lg:col-span-2">
+                <div className="lg:col-span-1">
                   <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
                     UDIN
                   </label>
@@ -397,6 +453,44 @@ const CAManagement: React.FC = () => {
                       className={`w-full pl-10 pr-4 py-3 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
                       placeholder="Enter UDIN..."
                     />
+                  </div>
+                </div>
+
+                <div className="lg:col-span-1">
+                  <label className={`block text-sm font-medium mb-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
+                    Firm Stamp Image
+                  </label>
+                  <div className="flex items-center gap-4">
+                    <div className="relative flex-grow">
+                      <Upload className={`absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`} />
+                      <input
+                        key={newCA.stamp_file ? 'file-selected' : 'no-file'}
+                        type="file"
+                        accept="image/*"
+                        onChange={(e) => setNewCA({ ...newCA, stamp_file: e.target.files ? e.target.files[0] : null, removeStamp: false })}
+                        className={`w-full pl-10 pr-4 py-2.5 border rounded-xl focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all file:mr-4 file:py-1 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-primary/10 file:text-primary hover:file:bg-primary/20 ${theme === 'dark' ? 'border-gray-600 bg-gray-700 text-white' : 'border-gray-200 bg-white text-gray-900'}`}
+                      />
+                    </div>
+                    {(newCA.stamp_file || newCA.stamp_url) && !newCA.removeStamp && (
+                      <div className="relative group shrink-0">
+                        <div className="w-20 h-20 rounded-lg border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-800 flex items-center justify-center overflow-hidden">
+                          <img 
+                            src={newCA.stamp_file ? URL.createObjectURL(newCA.stamp_file) : newCA.stamp_url} 
+                            alt="Stamp" 
+                            className="max-w-full max-h-full object-contain cursor-pointer hover:opacity-80 transition-opacity"
+                            onClick={handlePreviewImage}
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={handleRemoveStamp}
+                          className="absolute -top-2 -right-2 text-white bg-red-500 rounded-full p-1 shadow-md hover:bg-red-600 transition-all opacity-0 group-hover:opacity-100"
+                          title="Remove Stamp"
+                        >
+                          <X className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
