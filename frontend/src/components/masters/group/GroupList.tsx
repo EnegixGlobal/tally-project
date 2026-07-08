@@ -3,7 +3,7 @@ import { useAppContext } from "../../../context/AppContext";
 import { useAuth } from "../../../home/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import type { LedgerGroup, GstClassification } from "../../../types";
-import { Edit, Trash2, Plus, Search, ArrowLeft, Settings } from "lucide-react";
+import { Edit, Trash2, Plus, Search, ArrowLeft, Settings, FileCode2 } from "lucide-react";
 import { apiFetch } from "../../../utils/apiFetch";
 import { allSystemGroups } from "../../../constants/ledgerGroups";
 import Swal from "sweetalert2";
@@ -184,6 +184,20 @@ const GroupList: React.FC = () => {
           >
             <Plus size={18} className="mr-1" />
             Create Group
+          </button>
+
+          {/* Export XML Button */}
+          <button
+            type="button"
+            title="Export XML"
+            onClick={() => alert("Export XML functionality to be implemented")}
+            className={`flex items-center px-4 py-2 rounded text-sm font-medium ${theme === "dark"
+                ? "bg-red-600 hover:bg-red-700 text-white"
+                : "bg-red-600 hover:bg-red-700 text-white"
+              }`}
+          >
+            <FileCode2 size={18} className="mr-1" />
+            Export XML
           </button>
 
           {/* Settings Icon */}
