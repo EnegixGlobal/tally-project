@@ -56,16 +56,43 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
         </button>
        <div className="text-white font-bold">
   {companyData ? (
-    <>
-      {companyData.name}
+    <span className="inline-flex items-center flex-wrap gap-3">
+      <span className="mr-1">{companyData.name}</span>
       {user && (
-        <span className="ml-2">
-          | {localStorage.getItem('userType') === 'employee' ? 'Trader Name' : 
-             localStorage.getItem('userType') === 'ca' ? 'Accountant Name' : 
-             localStorage.getItem('userType') === 'new_ca' ? 'CA Name' : 'User Name'} : {user.firstName || user.name}
+        <span className="inline-flex items-center gap-3">
+          <span className="opacity-60">|</span>
+          {localStorage.getItem('userType') === 'employee' ? (
+             <>
+               <span className="px-3 py-1 bg-blue-500 text-white text-sm font-bold rounded shadow-sm border border-blue-400">
+                 Trader Name: {companyData.TraderName || user.firstName || user.name}
+               </span>
+               {companyData.AccountantName && (
+                 <span className="px-3 py-1 bg-yellow-500 text-yellow-900 text-sm font-bold rounded shadow-sm border border-yellow-400">
+                   Accountant Name: {companyData.AccountantName}
+                 </span>
+               )}
+               {companyData.NewCAName && (
+                 <span className="px-3 py-1 bg-green-500 text-white text-sm font-bold rounded shadow-sm border border-green-400">
+                   CA Name: {companyData.NewCAName}
+                 </span>
+               )}
+             </>
+          ) : localStorage.getItem('userType') === 'ca' ? (
+             <span className="px-3 py-1 bg-yellow-500 text-yellow-900 text-sm font-bold rounded shadow-sm border border-yellow-400">
+               Accountant Name: {user.firstName || user.name}
+             </span>
+          ) : localStorage.getItem('userType') === 'new_ca' ? (
+             <span className="px-3 py-1 bg-green-500 text-white text-sm font-bold rounded shadow-sm border border-green-400">
+               CA Name: {user.firstName || user.name}
+             </span>
+          ) : (
+             <span className="px-3 py-1 bg-gray-500 text-white text-sm font-bold rounded shadow-sm border border-gray-400">
+               User: {user.firstName || user.name}
+             </span>
+          )}
         </span>
       )}
-    </>
+    </span>
   ) : "No company assigned"}
 
 <div className="text-xs text-blue-200 dark:text-gray-400">
