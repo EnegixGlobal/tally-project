@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
-import { Edit, Trash2, Plus, Search, ArrowLeft, Download } from "lucide-react";
+import { Edit, Trash2, Plus, Search, ArrowLeft, Download, FileCode2 } from "lucide-react";
 import { useAppContext } from "../../../context/AppContext";
 import type { Ledger, LedgerGroup } from "../../../types";
 import { formatGSTNumber } from "../../../utils/ledgerUtils";
@@ -260,6 +260,18 @@ const LedgerList: React.FC = () => {
             >
               <Plus size={18} className="mr-1" />
               Create Ledger
+            </button>
+            <button
+              type="button"
+              title="Export XML"
+              onClick={() => alert("Export XML functionality to be implemented")}
+              className={`flex items-center px-4 py-2 rounded text-sm font-medium ${theme === "dark"
+                  ? "bg-red-600 hover:bg-red-700 text-white"
+                  : "bg-red-600 hover:bg-red-700 text-white"
+                }`}
+            >
+              <FileCode2 size={18} className="mr-1" />
+              Export XML
             </button>
           </div>
         </div>

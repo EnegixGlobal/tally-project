@@ -108,7 +108,7 @@ const HorizontalMenu: React.FC<HorizontalMenuProps> = ({ sidebarOpen }) => {
       <div className="flex items-center h-full px-2 space-x-2 min-w-max">
         {menuItems
           .filter((item) => {
-            if (user?.userType === "ca") {
+            if (user?.userType === "ca" || user?.userType === "new_ca") {
               const titleLower = item.title.toLowerCase();
               return !(
                 titleLower === "masters" ||

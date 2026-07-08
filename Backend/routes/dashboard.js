@@ -3,27 +3,61 @@ const router = express.Router();
 const db = require('../db');
 
 router.get('/dashboard-data', async (req, res) => {
-  const { employee_id, company_id } = req.query;
+  const { employee_id, company_id, user_type, user_id } = req.query;
 
   if (!employee_id) return res.status(400).json({ success: false, error: 'employee_id required' });
 
   try {
-    let companyInfoQuery = 'SELECT * FROM tbcompanies WHERE employee_id = ? OR id = ?';
-    let companiesQuery = `SELECT c.*, 
-       (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = c.id) > 0 as isLocked 
-       FROM tbcompanies c WHERE c.employee_id = ? OR c.id = ?`;
-    let queryParams = [employee_id, employee_id];
+    let companyInfoQuery;
+    let queryParams = [];
+
+    if (user_type === 'new_ca' && user_id) {
+      companyInfoQuery = `SELECT c.* FROM tbcompanies c INNER JOIN ca_company cc ON c.id = cc.company_id WHERE cc.ca_id = ?`;
+      queryParams = [user_id];
+    } else {
+      companyInfoQuery = 'SELECT * FROM tbcompanies WHERE employee_id = ? OR id = ?';
+      queryParams = [employee_id, employee_id];
+    }
+
+    let companiesQuery;
+    let companiesQueryParams = [];
+
+    if (user_type === 'new_ca' && user_id) {
+      companiesQuery = `SELECT c.*, 
+        (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = c.id) > 0 as isLocked 
+        FROM tbcompanies c 
+        INNER JOIN ca_company cc ON c.id = cc.company_id 
+        WHERE cc.ca_id = ?`;
+      companiesQueryParams = [user_id];
+    } else {
+      companiesQuery = `SELECT c.*, 
+        (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = c.id) > 0 as isLocked 
+        FROM tbcompanies c WHERE c.employee_id = ? OR c.id = ?`;
+      companiesQueryParams = [employee_id, employee_id];
+    }
 
     if (company_id) {
-      companyInfoQuery += ' AND id = ?';
-      companiesQuery += ' AND c.id = ?';
+      if (user_type === 'new_ca' && user_id) {
+        companyInfoQuery += ' AND c.id = ?';
+      } else {
+        companyInfoQuery += ' AND id = ?';
+      }
       queryParams.push(company_id);
+
+      // if filtering companies by company_id
+      if (user_type === 'new_ca' && user_id) {
+        companiesQuery += ' AND c.id = ?';
+        companiesQueryParams.push(company_id);
+      } else {
+        companiesQuery += ' AND c.id = ?';
+        companiesQueryParams.push(company_id);
+      }
     }
 
     const [[companyInfo]] = await db.query(companyInfoQuery, queryParams);
     const [userLimitRows] = await db.query('SELECT userLimit FROM tbemployees WHERE id = ?', [employee_id]);
     const userLimit = userLimitRows && userLimitRows.length > 0 ? userLimitRows[0].userLimit : 1;
-    const [companies] = await db.query(companiesQuery, queryParams);
+    const [companies] = await db.query(companiesQuery, companiesQueryParams);
 
     // Fetch ledgers and vouchers for the specific company (using the first one found or the company_id provided)
     const activeCompanyId = company_id || (companyInfo ? companyInfo.id : null);
@@ -150,8 +184,8 @@ router.get('/companies-by-ca', async (req, res) => {
       `SELECT id, name, employee_id, pan_number,
        (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = tbcompanies.id) > 0 as isLocked
        FROM tbcompanies 
-       WHERE (fdAccountantName = ?) OR (employee_id = ?)`,
-      [caName, caId]
+       WHERE (fdAccountantName = ?) OR (employee_id = ?) OR id IN (SELECT company_id FROM ca_company WHERE ca_id = ?)`,
+      [caName, caId, caId]
     );
 
     res.json({ companies: rows });
@@ -164,5 +198,26 @@ router.get('/companies-by-ca', async (req, res) => {
 });
 
 
+
+router.get('/companies-by-new-ca', async (req, res) => {
+  const caId = req.query.ca_id;
+  if (!caId) return res.status(400).json({ message: 'Missing ca_id' });
+
+  try {
+    const [companies] = await db.query(
+      `SELECT c.id, c.name, 
+       (SELECT COUNT(*) FROM tbusers u WHERE u.company_id = c.id) > 0 as isLocked 
+       FROM tbcompanies c
+       INNER JOIN ca_company cc ON c.id = cc.company_id
+       WHERE cc.ca_id = ?`,
+      [caId]
+    );
+
+    res.json({ companies });
+  } catch (err) {
+    console.error('Error fetching companies for new ca:', err);
+    res.status(500).json({ message: err.message });
+  }
+});
 
 module.exports = router;

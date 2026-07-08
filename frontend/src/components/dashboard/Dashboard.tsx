@@ -198,7 +198,7 @@ const Dashboard: React.FC = () => {
           fetchOwnerId = localStorage.getItem("employee_id");
         }
 
-        let url = `${import.meta.env.VITE_API_URL}/api/dashboard-data?employee_id=${fetchOwnerId}`;
+        let url = `${import.meta.env.VITE_API_URL}/api/dashboard-data?employee_id=${fetchOwnerId}&user_type=${userType}&user_id=${localStorage.getItem("user_id")}`;
 
         if (restrictedId) {
           url += `&company_id=${restrictedId}`;
@@ -257,7 +257,9 @@ const Dashboard: React.FC = () => {
     const employeeId = localStorage.getItem("employee_id");
     const caEmployeeId = localStorage.getItem("user_id");
 
-    if (!employeeId && userType !== "ca_employee") return;
+    if (!employeeId && userType !== "ca_employee" && userType !== "new_ca") return;
+
+
 
     if (userType === "ca_employee" && caEmployeeId) {
       fetch(
@@ -397,7 +399,7 @@ const Dashboard: React.FC = () => {
   ];
 
   const companyCount = companies.length;
-  const canCreateCompany = companyCount < userLimit && userType === "employee";
+  const canCreateCompany = companyCount < userLimit && (userType === "employee" || userType === "new_ca");
   // Note: For 'ca_employee', userType is 'ca_employee', so canCreateCompany will be false.
 
   const handleAddEmployee = () => {
@@ -451,7 +453,7 @@ const Dashboard: React.FC = () => {
                 )
               )}
 
-              {userType === "employee" && allCompanies.length > 1 && (
+              {(userType === "employee" || userType === "new_ca") && allCompanies.length > 1 && (
                 <div className="flex items-center gap-3">
                   <span className="text-sm font-bold text-gray-400 invisible sm:visible">Active:</span>
                   <select
@@ -601,6 +603,8 @@ const Dashboard: React.FC = () => {
             </div>
           ) : (
             <>
+
+
               {/* Company Info */}
               <div
                 className={`p-6 rounded-lg mb-6 ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"
@@ -788,8 +792,9 @@ const Dashboard: React.FC = () => {
             </table>
           </div>
 
-          {/* Employees Table */}
-          <div className="bg-white shadow rounded-2xl p-6 overflow-x-auto">
+          {/* Employees Table - hidden for new_ca */}
+          {userType !== "new_ca" && (
+            <div className="bg-white shadow rounded-2xl p-6 overflow-x-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Working Employees</h2>
               <button
@@ -865,9 +870,8 @@ const Dashboard: React.FC = () => {
                 ))}
               </tbody>
             </table>
-
-
           </div>
+          )}
         </div>
       ) : null}
       {
