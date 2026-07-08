@@ -792,8 +792,9 @@ const Dashboard: React.FC = () => {
             </table>
           </div>
 
-          {/* Employees Table */}
-          <div className="bg-white shadow rounded-2xl p-6 overflow-x-auto">
+          {/* Employees Table - hidden for new_ca */}
+          {userType !== "new_ca" && (
+            <div className="bg-white shadow rounded-2xl p-6 overflow-x-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-lg font-semibold">Working Employees</h2>
               <button
@@ -869,9 +870,8 @@ const Dashboard: React.FC = () => {
                 ))}
               </tbody>
             </table>
-
-
           </div>
+          )}
         </div>
       ) : null}
       {
