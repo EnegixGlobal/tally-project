@@ -61,7 +61,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
         <ul className="space-y-1">
           {menuItems
             .filter((item) => {
-              if (user?.userType === "ca") {
+              if (user?.userType === "ca" || user?.userType === "new_ca") {
                 const titleLower = item.title.toLowerCase();
                 return !(
                   titleLower === "masters" ||

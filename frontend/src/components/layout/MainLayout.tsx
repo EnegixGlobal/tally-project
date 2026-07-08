@@ -32,7 +32,7 @@ const MainLayout: React.FC = () => {
 
     // If authenticated but no company, handle routing based on role
     if (!isLoading && isAuthenticated && !hasCompany) {
-      const isOwner = user?.userType === 'employee';
+      const isOwner = user?.userType === 'employee' || user?.userType === 'new_ca';
       if (isOwner) {
         if (!location.pathname.startsWith('/app/company')) {
           navigate('/app/company');
@@ -48,7 +48,7 @@ const MainLayout: React.FC = () => {
 
     // Role-based route protection
     if (!isLoading && isAuthenticated) {
-      const isOwner = user?.userType === 'employee';
+      const isOwner = user?.userType === 'employee' || user?.userType === 'new_ca';
       
       // Block accountants from owner-only routes
       if (!isOwner) {
@@ -63,7 +63,7 @@ const MainLayout: React.FC = () => {
         }
       }
 
-      const isCa = user?.userType === 'ca';
+      const isCa = user?.userType === 'ca' || user?.userType === 'new_ca';
       if (isCa) {
         const caRestrictedPaths = [
           '/app/masters',

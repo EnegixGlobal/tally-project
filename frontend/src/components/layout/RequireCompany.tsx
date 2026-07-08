@@ -18,7 +18,7 @@ const RequireCompany: React.FC<RequireCompanyProps> = ({ children }) => {
   React.useEffect(() => {
     if (!isLoading && isAuthenticated) {
       if (!hasCompany) {
-        const isOwner = user?.userType === 'employee';
+        const isOwner = user?.userType === 'employee' || user?.userType === 'new_ca';
         if (isOwner) {
           navigate('/app/company');
         } else {
@@ -43,7 +43,7 @@ const RequireCompany: React.FC<RequireCompanyProps> = ({ children }) => {
 
   // If no company, show message
   if (!hasCompany) {
-    const isOwner = user?.userType === 'employee';
+    const isOwner = user?.userType === 'employee' || user?.userType === 'new_ca';
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <div className="text-center">

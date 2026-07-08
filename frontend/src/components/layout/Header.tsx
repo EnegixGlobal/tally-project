@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAppContext } from '../../context/AppContext';
 import { Moon, Sun, Menu } from 'lucide-react';
+import { useAuth } from '../../home/context/AuthContext';
 
 interface HeaderProps {
   toggleSidebar: () => void;
@@ -14,6 +15,7 @@ interface CompanyData {
 
 const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
   const { theme, toggleTheme } = useAppContext();
+  const { user } = useAuth();
   const storedCompanyId = localStorage.getItem("company_id");
   const [companyData, setCompanyData] = useState<CompanyData | null>(null);
 
@@ -53,15 +55,18 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
           <Menu size={20} />
         </button>
        <div className="text-white font-bold">
-  {companyData
- ? `${companyData.name} ${
-     companyData.fdAccountType &&
-     companyData.fdAccountType.toLowerCase() === "accountant" &&
-     companyData.AccountantName
-       ? `| Accountant Name : ${companyData.AccountantName}`
-       : ""
-   }`
- : "No company assigned"}
+  {companyData ? (
+    <>
+      {companyData.name}
+      {user && (
+        <span className="ml-2">
+          | {localStorage.getItem('userType') === 'employee' ? 'Trader Name' : 
+             localStorage.getItem('userType') === 'ca' ? 'Accountant Name' : 
+             localStorage.getItem('userType') === 'new_ca' ? 'CA Name' : 'User Name'} : {user.firstName || user.name}
+        </span>
+      )}
+    </>
+  ) : "No company assigned"}
 
 <div className="text-xs text-blue-200 dark:text-gray-400">
   {companyData
@@ -87,13 +92,17 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
         <span className="text-white text-xs hidden md:inline-block">
           F1: Help | F2: Period | Alt+F1: Company
         </span>
-        {localStorage.getItem('userType') !== 'employee' ? (
-          <span className="ml-4 px-3 py-1 bg-yellow-500 text-yellow-900 text-sm font-bold rounded shadow-sm">
-            Accountant
+        {localStorage.getItem('userType') === 'new_ca' ? (
+          <span className="ml-4 px-3 py-1 bg-green-500 text-white text-sm font-bold rounded shadow-sm border border-green-400">
+            CA
           </span>
-        ) : (
+        ) : localStorage.getItem('userType') === 'employee' ? (
           <span className="ml-4 px-3 py-1 bg-blue-500 text-white text-sm font-bold rounded shadow-sm border border-blue-400">
             Trader
+          </span>
+        ) : (
+          <span className="ml-4 px-3 py-1 bg-yellow-500 text-yellow-900 text-sm font-bold rounded shadow-sm">
+            Accountant
           </span>
         )}
       </div>

@@ -74,7 +74,7 @@ const LoginPage: React.FC = () => {
         if (hasCompany) {
           navigate('/app');
         } else {
-          if (userType === 'employee') {
+          if (userType === 'employee' || userType === 'new_ca') {
             navigate('/app/company');
           } else {
             navigate('/app/no-company');
