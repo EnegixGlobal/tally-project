@@ -1042,35 +1042,65 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         return;
       }
 
-      const csvContent = [
-        // Always show both debit and credit columns for consistency
-        [
-          "Date",
-          "Voucher Number",
-          "Voucher Type",
-          "Particulars",
-          "Debit Amount",
-          "Credit Amount",
-          "Status",
-        ].join(","),
-        ...filteredVouchers.map((voucher) => {
-          const { debit, credit } = calculateDebitCredit(voucher);
-          const particulars = getParticulars(voucher).replace(/"/g, '""'); // Escape quotes
-          const status = getVoucherStatus(voucher);
+      let csvContent = "";
 
-          if (voucherType === "sales") {
+      if (voucherType === "sales" || voucherType === "purchase") {
+        csvContent = [
+          [
+            "Date",
+            "Voucher No",
+            "Party",
+            "Supplier Invoice Date",
+            "Invoice No",
+            "Taxable Value",
+            "IGST",
+            "CGST",
+            "SGST",
+            "Total GST",
+            "Discount",
+            "Overall Discount",
+            "Invoice Value"
+          ].join(","),
+          ...filteredVouchers.map((voucher) => {
+            const partyEntryType = voucherType === "sales" ? "debit" : "credit";
+            const partyLedgerId = voucher.entries.find((e: any) => e.type === partyEntryType)?.ledgerId;
+            const partyName = getLedgerName(partyLedgerId).replace(/"/g, '""');
+            const totalGST = (Number(voucher.igstTotal || 0) + Number(voucher.cgstTotal || 0) + Number(voucher.sgstTotal || 0));
             return [
-              voucher.date,
+              formatDate(voucher.date),
               voucher.number,
-              voucher.type.toUpperCase(),
-              `"${particulars}"`,
-              debit.toFixed(2),
-              "0.00", // Sales only show debit amounts
-              status,
+              `"${partyName}"`,
+              voucher.supplierInvoiceDate ? formatDate(voucher.supplierInvoiceDate) : "",
+              voucher.referenceNo,
+              Number(voucher.subtotal || 0).toFixed(2),
+              Number(voucher.igstTotal || 0).toFixed(2),
+              Number(voucher.cgstTotal || 0).toFixed(2),
+              Number(voucher.sgstTotal || 0).toFixed(2),
+              totalGST.toFixed(2),
+              Number(voucher.discountTotal || 0).toFixed(2),
+              Number(voucher.overallDiscountAmount || voucher.discountAmount || 0).toFixed(2),
+              Number(voucher.total || 0).toFixed(2)
             ].join(",");
-          } else {
+          })
+        ].join("\n");
+      } else {
+        csvContent = [
+          [
+            "Date",
+            "Voucher Number",
+            "Voucher Type",
+            "Particulars",
+            "Debit Amount",
+            "Credit Amount",
+            "Status",
+          ].join(","),
+          ...filteredVouchers.map((voucher) => {
+            const { debit, credit } = calculateDebitCredit(voucher);
+            const particulars = getParticulars(voucher).replace(/"/g, '""');
+            const status = getVoucherStatus(voucher);
+
             return [
-              voucher.date,
+              formatDate(voucher.date),
               voucher.number,
               voucher.type.toUpperCase(),
               `"${particulars}"`,
@@ -1078,16 +1108,15 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               credit.toFixed(2),
               status,
             ].join(",");
-          }
-        }),
-      ].join("\n");
+          }),
+        ].join("\n");
+      }
 
       const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
       const url = window.URL.createObjectURL(blob);
       const a = document.createElement("a");
       a.href = url;
-      a.download = `${title.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]
-        }.csv`;
+      a.download = `${title.replace(/\s+/g, "_")}_${new Date().toISOString().split("T")[0]}.csv`;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
@@ -1113,9 +1142,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
       const selectedMonthName = selectedMonth
         ? getAvailableMonths().find((m) => m.value === selectedMonth)?.label ||
         "Unknown Month"
-        : "";
-
-      const printContent = `
+        : "";      const printContent = `
         <html>
           <head>
             <title>${title}</title>
@@ -1138,12 +1165,28 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             <div class="header">
               <h1>${title}</h1>
               <p>Generated on: ${new Date().toLocaleString()}</p>
-              <p>View Type: ${viewType}${selectedMonth ? ` - ${selectedMonthName}` : ""
-        }</p>
+              <p>View Type: ${viewType}${selectedMonth ? ` - ${selectedMonthName}` : ""}</p>
               <p>Total Records: ${filteredVouchers.length}</p>
             </div>
             <table>
               <thead>
+                ${voucherType === "sales" || voucherType === "purchase" ? `
+                <tr>
+                  <th>Date</th>
+                  <th>Voucher No</th>
+                  <th>Party</th>
+                  <th>Supplier Invoice Date</th>
+                  <th>Invoice No</th>
+                  <th class="text-right">Taxable Value</th>
+                  <th class="text-right">IGST</th>
+                  <th class="text-right">CGST</th>
+                  <th class="text-right">SGST</th>
+                  <th class="text-right">Total GST</th>
+                  <th class="text-right">Discount</th>
+                  <th class="text-right">Overall Discount</th>
+                  <th class="text-right">Invoice Value</th>
+                </tr>
+                ` : `
                 <tr>
                   <th>Date</th>
                   <th>Voucher No</th>
@@ -1153,22 +1196,33 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   <th class="text-right">Credit Amount</th>
                   <th class="text-center">Status</th>
                 </tr>
+                `}
               </thead>
               <tbody>
                 ${filteredVouchers
           .map((voucher) => {
             const { debit, credit } = calculateDebitCredit(voucher);
             const particulars = getParticulars(voucher);
-            if (voucherType === "sales") {
+            if (voucherType === "sales" || voucherType === "purchase") {
+              const partyEntryType = voucherType === "sales" ? "debit" : "credit";
+              const partyLedgerId = voucher.entries.find((e: any) => e.type === partyEntryType)?.ledgerId;
+              const partyName = getLedgerName(partyLedgerId);
+              const totalGST = (Number(voucher.igstTotal || 0) + Number(voucher.cgstTotal || 0) + Number(voucher.sgstTotal || 0));
               return `
                     <tr>
                       <td>${formatDate(voucher.date)}</td>
                       <td>${voucher.number}</td>
-                      <td>${voucher.type.toUpperCase()}</td>
-                      <td>${particulars}</td>
-                      <td class="text-right">${formatCurrency(debit)}</td>
-                      <td class="text-right">-</td>
-                      <td class="text-center">${getVoucherStatus(voucher)}</td>
+                      <td>${partyName}</td>
+                      <td>${voucher.supplierInvoiceDate ? formatDate(voucher.supplierInvoiceDate) : ""}</td>
+                      <td>${voucher.referenceNo}</td>
+                      <td class="text-right">${formatCurrency(Number(voucher.subtotal || 0))}</td>
+                      <td class="text-right">${formatCurrency(Number(voucher.igstTotal || 0))}</td>
+                      <td class="text-right">${formatCurrency(Number(voucher.cgstTotal || 0))}</td>
+                      <td class="text-right">${formatCurrency(Number(voucher.sgstTotal || 0))}</td>
+                      <td class="text-right">${formatCurrency(totalGST)}</td>
+                      <td class="text-right">${formatCurrency(Number(voucher.discountTotal || 0))}</td>
+                      <td class="text-right">${formatCurrency(Number(voucher.overallDiscountAmount || voucher.discountAmount || 0))}</td>
+                      <td class="text-right">${formatCurrency(Number(voucher.total || 0))}</td>
                     </tr>`;
             } else {
               return `
@@ -1177,10 +1231,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       <td>${voucher.number}</td>
                       <td>${voucher.type.toUpperCase()}</td>
                       <td>${particulars}</td>
-                      <td class="text-right">${debit > 0 ? formatCurrency(debit) : "-"
-                }</td>
-                      <td class="text-right">${credit > 0 ? formatCurrency(credit) : "-"
-                }</td>
+                      <td class="text-right">${debit > 0 ? formatCurrency(debit) : "-"}</td>
+                      <td class="text-right">${credit > 0 ? formatCurrency(credit) : "-"}</td>
                       <td class="text-center">${getVoucherStatus(voucher)}</td>
                     </tr>`;
             }
@@ -1188,19 +1240,31 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
           .join("")}
               </tbody>
               <tfoot>
+                ${voucherType === "sales" || voucherType === "purchase" ? `
                 <tr class="font-bold">
-                  <td colspan="4" class="text-right">Total (${filteredVouchers.length
-        } vouchers)</td>
+                  <td colspan="5" class="text-right">Total (${filteredVouchers.length} vouchers)</td>
+                  <td class="text-right">${formatCurrency(filteredVouchers.reduce((s, v) => s + Number(v.subtotal || 0), 0))}</td>
+                  <td class="text-right">${formatCurrency(filteredVouchers.reduce((s, v) => s + Number(v.igstTotal || 0), 0))}</td>
+                  <td class="text-right">${formatCurrency(filteredVouchers.reduce((s, v) => s + Number(v.cgstTotal || 0), 0))}</td>
+                  <td class="text-right">${formatCurrency(filteredVouchers.reduce((s, v) => s + Number(v.sgstTotal || 0), 0))}</td>
+                  <td class="text-right">${formatCurrency(filteredVouchers.reduce((s, v) => s + (Number(v.igstTotal || 0) + Number(v.cgstTotal || 0) + Number(v.sgstTotal || 0)), 0))}</td>
+                  <td class="text-right">${formatCurrency(filteredVouchers.reduce((s, v) => s + Number(v.discountTotal || 0), 0))}</td>
+                  <td class="text-right">${formatCurrency(filteredVouchers.reduce((s, v) => s + Number(v.overallDiscountAmount || v.discountAmount || 0), 0))}</td>
+                  <td class="text-right">${formatCurrency(filteredVouchers.reduce((s, v) => s + Number(v.total || 0), 0))}</td>
+                </tr>
+                ` : `
+                <tr class="font-bold">
+                  <td colspan="4" class="text-right">Total (${filteredVouchers.length} vouchers)</td>
                   <td class="text-right">${formatCurrency(totalDebit)}</td>
-                  <td class="text-right">${voucherType === "sales" ? "-" : formatCurrency(totalCredit)
-        }</td>
+                  <td class="text-right">${["sales", "purchase"].includes(voucherType) ? "-" : formatCurrency(totalCredit)}</td>
                   <td></td>
                 </tr>
+                `}
               </tfoot>
             </table>
           </body>
         </html>
-      `;
+      `;  
 
       const printWindow = window.open("", "_blank");
       if (printWindow) {
