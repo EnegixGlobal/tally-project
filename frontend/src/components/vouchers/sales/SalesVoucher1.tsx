@@ -2332,7 +2332,15 @@ const SalesVoucher: React.FC = () => {
     const payload = {
       date: formData.date,
       number: formData.number,
-      referenceNo: formData.referenceNo,
+      referenceNo: (() => {
+        let val = formData.referenceNo || formData.number || "";
+        const parts = String(val).split("/");
+        if (parts.length >= 2) {
+          const match = parts.find((p) => /^\d+$/.test(p));
+          if (match) return match;
+        }
+        return val;
+      })(),
       partyId: finalPartyId,
       salesLedgerId: formData.salesLedgerId,
       narration: formData.narration,

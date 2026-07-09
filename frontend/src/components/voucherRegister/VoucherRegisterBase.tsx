@@ -112,6 +112,18 @@ const fixVoucherNumber = (num: string) => {
   return String(num);
 };
 
+const formatInvoiceNumber = (referenceNo: string, voucherNo: string) => {
+  const val = referenceNo || voucherNo || "";
+  if (!val || val === "-") return "-";
+  const parts = String(val).split("/");
+  if (parts.length >= 2) {
+    // Try to find a purely numeric part (usually the middle one for prefix/number/suffix)
+    const match = parts.find((p) => /^\d+$/.test(p));
+    if (match) return match;
+  }
+  return val;
+};
+
 const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
   title,
   voucherType,
@@ -1071,7 +1083,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               voucher.number,
               `"${partyName}"`,
               voucher.supplierInvoiceDate ? formatDate(voucher.supplierInvoiceDate) : "",
-              voucher.referenceNo,
+              formatInvoiceNumber(voucher.referenceNo, voucher.number),
               Number(voucher.subtotal || 0).toFixed(2),
               Number(voucher.igstTotal || 0).toFixed(2),
               Number(voucher.cgstTotal || 0).toFixed(2),
@@ -1214,7 +1226,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       <td>${voucher.number}</td>
                       <td>${partyName}</td>
                       <td>${voucher.supplierInvoiceDate ? formatDate(voucher.supplierInvoiceDate) : ""}</td>
-                      <td>${voucher.referenceNo}</td>
+                      <td>${formatInvoiceNumber(voucher.referenceNo, voucher.number)}</td>
                       <td class="text-right">${formatCurrency(Number(voucher.subtotal || 0))}</td>
                       <td class="text-right">${formatCurrency(Number(voucher.igstTotal || 0))}</td>
                       <td class="text-right">${formatCurrency(Number(voucher.cgstTotal || 0))}</td>
@@ -2121,7 +2133,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
 
                         {/* Invoice No */}
                         <td className="px-6 py-4 text-sm text-gray-500">
-                          {voucher.referenceNo ?? "-"}
+                          {formatInvoiceNumber(voucher.referenceNo, voucher.number)}
                         </td>
 
                         {/* Taxable Value */}
