@@ -242,7 +242,7 @@ router.get("/", async (req, res) => {
       ${whereClause}
 
       GROUP BY po.id
-      ORDER BY po.date DESC, po.id DESC
+      ORDER BY po.date ASC, po.id ASC
       LIMIT ? OFFSET ?
       `,
       [...params, limitInt, offset]

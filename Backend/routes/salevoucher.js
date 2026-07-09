@@ -715,8 +715,7 @@ router.get("/", async (req, res) => {
       sql += " AND isQuotation = ?";
       params.push(isQuotation === "true" || isQuotation === "1" ? 1 : 0);
     }
-
-    sql += " ORDER BY id DESC";
+    sql += " ORDER BY date ASC, id ASC";
 
     // Add pagination if limit is provided
     const parsedLimit = parseInt(limit);

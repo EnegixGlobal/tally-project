@@ -811,8 +811,7 @@ router.get("/month-wise", async (req, res) => {
       params.push(company_id);
     }
 
-    sql += " ORDER BY date DESC";
-
+    sql += " ORDER BY date ASC, id ASC";
     const [rows] = await db.execute(sql, params);
 
     // 🏆 DYNAMIC TOTALS FIX FOR ACCOUNTING MODE (FOR REGISTER DISPLAY)
