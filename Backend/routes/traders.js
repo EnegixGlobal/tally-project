@@ -21,7 +21,7 @@ router.get('/', authMiddleware, async (req, res) => {
         e.pan, 
         e.userLimit, 
         e.created_at,
-        (SELECT COUNT(*) FROM tbcompanies WHERE employee_id = e.id OR id = e.id) as company_count
+        (SELECT COUNT(*) FROM tbcompanies WHERE employee_id = e.id) as company_count
       FROM tbemployees e
       ORDER BY e.created_at DESC
     `);
@@ -90,9 +90,9 @@ router.get('/:id', authMiddleware, async (req, res) => {
             FROM tbcompanies c
             LEFT JOIN tbusers u ON c.id = u.company_id
             LEFT JOIN company_subscriptions s ON c.id = s.company_id
-            WHERE c.employee_id = ? OR c.id = ?
+            WHERE c.employee_id = ?
             ORDER BY c.created_at DESC
-        `, [id, id]);
+        `, [id]);
 
         res.json({
             info: trader[0],
