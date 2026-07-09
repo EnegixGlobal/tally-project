@@ -266,6 +266,114 @@ const LedgerList: React.FC = () => {
     setShowExportPopup(false);
   };
 
+  const renderLedgerRow = (ledger: Ledger) => (
+    <tr
+      key={ledger.id}
+      className={`hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${
+        ledger.ownerId === 0
+          ? theme === "dark"
+            ? "bg-blue-900/10 border-b border-blue-900/30"
+            : "bg-blue-50/40 border-b border-blue-100"
+          : theme === "dark"
+            ? "border-b border-gray-700"
+            : "border-b border-gray-200"
+      }`}
+    >
+      <td className="px-4 py-3">
+        <div className="flex items-center gap-2">
+          <span className={ledger.ownerId === 0 ? "font-semibold text-blue-600 dark:text-blue-400" : ""}>
+            {ledger.name}
+          </span>
+        </div>
+      </td>
+      <td className="px-4 py-3">
+        {getGroupName(ledger.groupId)}
+      </td>
+
+      <td className="px-4 py-3">{ledger.gstNumber}</td>
+      <td className="px-4 py-3 text-right font-mono">
+        {ledger.openingBalance}
+      </td>
+      <td className="px-4 py-3 text-center">
+        <span
+          className={`px-2 py-1 rounded text-xs ${ledger.balanceType === "debit"
+            ? theme === "dark"
+              ? "bg-red-900 text-red-200"
+              : "bg-red-100 text-red-800"
+            : theme === "dark"
+              ? "bg-green-900 text-green-200"
+              : "bg-green-100 text-green-800"
+            }`}
+        >
+          {ledger.balanceType?.toUpperCase() || "N/A"}
+        </span>
+      </td>
+      <td className="px-4 py-3 text-center">
+        {ledger.gstNumber ? (
+          <>
+            <span
+              className={`${theme === "dark"
+                ? "bg-blue-900 text-blue-200"
+                : "bg-blue-100 text-blue-800"
+                } px-2 py-1 rounded text-xs font-medium`}
+            >
+              B2B
+            </span>
+            <div className="text-xs text-gray-500 font-mono">
+              {formatGSTNumber(ledger.gstNumber)}
+            </div>
+          </>
+        ) : (
+          <span
+            className={`${theme === "dark"
+              ? "bg-purple-900 text-purple-200"
+              : "bg-purple-100 text-purple-800"
+              } px-2 py-1 rounded text-xs font-medium`}
+          >
+            B2C
+          </span>
+        )}
+      </td>
+      <td className="px-4 py-3">
+        <div className="flex justify-center items-center space-x-2">
+          {ledger.ownerId === 0 ? (
+            <span className={`px-2 py-1 text-xs font-bold rounded uppercase tracking-wider ${
+              theme === 'dark' 
+                ? 'bg-blue-900/50 text-blue-300 border border-blue-800' 
+                : 'bg-blue-100 text-blue-700 border border-blue-200'
+            }`}>
+              Admin
+            </span>
+          ) : (
+            <>
+              <button
+                title="Edit Ledger"
+                onClick={() => navigate(`/app/masters/ledger/edit/${ledger.id}`)}
+                className={`p-1 rounded transition-all ${
+                  theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
+                }`}
+              >
+                <Edit size={16} />
+              </button>
+              <button
+                title="Delete Ledger"
+                onClick={() => handleDelete(ledger.id)}
+                className={`p-1 rounded transition-all ${
+                  theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
+                }`}
+              >
+                <Trash2 size={16} />
+              </button>
+            </>
+          )}
+        </div>
+      </td>
+    </tr>
+  );
+
+  const adminLedgers = filteredLedgers.filter((l) => l.ownerId === 0);
+  const normalLedgers = filteredLedgers.filter((l) => l.ownerId !== 0);
+
   return (
     <>
       <div className="pt-[56px] px-4 ">
@@ -431,110 +539,17 @@ const LedgerList: React.FC = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredLedgers.map((ledger) => (
-                  <tr
-                    key={ledger.id}
-                    className={`hover:bg-opacity-10 hover:bg-blue-500 transition-colors ${
-                      ledger.ownerId === 0
-                        ? theme === "dark"
-                          ? "bg-blue-900/10 border-b border-blue-900/30"
-                          : "bg-blue-50/40 border-b border-blue-100"
-                        : theme === "dark"
-                          ? "border-b border-gray-700"
-                          : "border-b border-gray-200"
-                    }`}
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <span className={ledger.ownerId === 0 ? "font-semibold text-blue-600 dark:text-blue-400" : ""}>
-                          {ledger.name}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      {getGroupName(ledger.groupId)}
-                    </td>
+                {adminLedgers.length > 0 && (
+                  <>
+                    {adminLedgers.map(renderLedgerRow)}
+                  </>
+                )}
 
-                    <td className="px-4 py-3">{ledger.gstNumber}</td>
-                    <td className="px-4 py-3 text-right font-mono">
-                      {ledger.openingBalance}
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      <span
-                        className={`px-2 py-1 rounded text-xs ${ledger.balanceType === "debit"
-                          ? theme === "dark"
-                            ? "bg-red-900 text-red-200"
-                            : "bg-red-100 text-red-800"
-                          : theme === "dark"
-                            ? "bg-green-900 text-green-200"
-                            : "bg-green-100 text-green-800"
-                          }`}
-                      >
-                        {ledger.balanceType?.toUpperCase() || "N/A"}
-                      </span>
-                    </td>
-                    <td className="px-4 py-3 text-center">
-                      {ledger.gstNumber ? (
-                        <>
-                          <span
-                            className={`${theme === "dark"
-                              ? "bg-blue-900 text-blue-200"
-                              : "bg-blue-100 text-blue-800"
-                              } px-2 py-1 rounded text-xs font-medium`}
-                          >
-                            B2B
-                          </span>
-                          <div className="text-xs text-gray-500 font-mono">
-                            {formatGSTNumber(ledger.gstNumber)}
-                          </div>
-                        </>
-                      ) : (
-                        <span
-                          className={`${theme === "dark"
-                            ? "bg-purple-900 text-purple-200"
-                            : "bg-purple-100 text-purple-800"
-                            } px-2 py-1 rounded text-xs font-medium`}
-                        >
-                          B2C
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex justify-center items-center space-x-2">
-                        {ledger.ownerId === 0 ? (
-                          <span className={`px-2 py-1 text-xs font-bold rounded uppercase tracking-wider ${
-                            theme === 'dark' 
-                              ? 'bg-blue-900/50 text-blue-300 border border-blue-800' 
-                              : 'bg-blue-100 text-blue-700 border border-blue-200'
-                          }`}>
-                            Admin
-                          </span>
-                        ) : (
-                          <>
-                            <button
-                              title="Edit Ledger"
-                              onClick={() => navigate(`/app/masters/ledger/edit/${ledger.id}`)}
-                              className={`p-1 rounded transition-all ${
-                                theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
-                              }`}
-                            >
-                              <Edit size={16} />
-                            </button>
-                            <button
-                              title="Delete Ledger"
-                              onClick={() => handleDelete(ledger.id)}
-                              className={`p-1 rounded transition-all ${
-                                theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
-                              }`}
-                            >
-                              <Trash2 size={16} />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))}
+                {normalLedgers.length > 0 && (
+                  <>
+                    {normalLedgers.map(renderLedgerRow)}
+                  </>
+                )}
               </tbody>
               <tfoot>
                 {/* TOTAL DEBIT */}
