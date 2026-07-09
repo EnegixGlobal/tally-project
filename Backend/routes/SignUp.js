@@ -53,6 +53,15 @@ router.post("/register", async (req, res) => {
       return res.status(409).json({ message: "Email already registered" }); // 409 = Conflict
     }
 
+    // 🔍 Check if PAN already exists
+    const [existingPan] = await db.query(
+      `SELECT id FROM tbemployees WHERE pan = ?`,
+      [pan]
+    );
+    if (existingPan.length > 0) {
+      return res.status(409).json({ message: "PAN number already exist" }); // 409 = Conflict
+    }
+
     // 🔒 Hash password
     const hashedPassword = await bcrypt.hash(password, 10);
 
