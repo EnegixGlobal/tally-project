@@ -1,21 +1,22 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAppContext } from "../../../context/AppContext";
 import { useAuth } from "../../../home/context/AuthContext";
 import { useNavigate } from "react-router-dom";
 import type { LedgerGroup, GstClassification } from "../../../types";
-import { Edit, Trash2, Plus, Search, ArrowLeft, Settings, FileCode2 } from "lucide-react";
+import { Edit, Trash2, Plus, Search, ArrowLeft, Settings, FileCode2, Download, Copy } from "lucide-react";
 import { apiFetch } from "../../../utils/apiFetch";
 import { allSystemGroups } from "../../../constants/ledgerGroups";
 import Swal from "sweetalert2";
 
 const GroupList: React.FC = () => {
-  const { theme } = useAppContext();
+  const { theme, companyInfo } = useAppContext();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [groups, setGroups] = useState<LedgerGroup[]>([]);
   const [gstClassifications] = useState<GstClassification[]>([]);
   const { user, companyId: authCompanyId } = useAuth();
   const [del, setDel] = useState(false);
+  const [showExportPopup, setShowExportPopup] = useState(false);
 
   const baseGroups = allSystemGroups;
 
@@ -148,6 +149,83 @@ const GroupList: React.FC = () => {
     group.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const resolveGroupName = (group: LedgerGroup) => {
+    if (group.parent) {
+      return groups.find((g) => g.id === group.parent)?.name || "";
+    }
+    if (group.id < 0) {
+      const parentId = allSystemGroups.find(g => g.id === group.id)?.parent;
+      return allSystemGroups.find(sg => sg.id === parentId)?.name || "";
+    }
+    return "";
+  };
+
+  const companyName = companyInfo?.name || localStorage.getItem("companyName") || "Ranchi Express";
+
+  const generatedXML = useMemo(() => {
+    let xmlString = `<ENVELOPE>\n`;
+    xmlString += `  <HEADER>\n`;
+    xmlString += `    <TALLYREQUEST>Import Data</TALLYREQUEST>\n`;
+    xmlString += `  </HEADER>\n`;
+    xmlString += `  <BODY>\n`;
+    xmlString += `    <IMPORTDATA>\n`;
+    xmlString += `      <REQUESTDESC>\n`;
+    xmlString += `        <REPORTNAME>All Masters</REPORTNAME>\n`;
+    xmlString += `        <STATICVARIABLES>\n`;
+    xmlString += `          <SVCURRENTCOMPANY>${companyName}</SVCURRENTCOMPANY>\n`;
+    xmlString += `        </STATICVARIABLES>\n`;
+    xmlString += `      </REQUESTDESC>\n`;
+    xmlString += `      <REQUESTDATA>\n`;
+    
+    filteredGroups.forEach((group) => {
+      const parentName = resolveGroupName(group);
+      xmlString += `        <TALLYMESSAGE xmlns:UDF="TallyUDF">\n`;
+      xmlString += `         <GROUP NAME="${group.name}" RESERVEDNAME="${group.name}">\n`;
+      xmlString += `          <NAME.LIST>\n`;
+      xmlString += `            <NAME>${group.name}</NAME>\n`;
+      xmlString += `          </NAME.LIST>\n`;
+      if (parentName) {
+        xmlString += `          <PARENT>${parentName}</PARENT>\n`;
+      } else {
+        xmlString += `          <PARENT/>\n`;
+      }
+      xmlString += `          <ISDEEMEDPOSITIVE>No</ISDEEMEDPOSITIVE>\n`;
+      xmlString += `          <ISSUBLEDGER>No</ISSUBLEDGER>\n`;
+      xmlString += `          <ISREVENUE>No</ISREVENUE>\n`;
+      xmlString += `          <TRACKNEGATIVEBALANCES>No</TRACKNEGATIVEBALANCES>\n`;
+      xmlString += `          <ISBILLWISEON>No</ISBILLWISEON>\n`;
+      xmlString += `          <ISCOSTCENTRESON>No</ISCOSTCENTRESON>\n`;
+      xmlString += `          <AFFECTSSTOCK>No</AFFECTSSTOCK>\n`;
+      xmlString += `          <ISCONDENSED>No</ISCONDENSED>\n`;
+      xmlString += `          <ISADDABLE>No</ISADDABLE>\n`;
+      xmlString += `          <SORTPOSITION> 70</SORTPOSITION>\n`;
+      xmlString += `         </GROUP>\n`;
+      xmlString += `        </TALLYMESSAGE>\n`;
+    });
+  
+    xmlString += `      </REQUESTDATA>\n`;
+    xmlString += `    </IMPORTDATA>\n`;
+    xmlString += `  </BODY>\n`;
+    xmlString += `</ENVELOPE>`;
+    
+    return xmlString;
+  }, [filteredGroups, companyName, groups]);
+
+  const handleDownloadXML = () => {
+    const blob = new Blob([generatedXML], { type: "application/xml" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "groups.xml";
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    
+    setShowExportPopup(false);
+  };
+
+
   return (
     <div className="pt-[56px] px-4" onKeyDown={handleKeyDown} tabIndex={0}>
       <div className="flex justify-between items-center mb-6">
@@ -190,7 +268,7 @@ const GroupList: React.FC = () => {
           <button
             type="button"
             title="Export XML"
-            onClick={() => alert("Export XML functionality to be implemented")}
+            onClick={() => setShowExportPopup(true)}
             className={`flex items-center px-4 py-2 rounded text-sm font-medium ${theme === "dark"
                 ? "bg-red-600 hover:bg-red-700 text-white"
                 : "bg-red-600 hover:bg-red-700 text-white"
@@ -378,6 +456,59 @@ const GroupList: React.FC = () => {
           group, F12 to configure.
         </p>
       </div>
+
+      {showExportPopup && (
+        <div className="fixed inset-0 bg-white/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+          <div className={`p-6 rounded-lg w-full max-w-4xl max-h-[90vh] flex flex-col shadow-xl ${theme === "dark" ? "bg-gray-800 text-white" : "bg-white text-gray-900"}`}>
+            <h3 className="text-xl font-semibold mb-4">Export to Tally (XML) Preview</h3>
+            
+            <div className={`flex-1 overflow-auto p-4 rounded-md mb-6 border ${theme === "dark" ? "bg-gray-900 border-gray-700" : "bg-gray-50 border-gray-200"}`}>
+              <pre className="text-sm whitespace-pre-wrap font-mono">
+                {generatedXML}
+              </pre>
+            </div>
+            
+            <div className="flex justify-between items-center mt-auto">
+              <p className="opacity-80 text-sm">Review the XML format before downloading.</p>
+              <div className="flex space-x-3">
+                <button
+                  onClick={async () => {
+                    try {
+                      await navigator.clipboard.writeText(generatedXML);
+                      Swal.fire({
+                        icon: 'success',
+                        title: 'Copied!',
+                        text: 'XML copied to clipboard',
+                        timer: 1500,
+                        showConfirmButton: false,
+                      });
+                    } catch (err) {
+                      console.error("Failed to copy", err);
+                    }
+                  }}
+                  className={`px-4 py-2 rounded flex items-center ${theme === "dark" ? "bg-blue-600 hover:bg-blue-700 text-white" : "bg-blue-500 hover:bg-blue-600 text-white"}`}
+                >
+                  <Copy size={18} className="mr-2" />
+                  Copy XML
+                </button>
+                <button
+                  onClick={() => setShowExportPopup(false)}
+                  className={`px-4 py-2 rounded ${theme === "dark" ? "bg-gray-700 hover:bg-gray-600" : "bg-gray-200 hover:bg-gray-300"}`}
+                >
+                  Cancel
+                </button>
+                <button
+                  onClick={handleDownloadXML}
+                  className="px-4 py-2 rounded bg-purple-600 hover:bg-purple-700 text-white flex items-center"
+                >
+                  <Download size={18} className="mr-2" />
+                  Download
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

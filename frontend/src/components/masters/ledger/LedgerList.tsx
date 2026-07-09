@@ -8,7 +8,7 @@ import Swal from "sweetalert2";
 import { allSystemGroups as baseGroups } from "../../../constants/ledgerGroups";
 
 const LedgerList: React.FC = () => {
-  const { theme } = useAppContext();
+  const { theme, companyInfo } = useAppContext();
   const navigate = useNavigate();
   const [searchTerm, setSearchTerm] = useState("");
   const [categoryFilter, setCategoryFilter] = useState<"all" | "b2b" | "b2c">(
@@ -206,6 +206,8 @@ const LedgerList: React.FC = () => {
     }
   }, [filteredLedgers, ledgerGroups]);
 
+  const companyName = companyInfo?.name || localStorage.getItem("companyName") || "Company Name";
+
   const generatedXML = useMemo(() => {
     let xmlString = `<ENVELOPE>\n`;
     xmlString += `  <HEADER>\n`;
@@ -215,6 +217,9 @@ const LedgerList: React.FC = () => {
     xmlString += `    <IMPORTDATA>\n`;
     xmlString += `      <REQUESTDESC>\n`;
     xmlString += `        <REPORTNAME>All Masters</REPORTNAME>\n`;
+    xmlString += `        <STATICVARIABLES>\n`;
+    xmlString += `          <SVCURRENTCOMPANY>${companyName}</SVCURRENTCOMPANY>\n`;
+    xmlString += `        </STATICVARIABLES>\n`;
     xmlString += `      </REQUESTDESC>\n`;
     xmlString += `      <REQUESTDATA>\n`;
     
