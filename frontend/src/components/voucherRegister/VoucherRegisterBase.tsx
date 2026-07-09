@@ -1060,10 +1060,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
         csvContent = [
           [
             "Date",
-            "Voucher No",
+            voucherType === "sales" ? "Invoice No" : "Voucher No",
             "Party",
             "Supplier Invoice Date",
-            "Invoice No",
+            voucherType === "sales" ? "Voucher No" : "Invoice No",
             "Taxable Value",
             "IGST",
             "CGST",
@@ -1080,10 +1080,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             const totalGST = (Number(voucher.igstTotal || 0) + Number(voucher.cgstTotal || 0) + Number(voucher.sgstTotal || 0));
             return [
               formatDate(voucher.date),
-              voucher.number,
+              voucherType === "sales" ? formatInvoiceNumber(voucher.referenceNo, voucher.number) : voucher.number,
               `"${partyName}"`,
               voucher.supplierInvoiceDate ? formatDate(voucher.supplierInvoiceDate) : "",
-              formatInvoiceNumber(voucher.referenceNo, voucher.number),
+              voucherType === "sales" ? voucher.number : formatInvoiceNumber(voucher.referenceNo, voucher.number),
               Number(voucher.subtotal || 0).toFixed(2),
               Number(voucher.igstTotal || 0).toFixed(2),
               Number(voucher.cgstTotal || 0).toFixed(2),
@@ -1185,10 +1185,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                 ${voucherType === "sales" || voucherType === "purchase" ? `
                 <tr>
                   <th>Date</th>
-                  <th>Voucher No</th>
+                  <th>${voucherType === "sales" ? "Invoice No" : "Voucher No"}</th>
                   <th>Party</th>
                   <th>Supplier Invoice Date</th>
-                  <th>Invoice No</th>
+                  <th>${voucherType === "sales" ? "Voucher No" : "Invoice No"}</th>
                   <th class="text-right">Taxable Value</th>
                   <th class="text-right">IGST</th>
                   <th class="text-right">CGST</th>
@@ -1223,10 +1223,10 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               return `
                     <tr>
                       <td>${formatDate(voucher.date)}</td>
-                      <td>${voucher.number}</td>
+                      <td>${voucherType === "sales" ? formatInvoiceNumber(voucher.referenceNo, voucher.number) : voucher.number}</td>
                       <td>${partyName}</td>
                       <td>${voucher.supplierInvoiceDate ? formatDate(voucher.supplierInvoiceDate) : ""}</td>
-                      <td>${formatInvoiceNumber(voucher.referenceNo, voucher.number)}</td>
+                      <td>${voucherType === "sales" ? voucher.number : formatInvoiceNumber(voucher.referenceNo, voucher.number)}</td>
                       <td class="text-right">${formatCurrency(Number(voucher.subtotal || 0))}</td>
                       <td class="text-right">${formatCurrency(Number(voucher.igstTotal || 0))}</td>
                       <td class="text-right">${formatCurrency(Number(voucher.cgstTotal || 0))}</td>
@@ -1953,7 +1953,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                   Date
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Voucher No
+                  {voucherType === "sales" ? "Invoice No" : "Voucher No"}
                 </th>
                 {["receipt", "contra", "journal", "stock_journal", "stock-journal"].includes(voucherType) ? (
                   <>
@@ -1985,7 +1985,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       Supplier Invoice Date
                     </th>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Invoice No
+                      {voucherType === "sales" ? "Voucher No" : "Invoice No"}
                     </th>
                     <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
                       Taxable Value
@@ -2062,9 +2062,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                       {voucher.date ? formatDate(voucher.date) : "-"}
                     </td>
 
-                    {/* Voucher Number */}
+                    {/* Voucher Number / Invoice Number */}
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
-                      {voucher.number ?? "-"}
+                      {voucherType === "sales" 
+                        ? formatInvoiceNumber(voucher.referenceNo, voucher.number) 
+                        : (voucher.number ?? "-")}
                     </td>
 
                     {["receipt", "contra", "journal", "stock_journal", "stock-journal"].includes(voucherType) ? (
@@ -2131,9 +2133,11 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                             : "-"}
                         </td>
 
-                        {/* Invoice No */}
+                        {/* Invoice No / Voucher No */}
                         <td className="px-6 py-4 text-sm text-gray-500">
-                          {formatInvoiceNumber(voucher.referenceNo, voucher.number)}
+                          {voucherType === "sales" 
+                            ? (voucher.number ?? "-") 
+                            : formatInvoiceNumber(voucher.referenceNo, voucher.number)}
                         </td>
 
                         {/* Taxable Value */}
