@@ -1086,6 +1086,7 @@ const SalesVoucher: React.FC = () => {
     setFormData((prev) => ({
       ...prev,
       number: voucherNo,
+      referenceNo: String(nextNo),
     }));
   }, [selectedSalesType, selectedSalesTypeId]);
 
@@ -2738,7 +2739,7 @@ const SalesVoucher: React.FC = () => {
                       !prefix && !suffix
                         ? String(nextNo)
                         : `${prefix}${nextNo}${suffix}`;
-                    setFormData((prev) => ({ ...prev, number: voucherNo }));
+                    setFormData((prev) => ({ ...prev, number: voucherNo, referenceNo: String(nextNo) }));
                   }
                 }
               }}
