@@ -46,17 +46,17 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
         theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-blue-900 border-blue-800'
       }`}
     >
-      <div className="flex items-center">
+      <div className="flex items-center flex-1 overflow-hidden pr-2">
         <button
           title="Toggle Sidebar"
           onClick={toggleSidebar}
-          className="p-1 mr-2 rounded-md text-white hover:bg-blue-800 dark:hover:bg-gray-700"
+          className="p-1 mr-2 rounded-md text-white hover:bg-blue-800 dark:hover:bg-gray-700 flex-shrink-0"
         >
           <Menu size={20} />
         </button>
-       <div className="text-white font-bold">
+       <div className="text-white font-bold flex-1 overflow-x-auto no-scrollbar whitespace-nowrap">
   {companyData ? (
-    <span className="inline-flex items-center flex-wrap gap-3">
+    <span className="inline-flex items-center gap-3">
       <span className="mr-1">{companyData.name}</span>
       {user && (
         <span className="inline-flex items-center gap-3">
@@ -108,7 +108,7 @@ const Header: React.FC<HeaderProps> = ({ toggleSidebar }) => {
 
       </div>
 
-      <div className="flex items-center space-x-2">
+      <div className="flex items-center space-x-2 flex-shrink-0">
         <button
           onClick={toggleTheme}
           className="p-1 rounded-md text-white hover:bg-blue-800 dark:hover:bg-gray-700"
