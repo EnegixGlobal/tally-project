@@ -1073,14 +1073,14 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             "Overall Discount",
             "Invoice Value"
           ].join(","),
-          ...filteredVouchers.map((voucher) => {
+          ...filteredVouchers.map((voucher, index) => {
             const partyEntryType = voucherType === "sales" ? "debit" : "credit";
             const partyLedgerId = voucher.entries.find((e: any) => e.type === partyEntryType)?.ledgerId;
             const partyName = getLedgerName(partyLedgerId).replace(/"/g, '""');
             const totalGST = (Number(voucher.igstTotal || 0) + Number(voucher.cgstTotal || 0) + Number(voucher.sgstTotal || 0));
             return [
               formatDate(voucher.date),
-              voucherType === "sales" ? formatInvoiceNumber(voucher.referenceNo, voucher.number) : voucher.number,
+              voucherType === "sales" ? index + 1 : voucher.number,
               `"${partyName}"`,
               voucher.supplierInvoiceDate ? formatDate(voucher.supplierInvoiceDate) : "",
               voucherType === "sales" ? voucher.number : formatInvoiceNumber(voucher.referenceNo, voucher.number),
@@ -1212,7 +1212,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               </thead>
               <tbody>
                 ${filteredVouchers
-          .map((voucher) => {
+          .map((voucher, index) => {
             const { debit, credit } = calculateDebitCredit(voucher);
             const particulars = getParticulars(voucher);
             if (voucherType === "sales" || voucherType === "purchase") {
@@ -1223,7 +1223,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
               return `
                     <tr>
                       <td>${formatDate(voucher.date)}</td>
-                      <td>${voucherType === "sales" ? formatInvoiceNumber(voucher.referenceNo, voucher.number) : voucher.number}</td>
+                      <td>${voucherType === "sales" ? index + 1 : voucher.number}</td>
                       <td>${partyName}</td>
                       <td>${voucher.supplierInvoiceDate ? formatDate(voucher.supplierInvoiceDate) : ""}</td>
                       <td>${voucherType === "sales" ? voucher.number : formatInvoiceNumber(voucher.referenceNo, voucher.number)}</td>
@@ -2024,7 +2024,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
             </thead>
 
             <tbody className="bg-white divide-y divide-gray-200">
-              {(isServerPaginated ? filteredVouchers : (filteredVouchers as VoucherEntry[]).slice(startIndex, endIndex)).map((voucher: any) => {
+              {(isServerPaginated ? filteredVouchers : (filteredVouchers as VoucherEntry[]).slice(startIndex, endIndex)).map((voucher: any, index: number) => {
                 if (!voucher || !voucher.entries) return null; // Safety
                 const isSelected = selectedVoucherIds.has(voucher.id);
                 const debitEntry = voucher.entries.find(
@@ -2065,7 +2065,7 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
                     {/* Voucher Number / Invoice Number */}
                     <td className="px-6 py-4 text-sm font-medium text-gray-900">
                       {voucherType === "sales" 
-                        ? formatInvoiceNumber(voucher.referenceNo, voucher.number) 
+                        ? startIndex + index + 1 
                         : (voucher.number ?? "-")}
                     </td>
 
