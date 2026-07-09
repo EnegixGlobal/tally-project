@@ -132,7 +132,7 @@ router.get("/", async (req, res) => {
         dnv.narration
       FROM debit_note_vouchers dnv
       ${whereClause}
-      ORDER BY dnv.date DESC, dnv.id DESC
+      ORDER BY dnv.date ASC, dnv.id ASC
       `;
 
     let totalCount = 0;

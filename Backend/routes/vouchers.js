@@ -209,7 +209,7 @@ router.get("/", async (req, res) => {
      AND v.owner_id = ? 
      AND v.voucher_type = ?
      AND v.company_id = ?
-   ORDER BY v.date DESC, v.id DESC`;
+   ORDER BY v.date ASC, v.id ASC`;
 
     let totalCount = 0;
     if (limit && limit > 0) {

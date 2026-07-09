@@ -127,7 +127,7 @@ router.get("/", async (req, res) => {
         cv.narration
       FROM credit_vouchers cv
       ${whereClause}
-      ORDER BY cv.date DESC, cv.id DESC
+      ORDER BY cv.date ASC, cv.id ASC
       `;
 
     let totalCount = 0;

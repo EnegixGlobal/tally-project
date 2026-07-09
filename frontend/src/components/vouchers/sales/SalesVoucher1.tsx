@@ -1086,6 +1086,7 @@ const SalesVoucher: React.FC = () => {
     setFormData((prev) => ({
       ...prev,
       number: voucherNo,
+      referenceNo: String(nextNo),
     }));
   }, [selectedSalesType, selectedSalesTypeId]);
 
@@ -2332,7 +2333,15 @@ const SalesVoucher: React.FC = () => {
     const payload = {
       date: formData.date,
       number: formData.number,
-      referenceNo: formData.referenceNo,
+      referenceNo: (() => {
+        let val = formData.referenceNo || formData.number || "";
+        const parts = String(val).split("/");
+        if (parts.length >= 2) {
+          const match = parts.find((p) => /^\d+$/.test(p));
+          if (match) return match;
+        }
+        return val;
+      })(),
       partyId: finalPartyId,
       salesLedgerId: formData.salesLedgerId,
       narration: formData.narration,
@@ -2730,7 +2739,7 @@ const SalesVoucher: React.FC = () => {
                       !prefix && !suffix
                         ? String(nextNo)
                         : `${prefix}${nextNo}${suffix}`;
-                    setFormData((prev) => ({ ...prev, number: voucherNo }));
+                    setFormData((prev) => ({ ...prev, number: voucherNo, referenceNo: String(nextNo) }));
                   }
                 }
               }}

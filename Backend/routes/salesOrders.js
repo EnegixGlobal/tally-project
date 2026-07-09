@@ -160,7 +160,7 @@ router.get("/", async (req, res) => {
          AND so.owner_id = ?
        
        GROUP BY so.id
-       ORDER BY so.id DESC`;
+       ORDER BY so.date ASC, so.id ASC`;
 
     let totalCount = 0;
     if (limit && limit > 0) {
