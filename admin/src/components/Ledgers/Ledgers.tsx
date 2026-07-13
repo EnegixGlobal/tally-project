@@ -229,7 +229,7 @@ const Ledgers: React.FC = () => {
               <thead>
                 <tr className={`text-left text-xs font-black uppercase tracking-wider ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
                   <th className="px-4 py-3 border-b border-gray-700/50">Ledger Name</th>
-                  <th className="px-4 py-3 border-b border-gray-700/50">Type</th>
+                  <th className="px-4 py-3 border-b border-gray-700/50">Group</th>
                   <th className="px-4 py-3 border-b border-gray-700/50 text-right">Opening Balance</th>
                   <th className="px-4 py-3 border-b border-gray-700/50">Balance Type</th>
                   <th className="px-4 py-3 border-b border-gray-700/50">Created At</th>
@@ -245,7 +245,9 @@ const Ledgers: React.FC = () => {
                     </td>
                     <td className={`px-4 py-4 border-b ${theme === 'dark' ? 'border-gray-700/50' : 'border-gray-100'}`}>
                       <div className="text-sm font-medium">
-                        <span className="text-purple-500 font-bold px-2 py-1 bg-purple-500/10 rounded">Global Template</span> 
+                        <span className="text-purple-500 font-bold px-2 py-1 bg-purple-500/10 rounded">
+                          {ledgerGroups.find(g => String(g.id) === String(ledger.group_id))?.name || 'Unknown Group'}
+                        </span> 
                       </div>
                     </td>
                     <td className={`px-4 py-4 border-b ${theme === 'dark' ? 'border-gray-700/50' : 'border-gray-100'} text-right font-mono font-medium ${parseFloat(ledger.opening_balance) < 0 ? 'text-red-500' : ''}`}>
