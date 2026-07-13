@@ -24,10 +24,13 @@ const GSTSummary: React.FC = () => {
   const financialMonths = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
   const quarters = ["Q1", "Q2", "Q3", "Q4"];
 
-  const [selectedSubPeriod, setSelectedSubPeriod] = useState(financialMonths[0]);
+  const calendarMonths = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const currentMonthName = calendarMonths[new Date().getMonth()];
+
+  const [selectedSubPeriod, setSelectedSubPeriod] = useState(currentMonthName);
 
   useEffect(() => {
-    if (selectedPeriod === 'monthly') setSelectedSubPeriod(financialMonths[0]);
+    if (selectedPeriod === 'monthly') setSelectedSubPeriod(currentMonthName);
     else if (selectedPeriod === 'quarterly') setSelectedSubPeriod(quarters[0]);
     else if (selectedPeriod === 'yearly') setSelectedSubPeriod(String(currentYear));
   }, [selectedPeriod]);
@@ -109,7 +112,24 @@ const GSTSummary: React.FC = () => {
           let combinedData: GSTSummaryData[] = [];
           let totalBreakdown: Record<number, number> = { 0: 0, 5: 0, 12: 0, 18: 0, 28: 0 };
 
-          financialMonths.forEach(mName => {
+          const quarters = [
+            { name: 'Q1', start: 0, end: 3 },
+            { name: 'Q2', start: 3, end: 6 },
+            { name: 'Q3', start: 6, end: 9 },
+            { name: 'Q4', start: 9, end: 12 },
+          ];
+
+          let monthsToProcess = financialMonths;
+          if (selectedPeriod === 'monthly') {
+            monthsToProcess = [selectedSubPeriod];
+          } else if (selectedPeriod === 'quarterly') {
+            const quarter = quarters.find(q => q.name === selectedSubPeriod);
+            if (quarter) {
+              monthsToProcess = financialMonths.slice(quarter.start, quarter.end);
+            }
+          }
+
+          monthsToProcess.forEach(mName => {
              const pMonth = pData[mName];
              if (pMonth) {
                 Object.entries(pMonth.intraPurchase || {}).forEach(([id, amt]) => {
@@ -144,13 +164,6 @@ const GSTSummary: React.FC = () => {
           if (selectedPeriod === 'monthly') {
             combinedData = monthlyDataRaw;
           } else if (selectedPeriod === 'quarterly') {
-            const quarters = [
-              { name: 'Q1', start: 0, end: 3 },
-              { name: 'Q2', start: 3, end: 6 },
-              { name: 'Q3', start: 6, end: 9 },
-              { name: 'Q4', start: 9, end: 12 },
-            ];
-            
             combinedData = quarters.map(q => {
               const qData = monthlyDataRaw.slice(q.start, q.end);
               return {
@@ -238,24 +251,45 @@ const GSTSummary: React.FC = () => {
   };
 
   const handleExportExcel = () => {
-    const exportData = summaryData.map(data => ({
-      Period: data.period,
-      Sales: data.totalSales,
-      Purchases: data.totalPurchases,
-      'Output GST': data.outputGST,
-      'Input GST': data.inputGST,
-      'Net GST': data.netGST
-    }));
-    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    let companyName = "Company Name";
+    try {
+      const companyInfo = JSON.parse(localStorage.getItem("companyInfo") || "{}");
+      companyName = companyInfo.company_name || companyInfo.name || "Company Name";
+    } catch(e) {}
+
+    const exportData = [
+      [companyName],
+      [`GST Summary - ${selectedPeriod} (${selectedSubPeriod})`],
+      [],
+      ["Period", "Sales", "Purchases", "Output GST", "Input GST", "Net GST"],
+      ...summaryData.map(data => [
+        data.period,
+        data.totalSales,
+        data.totalPurchases,
+        data.outputGST,
+        data.inputGST,
+        data.netGST
+      ])
+    ];
+    
+    const worksheet = XLSX.utils.aoa_to_sheet(exportData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, 'GST_Summary');
     XLSX.writeFile(workbook, `GST_Summary_${selectedPeriod}.xlsx`);
   };
 
   const handleExportPDF = () => {
+    let companyName = "Company Name";
+    try {
+      const companyInfo = JSON.parse(localStorage.getItem("companyInfo") || "{}");
+      companyName = companyInfo.company_name || companyInfo.name || "Company Name";
+    } catch(e) {}
+
     const doc = new jsPDF();
-    doc.setFontSize(18);
-    doc.text(`GST Summary (${selectedPeriod})`, 14, 22);
+    doc.setFontSize(20);
+    doc.text(companyName, 14, 20);
+    doc.setFontSize(14);
+    doc.text(`GST Summary (${selectedPeriod} - ${selectedSubPeriod})`, 14, 30);
     
     const tableColumn = ["Period", "Sales", "Purchases", "Output GST", "Input GST", "Net GST"];
     const formatForPDF = (amount: number) => amount.toLocaleString('en-IN', {
@@ -275,7 +309,7 @@ const GSTSummary: React.FC = () => {
     autoTable(doc, {
       head: [tableColumn],
       body: tableRows,
-      startY: 30,
+      startY: 40,
     });
     
     doc.save(`GST_Summary_${selectedPeriod}.pdf`);
@@ -498,8 +532,8 @@ const GSTSummary: React.FC = () => {
                 </thead>
                 <tbody>
                   {summaryData.map((data, index) => (
-                    <tr key={index} className="border-t border-gray-200">
-                      <td className="py-3 text-sm font-medium text-gray-900">{data.period}</td>
+                    <tr key={index} className={`border-t border-gray-200 ${data.period === selectedSubPeriod ? 'bg-blue-100' : 'hover:bg-gray-50'}`}>
+                      <td className="py-3 text-sm font-medium text-gray-900 px-2">{data.period}</td>
                       <td className="py-3 text-sm text-gray-700">{formatCurrency(data.totalSales)}</td>
                       <td className="py-3 text-sm text-gray-700">{formatCurrency(data.totalPurchases)}</td>
                       <td className="py-3 text-sm text-gray-700">{formatCurrency(data.outputGST)}</td>
