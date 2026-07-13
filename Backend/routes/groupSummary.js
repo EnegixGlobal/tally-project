@@ -508,7 +508,7 @@ router.get("/api/group-summary", async (req, res) => {
       LEFT JOIN ledger_groups pg ON g.parent = pg.id
       WHERE g.company_id = ?
         AND g.owner_type = ?
-        AND g.owner_id = ?
+        AND (g.owner_id = ? OR g.owner_id = 0)
       ORDER BY g.name
       `,
       [company_id, owner_type, owner_id]
@@ -539,7 +539,7 @@ router.get("/api/group-summary", async (req, res) => {
       LEFT JOIN ledger_groups pg ON g.parent = pg.id
       WHERE l.company_id = ?
         AND l.owner_type = ?
-        AND l.owner_id = ?
+        AND (l.owner_id = ? OR l.owner_id = 0)
     `;
 
     const params = [company_id, owner_type, owner_id];
