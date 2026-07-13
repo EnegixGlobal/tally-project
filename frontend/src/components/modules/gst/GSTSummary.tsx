@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import * as XLSX from 'xlsx';
+import { useAppContext } from '../../../context/AppContext';
 
 interface GSTSummaryData {
   period: string;
@@ -17,6 +18,7 @@ interface GSTSummaryData {
 }
 
 const GSTSummary: React.FC = () => {
+  const { theme } = useAppContext();
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
   const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
@@ -213,10 +215,10 @@ const GSTSummary: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen pt-[56px] px-4 flex items-center justify-center bg-gray-50">
+      <div className={`min-h-screen pt-[56px] px-4 flex items-center justify-center transition-colors duration-300 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
         <div className="flex flex-col items-center gap-3">
-          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
-          <p className="text-gray-500 font-medium animate-pulse">Loading Summary Data...</p>
+          <div className={`w-10 h-10 border-4 ${theme === 'dark' ? 'border-blue-500' : 'border-blue-600'} border-t-transparent rounded-full animate-spin`}></div>
+          <p className={`font-medium animate-pulse ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>Loading Summary Data...</p>
         </div>
       </div>
     );
@@ -224,9 +226,9 @@ const GSTSummary: React.FC = () => {
 
   if (error) {
     return (
-      <div className="min-h-screen pt-[56px] px-4 flex items-center justify-center bg-gray-50">
-        <div className="p-6 bg-red-50 border border-red-200 rounded-xl text-center">
-          <p className="text-red-600 font-semibold">{error}</p>
+      <div className={`min-h-screen pt-[56px] px-4 flex items-center justify-center transition-colors duration-300 ${theme === 'dark' ? 'bg-gray-900' : 'bg-gray-50'}`}>
+        <div className={`p-6 border rounded-xl text-center shadow-lg ${theme === 'dark' ? 'bg-red-900/20 border-red-800' : 'bg-red-50 border-red-200'}`}>
+          <p className={`font-semibold ${theme === 'dark' ? 'text-red-400' : 'text-red-600'}`}>{error}</p>
         </div>
       </div>
     );
@@ -316,234 +318,224 @@ const GSTSummary: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen pt-[56px] px-4">
-      <div className="max-w-7xl mx-auto">
-         <div className="flex items-center mb-4">
-            <button
-                title='Back to Reports'
-                type='button'
-                  onClick={() => navigate('/app/gst')}
-                  className="mr-4 p-2 rounded-full hover:bg-gray-200"
-                >
-                  <ArrowLeft size={20} />
-                </button>
-                <h1 className="text-2xl font-bold">Summary</h1>
-            </div>
-        <div className="bg-white rounded-lg shadow-md p-6 mb-6">
-          <div className="flex items-center justify-between mb-6">
+    <div className={`min-h-screen pt-[56px] px-4 pb-8 transition-colors duration-300 ${theme === 'dark' ? 'bg-gray-900 text-gray-100' : 'bg-gray-50 text-gray-900'}`}>
+      <div className="max-w-7xl mx-auto space-y-6">
+        <div className="flex items-center pt-4">
+          <button
+            title='Back to Reports'
+            type='button'
+            onClick={() => navigate('/app/gst')}
+            className={`mr-4 p-2 rounded-full transition-all duration-200 ${
+              theme === 'dark' ? 'hover:bg-gray-800 text-gray-300 hover:text-white' : 'hover:bg-gray-200 text-gray-600 hover:text-gray-900'
+            }`}
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-3xl font-bold tracking-tight">Summary</h1>
+        </div>
+        
+        <div className={`rounded-2xl shadow-xl overflow-hidden transition-colors duration-300 border ${
+          theme === 'dark' ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-100'
+        }`}>
+          <div className={`p-6 border-b flex flex-col md:flex-row items-center justify-between gap-4 ${theme === 'dark' ? 'border-gray-700/50' : 'border-gray-100'}`}>
             <div className="flex items-center gap-3">
-              <BarChart3 className="h-6 w-6 text-blue-600" />
-              <h1 className="text-2xl font-bold text-gray-900">GST Summary</h1>
+              <div className={`p-3 rounded-xl ${theme === 'dark' ? 'bg-blue-500/20 text-blue-400' : 'bg-blue-50 text-blue-600'}`}>
+                <BarChart3 className="h-6 w-6" />
+              </div>
+              <h2 className="text-2xl font-bold">GST Overview</h2>
             </div>
-            <div className="flex gap-3">
+            
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto">
               <select
-              title='Select Period'
+                title='Select Period'
                 value={selectedPeriod}
                 onChange={(e) => setSelectedPeriod(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`px-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 shadow-sm ${
+                  theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-white border-gray-200 text-gray-700'
+                }`}
               >
                 <option value="monthly">Monthly</option>
                 <option value="quarterly">Quarterly</option>
                 <option value="yearly">Yearly</option>
               </select>
               <select
-              title='Select Sub Period'
+                title='Select Sub Period'
                 value={selectedSubPeriod}
                 onChange={(e) => setSelectedSubPeriod(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                className={`px-4 py-2.5 rounded-xl border focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none transition-all duration-200 shadow-sm ${
+                  theme === 'dark' ? 'bg-gray-700 border-gray-600 text-gray-200' : 'bg-white border-gray-200 text-gray-700'
+                }`}
               >
                 {selectedPeriod === 'monthly' && financialMonths.map(m => <option key={m} value={m}>{m}</option>)}
                 {selectedPeriod === 'quarterly' && quarters.map(q => <option key={q} value={q}>{q}</option>)}
                 {selectedPeriod === 'yearly' && years.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
-              <button
-                type='button'
-                onClick={handleExportPDF}
-                title='Export PDF'
-                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
-              >
-                <Download className="h-4 w-4" />
-                PDF
-              </button>
-              <button
-                type='button'
-                onClick={handleExportExcel}
-                title='Export Excel'
-                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-              >
-                <Download className="h-4 w-4" />
-                Excel
-              </button>
-            </div>
-          </div>
-
-          {/* Key Metrics */}
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <div className="bg-gradient-to-r from-blue-500 to-blue-600 rounded-lg p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm opacity-90">Total Sales</div>
-                  <div className="text-2xl font-bold">{formatCurrency(currentPeriod.totalSales)}</div>
-                  <div className="flex items-center gap-1 text-sm mt-1">
-                    {getPercentageChange(currentPeriod.totalSales, previousPeriod.totalSales) > 0 ? (
-                      <TrendingUp className="h-4 w-4" />
-                    ) : (
-                      <TrendingDown className="h-4 w-4" />
-                    )}
-                    <span>
-                      {Math.abs(getPercentageChange(currentPeriod.totalSales, previousPeriod.totalSales)).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-green-500 to-green-600 rounded-lg p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm opacity-90">Output GST</div>
-                  <div className="text-2xl font-bold">{formatCurrency(currentPeriod.outputGST)}</div>
-                  <div className="flex items-center gap-1 text-sm mt-1">
-                    {getPercentageChange(currentPeriod.outputGST, previousPeriod.outputGST) > 0 ? (
-                      <TrendingUp className="h-4 w-4" />
-                    ) : (
-                      <TrendingDown className="h-4 w-4" />
-                    )}
-                    <span>
-                      {Math.abs(getPercentageChange(currentPeriod.outputGST, previousPeriod.outputGST)).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-yellow-500 to-yellow-600 rounded-lg p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm opacity-90">Input GST</div>
-                  <div className="text-2xl font-bold">{formatCurrency(currentPeriod.inputGST)}</div>
-                  <div className="flex items-center gap-1 text-sm mt-1">
-                    {getPercentageChange(currentPeriod.inputGST, previousPeriod.inputGST) > 0 ? (
-                      <TrendingUp className="h-4 w-4" />
-                    ) : (
-                      <TrendingDown className="h-4 w-4" />
-                    )}
-                    <span>
-                      {Math.abs(getPercentageChange(currentPeriod.inputGST, previousPeriod.inputGST)).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gradient-to-r from-red-500 to-red-600 rounded-lg p-6 text-white">
-              <div className="flex items-center justify-between">
-                <div>
-                  <div className="text-sm opacity-90">Net GST Payable</div>
-                  <div className="text-2xl font-bold">{formatCurrency(currentPeriod.netGST)}</div>
-                  <div className="flex items-center gap-1 text-sm mt-1">
-                    {getPercentageChange(currentPeriod.netGST, previousPeriod.netGST) > 0 ? (
-                      <TrendingUp className="h-4 w-4" />
-                    ) : (
-                      <TrendingDown className="h-4 w-4" />
-                    )}
-                    <span>
-                      {Math.abs(getPercentageChange(currentPeriod.netGST, previousPeriod.netGST)).toFixed(1)}%
-                    </span>
-                  </div>
-                </div>
+              
+              <div className="flex gap-2 ml-auto md:ml-0">
+                <button
+                  type='button'
+                  onClick={handleExportPDF}
+                  title='Export PDF'
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-red-500 to-red-600 text-white rounded-xl shadow-md hover:from-red-600 hover:to-red-700 hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline font-medium">PDF</span>
+                </button>
+                <button
+                  type='button'
+                  onClick={handleExportExcel}
+                  title='Export Excel'
+                  className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-green-500 to-green-600 text-white rounded-xl shadow-md hover:from-green-600 hover:to-green-700 hover:shadow-lg transform hover:-translate-y-0.5 transition-all duration-200"
+                >
+                  <Download className="h-4 w-4" />
+                  <span className="hidden sm:inline font-medium">Excel</span>
+                </button>
               </div>
             </div>
           </div>
 
-          {/* Detailed Summary */}
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 mb-8">
-            <div className="bg-gray-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Current Period Summary</h3>
-              <div className="space-y-4">
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Total Sales (Taxable Value)</span>
-                  <span className="font-medium">{formatCurrency(currentPeriod.totalSales)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Output GST Collected</span>
-                  <span className="font-medium">{formatCurrency(currentPeriod.outputGST)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Total Purchases (Taxable Value)</span>
-                  <span className="font-medium">{formatCurrency(currentPeriod.totalPurchases)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">Input GST Paid</span>
-                  <span className="font-medium">{formatCurrency(currentPeriod.inputGST)}</span>
-                </div>
-                <div className="flex justify-between items-center">
-                  <span className="text-gray-600">ITC Claimed</span>
-                  <span className="font-medium">{formatCurrency(currentPeriod.itcClaimed)}</span>
-                </div>
-                <div className="border-t pt-4">
-                  <div className="flex justify-between items-center">
-                    <span className="font-semibold text-gray-900">Net GST Payable</span>
-                    <span className="font-bold text-red-600">{formatCurrency(currentPeriod.netGST)}</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="bg-gray-50 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">GST Rate-wise Breakdown</h3>
-              <div className="space-y-4">
-                {rateBreakdown.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="text-sm font-medium text-gray-900 w-8">{item.rate}</span>
-                      <div className="flex-1">
-                        <div className="w-full bg-gray-200 rounded-full h-2">
-                          <div
-                            className="bg-blue-600 h-2 rounded-full"
-                            style={{ width: `${item.percentage}%` }}
-                          />
+          <div className="p-6 space-y-8">
+            {/* Key Metrics */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+              {[
+                { label: 'Total Sales', value: currentPeriod.totalSales, prev: previousPeriod.totalSales, gradient: 'from-blue-500 to-blue-600' },
+                { label: 'Output GST', value: currentPeriod.outputGST, prev: previousPeriod.outputGST, gradient: 'from-emerald-500 to-emerald-600' },
+                { label: 'Input GST', value: currentPeriod.inputGST, prev: previousPeriod.inputGST, gradient: 'from-amber-500 to-orange-500' },
+                { label: 'Net GST Payable', value: currentPeriod.netGST, prev: previousPeriod.netGST, gradient: 'from-rose-500 to-red-600' },
+              ].map((metric, idx) => {
+                const change = getPercentageChange(metric.value, metric.prev);
+                const isPositive = change > 0;
+                
+                return (
+                  <div key={idx} className={`relative overflow-hidden bg-gradient-to-br ${metric.gradient} rounded-2xl p-6 text-white shadow-lg transform transition-all duration-300 hover:-translate-y-1 hover:shadow-xl`}>
+                    {/* Decorative glassmorphism circle */}
+                    <div className="absolute -right-8 -top-8 w-32 h-32 bg-white/10 rounded-full blur-2xl"></div>
+                    
+                    <div className="relative z-10">
+                      <div className="text-white/80 text-sm font-medium tracking-wide uppercase mb-1">{metric.label}</div>
+                      <div className="text-3xl font-bold tracking-tight mb-2">{formatCurrency(metric.value)}</div>
+                      
+                      <div className="flex items-center gap-1.5 text-sm font-medium">
+                        <div className={`flex items-center justify-center p-1 rounded-full ${isPositive ? 'bg-white/20' : 'bg-black/20'}`}>
+                          {isPositive ? <TrendingUp className="h-3.5 w-3.5" /> : <TrendingDown className="h-3.5 w-3.5" />}
                         </div>
+                        <span className="opacity-90">
+                          {Math.abs(change).toFixed(1)}% vs Prev.
+                        </span>
                       </div>
                     </div>
-                    <span className="text-sm font-medium text-gray-900 ml-3">
-                      {formatCurrency(item.amount)}
-                    </span>
                   </div>
-                ))}
+                );
+              })}
+            </div>
+
+            {/* Detailed Summary & Rate Breakdown */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+              <div className={`p-6 rounded-2xl border transition-colors duration-300 ${
+                theme === 'dark' ? 'bg-gray-800/50 border-gray-700/50 hover:bg-gray-750' : 'bg-gray-50/50 border-gray-100 hover:bg-gray-50'
+              }`}>
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                  <span className="w-1.5 h-6 bg-blue-500 rounded-full"></span>
+                  Current Period Summary
+                </h3>
+                <div className="space-y-4">
+                  {[
+                    { label: 'Total Sales (Taxable Value)', value: currentPeriod.totalSales },
+                    { label: 'Output GST Collected', value: currentPeriod.outputGST },
+                    { label: 'Total Purchases (Taxable Value)', value: currentPeriod.totalPurchases },
+                    { label: 'Input GST Paid', value: currentPeriod.inputGST },
+                    { label: 'ITC Claimed', value: currentPeriod.itcClaimed },
+                  ].map((row, idx) => (
+                    <div key={idx} className="flex justify-between items-center group">
+                      <span className={`transition-colors ${theme === 'dark' ? 'text-gray-400 group-hover:text-gray-300' : 'text-gray-500 group-hover:text-gray-700'}`}>{row.label}</span>
+                      <span className="font-semibold text-lg">{formatCurrency(row.value)}</span>
+                    </div>
+                  ))}
+                  <div className={`mt-6 pt-4 border-t flex justify-between items-center ${theme === 'dark' ? 'border-gray-700' : 'border-gray-200'}`}>
+                    <span className="font-bold text-lg">Net GST Payable</span>
+                    <span className="font-bold text-2xl text-red-500">{formatCurrency(currentPeriod.netGST)}</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className={`p-6 rounded-2xl border transition-colors duration-300 ${
+                theme === 'dark' ? 'bg-gray-800/50 border-gray-700/50 hover:bg-gray-750' : 'bg-gray-50/50 border-gray-100 hover:bg-gray-50'
+              }`}>
+                <h3 className="text-xl font-bold mb-6 flex items-center gap-2">
+                  <span className="w-1.5 h-6 bg-purple-500 rounded-full"></span>
+                  GST Rate-wise Breakdown
+                </h3>
+                <div className="space-y-6">
+                  {rateBreakdown.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between group">
+                      <div className="flex items-center gap-4 flex-1">
+                        <span className={`w-10 text-sm font-bold ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>{item.rate}</span>
+                        <div className="flex-1 max-w-sm">
+                          <div className={`w-full h-2.5 rounded-full overflow-hidden ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-200'}`}>
+                            <div
+                              className="h-full bg-gradient-to-r from-indigo-500 to-purple-500 rounded-full transition-all duration-1000 ease-out"
+                              style={{ width: `${item.percentage}%` }}
+                            />
+                          </div>
+                        </div>
+                      </div>
+                      <div className="flex flex-col items-end min-w-[100px]">
+                        <span className="font-semibold text-base">{formatCurrency(item.amount)}</span>
+                        <span className={`text-xs font-medium ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>{item.percentage}%</span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
             </div>
-          </div>
 
-          {/* Monthly Trend */}
-          <div className="bg-gray-50 rounded-lg p-6">
-            <h3 className="text-lg font-semibold text-gray-900 mb-4">Monthly Trend</h3>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead>
-                  <tr className="text-left">
-                    <th className="pb-3 text-sm font-medium text-gray-600">Period</th>
-                    <th className="pb-3 text-sm font-medium text-gray-600">Sales</th>
-                    <th className="pb-3 text-sm font-medium text-gray-600">Purchases</th>
-                    <th className="pb-3 text-sm font-medium text-gray-600">Output GST</th>
-                    <th className="pb-3 text-sm font-medium text-gray-600">Input GST</th>
-                    <th className="pb-3 text-sm font-medium text-gray-600">Net GST</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {summaryData.map((data, index) => (
-                    <tr key={index} className={`border-t border-gray-200 ${data.period === selectedSubPeriod ? 'bg-blue-100' : 'hover:bg-gray-50'}`}>
-                      <td className="py-3 text-sm font-medium text-gray-900 px-2">{data.period}</td>
-                      <td className="py-3 text-sm text-gray-700">{formatCurrency(data.totalSales)}</td>
-                      <td className="py-3 text-sm text-gray-700">{formatCurrency(data.totalPurchases)}</td>
-                      <td className="py-3 text-sm text-gray-700">{formatCurrency(data.outputGST)}</td>
-                      <td className="py-3 text-sm text-gray-700">{formatCurrency(data.inputGST)}</td>
-                      <td className="py-3 text-sm font-medium text-red-600">{formatCurrency(data.netGST)}</td>
+            {/* Monthly Trend */}
+            <div className={`rounded-2xl border overflow-hidden transition-colors duration-300 ${
+              theme === 'dark' ? 'bg-gray-800/50 border-gray-700/50' : 'bg-gray-50/50 border-gray-100'
+            }`}>
+              <div className="p-6 pb-0">
+                <h3 className="text-xl font-bold flex items-center gap-2 mb-4">
+                  <span className="w-1.5 h-6 bg-emerald-500 rounded-full"></span>
+                  Monthly Trend
+                </h3>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left border-collapse">
+                  <thead>
+                    <tr className={`${theme === 'dark' ? 'bg-gray-800 border-b border-gray-700 text-gray-400' : 'bg-gray-100 border-b border-gray-200 text-gray-500'}`}>
+                      <th className="py-4 px-6 text-sm font-semibold uppercase tracking-wider">Period</th>
+                      <th className="py-4 px-6 text-sm font-semibold uppercase tracking-wider">Sales</th>
+                      <th className="py-4 px-6 text-sm font-semibold uppercase tracking-wider">Purchases</th>
+                      <th className="py-4 px-6 text-sm font-semibold uppercase tracking-wider">Output GST</th>
+                      <th className="py-4 px-6 text-sm font-semibold uppercase tracking-wider">Input GST</th>
+                      <th className="py-4 px-6 text-sm font-semibold uppercase tracking-wider">Net GST</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody className={`divide-y ${theme === 'dark' ? 'divide-gray-700' : 'divide-gray-100'}`}>
+                    {summaryData.map((data, index) => (
+                      <tr 
+                        key={index} 
+                        className={`transition-colors duration-150 group ${
+                          data.period === selectedSubPeriod 
+                            ? (theme === 'dark' ? 'bg-blue-900/60 font-semibold' : 'bg-blue-100 font-semibold') 
+                            : (theme === 'dark' ? 'hover:bg-gray-700/30' : 'hover:bg-gray-50')
+                        }`}
+                      >
+                        <td className="py-4 px-6 text-sm font-bold">
+                          <span className={data.period === selectedSubPeriod ? 'text-blue-500' : ''}>{data.period}</span>
+                        </td>
+                        <td className="py-4 px-6 text-sm font-medium">{formatCurrency(data.totalSales)}</td>
+                        <td className="py-4 px-6 text-sm font-medium">{formatCurrency(data.totalPurchases)}</td>
+                        <td className="py-4 px-6 text-sm font-medium">{formatCurrency(data.outputGST)}</td>
+                        <td className="py-4 px-6 text-sm font-medium">{formatCurrency(data.inputGST)}</td>
+                        <td className="py-4 px-6 text-sm font-bold text-red-500">{formatCurrency(data.netGST)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             </div>
+            
           </div>
         </div>
       </div>
@@ -551,4 +543,4 @@ const GSTSummary: React.FC = () => {
   );
 };
 
-export default GSTSummary;
+export default GSTSummary;
