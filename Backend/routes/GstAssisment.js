@@ -1158,7 +1158,7 @@ router.get("/trading-account", async (req, res) => {
         `SELECT 
            SUM(CASE WHEN entry_type = 'debit' THEN amount ELSE -amount END) AS balance
          FROM voucher_entries ve
-         JOIN vouchers v ON ve.voucher_id = v.id
+         JOIN voucher_main v ON ve.voucher_id = v.id
          WHERE ve.ledger_id = ? AND v.company_id = ? AND v.owner_type = ? AND v.owner_id = ?`,
         [ledger.id, company_id, owner_type, owner_id]
       );
