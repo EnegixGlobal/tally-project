@@ -1,6 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, TrendingDown, Download ,ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { jsPDF } from 'jspdf';
+import autoTable from 'jspdf-autotable';
+import * as XLSX from 'xlsx';
 
 interface GSTSummaryData {
   period: string;
@@ -234,6 +237,50 @@ const GSTSummary: React.FC = () => {
     }).format(amount);
   };
 
+  const handleExportExcel = () => {
+    const exportData = summaryData.map(data => ({
+      Period: data.period,
+      Sales: data.totalSales,
+      Purchases: data.totalPurchases,
+      'Output GST': data.outputGST,
+      'Input GST': data.inputGST,
+      'Net GST': data.netGST
+    }));
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'GST_Summary');
+    XLSX.writeFile(workbook, `GST_Summary_${selectedPeriod}.xlsx`);
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    doc.setFontSize(18);
+    doc.text(`GST Summary (${selectedPeriod})`, 14, 22);
+    
+    const tableColumn = ["Period", "Sales", "Purchases", "Output GST", "Input GST", "Net GST"];
+    const formatForPDF = (amount: number) => amount.toLocaleString('en-IN', {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 0
+    });
+
+    const tableRows = summaryData.map(data => [
+      data.period,
+      formatForPDF(data.totalSales),
+      formatForPDF(data.totalPurchases),
+      formatForPDF(data.outputGST),
+      formatForPDF(data.inputGST),
+      formatForPDF(data.netGST)
+    ]);
+
+    autoTable(doc, {
+      head: [tableColumn],
+      body: tableRows,
+      startY: 30,
+    });
+    
+    doc.save(`GST_Summary_${selectedPeriod}.pdf`);
+  };
+
   return (
     <div className="min-h-screen pt-[56px] px-4">
       <div className="max-w-7xl mx-auto">
@@ -276,11 +323,22 @@ const GSTSummary: React.FC = () => {
                 {selectedPeriod === 'yearly' && years.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
               <button
-              type='button'
-              title='Export Summary'
-               className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                type='button'
+                onClick={handleExportPDF}
+                title='Export PDF'
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors"
+              >
                 <Download className="h-4 w-4" />
-                Export
+                PDF
+              </button>
+              <button
+                type='button'
+                onClick={handleExportExcel}
+                title='Export Excel'
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
+              >
+                <Download className="h-4 w-4" />
+                Excel
               </button>
             </div>
           </div>
