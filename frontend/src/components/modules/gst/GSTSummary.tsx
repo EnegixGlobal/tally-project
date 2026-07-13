@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { BarChart3, TrendingUp, TrendingDown, Download ,ArrowLeft } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 
@@ -15,46 +15,208 @@ interface GSTSummaryData {
 
 const GSTSummary: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
-    const navigate = useNavigate();
-  const [selectedYear, setSelectedYear] = useState('2024');
+  const navigate = useNavigate();
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(String(currentYear));
+  const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
 
-  const summaryData: GSTSummaryData[] = [
-    {
-      period: 'Jan 2024',
-      totalSales: 5000000,
-      totalPurchases: 3000000,
-      outputGST: 900000,
-      inputGST: 540000,
-      netGST: 360000,
-      itcClaimed: 540000,
-      gstPaid: 360000
-    },
-    {
-      period: 'Dec 2023',
-      totalSales: 4500000,
-      totalPurchases: 2800000,
-      outputGST: 810000,
-      inputGST: 504000,
-      netGST: 306000,
-      itcClaimed: 504000,
-      gstPaid: 306000
-    },
-    {
-      period: 'Nov 2023',
-      totalSales: 4200000,
-      totalPurchases: 2600000,
-      outputGST: 756000,
-      inputGST: 468000,
-      netGST: 288000,
-      itcClaimed: 468000,
-      gstPaid: 288000
-    }
-  ];
+  const company_id = localStorage.getItem("company_id");
+  const owner_type = localStorage.getItem("supplier");
+  const owner_id = localStorage.getItem(owner_type === "employee" ? "employee_id" : "user_id") || "";
 
-  const currentPeriod = summaryData[0];
-  const previousPeriod = summaryData[1];
+  const [summaryData, setSummaryData] = useState<GSTSummaryData[]>([]);
+  const [rateBreakdown, setRateBreakdown] = useState([
+    { rate: '0%', amount: 0, percentage: 0 },
+    { rate: '5%', amount: 0, percentage: 0 },
+    { rate: '12%', amount: 0, percentage: 0 },
+    { rate: '18%', amount: 0, percentage: 0 },
+    { rate: '28%', amount: 0, percentage: 0 }
+  ]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!company_id || !owner_type || !owner_id) return;
+
+    const fetchGSTSummary = async () => {
+      try {
+        setLoading(true);
+
+        const [purchaseRes, salesRes] = await Promise.all([
+          fetch(`${import.meta.env.VITE_API_URL}/api/gst-assessment/purchase?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}&year=${selectedYear}`),
+          fetch(`${import.meta.env.VITE_API_URL}/api/gst-assessment/sales?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}&year=${selectedYear}`)
+        ]);
+
+        const purchaseJson = await purchaseRes.json();
+        const salesJson = await salesRes.json();
+
+        if (purchaseJson.success && salesJson.success) {
+          const pData = purchaseJson.data.monthlyData || {};
+          const sData = salesJson.data.monthlyData || {};
+          
+          const ledgerMap = new Map();
+          if (purchaseJson.data.ledgers) {
+            Object.values(purchaseJson.data.ledgers).flat().forEach((l: any) => ledgerMap.set(String(l.id), l));
+          }
+          if (salesJson.data.ledgers) {
+            Object.values(salesJson.data.ledgers).flat().forEach((l: any) => ledgerMap.set(String(l.id), l));
+          }
+
+          const getRate = (id: string) => {
+            const ledger = ledgerMap.get(String(id));
+            if (!ledger) return 0;
+            const match = ledger.name.match(/(\d+(\.\d+)?)/);
+            const rate = match ? parseFloat(match[0]) : 0;
+            return [0, 5, 12, 18, 28].includes(rate) ? rate : 0;
+          };
+
+          const monthNames = [
+            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
+          ];
+
+          const monthlyDataRaw = monthNames.map(mName => {
+            const pMonth = pData[mName] || { totalIntraPurchase: 0, totalInterPurchase: 0, totalCGST: 0, totalSGST: 0, totalIGST: 0 };
+            const sMonth = sData[mName] || { totalIntraSales: 0, totalInterSales: 0, totalCGST: 0, totalSGST: 0, totalIGST: 0 };
+
+            const totalSales = sMonth.totalIntraSales + sMonth.totalInterSales;
+            const totalPurchases = pMonth.totalIntraPurchase + pMonth.totalInterPurchase;
+            const outputGST = sMonth.totalCGST + sMonth.totalSGST + sMonth.totalIGST;
+            const inputGST = pMonth.totalCGST + pMonth.totalSGST + pMonth.totalIGST;
+            const netGST = outputGST - inputGST;
+
+            return {
+              period: `${mName} ${selectedYear}`,
+              totalSales,
+              totalPurchases,
+              outputGST,
+              inputGST,
+              netGST: netGST > 0 ? netGST : 0,
+              itcClaimed: inputGST,
+              gstPaid: netGST > 0 ? netGST : 0,
+            };
+          });
+
+          let combinedData: GSTSummaryData[] = [];
+          let totalBreakdown: Record<number, number> = { 0: 0, 5: 0, 12: 0, 18: 0, 28: 0 };
+
+          monthNames.forEach(mName => {
+             const pMonth = pData[mName];
+             if (pMonth) {
+                Object.entries(pMonth.intraPurchase || {}).forEach(([id, amt]) => {
+                   const rate = getRate(id);
+                   if (totalBreakdown[rate] !== undefined) totalBreakdown[rate] += Number(amt);
+                });
+                Object.entries(pMonth.interPurchase || {}).forEach(([id, amt]) => {
+                   const rate = getRate(id);
+                   if (totalBreakdown[rate] !== undefined) totalBreakdown[rate] += Number(amt);
+                });
+             }
+             const sMonth = sData[mName];
+             if (sMonth) {
+                Object.entries(sMonth.intraSales || {}).forEach(([id, amt]) => {
+                   const rate = getRate(id);
+                   if (totalBreakdown[rate] !== undefined) totalBreakdown[rate] += Number(amt);
+                });
+                Object.entries(sMonth.interSales || {}).forEach(([id, amt]) => {
+                   const rate = getRate(id);
+                   if (totalBreakdown[rate] !== undefined) totalBreakdown[rate] += Number(amt);
+                });
+             }
+          });
+
+          const totalAmount = Object.values(totalBreakdown).reduce((a, b) => a + b, 0);
+          setRateBreakdown([0, 5, 12, 18, 28].map(rate => ({
+             rate: `${rate}%`,
+             amount: totalBreakdown[rate],
+             percentage: totalAmount > 0 ? Math.round((totalBreakdown[rate] / totalAmount) * 100) : 0
+          })));
+
+          if (selectedPeriod === 'monthly') {
+            combinedData = monthlyDataRaw;
+          } else if (selectedPeriod === 'quarterly') {
+            const quarters = [
+              { name: 'Q1', start: 0, end: 3 },
+              { name: 'Q2', start: 3, end: 6 },
+              { name: 'Q3', start: 6, end: 9 },
+              { name: 'Q4', start: 9, end: 12 },
+            ];
+            
+            combinedData = quarters.map(q => {
+              const qData = monthlyDataRaw.slice(q.start, q.end);
+              return {
+                period: `${q.name} ${selectedYear}`,
+                totalSales: qData.reduce((sum, d) => sum + d.totalSales, 0),
+                totalPurchases: qData.reduce((sum, d) => sum + d.totalPurchases, 0),
+                outputGST: qData.reduce((sum, d) => sum + d.outputGST, 0),
+                inputGST: qData.reduce((sum, d) => sum + d.inputGST, 0),
+                netGST: qData.reduce((sum, d) => sum + d.netGST, 0),
+                itcClaimed: qData.reduce((sum, d) => sum + d.itcClaimed, 0),
+                gstPaid: qData.reduce((sum, d) => sum + d.gstPaid, 0),
+              };
+            });
+          } else if (selectedPeriod === 'yearly') {
+            combinedData = [{
+              period: `Year ${selectedYear}`,
+              totalSales: monthlyDataRaw.reduce((sum, d) => sum + d.totalSales, 0),
+              totalPurchases: monthlyDataRaw.reduce((sum, d) => sum + d.totalPurchases, 0),
+              outputGST: monthlyDataRaw.reduce((sum, d) => sum + d.outputGST, 0),
+              inputGST: monthlyDataRaw.reduce((sum, d) => sum + d.inputGST, 0),
+              netGST: monthlyDataRaw.reduce((sum, d) => sum + d.netGST, 0),
+              itcClaimed: monthlyDataRaw.reduce((sum, d) => sum + d.itcClaimed, 0),
+              gstPaid: monthlyDataRaw.reduce((sum, d) => sum + d.gstPaid, 0),
+            }];
+          }
+
+          // Filter out periods with no data if preferred, but usually we want to see the periods
+          const filteredData = combinedData.filter(d => 
+            d.totalSales > 0 || d.totalPurchases > 0 || d.outputGST > 0 || d.inputGST > 0
+          ).reverse(); // Reverse to show latest first
+
+          setSummaryData(filteredData.length > 0 ? filteredData : [{
+            period: `No Data ${selectedYear}`,
+            totalSales: 0, totalPurchases: 0, outputGST: 0, inputGST: 0, netGST: 0, itcClaimed: 0, gstPaid: 0
+          }]);
+        } else {
+          setError("Failed to load GST Summary data");
+        }
+      } catch (err) {
+        console.error("GST Summary Fetch Error:", err);
+        setError("Error loading GST Summary");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchGSTSummary();
+  }, [company_id, owner_type, owner_id, selectedYear, selectedPeriod]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen pt-[56px] px-4 flex items-center justify-center bg-gray-50">
+        <div className="flex flex-col items-center gap-3">
+          <div className="w-10 h-10 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-gray-500 font-medium animate-pulse">Loading Summary Data...</p>
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="min-h-screen pt-[56px] px-4 flex items-center justify-center bg-gray-50">
+        <div className="p-6 bg-red-50 border border-red-200 rounded-xl text-center">
+          <p className="text-red-600 font-semibold">{error}</p>
+        </div>
+      </div>
+    );
+  }
+
+  const currentPeriod = summaryData[0] || { totalSales: 0, totalPurchases: 0, outputGST: 0, inputGST: 0, netGST: 0, itcClaimed: 0, gstPaid: 0 };
+  const previousPeriod = summaryData[1] || { totalSales: 0, totalPurchases: 0, outputGST: 0, inputGST: 0, netGST: 0, itcClaimed: 0, gstPaid: 0 };
 
   const getPercentageChange = (current: number, previous: number) => {
+    if (previous === 0) return current > 0 ? 100 : 0;
     return ((current - previous) / previous) * 100;
   };
 
@@ -67,19 +229,10 @@ const GSTSummary: React.FC = () => {
     }).format(amount);
   };
 
-  const gstRateBreakdown = [
-    { rate: '0%', amount: 500000, percentage: 10 },
-    { rate: '5%', amount: 1000000, percentage: 20 },
-    { rate: '12%', amount: 1500000, percentage: 30 },
-    { rate: '18%', amount: 1500000, percentage: 30 },
-    { rate: '28%', amount: 500000, percentage: 10 }
-  ];
-
   return (
     <div className="min-h-screen pt-[56px] px-4">
       <div className="max-w-7xl mx-auto">
          <div className="flex items-center mb-4">
-
             <button
                 title='Back to Reports'
                 type='button'
@@ -113,9 +266,9 @@ const GSTSummary: React.FC = () => {
                 onChange={(e) => setSelectedYear(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                <option value="2024">2024</option>
-                <option value="2023">2023</option>
-                <option value="2022">2022</option>
+                {years.map(y => (
+                  <option key={y} value={y}>{y}</option>
+                ))}
               </select>
               <button
               type='button'
@@ -243,7 +396,7 @@ const GSTSummary: React.FC = () => {
             <div className="bg-gray-50 rounded-lg p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">GST Rate-wise Breakdown</h3>
               <div className="space-y-4">
-                {gstRateBreakdown.map((item, index) => (
+                {rateBreakdown.map((item, index) => (
                   <div key={index} className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
                       <span className="text-sm font-medium text-gray-900 w-8">{item.rate}</span>
@@ -301,4 +454,4 @@ const GSTSummary: React.FC = () => {
   );
 };
 
-export default GSTSummary;
+export default GSTSummary;
