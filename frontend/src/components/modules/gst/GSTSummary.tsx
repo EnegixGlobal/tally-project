@@ -17,8 +17,17 @@ const GSTSummary: React.FC = () => {
   const [selectedPeriod, setSelectedPeriod] = useState('monthly');
   const navigate = useNavigate();
   const currentYear = new Date().getFullYear();
-  const [selectedYear, setSelectedYear] = useState(String(currentYear));
   const years = Array.from({ length: 10 }, (_, i) => currentYear - i);
+  const financialMonths = ["Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec", "Jan", "Feb", "Mar"];
+  const quarters = ["Q1", "Q2", "Q3", "Q4"];
+
+  const [selectedSubPeriod, setSelectedSubPeriod] = useState(financialMonths[0]);
+
+  useEffect(() => {
+    if (selectedPeriod === 'monthly') setSelectedSubPeriod(financialMonths[0]);
+    else if (selectedPeriod === 'quarterly') setSelectedSubPeriod(quarters[0]);
+    else if (selectedPeriod === 'yearly') setSelectedSubPeriod(String(currentYear));
+  }, [selectedPeriod]);
 
   const company_id = localStorage.getItem("company_id");
   const owner_type = localStorage.getItem("supplier");
@@ -41,10 +50,11 @@ const GSTSummary: React.FC = () => {
     const fetchGSTSummary = async () => {
       try {
         setLoading(true);
+        const queryYear = selectedPeriod === 'yearly' ? selectedSubPeriod : String(currentYear);
 
         const [purchaseRes, salesRes] = await Promise.all([
-          fetch(`${import.meta.env.VITE_API_URL}/api/gst-assessment/purchase?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}&year=${selectedYear}`),
-          fetch(`${import.meta.env.VITE_API_URL}/api/gst-assessment/sales?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}&year=${selectedYear}`)
+          fetch(`${import.meta.env.VITE_API_URL}/api/gst-assessment/purchase?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}&year=${queryYear}`),
+          fetch(`${import.meta.env.VITE_API_URL}/api/gst-assessment/sales?company_id=${company_id}&owner_type=${owner_type}&owner_id=${owner_id}&year=${queryYear}`)
         ]);
 
         const purchaseJson = await purchaseRes.json();
@@ -70,12 +80,8 @@ const GSTSummary: React.FC = () => {
             return [0, 5, 12, 18, 28].includes(rate) ? rate : 0;
           };
 
-          const monthNames = [
-            "Jan", "Feb", "Mar", "Apr", "May", "Jun",
-            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"
-          ];
-
-          const monthlyDataRaw = monthNames.map(mName => {
+          // Use financial year mapping (Apr to Mar)
+          const monthlyDataRaw = financialMonths.map(mName => {
             const pMonth = pData[mName] || { totalIntraPurchase: 0, totalInterPurchase: 0, totalCGST: 0, totalSGST: 0, totalIGST: 0 };
             const sMonth = sData[mName] || { totalIntraSales: 0, totalInterSales: 0, totalCGST: 0, totalSGST: 0, totalIGST: 0 };
 
@@ -86,7 +92,7 @@ const GSTSummary: React.FC = () => {
             const netGST = outputGST - inputGST;
 
             return {
-              period: `${mName} ${selectedYear}`,
+              period: mName,
               totalSales,
               totalPurchases,
               outputGST,
@@ -100,7 +106,7 @@ const GSTSummary: React.FC = () => {
           let combinedData: GSTSummaryData[] = [];
           let totalBreakdown: Record<number, number> = { 0: 0, 5: 0, 12: 0, 18: 0, 28: 0 };
 
-          monthNames.forEach(mName => {
+          financialMonths.forEach(mName => {
              const pMonth = pData[mName];
              if (pMonth) {
                 Object.entries(pMonth.intraPurchase || {}).forEach(([id, amt]) => {
@@ -145,7 +151,7 @@ const GSTSummary: React.FC = () => {
             combinedData = quarters.map(q => {
               const qData = monthlyDataRaw.slice(q.start, q.end);
               return {
-                period: `${q.name} ${selectedYear}`,
+                period: q.name,
                 totalSales: qData.reduce((sum, d) => sum + d.totalSales, 0),
                 totalPurchases: qData.reduce((sum, d) => sum + d.totalPurchases, 0),
                 outputGST: qData.reduce((sum, d) => sum + d.outputGST, 0),
@@ -157,7 +163,7 @@ const GSTSummary: React.FC = () => {
             });
           } else if (selectedPeriod === 'yearly') {
             combinedData = [{
-              period: `Year ${selectedYear}`,
+              period: queryYear,
               totalSales: monthlyDataRaw.reduce((sum, d) => sum + d.totalSales, 0),
               totalPurchases: monthlyDataRaw.reduce((sum, d) => sum + d.totalPurchases, 0),
               outputGST: monthlyDataRaw.reduce((sum, d) => sum + d.outputGST, 0),
@@ -168,13 +174,11 @@ const GSTSummary: React.FC = () => {
             }];
           }
 
-          // Filter out periods with no data if preferred, but usually we want to see the periods
-          const filteredData = combinedData.filter(d => 
-            d.totalSales > 0 || d.totalPurchases > 0 || d.outputGST > 0 || d.inputGST > 0
-          ).reverse(); // Reverse to show latest first
+          // In Tally, we normally show all periods in the trend
+          const filteredData = combinedData;
 
           setSummaryData(filteredData.length > 0 ? filteredData : [{
-            period: `No Data ${selectedYear}`,
+            period: `No Data`,
             totalSales: 0, totalPurchases: 0, outputGST: 0, inputGST: 0, netGST: 0, itcClaimed: 0, gstPaid: 0
           }]);
         } else {
@@ -189,7 +193,7 @@ const GSTSummary: React.FC = () => {
     };
 
     fetchGSTSummary();
-  }, [company_id, owner_type, owner_id, selectedYear, selectedPeriod]);
+  }, [company_id, owner_type, owner_id, selectedPeriod, selectedSubPeriod]);
 
   if (loading) {
     return (
@@ -212,8 +216,9 @@ const GSTSummary: React.FC = () => {
     );
   }
 
-  const currentPeriod = summaryData[0] || { totalSales: 0, totalPurchases: 0, outputGST: 0, inputGST: 0, netGST: 0, itcClaimed: 0, gstPaid: 0 };
-  const previousPeriod = summaryData[1] || { totalSales: 0, totalPurchases: 0, outputGST: 0, inputGST: 0, netGST: 0, itcClaimed: 0, gstPaid: 0 };
+  const currentIndex = summaryData.findIndex(d => d.period === selectedSubPeriod);
+  const currentPeriod = currentIndex !== -1 ? summaryData[currentIndex] : summaryData[0] || { totalSales: 0, totalPurchases: 0, outputGST: 0, inputGST: 0, netGST: 0, itcClaimed: 0, gstPaid: 0 };
+  const previousPeriod = currentIndex > 0 ? summaryData[currentIndex - 1] : { totalSales: 0, totalPurchases: 0, outputGST: 0, inputGST: 0, netGST: 0, itcClaimed: 0, gstPaid: 0 };
 
   const getPercentageChange = (current: number, previous: number) => {
     if (previous === 0) return current > 0 ? 100 : 0;
@@ -261,14 +266,14 @@ const GSTSummary: React.FC = () => {
                 <option value="yearly">Yearly</option>
               </select>
               <select
-              title='Select Year'
-                value={selectedYear}
-                onChange={(e) => setSelectedYear(e.target.value)}
+              title='Select Sub Period'
+                value={selectedSubPeriod}
+                onChange={(e) => setSelectedSubPeriod(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               >
-                {years.map(y => (
-                  <option key={y} value={y}>{y}</option>
-                ))}
+                {selectedPeriod === 'monthly' && financialMonths.map(m => <option key={m} value={m}>{m}</option>)}
+                {selectedPeriod === 'quarterly' && quarters.map(q => <option key={q} value={q}>{q}</option>)}
+                {selectedPeriod === 'yearly' && years.map(y => <option key={y} value={y}>{y}</option>)}
               </select>
               <button
               type='button'
