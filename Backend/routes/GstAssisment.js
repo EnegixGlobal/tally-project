@@ -6,7 +6,7 @@ const db = require("../db");
 router.get("/purchase", async (req, res) => {
   try {
 
-    const { company_id, owner_type, owner_id } = req.query;
+    const { company_id, owner_type, owner_id, year } = req.query;
 
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
@@ -95,7 +95,8 @@ router.get("/purchase", async (req, res) => {
       WHERE v.company_id = ? 
         AND v.owner_type = ? 
         AND v.owner_id = ?
-    `, [company_id, owner_type, owner_id]);
+        ${year ? "AND YEAR(v.date) = ?" : ""}
+    `, year ? [company_id, owner_type, owner_id, year] : [company_id, owner_type, owner_id]);
 
     // ================================
     // MONTH CONFIG
@@ -269,7 +270,7 @@ router.get("/purchase", async (req, res) => {
 router.get("/sales", async (req, res) => {
   try {
 
-    const { company_id, owner_type, owner_id } = req.query;
+    const { company_id, owner_type, owner_id, year } = req.query;
 
     if (!company_id || !owner_type || !owner_id) {
       return res.status(400).json({
@@ -357,7 +358,8 @@ router.get("/sales", async (req, res) => {
       WHERE v.company_id = ? 
         AND v.owner_type = ? 
         AND v.owner_id = ?
-    `, [company_id, owner_type, owner_id]);
+        ${year ? "AND YEAR(v.date) = ?" : ""}
+    `, year ? [company_id, owner_type, owner_id, year] : [company_id, owner_type, owner_id]);
 
     // ================================
     // MONTH CONFIG
