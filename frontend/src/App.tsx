@@ -138,6 +138,7 @@ import Reconciliation from "./components/modules/gst/Reconciliation";
 import ExportReturns from "./components/modules/gst/ExportReturns";
 import GSTSummary from "./components/modules/gst/GSTSummary";
 import EWayBill from "./components/modules/gst/EWayBill";
+import ComingSoon from "./components/modules/gst/ComingSoon";
 import TDSSummary from "./components/modules/tds/TDSSummary";
 
 //TDSvModules
@@ -1608,6 +1609,30 @@ function App() {
                   element={
                     <RequireCompany>
                       <GSTR3B />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="gst/gstr-9"
+                  element={
+                    <RequireCompany>
+                      <ComingSoon title="GSTR-9" />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="gst/gstr-9c"
+                  element={
+                    <RequireCompany>
+                      <ComingSoon title="GSTR-9C" />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="gst/gstr-2a"
+                  element={
+                    <RequireCompany>
+                      <ComingSoon title="GSTR-2A" />
                     </RequireCompany>
                   }
                 />
