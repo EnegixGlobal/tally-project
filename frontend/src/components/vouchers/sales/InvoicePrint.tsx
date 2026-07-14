@@ -602,7 +602,7 @@ const InvoicePrint: React.FC<InvoicePrintProps> = ({
               {/* Top Header with TAX INVOICE */}
               <div className={PRINT_STYLES.invoice.header}>
                 <h1 className={PRINT_STYLES.invoice.title}>
-                  {isQuotation ? "SALES QUOTATION" : (voucherData.number?.toLowerCase().includes("b2c") ? "BILL OF SUPPLY" : "TAX INVOICE")}
+                  {isQuotation ? "SALES QUOTATION" : (partyLedger?.gstNumber ? "TAX INVOICE" : "BILL OF SUPPLY")}
                 </h1>
                 {isQuotation && (
                   <div className="text-center text-sm text-gray-600 mt-1 font-medium">
