@@ -1,16 +1,23 @@
-import React from 'react';
-import { useAppContext } from '../../context/AppContext';
-import { useAuth } from '../../home/context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import React from "react";
+import { useAppContext } from "../../context/AppContext";
+import { useAuth } from "../../home/context/AuthContext";
+import { useNavigate } from "react-router-dom";
 import {
-  DollarSign, ArrowRightCircle, ArrowLeftCircle,
-  FileText, ShoppingCart, ShoppingBag,
-  FileMinus, FilePlus, Truck, Clipboard,
+  DollarSign,
+  ArrowRightCircle,
+  ArrowLeftCircle,
+  FileText,
+  ShoppingCart,
+  ShoppingBag,
+  FileMinus,
+  FilePlus,
+  Truck,
+  Clipboard,
   Package,
   ImportIcon,
   Lock,
-  FileSpreadsheet
-} from 'lucide-react';
+  FileSpreadsheet,
+} from "lucide-react";
 
 interface VoucherType {
   id: string;
@@ -20,7 +27,7 @@ interface VoucherType {
   color: string;
   iconBg: string;
   description: string;
-  category: 'accounting' | 'trading' | 'inventory' | 'import';
+  category: "accounting" | "trading" | "inventory" | "import";
 }
 
 interface VoucherSection {
@@ -41,9 +48,9 @@ const VouchersIndex: React.FC = () => {
 
   // Helper function to get party name with better error handling
   const getPartyName = (partyId: string | undefined): string => {
-    if (!partyId) return 'No Party';
-    const party = safeLedgers.find(l => l.id === partyId);
-    return party?.name || 'Unknown Party';
+    if (!partyId) return "No Party";
+    const party = safeLedgers.find((l) => l.id === partyId);
+    return party?.name || "Unknown Party";
   };
 
   // Helper function to handle voucher navigation
@@ -54,13 +61,13 @@ const VouchersIndex: React.FC = () => {
   // Helper function to format date consistently
   const formatDate = (date: string | Date): string => {
     try {
-      return new Date(date).toLocaleDateString('en-IN', {
-        day: '2-digit',
-        month: 'short',
-        year: 'numeric'
+      return new Date(date).toLocaleDateString("en-IN", {
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
       });
     } catch {
-      return 'Invalid Date';
+      return "Invalid Date";
     }
   };
 
@@ -72,46 +79,58 @@ const VouchersIndex: React.FC = () => {
       icon: <DollarSign size={20} />,
       vouchers: [
         {
-          id: 'payment',
+          id: "payment",
           icon: <DollarSign size={20} />,
-          name: 'Payment',
-          path: '/app/vouchers/payment/create',
-          color: theme === 'dark' ? 'bg-red-900/50 hover:bg-red-800/50' : 'bg-red-50 hover:bg-red-100',
-          iconBg: theme === 'dark' ? 'bg-red-800/70' : 'bg-red-100',
-          description: 'Record cash/bank payments',
-          category: 'accounting'
+          name: "Payment",
+          path: "/app/vouchers/payment/create",
+          color:
+            theme === "dark"
+              ? "bg-red-900/50 hover:bg-red-800/50"
+              : "bg-red-50 hover:bg-red-100",
+          iconBg: theme === "dark" ? "bg-red-800/70" : "bg-red-100",
+          description: "Record cash/bank payments",
+          category: "accounting",
         },
         {
-          id: 'receipt',
+          id: "receipt",
           icon: <ArrowRightCircle size={20} />,
-          name: 'Receipt',
-          path: '/app/vouchers/receipt/create',
-          color: theme === 'dark' ? 'bg-green-900/50 hover:bg-green-800/50' : 'bg-green-50 hover:bg-green-100',
-          iconBg: theme === 'dark' ? 'bg-green-800/70' : 'bg-green-100',
-          description: 'Record cash/bank receipts',
-          category: 'accounting'
+          name: "Receipt",
+          path: "/app/vouchers/receipt/create",
+          color:
+            theme === "dark"
+              ? "bg-green-900/50 hover:bg-green-800/50"
+              : "bg-green-50 hover:bg-green-100",
+          iconBg: theme === "dark" ? "bg-green-800/70" : "bg-green-100",
+          description: "Record cash/bank receipts",
+          category: "accounting",
         },
         {
-          id: 'contra',
+          id: "contra",
           icon: <ArrowLeftCircle size={20} />,
-          name: 'Contra',
-          path: '/app/vouchers/contra/create',
-          color: theme === 'dark' ? 'bg-purple-900/50 hover:bg-purple-800/50' : 'bg-purple-50 hover:bg-purple-100',
-          iconBg: theme === 'dark' ? 'bg-purple-800/70' : 'bg-purple-100',
-          description: 'Transfer between accounts',
-          category: 'accounting'
+          name: "Contra",
+          path: "/app/vouchers/contra/create",
+          color:
+            theme === "dark"
+              ? "bg-purple-900/50 hover:bg-purple-800/50"
+              : "bg-purple-50 hover:bg-purple-100",
+          iconBg: theme === "dark" ? "bg-purple-800/70" : "bg-purple-100",
+          description: "Transfer between accounts",
+          category: "accounting",
         },
         {
-          id: 'journal',
+          id: "journal",
           icon: <FileText size={20} />,
-          name: 'Journal',
-          path: '/app/vouchers/journal/create',
-          color: theme === 'dark' ? 'bg-amber-900/50 hover:bg-amber-800/50' : 'bg-amber-50 hover:bg-amber-100',
-          iconBg: theme === 'dark' ? 'bg-amber-800/70' : 'bg-amber-100',
-          description: 'General journal entries',
-          category: 'accounting'
-        }
-      ]
+          name: "Journal",
+          path: "/app/vouchers/journal/create",
+          color:
+            theme === "dark"
+              ? "bg-amber-900/50 hover:bg-amber-800/50"
+              : "bg-amber-50 hover:bg-amber-100",
+          iconBg: theme === "dark" ? "bg-amber-800/70" : "bg-amber-100",
+          description: "General journal entries",
+          category: "accounting",
+        },
+      ],
     },
     {
       title: "Trading Vouchers",
@@ -119,56 +138,71 @@ const VouchersIndex: React.FC = () => {
       icon: <ShoppingCart size={20} />,
       vouchers: [
         {
-          id: 'sales',
+          id: "sales",
           icon: <ShoppingCart size={20} />,
-          name: 'Sales',
-          path: '/app/vouchers/sales/create',
-          color: theme === 'dark' ? 'bg-blue-900/50 hover:bg-blue-800/50' : 'bg-blue-50 hover:bg-blue-100',
-          iconBg: theme === 'dark' ? 'bg-blue-800/70' : 'bg-blue-100',
-          description: 'Sales invoices',
-          category: 'trading'
+          name: "Sales",
+          path: "/app/vouchers/sales/create",
+          color:
+            theme === "dark"
+              ? "bg-blue-900/50 hover:bg-blue-800/50"
+              : "bg-blue-50 hover:bg-blue-100",
+          iconBg: theme === "dark" ? "bg-blue-800/70" : "bg-blue-100",
+          description: "Sales invoices",
+          category: "trading",
         },
         {
-          id: 'purchase',
+          id: "purchase",
           icon: <ShoppingBag size={20} />,
-          name: 'Purchase',
-          path: '/app/vouchers/purchase/create',
-          color: theme === 'dark' ? 'bg-indigo-900/50 hover:bg-indigo-800/50' : 'bg-indigo-50 hover:bg-indigo-100',
-          iconBg: theme === 'dark' ? 'bg-indigo-800/70' : 'bg-indigo-100',
-          description: 'Purchase invoices',
-          category: 'trading'
+          name: "Purchase",
+          path: "/app/vouchers/purchase/create",
+          color:
+            theme === "dark"
+              ? "bg-indigo-900/50 hover:bg-indigo-800/50"
+              : "bg-indigo-50 hover:bg-indigo-100",
+          iconBg: theme === "dark" ? "bg-indigo-800/70" : "bg-indigo-100",
+          description: "Purchase invoices",
+          category: "trading",
         },
         {
-          id: 'sales-order',
+          id: "sales-order",
           icon: <Clipboard size={20} />,
-          name: 'Sales Order',
-          path: '/app/vouchers/sales-order/create',
-          color: theme === 'dark' ? 'bg-sky-900/50 hover:bg-sky-800/50' : 'bg-sky-50 hover:bg-sky-100',
-          iconBg: theme === 'dark' ? 'bg-sky-800/70' : 'bg-sky-100',
-          description: 'Sales orders',
-          category: 'trading'
+          name: "Sales Order",
+          path: "/app/vouchers/sales-order/create",
+          color:
+            theme === "dark"
+              ? "bg-sky-900/50 hover:bg-sky-800/50"
+              : "bg-sky-50 hover:bg-sky-100",
+          iconBg: theme === "dark" ? "bg-sky-800/70" : "bg-sky-100",
+          description: "Sales orders",
+          category: "trading",
         },
         {
-          id: 'purchase-order',
+          id: "purchase-order",
           icon: <Package size={20} />,
-          name: 'Purchase Order',
-          path: '/app/vouchers/purchase-order/create',
-          color: theme === 'dark' ? 'bg-cyan-900/50 hover:bg-cyan-800/50' : 'bg-cyan-50 hover:bg-cyan-100',
-          iconBg: theme === 'dark' ? 'bg-cyan-800/70' : 'bg-cyan-100',
-          description: 'Purchase orders',
-          category: 'trading'
+          name: "Purchase Order",
+          path: "/app/vouchers/purchase-order/create",
+          color:
+            theme === "dark"
+              ? "bg-cyan-900/50 hover:bg-cyan-800/50"
+              : "bg-cyan-50 hover:bg-cyan-100",
+          iconBg: theme === "dark" ? "bg-cyan-800/70" : "bg-cyan-100",
+          description: "Purchase orders",
+          category: "trading",
         },
         {
-          id: 'quotation',
+          id: "quotation",
           icon: <FileText size={20} />,
-          name: 'Quotation',
-          path: '/app/vouchers/quotation/list',
-          color: theme === 'dark' ? 'bg-violet-900/50 hover:bg-violet-800/50' : 'bg-violet-50 hover:bg-violet-100',
-          iconBg: theme === 'dark' ? 'bg-violet-800/70' : 'bg-violet-100',
-          description: 'Price quotations',
-          category: 'trading'
-        }
-      ]
+          name: "Quotation",
+          path: "/app/vouchers/quotation/list",
+          color:
+            theme === "dark"
+              ? "bg-violet-900/50 hover:bg-violet-800/50"
+              : "bg-violet-50 hover:bg-violet-100",
+          iconBg: theme === "dark" ? "bg-violet-800/70" : "bg-violet-100",
+          description: "Price quotations",
+          category: "trading",
+        },
+      ],
     },
     {
       title: "Credit/Debit Notes",
@@ -176,24 +210,30 @@ const VouchersIndex: React.FC = () => {
       icon: <FilePlus size={20} />,
       vouchers: [
         {
-          id: 'debit-note',
+          id: "debit-note",
           icon: <FilePlus size={20} />,
-          name: 'Debit Note',
-          path: '/app/vouchers/debit-note/create',
-          color: theme === 'dark' ? 'bg-rose-900/50 hover:bg-rose-800/50' : 'bg-rose-50 hover:bg-rose-100',
-          iconBg: theme === 'dark' ? 'bg-rose-800/70' : 'bg-rose-100',
-          description: 'Debit adjustments',
-          category: 'trading'
+          name: "Debit Note",
+          path: "/app/vouchers/debit-note/create",
+          color:
+            theme === "dark"
+              ? "bg-rose-900/50 hover:bg-rose-800/50"
+              : "bg-rose-50 hover:bg-rose-100",
+          iconBg: theme === "dark" ? "bg-rose-800/70" : "bg-rose-100",
+          description: "Debit adjustments",
+          category: "trading",
         },
         {
-          id: 'credit-note',
+          id: "credit-note",
           icon: <FileMinus size={20} />,
-          name: 'Credit Note',
-          path: '/app/vouchers/credit-note/create',
-          color: theme === 'dark' ? 'bg-teal-900/50 hover:bg-teal-800/50' : 'bg-teal-50 hover:bg-teal-100',
-          iconBg: theme === 'dark' ? 'bg-teal-800/70' : 'bg-teal-100',
-          description: 'Credit adjustments',
-          category: 'trading'
+          name: "Credit Note",
+          path: "/app/vouchers/credit-note/create",
+          color:
+            theme === "dark"
+              ? "bg-teal-900/50 hover:bg-teal-800/50"
+              : "bg-teal-50 hover:bg-teal-100",
+          iconBg: theme === "dark" ? "bg-teal-800/70" : "bg-teal-100",
+          description: "Credit adjustments",
+          category: "trading",
         },
 
         // {
@@ -216,7 +256,7 @@ const VouchersIndex: React.FC = () => {
         //   description: 'Purchase returns',
         //   category: 'trading'
         // }
-      ]
+      ],
     },
     {
       title: "Inventory Vouchers",
@@ -224,26 +264,32 @@ const VouchersIndex: React.FC = () => {
       icon: <Package size={20} />,
       vouchers: [
         {
-          id: 'stock-journal',
+          id: "stock-journal",
           icon: <Package size={20} />,
-          name: 'Stock Journal',
-          path: '/app/vouchers/stock-journal/create',
-          color: theme === 'dark' ? 'bg-yellow-900/50 hover:bg-yellow-800/50' : 'bg-yellow-50 hover:bg-yellow-100',
-          iconBg: theme === 'dark' ? 'bg-yellow-800/70' : 'bg-yellow-100',
-          description: 'Stock adjustments',
-          category: 'inventory'
+          name: "Stock Journal",
+          path: "/app/vouchers/stock-journal/create",
+          color:
+            theme === "dark"
+              ? "bg-yellow-900/50 hover:bg-yellow-800/50"
+              : "bg-yellow-50 hover:bg-yellow-100",
+          iconBg: theme === "dark" ? "bg-yellow-800/70" : "bg-yellow-100",
+          description: "Stock adjustments",
+          category: "inventory",
         },
         {
-          id: 'delivery-note',
+          id: "delivery-note",
           icon: <Truck size={20} />,
-          name: 'Delivery Note',
-          path: '/app/vouchers/delivery-note/create',
-          color: theme === 'dark' ? 'bg-cyan-900/50 hover:bg-cyan-800/50' : 'bg-cyan-50 hover:bg-cyan-100',
-          iconBg: theme === 'dark' ? 'bg-cyan-800/70' : 'bg-cyan-100',
-          description: 'Delivery notes',
-          category: 'inventory'
-        }
-      ]
+          name: "Delivery Note",
+          path: "/app/vouchers/delivery-note/create",
+          color:
+            theme === "dark"
+              ? "bg-cyan-900/50 hover:bg-cyan-800/50"
+              : "bg-cyan-50 hover:bg-cyan-100",
+          iconBg: theme === "dark" ? "bg-cyan-800/70" : "bg-cyan-100",
+          description: "Delivery notes",
+          category: "inventory",
+        },
+      ],
     },
     {
       title: "Import Vouchers",
@@ -251,48 +297,85 @@ const VouchersIndex: React.FC = () => {
       icon: <ImportIcon size={20} />,
       vouchers: [
         {
-          id: 'import-vouchers',
+          id: "import-vouchers",
           icon: <ImportIcon size={20} />,
-          name: 'Import Vouchers',
-          path: '/app/vouchers/import',
-          color: theme === 'dark' ? 'bg-teal-900/50 hover:bg-teal-800/50' : 'bg-teal-50 hover:bg-teal-100',
-          iconBg: theme === 'dark' ? 'bg-teal-800/70' : 'bg-teal-100',
-          description: 'Import from Excel/CSV files',
-          category: 'import'
+          name: "Import Vouchers",
+          path: "/app/vouchers/import",
+          color:
+            theme === "dark"
+              ? "bg-teal-900/50 hover:bg-teal-800/50"
+              : "bg-teal-50 hover:bg-teal-100",
+          iconBg: theme === "dark" ? "bg-teal-800/70" : "bg-teal-100",
+          description: "Import from Excel/CSV files",
+          category: "import",
         },
         {
-          id: 'bank-statement-import',
+          id: "bank-statement-import",
           icon: <FileSpreadsheet size={20} />,
-          name: 'Bank Statement',
-          path: '/app/vouchers/bank-statement-import',
-          color: theme === 'dark' ? 'bg-emerald-900/50 hover:bg-emerald-800/50' : 'bg-emerald-50 hover:bg-emerald-100',
-          iconBg: theme === 'dark' ? 'bg-emerald-800/70' : 'bg-emerald-100',
-          description: 'Import Bank Statements',
-          category: 'import'
+          name: "Bank Statement",
+          path: "/app/vouchers/bank-statement-import",
+          color:
+            theme === "dark"
+              ? "bg-emerald-900/50 hover:bg-emerald-800/50"
+              : "bg-emerald-50 hover:bg-emerald-100",
+          iconBg: theme === "dark" ? "bg-emerald-800/70" : "bg-emerald-100",
+          description: "Import Bank Statements",
+          category: "import",
         },
         {
-          id: 'purchase-import',
+          id: "purchase-import",
           icon: <ShoppingCart size={20} />,
-          name: 'Purchase Import',
-          path: '/app/vouchers/purchase-import',
-          color: theme === 'dark' ? 'bg-blue-900/50 hover:bg-blue-800/50' : 'bg-blue-50 hover:bg-blue-100',
-          iconBg: theme === 'dark' ? 'bg-blue-800/70' : 'bg-blue-100',
-          description: 'Import Purchase GST Summary',
-          category: 'import'
+          name: "Purchase Import",
+          path: "/app/vouchers/purchase-import",
+          color:
+            theme === "dark"
+              ? "bg-blue-900/50 hover:bg-blue-800/50"
+              : "bg-blue-50 hover:bg-blue-100",
+          iconBg: theme === "dark" ? "bg-blue-800/70" : "bg-blue-100",
+          description: "Import Purchase GST Summary",
+          category: "import",
         },
         {
-          id: 'sales-import',
+          id: "sales-import",
           icon: <ShoppingCart size={20} />,
-          name: 'Sales Import',
-          path: '/app/vouchers/sales-import',
-          color: theme === 'dark' ? 'bg-sky-900/50 hover:bg-sky-800/50' : 'bg-sky-50 hover:bg-sky-100',
-          iconBg: theme === 'dark' ? 'bg-sky-800/70' : 'bg-sky-100',
-          description: 'Import Sales GST Summary',
-          category: 'import'
-        }
-      ]
+          name: "Sales Import",
+          path: "/app/vouchers/sales-import",
+          color:
+            theme === "dark"
+              ? "bg-sky-900/50 hover:bg-sky-800/50"
+              : "bg-sky-50 hover:bg-sky-100",
+          iconBg: theme === "dark" ? "bg-sky-800/70" : "bg-sky-100",
+          description: "Import Sales GST Summary",
+          category: "import",
+        },
+        {
+          id: "credit-debit-import",
+          icon: <FileText size={20} />,
+          name: "Credit Note Import",
+          path: "/app/vouchers/import?type=credit-note",
+          color:
+            theme === "dark"
+              ? "bg-amber-900/50 hover:bg-amber-800/50"
+              : "bg-amber-50 hover:bg-amber-100",
+          iconBg: theme === "dark" ? "bg-amber-800/70" : "bg-amber-100",
+          description: "Import Credit Notes",
+          category: "import",
+        },
+        {
+          id: "debit-note-import",
+          icon: <FileText size={20} />,
+          name: "Debit Note Import",
+          path: "/app/vouchers/import?type=debit-note",
+          color:
+            theme === "dark"
+              ? "bg-amber-900/50 hover:bg-amber-800/50"
+              : "bg-amber-50 hover:bg-amber-100",
+          iconBg: theme === "dark" ? "bg-amber-800/70" : "bg-amber-100",
+          description: "Import Debit Notes",
+          category: "import",
+        },
+      ],
     },
-
   ];
 
   return (
@@ -300,7 +383,11 @@ const VouchersIndex: React.FC = () => {
       {/* Header Section */}
       <div className="mb-6">
         <h1 className="text-2xl font-bold mb-2">Voucher Management</h1>
-        <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+        <p
+          className={`text-sm ${
+            theme === "dark" ? "text-gray-400" : "text-gray-600"
+          }`}
+        >
           Create, manage, and track all your vouchers in one place
         </p>
       </div>
@@ -308,14 +395,29 @@ const VouchersIndex: React.FC = () => {
       {/* Voucher Types by Section */}
       <div className="space-y-6 mb-6">
         {voucherSections.map((section, sectionIndex) => (
-          <div key={sectionIndex} className={`p-6 rounded-lg ${theme === 'dark' ? 'bg-gray-800 border border-gray-700' : 'bg-white shadow-sm border border-gray-200'}`}>
+          <div
+            key={sectionIndex}
+            className={`p-6 rounded-lg ${
+              theme === "dark"
+                ? "bg-gray-800 border border-gray-700"
+                : "bg-white shadow-sm border border-gray-200"
+            }`}
+          >
             <div className="flex items-center mb-4">
-              <div className={`p-2 rounded-lg mr-3 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}>
+              <div
+                className={`p-2 rounded-lg mr-3 ${
+                  theme === "dark" ? "bg-gray-700" : "bg-gray-100"
+                }`}
+              >
                 {section.icon}
               </div>
               <div>
                 <h2 className="text-lg font-semibold">{section.title}</h2>
-                <p className={`text-sm ${theme === 'dark' ? 'text-gray-400' : 'text-gray-600'}`}>
+                <p
+                  className={`text-sm ${
+                    theme === "dark" ? "text-gray-400" : "text-gray-600"
+                  }`}
+                >
                   {section.description}
                 </p>
               </div>
@@ -330,23 +432,40 @@ const VouchersIndex: React.FC = () => {
                     key={voucher.id}
                     onClick={() => isAllowed && handleVoucherClick(voucher)}
                     disabled={!isAllowed}
-                    className={`p-4 rounded-lg flex flex-col items-center text-center transition-all duration-200 transform ${isAllowed
-                      ? 'hover:scale-105 hover:shadow-lg translate-y-0 active:scale-95 cursor-pointer'
-                      : 'opacity-50 grayscale cursor-not-allowed scale-100'
-                      } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${voucher.color} group relative`}
+                    className={`p-4 rounded-lg flex flex-col items-center text-center transition-all duration-200 transform ${
+                      isAllowed
+                        ? "hover:scale-105 hover:shadow-lg translate-y-0 active:scale-95 cursor-pointer"
+                        : "opacity-50 grayscale cursor-not-allowed scale-100"
+                    } focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
+                      voucher.color
+                    } group relative`}
                     aria-label={`Create ${voucher.name} voucher - ${voucher.description}`}
-                    title={isAllowed ? voucher.description : "You don't have permission to access this module"}
+                    title={
+                      isAllowed
+                        ? voucher.description
+                        : "You don't have permission to access this module"
+                    }
                   >
                     {!isAllowed && (
                       <div className="absolute top-2 right-2 text-red-500 bg-white/80 rounded-full p-1 shadow-sm">
                         <Lock size={12} />
                       </div>
                     )}
-                    <div className={`p-3 rounded-full mb-3 transition-colors ${isAllowed ? 'group-hover:scale-110' : ''} ${voucher.iconBg}`}>
+                    <div
+                      className={`p-3 rounded-full mb-3 transition-colors ${
+                        isAllowed ? "group-hover:scale-110" : ""
+                      } ${voucher.iconBg}`}
+                    >
                       {voucher.icon}
                     </div>
-                    <span className="font-medium text-sm leading-tight">{voucher.name}</span>
-                    <span className={`text-xs mt-1 opacity-70 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
+                    <span className="font-medium text-sm leading-tight">
+                      {voucher.name}
+                    </span>
+                    <span
+                      className={`text-xs mt-1 opacity-70 ${
+                        theme === "dark" ? "text-gray-400" : "text-gray-500"
+                      }`}
+                    >
                       {voucher.category}
                     </span>
                   </button>

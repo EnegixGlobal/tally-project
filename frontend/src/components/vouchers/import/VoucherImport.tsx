@@ -10,8 +10,9 @@ import {
   RefreshCw,
   FileSpreadsheet,
 } from "lucide-react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import * as XLSX from "xlsx";
+import Swal from "sweetalert2";
 
 interface ImportedVoucher {
   id: string;
@@ -45,7 +46,11 @@ interface VoucherTemplate {
 
 const VoucherImport: React.FC = () => {
   const navigate = useNavigate();
+  const location = useLocation();
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const searchParams = new URLSearchParams(location.search);
+  const initialType = searchParams.get("type") || "payment";
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [importedVouchers, setImportedVouchers] = useState<ImportedVoucher[]>(
@@ -53,10 +58,36 @@ const VoucherImport: React.FC = () => {
   );
   const [isProcessing, setIsProcessing] = useState(false);
   const [dragActive, setDragActive] = useState(false);
-  const [selectedTemplate, setSelectedTemplate] = useState("payment");
+  const [selectedTemplate, setSelectedTemplate] = useState(initialType);
+
+  React.useEffect(() => {
+    const type = new URLSearchParams(location.search).get("type");
+    if (type) {
+      setSelectedTemplate(type);
+    }
+  }, [location.search]);
   const [activeTab, setActiveTab] = useState<
     "import" | "preview" | "templates"
   >("import");
+  const [ledgers, setLedgers] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const fetchLedgers = async () => {
+      const companyId = localStorage.getItem("company_id") || "";
+      const ownerType = localStorage.getItem("supplier") || "";
+      const ownerId = localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id") || "";
+      try {
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/ledger?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`);
+        const data = await res.json();
+        if (data.success || Array.isArray(data)) {
+           setLedgers(data.data || data || []);
+        }
+      } catch (err) {
+        console.error("Failed to fetch ledgers", err);
+      }
+    };
+    fetchLedgers();
+  }, []);
 
   const voucherTemplates: VoucherTemplate[] = [
 
@@ -116,6 +147,41 @@ const VoucherImport: React.FC = () => {
         },
       ],
     },
+    {
+      name: "Credit Note Template",
+      type: "credit-note",
+      description: "Import credit note vouchers (Accounting Invoice mode)",
+      fields: [
+        "Sr No",
+        "Date",
+        "Ledger Name",
+        "Dr/Cr",
+        "Amount",
+        "Narration"
+      ],
+      sampleData: [
+        {
+          "Sr No": 1,
+          Date: "2026-07-14",
+          "Ledger Name": "Ayush",
+          "Dr/Cr": "Dr",
+          Amount: 1000,
+          Narration: "import"
+        },
+        {
+          "Ledger Name": "axis bank",
+          "Dr/Cr": "Cr",
+          Amount: 500,
+          Narration: ""
+        },
+        {
+          "Ledger Name": "Aman",
+          "Dr/Cr": "Cr",
+          Amount: 500,
+          Narration: ""
+        }
+      ],
+    },
 
   ];
 
@@ -149,7 +215,7 @@ const VoucherImport: React.FC = () => {
     ];
 
     if (!validTypes.includes(file.type)) {
-      alert("Please select a valid Excel (.xlsx, .xls) or CSV file");
+      Swal.fire("Error", "Please select a valid Excel (.xlsx, .xls) or CSV file", "error");
       return;
     }
 
@@ -173,11 +239,89 @@ const VoucherImport: React.FC = () => {
 
       console.log("📌 Raw Excel Data:", jsonData);
 
-      // 🔹 Process Data (Format Dates)
-      const formattedData = (jsonData as any[]).map((row) => ({
-        ...row,
-        Date: formatDate(row["Date"]), // ✅ Fix Date Format here
-      }));
+      // 🔹 Process Data (Format Dates & Validate Ledgers)
+      let lastDate = "";
+      let lastSrNo = "";
+      let formattedData = (jsonData as any[]).map((row) => {
+        let hasError = false;
+        let errorMessage = "";
+
+        let rowDate = row["Date"];
+        if (!rowDate) {
+          rowDate = lastDate;
+        } else {
+          rowDate = formatDate(row["Date"]);
+          lastDate = rowDate;
+        }
+
+        let rowSrNo = row["Sr No"] || row["Srno"] || "";
+        if (!rowSrNo) {
+          rowSrNo = lastSrNo;
+        } else {
+          lastSrNo = rowSrNo;
+        }
+        row["Sr No"] = rowSrNo;
+
+        Object.keys(row).forEach(key => {
+          if (key === "Debit Ledger" || key === "Credit Ledger" || key === "Paid To" || key === "Payment Mode" || key === "Party Name" || key === "Return Ledger" || key === "Ledger Name") {
+            const val = row[key];
+            if (val) {
+              const matched = ledgers.find(l => l.name && l.name.toLowerCase().trim() === String(val).toLowerCase().trim());
+              if (!matched) {
+                hasError = true;
+                errorMessage = `Ledger not found: ${val}`;
+              }
+            }
+          }
+        });
+
+        return {
+          ...row,
+          Date: rowDate, // ✅ Fix Date Format here
+          status: hasError ? "error" : "pending",
+          errorMessage,
+        };
+      });
+
+      // 🔹 Auto-generate Credit Note Numbers for Preview
+      if (selectedTemplate === "credit-note" && formattedData.length > 0) {
+        try {
+          const companyId = localStorage.getItem("company_id") || "";
+          const ownerType = localStorage.getItem("supplier") || "";
+          const ownerId = localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id") || "";
+          const sampleDate = formattedData[0]?.Date || new Date().toISOString().split("T")[0];
+
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/CreditNotevoucher/next-number?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&date=${sampleDate}`);
+          const result = await res.json();
+          
+          if (result.success && result.voucherNumber) {
+            const parts = result.voucherNumber.split("/");
+            const lastSeqStr = parts.pop();
+            const lastSeq = parseInt(lastSeqStr || "0", 10);
+            const prefix = parts.join("/") + "/";
+
+            let currentSeqOffset = lastSeq;
+            const groupToSeqMap: Record<string, string> = {};
+
+            formattedData = formattedData.map((row) => {
+              const srNo = row["Sr No"] || row["Srno"] || "";
+              const rowDate = row.Date || "unknown";
+              const groupKey = srNo || rowDate;
+
+              if (!groupToSeqMap[groupKey]) {
+                groupToSeqMap[groupKey] = prefix + String(currentSeqOffset).padStart(6, "0");
+                currentSeqOffset++;
+              }
+              return {
+                "Credit Note No.": groupToSeqMap[groupKey],
+                ...row,
+              };
+            });
+          }
+        } catch (error) {
+          console.error("Failed to fetch next credit note number", error);
+        }
+      }
 
       console.log("📌 Processed Excel Data:", formattedData);
 
@@ -185,7 +329,7 @@ const VoucherImport: React.FC = () => {
       setActiveTab("preview");
     } catch (err) {
       console.error("File Read Error:", err);
-      alert("Invalid Excel file!");
+      Swal.fire("Error", "Invalid Excel file!", "error");
     } finally {
       setIsProcessing(false);
     }
@@ -252,8 +396,11 @@ const VoucherImport: React.FC = () => {
         case "receipt":
           endpoint = `${import.meta.env.VITE_API_URL}/api/receipt_import`;
           break;
+        case "credit-note":
+          endpoint = `${import.meta.env.VITE_API_URL}/api/credit_note_import`;
+          break;
         default:
-          alert("Invalid template selected");
+          Swal.fire("Error", "Invalid template selected", "error");
           setIsProcessing(false);
           return;
       }
@@ -272,14 +419,17 @@ const VoucherImport: React.FC = () => {
       console.log("📥 Import Result:", result);
 
       if (result.success) {
-        alert(`✅ Imported Successfully: ${result.imported}`);
+        setImportedVouchers(prev => prev.map(v => ({ ...v, status: "imported" })));
+        Swal.fire("Success", `Imported Successfully: ${result.imported}`, "success");
       } else {
-        alert("⚠️ Some rows failed. Check console for errors.");
+        // If there are errors, mark everything as error for now, or just leave as pending
+        setImportedVouchers(prev => prev.map(v => ({ ...v, status: "error", errorMessage: "Failed to import" })));
+        Swal.fire("Warning", "Some rows failed. Check console for errors.", "warning");
         console.log("Errors:", result.errors);
       }
     } catch (err) {
       console.error("Import Error:", err);
-      alert("❌ Import Failed!");
+      Swal.fire("Error", "Import Failed!", "error");
     } finally {
       setIsProcessing(false);
     }
@@ -376,6 +526,7 @@ const VoucherImport: React.FC = () => {
             >
               <option value="payment">Payment Voucher</option>
               <option value="receipt">Receipt Voucher</option>
+              <option value="credit-note">Credit Note Voucher</option>
             </select>
           </div>
 
@@ -491,7 +642,12 @@ const VoucherImport: React.FC = () => {
                 </span>
               </div>
               <div className="text-2xl font-bold text-blue-600 mt-2">
-                {importedVouchers.filter((v) => v.status === "pending").length}
+                {(() => {
+                  const filtered = importedVouchers.filter((v) => v.status === "pending");
+                  const uniqueGroups = new Set();
+                  filtered.forEach((v, i) => uniqueGroups.add(v["Credit Note No."] || v["Invoice number"] || v["Voucher No"] || v["Sr No"] || `row_${i}`));
+                  return uniqueGroups.size;
+                })()}
               </div>
             </div>
             <div className="bg-red-50 border border-red-200 rounded-lg p-4">
@@ -500,7 +656,12 @@ const VoucherImport: React.FC = () => {
                 <span className="font-medium text-red-900">Errors</span>
               </div>
               <div className="text-2xl font-bold text-red-600 mt-2">
-                {importedVouchers.filter((v) => v.status === "error").length}
+                {(() => {
+                  const filtered = importedVouchers.filter((v) => v.status === "error");
+                  const uniqueGroups = new Set();
+                  filtered.forEach((v, i) => uniqueGroups.add(v["Credit Note No."] || v["Invoice number"] || v["Voucher No"] || v["Sr No"] || `row_${i}`));
+                  return uniqueGroups.size;
+                })()}
               </div>
             </div>
             <div className="bg-green-50 border border-green-200 rounded-lg p-4">
@@ -509,7 +670,12 @@ const VoucherImport: React.FC = () => {
                 <span className="font-medium text-green-900">Imported</span>
               </div>
               <div className="text-2xl font-bold text-green-600 mt-2">
-                {importedVouchers.filter((v) => v.status === "imported").length}
+                {(() => {
+                  const filtered = importedVouchers.filter((v) => v.status === "imported");
+                  const uniqueGroups = new Set();
+                  filtered.forEach((v, i) => uniqueGroups.add(v["Credit Note No."] || v["Invoice number"] || v["Voucher No"] || v["Sr No"] || `row_${i}`));
+                  return uniqueGroups.size;
+                })()}
               </div>
             </div>
           </div>
@@ -527,19 +693,45 @@ const VoucherImport: React.FC = () => {
 
                     {/* Dynamic Columns from Excel */}
                     {importedVouchers.length > 0 &&
-                      Object.keys(importedVouchers[0]).map((key) => (
-                        <th
-                          key={key}
-                          className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
-                        >
-                          {key}
-                        </th>
-                      ))}
+                      Object.keys(importedVouchers[0])
+                        .filter(key => key !== "status" && key !== "errorMessage")
+                        .map((key) => (
+                          <th
+                            key={key}
+                            className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase whitespace-nowrap"
+                          >
+                            {key}
+                          </th>
+                        ))}
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200">
-                  {importedVouchers.map((row: any, rowIndex: number) => (
-                    <tr key={rowIndex} className="hover:bg-gray-50">
+                  {importedVouchers.map((row: any, rowIndex: number) => {
+                    let hasError = false;
+                    let hasMatch = false;
+
+                    Object.keys(row)
+                      .filter(key => key !== "status" && key !== "errorMessage")
+                      .forEach(key => {
+                        const val = row[key];
+                        if (key === "Debit Ledger" || key === "Credit Ledger" || key === "Paid To" || key === "Payment Mode" || key === "Party Name" || key === "Return Ledger" || key === "Ledger Name") {
+                          if (val) {
+                            const matched = ledgers.find(l => l.name && l.name.toLowerCase().trim() === String(val).toLowerCase().trim());
+                            if (matched) {
+                              hasMatch = true;
+                            } else {
+                              hasError = true;
+                            }
+                          }
+                        }
+                      });
+                      
+                    let rowBgClass = "hover:bg-gray-50";
+                    if (hasError) rowBgClass = "bg-red-50 hover:bg-red-100";
+                    else if (hasMatch) rowBgClass = "bg-green-50 hover:bg-green-100";
+
+                    return (
+                    <tr key={rowIndex} className={rowBgClass}>
                       {/* Status Cell */}
                       <td className="px-4 py-3 text-sm">
                         {row.status === "error" ? (
@@ -563,20 +755,43 @@ const VoucherImport: React.FC = () => {
                       </td>
 
                       {/* Dynamic Data Cells */}
-                      {Object.keys(row).map((key, colIndex) => (
-                        <td
-                          key={`${rowIndex}-${colIndex}`}
-                          className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap"
-                        >
-                          {key === "Date" || key.includes("Date")
-                            ? formatDate(row[key])
-                            : row[key] !== undefined && row[key] !== null
-                              ? String(row[key])
-                              : "-"}
-                        </td>
-                      ))}
+                      {Object.keys(row)
+                        .filter(key => key !== "status" && key !== "errorMessage")
+                        .map((key, colIndex) => {
+                          const val = row[key];
+                          let displayVal = val !== undefined && val !== null ? String(val) : "-";
+
+                          if (key === "Debit Ledger" || key === "Credit Ledger" || key === "Paid To" || key === "Payment Mode" || key === "Party Name" || key === "Return Ledger" || key === "Ledger Name") {
+                            if (val) {
+                              const matched = ledgers.find(l => l.name && l.name.toLowerCase().trim() === String(val).toLowerCase().trim());
+                              if (matched) {
+                                displayVal = `${val} (ID: ${matched.id})`;
+                              }
+                            }
+                          } else if (key === "Date" || key.includes("Date")) {
+                            displayVal = formatDate(val);
+                          }
+
+                          // Visual Grouping: Hide repeating header info for grouped rows
+                          if (rowIndex > 0 && (key === "Credit Note No." || key === "Sr No" || key === "Date")) {
+                            const prevRow = importedVouchers[rowIndex - 1];
+                            if (prevRow && String(prevRow[key]) === String(val)) {
+                              displayVal = ""; // Leave blank for cleaner grouped look
+                            }
+                          }
+
+                          return (
+                            <td
+                              key={`${rowIndex}-${colIndex}`}
+                              className="px-4 py-3 text-sm text-gray-900 whitespace-nowrap"
+                            >
+                              {displayVal}
+                            </td>
+                          );
+                        })}
                     </tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
 
               </table>
