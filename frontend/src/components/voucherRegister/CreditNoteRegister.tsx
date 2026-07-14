@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
-import { ArrowLeft, CreditCard, Download, Printer, Trash2, Settings } from "lucide-react";
+import { ArrowLeft, CreditCard, Download, Printer, Trash2, Settings, Edit } from "lucide-react";
 import Swal from "sweetalert2";
 
 // Types - keeping everything in this file as requested
@@ -681,15 +681,6 @@ const CreditNoteRegister: React.FC = () => {
                 Delete Selected ({selectedVoucherIds.size})
               </button>
             )}
-            {hasPermission("add") && (
-              <button
-                onClick={() => navigate("/app/vouchers/credit-note/create")}
-                className="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded-lg transition-colors"
-                title="Add new credit note voucher"
-              >
-                Add New Credit Note
-              </button>
-            )}
           </div>
         </div>
       </div>
@@ -1011,7 +1002,7 @@ const CreditNoteRegister: React.FC = () => {
                               className="text-indigo-600 hover:text-indigo-900"
                               title="Edit voucher"
                             >
-                              Edit
+                              <Edit size={18} />
                             </button>
                           )}
                           {hasPermission("delete") && (
@@ -1020,7 +1011,7 @@ const CreditNoteRegister: React.FC = () => {
                               className="text-red-600 hover:text-red-900"
                               title="Delete voucher"
                             >
-                              Delete
+                              <Trash2 size={18} />
                             </button>
                           )}
                         </div>

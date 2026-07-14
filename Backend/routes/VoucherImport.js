@@ -1396,6 +1396,292 @@ router.post("/journal_import", async (req, res) => {
 
 
 // =========================================
+// CREDIT NOTE EXCEL IMPORT
+// =========================================
+
+router.post("/credit_note_import", async (req, res) => {
+    try {
+        const { rows, companyId, ownerType, ownerId } = req.body;
+
+        if (!rows || !rows.length) {
+            return res.status(400).json({ success: false, message: "No data received" });
+        }
+        if (!companyId || !ownerType || !ownerId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const [ledgers] = await db.execute("SELECT id, name FROM ledgers WHERE company_id=?", [companyId]);
+        const ledgerMap = {};
+        ledgers.forEach((l) => { ledgerMap[l.name.toLowerCase().trim()] = l.id; });
+
+        const errors = [];
+        const saved = [];
+        const groups = {};
+
+        let lastDate = "";
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            let date = row.Date;
+            if (!date) {
+                date = lastDate;
+            } else {
+                lastDate = date;
+            }
+            const creditNoteNo = row["Credit Note No."] || row["Reference No"] || row["Voucher No"] || null;
+            
+            if (!date) {
+                errors.push(`Row ${i + 2}: Date is required`);
+                continue;
+            }
+
+            const key = creditNoteNo || date;
+
+            if (!groups[key]) {
+                groups[key] = {
+                    date: date,
+                    creditNoteNo: creditNoteNo,
+                    items: [],
+                    rowNos: []
+                };
+            }
+            groups[key].items.push(row);
+            groups[key].rowNos.push(i + 2);
+        }
+
+        // 2. Process Each Group
+        for (const key in groups) {
+            const group = groups[key];
+            let totalDebit = 0;
+            let totalCredit = 0;
+            const cleanAccountingEntries = [];
+            let mainPartyId = null; 
+            let narration = "";
+            let groupHasError = false;
+
+            for (let i = 0; i < group.items.length; i++) {
+                const row = group.items[i];
+                const rowNo = group.rowNos[i];
+                const ledgerName = row["Ledger Name"] ? String(row["Ledger Name"]).toLowerCase().trim() : "";
+                const drCr = row["Dr/Cr"] ? String(row["Dr/Cr"]).toLowerCase().trim() : "";
+                const amount = Number(row.Amount || 0);
+                if (row.Narration && !narration) narration = row.Narration;
+
+                if (!ledgerName || !drCr || !amount) {
+                    errors.push(`Row ${rowNo}: Ledger Name, Dr/Cr, and Amount are required`);
+                    groupHasError = true;
+                    continue;
+                }
+
+                const ledgerId = ledgerMap[ledgerName];
+                if (!ledgerId) {
+                    errors.push(`Row ${rowNo}: Ledger not found (${row["Ledger Name"]})`);
+                    groupHasError = true;
+                    continue;
+                }
+
+                if (drCr === "dr" || drCr === "debit") {
+                    totalDebit += amount;
+                    cleanAccountingEntries.push({ ledgerId, type: "debit", amount });
+                } else if (drCr === "cr" || drCr === "credit") {
+                    totalCredit += amount;
+                    cleanAccountingEntries.push({ ledgerId, type: "credit", amount });
+                    if (!mainPartyId) mainPartyId = ledgerId; // Take first credit ledger as party
+                } else {
+                    errors.push(`Row ${rowNo}: Dr/Cr must be 'Dr' or 'Cr'`);
+                    groupHasError = true;
+                }
+            }
+
+            if (groupHasError) continue;
+
+            // Check if balances match
+            if (Math.abs(totalDebit - totalCredit) > 0.01) {
+                errors.push(`Group ${key} (Rows ${group.rowNos.join(",")}): Debit Total (${totalDebit}) and Credit Total (${totalCredit}) do not match`);
+                continue;
+            }
+
+            const voucherNumber = group.creditNoteNo || await generateVoucherNumber({
+                companyId, ownerType, ownerId, voucherType: "credit_note", date: group.date,
+            });
+
+            const finalNarration = JSON.stringify({
+                accountingEntries: cleanAccountingEntries,
+                note: narration || ""
+            });
+
+            const [result] = await db.query(
+                `INSERT INTO credit_vouchers 
+                 (company_id, owner_type, owner_id, date, number, mode, partyId, narration)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    companyId,
+                    ownerType,
+                    ownerId,
+                    group.date,
+                    voucherNumber,
+                    "accounting-invoice",
+                    mainPartyId,
+                    finalNarration
+                ]
+            );
+
+            saved.push(voucherNumber);
+        }
+
+        return res.json({ success: errors.length === 0, imported: saved.length, vouchers: saved, errors });
+    } catch (error) {
+        console.error("❌ Credit Note Import Error:", error);
+        return res.status(500).json({ success: false, message: "Import failed", error: error.message });
+    }
+});
+
+
+
+// =========================================
+// DEBIT NOTE EXCEL IMPORT
+// =========================================
+
+router.post("/debit_note_import", async (req, res) => {
+    try {
+        const { rows, companyId, ownerType, ownerId } = req.body;
+
+        if (!rows || !rows.length) {
+            return res.status(400).json({ success: false, message: "No data received" });
+        }
+        if (!companyId || !ownerType || !ownerId) {
+            return res.status(401).json({ success: false, message: "Unauthorized" });
+        }
+
+        const [ledgers] = await db.execute("SELECT id, name FROM ledgers WHERE company_id=?", [companyId]);
+        const ledgerMap = {};
+        ledgers.forEach((l) => { ledgerMap[l.name.toLowerCase().trim()] = l.id; });
+
+        const errors = [];
+        const saved = [];
+        const groups = {};
+
+        let lastDate = "";
+        for (let i = 0; i < rows.length; i++) {
+            const row = rows[i];
+            let date = row.Date;
+            if (!date) {
+                date = lastDate;
+            } else {
+                lastDate = date;
+            }
+            const debitNoteNo = row["Debit Note No."] || row["Reference No"] || row["Voucher No"] || null;
+            
+            if (!date) {
+                errors.push(`Row ${i + 2}: Date is required`);
+                continue;
+            }
+
+            const key = debitNoteNo || date;
+
+            if (!groups[key]) {
+                groups[key] = {
+                    date: date,
+                    debitNoteNo: debitNoteNo,
+                    items: [],
+                    rowNos: []
+                };
+            }
+            groups[key].items.push(row);
+            groups[key].rowNos.push(i + 2);
+        }
+
+        // 2. Process Each Group
+        for (const key in groups) {
+            const group = groups[key];
+            let totalDebit = 0;
+            let totalCredit = 0;
+            const cleanAccountingEntries = [];
+            let mainPartyId = null; 
+            let narration = "";
+            let groupHasError = false;
+
+            for (let i = 0; i < group.items.length; i++) {
+                const row = group.items[i];
+                const rowNo = group.rowNos[i];
+                const ledgerName = row["Ledger Name"] ? String(row["Ledger Name"]).toLowerCase().trim() : "";
+                const drCr = row["Dr/Cr"] ? String(row["Dr/Cr"]).toLowerCase().trim() : "";
+                const amount = Number(row.Amount || 0);
+                if (row.Narration && !narration) narration = row.Narration;
+
+                if (!ledgerName || !drCr || !amount) {
+                    errors.push(`Row ${rowNo}: Ledger Name, Dr/Cr, and Amount are required`);
+                    groupHasError = true;
+                    continue;
+                }
+
+                const ledgerId = ledgerMap[ledgerName];
+                if (!ledgerId) {
+                    errors.push(`Row ${rowNo}: Ledger not found (${row["Ledger Name"]})`);
+                    groupHasError = true;
+                    continue;
+                }
+
+                if (drCr === "dr" || drCr === "debit") {
+                    totalDebit += amount;
+                    cleanAccountingEntries.push({ ledgerId, type: "debit", amount });
+                } else if (drCr === "cr" || drCr === "credit") {
+                    totalCredit += amount;
+                    cleanAccountingEntries.push({ ledgerId, type: "credit", amount });
+                    if (!mainPartyId) mainPartyId = ledgerId; // Take first credit ledger as party
+                } else {
+                    errors.push(`Row ${rowNo}: Dr/Cr must be 'Dr' or 'Cr'`);
+                    groupHasError = true;
+                }
+            }
+
+            if (groupHasError) continue;
+
+            // Check if balances match
+            if (Math.abs(totalDebit - totalCredit) > 0.01) {
+                errors.push(`Group ${key} (Rows ${group.rowNos.join(",")}): Debit Total (${totalDebit}) and Credit Total (${totalCredit}) do not match`);
+                continue;
+            }
+
+            const voucherNumber = group.debitNoteNo || await generateVoucherNumber({
+                companyId, ownerType, ownerId, voucherType: "debit_note", date: group.date,
+            });
+
+            const finalNarration = JSON.stringify({
+                accountingEntries: cleanAccountingEntries,
+                note: narration || ""
+            });
+
+            const [result] = await db.query(
+                `INSERT INTO debit_note_vouchers 
+                 (company_id, owner_type, owner_id, date, number, mode, party_id, sales_ledger_id, narration)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+                [
+                    companyId,
+                    ownerType,
+                    ownerId,
+                    group.date,
+                    voucherNumber,
+                    "accounting-invoice",
+                    mainPartyId || null,
+                    null, // sales_ledger_id (not required for accounting-invoice)
+                    finalNarration
+                ]
+            );
+
+            saved.push(voucherNumber);
+        }
+
+        return res.json({ success: errors.length === 0, imported: saved.length, vouchers: saved, errors });
+    } catch (error) {
+        console.error("❌ Debit Note Import Error:", error);
+        return res.status(500).json({ success: false, message: "Import failed", error: error.message });
+    }
+});
+
+
+
+
+// =========================================
 // PURCHASE SUMMARY IMPORT (GST TEMPLATE)
 // =========================================
 

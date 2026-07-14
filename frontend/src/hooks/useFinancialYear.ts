@@ -23,7 +23,7 @@ export const filterByFinancialYear = <T extends Record<string, any>>(
     dateField: string,
     finYearStr: string | null
 ): T[] => {
-    if (!finYearStr) return data;
+    if (!finYearStr || finYearStr === "All-Years" || finYearStr === "All Years") return data;
     if (!Array.isArray(data)) return data;
 
     const { startDate, endDate } = getFinancialYearRange(finYearStr);
