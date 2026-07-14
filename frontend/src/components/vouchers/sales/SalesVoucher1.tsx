@@ -1007,9 +1007,25 @@ const SalesVoucher: React.FC = () => {
           if (itemsLoaded && entry.itemId) {
             const details = getItemDetails(entry.itemId);
             if (details.gstRate > 0) {
-              if (cRate === 0) cRate = details.gstRate / 2;
-              if (sRate === 0) sRate = details.gstRate / 2;
-              if (iRate === 0) iRate = details.gstRate;
+              const companyState = safeCompanyInfo?.state || "";
+              const partyState = selectedPartyState || "";
+              const hasParty = !!formData.partyId;
+              const statesMatch =
+                hasParty &&
+                (!companyState ||
+                  !partyState ||
+                  companyState.toLowerCase().trim() ===
+                    partyState.toLowerCase().trim());
+
+              if (!hasParty || statesMatch) {
+                if (cRate === 0) cRate = details.gstRate / 2;
+                if (sRate === 0) sRate = details.gstRate / 2;
+                iRate = 0;
+              } else {
+                cRate = 0;
+                sRate = 0;
+                if (iRate === 0) iRate = details.gstRate;
+              }
             }
           }
 
