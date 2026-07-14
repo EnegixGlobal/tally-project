@@ -216,7 +216,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     (gstFilter !== "all") ||
     (groupBy !== "none") ||
     (viewType !== "Daily" && viewType !== "Custom Date") ||
-    (viewType === "Custom Date" && customStartDate && customEndDate)
+    (viewType === "Custom Date" && customStartDate && customEndDate) ||
+    (selectedFinYear && selectedFinYear !== "All-Years" && selectedFinYear !== "All Years")
   );
 
   // Reset page to 1 when any filter changes
@@ -232,7 +233,8 @@ const VoucherRegisterBase: React.FC<VoucherRegisterBaseProps> = ({
     selectedMonth,
     selectedQuarter,
     customStartDate,
-    customEndDate
+    customEndDate,
+    selectedFinYear
   ]);
 
   const lastFetchedWithFilterRef = React.useRef(false);
