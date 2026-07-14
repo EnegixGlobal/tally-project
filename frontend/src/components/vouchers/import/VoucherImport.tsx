@@ -552,22 +552,24 @@ const VoucherImport: React.FC = () => {
       {activeTab === "import" && (
         <div className="space-y-6">
           {/* Template Selection */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Select Voucher Type
-            </label>
-            <select
-              title="Select Voucher Type"
-              value={selectedTemplate}
-              onChange={(e) => setSelectedTemplate(e.target.value)}
-              className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-            >
-              <option value="payment">Payment Voucher</option>
-              <option value="receipt">Receipt Voucher</option>
-              <option value="credit-note">Credit Note Voucher</option>
-              <option value="debit-note">Debit Note Voucher</option>
-            </select>
-          </div>
+          {!searchParams.get("type") && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-2">
+                Select Voucher Type
+              </label>
+              <select
+                title="Select Voucher Type"
+                value={selectedTemplate}
+                onChange={(e) => setSelectedTemplate(e.target.value)}
+                className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+              >
+                <option value="payment">Payment Voucher</option>
+                <option value="receipt">Receipt Voucher</option>
+                <option value="credit-note">Credit Note Voucher</option>
+                <option value="debit-note">Debit Note Voucher</option>
+              </select>
+            </div>
+          )}
 
           {/* File Upload Area */}
           <div
@@ -852,7 +854,9 @@ const VoucherImport: React.FC = () => {
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            {voucherTemplates.map((template) => (
+            {voucherTemplates
+              .filter(t => !searchParams.get("type") || t.type === searchParams.get("type"))
+              .map((template) => (
               <div
                 key={template.type}
                 className="border border-gray-200 rounded-lg p-6"
