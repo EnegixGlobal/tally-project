@@ -165,6 +165,40 @@ const LedgerList: React.FC = () => {
     }
   };
 
+  // Quick Update
+  const handleLedgerChange = (ledgerId: string | number, field: keyof Ledger, value: any) => {
+    setLedgers((prev) =>
+      prev.map((l) => (l.id === ledgerId ? { ...l, [field]: value } : l))
+    );
+  };
+
+  const handleLedgerSave = async (ledgerToSave: Ledger) => {
+    try {
+      const companyId = localStorage.getItem("company_id");
+      const ownerType = localStorage.getItem("supplier");
+      const ownerId = localStorage.getItem(
+        ownerType === "employee" ? "employee_id" : "user_id"
+      );
+
+      const payload = { ...ledgerToSave, companyId, ownerType, ownerId };
+
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/ledger/${ledgerToSave.id}?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`,
+        {
+          method: "PUT",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      if (!res.ok) {
+        console.error("Failed to quick update ledger");
+      }
+    } catch (err) {
+      console.error("Update error:", err);
+    }
+  };
+
   //total debit or total cradit
   const totalDebit = filteredLedgers.reduce((sum, ledger) => {
     if (ledger.balanceType === "debit") {
@@ -297,21 +331,39 @@ const LedgerList: React.FC = () => {
 
       <td className="px-4 py-3">{ledger.gstNumber}</td>
       <td className="px-4 py-3 text-right font-mono">
-        {ledger.openingBalance}
+        <input
+          type="number"
+          value={ledger.openingBalance}
+          onChange={(e) => handleLedgerChange(ledger.id, 'openingBalance', e.target.value === '' ? 0 : parseFloat(e.target.value))}
+          onBlur={() => handleLedgerSave(ledger)}
+          className={`w-28 text-right p-1 rounded border outline-none font-sans ${
+            theme === "dark"
+              ? "bg-gray-700 border-gray-600 focus:border-blue-500"
+              : "bg-white border-gray-300 focus:border-blue-500"
+          }`}
+        />
       </td>
       <td className="px-4 py-3 text-center">
-        <span
-          className={`px-2 py-1 rounded text-xs ${ledger.balanceType === "debit"
-            ? theme === "dark"
-              ? "bg-red-900 text-red-200"
-              : "bg-red-100 text-red-800"
-            : theme === "dark"
-              ? "bg-green-900 text-green-200"
-              : "bg-green-100 text-green-800"
-            }`}
+        <select
+          value={ledger.balanceType || "debit"}
+          onChange={(e) => {
+            const newType = e.target.value as "debit" | "credit";
+            handleLedgerChange(ledger.id, 'balanceType', newType);
+            handleLedgerSave({ ...ledger, balanceType: newType });
+          }}
+          className={`p-1 rounded text-xs outline-none border cursor-pointer font-bold ${
+            ledger.balanceType === "debit"
+              ? theme === "dark"
+                ? "bg-red-900 text-red-200 border-red-800"
+                : "bg-red-100 text-red-800 border-red-200"
+              : theme === "dark"
+                ? "bg-green-900 text-green-200 border-green-800"
+                : "bg-green-100 text-green-800 border-green-200"
+          }`}
         >
-          {ledger.balanceType?.toUpperCase() || "N/A"}
-        </span>
+          <option value="debit" className="bg-white text-black dark:bg-gray-800 dark:text-white">DEBIT</option>
+          <option value="credit" className="bg-white text-black dark:bg-gray-800 dark:text-white">CREDIT</option>
+        </select>
       </td>
       <td className="px-4 py-3 text-center">
         {ledger.gstNumber ? (
