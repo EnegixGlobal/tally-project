@@ -13,6 +13,7 @@ import MastersIndex from "./components/masters/MastersIndex";
 import LedgerList from "./components/masters/ledger/LedgerList";
 import LedgerForm from "./components/masters/ledger/LedgerForm";
 import MultiLedgerForm from "./components/masters/ledger/MultiLedgerForm";
+import OpeningBalance from "./components/masters/ledger/OpeningBalance";
 import GroupList from "./components/masters/group/GroupList";
 import GroupForm from "./components/masters/group/GroupForm";
 import BudgetList from "./components/masters/budget/BudgetList";
@@ -340,6 +341,16 @@ function App() {
                     <RequireCompany>
                       <RequireSubscription>
                         <LedgerForm />
+                      </RequireSubscription>
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="masters/ledger/opn"
+                  element={
+                    <RequireCompany>
+                      <RequireSubscription>
+                        <OpeningBalance />
                       </RequireSubscription>
                     </RequireCompany>
                   }
