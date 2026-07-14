@@ -182,7 +182,41 @@ const VoucherImport: React.FC = () => {
         }
       ],
     },
-
+    {
+      name: "Debit Note Template",
+      type: "debit-note",
+      description: "Import debit note vouchers (Accounting Invoice mode)",
+      fields: [
+        "Sr No",
+        "Date",
+        "Ledger Name",
+        "Dr/Cr",
+        "Amount",
+        "Narration"
+      ],
+      sampleData: [
+        {
+          "Sr No": 1,
+          Date: "2026-07-14",
+          "Ledger Name": "Purchase Return",
+          "Dr/Cr": "Cr",
+          Amount: 1000,
+          Narration: "import"
+        },
+        {
+          "Ledger Name": "axis bank",
+          "Dr/Cr": "Dr",
+          Amount: 500,
+          Narration: ""
+        },
+        {
+          "Ledger Name": "Aman",
+          "Dr/Cr": "Dr",
+          Amount: 500,
+          Narration: ""
+        }
+      ],
+    },
   ];
 
   const handleDrag = (e: React.DragEvent) => {
@@ -283,15 +317,16 @@ const VoucherImport: React.FC = () => {
         };
       });
 
-      // 🔹 Auto-generate Credit Note Numbers for Preview
-      if (selectedTemplate === "credit-note" && formattedData.length > 0) {
+      // 🔹 Auto-generate Credit/Debit Note Numbers for Preview
+      if ((selectedTemplate === "credit-note" || selectedTemplate === "debit-note") && formattedData.length > 0) {
         try {
           const companyId = localStorage.getItem("company_id") || "";
           const ownerType = localStorage.getItem("supplier") || "";
           const ownerId = localStorage.getItem(ownerType === "employee" ? "employee_id" : "user_id") || "";
           const sampleDate = formattedData[0]?.Date || new Date().toISOString().split("T")[0];
 
-          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/CreditNotevoucher/next-number?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&date=${sampleDate}`);
+          const routeName = selectedTemplate === "credit-note" ? "CreditNotevoucher" : "DebitNotevoucher";
+          const res = await fetch(`${import.meta.env.VITE_API_URL}/api/${routeName}/next-number?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}&date=${sampleDate}`);
           const result = await res.json();
           
           if (result.success && result.voucherNumber) {
@@ -313,13 +348,13 @@ const VoucherImport: React.FC = () => {
                 currentSeqOffset++;
               }
               return {
-                "Credit Note No.": groupToSeqMap[groupKey],
+                [selectedTemplate === "credit-note" ? "Credit Note No." : "Debit Note No."]: groupToSeqMap[groupKey],
                 ...row,
               };
             });
           }
         } catch (error) {
-          console.error("Failed to fetch next credit note number", error);
+          console.error(`Failed to fetch next ${selectedTemplate} number`, error);
         }
       }
 
@@ -398,6 +433,9 @@ const VoucherImport: React.FC = () => {
           break;
         case "credit-note":
           endpoint = `${import.meta.env.VITE_API_URL}/api/credit_note_import`;
+          break;
+        case "debit-note":
+          endpoint = `${import.meta.env.VITE_API_URL}/api/debit_note_import`;
           break;
         default:
           Swal.fire("Error", "Invalid template selected", "error");
@@ -527,6 +565,7 @@ const VoucherImport: React.FC = () => {
               <option value="payment">Payment Voucher</option>
               <option value="receipt">Receipt Voucher</option>
               <option value="credit-note">Credit Note Voucher</option>
+              <option value="debit-note">Debit Note Voucher</option>
             </select>
           </div>
 
@@ -773,7 +812,7 @@ const VoucherImport: React.FC = () => {
                           }
 
                           // Visual Grouping: Hide repeating header info for grouped rows
-                          if (rowIndex > 0 && (key === "Credit Note No." || key === "Sr No" || key === "Date")) {
+                          if (rowIndex > 0 && (key === "Credit Note No." || key === "Debit Note No." || key === "Sr No" || key === "Date")) {
                             const prevRow = importedVouchers[rowIndex - 1];
                             if (prevRow && String(prevRow[key]) === String(val)) {
                               displayVal = ""; // Leave blank for cleaner grouped look
