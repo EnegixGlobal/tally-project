@@ -129,40 +129,80 @@ const OpeningBalance: React.FC = () => {
       >
         {!selectedGroup ? (
           <>
-            <h2 className="text-xl font-semibold mb-6 border-b pb-3">Ledger Groups</h2>
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-              {groups.map((group) => {
-                const groupLedgers = getLedgersForGroup(group.id);
-                return (
-                  <div 
-                    key={group.id}
-                    onClick={() => setSelectedGroup(group)}
-                    className={`p-4 rounded-lg border transition-all cursor-pointer hover:shadow-md ${
-                      theme === "dark" 
-                        ? "border-gray-700 bg-gray-900/50 hover:border-gray-500" 
-                        : "border-gray-200 bg-gray-50 hover:border-indigo-300"
-                    }`}
-                  >
-                    <div className="flex justify-between items-start">
-                      <h3 className="font-semibold text-lg">{group.name}</h3>
-                      <span className={`text-xs font-bold px-2 py-1 rounded-full ${
-                        groupLedgers.length > 0 
-                          ? (theme === "dark" ? "bg-green-900/50 text-green-300" : "bg-green-100 text-green-800")
-                          : (theme === "dark" ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-600")
-                      }`}>
-                        {groupLedgers.length}
-                      </span>
-                    </div>
-                    {group.nature && (
-                      <div className={`mt-2 inline-block px-2 py-1 rounded text-xs font-medium ${
-                        theme === "dark" ? "bg-indigo-900/50 text-indigo-300" : "bg-indigo-100 text-indigo-800"
-                      }`}>
-                        {group.nature}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              {/* Liabilities Column */}
+              <div>
+                <h2 className={`text-xl font-bold mb-4 border-b-2 pb-2 ${theme === "dark" ? "border-red-900/50 text-red-400" : "border-red-200 text-red-600"}`}>
+                  Liabilities
+                </h2>
+                <div className="flex flex-col space-y-3">
+                  {["Capital Account", "Loan(Liability)", "Current Liabilities", "TDS Payables"].map((groupName) => {
+                    const group = groups.find(g => g.name.toLowerCase() === groupName.toLowerCase());
+                    if (!group) return null;
+                    const groupLedgers = getLedgersForGroup(group.id);
+                    
+                    return (
+                      <div 
+                        key={group.id}
+                        onClick={() => setSelectedGroup(group)}
+                        className={`p-4 rounded-lg border transition-all cursor-pointer hover:shadow-md ${
+                          theme === "dark" 
+                            ? "border-gray-700 bg-gray-900/50 hover:border-red-500/50" 
+                            : "border-gray-200 bg-gray-50 hover:border-red-300 hover:bg-red-50/30"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-semibold text-lg">{group.name}</h3>
+                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                            groupLedgers.length > 0 
+                              ? (theme === "dark" ? "bg-red-900/50 text-red-300" : "bg-red-100 text-red-800")
+                              : (theme === "dark" ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-600")
+                          }`}>
+                            {groupLedgers.length} Ledgers
+                          </span>
+                        </div>
                       </div>
-                    )}
-                  </div>
-                );
-              })}
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* Assets Column */}
+              <div>
+                <h2 className={`text-xl font-bold mb-4 border-b-2 pb-2 ${theme === "dark" ? "border-green-900/50 text-green-400" : "border-green-200 text-green-600"}`}>
+                  Assets
+                </h2>
+                <div className="flex flex-col space-y-3">
+                  {["Fixed Assets", "Current Assets"].map((groupName) => {
+                    const group = groups.find(g => g.name.toLowerCase() === groupName.toLowerCase());
+                    if (!group) return null;
+                    const groupLedgers = getLedgersForGroup(group.id);
+                    
+                    return (
+                      <div 
+                        key={group.id}
+                        onClick={() => setSelectedGroup(group)}
+                        className={`p-4 rounded-lg border transition-all cursor-pointer hover:shadow-md ${
+                          theme === "dark" 
+                            ? "border-gray-700 bg-gray-900/50 hover:border-green-500/50" 
+                            : "border-gray-200 bg-gray-50 hover:border-green-300 hover:bg-green-50/30"
+                        }`}
+                      >
+                        <div className="flex justify-between items-center">
+                          <h3 className="font-semibold text-lg">{group.name}</h3>
+                          <span className={`text-xs font-bold px-2 py-1 rounded-full ${
+                            groupLedgers.length > 0 
+                              ? (theme === "dark" ? "bg-green-900/50 text-green-300" : "bg-green-100 text-green-800")
+                              : (theme === "dark" ? "bg-gray-700 text-gray-400" : "bg-gray-200 text-gray-600")
+                          }`}>
+                            {groupLedgers.length} Ledgers
+                          </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
             </div>
           </>
         ) : (
