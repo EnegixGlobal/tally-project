@@ -27,7 +27,9 @@ router.post('/company', async (req, res) => {
     employeeId,
     maintainBy,
     accountantName,
-    caId
+    caId,
+    assesseeName,
+    companyType
   } = req.body;
 
   const connection = await db.getConnection();
@@ -73,6 +75,18 @@ router.post('/company', async (req, res) => {
       console.log("✅ back_date_allowed column created");
     }
 
+    const [assesseeCols] = await connection.query(`SHOW COLUMNS FROM tbcompanies LIKE 'assessee_name'`);
+    if (assesseeCols.length === 0) {
+      await connection.query(`ALTER TABLE tbcompanies ADD COLUMN assessee_name VARCHAR(100)`);
+      console.log("✅ assessee_name column created");
+    }
+
+    const [companyTypeCols] = await connection.query(`SHOW COLUMNS FROM tbcompanies LIKE 'company_type'`);
+    if (companyTypeCols.length === 0) {
+      await connection.query(`ALTER TABLE tbcompanies ADD COLUMN company_type VARCHAR(50)`);
+      console.log("✅ company_type column created");
+    }
+
     let hashedVaultPassword = null;
 
     if (vaultPassword) {
@@ -99,9 +113,11 @@ router.post('/company', async (req, res) => {
         vault_password,
         fdAccountType,
         fdAccountantName,
-        back_date_allowed
+        back_date_allowed,
+        assessee_name,
+        company_type
       )
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
     `, [
       name,
       financialYear,
@@ -121,7 +137,9 @@ router.post('/company', async (req, res) => {
       hashedVaultPassword || null,
       maintainBy || null,
       accountantName || null,
-      req.body.backDateAllowed !== undefined ? (req.body.backDateAllowed ? 1 : 0) : 1
+      req.body.backDateAllowed !== undefined ? (req.body.backDateAllowed ? 1 : 0) : 1,
+      assesseeName || null,
+      companyType || null
     ]);
 
     const companyId = companyResult.insertId;
@@ -259,7 +277,9 @@ router.put('/company/:companyId', async (req, res) => {
     employeeId,
     maintainBy,
     accountantName,
-    caId
+    caId,
+    assesseeName,
+    companyType
   } = req.body;
 
   const connection = await db.getConnection();
@@ -284,6 +304,18 @@ router.put('/company/:companyId', async (req, res) => {
     if (bdCols.length === 0) {
       await connection.query(`ALTER TABLE tbcompanies ADD COLUMN back_date_allowed TINYINT(1) DEFAULT 0`);
       console.log("✅ back_date_allowed column created");
+    }
+
+    const [assesseeCols] = await connection.query(`SHOW COLUMNS FROM tbcompanies LIKE 'assessee_name'`);
+    if (assesseeCols.length === 0) {
+      await connection.query(`ALTER TABLE tbcompanies ADD COLUMN assessee_name VARCHAR(100)`);
+      console.log("✅ assessee_name column created");
+    }
+
+    const [companyTypeCols] = await connection.query(`SHOW COLUMNS FROM tbcompanies LIKE 'company_type'`);
+    if (companyTypeCols.length === 0) {
+      await connection.query(`ALTER TABLE tbcompanies ADD COLUMN company_type VARCHAR(50)`);
+      console.log("✅ company_type column created");
     }
 
     let hashedVaultPassword = null;
@@ -312,7 +344,9 @@ router.put('/company/:companyId', async (req, res) => {
         vault_password = COALESCE(?, vault_password),
         fdAccountType = ?,
         fdAccountantName = ?,
-        back_date_allowed = ?
+        back_date_allowed = ?,
+        assessee_name = ?,
+        company_type = ?
       WHERE id = ?
     `, [
       name,
@@ -334,6 +368,8 @@ router.put('/company/:companyId', async (req, res) => {
       maintainBy || null,
       accountantName || null,
       req.body.backDateAllowed !== undefined ? (req.body.backDateAllowed ? 1 : 0) : 1,
+      assesseeName || null,
+      companyType || null,
       companyId
     ]);
 
@@ -451,6 +487,18 @@ router.get('/company/:companyId', async (req, res) => {
       console.log("✅ back_date_allowed column created");
     }
 
+    const [assesseeColsGet] = await connection.query(`SHOW COLUMNS FROM tbcompanies LIKE 'assessee_name'`);
+    if (assesseeColsGet.length === 0) {
+      await connection.query(`ALTER TABLE tbcompanies ADD COLUMN assessee_name VARCHAR(100)`);
+      console.log("✅ assessee_name column auto created (GET)");
+    }
+
+    const [companyTypeColsGet] = await connection.query(`SHOW COLUMNS FROM tbcompanies LIKE 'company_type'`);
+    if (companyTypeColsGet.length === 0) {
+      await connection.query(`ALTER TABLE tbcompanies ADD COLUMN company_type VARCHAR(50)`);
+      console.log("✅ company_type column auto created (GET)");
+    }
+
     const [rows] = await connection.query(`
       SELECT 
         c.id,
@@ -468,6 +516,8 @@ router.get('/company/:companyId', async (req, res) => {
         c.state,
         c.country,
         c.tax_type AS taxType,
+        c.assessee_name AS assesseeName,
+        c.company_type AS companyType,
         c.fdAccountType AS maintainBy,
         c.fdAccountantName AS accountantName,
         c.vault_password IS NOT NULL as vaultEnabled,

@@ -194,6 +194,8 @@ const CompanyForm: React.FC = () => {
     maintainBy: "self",
     accountantName: "",
     caId: "",
+    assesseeName: "",
+    companyType: "",
   });
 
   // Security & Access Control States
@@ -686,6 +688,37 @@ const CompanyForm: React.FC = () => {
                   placeholder="e.g., 2024-25"
                 />
                 {errors.financialYear && <p className="text-red-500 text-sm mt-1">{errors.financialYear}</p>}
+              </div>
+
+              <div>
+                <InputField
+                  id="assesseeName"
+                  name="assesseeName"
+                  label="Assessee Name"
+                  placeholder="Enter assessee name"
+                  value={company.assesseeName || ""}
+                  onChange={handleChange}
+                  icon={<User size={16} />}
+                  theme={theme}
+                />
+              </div>
+
+              <div>
+                <SelectField
+                  id="companyType"
+                  name="companyType"
+                  label="Company Type"
+                  value={company.companyType || ""}
+                  onChange={handleChange}
+                  options={[
+                    { value: "", label: "Select Company Type" },
+                    { value: "Director", label: "Director" },
+                    { value: "Proprietor", label: "Proprietor" },
+                    { value: "Partnership", label: "Partnership" }
+                  ]}
+                  icon={<Building size={16} />}
+                  theme={theme}
+                />
               </div>
 
               <div>

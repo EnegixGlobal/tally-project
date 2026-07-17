@@ -115,10 +115,6 @@ const GSTR9 = () => {
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">GSTIN</label>
                 <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter GSTIN" value={companyInfo.gstin} onChange={(e) => setCompanyInfo(p => ({...p, gstin: e.target.value}))} />
               </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Date of Filing</label>
-                <input type="date" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold" defaultValue={todayFormatted} />
-              </div>
             </div>
           </div>
 
@@ -132,10 +128,6 @@ const GSTR9 = () => {
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Trade name, if any</label>
                 <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter Trade Name" value={companyInfo.legalName} onChange={(e) => setCompanyInfo(p => ({...p, legalName: e.target.value}))} />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">ARN</label>
-                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter ARN" />
               </div>
             </div>
           </div>
