@@ -348,8 +348,9 @@ const TrialBalance: React.FC = () => {
                 <tbody>
                   {trialGroups.map(tg => {
                     const totals = calculateGroupTotals(tg.id);
-                    // Include if closing <= 0 (Credit balance) or if 0 but has activity
-                    if (totals.closing > 0) return null;
+                    // Include if nature is Liabilities or Income
+                    const isLiabilitySide = tg.nature === "Liabilities" || tg.nature === "Income";
+                    if (!isLiabilitySide) return null;
                     if (totals.opening === 0 && totals.debit === 0 && totals.credit === 0 && totals.closing === 0 && !isDetailedView) return null;
 
                     return (
@@ -371,7 +372,7 @@ const TrialBalance: React.FC = () => {
                             <td className="py-3 px-4 text-right font-mono text-sm">{totals.credit > 0 ? totals.credit.toLocaleString() : ""}</td>
                           )}
                           <td className="py-3 px-4 text-right font-mono text-sm">
-                            {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()}` : ""}
+                            {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : ""}
                           </td>
                         </tr>
                         {isDetailedView && renderGroupRows(tg.id)}
@@ -381,12 +382,12 @@ const TrialBalance: React.FC = () => {
                 </tbody>
                 <tfoot>
                   <tr className="font-bold text-base border-t-2 border-gray-400">
-                    <td className="py-4 px-4 font-bold">Total Liabilities</td>
+                    <td className="py-4 px-4 font-bold">Grand Total (Credit)</td>
                     {showOpening && <td className="py-4 px-4 text-right"></td>}
                     {showDebit && <td className="py-4 px-4 text-right"></td>}
                     {showCredit && <td className="py-4 px-4 text-right"></td>}
-                    <td className="py-4 px-4 text-right text-indigo-600 font-mono">
-                      {grandTotals.closingCr > 0 ? grandTotals.closingCr.toLocaleString() : "-"}
+                    <td className="py-4 px-4 text-right text-indigo-600 font-bold font-mono">
+                      {grandTotals.closingCr > 0 ? `${grandTotals.closingCr.toLocaleString()} Cr` : "-"}
                     </td>
                   </tr>
                 </tfoot>
@@ -411,8 +412,9 @@ const TrialBalance: React.FC = () => {
                 <tbody>
                   {trialGroups.map(tg => {
                     const totals = calculateGroupTotals(tg.id);
-                    // Include if closing > 0 (Debit balance)
-                    if (totals.closing <= 0) return null;
+                    // Include if nature is Assets or Expenses
+                    const isAssetSide = tg.nature === "Assets" || tg.nature === "Expenses";
+                    if (!isAssetSide) return null;
                     if (totals.opening === 0 && totals.debit === 0 && totals.credit === 0 && totals.closing === 0 && !isDetailedView) return null;
 
                     return (
@@ -434,7 +436,7 @@ const TrialBalance: React.FC = () => {
                             <td className="py-3 px-4 text-right font-mono text-sm">{totals.credit > 0 ? totals.credit.toLocaleString() : ""}</td>
                           )}
                           <td className="py-3 px-4 text-right font-mono text-sm">
-                            {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()}` : ""}
+                            {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : ""}
                           </td>
                         </tr>
                         {isDetailedView && renderGroupRows(tg.id)}
@@ -444,12 +446,12 @@ const TrialBalance: React.FC = () => {
                 </tbody>
                 <tfoot>
                   <tr className="font-bold text-base border-t-2 border-gray-400">
-                    <td className="py-4 px-4 font-bold">Total Assets</td>
+                    <td className="py-4 px-4 font-bold">Grand Total (Debit)</td>
                     {showOpening && <td className="py-4 px-4 text-right"></td>}
                     {showDebit && <td className="py-4 px-4 text-right"></td>}
                     {showCredit && <td className="py-4 px-4 text-right"></td>}
-                    <td className="py-4 px-4 text-right text-indigo-600 font-mono">
-                      {grandTotals.closingDr > 0 ? grandTotals.closingDr.toLocaleString() : "-"}
+                    <td className="py-4 px-4 text-right text-indigo-600 font-bold font-mono">
+                      {grandTotals.closingDr > 0 ? `${grandTotals.closingDr.toLocaleString()} Dr` : "-"}
                     </td>
                   </tr>
                 </tfoot>
