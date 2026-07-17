@@ -132,6 +132,8 @@ import GSTRates from "./components/modules/gst/GSTRates";
 import HSNCodes from "./components/modules/gst/HSNCode";
 import GSTR1 from "./components/modules/gst/GSTR1";
 import GSTR3B from "./components/modules/gst/GSTR3B";
+import GSTR9 from "./components/modules/gst/GSTR9";
+import GSTR9C from "./components/modules/gst/GSTR9C";
 import GSTRegistration from "./components/modules/gst/GSTRegistration";
 import ComplianceCheck from "./components/modules/gst/ComplianceCheck";
 import ImportData from "./components/modules/gst/ImportData";
@@ -1627,7 +1629,7 @@ function App() {
                   path="gst/gstr-9"
                   element={
                     <RequireCompany>
-                      <ComingSoon title="GSTR-9" />
+                      <GSTR9 />
                     </RequireCompany>
                   }
                 />
@@ -1635,7 +1637,7 @@ function App() {
                   path="gst/gstr-9c"
                   element={
                     <RequireCompany>
-                      <ComingSoon title="GSTR-9C" />
+                      <GSTR9C />
                     </RequireCompany>
                   }
                 />
