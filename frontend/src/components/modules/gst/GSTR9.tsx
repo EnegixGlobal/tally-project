@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 
 const InputCell = ({ value = "", className = "" }) => (
   <td className={`p-1.5 border-b border-slate-200 ${className}`}>
@@ -37,6 +37,51 @@ const SectionCard = ({ title, badge = "", children }) => (
 );
 
 const GSTR9 = () => {
+  const currentDate = new Date();
+  const year = currentDate.getFullYear();
+  const month = currentDate.getMonth();
+  
+  const financialYear = month < 3 
+    ? `${year - 1}-${year.toString().slice(2)}` 
+    : `${year}-${(year + 1).toString().slice(2)}`;
+    
+  const todayFormatted = currentDate.toISOString().split('T')[0];
+
+  const companyDataStr = localStorage.getItem("companyInfo");
+  const companyData = companyDataStr ? JSON.parse(companyDataStr) : null;
+  
+  const [companyInfo, setCompanyInfo] = useState({
+    gstin: companyData?.gstNumber || companyData?.gst_number || "",
+    legalName: companyData?.name || "",
+  });
+
+  useEffect(() => {
+    const companyIdVal = localStorage.getItem("company_id") || "";
+    if (!companyIdVal) return;
+    const fetchCompanyInfo = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/company/company/${companyIdVal}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const data = await res.json();
+        if (data) {
+          setCompanyInfo((prev) => ({
+            ...prev,
+            gstin: data.gstNumber || data.gst_number || prev.gstin,
+            legalName: data.name || prev.legalName,
+          }));
+        }
+      } catch (err) {
+        console.error("Failed to fetch company details:", err);
+      }
+    };
+    fetchCompanyInfo();
+  }, []);
+
   return (
     <div className="w-full min-h-screen bg-slate-50/50 py-10 px-4 sm:px-6 lg:px-8 font-sans">
       <div className="max-w-[1200px] mx-auto pb-20">
@@ -64,15 +109,15 @@ const GSTR9 = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Financial Year</label>
-                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold" placeholder="e.g. 2022-23" />
+                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold" placeholder="e.g. 2022-23" defaultValue={financialYear} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">GSTIN</label>
-                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter GSTIN" />
+                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter GSTIN" value={companyInfo.gstin} onChange={(e) => setCompanyInfo(p => ({...p, gstin: e.target.value}))} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Date of Filing</label>
-                <input type="date" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold" />
+                <input type="date" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold" defaultValue={todayFormatted} />
               </div>
             </div>
           </div>
@@ -82,11 +127,11 @@ const GSTR9 = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Legal name of the registered person</label>
-                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter Legal Name" />
+                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter Legal Name" value={companyInfo.legalName} onChange={(e) => setCompanyInfo(p => ({...p, legalName: e.target.value}))} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Trade name, if any</label>
-                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter Trade Name" />
+                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter Trade Name" value={companyInfo.legalName} onChange={(e) => setCompanyInfo(p => ({...p, legalName: e.target.value}))} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">ARN</label>
@@ -398,7 +443,7 @@ const GSTR9 = () => {
           <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
             <div className="w-full md:w-1/3">
               <label className="block text-xs font-medium text-blue-200 uppercase tracking-wider mb-2">Date</label>
-              <input type="date" className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg focus:bg-white/20 focus:border-blue-300 focus:ring-2 focus:ring-blue-300/50 transition-all outline-none text-white font-medium" />
+              <input type="date" className="w-full px-4 py-2.5 bg-white/10 border border-white/20 rounded-lg focus:bg-white/20 focus:border-blue-300 focus:ring-2 focus:ring-blue-300/50 transition-all outline-none text-white font-medium" defaultValue={todayFormatted} />
             </div>
             
             <div className="w-full md:w-1/3 flex flex-col gap-4">
