@@ -187,6 +187,8 @@ const Profile: React.FC = () => {
     maintainBy: "self",
     accountantName: "",
     caId: "",
+    assesseeName: "",
+    companyType: "",
   });
 
   // Security & Access Control States
@@ -242,6 +244,8 @@ const Profile: React.FC = () => {
           maintainBy: data.maintainBy || "self",
           accountantName: data.accountantName || "",
           caId: data.caId || "",
+          assesseeName: data.assesseeName || "",
+          companyType: data.companyType || "",
         });
 
         // Set Security States
@@ -653,6 +657,37 @@ const Profile: React.FC = () => {
                     {errors.financialYear}
                   </p>
                 )}
+              </div>
+
+              <div>
+                <InputField
+                  id="assesseeName"
+                  name="assesseeName"
+                  label="Assessee Name"
+                  placeholder="Enter assessee name"
+                  value={company.assesseeName || ""}
+                  onChange={handleChange}
+                  icon={<User size={16} />}
+                  theme={theme}
+                />
+              </div>
+
+              <div>
+                <SelectField
+                  id="companyType"
+                  name="companyType"
+                  label="Company Type"
+                  value={company.companyType || ""}
+                  onChange={handleChange}
+                  options={[
+                    { value: "", label: "Select Company Type" },
+                    { value: "Director", label: "Director" },
+                    { value: "Proprietor", label: "Proprietor" },
+                    { value: "Partnership", label: "Partnership" },
+                  ]}
+                  icon={<Building size={16} />}
+                  theme={theme}
+                />
               </div>
 
               <div>

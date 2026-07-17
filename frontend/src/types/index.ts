@@ -34,7 +34,8 @@ export type CompanyInfo = {
   accountantName?: string;
   caId?: number | string;
   godowns?: Godown[];
-  backDateAllowed?: boolean;
+  assesseeName?: string;
+  companyType?: string;
 };
 
 export type LedgerType =
