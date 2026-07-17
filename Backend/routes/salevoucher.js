@@ -208,17 +208,24 @@ async function ensureOverallDiscountColumns() {
   }
 }
 
+let columnChecksDone = false;
+async function ensureColumnsOnce() {
+  if (columnChecksDone) return;
+  await ensureSalesLedgerColumn();
+  await ensureDiscountLedgerColumn();
+  await ensureDispatchColumns();
+  await ensureModeColumn();
+  await ensureOverallDiscountColumns();
+  columnChecksDone = true;
+}
+
 // ================= SAVE SALES VOUCHER =================
 router.post("/", async (req, res) => {
   console.log("POST /sales-vouchers hit");
 
   try {
     // ✅ Ensure column exists first
-    await ensureSalesLedgerColumn();
-    await ensureDiscountLedgerColumn();
-    await ensureDispatchColumns();
-    await ensureModeColumn();
-    await ensureOverallDiscountColumns();
+    await ensureColumnsOnce();
 
     const {
       number,

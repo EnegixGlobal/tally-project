@@ -187,15 +187,7 @@ async function renumberVouchers(
 
     if (vouchers.length === 0) return;
 
-    // 1. Temporarily move all to a non-conflicting sequence to avoid UNIQUE constraint errors
-    for (const v of vouchers) {
-      await executor.execute(
-        `UPDATE ${table} SET ${column} = CONCAT(${column}, '_TEMP') WHERE id = ?`,
-        [v.id]
-      );
-    }
-
-    // 2. Now re-assign correctly in order
+    const updatesNeeded = [];
     for (let i = 0; i < vouchers.length; i++) {
       const newSeq = i + 1;
       let newNumber;
@@ -206,15 +198,39 @@ async function renumberVouchers(
         newNumber = `${prefix}/${fy}/${String(newSeq).padStart(6, "0")}`;
       }
 
-      const oldNumber = vouchers[i].oldNumber;
+      if (vouchers[i].oldNumber !== newNumber) {
+        updatesNeeded.push({
+          id: vouchers[i].id,
+          oldNumber: vouchers[i].oldNumber,
+          newNumber,
+        });
+      }
+    }
+
+    if (updatesNeeded.length === 0) {
+      console.log(`[renumberVouchers] No numbering changes needed.`);
+      return;
+    }
+
+    // 1. Temporarily move all affected to a non-conflicting sequence to avoid UNIQUE constraint errors
+    for (const v of updatesNeeded) {
+      await executor.execute(
+        `UPDATE ${table} SET ${column} = CONCAT(${column}, '_TEMP') WHERE id = ?`,
+        [v.id]
+      );
+    }
+
+    // 2. Now re-assign correctly in order
+    for (const v of updatesNeeded) {
+      const { id, oldNumber, newNumber } = v;
 
       console.log(
-        `[renumberVouchers] Updating voucher ${vouchers[i].id}: ${oldNumber} -> ${newNumber}`
+        `[renumberVouchers] Updating voucher ${id}: ${oldNumber} -> ${newNumber}`
       );
 
       await executor.execute(`UPDATE ${table} SET ${column} = ? WHERE id = ?`, [
         newNumber,
-        vouchers[i].id,
+        id,
       ]);
 
       // Update related history
@@ -232,7 +248,7 @@ async function renumberVouchers(
     }
 
     console.log(
-      `[renumberVouchers] Successfully renumbered ${vouchers.length} vouchers.`
+      `[renumberVouchers] Successfully renumbered ${updatesNeeded.length} vouchers.`
     );
   } catch (err) {
     console.error(`[renumberVouchers] ERROR:`, err);
