@@ -304,16 +304,11 @@ router.post("/", async (req, res) => {
       cleanState(companyState) === cleanState(partyState);
 
     // ================= GST TOTAL FIX =================
+    // Use the totals provided by the frontend instead of zeroing them out 
+    // if state information is missing or mismatched.
     let finalCgst = Number(cgstTotal || 0);
     let finalSgst = Number(sgstTotal || 0);
     let finalIgst = Number(igstTotal || 0);
-
-    if (isIntra) {
-      finalIgst = 0;
-    } else {
-      finalCgst = 0;
-      finalSgst = 0;
-    }
 
     // ================= DISPATCH =================
     const dispatchDocNo = dispatchDetails?.docNo || null;
@@ -436,49 +431,25 @@ router.post("/", async (req, res) => {
       const itemEntries = receivedEntries.filter((e) => e.itemId);
 
       if (itemEntries.length > 0) {
-        const itemValues = itemEntries.map((e) => {
-          if (isIntra) {
-            return [
-              voucherId,
-              e.itemId,
-              Number(e.quantity || 0),
-              Number(e.rate || 0),
-              Number(e.amount || 0),
+        const itemValues = itemEntries.map((e) => [
+          voucherId,
+          e.itemId,
+          Number(e.quantity || 0),
+          Number(e.rate || 0),
+          Number(e.amount || 0),
 
-              Number(e.cgstLedgerId || 0),
-              Number(e.sgstLedgerId || 0),
-              0,
+          Number(e.cgstLedgerId || e.cgstRate || 0),
+          Number(e.sgstLedgerId || e.sgstRate || 0),
+          Number(e.igstLedgerId || e.igstRate || e.gstLedgerId || 0),
 
-              Number(e.discount || 0),
-              e.hsnCode ?? "",
-              e.batchNumber ?? "",
-              e.godownId ?? null,
+          Number(e.discount || 0),
+          e.hsnCode ?? "",
+          e.batchNumber ?? "",
+          e.godownId ?? null,
 
-              Number(e.salesLedgerId || 0),
-              Number(e.discountLedgerId || 0),
-            ];
-          }
-
-          return [
-            voucherId,
-            e.itemId,
-            Number(e.quantity || 0),
-            Number(e.rate || 0),
-            Number(e.amount || 0),
-
-            0,
-            0,
-            Number(e.gstLedgerId || e.igstLedgerId || 0),
-
-            Number(e.discount || 0),
-            e.hsnCode ?? "",
-            e.batchNumber ?? "",
-            e.godownId ?? null,
-
-            Number(e.salesLedgerId || 0),
-            Number(e.discountLedgerId || 0),
-          ];
-        });
+          Number(e.salesLedgerId || 0),
+          Number(e.discountLedgerId || 0),
+        ]);
 
         await db.query(
           `
@@ -1158,56 +1129,56 @@ router.put("/:id", async (req, res) => {
 
 //history maintain
 
+let historyColumnChecksDone = false;
+async function ensureSaleHistorySchemaOnce() {
+  if (historyColumnChecksDone) return;
+
+  await db.execute(`
+    CREATE TABLE IF NOT EXISTS sale_history (
+      id INT AUTO_INCREMENT PRIMARY KEY
+    )
+  `);
+
+  const requiredColumns = {
+    itemName: "VARCHAR(255)",
+    hsnCode: "VARCHAR(50)",
+    batchNumber: "VARCHAR(255)",
+    qtyChange: "INT",
+    rate: "DECIMAL(10,2)",
+    movementDate: "DATE",
+    voucherNumber: "VARCHAR(100)",
+    godownId: "INT",
+    companyId: "VARCHAR(100)",
+    ownerType: "VARCHAR(50)",
+    ownerId: "VARCHAR(100)",
+  };
+
+  for (const [col, def] of Object.entries(requiredColumns)) {
+    const [rows] = await db.execute(
+      `
+      SELECT COLUMN_NAME
+      FROM INFORMATION_SCHEMA.COLUMNS
+      WHERE TABLE_SCHEMA = DATABASE()
+        AND TABLE_NAME = 'sale_history'
+        AND COLUMN_NAME = ?
+      `,
+      [col]
+    );
+
+    if (rows.length === 0) {
+      await db.execute(`ALTER TABLE sale_history ADD COLUMN ${col} ${def}`);
+    }
+  }
+
+  historyColumnChecksDone = true;
+}
+
 router.post("/sale-history", async (req, res) => {
   try {
     // 1️⃣ Normalize input (single OR array)
     const movementData = Array.isArray(req.body) ? req.body : [req.body];
 
-    /* =====================================================
-       2️⃣ CREATE TABLE IF NOT EXISTS (MINIMAL)
-    ===================================================== */
-    await db.execute(`
-      CREATE TABLE IF NOT EXISTS sale_history (
-        id INT AUTO_INCREMENT PRIMARY KEY
-      )
-    `);
-
-    /* =====================================================
-       3️⃣ REQUIRED COLUMNS (AUTO-MIGRATION)
-    ===================================================== */
-    const requiredColumns = {
-      itemName: "VARCHAR(255)",
-      hsnCode: "VARCHAR(50)",
-      batchNumber: "VARCHAR(255)",
-      qtyChange: "INT",
-      rate: "DECIMAL(10,2)",
-      movementDate: "DATE",
-      voucherNumber: "VARCHAR(100)",
-      godownId: "INT",
-      companyId: "VARCHAR(100)",
-      ownerType: "VARCHAR(50)",
-      ownerId: "VARCHAR(100)",
-    };
-
-    /* =====================================================
-       4️⃣ CHECK & ADD MISSING COLUMNS
-    ===================================================== */
-    for (const [col, def] of Object.entries(requiredColumns)) {
-      const [rows] = await db.execute(
-        `
-        SELECT COLUMN_NAME
-        FROM INFORMATION_SCHEMA.COLUMNS
-        WHERE TABLE_SCHEMA = DATABASE()
-          AND TABLE_NAME = 'sale_history'
-          AND COLUMN_NAME = ?
-        `,
-        [col]
-      );
-
-      if (rows.length === 0) {
-        await db.execute(`ALTER TABLE sale_history ADD COLUMN ${col} ${def}`);
-      }
-    }
+    await ensureSaleHistorySchemaOnce();
 
     /* =====================================================
        5️⃣ INSERT QUERY (ORDER MATTERS)
