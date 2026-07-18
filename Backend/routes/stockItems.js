@@ -981,6 +981,7 @@ router.get("/ledger", async (req, res) => {
           (owner_type = ? AND owner_id = ?) 
           OR owner_id = 0
         )
+        AND group_id = -103
         AND (
           LOWER(name) LIKE '%gst%'
           OR LOWER(name) LIKE '%cgst%'
