@@ -3505,24 +3505,24 @@ const SalesVoucher: React.FC = () => {
                                 if (!hasParty) {
                                   return (
                                     <td className="px-1 py-2 text-center min-w-[50px] text-xs align-top pt-3">
-                                      {getLedgerNameById(entry.gstLedgerId)}
+                                      {entry.gstLedgerId ? getLedgerNameById(entry.gstLedgerId) : (entry.igstRate ? `${entry.igstRate}%` : (entry.cgstRate ? `${entry.cgstRate + entry.sgstRate}%` : "-"))}
                                     </td>
                                   );
                                 } else if (statesMatch) {
                                   return (
                                     <>
                                       <td className="px-1 py-2 text-center min-w-[50px] text-xs align-top pt-3">
-                                        {getLedgerNameById(entry.cgstLedgerId)}
+                                        {entry.cgstLedgerId ? getLedgerNameById(entry.cgstLedgerId) : (entry.cgstRate ? `${entry.cgstRate}%` : "-")}
                                       </td>
                                       <td className="px-1 py-2 text-center min-w-[50px] text-xs align-top pt-3">
-                                        {getLedgerNameById(entry.sgstLedgerId)}
+                                        {entry.sgstLedgerId ? getLedgerNameById(entry.sgstLedgerId) : (entry.sgstRate ? `${entry.sgstRate}%` : "-")}
                                       </td>
                                     </>
                                   );
                                 } else {
                                   return (
                                     <td className="px-1 py-2 text-center min-w-[50px] text-xs align-top pt-3">
-                                      {getLedgerNameById(entry.igstLedgerId)}
+                                      {entry.igstLedgerId ? getLedgerNameById(entry.igstLedgerId) : (entry.igstRate ? `${entry.igstRate}%` : "-")}
                                     </td>
                                   );
                                 }
