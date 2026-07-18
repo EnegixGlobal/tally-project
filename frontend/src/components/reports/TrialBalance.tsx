@@ -184,7 +184,7 @@ const TrialBalance: React.FC = () => {
           return (
             <React.Fragment key={group.id}>
               <tr
-                className="hover:bg-gray-100 cursor-pointer text-sm"
+                className={`cursor-pointer text-sm transition-colors ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
                 onClick={() => navigate(`/app/reports/sub-group-summary/${group.id}`)}
               >
                 <td className="py-2 px-4" style={{ paddingLeft: `${(level + 1) * 1.5}rem` }}>
@@ -229,7 +229,7 @@ const TrialBalance: React.FC = () => {
           return (
             <tr
               key={ledger.id}
-              className="hover:bg-gray-100 cursor-pointer text-xs text-gray-600 font-semibold"
+              className={`cursor-pointer text-xs text-gray-600 font-semibold transition-colors ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-gray-100'}`}
               onClick={() => navigate(`/app/reports/ledger/${ledger.id}`)}
             >
               <td className="py-1 px-4" style={{ paddingLeft: `${(level + 1) * 1.5}rem` }}>
@@ -326,139 +326,92 @@ const TrialBalance: React.FC = () => {
 
       {!loading && !error && (
         <div className={`p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"}`}>
-          
-          {/* Custom 50-50 Layout */}
-          <div className="flex flex-col md:flex-row gap-6 w-full">
-            
-            {/* LIABILITIES SIDE (Credit Balances) */}
-            <div className="flex-1 border rounded-lg border-gray-300">
-              <div className="py-3 text-center font-bold text-lg border-b border-gray-300">
-                Liabilities
-              </div>
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-gray-400 font-bold text-sm">
-                    <th className="py-3 px-4">Particulars</th>
-                    {showOpening && <th className="py-3 px-4 text-right">Opening</th>}
-                    {showDebit && <th className="py-3 px-4 text-right">Debit</th>}
-                    {showCredit && <th className="py-3 px-4 text-right">Credit</th>}
-                    <th className="py-3 px-4 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trialGroups.map(tg => {
-                    const totals = calculateGroupTotals(tg.id);
-                    // Include if nature is Liabilities or Income
-                    const isLiabilitySide = tg.nature === "Liabilities" || tg.nature === "Income";
-                    if (!isLiabilitySide) return null;
-                    if (totals.opening === 0 && totals.debit === 0 && totals.credit === 0 && totals.closing === 0 && !isDetailedView) return null;
+          <table className="w-full text-left border-collapse">
+            <thead>
+              <tr className="border-b-2 border-gray-400 font-bold text-sm">
+                <th className="py-3 px-4">Particulars</th>
+                {showOpening && <th className="py-3 px-4 text-right">Opening Balance</th>}
+                {showDebit && <th className="py-3 px-4 text-right">Debit</th>}
+                {showCredit && <th className="py-3 px-4 text-right">Credit</th>}
+                <th className="py-3 px-4 text-right">Closing Balance</th>
+              </tr>
+            </thead>
+            <tbody>
+              {trialGroups.map(tg => {
+                const alwaysShowGroups = [
+                  "Capital Account",
+                  "Loan(Liability)",
+                  "Current Liabilities",
+                  "Current Assets",
+                  "Sales Accounts",
+                  "Purchase Accounts",
+                  "Indirect Income",
+                  "Indirect Expenses"
+                ];
+                const isAlwaysShow = alwaysShowGroups.includes(tg.name);
+                
+                const totals = calculateGroupTotals(tg.id);
+                if (totals.opening === 0 && totals.debit === 0 && totals.credit === 0 && totals.closing === 0 && !isDetailedView && !isAlwaysShow) return null;
 
-                    return (
-                      <React.Fragment key={tg.id}>
-                        <tr
-                          className="border-b border-gray-300 font-semibold cursor-pointer hover:bg-indigo-50 transition-colors"
-                          onClick={() => navigate(`/app/reports/sub-group-summary/${tg.id}`)}
-                        >
-                          <td className="py-3 px-4 text-blue-600">{tg.name}</td>
-                          {showOpening && (
-                            <td className="py-3 px-4 text-right font-mono text-sm">
-                              {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : ""}
-                            </td>
-                          )}
-                          {showDebit && (
-                            <td className="py-3 px-4 text-right font-mono text-sm">{totals.debit > 0 ? totals.debit.toLocaleString() : ""}</td>
-                          )}
-                          {showCredit && (
-                            <td className="py-3 px-4 text-right font-mono text-sm">{totals.credit > 0 ? totals.credit.toLocaleString() : ""}</td>
-                          )}
-                          <td className="py-3 px-4 text-right font-mono text-sm">
-                            {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : ""}
-                          </td>
-                        </tr>
-                        {isDetailedView && renderGroupRows(tg.id)}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="font-bold text-base border-t-2 border-gray-400">
-                    <td className="py-4 px-4 font-bold">Grand Total (Credit)</td>
-                    {showOpening && <td className="py-4 px-4 text-right"></td>}
-                    {showDebit && <td className="py-4 px-4 text-right"></td>}
-                    {showCredit && <td className="py-4 px-4 text-right"></td>}
-                    <td className="py-4 px-4 text-right text-indigo-600 font-bold font-mono">
-                      {grandTotals.closingCr > 0 ? `${grandTotals.closingCr.toLocaleString()} Cr` : "-"}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-
-            {/* ASSETS SIDE (Debit Balances) */}
-            <div className="flex-1 border rounded-lg border-gray-300">
-              <div className="py-3 text-center font-bold text-lg border-b border-gray-300">
-                Assets
-              </div>
-              <table className="w-full text-left border-collapse">
-                <thead>
-                  <tr className="border-b-2 border-gray-400 font-bold text-sm">
-                    <th className="py-3 px-4">Particulars</th>
-                    {showOpening && <th className="py-3 px-4 text-right">Opening</th>}
-                    {showDebit && <th className="py-3 px-4 text-right">Debit</th>}
-                    {showCredit && <th className="py-3 px-4 text-right">Credit</th>}
-                    <th className="py-3 px-4 text-right">Amount</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {trialGroups.map(tg => {
-                    const totals = calculateGroupTotals(tg.id);
-                    // Include if nature is Assets or Expenses
-                    const isAssetSide = tg.nature === "Assets" || tg.nature === "Expenses";
-                    if (!isAssetSide) return null;
-                    if (totals.opening === 0 && totals.debit === 0 && totals.credit === 0 && totals.closing === 0 && !isDetailedView) return null;
-
-                    return (
-                      <React.Fragment key={tg.id}>
-                        <tr
-                          className="border-b border-gray-300 font-semibold cursor-pointer hover:bg-indigo-50 transition-colors"
-                          onClick={() => navigate(`/app/reports/sub-group-summary/${tg.id}`)}
-                        >
-                          <td className="py-3 px-4 text-blue-600">{tg.name}</td>
-                          {showOpening && (
-                            <td className="py-3 px-4 text-right font-mono text-sm">
-                              {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : ""}
-                            </td>
-                          )}
-                          {showDebit && (
-                            <td className="py-3 px-4 text-right font-mono text-sm">{totals.debit > 0 ? totals.debit.toLocaleString() : ""}</td>
-                          )}
-                          {showCredit && (
-                            <td className="py-3 px-4 text-right font-mono text-sm">{totals.credit > 0 ? totals.credit.toLocaleString() : ""}</td>
-                          )}
-                          <td className="py-3 px-4 text-right font-mono text-sm">
-                            {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : ""}
-                          </td>
-                        </tr>
-                        {isDetailedView && renderGroupRows(tg.id)}
-                      </React.Fragment>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="font-bold text-base border-t-2 border-gray-400">
-                    <td className="py-4 px-4 font-bold">Grand Total (Debit)</td>
-                    {showOpening && <td className="py-4 px-4 text-right"></td>}
-                    {showDebit && <td className="py-4 px-4 text-right"></td>}
-                    {showCredit && <td className="py-4 px-4 text-right"></td>}
-                    <td className="py-4 px-4 text-right text-indigo-600 font-bold font-mono">
-                      {grandTotals.closingDr > 0 ? `${grandTotals.closingDr.toLocaleString()} Dr` : "-"}
-                    </td>
-                  </tr>
-                </tfoot>
-              </table>
-            </div>
-
-          </div>
+                return (
+                  <React.Fragment key={tg.id}>
+                    <tr
+                      className={`border-b border-gray-300 font-semibold cursor-pointer transition-colors ${theme === 'dark' ? 'hover:bg-gray-700' : 'hover:bg-indigo-50'}`}
+                      onClick={() => navigate(`/app/reports/sub-group-summary/${tg.id}`)}
+                    >
+                      <td className="py-3 px-4 text-blue-600">{tg.name}</td>
+                      {showOpening && (
+                        <td className="py-3 px-4 text-right font-mono">
+                          {totals.opening !== 0 ? `${Math.abs(totals.opening).toLocaleString()} ${totals.opening > 0 ? "Dr" : "Cr"}` : (isAlwaysShow ? "0" : "")}
+                        </td>
+                      )}
+                      {showDebit && (
+                        <td className="py-3 px-4 text-right font-mono">{totals.debit > 0 ? totals.debit.toLocaleString() : (isAlwaysShow ? "0" : "")}</td>
+                      )}
+                      {showCredit && (
+                        <td className="py-3 px-4 text-right font-mono">{totals.credit > 0 ? totals.credit.toLocaleString() : (isAlwaysShow ? "0" : "")}</td>
+                      )}
+                      <td className="py-3 px-4 text-right font-mono">
+                        {totals.closing !== 0 ? `${Math.abs(totals.closing).toLocaleString()} ${totals.closing > 0 ? "Dr" : "Cr"}` : (isAlwaysShow ? "0" : "")}
+                      </td>
+                    </tr>
+                    {isDetailedView && renderGroupRows(tg.id)}
+                  </React.Fragment>
+                );
+              })}
+            </tbody>
+            <tfoot>
+              <tr className="font-bold text-lg border-t-2 border-gray-400 cursor-pointer" onClick={() => setIsDetailedView(true)}>
+                <td className="py-3 px-4 font-bold">Grand Total</td>
+                {showOpening && (
+                  <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
+                    {grandTotals.openingDr > 0 || grandTotals.openingCr > 0 ? (
+                      <>
+                        {grandTotals.openingDr > grandTotals.openingCr
+                          ? `${(grandTotals.openingDr - grandTotals.openingCr).toLocaleString()} Dr`
+                          : `${(grandTotals.openingCr - grandTotals.openingDr).toLocaleString()} Cr`}
+                      </>
+                    ) : "-"}
+                  </td>
+                )}
+                {showDebit && (
+                  <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.debit.toLocaleString()}</td>
+                )}
+                {showCredit && (
+                  <td className="py-3 px-4 text-right text-indigo-600 font-mono">{grandTotals.credit.toLocaleString()}</td>
+                )}
+                <td className="py-3 px-4 text-right text-indigo-600 font-mono text-sm">
+                  {grandTotals.closingDr > 0 || grandTotals.closingCr > 0 ? (
+                    <>
+                      {grandTotals.closingDr > grandTotals.closingCr
+                        ? `${(grandTotals.closingDr - grandTotals.closingCr).toLocaleString()} Dr`
+                        : `${(grandTotals.closingCr - grandTotals.closingDr).toLocaleString()} Cr`}
+                    </>
+                  ) : "-"}
+                </td>
+              </tr>
+            </tfoot>
+          </table>
         </div>
       )}
     </div>
