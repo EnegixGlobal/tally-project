@@ -55,6 +55,8 @@ const GSTR9 = () => {
     legalName: companyData?.name || "",
   });
 
+  const [gstr9Data, setGstr9Data] = useState<any>(null);
+
   useEffect(() => {
     const companyIdVal = localStorage.getItem("company_id") || "";
     if (!companyIdVal) return;
@@ -80,7 +82,27 @@ const GSTR9 = () => {
       }
     };
     fetchCompanyInfo();
-  }, []);
+
+    const fetchGstr9Data = async () => {
+      try {
+        const token = localStorage.getItem("token");
+        const owner_type = localStorage.getItem("supplier") || "";
+        const owner_id = localStorage.getItem(owner_type === "employee" ? "employee_id" : "user_id") || "";
+
+        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/gstr9/data?company_id=${companyIdVal}&owner_type=${owner_type}&owner_id=${owner_id}&financialYear=${financialYear}`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+            "Content-Type": "application/json",
+          },
+        });
+        const data = await res.json();
+        setGstr9Data(data);
+      } catch (err) {
+        console.error("Failed to fetch GSTR-9 data:", err);
+      }
+    };
+    fetchGstr9Data();
+  }, [financialYear]);
 
   return (
     <div className="w-full min-h-screen bg-slate-50/50 py-10 px-4 sm:px-6 lg:px-8 font-sans">
@@ -173,11 +195,13 @@ const GSTR9 = () => {
                   "Supplies and advances on which tax is to be paid (H + M) above"
                 ];
                 const blockedC = char === 'C' || char === 'D';
+                const rowData = char === 'A' ? gstr9Data?.b2c : char === 'B' ? gstr9Data?.b2b : null;
+                
                 return (
                   <tr key={char} className="hover:bg-blue-50/30 transition-colors group">
                     <TextCell className="text-center font-bold text-slate-500">{char}</TextCell>
                     <TextCell className="text-slate-600">{labels[idx]}</TextCell>
-                    <InputCell />
+                    <InputCell value={rowData?.taxableValue || ""} />
                     {blockedC ? (
                       <>
                         <td className="bg-slate-100/50 border-b border-slate-200"></td>
@@ -185,12 +209,12 @@ const GSTR9 = () => {
                       </>
                     ) : (
                       <>
-                        <InputCell />
-                        <InputCell />
+                        <InputCell value={rowData?.centralTax || ""} />
+                        <InputCell value={rowData?.stateTax || ""} />
                       </>
                     )}
-                    <InputCell />
-                    <InputCell />
+                    <InputCell value={rowData?.integratedTax || ""} />
+                    <InputCell value={rowData?.cess || ""} />
                   </tr>
                 );
               })}
