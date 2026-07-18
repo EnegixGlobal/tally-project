@@ -342,13 +342,24 @@ const LedgerList: React.FC = () => {
       <td className="px-4 py-3">
         <div className="flex justify-center items-center space-x-2">
           {ledger.ownerId === 0 ? (
-            <span className={`px-2 py-1 text-xs font-bold rounded uppercase tracking-wider ${
-              theme === 'dark' 
-                ? 'bg-blue-900/50 text-blue-300 border border-blue-800' 
-                : 'bg-blue-100 text-blue-700 border border-blue-200'
-            }`}>
-              Admin
-            </span>
+            <>
+              <span className={`px-2 py-1 text-xs font-bold rounded uppercase tracking-wider ${
+                theme === 'dark' 
+                  ? 'bg-blue-900/50 text-blue-300 border border-blue-800' 
+                  : 'bg-blue-100 text-blue-700 border border-blue-200'
+              }`}>
+                Admin
+              </span>
+              <button
+                title="Edit Ledger"
+                onClick={() => navigate(`/app/masters/ledger/edit/${ledger.id}`)}
+                className={`p-1 rounded transition-all ml-2 ${
+                  theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-100"
+                }`}
+              >
+                <Edit size={16} />
+              </button>
+            </>
           ) : (
             <>
               <button
