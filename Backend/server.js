@@ -100,6 +100,9 @@ app.use("/api/stock-attributes", stockAttributesRoutes);
 const salesTypesRoutes = require("./routes/salesTypes");
 app.use("/api/sales-types", salesTypesRoutes);
 
+const gstr9Routes = require("./routes/gstr9");
+app.use("/api/gstr9", gstr9Routes);
+
 const geminiRoutes = require("./routes/gemini");
 app.use("/api/gemini", geminiRoutes);
 

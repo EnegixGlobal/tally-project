@@ -24,6 +24,7 @@ export const systemPrimaryGroups: SystemGroup[] = [
     { id: -17, name: "Suspense A/C", nature: "Assets", isSystem: true },
     { id: -18, name: "Profit & Loss A/c", nature: "Liabilities", isSystem: true },
     { id: -19, name: "TDS Payables", nature: "Liabilities", isSystem: true },
+    { id: -20, name: "Gst Liabilities", nature: "Liabilities", isSystem: true },
 ];
 
 export const systemSubGroups: SystemGroup[] = [
