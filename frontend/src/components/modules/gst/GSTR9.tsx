@@ -41,10 +41,12 @@ const GSTR9 = () => {
   const year = currentDate.getFullYear();
   const month = currentDate.getMonth();
   
-  const financialYear = month < 3 
+  const initialFinancialYear = month < 3 
     ? `${year - 1}-${year.toString().slice(2)}` 
     : `${year}-${(year + 1).toString().slice(2)}`;
     
+  const [financialYear, setFinancialYear] = useState(initialFinancialYear);
+
   const todayFormatted = currentDate.toISOString().split('T')[0];
 
   const companyDataStr = localStorage.getItem("companyInfo");
@@ -131,7 +133,7 @@ const GSTR9 = () => {
             <div className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Financial Year</label>
-                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold" placeholder="e.g. 2022-23" defaultValue={financialYear} />
+                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold" placeholder="e.g. 2022-23" value={financialYear} onChange={(e) => setFinancialYear(e.target.value)} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">GSTIN</label>
@@ -178,6 +180,14 @@ const GSTR9 = () => {
                 <HeaderCell colSpan={6} className="text-left bg-white text-slate-800">Details of advances, inward and outward supplies made during the financial year on which tax is payable</HeaderCell>
               </tr>
               {['A', 'B', 'C', 'D', 'E', 'F', 'G', 'H', 'I', 'J', 'K', 'L', 'M', 'N'].map((char, idx) => {
+                const totalPurchase = gstr9Data ? {
+                  taxableValue: (Number(gstr9Data.purchaseB2b.taxableValue) + Number(gstr9Data.purchaseB2c.taxableValue)).toFixed(2),
+                  centralTax: (Number(gstr9Data.purchaseB2b.centralTax) + Number(gstr9Data.purchaseB2c.centralTax)).toFixed(2),
+                  stateTax: (Number(gstr9Data.purchaseB2b.stateTax) + Number(gstr9Data.purchaseB2c.stateTax)).toFixed(2),
+                  integratedTax: (Number(gstr9Data.purchaseB2b.integratedTax) + Number(gstr9Data.purchaseB2c.integratedTax)).toFixed(2),
+                  cess: (Number(gstr9Data.purchaseB2b.cess) + Number(gstr9Data.purchaseB2c.cess)).toFixed(2)
+                } : null;
+
                 const labels = [
                   "Supplies made to un-registered persons (B2C)",
                   "Supplies made to registered persons (B2B)",
@@ -195,7 +205,9 @@ const GSTR9 = () => {
                   "Supplies and advances on which tax is to be paid (H + M) above"
                 ];
                 const blockedC = char === 'C' || char === 'D';
-                const rowData = char === 'A' ? gstr9Data?.b2c : char === 'B' ? gstr9Data?.b2b : null;
+                const rowData = char === 'A' ? gstr9Data?.b2c : 
+                                char === 'B' ? gstr9Data?.b2b : 
+                                char === 'G' ? totalPurchase : null;
                 
                 return (
                   <tr key={char} className="hover:bg-blue-50/30 transition-colors group">
@@ -287,14 +299,25 @@ const GSTR9 = () => {
                 <HeaderCell colSpan={6} className="text-left bg-white text-slate-800">Details of ITC availed during the financial year</HeaderCell>
               </tr>
               
-              <tr className="hover:bg-blue-50/30 transition-colors">
-                <TextCell className="text-center font-bold text-slate-500">A</TextCell>
-                <TextCell colSpan={2} className="text-slate-600">Total amount of input tax credit availed through FORM GSTR-3B</TextCell>
-                <InputCell />
-                <InputCell />
-                <InputCell />
-                <InputCell />
-              </tr>
+              {(() => {
+                const totalPurchase = gstr9Data ? {
+                  centralTax: (Number(gstr9Data.purchaseB2b.centralTax) + Number(gstr9Data.purchaseB2c.centralTax)).toFixed(2),
+                  stateTax: (Number(gstr9Data.purchaseB2b.stateTax) + Number(gstr9Data.purchaseB2c.stateTax)).toFixed(2),
+                  integratedTax: (Number(gstr9Data.purchaseB2b.integratedTax) + Number(gstr9Data.purchaseB2c.integratedTax)).toFixed(2),
+                  cess: (Number(gstr9Data.purchaseB2b.cess) + Number(gstr9Data.purchaseB2c.cess)).toFixed(2)
+                } : null;
+
+                return (
+                  <tr className="hover:bg-blue-50/30 transition-colors">
+                    <TextCell className="text-center font-bold text-slate-500">A</TextCell>
+                    <TextCell colSpan={2} className="text-slate-600">Total amount of input tax credit availed through FORM GSTR-3B</TextCell>
+                    <InputCell value={totalPurchase?.centralTax || ""} />
+                    <InputCell value={totalPurchase?.stateTax || ""} />
+                    <InputCell value={totalPurchase?.integratedTax || ""} />
+                    <InputCell value={totalPurchase?.cess || ""} />
+                  </tr>
+                );
+              })()}
 
               {['B', 'C', 'D'].map((char, idx) => {
                 const desc = [
@@ -302,16 +325,18 @@ const GSTR9 = () => {
                   "Inward supplies received from unregistered persons liable to reverse charge on which tax is paid & ITC availed",
                   "Inward supplies received from registered persons liable to reverse charge on which tax is paid and ITC availed"
                 ];
+                const rowData = char === 'C' ? gstr9Data?.purchaseB2c : 
+                                char === 'D' ? gstr9Data?.purchaseB2b : null;
                 return (
                   <React.Fragment key={char}>
                     <tr className="hover:bg-blue-50/30 transition-colors">
                       <TextCell rowSpan={3} className="text-center font-bold text-slate-500 align-top pt-4">{char}</TextCell>
                       <TextCell rowSpan={3} className="text-slate-600 align-top pt-4">{desc[idx]}</TextCell>
                       <TextCell className="text-center text-xs font-bold text-slate-500 uppercase">Inputs</TextCell>
-                      <InputCell />
-                      <InputCell />
-                      <InputCell />
-                      <InputCell />
+                      <InputCell value={rowData?.centralTax || ""} />
+                      <InputCell value={rowData?.stateTax || ""} />
+                      <InputCell value={rowData?.integratedTax || ""} />
+                      <InputCell value={rowData?.cess || ""} />
                     </tr>
                     <tr className="hover:bg-blue-50/30 transition-colors">
                       <TextCell className="text-center text-xs font-bold text-slate-500 uppercase">Capital Goods</TextCell>
@@ -392,14 +417,31 @@ const GSTR9 = () => {
                 </tr>
               </thead>
               <tbody>
-                {['Integrated Tax', 'Central Tax', 'State/UT Tax', 'Cess', 'Interest', 'Late Fees', 'Penalty', 'Other'].map((item) => (
-                  <tr key={item} className="hover:bg-blue-50/30 transition-colors">
-                    <TextCell className="font-semibold text-slate-700">{item}</TextCell>
-                    <InputCell />
-                    <InputCell />
-                    <InputCell />
-                  </tr>
-                ))}
+                {(() => {
+                  const totalSales = gstr9Data ? {
+                    integratedTax: (Number(gstr9Data.b2b.integratedTax) + Number(gstr9Data.b2c.integratedTax)).toFixed(2),
+                    centralTax: (Number(gstr9Data.b2b.centralTax) + Number(gstr9Data.b2c.centralTax)).toFixed(2),
+                    stateTax: (Number(gstr9Data.b2b.stateTax) + Number(gstr9Data.b2c.stateTax)).toFixed(2),
+                    cess: (Number(gstr9Data.b2b.cess) + Number(gstr9Data.b2c.cess)).toFixed(2)
+                  } : null;
+
+                  return ['Integrated Tax', 'Central Tax', 'State/UT Tax', 'Cess', 'Interest', 'Late Fees', 'Penalty', 'Other'].map((item) => {
+                    let taxPayableValue = "";
+                    if (item === 'Integrated Tax') taxPayableValue = totalSales?.integratedTax || "";
+                    else if (item === 'Central Tax') taxPayableValue = totalSales?.centralTax || "";
+                    else if (item === 'State/UT Tax') taxPayableValue = totalSales?.stateTax || "";
+                    else if (item === 'Cess') taxPayableValue = totalSales?.cess || "";
+
+                    return (
+                      <tr key={item} className="hover:bg-blue-50/30 transition-colors">
+                        <TextCell className="font-semibold text-slate-700">{item}</TextCell>
+                        <InputCell value={taxPayableValue} />
+                        <InputCell />
+                        <InputCell />
+                      </tr>
+                    );
+                  });
+                })()}
               </tbody>
             </table>
           </SectionCard>
