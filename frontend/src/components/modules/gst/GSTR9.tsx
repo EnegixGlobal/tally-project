@@ -52,9 +52,14 @@ const GSTR9 = () => {
   const companyDataStr = localStorage.getItem("companyInfo");
   const companyData = companyDataStr ? JSON.parse(companyDataStr) : null;
   
+  const initAssesseeName = companyData?.assesseeName || companyData?.assessee_name || "";
+  const initCompanyType = companyData?.companyType || companyData?.company_type || "";
+  const combinedInitAssessee = initAssesseeName && initCompanyType ? `${initAssesseeName} (${initCompanyType})` : initAssesseeName;
+
   const [companyInfo, setCompanyInfo] = useState({
     gstin: companyData?.gstNumber || companyData?.gst_number || "",
     legalName: companyData?.name || "",
+    assesseeName: combinedInitAssessee,
   });
 
   const [gstr9Data, setGstr9Data] = useState<any>(null);
@@ -73,10 +78,17 @@ const GSTR9 = () => {
         });
         const data = await res.json();
         if (data) {
+          const fetchedAssesseeName = data.assesseeName || prev.assesseeName;
+          const fetchedCompanyType = data.companyType || data.company_type || "";
+          const finalAssesseeName = fetchedAssesseeName && fetchedCompanyType 
+            ? `${fetchedAssesseeName} (${fetchedCompanyType})` 
+            : fetchedAssesseeName;
+
           setCompanyInfo((prev) => ({
             ...prev,
             gstin: data.gstNumber || data.gst_number || prev.gstin,
             legalName: data.name || prev.legalName,
+            assesseeName: finalAssesseeName,
           }));
         }
       } catch (err) {
@@ -146,8 +158,8 @@ const GSTR9 = () => {
             <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider mb-4 pb-2 border-b border-slate-100">3. Entity Details</h3>
             <div className="space-y-4">
               <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Legal name of the registered person</label>
-                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter Legal Name" value={companyInfo.legalName} onChange={(e) => setCompanyInfo(p => ({...p, legalName: e.target.value}))} />
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Assessee Name</label>
+                <input type="text" className="w-full px-4 py-2.5 bg-slate-100 border border-slate-300 shadow-inner rounded-md focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition-all outline-none text-slate-800 font-semibold uppercase" placeholder="Enter Assessee Name" value={companyInfo.assesseeName} onChange={(e) => setCompanyInfo(p => ({...p, assesseeName: e.target.value}))} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1.5">Trade name, if any</label>
