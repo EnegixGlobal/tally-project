@@ -23,7 +23,7 @@ import {
   Eye,
   EyeOff,
   AlertTriangle,
-  Key
+  Key,
 } from "lucide-react";
 
 const states = [
@@ -88,7 +88,7 @@ const InputField: React.FC<InputFieldProps> = ({
   icon,
   theme,
   title,
-  disabled = false
+  disabled = false,
 }) => (
   <div>
     <label className="block text-sm font-medium mb-1" htmlFor={id}>
@@ -105,10 +105,17 @@ const InputField: React.FC<InputFieldProps> = ({
       placeholder={placeholder}
       title={title}
       disabled={disabled}
-      className={`w-full p-2 rounded border ${disabled ? (theme === "dark" ? "bg-gray-600 cursor-not-allowed opacity-70" : "bg-gray-100 cursor-not-allowed opacity-70") : ""} ${theme === "dark"
-        ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
-        : "bg-white border-gray-300 focus:border-blue-500"
-        } outline-none transition-colors`}
+      className={`w-full p-2 rounded border ${
+        disabled
+          ? theme === "dark"
+            ? "bg-gray-600 cursor-not-allowed opacity-70"
+            : "bg-gray-100 cursor-not-allowed opacity-70"
+          : ""
+      } ${
+        theme === "dark"
+          ? "bg-gray-700 border-gray-600 focus:border-blue-500 text-white"
+          : "bg-white border-gray-300 focus:border-blue-500"
+      } outline-none transition-colors`}
     />
   </div>
 );
@@ -138,7 +145,7 @@ const SelectField: React.FC<SelectFieldProps> = ({
   required = false,
   options,
   icon,
-  theme
+  theme,
 }) => (
   <div>
     <label className="block text-sm font-medium mb-1" htmlFor={id}>
@@ -151,10 +158,11 @@ const SelectField: React.FC<SelectFieldProps> = ({
       value={value}
       onChange={onChange}
       required={required}
-      className={`w-full p-2 rounded border ${theme === "dark"
-        ? "bg-gray-700 border-gray-600 text-white"
-        : "bg-white border-gray-300 text-black"
-        } outline-none transition-colors`}
+      className={`w-full p-2 rounded border ${
+        theme === "dark"
+          ? "bg-gray-700 border-gray-600 text-white"
+          : "bg-white border-gray-300 text-black"
+      } outline-none transition-colors`}
     >
       {options.map((option) => (
         <option key={option.value} value={option.value}>
@@ -166,12 +174,15 @@ const SelectField: React.FC<SelectFieldProps> = ({
 );
 
 const CompanyForm: React.FC = () => {
-
-
-
   const { theme, setCompanyInfo } = useAppContext();
   const { user, updateCompany, isLoading: isAuthLoading } = useAuth();
-  const { companies, switchCompany, addCompany, setCompanies, isLoading: isCompanyLoading } = useCompany();
+  const {
+    companies,
+    switchCompany,
+    addCompany,
+    setCompanies,
+    isLoading: isCompanyLoading,
+  } = useCompany();
   const navigate = useNavigate();
 
   const isDataLoading = isAuthLoading || isCompanyLoading;
@@ -200,15 +211,14 @@ const CompanyForm: React.FC = () => {
 
   // Security & Access Control States
 
-
-
-
-  const [accessControlEnabled, setAccessControlEnabled] = useState<boolean>(false);
+  const [accessControlEnabled, setAccessControlEnabled] =
+    useState<boolean>(false);
   const [username, setUsername] = useState<string>("");
   const [password, setPassword] = useState<string>("");
   const [confirmPassword, setConfirmPassword] = useState<string>("");
   const [showPassword, setShowPassword] = useState<boolean>(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState<boolean>(false);
+  const [showConfirmPassword, setShowConfirmPassword] =
+    useState<boolean>(false);
   const [accountantsList, setAccountantsList] = useState<Accountant[]>([]);
   const [caList, setCaList] = useState<any[]>([]);
   const [vaultEnabled, setVaultEnabled] = useState<boolean>(false);
@@ -221,9 +231,9 @@ const CompanyForm: React.FC = () => {
   // Pre-fill PAN from user
   useEffect(() => {
     if (user && user.pan) {
-      setCompany(prev => ({
+      setCompany((prev) => ({
         ...prev,
-        panNumber: user.pan
+        panNumber: user.pan,
       }));
     }
   }, [user]);
@@ -238,7 +248,11 @@ const CompanyForm: React.FC = () => {
         const empId = localStorage.getItem("employee_id");
         if (!empId) return;
 
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/companies-by-employee?employee_id=${empId}`);
+        const res = await fetch(
+          `${
+            import.meta.env.VITE_API_URL
+          }/api/companies-by-employee?employee_id=${empId}`
+        );
         const data = await res.json();
 
         const currentCompanies = data.companies || [];
@@ -264,7 +278,9 @@ const CompanyForm: React.FC = () => {
   useEffect(() => {
     const fetchAccountants = async () => {
       try {
-        const res = await fetch(`${import.meta.env.VITE_API_URL}/api/company/accountants`); // your API endpoint
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/company/accountants`
+        ); // your API endpoint
         const data = await res.json();
         if (res.ok) {
           setAccountantsList(data); // assuming data = [{id: "1", name: "John Doe"}, ...]
@@ -297,7 +313,6 @@ const CompanyForm: React.FC = () => {
     }
   }, [company.maintainBy]);
 
-
   const handleChange = (
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
   ) => {
@@ -306,7 +321,7 @@ const CompanyForm: React.FC = () => {
 
     // Clear errors when user types
     if (errors[name]) {
-      setErrors(prev => ({ ...prev, [name]: '' }));
+      setErrors((prev) => ({ ...prev, [name]: "" }));
     }
   };
 
@@ -315,18 +330,18 @@ const CompanyForm: React.FC = () => {
     { value: "", label: "Select State" },
     ...states.map(({ code, name }) => ({
       value: `${name}(${code})`,
-      label: `${name} (${code})`
-    }))
+      label: `${name} (${code})`,
+    })),
   ];
 
   const taxTypeOptions = [
     { value: "GST", label: "GST" },
-    { value: "VAT", label: "VAT" }
+    { value: "VAT", label: "VAT" },
   ];
 
   const maintainByOptions = [
     { value: "self", label: "Self Maintenance" },
-    { value: "accountant", label: "Accountant" }
+    { value: "accountant", label: "Accountant" },
   ];
 
   const validateForm = (): boolean => {
@@ -334,13 +349,13 @@ const CompanyForm: React.FC = () => {
 
     // Basic validations
     const panRegex = /^[A-Z]{5}[0-9]{4}[A-Z]{1}$/;
-    const gstRegex = /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
+    const gstRegex =
+      /^[0-9]{2}[A-Z]{5}[0-9]{4}[A-Z]{1}[1-9A-Z]{1}Z[0-9A-Z]{1}$/;
     const vatRegex = /^[0-9]{11}$/; // Simple VAT regex for demo
     const cinRegex = /^[LUF][0-9]{5}[A-Z]{2}[0-9]{4}[A-Z]{3}[0-9]{6}$/; // CIN format validation
     const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     const phoneRegex = /^[0-9]{10}$/;
     const pinRegex = /^[0-9]{6}$/;
-
 
     // Required fields
     if (!company.name.trim()) newErrors.name = "Company name is required";
@@ -349,23 +364,31 @@ const CompanyForm: React.FC = () => {
     } else if (!/^\d{4}-\d{2}$/.test(company.financialYear.trim())) {
       newErrors.financialYear = "Format must be YYYY-YY (e.g., 2024-25)";
     }
-    if (!company.booksBeginningYear.trim()) newErrors.booksBeginningYear = "Books beginning year is required";
+    if (!company.booksBeginningYear.trim())
+      newErrors.booksBeginningYear = "Books beginning year is required";
     if (!company.state) newErrors.state = "State is required";
-    if (!company.panNumber.trim()) newErrors.panNumber = "PAN number is required";
+    if (!company.panNumber.trim())
+      newErrors.panNumber = "PAN number is required";
     if (!company.email) newErrors.email = "Email is required";
-
-
 
     // Format validations
     if (company.panNumber && !panRegex.test(company.panNumber)) {
       newErrors.panNumber = "Invalid PAN format (e.g., ABCDE1234F)";
     }
 
-    if (company.taxType === "GST" && company.gstNumber && !gstRegex.test(company.gstNumber)) {
+    if (
+      company.taxType === "GST" &&
+      company.gstNumber &&
+      !gstRegex.test(company.gstNumber)
+    ) {
       newErrors.gstNumber = "Invalid GST Number format (15 characters)";
     }
 
-    if (company.taxType === "VAT" && company.vatNumber && !vatRegex.test(company.vatNumber)) {
+    if (
+      company.taxType === "VAT" &&
+      company.vatNumber &&
+      !vatRegex.test(company.vatNumber)
+    ) {
       newErrors.vatNumber = "Invalid VAT Number format (11 digits)";
     }
 
@@ -390,7 +413,8 @@ const CompanyForm: React.FC = () => {
 
     // Vault password validation
     if (vaultEnabled && !vaultPassword.trim()) {
-      newErrors.vaultPassword = "Vault password is required when vault is enabled";
+      newErrors.vaultPassword =
+        "Vault password is required when vault is enabled";
     }
 
     if (vaultEnabled && vaultPassword.length < 6) {
@@ -400,11 +424,13 @@ const CompanyForm: React.FC = () => {
     // Access control validation
     if (accessControlEnabled) {
       if (!username.trim()) {
-        newErrors.username = "Username is required when access control is enabled";
+        newErrors.username =
+          "Username is required when access control is enabled";
       }
 
       if (!password.trim()) {
-        newErrors.password = "Password is required when access control is enabled";
+        newErrors.password =
+          "Password is required when access control is enabled";
       }
 
       if (password.length < 8) {
@@ -424,22 +450,22 @@ const CompanyForm: React.FC = () => {
     if (!vaultEnabled) return true;
 
     const { value: enteredPassword } = await Swal.fire({
-      title: 'Confirm Vault Password',
-      text: 'Please re-enter your vault password to confirm',
-      input: 'password',
-      inputPlaceholder: 'Re-enter vault password',
+      title: "Confirm Vault Password",
+      text: "Please re-enter your vault password to confirm",
+      input: "password",
+      inputPlaceholder: "Re-enter vault password",
       showCancelButton: true,
-      confirmButtonText: 'Confirm',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: "Confirm",
+      cancelButtonText: "Cancel",
       inputValidator: (value) => {
         if (!value) {
-          return 'Vault password is required!';
+          return "Vault password is required!";
         }
         if (value !== vaultPassword) {
-          return 'Vault password does not match!';
+          return "Vault password does not match!";
         }
         return null;
-      }
+      },
     });
 
     return enteredPassword === vaultPassword;
@@ -449,31 +475,35 @@ const CompanyForm: React.FC = () => {
     if (!accessControlEnabled) return true;
 
     const { value: formValues } = await Swal.fire({
-      title: 'Company Access Login',
+      title: "Company Access Login",
       html: `
         <input id="swal-input1" class="swal2-input" placeholder="Username">
         <input id="swal-input2" class="swal2-input" type="password" placeholder="Password">
       `,
       focusConfirm: false,
       showCancelButton: true,
-      confirmButtonText: 'Login',
-      cancelButtonText: 'Cancel',
+      confirmButtonText: "Login",
+      cancelButtonText: "Cancel",
       preConfirm: () => {
-        const usernameEl = document.getElementById('swal-input1') as HTMLInputElement;
-        const passwordEl = document.getElementById('swal-input2') as HTMLInputElement;
+        const usernameEl = document.getElementById(
+          "swal-input1"
+        ) as HTMLInputElement;
+        const passwordEl = document.getElementById(
+          "swal-input2"
+        ) as HTMLInputElement;
 
         if (!usernameEl.value || !passwordEl.value) {
-          Swal.showValidationMessage('Please enter both username and password');
+          Swal.showValidationMessage("Please enter both username and password");
           return null;
         }
 
         if (usernameEl.value !== username || passwordEl.value !== password) {
-          Swal.showValidationMessage('Invalid username or password');
+          Swal.showValidationMessage("Invalid username or password");
           return null;
         }
 
         return [usernameEl.value, passwordEl.value];
-      }
+      },
     });
 
     return !!formValues;
@@ -530,14 +560,17 @@ const CompanyForm: React.FC = () => {
       };
 
       // Step 4: Submit to backend
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/company/company`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-          // Add authorization header if needed
-        },
-        body: JSON.stringify(payload),
-      });
+      const res = await fetch(
+        `${import.meta.env.VITE_API_URL}/api/company/company`,
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            // Add authorization header if needed
+          },
+          body: JSON.stringify(payload),
+        }
+      );
 
       const data = await res.json();
 
@@ -546,10 +579,16 @@ const CompanyForm: React.FC = () => {
           title: "🎉 Success!",
           html: `
             <div style="text-align: left;">
-              <p><strong>Company "${company.name}" created successfully!</strong></p>
+              <p><strong>Company "${
+                company.name
+              }" created successfully!</strong></p>
               <br>
-              ${vaultEnabled ? '<p>✅ Vault protection is enabled</p>' : ''}
-              ${accessControlEnabled ? '<p>✅ Access control is enabled</p>' : ''}
+              ${vaultEnabled ? "<p>✅ Vault protection is enabled</p>" : ""}
+              ${
+                accessControlEnabled
+                  ? "<p>✅ Access control is enabled</p>"
+                  : ""
+              }
               <p>✅ You have been set as the Admin</p>
               <br>
               <div style="background: #f8f9fa; padding: 10px; border-radius: 5px; font-size: 14px;">
@@ -559,7 +598,11 @@ const CompanyForm: React.FC = () => {
                 • Manage user roles<br>
                 • Full system access
               </div>
-              ${company.cinNumber ? `<br><p><strong>Note:</strong> CIN Number (${company.cinNumber}) is stored locally for display purposes.</p>` : ''}
+              ${
+                company.cinNumber
+                  ? `<br><p><strong>Note:</strong> CIN Number (${company.cinNumber}) is stored locally for display purposes.</p>`
+                  : ""
+              }
             </div>
           `,
           icon: "success",
@@ -569,12 +612,17 @@ const CompanyForm: React.FC = () => {
 
         // Persist company id and update contexts
         try {
-          console.log('Backend response data:', data);
-          console.log('companyId value:', data.companyId, 'Type:', typeof data.companyId);
+          console.log("Backend response data:", data);
+          console.log(
+            "companyId value:",
+            data.companyId,
+            "Type:",
+            typeof data.companyId
+          );
 
           if (data.companyId !== null && data.companyId !== undefined) {
             const companyIdStr = String(data.companyId);
-            console.log('Setting company_id to:', companyIdStr);
+            console.log("Setting company_id to:", companyIdStr);
 
             // Create company object for CompanyContext
             const newCompany = {
@@ -591,18 +639,18 @@ const CompanyForm: React.FC = () => {
             await switchCompany(data.companyId);
 
             // Also update auth context for backward compatibility
-            if (typeof updateCompany === 'function') {
-              console.log('Calling updateCompany with:', companyIdStr);
+            if (typeof updateCompany === "function") {
+              console.log("Calling updateCompany with:", companyIdStr);
               updateCompany(companyIdStr, data.companyInfo ?? company);
             }
 
             // Store company info with CIN number for frontend display
             setCompanyInfo(data.companyInfo ?? company);
           } else {
-            console.error('No companyId in response:', data);
+            console.error("No companyId in response:", data);
           }
         } catch (e) {
-          console.warn('Could not update company info', e);
+          console.warn("Could not update company info", e);
         }
 
         navigate("/app");
@@ -625,9 +673,6 @@ const CompanyForm: React.FC = () => {
     }
   };
 
-
-
-
   if (isDataLoading) {
     return (
       <div className="pt-[56px] px-4 flex justify-center items-center h-[200px]">
@@ -644,17 +689,30 @@ const CompanyForm: React.FC = () => {
   return (
     <div className="pt-[56px] px-4">
       <div
-        className={`max-w-4xl mx-auto p-6 rounded-lg ${theme === "dark" ? "bg-gray-800" : "bg-white shadow-md"
-          }`}
+        className={`max-w-4xl mx-auto p-6 rounded-lg ${
+          theme === "dark" ? "bg-gray-800" : "bg-white shadow-md"
+        }`}
       >
-        <h2 className={`text-2xl font-bold mb-6 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+        <h2
+          className={`text-2xl font-bold mb-6 ${
+            theme === "dark" ? "text-white" : "text-gray-900"
+          }`}
+        >
           Create New Company
         </h2>
 
         <form onSubmit={handleSubmit}>
           {/* Basic Company Information */}
-          <div className={`p-4 rounded-lg mb-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
-            <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          <div
+            className={`p-4 rounded-lg mb-6 ${
+              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+            }`}
+          >
+            <h3
+              className={`text-lg font-semibold mb-4 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
               <Building size={20} className="inline mr-2" />
               Basic Information
             </h3>
@@ -672,7 +730,9 @@ const CompanyForm: React.FC = () => {
                   icon={<Building size={16} />}
                   theme={theme}
                 />
-                {errors.name && <p className="text-red-500 text-sm mt-1">{errors.name}</p>}
+                {errors.name && (
+                  <p className="text-red-500 text-sm mt-1">{errors.name}</p>
+                )}
               </div>
 
               <div>
@@ -687,7 +747,11 @@ const CompanyForm: React.FC = () => {
                   theme={theme}
                   placeholder="e.g., 2024-25"
                 />
-                {errors.financialYear && <p className="text-red-500 text-sm mt-1">{errors.financialYear}</p>}
+                {errors.financialYear && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.financialYear}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -714,7 +778,10 @@ const CompanyForm: React.FC = () => {
                     { value: "", label: "Select Company Type" },
                     { value: "Director", label: "Director" },
                     { value: "Proprietor", label: "Proprietor" },
-                    { value: "Partnership", label: "Partnership" }
+                    { value: "Partnership", label: "Partnership" },
+                    { value: "Trust", label: "Trust" },
+                    { value: "Society", label: "Society" },
+                    { value: "HUF", label: "Hindu Undivided Family (HUF)" },
                   ]}
                   icon={<Building size={16} />}
                   theme={theme}
@@ -735,7 +802,11 @@ const CompanyForm: React.FC = () => {
                   theme={theme}
                   title="Enter the beginning financial year"
                 />
-                {errors.booksBeginningYear && <p className="text-red-500 text-sm mt-1">{errors.booksBeginningYear}</p>}
+                {errors.booksBeginningYear && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.booksBeginningYear}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -750,7 +821,9 @@ const CompanyForm: React.FC = () => {
                   icon={<MapPin size={16} />}
                   theme={theme}
                 />
-                {errors.state && <p className="text-red-500 text-sm mt-1">{errors.state}</p>}
+                {errors.state && (
+                  <p className="text-red-500 text-sm mt-1">{errors.state}</p>
+                )}
               </div>
 
               <div className="md:col-span-2">
@@ -777,7 +850,9 @@ const CompanyForm: React.FC = () => {
                   theme={theme}
                   placeholder="6-digit PIN code"
                 />
-                {errors.pin && <p className="text-red-500 text-sm mt-1">{errors.pin}</p>}
+                {errors.pin && (
+                  <p className="text-red-500 text-sm mt-1">{errors.pin}</p>
+                )}
               </div>
 
               <div>
@@ -805,7 +880,11 @@ const CompanyForm: React.FC = () => {
                   theme={theme}
                   placeholder="10-digit mobile number"
                 />
-                {errors.phoneNumber && <p className="text-red-500 text-sm mt-1">{errors.phoneNumber}</p>}
+                {errors.phoneNumber && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.phoneNumber}
+                  </p>
+                )}
               </div>
 
               <div>
@@ -821,11 +900,12 @@ const CompanyForm: React.FC = () => {
                   icon={<Mail size={16} />}
                   theme={theme}
                 />
-                {errors.email && <p className="text-red-500 text-sm mt-1">{errors.email}</p>}
+                {errors.email && (
+                  <p className="text-red-500 text-sm mt-1">{errors.email}</p>
+                )}
               </div>
 
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
                 {/* PAN */}
                 <div>
                   <InputField
@@ -840,7 +920,9 @@ const CompanyForm: React.FC = () => {
                     disabled={true}
                   />
                   {errors.panNumber && (
-                    <p className="text-red-500 text-sm mt-1">{errors.panNumber}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.panNumber}
+                    </p>
                   )}
                 </div>
 
@@ -857,12 +939,12 @@ const CompanyForm: React.FC = () => {
                     placeholder="e.g., ABCD12345E (optional)"
                   />
                   {errors.tanNumber && (
-                    <p className="text-red-500 text-sm mt-1">{errors.tanNumber}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.tanNumber}
+                    </p>
                   )}
                 </div>
-
               </div>
-
 
               <div>
                 <SelectField
@@ -878,7 +960,10 @@ const CompanyForm: React.FC = () => {
               </div>
 
               <div>
-                <label className="block text-sm font-medium mb-1" htmlFor="taxNumber">
+                <label
+                  className="block text-sm font-medium mb-1"
+                  htmlFor="taxNumber"
+                >
                   <FileText size={16} className="inline mr-1" />
                   {company.taxType} Number
                 </label>
@@ -886,20 +971,27 @@ const CompanyForm: React.FC = () => {
                   type="text"
                   id="taxNumber"
                   name={company.taxType === "GST" ? "gstNumber" : "vatNumber"}
-                  value={company.taxType === "GST" ? company.gstNumber : company.vatNumber}
+                  value={
+                    company.taxType === "GST"
+                      ? company.gstNumber
+                      : company.vatNumber
+                  }
                   onChange={handleChange}
                   placeholder={`Enter ${company.taxType} number`}
                   title={`Enter the ${company.taxType} Number`}
-                  className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                    : "bg-white border-gray-300 text-black focus:border-blue-500"
-                    } outline-none transition-colors`}
+                  className={`w-full p-2 rounded border ${
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                      : "bg-white border-gray-300 text-black focus:border-blue-500"
+                  } outline-none transition-colors`}
                 />
 
-
-                {((company.taxType === "GST" && errors.gstNumber) || (company.taxType === "VAT" && errors.vatNumber)) && (
+                {((company.taxType === "GST" && errors.gstNumber) ||
+                  (company.taxType === "VAT" && errors.vatNumber)) && (
                   <p className="text-red-500 text-sm mt-1">
-                    {company.taxType === "GST" ? errors.gstNumber : errors.vatNumber}
+                    {company.taxType === "GST"
+                      ? errors.gstNumber
+                      : errors.vatNumber}
                   </p>
                 )}
               </div>
@@ -916,9 +1008,14 @@ const CompanyForm: React.FC = () => {
                   placeholder="e.g., L12345XX2021PLC123456"
                   title="Corporate Identification Number"
                 />
-                {errors.cinNumber && <p className="text-red-500 text-sm mt-1">{errors.cinNumber}</p>}
+                {errors.cinNumber && (
+                  <p className="text-red-500 text-sm mt-1">
+                    {errors.cinNumber}
+                  </p>
+                )}
                 <p className="text-xs text-gray-500 mt-1">
-                  * CIN is stored locally for display purposes and not saved to database whwn backend itegrate then remove this line
+                  * CIN is stored locally for display purposes and not saved to
+                  database whwn backend itegrate then remove this line
                 </p>
               </div>
 
@@ -936,7 +1033,10 @@ const CompanyForm: React.FC = () => {
               </div>
               {company.maintainBy === "accountant" && (
                 <div>
-                  <label className="block text-sm font-medium mb-1" htmlFor="accountantName">
+                  <label
+                    className="block text-sm font-medium mb-1"
+                    htmlFor="accountantName"
+                  >
                     <User size={16} className="inline mr-1" />
                     Select Accountant
                   </label>
@@ -945,20 +1045,23 @@ const CompanyForm: React.FC = () => {
                     name="accountantName"
                     value={company.accountantName || ""}
                     onChange={handleChange}
-                    className={`w-full p-2 rounded border ${theme === "dark"
-                      ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                      : "bg-white border-gray-300 text-black focus:border-blue-500"
-                      } outline-none transition-colors`}
+                    className={`w-full p-2 rounded border ${
+                      theme === "dark"
+                        ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                        : "bg-white border-gray-300 text-black focus:border-blue-500"
+                    } outline-none transition-colors`}
                   >
                     <option value="">-- Select Accountant --</option>
-                    {accountantsList.map(acc => (
+                    {accountantsList.map((acc) => (
                       <option key={acc.fdSiNo} value={acc.fdname}>
                         {acc.fdname}
                       </option>
                     ))}
                   </select>
                   {errors.accountantName && (
-                    <p className="text-red-500 text-sm mt-1">{errors.accountantName}</p>
+                    <p className="text-red-500 text-sm mt-1">
+                      {errors.accountantName}
+                    </p>
                   )}
                 </div>
               )}
@@ -975,10 +1078,11 @@ const CompanyForm: React.FC = () => {
                   name="caId"
                   value={company.caId || ""}
                   onChange={handleChange}
-                  className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                    : "bg-white border-gray-300 text-black focus:border-blue-500"
-                    } outline-none transition-colors`}
+                  className={`w-full p-2 rounded border ${
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                      : "bg-white border-gray-300 text-black focus:border-blue-500"
+                  } outline-none transition-colors`}
                 >
                   <option value="">-- Select CA --</option>
                   {caList.map((ca) => (
@@ -991,8 +1095,16 @@ const CompanyForm: React.FC = () => {
             </div>
           </div>
           {/* Tally Vault Security */}
-          <div className={`p-4 rounded-lg mb-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
-            <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          <div
+            className={`p-4 rounded-lg mb-6 ${
+              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+            }`}
+          >
+            <h3
+              className={`text-lg font-semibold mb-4 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
               <Lock size={20} className="inline mr-2" />
               Tally Vault Security (Optional)
             </h3>
@@ -1006,10 +1118,11 @@ const CompanyForm: React.FC = () => {
                   title="Enable or disable Tally Vault password protection"
                   value={vaultEnabled ? "yes" : "no"}
                   onChange={(e) => setVaultEnabled(e.target.value === "yes")}
-                  className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-black"
-                    } outline-none transition-colors`}
+                  className={`w-full p-2 rounded border ${
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white"
+                      : "bg-white border-gray-300 text-black"
+                  } outline-none transition-colors`}
                 >
                   <option value="no">No</option>
                   <option value="yes">Yes</option>
@@ -1018,12 +1131,20 @@ const CompanyForm: React.FC = () => {
 
               {vaultEnabled && (
                 <>
-                  <div className={`p-3 rounded border-l-4 border-orange-500 ${theme === 'dark' ? 'bg-orange-900/20' : 'bg-orange-50'
-                    }`}>
+                  <div
+                    className={`p-3 rounded border-l-4 border-orange-500 ${
+                      theme === "dark" ? "bg-orange-900/20" : "bg-orange-50"
+                    }`}
+                  >
                     <div className="flex items-start">
-                      <AlertTriangle size={16} className="text-orange-500 mr-2 mt-0.5" />
+                      <AlertTriangle
+                        size={16}
+                        className="text-orange-500 mr-2 mt-0.5"
+                      />
                       <div className="text-sm">
-                        <strong>Warning:</strong> If you forget your Apno Vault password, you will permanently lose access to this company.
+                        <strong>Warning:</strong> If you forget your Apno Vault
+                        password, you will permanently lose access to this
+                        company.
                       </div>
                     </div>
                   </div>
@@ -1039,20 +1160,29 @@ const CompanyForm: React.FC = () => {
                         value={vaultPassword}
                         onChange={(e) => setVaultPassword(e.target.value)}
                         placeholder="Enter vault password (min 6 characters)"
-                        className={`w-full p-2 pr-10 rounded border ${theme === "dark"
-                          ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                          : "bg-white border-gray-300 text-black focus:border-blue-500"
-                          } outline-none transition-colors`}
+                        className={`w-full p-2 pr-10 rounded border ${
+                          theme === "dark"
+                            ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                            : "bg-white border-gray-300 text-black focus:border-blue-500"
+                        } outline-none transition-colors`}
                       />
                       <button
                         type="button"
                         onClick={() => setShowVaultPassword(!showVaultPassword)}
                         className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
                       >
-                        {showVaultPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {showVaultPassword ? (
+                          <EyeOff size={16} />
+                        ) : (
+                          <Eye size={16} />
+                        )}
                       </button>
                     </div>
-                    {errors.vaultPassword && <p className="text-red-500 text-sm mt-1">{errors.vaultPassword}</p>}
+                    {errors.vaultPassword && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.vaultPassword}
+                      </p>
+                    )}
                   </div>
                 </>
               )}
@@ -1060,8 +1190,16 @@ const CompanyForm: React.FC = () => {
           </div>
 
           {/* Access Control */}
-          <div className={`p-4 rounded-lg mb-6 ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50'}`}>
-            <h3 className={`text-lg font-semibold mb-4 ${theme === 'dark' ? 'text-white' : 'text-gray-900'}`}>
+          <div
+            className={`p-4 rounded-lg mb-6 ${
+              theme === "dark" ? "bg-gray-700" : "bg-gray-50"
+            }`}
+          >
+            <h3
+              className={`text-lg font-semibold mb-4 ${
+                theme === "dark" ? "text-white" : "text-gray-900"
+              }`}
+            >
               <Shield size={20} className="inline mr-2" />
               Access Control (Optional)
             </h3>
@@ -1074,11 +1212,14 @@ const CompanyForm: React.FC = () => {
                 <select
                   title="Enable or disable user access control for this company"
                   value={accessControlEnabled ? "yes" : "no"}
-                  onChange={(e) => setAccessControlEnabled(e.target.value === "yes")}
-                  className={`w-full p-2 rounded border ${theme === "dark"
-                    ? "bg-gray-700 border-gray-600 text-white"
-                    : "bg-white border-gray-300 text-black"
-                    } outline-none transition-colors`}
+                  onChange={(e) =>
+                    setAccessControlEnabled(e.target.value === "yes")
+                  }
+                  className={`w-full p-2 rounded border ${
+                    theme === "dark"
+                      ? "bg-gray-700 border-gray-600 text-white"
+                      : "bg-white border-gray-300 text-black"
+                  } outline-none transition-colors`}
                 >
                   <option value="no">No</option>
                   <option value="yes">Yes</option>
@@ -1097,12 +1238,17 @@ const CompanyForm: React.FC = () => {
                       value={username}
                       onChange={(e) => setUsername(e.target.value)}
                       placeholder="Enter username"
-                      className={`w-full p-2 rounded border ${theme === "dark"
-                        ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                        : "bg-white border-gray-300 text-black focus:border-blue-500"
-                        } outline-none transition-colors`}
+                      className={`w-full p-2 rounded border ${
+                        theme === "dark"
+                          ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                          : "bg-white border-gray-300 text-black focus:border-blue-500"
+                      } outline-none transition-colors`}
                     />
-                    {errors.username && <p className="text-red-500 text-sm mt-1">{errors.username}</p>}
+                    {errors.username && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.username}
+                      </p>
+                    )}
                   </div>
 
                   <div>
@@ -1116,20 +1262,29 @@ const CompanyForm: React.FC = () => {
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
                         placeholder="Enter password (min 8 characters)"
-                        className={`w-full p-2 pr-10 rounded border ${theme === "dark"
-                          ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                          : "bg-white border-gray-300 text-black focus:border-blue-500"
-                          } outline-none transition-colors`}
+                        className={`w-full p-2 pr-10 rounded border ${
+                          theme === "dark"
+                            ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                            : "bg-white border-gray-300 text-black focus:border-blue-500"
+                        } outline-none transition-colors`}
                       />
                       <button
                         type="button"
                         onClick={() => setShowPassword(!showPassword)}
                         className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
                       >
-                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {showPassword ? (
+                          <EyeOff size={16} />
+                        ) : (
+                          <Eye size={16} />
+                        )}
                       </button>
                     </div>
-                    {errors.password && <p className="text-red-500 text-sm mt-1">{errors.password}</p>}
+                    {errors.password && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.password}
+                      </p>
+                    )}
                   </div>
 
                   <div className="md:col-span-2">
@@ -1143,37 +1298,65 @@ const CompanyForm: React.FC = () => {
                         value={confirmPassword}
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="Confirm your password"
-                        className={`w-full p-2 pr-10 rounded border ${theme === "dark"
-                          ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
-                          : "bg-white border-gray-300 text-black focus:border-blue-500"
-                          } outline-none transition-colors`}
+                        className={`w-full p-2 pr-10 rounded border ${
+                          theme === "dark"
+                            ? "bg-gray-700 border-gray-600 text-white focus:border-blue-500"
+                            : "bg-white border-gray-300 text-black focus:border-blue-500"
+                        } outline-none transition-colors`}
                       />
                       <button
                         type="button"
-                        onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                        onClick={() =>
+                          setShowConfirmPassword(!showConfirmPassword)
+                        }
                         className="absolute right-2 top-2.5 text-gray-400 hover:text-gray-600"
                       >
-                        {showConfirmPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                        {showConfirmPassword ? (
+                          <EyeOff size={16} />
+                        ) : (
+                          <Eye size={16} />
+                        )}
                       </button>
                     </div>
-                    {errors.confirmPassword && <p className="text-red-500 text-sm mt-1">{errors.confirmPassword}</p>}
+                    {errors.confirmPassword && (
+                      <p className="text-red-500 text-sm mt-1">
+                        {errors.confirmPassword}
+                      </p>
+                    )}
                   </div>
                 </div>
               )}
             </div>
           </div>
 
-
           {/* Admin Information */}
-          <div className={`p-4 rounded-lg mb-6 ${theme === 'dark' ? 'bg-blue-900/20' : 'bg-blue-50'}`}>
-            <h3 className={`text-lg font-semibold mb-2 ${theme === 'dark' ? 'text-blue-200' : 'text-blue-900'}`}>
+          <div
+            className={`p-4 rounded-lg mb-6 ${
+              theme === "dark" ? "bg-blue-900/20" : "bg-blue-50"
+            }`}
+          >
+            <h3
+              className={`text-lg font-semibold mb-2 ${
+                theme === "dark" ? "text-blue-200" : "text-blue-900"
+              }`}
+            >
               <User size={20} className="inline mr-2" />
               Admin Rights
             </h3>
-            <p className={`text-sm ${theme === 'dark' ? 'text-blue-300' : 'text-blue-800'}`}>
-              You will be automatically set as the <strong>Administrator</strong> of this company with full access to:
+            <p
+              className={`text-sm ${
+                theme === "dark" ? "text-blue-300" : "text-blue-800"
+              }`}
+            >
+              You will be automatically set as the{" "}
+              <strong>Administrator</strong> of this company with full access
+              to:
             </p>
-            <ul className={`mt-2 text-sm space-y-1 ${theme === 'dark' ? 'text-blue-300' : 'text-blue-800'}`}>
+            <ul
+              className={`mt-2 text-sm space-y-1 ${
+                theme === "dark" ? "text-blue-300" : "text-blue-800"
+              }`}
+            >
               <li>• Lock/Unlock company access</li>
               <li>• Grant or revoke user permissions</li>
               <li>• Assign roles (Admin, Editor, Viewer)</li>
@@ -1185,20 +1368,22 @@ const CompanyForm: React.FC = () => {
             <button
               type="button"
               onClick={() => navigate("/app")}
-              className={`flex items-center gap-2 px-6 py-2 rounded ${theme === "dark"
-                ? "bg-gray-700 hover:bg-gray-600"
-                : "bg-gray-200 hover:bg-gray-300"
-                } transition-colors`}
+              className={`flex items-center gap-2 px-6 py-2 rounded ${
+                theme === "dark"
+                  ? "bg-gray-700 hover:bg-gray-600"
+                  : "bg-gray-200 hover:bg-gray-300"
+              } transition-colors`}
             >
               <X size={16} />
               Cancel
             </button>
             <button
               type="submit"
-              className={`flex items-center gap-2 px-6 py-2 rounded ${theme === "dark"
-                ? "bg-blue-600 hover:bg-blue-700 text-white"
-                : "bg-blue-600 hover:bg-blue-700 text-white"
-                } transition-colors`}
+              className={`flex items-center gap-2 px-6 py-2 rounded ${
+                theme === "dark"
+                  ? "bg-blue-600 hover:bg-blue-700 text-white"
+                  : "bg-blue-600 hover:bg-blue-700 text-white"
+              } transition-colors`}
             >
               <Save size={16} />
               Create Company
