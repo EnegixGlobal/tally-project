@@ -111,9 +111,11 @@ const UnitForm: React.FC = () => {
           setFormData({
             name: unit.name,
             symbol: unit.symbol,
-            type: type,
-            formalName: type === "Simple" ? (unit.formalName || "") : "",
-            decimalPlaces: type === "Simple" ? (unit.decimalPlaces || 2) : 2,
+            type: unit.type || type,
+            formalName: (unit.type || type) === "Simple" ? (unit.formalName || "") : "",
+            decimalPlaces: (unit.type || type) === "Simple" 
+              ? (unit.decimalPlaces !== undefined && unit.decimalPlaces !== null ? unit.decimalPlaces : 2) 
+              : 2,
             firstUnit: firstUnit,
             conversionFactor: conversionFactor,
             secondUnit: secondUnit,
