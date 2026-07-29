@@ -133,23 +133,23 @@ const MastersIndex: React.FC = () => {
               }`}
           >
             <h2 className="text-xl font-semibold mb-4">{category.title}</h2>
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 sm:gap-4">
               {category.items.map((item, itemIndex) => (
                 <button
                   key={itemIndex}
                   onClick={() => navigate(item.path)}
-                  className={`p-4 rounded-lg flex flex-col items-center text-center transition-colors ${theme === "dark"
+                  className={`p-3 sm:p-4 rounded-lg flex flex-col items-center justify-center text-center transition-colors ${theme === "dark"
                       ? "bg-gray-700 hover:bg-gray-600"
                       : "bg-gray-50 hover:bg-gray-100"
                     }`}
                 >
                   <div
-                    className={`p-2 rounded-full mb-2 ${theme === "dark" ? "bg-gray-600" : "bg-blue-50"
+                    className={`p-2 rounded-full mb-2 flex-shrink-0 ${theme === "dark" ? "bg-gray-600" : "bg-blue-50"
                       }`}
                   >
                     {item.icon}
                   </div>
-                  <span>{item.name}</span>
+                  <span className="text-xs sm:text-sm font-medium break-words w-full">{item.name}</span>
                 </button>
               ))}
             </div>

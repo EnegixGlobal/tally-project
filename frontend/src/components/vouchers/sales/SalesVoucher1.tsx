@@ -726,7 +726,7 @@ const SalesVoucher: React.FC = () => {
   const [showInvoicePrint, setShowInvoicePrint] = useState(false); // Invoice print modal state
   const [showConfig, setShowConfig] = useState(false);
   const [columnSettings, setColumnSettings] = useState({
-    showGodown: true,
+    showGodown: false,
     showBatch: true,
     showDiscount: true,
     showGST: true,
@@ -1639,8 +1639,42 @@ const SalesVoucher: React.FC = () => {
 
       // 3️⃣ QUANTITY UPDATE
       if (name === "quantity") {
+        const item = stockItems.find((i: any) => String(i.id) === String(entry.itemId));
+        if (item) {
+          const itemUnit = unitss.find((u: any) => u.symbol === item.unit || u.name === item.unit || String(u.id) === String(item.unit));
+          if (itemUnit) {
+            const maxDecimals = Number(itemUnit.decimalPlaces || 0);
+            if (value.includes('.')) {
+              if (maxDecimals === 0) {
+                Swal.fire({
+                  toast: true,
+                  position: 'top-end',
+                  icon: 'warning',
+                  title: `Decimals not allowed for ${itemUnit.symbol}`,
+                  showConfirmButton: false,
+                  timer: 2000
+                });
+                return;
+              }
+              const decimals = value.split('.')[1] || "";
+              if (decimals.length > maxDecimals) {
+                Swal.fire({
+                  toast: true,
+                  position: 'top-end',
+                  icon: 'warning',
+                  title: `Only ${maxDecimals} decimal places allowed for ${itemUnit.symbol}`,
+                  showConfirmButton: false,
+                  timer: 2000
+                });
+                return;
+              }
+            }
+          }
+        }
+        
         const oldQty = Number(entry.quantity || 0);
-        const newQty = Number(value || 0);
+        // @ts-ignore
+        const newQty = value.endsWith('.') ? value : Number(value || 0);
 
         updatedEntries[index].quantity = newQty;
 
@@ -2134,15 +2168,7 @@ const SalesVoucher: React.FC = () => {
           }
         }
 
-        if (
-          godownEnabled === "yes" &&
-          columnSettings.showGodown &&
-          !entry.godownId
-        )
-          pushError(
-            `entry.${index}.godownId`,
-            `Row ${row}: Godown is required`
-          );
+        // Godown is now optional, so no validation here
       } else {
         if (!entry.ledgerId)
           pushError(
@@ -3443,6 +3469,7 @@ const SalesVoucher: React.FC = () => {
                             <td className="px-1 py-2 min-w-[55px] align-top">
                               <input
                                 type="number"
+                                step="any"
                                 name="quantity"
                                 value={entry.quantity ?? ""}
                                 onChange={(e) => handleEntryChange(index, e)}

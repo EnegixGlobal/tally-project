@@ -809,7 +809,7 @@ const StockPerchaseItem = () => {
 
 
             {/* ----------------- Batch Tracking Dynamic Rows ----------------- */}
-            <div className="flex justify-between items-center mt-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-4 gap-3 md:col-span-2">
               {/* Left: Checkbox */}
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input
@@ -832,7 +832,7 @@ const StockPerchaseItem = () => {
               </button>
             </div>
 
-            <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
+            <div className="flex flex-col gap-4 mt-4 md:col-span-2 border border-gray-400 rounded-lg p-3">
               {batchRows.map((row, index) => (
                 <div
                   key={index}
