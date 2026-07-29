@@ -121,10 +121,10 @@ const GodownAllocationField: React.FC<GodownAllocationFieldProps> = ({ allocatio
   };
 
   return (
-    <div className="col-span-2">
+    <div className="md:col-span-2">
       <label className="block text-sm font-medium mb-1">Godown Allocations</label>
       {allocations.map((alloc: GodownAllocation, index: number) => (
-        <div key={index} className="flex gap-4 mt-2 items-center">
+        <div key={index} className="flex flex-col sm:flex-row gap-4 mt-2 sm:items-center items-stretch">
           <SelectField
             id={`godown-${index}`}
             name={`godown-${index}`}

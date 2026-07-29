@@ -1011,7 +1011,7 @@ const StockItemForm = () => {
             <div className="md:col-span-2">
 
               <label className="block text-sm font-medium mb-1">Product Image</label>
-              <div className="flex items-center space-x-4">
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
                 <div
                   className={`relative w-32 h-32 rounded-lg border-2 border-dashed flex items-center justify-center overflow-hidden ${theme === "dark" ? "border-gray-600 bg-gray-700" : "border-gray-300 bg-gray-50"
                     }`}
@@ -1058,7 +1058,7 @@ const StockItemForm = () => {
 
 
             {/* ----------------- Batch Tracking Dynamic Rows ----------------- */}
-            <div className="flex justify-between items-center mt-4">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-4 gap-3 md:col-span-2">
               {/* Left: Checkbox */}
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input
@@ -1085,11 +1085,11 @@ const StockItemForm = () => {
             </div>
 
             {/* ALWAYS SHOWN BATCH CONTAINER */}
-            <div className="flex flex-col gap-4 mt-4 col-span-2 border border-gray-400 rounded-lg p-3">
+            <div className="flex flex-col gap-4 mt-4 md:col-span-2 border border-gray-400 rounded-lg p-3">
               {batchRows.map((row, index) => (
                 <div
                   key={row.id}
-                  className="flex flex-col md:flex-row gap-3 items-end w-full"
+                  className="flex flex-col md:flex-row gap-3 items-stretch md:items-end w-full"
                 >
                   {/* Batch/Serial Number field - ONLY visible when enableBatchTracking is checked */}
                   {formData.enableBatchTracking && (
@@ -1218,7 +1218,7 @@ const StockItemForm = () => {
 
             {/* ---------------------------------------------------------------- */}
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-2 md:col-span-2">
 
 
               <label className="flex items-center gap-2 text-sm font-medium">
@@ -1239,15 +1239,15 @@ const StockItemForm = () => {
             </div>
 
             {barcode ? (
-              <div className="mb-4 mt-2">
-                <h3>{id ? 'Barcode' : 'Generated/Scanned Barcode'}</h3>
+              <div className="mb-4 mt-2 md:col-span-2">
+                <h3 className="mb-1 font-medium">{id ? 'Barcode' : 'Generated/Scanned Barcode'}</h3>
                 <div className="border p-2 rounded flex flex-col items-center bg-white">
                   <Barcode value={barcode} width={1} height={40} fontSize={16} />
                 </div>
-                <p className="text-xs text-xs text-gray-500 mt-1">Scan a barcode with your POS scanner to update automatically.</p>
+                <p className="text-xs text-gray-500 mt-1">Scan a barcode with your POS scanner to update automatically.</p>
               </div>
             ) : (
-              <div className="mb-4 mt-2 p-4 border border-blue-300 bg-blue-50 rounded text-center">
+              <div className="mb-4 mt-2 p-4 border border-blue-300 bg-blue-50 rounded text-center md:col-span-2">
                 <p className="font-semibold text-blue-700 animate-pulse">Waiting for POS Scan...</p>
                 <p className="text-xs text-blue-600">Please scan the product barcode now.</p>
               </div>
