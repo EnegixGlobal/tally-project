@@ -1824,9 +1824,45 @@ const PurchaseVoucher: React.FC = () => {
 
       // 3️⃣ QUANTITY / RATE / AMOUNT CHANGE
       if (["quantity", "rate", "amount"].includes(name)) {
-        const newVal = Number(value || 0);
+        if (name === "quantity") {
+          const item = stockItems.find((i: any) => String(i.id) === String(entry.itemId));
+          if (item) {
+            const itemUnit = unitss.find((u: any) => u.symbol === item.unit || u.name === item.unit || String(u.id) === String(item.unit));
+            if (itemUnit) {
+              const maxDecimals = Number(itemUnit.decimalPlaces || 0);
+              if (value.includes('.')) {
+                if (maxDecimals === 0) {
+                  Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'warning',
+                    title: `Decimals not allowed for ${itemUnit.symbol}`,
+                    showConfirmButton: false,
+                    timer: 2000
+                  });
+                  return;
+                }
+                const decimals = value.split('.')[1] || "";
+                if (decimals.length > maxDecimals) {
+                  Swal.fire({
+                    toast: true,
+                    position: 'top-end',
+                    icon: 'warning',
+                    title: `Only ${maxDecimals} decimal places allowed for ${itemUnit.symbol}`,
+                    showConfirmButton: false,
+                    timer: 2000
+                  });
+                  return;
+                }
+              }
+            }
+          }
+        }
+        
+        const newVal = name === "quantity" && value.endsWith('.') ? value : Number(value || 0);
 
         // Prepare inputs for calc
+        // @ts-ignore
         let newQty = name === "quantity" ? newVal : Number(entry.quantity || 0);
         let newRate = name === "rate" ? newVal : Number(entry.rate || 0);
         let newAmount = name === "amount" ? newVal : Number(entry.amount || 0);
@@ -3697,6 +3733,7 @@ const PurchaseVoucher: React.FC = () => {
                             {!isAddingBatch && (
                               <input
                                 type="number"
+                                step="any"
                                 name="quantity"
                                 value={entry.quantity ?? ""}
                                 onChange={(e) => handleEntryChange(index, e)}
