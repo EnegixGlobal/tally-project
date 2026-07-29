@@ -148,6 +148,7 @@ const UnitList: React.FC = () => {
               >
                 <th className="px-4 py-3 text-left">Name</th>
                 <th className="px-4 py-3 text-left">Symbol</th>
+                <th className="px-4 py-3 text-left">Decimal Places</th>
                 <th className="px-4 py-3 text-center">Actions</th>
               </tr>
             </thead>
@@ -163,6 +164,7 @@ const UnitList: React.FC = () => {
                 >
                   <td className="px-4 py-3">{unit.name}</td>
                   <td className="px-4 py-3 font-mono">{unit.symbol}</td>
+                  <td className="px-4 py-3">{unit.decimalPlaces || 0}</td>
                   <td className="px-4 py-3">
                     <div className="flex justify-center space-x-2">
                       <button

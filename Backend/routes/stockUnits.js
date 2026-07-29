@@ -52,7 +52,7 @@ router.get("/:id", async (req, res) => {
 
 // Create unit
 router.post("/", async (req, res) => {
-  const { name, symbol, company_id, owner_type, owner_id } = req.body;
+  const { name, symbol, type, formalName, decimalPlaces, firstUnit, conversionFactor, secondUnit, company_id, owner_type, owner_id } = req.body;
   console.log(company_id, owner_type, owner_id);
 
   if (!company_id || !owner_type || !owner_id) {
@@ -65,8 +65,8 @@ router.post("/", async (req, res) => {
 
   try {
     await db.query(
-      "INSERT INTO stock_units (name, symbol, company_id, owner_type, owner_id) VALUES (?, ?, ?, ?, ?)",
-      [name, symbol, company_id, owner_type, owner_id]
+      "INSERT INTO stock_units (name, symbol, type, formalName, decimalPlaces, firstUnit, conversionFactor, secondUnit, company_id, owner_type, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+      [name, symbol, type || "Simple", formalName || null, decimalPlaces || 2, firstUnit || null, conversionFactor || null, secondUnit || null, company_id, owner_type, owner_id]
     );
 
     res.json({ message: "Unit created successfully" });
@@ -80,7 +80,7 @@ router.post("/", async (req, res) => {
 router.put("/:id", async (req, res) => {
   const { owner_type, owner_id } = req.query;
   const { id } = req.params;
-  const { name, symbol } = req.body;
+  const { name, symbol, type, formalName, decimalPlaces, firstUnit, conversionFactor, secondUnit } = req.body;
 
   if (!owner_type || !owner_id) {
     return res.status(400).json({ message: "owner_type and owner_id are required" });
@@ -88,9 +88,9 @@ router.put("/:id", async (req, res) => {
 
   try {
     const [result] = await db.query(
-      `UPDATE stock_units SET name = ?, symbol = ? 
+      `UPDATE stock_units SET name = ?, symbol = ?, type = ?, formalName = ?, decimalPlaces = ?, firstUnit = ?, conversionFactor = ?, secondUnit = ? 
        WHERE id = ? AND owner_type = ? AND owner_id = ?`,
-      [name, symbol, id, owner_type, owner_id]
+      [name, symbol, type || "Simple", formalName || null, decimalPlaces || 2, firstUnit || null, conversionFactor || null, secondUnit || null, id, owner_type, owner_id]
     );
 
     if (result.affectedRows === 0)
