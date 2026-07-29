@@ -726,7 +726,7 @@ const SalesVoucher: React.FC = () => {
   const [showInvoicePrint, setShowInvoicePrint] = useState(false); // Invoice print modal state
   const [showConfig, setShowConfig] = useState(false);
   const [columnSettings, setColumnSettings] = useState({
-    showGodown: true,
+    showGodown: false,
     showBatch: true,
     showDiscount: true,
     showGST: true,
@@ -2168,15 +2168,7 @@ const SalesVoucher: React.FC = () => {
           }
         }
 
-        if (
-          godownEnabled === "yes" &&
-          columnSettings.showGodown &&
-          !entry.godownId
-        )
-          pushError(
-            `entry.${index}.godownId`,
-            `Row ${row}: Godown is required`
-          );
+        // Godown is now optional, so no validation here
       } else {
         if (!entry.ledgerId)
           pushError(

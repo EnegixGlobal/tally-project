@@ -2070,11 +2070,7 @@ const PurchaseVoucher: React.FC = () => {
           newErrors[`entry${index}.quantity`] =
             "Quantity must be greater than 0";
 
-        if (godownEnabled === "yes" && visibleColumns.godown) {
-          if (!entry.godownId || String(entry.godownId).trim() === "") {
-            newErrors[`entry${index}.godownId`] = "Godown is required";
-          }
-        }
+        // Godown is now optional, so no validation here
       });
     } else {
       formData.entries.forEach((entry, index) => {
