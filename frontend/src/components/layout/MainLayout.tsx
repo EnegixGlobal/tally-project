@@ -125,6 +125,13 @@ const MainLayout: React.FC = () => {
     }
   }, [isLoading, isAuthenticated, user, location.pathname, navigate]);
 
+  // Close sidebar on mobile when navigating to a new page
+  useEffect(() => {
+    if (window.innerWidth < 768) {
+      setSidebarOpen(false);
+    }
+  }, [location.pathname]);
+
   // Handle keyboard shortcuts
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -186,7 +193,7 @@ const MainLayout: React.FC = () => {
       )}
       <div className="flex flex-1">
         <Sidebar isOpen={sidebarOpen} />
-        <main className={`flex-1 transition-all duration-300 print:ml-0 print:pt-0 ${sidebarOpen ? 'ml-60' : 'ml-16'} pt-12`}>
+        <main className={`flex-1 transition-all duration-300 print:ml-0 print:pt-0 ${sidebarOpen ? 'ml-60' : 'ml-0 md:ml-16'} pt-12`}>
           <div className="p-4 print:p-0 h-full">
             <ErrorBoundary>
               <Outlet />

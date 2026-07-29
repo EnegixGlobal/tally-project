@@ -50,12 +50,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen }) => {
 
   return (
     <div
-      className={`print:hidden ${isOpen ? "w-60" : "w-16"
-        } transition-width duration-300 ease-in-out h-full ${theme === "dark"
+      className={`print:hidden ${isOpen ? "translate-x-0 w-60" : "-translate-x-full md:translate-x-0 md:w-16"
+        } transition-all duration-300 ease-in-out h-full ${theme === "dark"
           ? "bg-gray-900 text-gray-200"
           : "bg-blue-800 text-white"
         } border-r ${theme === "dark" ? "border-gray-700" : "border-blue-700"
-        } fixed top-12 left-0 z-10`}
+        } fixed top-12 left-0 z-40`}
     >
       <nav className="p-2 pb-16">
         <ul className="space-y-1">
