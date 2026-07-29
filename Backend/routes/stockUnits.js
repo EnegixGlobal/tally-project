@@ -66,7 +66,7 @@ router.post("/", async (req, res) => {
   try {
     await db.query(
       "INSERT INTO stock_units (name, symbol, type, formalName, decimalPlaces, firstUnit, conversionFactor, secondUnit, company_id, owner_type, owner_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-      [name, symbol, type || "Simple", formalName || null, decimalPlaces || 2, firstUnit || null, conversionFactor || null, secondUnit || null, company_id, owner_type, owner_id]
+      [name, symbol, type || "Simple", formalName || null, decimalPlaces !== undefined ? decimalPlaces : 2, firstUnit || null, conversionFactor || null, secondUnit || null, company_id, owner_type, owner_id]
     );
 
     res.json({ message: "Unit created successfully" });
@@ -90,7 +90,7 @@ router.put("/:id", async (req, res) => {
     const [result] = await db.query(
       `UPDATE stock_units SET name = ?, symbol = ?, type = ?, formalName = ?, decimalPlaces = ?, firstUnit = ?, conversionFactor = ?, secondUnit = ? 
        WHERE id = ? AND owner_type = ? AND owner_id = ?`,
-      [name, symbol, type || "Simple", formalName || null, decimalPlaces || 2, firstUnit || null, conversionFactor || null, secondUnit || null, id, owner_type, owner_id]
+      [name, symbol, type || "Simple", formalName || null, decimalPlaces !== undefined ? decimalPlaces : 2, firstUnit || null, conversionFactor || null, secondUnit || null, id, owner_type, owner_id]
     );
 
     if (result.affectedRows === 0)
