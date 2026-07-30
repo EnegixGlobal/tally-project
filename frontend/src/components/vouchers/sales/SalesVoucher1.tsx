@@ -4162,6 +4162,20 @@ const SalesVoucher: React.FC = () => {
 
               <div className="space-y-4">
                 <label className="flex justify-between items-center">
+                  <span>Enable Godown Column</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showGodown}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showGodown: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
+                <label className="flex justify-between items-center">
                   <span>Enable Batch Column</span>
                   <input
                     type="checkbox"
