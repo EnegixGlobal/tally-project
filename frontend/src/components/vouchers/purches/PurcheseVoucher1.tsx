@@ -260,7 +260,7 @@ const PurchaseVoucher: React.FC = () => {
       hsn: true,
       gst: true,
       batch: true,   // ✅ Default ON — but column only shows when item has batches (hasAnyBatch)
-      godown: false,
+      godown: true,
       showReceiptDetails: false,
       tds: true,
       enableTdsCredit: false,
@@ -1777,6 +1777,7 @@ const PurchaseVoucher: React.FC = () => {
           gstLedgerId: selected?.gstLedgerId || "",
           sgstLedgerId: selected?.sgstLedgerId || "",
           cgstLedgerId: selected?.cgstLedgerId || "",
+          godownId: selected?.godown_id?.toString() || "",
           // ... rest
           batches: selected?.batches || [],
           batchNumber: "",
@@ -2931,6 +2932,12 @@ const PurchaseVoucher: React.FC = () => {
     );
   });
 
+  const hasAnyGodown = formData.entries?.some((entry) => {
+    if (!entry.itemId) return false;
+    const item = stockItems.find((s) => String(s.id) === String(entry.itemId));
+    return (item as any)?.godown_id || entry.godownId;
+  });
+
   return (
     <div className="pt-[56px] px-4">
       <div className="flex items-center mb-6">
@@ -3213,7 +3220,7 @@ const PurchaseVoucher: React.FC = () => {
                 </select>
               </div>
 
-              {formData.mode === "item-invoice" && visibleColumns.godown && (
+              {formData.mode === "item-invoice" && visibleColumns.godown && hasAnyGodown && (
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
                     Godown Tracking
@@ -3370,7 +3377,7 @@ const PurchaseVoucher: React.FC = () => {
                       )}
 
                       <th className={TABLE_STYLES.headerRight}>Taxable </th>
-                      {godownEnabled === "yes" && visibleColumns.godown && (
+                      {godownEnabled === "yes" && visibleColumns.godown && hasAnyGodown && (
                         <th className={TABLE_STYLES.header}>Godown</th>
                       )}
                       <th className={TABLE_STYLES.header}>Purchase Ledger</th>
@@ -3798,7 +3805,7 @@ const PurchaseVoucher: React.FC = () => {
                           </td>
 
                           {/* GODOWN (Show only if Enabled) */}
-                          {godownEnabled === "yes" && visibleColumns.godown && (
+                          {godownEnabled === "yes" && visibleColumns.godown && hasAnyGodown && (
                             <td className="px-1 py-2 min-w-[95px] align-top">
                               <select
                                 name="godownId"
@@ -3876,7 +3883,7 @@ const PurchaseVoucher: React.FC = () => {
 
                       const colSpanAfterAmount =
                         2 + // Purchase Ledger(1) + Action(1)
-                        ((godownEnabled === "yes" && visibleColumns.godown) ? 1 : 0);
+                        ((godownEnabled === "yes" && visibleColumns.godown && hasAnyGodown) ? 1 : 0);
 
                       return (
                         <>

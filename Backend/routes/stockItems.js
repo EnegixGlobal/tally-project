@@ -32,6 +32,7 @@ router.get("/", async (req, res) => {
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "attributeId", "INT NULL");
+    await ensureColumn("stock_items", "godown_id", "INT NULL");
     await ensureColumn("stock_items", "gstRate", "DECIMAL(5,2) DEFAULT 0.00");
     let query = `
       SELECT 
@@ -51,6 +52,7 @@ router.get("/", async (req, res) => {
         s.sgstLedgerId,
         s.gstRate,
         s.attributeId,
+        s.godown_id,
         s.barcode,
         s.batches,
         s.type,
@@ -418,6 +420,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "attributeId", "INT NULL");
+    await ensureColumn("stock_items", "godown_id", "INT NULL");
     await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
 
 
@@ -448,6 +451,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       batches = [],
       godownAllocations = [],
       barcode,
+      godown_id,
       company_id,
       owner_type,
       owner_id,
@@ -605,6 +609,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     cgstLedgerId,
     sgstLedgerId,
     attributeId,
+    godown_id,
     enableBatchTracking,
     barcode,
     batches,
@@ -613,7 +618,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     owner_id,
     type,
     image
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
     const values = [
@@ -627,6 +632,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       sanitize(cgstLedgerId),
       sanitize(sgstLedgerId),
       sanitize(attributeId),
+      sanitize(godown_id),
       enableBatchTracking ? 1 : 0,
       sanitize(barcode),
       JSON.stringify(batchData),
@@ -1369,6 +1375,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       secondaryUnit,
       batches = [],
       barcode,
+      godown_id,
       company_id,
       owner_type,
       owner_id,
@@ -1454,6 +1461,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
         cgstLedgerId = ?,
         sgstLedgerId = ?,
         attributeId = ?,
+        godown_id = ?,
         taxType = ?,
         enableBatchTracking = ?,
         batches = ?,
@@ -1474,6 +1482,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       sanitize(cgstLedgerId),
       sanitize(sgstLedgerId),
       sanitize(attributeId),
+      sanitize(godown_id),
       taxType ?? "Taxable",
       enableBatchTracking ? 1 : 0,
       JSON.stringify(batchData),
@@ -1557,6 +1566,7 @@ router.get("/:id", async (req, res) => {
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "attributeId", "INT NULL");
+    await ensureColumn("stock_items", "godown_id", "INT NULL");
 
     let query = `
       SELECT 
@@ -1576,6 +1586,7 @@ router.get("/:id", async (req, res) => {
         s.cgstLedgerId,
         s.sgstLedgerId,
         s.attributeId,
+        s.godown_id,
         s.taxType,
         s.barcode,
         s.batches,
