@@ -221,6 +221,7 @@ const SalesVoucher: React.FC = () => {
       cgstLedgerId: (item as any).cgstLedgerId || "",
       sgstLedgerId: (item as any).sgstLedgerId || "",
       igstLedgerId: (item as any).igstLedgerId || "",
+      godown_id: (item as any).godown_id || "",
       rate: Number(
         (item as any).standardSaleRate ||
           (item as any).sellingRate ||
@@ -726,7 +727,7 @@ const SalesVoucher: React.FC = () => {
   const [showInvoicePrint, setShowInvoicePrint] = useState(false); // Invoice print modal state
   const [showConfig, setShowConfig] = useState(false);
   const [columnSettings, setColumnSettings] = useState({
-    showGodown: false,
+    showGodown: true,
     showBatch: true,
     showDiscount: true,
     showGST: true,
@@ -1554,6 +1555,7 @@ const SalesVoucher: React.FC = () => {
           cgstLedgerId: details.cgstLedgerId || "",
           sgstLedgerId: details.sgstLedgerId || "",
           igstLedgerId: details.igstLedgerId || "",
+          godownId: details.godown_id?.toString() || "",
         };
 
         // ================= AUTO SALES LEDGER (DYNAMIC) =================
@@ -2712,6 +2714,12 @@ const SalesVoucher: React.FC = () => {
     entry?.batches?.some((b) => b?.batchName)
   );
 
+  const hasAnyGodown = formData.entries?.some((entry) => {
+    if (!entry.itemId) return false;
+    const item = stockItems.find((s) => String(s.id) === String(entry.itemId));
+    return (item as any)?.godown_id || entry.godownId;
+  });
+
   // 🔹 Resolve Party & Sales Ledger for Invoice Print
   const partyLedger = safeLedgers.find(
     (l) => String(l.id) === String(formData.partyId)
@@ -3310,7 +3318,7 @@ const SalesVoucher: React.FC = () => {
                         )}
 
                         {godownEnabled === "yes" &&
-                          columnSettings.showGodown && (
+                          columnSettings.showGodown && hasAnyGodown && (
                             <th className="px-4 py-2 text-left whitespace-nowrap">
                               Godown
                             </th>
@@ -3583,7 +3591,7 @@ const SalesVoucher: React.FC = () => {
 
                             {/* GODOWN */}
                             {godownEnabled === "yes" &&
-                              columnSettings.showGodown && (
+                              columnSettings.showGodown && hasAnyGodown && (
                                 <td className="px-1 py-2 min-w-[95px] align-top">
                                   {godownList.length === 1 ? (
                                     <input
@@ -3698,7 +3706,7 @@ const SalesVoucher: React.FC = () => {
                         if (columnSettings.showDiscount) totalCols += 1; // Discount
                         if (
                           godownEnabled === "yes" &&
-                          columnSettings.showGodown
+                          columnSettings.showGodown && hasAnyGodown
                         )
                           totalCols += 1; // Godown
                         totalCols += 1; // Sales Ledger
@@ -4161,6 +4169,20 @@ const SalesVoucher: React.FC = () => {
               </h2>
 
               <div className="space-y-4">
+                <label className="flex justify-between items-center">
+                  <span>Enable Godown Column</span>
+                  <input
+                    type="checkbox"
+                    checked={columnSettings.showGodown}
+                    onChange={(e) =>
+                      setColumnSettings((prev) => ({
+                        ...prev,
+                        showGodown: e.target.checked,
+                      }))
+                    }
+                  />
+                </label>
+
                 <label className="flex justify-between items-center">
                   <span>Enable Batch Column</span>
                   <input

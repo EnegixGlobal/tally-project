@@ -1,6 +1,6 @@
 import { useEffect, useState, useRef } from "react";
 import { useNavigate } from "react-router-dom";
-import { Save, X, Trash2, ArrowLeft, Plus, ChevronDown } from "lucide-react";
+import { Save, X, Trash2, ArrowLeft, Plus, ChevronDown, Settings } from "lucide-react";
 import { useAppContext } from "../../../context/AppContext";
 import type {
   GodownAllocation,
@@ -154,6 +154,9 @@ const StockItemForm = () => {
   >([]);
 
   const [masterAttributes, setMasterAttributes] = useState<{id: number; name: string}[]>([]);
+  const [showRageInput, setShowRageInput] = useState(false);
+  const [rage, setRage] = useState("");
+  const [godowns, setGodowns] = useState<{ value: string; label: string }[]>([]);
 
   const [gstLedgers, setGstLedgers] = useState<{
     gst: any[];
@@ -311,7 +314,31 @@ const StockItemForm = () => {
       }
     }
 
+    async function fetchGodowns() {
+      if (!companyId || !ownerType || !ownerId) return;
+      try {
+        const res = await fetch(
+          `${import.meta.env.VITE_API_URL}/api/godowns?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
+        );
+        const data = await res.json();
+        if (data.success && Array.isArray(data.data) && data.data.length > 0) {
+          setGodowns(
+            data.data.map((g: any) => ({
+              value: g.id.toString(),
+              label: g.name,
+            }))
+          );
+        } else {
+          setGodowns([{ value: "", label: "No godowns available" }]);
+        }
+      } catch (error) {
+        console.error("Failed to fetch godowns:", error);
+        setGodowns([{ value: "", label: "Failed to load godowns" }]);
+      }
+    }
+
     fetchCategories();
+    fetchGodowns();
   }, [companyId, ownerType, ownerId]);
 
   useEffect(() => {
@@ -365,6 +392,11 @@ const StockItemForm = () => {
 
           if (item.image) {
             setPreview(item.image);
+          }
+
+          if (item.godown_id) {
+            setRage(item.godown_id.toString());
+            setShowRageInput(true);
           }
 
           // --- Set godown allocations ---
@@ -760,6 +792,7 @@ const StockItemForm = () => {
         })),
       godownAllocations,
       barcode,
+      godown_id: rage,
       company_id: companyId,
       owner_type: ownerType,
       owner_id: ownerId,
@@ -866,16 +899,27 @@ const StockItemForm = () => {
 
   return (
     <div className="pt-[56px] px-4 ">
-      <div className="flex items-center mb-6">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center">
+          <button
+            onClick={() => navigate("/app/masters/stock-item")}
+            className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+              }`}
+            aria-label="Back"
+          >
+            <ArrowLeft size={20} />
+          </button>
+          <h1 className="text-2xl font-bold">New Stock Item</h1>
+        </div>
         <button
-          onClick={() => navigate("/app/masters/stock-item")}
-          className={`mr-4 p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
+          className={`p-2 rounded-full ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-200"
             }`}
-          aria-label="Back"
+          aria-label="Settings"
+          type="button"
+          onClick={() => setShowRageInput(!showRageInput)}
         >
-          <ArrowLeft size={20} />
+          <Settings size={20} />
         </button>
-        <h1 className="text-2xl font-bold">New Stock Item</h1>
       </div>
 
       <div
@@ -1007,6 +1051,17 @@ const StockItemForm = () => {
                 </div>
               )}
             </div>
+
+            {showRageInput && (
+              <SelectField
+                id="rage"
+                name="rage"
+                label="Rage"
+                value={rage}
+                onChange={(e) => setRage(e.target.value)}
+                options={godowns}
+              />
+            )}
 
             <div className="md:col-span-2">
 
