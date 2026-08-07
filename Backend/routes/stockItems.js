@@ -1889,5 +1889,25 @@ router.delete("/:id/batch", async (req, res) => {
     connection.release();
   }
 });
+// Update attribute value for a stock item
+router.put("/attribute/:linkId", async (req, res) => {
+  const { linkId } = req.params;
+  const { value } = req.body;
+
+  const connection = await db.getConnection();
+  try {
+    await connection.execute(
+      "UPDATE stock_item_attributes SET attribute_value = ? WHERE id = ?",
+      [value || null, linkId]
+    );
+
+    res.json({ success: true, message: "Attribute value updated successfully" });
+  } catch (err) {
+    console.error("🔥 Error updating attribute value:", err);
+    res.status(500).json({ success: false, message: "Server error updating attribute value" });
+  } finally {
+    connection.release();
+  }
+});
 
 module.exports = router;

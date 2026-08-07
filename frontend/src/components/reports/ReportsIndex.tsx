@@ -41,7 +41,8 @@ const ReportsIndex: React.FC = () => {
         { icon: <BookOpen size={20} />, name: 'Stock Summary', path: '/app/reports/stock-summary' },
         { icon: <Activity size={20} />, name: 'Movement Analysis', path: '/app/reports/movement-analysis' },
         { icon: <Calendar size={20} />, name: 'Ageing Analysis', path: '/app/reports/ageing-analysis' },
-        { icon: <BarChart2 size={20} />, name: 'Godown Summary', path: '/app/reports/godown-summary' }
+        { icon: <BarChart2 size={20} />, name: 'Godown Summary', path: '/app/reports/godown-summary' },
+        { icon: <FileText size={20} />, name: 'Attribute summary', path: '/app/reports/attribute-summary' }
       ]
     },
     {

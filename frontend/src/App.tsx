@@ -123,6 +123,7 @@ import PurchaseInvoiceMatching1 from "./components/reports/PurchaseInvoiceMatchi
 import B2B from "./components/reports/B2B";
 import B2C from "./components/reports/B2C";
 import Consolidation from "./components/reports/Consolidation";
+import AttributeSummary from "./components/reports/AttributeSummary";
 
 // GST Module Components
 
@@ -1389,6 +1390,14 @@ function App() {
                   element={
                     <RequireCompany>
                       <StockSummary />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="reports/attribute-summary"
+                  element={
+                    <RequireCompany>
+                      <AttributeSummary />
                     </RequireCompany>
                   }
                 />
