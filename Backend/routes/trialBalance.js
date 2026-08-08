@@ -19,7 +19,7 @@ router.get('/api/trial-balance', async (req, res) => {
         lg.name as group_name, lg.type AS group_type
       FROM ledgers l
       LEFT JOIN ledger_groups lg ON l.group_id = lg.id
-      WHERE l.company_id = ? AND l.owner_type = ? AND l.owner_id = ?
+      WHERE l.company_id = ? AND ((l.owner_type = ? AND l.owner_id = ?) OR l.owner_id = 0)
       ORDER BY lg.type, lg.name, l.name
     `, [company_id, owner_type, owner_id]);
 

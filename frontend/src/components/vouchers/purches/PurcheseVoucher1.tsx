@@ -3552,7 +3552,7 @@ const PurchaseVoucher: React.FC = () => {
                                     <div className="space-y-3 text-sm">
                                       <div>
                                         <label className="block font-medium">
-                                          Batch Name
+                                          Batch Name/Serial Number/IMEI
                                         </label>
                                         <input
                                           className="w-full border rounded p-2"
