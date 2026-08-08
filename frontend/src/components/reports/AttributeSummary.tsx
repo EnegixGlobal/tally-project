@@ -1,225 +1,231 @@
-import React, { useEffect, useState } from 'react';
-import { useAppContext } from '../../context/AppContext';
-import { ChevronRight, ChevronDown, Tag, Save, Check } from 'lucide-react';
-import Swal from 'sweetalert2';
-
-interface Attribute {
-  id: number;
-  name: string;
-}
-
-interface StockItem {
-  id: string;
-  name: string;
-  attributes?: string[] | string;
-}
+import React, { useState, useEffect } from "react";
+import { ArrowLeft, ChevronDown, ChevronRight, Copy, Trash2 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
+import { useAppContext } from "../../context/AppContext";
 
 const AttributeSummary: React.FC = () => {
   const { theme } = useAppContext();
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
-  const [attributes, setAttributes] = useState<Attribute[]>([]);
-  const [loading, setLoading] = useState(true);
-  
-  const [expandedItemId, setExpandedItemId] = useState<string | null>(null);
-  
-  // Local state for tracking edited attribute values
-  const [editValues, setEditValues] = useState<Record<string, string>>({});
-  const [savedIds, setSavedIds] = useState<string[]>([]);
+  const navigate = useNavigate();
 
-  const companyId = localStorage.getItem("company_id");
-  const ownerType = localStorage.getItem("supplier");
-  const ownerId = localStorage.getItem(
-    ownerType === "employee" ? "employee_id" : "user_id"
-  );
+  const [data, setData] = useState<any[]>([]);
+  const [attributes, setAttributes] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
+  const [copyCounts, setCopyCounts] = useState<Record<string, number>>({});
+
+  const company_id = localStorage.getItem("company_id") || "";
+  const owner_type = localStorage.getItem("supplier") || localStorage.getItem("owner_type") || "employee";
+  const owner_id = localStorage.getItem(owner_type === "employee" ? "employee_id" : "user_id") || "";
 
   useEffect(() => {
-    const fetchData = async () => {
-      if (!companyId || !ownerType || !ownerId) return;
+    loadData();
+    loadAttributes();
+  }, [company_id, owner_type, owner_id]);
 
-      try {
-        const attrRes = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-attributes`);
-        const attrJson = await attrRes.json();
-        if (attrJson.success) {
-          setAttributes(attrJson.data || []);
-        }
-
-        const stockRes = await fetch(
-          `${import.meta.env.VITE_API_URL}/api/stock-items?company_id=${companyId}&owner_type=${ownerType}&owner_id=${ownerId}`
-        );
-        const stockJson = await stockRes.json();
-        if (stockJson.success) {
-          setStockItems(stockJson.data || []);
-        }
-      } catch (err) {
-        console.error("Failed to fetch data for Attribute Summary:", err);
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    fetchData();
-  }, [companyId, ownerType, ownerId]);
+  const loadAttributes = async () => {
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-attributes`);
+      const json = await res.json();
+      if (json.success) setAttributes(json.data || []);
+    } catch (err) {
+      console.error(err);
+    }
+  };
 
   const getAttributesData = (attributesData: any) => {
     if (!attributesData || attributesData.length === 0) return [];
-    
     let parsedData = attributesData;
     if (typeof attributesData === 'string') {
-        try {
-            parsedData = JSON.parse(attributesData);
-        } catch {
-            parsedData = attributesData.split(',');
-        }
+        try { parsedData = JSON.parse(attributesData); } 
+        catch { parsedData = attributesData.split(','); }
     }
-
     if (!Array.isArray(parsedData)) return [];
-
-    const items = parsedData.map((attr: any) => {
+    return parsedData.map((attr: any) => {
       if (attr && typeof attr === 'object') {
-        return { 
-          linkId: String(attr.id), 
-          name: attr.attribute_name || attr.name, 
-          value: attr.value || '' 
-        };
+        return { name: attr.attribute_name || attr.name, value: attr.value || '' };
       }
       const match = attributes.find(a => String(a.id) === String(attr));
-      return match ? { linkId: null, name: match.name, value: '' } : null;
+      return match ? { name: match.name, value: '' } : null;
     }).filter(Boolean);
+  };
 
-    return items;
+  const loadData = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const params = new URLSearchParams({ company_id, owner_type, owner_id });
+      
+      const [stockRes, purRes, salRes] = await Promise.all([
+        fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params}`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?${params}`),
+        fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers/sale-history?${params}`)
+      ]);
+
+      const stockData = await stockRes.json();
+      const purData = await purRes.json();
+      const salData = await salRes.json();
+
+      const items = Array.isArray(stockData.data) ? stockData.data : [];
+      const purchases = Array.isArray(purData.data) ? purData.data : [];
+      const sales = Array.isArray(salData.data) ? salData.data : [];
+
+      const formatted = items.map((item: any) => {
+        const itemPurchases = purchases.filter((p: any) => p.itemName?.toLowerCase().trim() === item.name.toLowerCase().trim());
+        const itemSales = sales.filter((s: any) => s.itemName?.toLowerCase().trim() === item.name.toLowerCase().trim());
+
+        return {
+          id: item.id,
+          name: item.name,
+          attributes: getAttributesData(item.attributes),
+          purchases: itemPurchases,
+          sales: itemSales,
+        };
+      });
+
+      setData(formatted);
+    } catch (err: any) {
+      setError("Failed to load summary data.");
+    } finally {
+      setLoading(false);
+    }
   };
 
   const toggleExpand = (id: string) => {
-    setExpandedItemId(expandedItemId === id ? null : id);
+    setExpandedItems(prev => {
+      const newSet = new Set(prev);
+      if (newSet.has(id)) newSet.delete(id);
+      else newSet.add(id);
+      return newSet;
+    });
   };
 
-  const handleValueChange = (linkId: string, val: string) => {
-    setEditValues(prev => ({ ...prev, [linkId]: val }));
-    setSavedIds(prev => prev.filter(id => id !== linkId));
+  const handleCopyAttribute = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCopyCounts(prev => ({
+      ...prev,
+      [id]: (prev[id] ?? 1) + 1
+    }));
   };
 
-  const handleSave = async (linkId: string, currentValue: string) => {
-    if (!linkId) return;
-    
-    const valueToSave = editValues[linkId] !== undefined ? editValues[linkId] : currentValue;
-
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/attribute/${linkId}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value: valueToSave })
-      });
-      const data = await res.json();
-      if (data.success) {
-        setSavedIds(prev => [...prev, linkId]);
-        setTimeout(() => {
-          setSavedIds(prev => prev.filter(id => id !== linkId));
-        }, 2000);
-      } else {
-        Swal.fire('Error', data.message || 'Failed to save attribute', 'error');
-      }
-    } catch (err) {
-      console.error(err);
-      Swal.fire('Error', 'An error occurred while saving the attribute', 'error');
-    }
+  const handleRemoveAttribute = (id: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    setCopyCounts(prev => {
+      const current = prev[id] ?? 1;
+      if (current <= 1) return prev; // Minimum 1 row must remain
+      return { ...prev, [id]: current - 1 };
+    });
   };
 
   return (
-    <div className='pt-[56px] px-4'>
-      <div className="flex justify-between items-center mb-6">
-        <h1 className="text-2xl font-bold">Attribute Summary</h1>
-      </div>
+    <div className={`min-h-screen pt-[60px] ${theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"}`}>
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        {/* Header Section */}
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+          <div className="flex items-center gap-4">
+            <button onClick={() => navigate(-1)} className={`p-2 rounded-full transition-colors ${theme === "dark" ? "hover:bg-gray-800" : "hover:bg-gray-200"}`}>
+              <ArrowLeft size={24} />
+            </button>
+            <h1 className="text-2xl font-bold">Attribute Summary Report</h1>
+          </div>
+        </div>
 
-      <div className={`rounded-lg overflow-hidden ${theme === "dark" ? "bg-gray-800" : "bg-white shadow"}`}>
-        <div className="flex flex-col">
+        {/* Main Content Area */}
+        <div className={`rounded-xl shadow-lg overflow-hidden border ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+          
           <div className="overflow-x-auto">
-            <div className="inline-block min-w-full align-middle">
-              <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-600">
-                <thead className={`${theme === "dark" ? "bg-gray-700" : "bg-gray-50"}`}>
+            {loading ? (
+              <div className="p-8 text-center text-gray-500">Loading...</div>
+            ) : error ? (
+              <div className="p-8 text-center text-red-500">{error}</div>
+            ) : (
+              <table className="w-full border-collapse text-sm">
+                <thead className={`${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
                   <tr>
-                    <th scope="col" className={`px-6 py-4 text-left text-xs font-medium uppercase tracking-wider ${theme === "dark" ? "text-gray-300" : "text-gray-500"}`}>
-                      Stock Item Name
+                    <th className={`p-4 text-left border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} font-semibold min-w-[200px]`}>
+                      Item Name
                     </th>
+                    <th className={`p-3 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} font-semibold bg-green-500/10`}>Purchase</th>
+                    <th className={`p-3 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} font-semibold bg-red-500/10`}>Sales</th>
+                    <th className={`p-3 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} font-semibold bg-blue-500/10`}>Closing Balance</th>
                   </tr>
                 </thead>
-                <tbody className={`divide-y ${theme === "dark" ? "bg-gray-800 divide-gray-600" : "bg-white divide-gray-200"}`}>
-                  {loading ? (
-                    <tr>
-                      <td className={`px-6 py-4 text-center ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                        Loading...
-                      </td>
-                    </tr>
-                  ) : stockItems.length === 0 ? (
-                    <tr>
-                      <td className={`px-6 py-4 text-center ${theme === "dark" ? "text-gray-400" : "text-gray-500"}`}>
-                        No stock items found
-                      </td>
-                    </tr>
+                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {data.length === 0 ? (
+                    <tr><td colSpan={4} className="p-8 text-center text-gray-500">No stock data available.</td></tr>
                   ) : (
-                    stockItems.map((item) => {
-                      const isExpanded = expandedItemId === item.id;
-                      const itemAttributes = getAttributesData(item.attributes);
+                    data.map((row) => {
+                      const attributesString = row.attributes.length > 0 
+                        ? row.attributes.map((a: any) => `${a.name}${a.value ? `: ${a.value}` : ''}`).join(', ')
+                        : 'No attributes linked';
+                      
+                      // Extract IMEI from the attributes string to match with batchNumber
+                      const imeiMatch = attributesString.match(/(?:imei|batch)[\s:]*([a-zA-Z0-9_-]+)/i);
+                      const imei = imeiMatch ? imeiMatch[1].toLowerCase() : null;
+
+                      let purQty = 0;
+                      let salQty = 0;
+
+                      if (imei) {
+                        row.purchases.forEach((p: any) => {
+                          if (p.batchNumber?.toLowerCase() === imei) purQty += Number(p.purchaseQuantity || 0);
+                        });
+                        row.sales.forEach((s: any) => {
+                          if (s.batchNumber?.toLowerCase() === imei) salQty += Math.abs(Number(s.qtyChange || 0));
+                        });
+                      }
+
+                      const closingQty = purQty - salQty;
                       
                       return (
-                        <React.Fragment key={item.id}>
+                        <React.Fragment key={row.id}>
+                          {/* Item Row */}
                           <tr 
-                            onClick={() => toggleExpand(item.id)}
-                            className={`cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700" : "hover:bg-gray-50"} ${isExpanded ? (theme === 'dark' ? 'bg-gray-700' : 'bg-gray-50') : ''}`}
+                            onClick={() => toggleExpand(row.id)}
+                            className={`cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700/50" : "hover:bg-gray-50"} ${expandedItems.has(row.id) ? 'font-bold' : ''}`}
                           >
-                            <td className={`px-6 py-4 whitespace-nowrap text-sm font-medium flex items-center gap-2 ${theme === "dark" ? "text-gray-200" : "text-gray-900"}`}>
-                              {isExpanded ? <ChevronDown size={18} className="text-blue-500" /> : <ChevronRight size={18} className="text-gray-400" />}
-                              {item.name}
+                            <td className={`p-4 border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} font-medium flex items-center gap-2`}>
+                              {expandedItems.has(row.id) ? <ChevronDown size={16} className="text-blue-500"/> : <ChevronRight size={16} className="text-gray-400"/>}
+                              {row.name}
                             </td>
+                            {/* Empty columns for Purchase, Sales, Closing */}
+                            <td className={`p-2 border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}></td>
+                            <td className={`p-2 border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}></td>
+                            <td className={`p-2 border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}></td>
                           </tr>
-                          {isExpanded && (
-                            <tr className={`${theme === "dark" ? "bg-gray-750" : "bg-blue-50/30"}`}>
-                              <td className="px-12 py-6">
-                                <div className="flex flex-col gap-4">
-                                  <h4 className={`text-xs font-semibold uppercase tracking-wider flex items-center gap-2 ${theme === 'dark' ? 'text-gray-400' : 'text-gray-500'}`}>
-                                    <Tag size={14} /> Linked Attributes
-                                  </h4>
-                                  {itemAttributes.length === 0 ? (
-                                    <p className={`text-sm italic ${theme === 'dark' ? 'text-gray-500' : 'text-gray-400'}`}>
-                                      No attributes linked to this item.
-                                    </p>
-                                  ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                                      {itemAttributes.map((attr, idx) => (
-                                        <div key={idx} className={`p-3 rounded-lg border ${theme === 'dark' ? 'bg-gray-800 border-gray-600' : 'bg-white border-gray-200'} flex flex-col gap-2`}>
-                                          <label className={`text-sm font-medium flex items-center gap-2 ${theme === 'dark' ? 'text-gray-300' : 'text-gray-700'}`}>
-                                            <div className={`w-1.5 h-1.5 rounded-full ${theme === 'dark' ? 'bg-blue-500' : 'bg-blue-500'}`}></div>
-                                            {attr?.name}
-                                          </label>
-                                          <div className="flex gap-2">
-                                            <input 
-                                              type="text" 
-                                              value={attr?.linkId && editValues[attr.linkId] !== undefined ? editValues[attr.linkId] : (attr?.value || '')}
-                                              onChange={(e) => attr?.linkId && handleValueChange(attr.linkId, e.target.value)}
-                                              placeholder={`Value...`}
-                                              disabled={!attr?.linkId}
-                                              className={`flex-1 px-3 py-1.5 text-sm rounded-md border focus:outline-none focus:ring-1 ${theme === 'dark' ? 'bg-gray-700 border-gray-600 text-white focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50' : 'bg-white border-gray-300 text-gray-900 focus:border-blue-500 focus:ring-blue-500 disabled:opacity-50'}`}
-                                            />
-                                            {attr?.linkId && (
-                                              <button 
-                                                onClick={() => handleSave(attr.linkId!, attr.value)}
-                                                className={`p-1.5 rounded-md flex items-center justify-center transition-colors ${
-                                                  savedIds.includes(attr.linkId) 
-                                                    ? 'bg-green-100 text-green-600 hover:bg-green-200 dark:bg-green-900/30 dark:text-green-400' 
-                                                    : 'bg-blue-100 text-blue-600 hover:bg-blue-200 dark:bg-blue-900/30 dark:text-blue-400'
-                                                }`}
-                                                title="Save Value"
-                                              >
-                                                {savedIds.includes(attr.linkId) ? <Check size={16} /> : <Save size={16} />}
-                                              </button>
-                                            )}
-                                          </div>
-                                        </div>
-                                      ))}
-                                    </div>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
+
+                          {/* Expanded Rows showing Attributes */}
+                          {expandedItems.has(row.id) && (
+                            Array.from({ length: copyCounts[row.id] ?? 1 }).map((_, index) => (
+                              <tr key={`${row.id}-attr-${index}`} className={`${theme === "dark" ? "bg-gray-800" : "bg-blue-50"}`}>
+                                <td className={`p-4 border ${theme === "dark" ? "border-gray-700" : "border-gray-300"} pl-10 ${theme === "dark" ? "text-white" : "text-black"} font-bold`}>
+                                  <div className="flex items-center gap-2">
+                                    <span>{index + 1}. ↳ {attributesString}</span>
+                                    <button 
+                                      onClick={(e) => handleCopyAttribute(row.id, e)} 
+                                      className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors" 
+                                      title="Duplicate Attribute"
+                                    >
+                                      <Copy size={16} className="text-blue-600 dark:text-blue-400" />
+                                    </button>
+                                    {index > 0 && (
+                                      <button 
+                                        onClick={(e) => handleRemoveAttribute(row.id, e)} 
+                                        className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md transition-colors" 
+                                        title="Remove Attribute"
+                                      >
+                                        <Trash2 size={16} className="text-red-500" />
+                                      </button>
+                                    )}
+                                  </div>
+                                </td>
+                                {/* Purchase, Sales, Closing for the IMEI */}
+                                <td className={`p-2 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>{purQty > 0 ? `${purQty} pcs` : ""}</td>
+                                <td className={`p-2 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>{salQty > 0 ? `${salQty} pcs` : ""}</td>
+                                <td className={`p-2 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>{closingQty !== 0 ? `${closingQty} pcs` : ""}</td>
+                              </tr>
+                            ))
                           )}
                         </React.Fragment>
                       );
@@ -227,7 +233,7 @@ const AttributeSummary: React.FC = () => {
                   )}
                 </tbody>
               </table>
-            </div>
+            )}
           </div>
         </div>
       </div>
