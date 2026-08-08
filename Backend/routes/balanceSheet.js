@@ -15,7 +15,8 @@ router.get("/api/balance-sheet", async (req, res) => {
       `
       SELECT id, name, type, parent 
       FROM ledger_groups 
-      WHERE company_id = ? AND owner_type = ? AND owner_id = ?`,
+      WHERE (company_id = ? AND owner_type = ? AND owner_id = ?)
+      OR (company_id = 0 AND owner_type = 'employee' AND owner_id = 0)`,
       [company_id, owner_type, owner_id]
     );
 
@@ -34,7 +35,7 @@ router.get("/api/balance-sheet", async (req, res) => {
       FROM ledgers l
       LEFT JOIN ledger_groups g
         ON l.group_id = g.id
-      WHERE l.company_id = ? AND l.owner_type = ? AND l.owner_id = ?
+      WHERE l.company_id = ? AND ((l.owner_type = ? AND l.owner_id = ?) OR l.owner_id = 0)
       ORDER BY g.type, g.name, l.name
     `,
       [company_id, owner_type, owner_id]
@@ -82,9 +83,10 @@ router.get("/api/balance-sheet/group", async (req, res) => {
       SELECT id, name, parent
       FROM ledger_groups
       WHERE parent = ?
-      AND company_id = ?
-      AND owner_type = ?
-      AND owner_id = ?
+      AND (
+        (company_id = ? AND owner_type = ? AND owner_id = ?)
+        OR (company_id = 0 AND owner_type = 'employee' AND owner_id = 0)
+      )
       `,
       [id, company_id, owner_type, owner_id]
     );
@@ -105,8 +107,7 @@ router.get("/api/balance-sheet/group", async (req, res) => {
       WHERE 
         l.group_id = ?
         AND l.company_id = ?
-        AND l.owner_type = ?
-        AND l.owner_id = ?
+        AND ((l.owner_type = ? AND l.owner_id = ?) OR l.owner_id = 0)
       `,
       [id, company_id, owner_type, owner_id]
     );
@@ -134,8 +135,7 @@ router.get("/api/balance-sheet/group", async (req, res) => {
         WHERE 
           l.group_id IN (${placeholders})
           AND l.company_id = ?
-          AND l.owner_type = ?
-          AND l.owner_id = ?
+          AND ((l.owner_type = ? AND l.owner_id = ?) OR l.owner_id = 0)
         `,
         [...groupIds, company_id, owner_type, owner_id]
       );
