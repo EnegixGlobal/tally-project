@@ -424,6 +424,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
 
 
+
     /* ===============================
        📥 REQUEST DATA
        =============================== */
@@ -450,6 +451,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       secondaryUnit,
       batches = [],
       godownAllocations = [],
+      attributeTrackingRows = [],
       barcode,
       godown_id,
       company_id,
@@ -470,6 +472,11 @@ router.post("/", upload.single("image"), async (req, res) => {
     let parsedAttributes = Array.isArray(attributes) ? attributes : [];
     if (typeof attributes === "string") {
       try { parsedAttributes = JSON.parse(attributes); } catch (e) { parsedAttributes = []; }
+    }
+    
+    let parsedAttributeTrackingRows = Array.isArray(attributeTrackingRows) ? attributeTrackingRows : [];
+    if (typeof attributeTrackingRows === "string") {
+      try { parsedAttributeTrackingRows = JSON.parse(attributeTrackingRows); } catch (e) { parsedAttributeTrackingRows = []; }
     }
 
 
@@ -688,6 +695,45 @@ router.post("/", upload.single("image"), async (req, res) => {
       }
     }
 
+    /* ===============================
+        📈 ATTRIBUTE TRACKING ROWS
+       =============================== */
+    for (const row of parsedAttributeTrackingRows) {
+      if (!row.primaryAttribute) continue;
+      const qty = Number(row.quantity) || 0;
+      const rate = Number(row.rate) || 0;
+      const total = qty * rate;
+      const primaryValue = row.primaryAttributeValue || null;
+      const mode = row.mode || 'opening';
+
+      const [trackingRes] = await connection.execute(
+        `
+        INSERT INTO stock_item_attribute_tracking
+        (stock_item_id, primary_attribute_id, primary_attribute_value, quantity, rate, total_value, mode)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [stockItemId, row.primaryAttribute, primaryValue, qty, rate, total, mode]
+      );
+
+      const trackingId = trackingRes.insertId;
+
+      if (Array.isArray(row.subAttributes)) {
+        for (const subAttrId of row.subAttributes) {
+          if (subAttrId) {
+            const subVal = (row.subAttributeValues && row.subAttributeValues[subAttrId]) ? row.subAttributeValues[subAttrId] : null;
+            await connection.execute(
+              `
+              INSERT INTO tracking_sub_attributes
+              (tracking_id, sub_attribute_id, sub_attribute_value)
+              VALUES (?, ?, ?)
+              `,
+              [trackingId, subAttrId, subVal]
+            );
+          }
+        }
+      }
+    }
+
     await connection.commit();
 
     res.json({
@@ -719,6 +765,9 @@ const parseFormDataArrays = (req) => {
   }
   if (typeof req.body.attributes === "string") {
     try { req.body.attributes = JSON.parse(req.body.attributes); } catch (e) { req.body.attributes = []; }
+  }
+  if (typeof req.body.attributeTrackingRows === "string") {
+    try { req.body.attributeTrackingRows = JSON.parse(req.body.attributeTrackingRows); } catch (e) { req.body.attributeTrackingRows = []; }
   }
 };
 
@@ -1374,6 +1423,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       maintainInPieces,
       secondaryUnit,
       batches = [],
+      attributeTrackingRows = [],
       barcode,
       godown_id,
       company_id,
@@ -1516,6 +1566,61 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       }
     }
 
+
+    // Delete existing attribute tracking rows first
+    const [oldTrackingRows] = await connection.execute(
+      'SELECT id FROM stock_item_attribute_tracking WHERE stock_item_id = ?',
+      [id]
+    );
+    if (oldTrackingRows.length > 0) {
+      const oldIds = oldTrackingRows.map(r => r.id);
+      await connection.execute(`DELETE FROM tracking_sub_attributes WHERE tracking_id IN (${oldIds.join(',')})`);
+      await connection.execute(`DELETE FROM stock_item_attribute_tracking WHERE stock_item_id = ?`, [id]);
+    }
+
+    /* ===============================
+        📈 RE-INSERT ATTRIBUTE TRACKING ROWS
+       =============================== */
+    let parsedAttributeTrackingRows = Array.isArray(attributeTrackingRows) ? attributeTrackingRows : [];
+    if (typeof attributeTrackingRows === "string") {
+      try { parsedAttributeTrackingRows = JSON.parse(attributeTrackingRows); } catch (e) { parsedAttributeTrackingRows = []; }
+    }
+    for (const row of parsedAttributeTrackingRows) {
+      if (!row.primaryAttribute) continue;
+      const qty = Number(row.quantity) || 0;
+      const rate = Number(row.rate) || 0;
+      const total = qty * rate;
+      const primaryValue = row.primaryAttributeValue || null;
+      const mode = row.mode || 'opening';
+
+      const [trackingRes] = await connection.execute(
+        `
+        INSERT INTO stock_item_attribute_tracking
+        (stock_item_id, primary_attribute_id, primary_attribute_value, quantity, rate, total_value, mode)
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+        `,
+        [id, row.primaryAttribute, primaryValue, qty, rate, total, mode]
+      );
+
+      const trackingId = trackingRes.insertId;
+
+      if (Array.isArray(row.subAttributes)) {
+        for (const subAttrId of row.subAttributes) {
+          if (subAttrId) {
+            const subVal = (row.subAttributeValues && row.subAttributeValues[subAttrId]) ? row.subAttributeValues[subAttrId] : null;
+            await connection.execute(
+              `
+              INSERT INTO tracking_sub_attributes
+              (tracking_id, sub_attribute_id, sub_attribute_value)
+              VALUES (?, ?, ?)
+              `,
+              [trackingId, subAttrId, subVal]
+            );
+          }
+        }
+      }
+    }
+
     await connection.commit();
 
     return res.json({
@@ -1642,6 +1747,47 @@ router.get("/:id", async (req, res) => {
       console.warn("Failed to fetch stock item attributes", err);
     }
 
+    // Fetch attribute tracking rows
+    let attributeTrackingRows = [];
+    try {
+      const [trackingRows] = await connection.execute(
+        `SELECT 
+           t.id, t.primary_attribute_id as primaryAttribute, t.primary_attribute_value as primaryAttributeValue, 
+           t.quantity, t.rate, t.total_value, t.mode,
+           GROUP_CONCAT(CONCAT_WS('::', s.sub_attribute_id, IFNULL(s.sub_attribute_value, ''))) as subAttributes
+         FROM stock_item_attribute_tracking t
+         LEFT JOIN tracking_sub_attributes s ON t.id = s.tracking_id
+         WHERE t.stock_item_id = ?
+         GROUP BY t.id`,
+         [id]
+      );
+      attributeTrackingRows = trackingRows.map(row => {
+        let subAttrs = [];
+        try {
+          if (row.subAttributes && typeof row.subAttributes === 'string') {
+             subAttrs = row.subAttributes.split(',').map(pair => {
+                 const [id, value] = pair.split('::');
+                 return { id: id, value: value || "" };
+             });
+          }
+          subAttrs = subAttrs.filter((sa) => sa && sa.id && sa.id !== "null");
+        } catch (e) {}
+
+        return {
+          id: row.id.toString(),
+          primaryAttribute: row.primaryAttribute ? row.primaryAttribute.toString() : "",
+          primaryAttributeValue: row.primaryAttributeValue || "",
+          quantity: row.quantity,
+          rate: row.rate,
+          total_value: row.total_value,
+          mode: row.mode || "opening",
+          subAttributes: subAttrs.map((sa) => ({ id: sa.id.toString(), value: sa.value || "" }))
+        };
+      });
+    } catch (err) {
+      console.warn("Failed to fetch attribute tracking rows", err);
+    }
+
     // 🔥 batches parse
     let batches = [];
 
@@ -1673,6 +1819,7 @@ router.get("/:id", async (req, res) => {
         gstRate: rate,
         batches,
         attributes: itemAttributes,
+        attributeTrackingRows,
       },
     });
   } catch (err) {

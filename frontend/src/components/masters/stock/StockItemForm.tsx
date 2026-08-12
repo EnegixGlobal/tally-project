@@ -171,6 +171,7 @@ const StockItemForm = () => {
   });
 
   const [isAttributeDropdownOpen, setIsAttributeDropdownOpen] = useState(false);
+  const [openSubAttrDropdownId, setOpenSubAttrDropdownId] = useState<string | null>(null);
   const attributeDropdownRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -381,6 +382,7 @@ const StockItemForm = () => {
             standardPurchaseRate: Number(item.standardPurchaseRate) || 0,
             standardSaleRate: Number(item.standardSaleRate) || 0,
             enableBatchTracking: !!item.enableBatchTracking && Array.isArray(item.batches) && item.batches.some((b: any) => b.batchName && b.batchName.trim() !== ""),
+            enableAttributeTracking: !!item.enableAttributeTracking || (Array.isArray(item.attributeTrackingRows) && item.attributeTrackingRows.length > 0),
             batchName: item.batchNumber || "",
             batchExpiryDate: item.batchExpiryDate || "",
             batchManufacturingDate: item.batchManufacturingDate || "",
@@ -438,6 +440,37 @@ const StockItemForm = () => {
                 openingRate: 0,
                 mrp: "",
               },
+            ]);
+          }
+
+          // --- Set attribute rows safely ---
+          if (Array.isArray(item.attributeTrackingRows) && item.attributeTrackingRows.length > 0) {
+            setAttributeRows(
+              item.attributeTrackingRows.map((a: any) => ({
+                id: a.id || nanoid(),
+                primaryAttribute: a.primaryAttribute || "",
+                primaryAttributeValue: a.primaryAttributeValue || "",
+                subAttributes: Array.isArray(a.subAttributes) ? a.subAttributes.map((sa: any) => sa.id || sa) : (a.subAttributes ? a.subAttributes.split(',') : []),
+                subAttributeValues: Array.isArray(a.subAttributes) 
+                  ? a.subAttributes.reduce((acc: any, sa: any) => ({ ...acc, [sa.id]: sa.value || "" }), {})
+                  : {},
+                quantity: a.quantity || "",
+                rate: a.rate || "",
+                openingRate: Number(a.quantity || 0) * Number(a.rate || 0),
+              }))
+            );
+          } else {
+            setAttributeRows([
+              {
+                id: nanoid(),
+                primaryAttribute: "",
+                primaryAttributeValue: "",
+                subAttributes: [],
+                subAttributeValues: {},
+                quantity: "",
+                rate: "",
+                openingRate: 0,
+              }
             ]);
           }
         } else {
@@ -539,6 +572,7 @@ const StockItemForm = () => {
     maintainInPieces: boolean;
     secondaryUnit: string;
     image: string;
+    enableAttributeTracking: boolean;
   }
 
   interface Errors {
@@ -572,6 +606,7 @@ const StockItemForm = () => {
     maintainInPieces: false,
     secondaryUnit: "",
     image: "",
+    enableAttributeTracking: false,
   });
 
   const [imageFile, setImageFile] = useState<File | null>(null);
@@ -605,6 +640,19 @@ const StockItemForm = () => {
       mrp: "",
     },
   ]);
+
+  const [attributeRows, setAttributeRows] = useState([
+    {
+      id: nanoid(),
+      primaryAttribute: "",
+      primaryAttributeValue: "",
+      subAttributes: [] as string[],
+      subAttributeValues: {} as Record<string, string>,
+      quantity: "",
+      rate: "",
+      openingRate: 0,
+    },
+  ]);
   const [errors, setErrors] = useState<Errors>({});
 
   const handleChange = (
@@ -634,6 +682,52 @@ const StockItemForm = () => {
         mrp: "",
       },
     ]);
+  };
+  
+  const addAttributeRow = () => {
+    setAttributeRows([
+      ...attributeRows,
+      {
+        id: nanoid(),
+        primaryAttribute: "",
+        primaryAttributeValue: "",
+        subAttributes: [],
+        subAttributeValues: {},
+        quantity: "",
+        rate: "",
+        openingRate: 0,
+      },
+    ]);
+  };
+  
+  const removeAttributeRow = (index: number) => {
+    setAttributeRows(attributeRows.filter((_, i) => i !== index));
+  };
+  
+  const updateAttributeRow = (index: number, field: string, value: any) => {
+    setAttributeRows((prev) =>
+      prev.map((row, i) => {
+        if (i !== index) return row;
+        
+        let updated = { ...row };
+        if (field === "subAttributeValue") {
+          updated.subAttributeValues = {
+            ...updated.subAttributeValues,
+            [value.id]: value.value,
+          };
+        } else {
+          updated = {
+            ...updated,
+            [field]: field === "quantity" || field === "rate" ? Number(value) : value,
+          };
+        }
+        
+        const qty = Number(updated.quantity) || 0;
+        const rate = Number(updated.rate) || 0;
+        updated.openingRate = qty * rate;
+        return updated;
+      })
+    );
   };
   const removeBatchRow = async (index: number) => {
     const batchToDelete = batchRows[index];
@@ -790,6 +884,7 @@ const StockItemForm = () => {
           batchRate: Number(b.batchRate) || 0,
           openingRate: Number(b.batchRate || 0) * Number(b.batchQuantity || 0),
         })),
+      attributeTrackingRows: formData.enableAttributeTracking ? attributeRows.filter(a => a.primaryAttribute || a.quantity || a.rate) : [],
       godownAllocations,
       barcode,
       godown_id: rage,
@@ -801,7 +896,7 @@ const StockItemForm = () => {
     // Use FormData for file upload
     const submitData = new FormData();
     Object.entries(stockItem).forEach(([key, value]) => {
-      if (key === "batches" || key === "godownAllocations" || key === "attributes") {
+      if (key === "batches" || key === "godownAllocations" || key === "attributes" || key === "attributeTrackingRows") {
         submitData.append(key, JSON.stringify(value));
       } else {
         submitData.append(key, value as string);
@@ -1114,20 +1209,19 @@ const StockItemForm = () => {
 
             {/* ----------------- Batch Tracking Dynamic Rows ----------------- */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-4 gap-3 md:col-span-2">
-              {/* Left: Checkbox */}
-              <label className="flex items-center gap-2 text-sm font-medium">
-                <input
-                  type="checkbox"
-                  name="enableBatchTracking"
-                  checked={formData.enableBatchTracking}
-                  onChange={handleChange}
-                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-                />
-                Enable Batch Tracking
-              </label>
-
-
-
+              {/* Left: Checkboxes */}
+              <div className="flex flex-col sm:flex-row items-start sm:items-center gap-4">
+                <label className="flex items-center gap-2 text-sm font-medium">
+                  <input
+                    type="checkbox"
+                    name="enableBatchTracking"
+                    checked={formData.enableBatchTracking}
+                    onChange={handleChange}
+                    className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  Enable Batch Tracking
+                </label>
+              </div>
 
               {/* Right: Add Batch Button - ALWAYS SHOWN */}
               <button
@@ -1274,7 +1368,158 @@ const StockItemForm = () => {
             {/* ---------------------------------------------------------------- */}
 
             <div className="flex flex-col gap-2 md:col-span-2">
+              <label className="flex items-center gap-2 text-sm font-medium mb-2">
+                <input
+                  type="checkbox"
+                  name="enableAttributeTracking"
+                  checked={formData.enableAttributeTracking}
+                  onChange={handleChange}
+                  className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                />
+                Attributes wise
+              </label>
 
+              {formData.enableAttributeTracking && (
+                <div className="flex flex-col gap-4 mb-4 md:col-span-2 border border-gray-400 rounded-lg p-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <h4 className="font-semibold text-sm">Attributes Tracking</h4>
+                    <button
+                      type="button"
+                      onClick={addAttributeRow}
+                      className="flex items-center gap-1 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 text-sm"
+                    >
+                      <Plus size={16} /> Add Row
+                    </button>
+                  </div>
+                  {attributeRows.map((row, index) => (
+                    <div key={row.id} className="flex flex-col md:flex-row gap-3 items-stretch md:items-end w-full">
+                      <div className="w-full md:flex-1">
+                        <SelectField
+                          id={`attr-select-primary-${index}`}
+                          name={`attr-select-primary-${index}`}
+                          label="Primary Attribute"
+                          value={row.primaryAttribute}
+                          options={masterAttributes.map(a => ({ value: a.id.toString(), label: a.name }))}
+                          onChange={(e) => updateAttributeRow(index, "primaryAttribute", e.target.value)}
+                          error={errors[`attr-select-primary-${index}`]}
+                        />
+                        {row.primaryAttribute && (
+                          <div className="mt-2">
+                            <InputField
+                              id={`attr-primary-val-${index}`}
+                              name={`attr-primary-val-${index}`}
+                              label="Value"
+                              value={row.primaryAttributeValue}
+                              onChange={(e) => updateAttributeRow(index, "primaryAttributeValue", e.target.value)}
+                            />
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-full md:flex-1 relative">
+                        <label className="block text-sm font-medium mb-1">Sub Attributes</label>
+                        <div 
+                          className={`w-full p-2 rounded border flex justify-between items-center cursor-pointer ${theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
+                          onClick={() => setOpenSubAttrDropdownId(openSubAttrDropdownId === row.id ? null : row.id)}
+                        >
+                          <span className={`truncate ${(!row.subAttributes || row.subAttributes.length === 0) ? "text-gray-500" : ""}`}>
+                            {row.subAttributes && row.subAttributes.length > 0 
+                              ? row.subAttributes.map((id: string) => masterAttributes.find(a => a.id.toString() === id)?.name).filter(Boolean).join(", ")
+                              : "Select sub attributes"}
+                          </span>
+                          <ChevronDown size={16} />
+                        </div>
+                        
+                        {openSubAttrDropdownId === row.id && (
+                          <div className={`absolute z-20 w-full mt-1 border rounded shadow-lg max-h-48 overflow-y-auto ${theme === "dark" ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"}`}>
+                            <div className="p-2 flex flex-col gap-1">
+                              {masterAttributes.map((attr) => (
+                                <label key={attr.id} className={`flex items-center gap-2 cursor-pointer p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors`}>
+                                  <input
+                                    type="checkbox"
+                                    checked={row.subAttributes?.includes(attr.id.toString()) || false}
+                                    onChange={(e) => {
+                                      const checked = e.target.checked;
+                                      const newSubAttrs = checked
+                                        ? [...(row.subAttributes || []), attr.id.toString()]
+                                        : (row.subAttributes || []).filter((id: string) => id !== attr.id.toString());
+                                      updateAttributeRow(index, "subAttributes", newSubAttrs as any);
+                                    }}
+                                    className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+                                  />
+                                  <span className="text-sm select-none">{attr.name}</span>
+                                </label>
+                              ))}
+                              {masterAttributes.length === 0 && (
+                                <span className="text-sm text-gray-400 p-1">No attributes found</span>
+                              )}
+                            </div>
+                          </div>
+                        )}
+                        
+                        {row.subAttributes && row.subAttributes.length > 0 && (
+                          <div className="mt-2 flex flex-col gap-2">
+                            {row.subAttributes.map((subId: string) => {
+                              const attrName = masterAttributes.find(a => a.id.toString() === subId)?.name || subId;
+                              return (
+                                <div key={subId} className="pl-4 border-l-2 border-blue-200">
+                                  <InputField
+                                    id={`attr-sub-val-${index}-${subId}`}
+                                    name={`attr-sub-val-${index}-${subId}`}
+                                    label={`${attrName} Value`}
+                                    value={row.subAttributeValues[subId] || ""}
+                                    onChange={(e) => updateAttributeRow(index, "subAttributeValue", { id: subId, value: e.target.value })}
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                      <div className="w-full md:flex-1">
+                        <InputField
+                          id={`attr-qty-${index}`}
+                          name={`attr-qty-${index}`}
+                          label="Qty"
+                          value={row.quantity}
+                          onChange={(e) => updateAttributeRow(index, "quantity", e.target.value)}
+                          error={errors[`attr-qty-${index}`]}
+                        />
+                      </div>
+                      <div className="w-full md:flex-1">
+                        <InputField
+                          id={`attr-rate-${index}`}
+                          name={`attr-rate-${index}`}
+                          label="Rate"
+                          value={row.rate}
+                          onChange={(e) => updateAttributeRow(index, "rate", e.target.value)}
+                          error={errors[`attr-rate-${index}`]}
+                        />
+                      </div>
+                      <div className="w-full md:flex-1">
+                        <InputField
+                          id={`attr-total-${index}`}
+                          name={`attr-total-${index}`}
+                          label="Total Value"
+                          type="number"
+                          value={row.rate && row.quantity ? Number(row.rate) * Number(row.quantity) : ""}
+                          onChange={() => { }}
+                          error={errors[`attr-total-${index}`]}
+                          disabled
+                        />
+                      </div>
+                      <div className="flex justify-center pb-2 w-full md:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => removeAttributeRow(index)}
+                          className="p-2 text-red-700 hover:text-red-900"
+                        >
+                          <Trash2 size={20} />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
 
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input
