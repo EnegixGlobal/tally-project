@@ -919,8 +919,8 @@ const B2C: React.FC = () => {
     const today = new Date();
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     setFilters({
-      dateRange: 'this-month',
-      fromDate: firstDayOfMonth.toISOString().split('T')[0],
+      dateRange: 'this-year',
+      fromDate: new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0],
       toDate: today.toISOString().split('T')[0],
       customerFilter: '',
       paymentMethod: '',
