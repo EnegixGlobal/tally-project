@@ -94,8 +94,8 @@ const B2C: React.FC = () => {
 
   const [showFilterPanel, setShowFilterPanel] = useState(false);
   const [filters, setFilters] = useState<FilterState>({
-    dateRange: 'this-month',
-    fromDate: new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().split('T')[0],
+    dateRange: 'this-year',
+    fromDate: new Date(new Date().getFullYear(), 0, 1).toISOString().split('T')[0],
     toDate: new Date().toISOString().split('T')[0],
     customerFilter: '',
     paymentMethod: '',
