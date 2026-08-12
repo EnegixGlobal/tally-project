@@ -990,6 +990,21 @@ const SalesVoucher: React.FC = () => {
 
         // --- 2. Hydrate GST Rates from Ledger IDs ---
         if (ledgersLoaded) {
+          const verifyGstLedger = (ledgerId: any) => {
+            if (!ledgerId) return "";
+            const l = ledgers.find((x) => String(x.id) === String(ledgerId));
+            if (!l) return "";
+            const groupId = (l as any).groupId ?? (l as any).group_id ?? ((l as any).group && (l as any).group.id);
+            if (String(groupId) === "7" || String(groupId) === "8") return String(ledgerId);
+            const upperName = l.name.toUpperCase();
+            if (upperName.includes("GST") || upperName.includes("TAX") || upperName.includes("%")) return String(ledgerId);
+            return ""; // Incorrectly mapped from rate
+          };
+
+          updatedEntry.cgstLedgerId = verifyGstLedger(updatedEntry.cgstLedgerId);
+          updatedEntry.sgstLedgerId = verifyGstLedger(updatedEntry.sgstLedgerId);
+          updatedEntry.igstLedgerId = verifyGstLedger(updatedEntry.igstLedgerId);
+
           const extract = (ledgerId: any) => {
             if (!ledgerId) return 0;
             const l = ledgers.find((x) => String(x.id) === String(ledgerId));
@@ -1000,9 +1015,9 @@ const SalesVoucher: React.FC = () => {
             return 0;
           };
 
-          let cRate = entry.cgstLedgerId ? extract(entry.cgstLedgerId) : 0;
-          let sRate = entry.sgstLedgerId ? extract(entry.sgstLedgerId) : 0;
-          let iRate = entry.igstLedgerId ? extract(entry.igstLedgerId) : 0;
+          let cRate = updatedEntry.cgstLedgerId ? extract(updatedEntry.cgstLedgerId) : 0;
+          let sRate = updatedEntry.sgstLedgerId ? extract(updatedEntry.sgstLedgerId) : 0;
+          let iRate = updatedEntry.igstLedgerId ? extract(updatedEntry.igstLedgerId) : 0;
 
           // Fallback to item GST rate if missing or extract failed
           if (itemsLoaded && entry.itemId) {
