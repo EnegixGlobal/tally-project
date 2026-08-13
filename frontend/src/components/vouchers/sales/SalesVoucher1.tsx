@@ -3528,33 +3528,7 @@ const SalesVoucher: React.FC = () => {
                                   </span>
                                 )}
                               </div>
-                              {/* Item Attributes Display */}
-                              {(() => {
-                                const attributes = itemDetails.attributes || [];
-                                if (attributes.length === 0) return null;
-                                return (
-                                  <div className="mt-1 space-y-1">
-                                    {attributes.map((attr: any, i: number) => (
-                                      <div
-                                        key={i}
-                                        className="flex items-center gap-1"
-                                      >
-                                        <span className="text-[11px] font-medium min-w-[40px] capitalize text-gray-500">
-                                          {attr.name}:
-                                        </span>
-                                        <input
-                                          type="text"
-                                          value={attr.value || ""}
-                                          readOnly
-                                          className={`${FORM_STYLES.tableInput(
-                                            theme
-                                          )} text-[11px] h-6 flex-1 px-1 py-0`}
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
-                              })()}
+
                             </td>
 
                             {/* HSN */}
