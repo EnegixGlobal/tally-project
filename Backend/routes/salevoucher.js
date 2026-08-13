@@ -220,7 +220,24 @@ async function ensureColumnsOnce() {
 }
 
 // ================= SAVE SALES VOUCHER =================
+const ensureTrackingIdColumn = async () => {
+  try {
+    const [cols] = await db.execute(
+      `SHOW COLUMNS FROM sales_voucher_items LIKE 'tracking_id'`
+    );
+    if (cols.length === 0) {
+      await db.execute(
+        `ALTER TABLE sales_voucher_items ADD COLUMN tracking_id INT DEFAULT NULL`
+      );
+      console.log("✅ tracking_id column created in sales_voucher_items");
+    }
+  } catch (err) {
+    console.error("🔥 Error ensuring tracking_id column:", err);
+  }
+};
+
 router.post("/", async (req, res) => {
+  await ensureTrackingIdColumn();
   console.log("POST /sales-vouchers hit");
 
   try {
@@ -449,6 +466,7 @@ router.post("/", async (req, res) => {
 
           Number(e.salesLedgerId || 0),
           Number(e.discountLedgerId || 0),
+          e.tracking_id || null,
         ]);
 
         await db.query(
@@ -468,12 +486,26 @@ router.post("/", async (req, res) => {
           batchNumber,
           godownId,
           salesLedgerId,
-          discountLedgerId
+          discountLedgerId,
+          tracking_id
         )
         VALUES ?
         `,
           [itemValues]
         );
+      }
+      
+      // Update sub_attribute_values if any exist
+      for (const e of itemEntries) {
+        if (e.tracking_id && e.sub_attributes && Object.keys(e.sub_attributes).length > 0) {
+          for (const [subAttrId, val] of Object.entries(e.sub_attributes)) {
+            await db.execute(
+              `UPDATE tracking_sub_attributes SET sub_attribute_value = ? 
+               WHERE tracking_id = ? AND sub_attribute_id = ?`,
+              [val, e.tracking_id, subAttrId]
+            );
+          }
+        }
       }
     }
 
@@ -882,10 +914,25 @@ router.get("/:id", async (req, res) => {
         [voucher.number]
       );
 
-      entries = items.map((item) => {
+      entries = await Promise.all(items.map(async (item) => {
         const historyRow = history.find(
           (h) => String(h.godownId) === String(item.godownId)
         );
+
+        let sub_attributes = {};
+        if (item.tracking_id) {
+          try {
+            const [subAttrRows] = await db.execute(
+              `SELECT sub_attribute_id, sub_attribute_value FROM tracking_sub_attributes WHERE tracking_id = ?`,
+              [item.tracking_id]
+            );
+            subAttrRows.forEach(row => {
+              sub_attributes[row.sub_attribute_id] = row.sub_attribute_value;
+            });
+          } catch (e) {
+            console.error("Error fetching sub attributes:", e);
+          }
+        }
 
         return {
           id: item.id,
@@ -904,8 +951,10 @@ router.get("/:id", async (req, res) => {
           batchNumber: historyRow?.batchNumber || "",
           hsnCode: historyRow?.hsnCode || "",
           movementDate: historyRow?.movementDate || voucher.date,
+          tracking_id: item.tracking_id || null,
+          sub_attributes
         };
-      });
+      }));
     }
 
 
@@ -971,6 +1020,7 @@ router.get("/:id", async (req, res) => {
 
 //single put
 router.put("/:id", async (req, res) => {
+  await ensureTrackingIdColumn();
   const voucherId = req.params.id;
 
   const {
@@ -1096,14 +1146,28 @@ router.put("/:id", async (req, res) => {
           e.godownId || null,
           Number(e.salesLedgerId || 0),
           Number(e.discountLedgerId || 0),
+          e.tracking_id || null,
         ]);
 
         await db.query(
           `INSERT INTO sales_voucher_items 
-          (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId, salesLedgerId, discountLedgerId)
+          (voucherId, itemId, quantity, rate, amount, cgstRate, sgstRate, igstRate, discount, hsnCode, batchNumber, godownId, salesLedgerId, discountLedgerId, tracking_id)
           VALUES ?`,
           [itemValues]
         );
+      }
+
+      // Update sub_attribute_values if any exist
+      for (const e of itemEntries) {
+        if (e.tracking_id && e.sub_attributes && Object.keys(e.sub_attributes).length > 0) {
+          for (const [subAttrId, val] of Object.entries(e.sub_attributes)) {
+            await db.execute(
+              `UPDATE tracking_sub_attributes SET sub_attribute_value = ? 
+               WHERE tracking_id = ? AND sub_attribute_id = ?`,
+              [val, e.tracking_id, subAttrId]
+            );
+          }
+        }
       }
     }
 

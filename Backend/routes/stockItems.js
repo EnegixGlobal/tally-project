@@ -1645,7 +1645,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
 
 // POST add tracking
 router.post("/add-tracking", async (req, res) => {
-  const { stock_item_id, primary_attribute_id, primary_attribute_value, sub_attributes, quantity, rate, total_value } = req.body;
+  const { stock_item_id, primary_attribute_id, primary_attribute_value, sub_attributes, quantity, rate, total_value, mode } = req.body;
   
   if (!stock_item_id || !primary_attribute_id) {
     return res.status(400).json({ success: false, message: "Missing required fields" });
@@ -1658,8 +1658,8 @@ router.post("/add-tracking", async (req, res) => {
     const [trackingResult] = await connection.execute(
       `INSERT INTO stock_item_attribute_tracking 
        (stock_item_id, primary_attribute_id, primary_attribute_value, quantity, rate, total_value, mode)
-       VALUES (?, ?, ?, ?, ?, ?, 'purchase')`,
-      [stock_item_id, primary_attribute_id, primary_attribute_value || '', quantity || 0, rate || 0, total_value || 0]
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [stock_item_id, primary_attribute_id, primary_attribute_value || '', quantity || 0, rate || 0, total_value || 0, mode || 'purchase']
     );
     
     const newTrackingId = trackingResult.insertId;
