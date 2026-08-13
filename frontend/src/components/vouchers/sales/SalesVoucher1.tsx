@@ -1644,7 +1644,8 @@ const SalesVoucher: React.FC = () => {
           igstLedgerId: details.igstLedgerId || "",
           godownId: details.godown_id?.toString() || "",
           tracking_id: "",
-          trackingOptions: []
+          trackingOptions: [],
+          sub_attributes: {}
         };
 
         // Async fetch tracking options
