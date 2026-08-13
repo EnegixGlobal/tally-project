@@ -49,6 +49,9 @@ app.use(checkSubscription);
 const ledgerGroupRoutes = require("./routes/ledgerGroups");
 app.use("/api/ledger-groups", ledgerGroupRoutes);
 
+const attributeSummaryReport = require("./routes/attributeSummaryReport");
+app.use("/api/attribute-summary-report", attributeSummaryReport);
+
 const ledgerRoutes = require("./routes/ledger");
 app.use("/api/ledger", ledgerRoutes);
 

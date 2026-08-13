@@ -1103,49 +1103,7 @@ const StockItemForm = () => {
               options={sgstOptions}
             />
 
-            <div className="md:col-span-1 relative" ref={attributeDropdownRef}>
-              <label className="block text-sm font-medium mb-1">Attributes</label>
-              <div 
-                className={`w-full p-2 rounded border flex justify-between items-center cursor-pointer ${theme === "dark" ? "bg-gray-700 border-gray-600" : "bg-white border-gray-300"}`}
-                onClick={() => setIsAttributeDropdownOpen(!isAttributeDropdownOpen)}
-              >
-                <span className={`truncate ${formData.attributes.length === 0 ? "text-gray-500" : ""}`}>
-                  {formData.attributes.length > 0 
-                    ? formData.attributes.map(id => masterAttributes.find(a => a.id.toString() === id)?.name.toUpperCase()).filter(Boolean).join(", ")
-                    : "Select attributes"}
-                </span>
-                <ChevronDown size={16} />
-              </div>
-              
-              {isAttributeDropdownOpen && (
-                <div className={`absolute z-10 w-full mt-1 border rounded shadow-lg max-h-48 overflow-y-auto ${theme === "dark" ? "bg-gray-800 border-gray-600" : "bg-white border-gray-200"}`}>
-                  <div className="p-2 flex flex-col gap-1">
-                    {masterAttributes.map((attr) => (
-                      <label key={attr.id} className={`flex items-center gap-2 cursor-pointer p-1.5 hover:bg-gray-100 dark:hover:bg-gray-700 rounded transition-colors`}>
-                        <input
-                          type="checkbox"
-                          checked={formData.attributes.includes(attr.id.toString())}
-                          onChange={(e) => {
-                            const checked = e.target.checked;
-                            setFormData((prev) => ({
-                              ...prev,
-                              attributes: checked
-                                ? [...prev.attributes, attr.id.toString()]
-                                : prev.attributes.filter((id) => id !== attr.id.toString()),
-                            }));
-                          }}
-                          className="h-4 w-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
-                        />
-                        <span className="text-sm select-none">{attr.name.toUpperCase()}</span>
-                      </label>
-                    ))}
-                    {masterAttributes.length === 0 && (
-                      <span className="text-sm text-gray-400 p-1">No attributes found</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </div>
+
 
             {showRageInput && (
               <SelectField

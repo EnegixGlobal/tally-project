@@ -150,6 +150,78 @@ const SalesVoucher: React.FC = () => {
     return false;
   };
 
+  // --- Add Attribute Modal State ---
+  const [showAttributeModal, setShowAttributeModal] = useState(false);
+  const [masterAttributes, setMasterAttributes] = useState<any[]>([]);
+  const [modalFormData, setModalFormData] = useState({
+    stock_item_id: "",
+    primary_attribute_id: "",
+    primary_attribute_value: "",
+    sub_attributes: [] as string[],
+    sub_attribute_values: {} as any,
+    quantity: 0,
+    rate: 0,
+    total_value: 0,
+    entryIndex: -1
+  });
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL}/api/stock-attributes`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && Array.isArray(data.data)) {
+          setMasterAttributes(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching master attributes", err));
+  }, []);
+
+  const submitAttributeModal = async () => {
+    if (!modalFormData.primary_attribute_id) {
+      alert("Please select a Primary Attribute");
+      return;
+    }
+    try {
+      const payload = { ...modalFormData, mode: "sales" };
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/add-tracking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Refresh tracking options for this item
+        const itemRes = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/${modalFormData.stock_item_id}`);
+        const itemData = await itemRes.json();
+        const trackingRows = itemData?.data?.attributeTrackingRows || itemData?.attributeTrackingRows;
+        
+        setFormData((prev) => {
+          const currentEntries = [...prev.entries];
+          const idx = modalFormData.entryIndex;
+          if (currentEntries[idx]) {
+            currentEntries[idx] = {
+              ...currentEntries[idx],
+              trackingOptions: trackingRows || [],
+              tracking_id: data.tracking_id,
+              sub_attributes: { ...modalFormData.sub_attribute_values },
+              quantity: modalFormData.quantity > 0 ? modalFormData.quantity : currentEntries[idx].quantity,
+              rate: modalFormData.rate > 0 ? modalFormData.rate : currentEntries[idx].rate,
+              amount: modalFormData.total_value > 0 ? modalFormData.total_value : currentEntries[idx].amount
+            };
+          }
+          return { ...prev, entries: currentEntries };
+        });
+        
+        setShowAttributeModal(false);
+      } else {
+        alert("Error: " + data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error adding tracking");
+    }
+  };
+
   const partyLedgers = ledgers;
   const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [unitss, setUnits] = useState<any[]>([]);
@@ -1571,7 +1643,27 @@ const SalesVoucher: React.FC = () => {
           sgstLedgerId: details.sgstLedgerId || "",
           igstLedgerId: details.igstLedgerId || "",
           godownId: details.godown_id?.toString() || "",
+          tracking_id: "",
+          trackingOptions: [],
+          sub_attributes: {}
         };
+
+        // Async fetch tracking options
+        fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/${value}`)
+          .then(res => res.json())
+          .then(data => {
+            const trackingRows = data?.data?.attributeTrackingRows || data?.attributeTrackingRows;
+            if (trackingRows) {
+              setFormData((prev) => {
+                const cur = [...prev.entries];
+                if (cur[index]) {
+                  cur[index] = { ...cur[index], trackingOptions: trackingRows };
+                }
+                return { ...prev, entries: cur };
+              });
+            }
+          })
+          .catch(err => console.error("Error fetching tracking options:", err));
 
         // ================= AUTO SALES LEDGER (DYNAMIC) =================
 
@@ -1603,6 +1695,35 @@ const SalesVoucher: React.FC = () => {
         }
 
         updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+        setFormData((p) => ({ ...p, entries: updatedEntries }));
+        return;
+      }
+
+      // TRACKING / ATTRIBUTE SELECT
+      if (name === "tracking_id") {
+        const trackingId = value;
+        const selectedTracking = (entry.trackingOptions || []).find((t: any) => String(t.id) === String(trackingId));
+        
+        let newSubAttributes: Record<string, string> = {};
+        if (selectedTracking && Array.isArray(selectedTracking.subAttributes)) {
+           selectedTracking.subAttributes.forEach((sub: any) => {
+               newSubAttributes[String(sub.id)] = sub.value || "";
+           });
+        }
+        
+        updatedEntries[index] = {
+           ...entry,
+           tracking_id: trackingId,
+           sub_attributes: newSubAttributes,
+        };
+        
+        // Auto-fill qty/rate from tracking if available
+        if (selectedTracking) {
+           if (Number(selectedTracking.quantity) > 0) updatedEntries[index].quantity = Number(selectedTracking.quantity);
+           if (Number(selectedTracking.rate) > 0) updatedEntries[index].rate = Number(selectedTracking.rate);
+           updatedEntries[index].amount = recalcAmount(updatedEntries[index]);
+        }
+        
         setFormData((p) => ({ ...p, entries: updatedEntries }));
         return;
       }
@@ -3265,6 +3386,9 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-left whitespace-nowrap">
                           HSN/SAC
                         </th>
+                        <th className="px-4 py-2 text-left whitespace-nowrap">
+                          Attribute
+                        </th>
                         {columnSettings.showBatch && hasAnyBatch && (
                           <th className="whitespace-nowrap">Batch</th>
                         )}
@@ -3405,33 +3529,7 @@ const SalesVoucher: React.FC = () => {
                                   </span>
                                 )}
                               </div>
-                              {/* Item Attributes Display */}
-                              {(() => {
-                                const attributes = itemDetails.attributes || [];
-                                if (attributes.length === 0) return null;
-                                return (
-                                  <div className="mt-1 space-y-1">
-                                    {attributes.map((attr: any, i: number) => (
-                                      <div
-                                        key={i}
-                                        className="flex items-center gap-1"
-                                      >
-                                        <span className="text-[11px] font-medium min-w-[40px] capitalize text-gray-500">
-                                          {attr.name}:
-                                        </span>
-                                        <input
-                                          type="text"
-                                          value={attr.value || ""}
-                                          readOnly
-                                          className={`${FORM_STYLES.tableInput(
-                                            theme
-                                          )} text-[11px] h-6 flex-1 px-1 py-0`}
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
-                              })()}
+
                             </td>
 
                             {/* HSN */}
@@ -3446,6 +3544,41 @@ const SalesVoucher: React.FC = () => {
                                 )} text-center text-xs`}
                                 placeholder="HSN"
                               />
+                            </td>
+
+                            {/* ATTRIBUTE */}
+                            <td className="px-1 py-2 text-center min-w-[150px] text-xs align-top">
+                              <select
+                                name="tracking_id"
+                                value={entry.tracking_id || ""}
+                                onChange={(e) => handleEntryChange(index, e)}
+                                className={`${FORM_STYLES.tableSelect(theme)} w-full text-xs font-mono`}
+                              >
+                                <option value="">Attribute</option>
+                                {(entry.trackingOptions || []).map((t: any) => {
+                                  const pAttr = masterAttributes.find(ma => String(ma.id) === String(t.primaryAttribute));
+                                  return (
+                                    <option key={t.id} value={t.id}>
+                                      {pAttr ? pAttr.name : 'Attribute'}: {t.primaryAttributeValue}
+                                    </option>
+                                  );
+                                })}
+                              </select>
+                              
+                              {/* DISPLAY SUB-ATTRIBUTES IN ROW */}
+                              {entry.sub_attributes && Object.keys(entry.sub_attributes).length > 0 && (
+                                <div className="mt-1 text-left text-[10px] text-gray-500 bg-gray-50 p-1 rounded border border-gray-200">
+                                  {Object.entries(entry.sub_attributes).map(([subId, val]) => {
+                                    const subAttr = masterAttributes.find(a => String(a.id) === String(subId));
+                                    return subAttr && val ? (
+                                      <div key={subId} className="flex justify-between border-b border-gray-100 last:border-0">
+                                        <span className="text-gray-400 capitalize">{subAttr.name}:</span>
+                                        <span className="font-medium text-gray-700">{String(val)}</span>
+                                      </div>
+                                    ) : null;
+                                  })}
+                                </div>
+                              )}
                             </td>
 
                             {/* BATCH */}

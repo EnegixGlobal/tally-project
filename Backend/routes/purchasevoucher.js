@@ -258,6 +258,23 @@ const ensureModeColumn = async () => {
   isModeChecked = true;
 };
 
+let isTrackingIdChecked = false;
+const ensureTrackingIdColumn = async () => {
+  if (isTrackingIdChecked) return;
+
+  const [itemRows] = await db.execute(`
+    SHOW COLUMNS FROM purchase_voucher_items LIKE 'tracking_id'
+  `);
+  if (itemRows.length === 0) {
+    await db.execute(`
+      ALTER TABLE purchase_voucher_items ADD COLUMN tracking_id INT DEFAULT NULL
+    `);
+    console.log("✅ tracking_id column created in purchase_voucher_items");
+  }
+
+  isTrackingIdChecked = true;
+};
+
 // ✅ AUTO CREATE TDS COLUMNS
 let isTDSChecked = false;
 const ensureTDSColumns = async () => {
@@ -362,6 +379,7 @@ router.post("/", async (req, res) => {
     await ensurePurchaseLedgerColumn();
     await ensureTDSColumns();
     await ensureModeColumn();
+    await ensureTrackingIdColumn();
     await ensureDiscountLedgerColumn();
 
     let companyState = "";
@@ -521,7 +539,8 @@ router.post("/", async (req, res) => {
             tdsRate,
             godownId,
             purchaseLedgerId,
-            discountLedgerId
+            discountLedgerId,
+            tracking_id
           ) VALUES ?
         `;
 
@@ -541,6 +560,7 @@ router.post("/", async (req, res) => {
               e.godownId || null,
               e.purchaseLedgerId || purchaseLedgerId || null,
               Number(discountLedgerId || 0),
+              e.tracking_id || null,
             ];
           }
 
@@ -558,10 +578,25 @@ router.post("/", async (req, res) => {
             e.godownId || null,
             e.purchaseLedgerId || purchaseLedgerId || null,
             Number(discountLedgerId || 0),
+            e.tracking_id || null,
           ];
         });
 
         await db.query(insertItemSql, [itemValues]);
+
+        // ✅ Update sub-attributes if provided
+        for (const e of validItems) {
+          if (e.tracking_id && e.sub_attributes && Object.keys(e.sub_attributes).length > 0) {
+            for (const [subAttrId, val] of Object.entries(e.sub_attributes)) {
+              await db.execute(
+                `UPDATE tracking_sub_attributes 
+                 SET sub_attribute_value = ? 
+                 WHERE tracking_id = ? AND sub_attribute_id = ?`,
+                [val, e.tracking_id, subAttrId]
+              );
+            }
+          }
+        }
       }
     } else {
       // accounting-invoice
@@ -1119,8 +1154,25 @@ router.get("/:id", async (req, res) => {
           batchNumber: historyRow?.batchNumber || "",
           hsnCode: historyRow?.hsnCode || "",
           purchaseDate: historyRow?.purchaseDate || voucher.date,
+
+          // ✅ FROM TRACKING
+          tracking_id: item.tracking_id || null,
         };
       });
+
+      // Fetch sub-attributes for items with tracking
+      for (const entry of entries) {
+        if (entry.tracking_id) {
+          const [subAttrs] = await db.execute(
+            `SELECT sub_attribute_id, sub_attribute_value FROM tracking_sub_attributes WHERE tracking_id = ?`,
+            [entry.tracking_id]
+          );
+          entry.sub_attributes = {};
+          subAttrs.forEach(sa => {
+            entry.sub_attributes[sa.sub_attribute_id] = sa.sub_attribute_value;
+          });
+        }
+      }
     } else {
       // accounting-invoice
       const [ledgerRows] = await db.execute(
@@ -1294,6 +1346,7 @@ router.put("/:id", async (req, res) => {
     await ensurePurchaseLedgerColumn();
     await ensureTDSColumns();
     await ensureModeColumn();
+    await ensureTrackingIdColumn();
     await ensureDiscountLedgerColumn();
 
     let companyState = "";
@@ -1441,7 +1494,8 @@ router.put("/:id", async (req, res) => {
             tdsRate,
             godownId,
             purchaseLedgerId,
-            discountLedgerId
+            discountLedgerId,
+            tracking_id
           ) VALUES ?
         `;
 
@@ -1461,6 +1515,7 @@ router.put("/:id", async (req, res) => {
               e.godownId || null,
               e.purchaseLedgerId || purchaseLedgerId || null,
               Number(discountLedgerId || 0),
+              e.tracking_id || null,
             ];
           }
 
@@ -1478,10 +1533,25 @@ router.put("/:id", async (req, res) => {
             e.godownId || null,
             e.purchaseLedgerId || purchaseLedgerId || null,
             Number(discountLedgerId || 0),
+            e.tracking_id || null,
           ];
         });
 
         await db.query(insertItemSql, [itemValues]);
+
+        // ✅ Update sub-attributes if provided
+        for (const e of validItems) {
+          if (e.tracking_id && e.sub_attributes && Object.keys(e.sub_attributes).length > 0) {
+            for (const [subAttrId, val] of Object.entries(e.sub_attributes)) {
+              await db.execute(
+                `UPDATE tracking_sub_attributes 
+                 SET sub_attribute_value = ? 
+                 WHERE tracking_id = ? AND sub_attribute_id = ?`,
+                [val, e.tracking_id, subAttrId]
+              );
+            }
+          }
+        }
       }
     } else {
       // accounting-invoice
