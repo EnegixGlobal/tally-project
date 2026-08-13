@@ -1,89 +1,51 @@
 import React, { useState, useEffect } from "react";
-import { ArrowLeft, ChevronDown, ChevronRight, Copy, Trash2 } from "lucide-react";
+import { ArrowLeft, Box } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
+
+interface SubAttribute {
+  name: string;
+  value: string;
+}
+
+interface AttributeReportRow {
+  item_name: string;
+  prime_attribute: string;
+  attribute_name: string;
+  sub_attributes: SubAttribute[];
+  opening: number;
+  purchase: number;
+  sales: number;
+  closing: number;
+}
 
 const AttributeSummary: React.FC = () => {
   const { theme } = useAppContext();
   const navigate = useNavigate();
 
-  const [data, setData] = useState<any[]>([]);
-  const [attributes, setAttributes] = useState<any[]>([]);
+  const [data, setData] = useState<AttributeReportRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set());
-  const [copyCounts, setCopyCounts] = useState<Record<string, number>>({});
 
   const company_id = localStorage.getItem("company_id") || "";
-  const owner_type = localStorage.getItem("supplier") || localStorage.getItem("owner_type") || "employee";
-  const owner_id = localStorage.getItem(owner_type === "employee" ? "employee_id" : "user_id") || "";
 
   useEffect(() => {
     loadData();
-    loadAttributes();
-  }, [company_id, owner_type, owner_id]);
-
-  const loadAttributes = async () => {
-    try {
-      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-attributes`);
-      const json = await res.json();
-      if (json.success) setAttributes(json.data || []);
-    } catch (err) {
-      console.error(err);
-    }
-  };
-
-  const getAttributesData = (attributesData: any) => {
-    if (!attributesData || attributesData.length === 0) return [];
-    let parsedData = attributesData;
-    if (typeof attributesData === 'string') {
-        try { parsedData = JSON.parse(attributesData); } 
-        catch { parsedData = attributesData.split(','); }
-    }
-    if (!Array.isArray(parsedData)) return [];
-    return parsedData.map((attr: any) => {
-      if (attr && typeof attr === 'object') {
-        return { name: attr.attribute_name || attr.name, value: attr.value || '' };
-      }
-      const match = attributes.find(a => String(a.id) === String(attr));
-      return match ? { name: match.name, value: '' } : null;
-    }).filter(Boolean);
-  };
+  }, [company_id]);
 
   const loadData = async () => {
     setLoading(true);
     setError(null);
     try {
-      const params = new URLSearchParams({ company_id, owner_type, owner_id });
+      const params = new URLSearchParams({ company_id });
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/attribute-summary-report?${params}`);
       
-      const [stockRes, purRes, salRes] = await Promise.all([
-        fetch(`${import.meta.env.VITE_API_URL}/api/stock-items?${params}`),
-        fetch(`${import.meta.env.VITE_API_URL}/api/purchase-vouchers/purchase-history?${params}`),
-        fetch(`${import.meta.env.VITE_API_URL}/api/sales-vouchers/sale-history?${params}`)
-      ]);
-
-      const stockData = await stockRes.json();
-      const purData = await purRes.json();
-      const salData = await salRes.json();
-
-      const items = Array.isArray(stockData.data) ? stockData.data : [];
-      const purchases = Array.isArray(purData.data) ? purData.data : [];
-      const sales = Array.isArray(salData.data) ? salData.data : [];
-
-      const formatted = items.map((item: any) => {
-        const itemPurchases = purchases.filter((p: any) => p.itemName?.toLowerCase().trim() === item.name.toLowerCase().trim());
-        const itemSales = sales.filter((s: any) => s.itemName?.toLowerCase().trim() === item.name.toLowerCase().trim());
-
-        return {
-          id: item.id,
-          name: item.name,
-          attributes: getAttributesData(item.attributes),
-          purchases: itemPurchases,
-          sales: itemSales,
-        };
-      });
-
-      setData(formatted);
+      const json = await res.json();
+      if (json.success) {
+        setData(json.data || []);
+      } else {
+        setError(json.message || "Failed to load summary data.");
+      }
     } catch (err: any) {
       setError("Failed to load summary data.");
     } finally {
@@ -91,145 +53,124 @@ const AttributeSummary: React.FC = () => {
     }
   };
 
-  const toggleExpand = (id: string) => {
-    setExpandedItems(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(id)) newSet.delete(id);
-      else newSet.add(id);
-      return newSet;
-    });
-  };
-
-  const handleCopyAttribute = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCopyCounts(prev => ({
-      ...prev,
-      [id]: (prev[id] ?? 1) + 1
-    }));
-  };
-
-  const handleRemoveAttribute = (id: string, e: React.MouseEvent) => {
-    e.stopPropagation();
-    setCopyCounts(prev => {
-      const current = prev[id] ?? 1;
-      if (current <= 1) return prev; // Minimum 1 row must remain
-      return { ...prev, [id]: current - 1 };
-    });
-  };
+  const isDark = theme === "dark";
 
   return (
-    <div className={`min-h-screen pt-[60px] ${theme === "dark" ? "bg-gray-900 text-white" : "bg-gray-100 text-gray-800"}`}>
+    <div className={`min-h-screen pt-[60px] ${isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-800"} font-sans transition-colors duration-300`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         
         {/* Header Section */}
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-6 gap-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
           <div className="flex items-center gap-4">
-            <button onClick={() => navigate(-1)} className={`p-2 rounded-full transition-colors ${theme === "dark" ? "hover:bg-gray-800" : "hover:bg-gray-200"}`}>
-              <ArrowLeft size={24} />
+            <button 
+              onClick={() => navigate(-1)} 
+              className={`p-2 rounded-xl transition-all duration-300 ${isDark ? "bg-slate-800/80 hover:bg-slate-700 text-slate-300" : "bg-white shadow-sm hover:shadow text-slate-600"}`}
+            >
+              <ArrowLeft size={22} />
             </button>
-            <h1 className="text-2xl font-bold">Attribute Summary Report</h1>
+            <div>
+              <h1 className="text-3xl font-bold tracking-tight bg-clip-text text-transparent bg-gradient-to-r from-blue-500 to-indigo-600">
+                Attribute Movement
+              </h1>
+              <p className={`text-sm mt-1 ${isDark ? "text-slate-400" : "text-slate-500"}`}>Track opening, purchase, and sales for specific item attributes</p>
+            </div>
           </div>
         </div>
 
         {/* Main Content Area */}
-        <div className={`rounded-xl shadow-lg overflow-hidden border ${theme === "dark" ? "bg-gray-800 border-gray-700" : "bg-white border-gray-200"}`}>
+        <div className={`rounded-2xl shadow-xl overflow-hidden border backdrop-blur-sm ${isDark ? "bg-slate-900/60 border-slate-800 shadow-black/50" : "bg-white/80 border-slate-200 shadow-slate-200/50"}`}>
           
           <div className="overflow-x-auto">
             {loading ? (
-              <div className="p-8 text-center text-gray-500">Loading...</div>
+              <div className="p-12 flex flex-col items-center justify-center gap-4">
+                <div className="w-10 h-10 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin"></div>
+                <p className={`font-medium ${isDark ? "text-slate-400" : "text-slate-500"}`}>Syncing data...</p>
+              </div>
             ) : error ? (
-              <div className="p-8 text-center text-red-500">{error}</div>
+              <div className="p-12 text-center text-red-500 bg-red-500/10 rounded-xl m-4 border border-red-500/20">{error}</div>
             ) : (
-              <table className="w-full border-collapse text-sm">
-                <thead className={`${theme === "dark" ? "bg-gray-700/50" : "bg-gray-50"}`}>
-                  <tr>
-                    <th className={`p-4 text-left border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} font-semibold min-w-[200px]`}>
-                      Item Name
-                    </th>
-                    <th className={`p-3 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} font-semibold bg-green-500/10`}>Purchase</th>
-                    <th className={`p-3 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} font-semibold bg-red-500/10`}>Sales</th>
-                    <th className={`p-3 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} font-semibold bg-blue-500/10`}>Closing Balance</th>
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className={`${isDark ? "bg-slate-800/80 text-slate-300" : "bg-slate-100/80 text-slate-600"} uppercase text-xs tracking-wider font-bold`}>
+                    <th className="p-5 text-left min-w-[300px]">Item & Attributes</th>
+                    <th className="p-5 text-right w-32 border-l border-white/5">Opening</th>
+                    <th className="p-5 text-right w-32 border-l border-white/5">Purchase</th>
+                    <th className="p-5 text-right w-32 border-l border-white/5">Sales</th>
+                    <th className="p-5 text-right w-32 border-l border-white/5">Closing</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                <tbody className="divide-y divide-slate-200/10 dark:divide-slate-800/50">
                   {data.length === 0 ? (
-                    <tr><td colSpan={4} className="p-8 text-center text-gray-500">No stock data available.</td></tr>
+                    <tr>
+                      <td colSpan={5} className="p-16 text-center">
+                        <div className="flex flex-col items-center gap-3">
+                          <Box size={48} className={isDark ? "text-slate-700" : "text-slate-300"} />
+                          <p className={`font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>No attribute data available for this company.</p>
+                        </div>
+                      </td>
+                    </tr>
                   ) : (
-                    data.map((row) => {
-                      const attributesString = row.attributes.length > 0 
-                        ? row.attributes.map((a: any) => `${a.name}${a.value ? `: ${a.value}` : ''}`).join(', ')
-                        : 'No attributes linked';
-                      
-                      // Extract IMEI from the attributes string to match with batchNumber
-                      const imeiMatch = attributesString.match(/(?:imei|batch)[\s:]*([a-zA-Z0-9_-]+)/i);
-                      const imei = imeiMatch ? imeiMatch[1].toLowerCase() : null;
+                    data.map((row, index) => (
+                      <tr 
+                        key={index} 
+                        className={`group transition-all duration-300 ${isDark ? "hover:bg-slate-800/60" : "hover:bg-blue-50/50 hover:shadow-sm"}`}
+                      >
+                        <td className="p-5">
+                          <div className="flex flex-col gap-2">
+                            {/* Item Name */}
+                            <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? "text-indigo-400" : "text-indigo-600"}`}>
+                              {row.item_name}
+                            </span>
+                            
+                            {/* Prime Attribute */}
+                            <div className="flex items-center gap-2">
+                              <span className={`px-2.5 py-1 rounded-md text-sm font-semibold border ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-white border-slate-200 shadow-sm text-slate-800"}`}>
+                                <span className={isDark ? "text-slate-400" : "text-slate-500"}>{row.attribute_name}:</span> {row.prime_attribute}
+                              </span>
+                            </div>
 
-                      let purQty = 0;
-                      let salQty = 0;
-
-                      if (imei) {
-                        row.purchases.forEach((p: any) => {
-                          if (p.batchNumber?.toLowerCase() === imei) purQty += Number(p.purchaseQuantity || 0);
-                        });
-                        row.sales.forEach((s: any) => {
-                          if (s.batchNumber?.toLowerCase() === imei) salQty += Math.abs(Number(s.qtyChange || 0));
-                        });
-                      }
-
-                      const closingQty = purQty - salQty;
-                      
-                      return (
-                        <React.Fragment key={row.id}>
-                          {/* Item Row */}
-                          <tr 
-                            onClick={() => toggleExpand(row.id)}
-                            className={`cursor-pointer transition-colors ${theme === "dark" ? "hover:bg-gray-700/50" : "hover:bg-gray-50"} ${expandedItems.has(row.id) ? 'font-bold' : ''}`}
-                          >
-                            <td className={`p-4 border ${theme === "dark" ? "border-gray-700" : "border-gray-200"} font-medium flex items-center gap-2`}>
-                              {expandedItems.has(row.id) ? <ChevronDown size={16} className="text-blue-500"/> : <ChevronRight size={16} className="text-gray-400"/>}
-                              {row.name}
-                            </td>
-                            {/* Empty columns for Purchase, Sales, Closing */}
-                            <td className={`p-2 border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}></td>
-                            <td className={`p-2 border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}></td>
-                            <td className={`p-2 border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}></td>
-                          </tr>
-
-                          {/* Expanded Rows showing Attributes */}
-                          {expandedItems.has(row.id) && (
-                            Array.from({ length: copyCounts[row.id] ?? 1 }).map((_, index) => (
-                              <tr key={`${row.id}-attr-${index}`} className={`${theme === "dark" ? "bg-gray-800" : "bg-blue-50"}`}>
-                                <td className={`p-4 border ${theme === "dark" ? "border-gray-700" : "border-gray-300"} pl-10 ${theme === "dark" ? "text-white" : "text-black"} font-bold`}>
-                                  <div className="flex items-center gap-2">
-                                    <span>{index + 1}. ↳ {attributesString}</span>
-                                    <button 
-                                      onClick={(e) => handleCopyAttribute(row.id, e)} 
-                                      className="p-1.5 hover:bg-gray-200 dark:hover:bg-gray-700 rounded-md transition-colors" 
-                                      title="Duplicate Attribute"
-                                    >
-                                      <Copy size={16} className="text-blue-600 dark:text-blue-400" />
-                                    </button>
-                                    {index > 0 && (
-                                      <button 
-                                        onClick={(e) => handleRemoveAttribute(row.id, e)} 
-                                        className="p-1.5 hover:bg-red-100 dark:hover:bg-red-900/30 rounded-md transition-colors" 
-                                        title="Remove Attribute"
-                                      >
-                                        <Trash2 size={16} className="text-red-500" />
-                                      </button>
-                                    )}
-                                  </div>
-                                </td>
-                                {/* Purchase, Sales, Closing for the IMEI */}
-                                <td className={`p-2 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>{purQty > 0 ? `${purQty} pcs` : ""}</td>
-                                <td className={`p-2 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>{salQty > 0 ? `${salQty} pcs` : ""}</td>
-                                <td className={`p-2 text-right border ${theme === "dark" ? "border-gray-700" : "border-gray-200"}`}>{closingQty !== 0 ? `${closingQty} pcs` : ""}</td>
-                              </tr>
-                            ))
-                          )}
-                        </React.Fragment>
-                      );
-                    })
+                            {/* Sub Attributes */}
+                            {row.sub_attributes && row.sub_attributes.length > 0 && (
+                              <div className="flex flex-wrap gap-2 mt-1">
+                                {row.sub_attributes.map((sub, idx) => (
+                                  <span 
+                                    key={idx} 
+                                    className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
+                                      isDark 
+                                        ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-300 group-hover:bg-indigo-500/20 group-hover:border-indigo-500/40" 
+                                        : "bg-blue-50 border-blue-100 text-blue-700 group-hover:bg-blue-100 group-hover:border-blue-200"
+                                    }`}
+                                  >
+                                    <span className="opacity-75">{sub.name}:</span> {sub.value}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        </td>
+                        
+                        <td className="p-5 text-right font-medium text-slate-500">
+                          {row.opening > 0 ? (
+                            <span className="px-3 py-1 rounded-full bg-slate-500/10 text-slate-600 dark:text-slate-400">{row.opening}</span>
+                          ) : "-"}
+                        </td>
+                        <td className="p-5 text-right font-medium">
+                          {row.purchase > 0 ? (
+                            <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">{row.purchase}</span>
+                          ) : "-"}
+                        </td>
+                        <td className="p-5 text-right font-medium">
+                          {row.sales > 0 ? (
+                            <span className="px-3 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">{row.sales}</span>
+                          ) : "-"}
+                        </td>
+                        <td className="p-5 text-right">
+                          <span className={`text-lg font-bold ${row.closing < 0 ? "text-rose-500" : row.closing > 0 ? "text-blue-500 dark:text-blue-400" : "text-slate-400"}`}>
+                            {row.closing}
+                          </span>
+                        </td>
+                      </tr>
+                    ))
                   )}
                 </tbody>
               </table>
