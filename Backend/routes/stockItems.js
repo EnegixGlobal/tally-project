@@ -1754,9 +1754,10 @@ router.get("/:id", async (req, res) => {
         `SELECT 
            t.id, t.primary_attribute_id as primaryAttribute, t.primary_attribute_value as primaryAttributeValue, 
            t.quantity, t.rate, t.total_value, t.mode,
-           GROUP_CONCAT(CONCAT_WS('::', s.sub_attribute_id, IFNULL(s.sub_attribute_value, ''))) as subAttributes
+           GROUP_CONCAT(CONCAT_WS('::', s.sub_attribute_id, IFNULL(s.sub_attribute_value, ''), IFNULL(sa.name, 'Unknown'))) as subAttributes
          FROM stock_item_attribute_tracking t
          LEFT JOIN tracking_sub_attributes s ON t.id = s.tracking_id
+         LEFT JOIN stock_attributes sa ON s.sub_attribute_id = sa.id
          WHERE t.stock_item_id = ?
          GROUP BY t.id`,
          [id]
@@ -1766,8 +1767,8 @@ router.get("/:id", async (req, res) => {
         try {
           if (row.subAttributes && typeof row.subAttributes === 'string') {
              subAttrs = row.subAttributes.split(',').map(pair => {
-                 const [id, value] = pair.split('::');
-                 return { id: id, value: value || "" };
+                 const [id, value, name] = pair.split('::');
+                 return { id: id, value: value || "", name: name || "Unknown" };
              });
           }
           subAttrs = subAttrs.filter((sa) => sa && sa.id && sa.id !== "null");
@@ -1781,7 +1782,7 @@ router.get("/:id", async (req, res) => {
           rate: row.rate,
           total_value: row.total_value,
           mode: row.mode || "opening",
-          subAttributes: subAttrs.map((sa) => ({ id: sa.id.toString(), value: sa.value || "" }))
+          subAttributes: subAttrs.map((sa) => ({ id: sa.id.toString(), value: sa.value || "", name: sa.name || "Unknown" }))
         };
       });
     } catch (err) {

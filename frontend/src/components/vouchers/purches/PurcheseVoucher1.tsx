@@ -1078,9 +1078,35 @@ const PurchaseVoucher: React.FC = () => {
                 purchaseLedgerId: e.purchaseLedgerId || data.purchaseLedgerId || "",
                 type: e.type || "debit",
                 narration: e.narration || "",
+
+                // Tracking
+                tracking_id: e.tracking_id || "",
+                sub_attributes: e.sub_attributes || {},
               };
             }) || [],
         }));
+
+        // Dynamically fetch tracking options for populated items
+        const itemIdsToFetch = new Set((data.entries || []).filter((e: any) => e.itemId).map((e: any) => e.itemId));
+        itemIdsToFetch.forEach(itemId => {
+          fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/${itemId}`)
+            .then(res => res.json())
+            .then(resData => {
+              const trackingRows = resData?.data?.attributeTrackingRows || resData?.attributeTrackingRows;
+              if (trackingRows && trackingRows.length > 0) {
+                setFormData(prev => {
+                  const updatedEntries = prev.entries.map(entry => {
+                    if (String(entry.itemId) === String(itemId)) {
+                      return { ...entry, trackingOptions: trackingRows };
+                    }
+                    return entry;
+                  });
+                  return { ...prev, entries: updatedEntries };
+                });
+              }
+            })
+            .catch(err => console.error("Error fetching attribute tracking for hydration", err));
+        });
 
         // 🔹 Auto-detect if TDS was Credit (subtracted) or Debit (added)
         // Re-calculate totals from raw data to check
@@ -1689,6 +1715,22 @@ const PurchaseVoucher: React.FC = () => {
     }
   };
 
+  const handleSubAttributeChange = (entryIndex: number, subAttrId: string, value: string) => {
+    setFormData((prev) => {
+      const updated = [...prev.entries];
+      if (updated[entryIndex]) {
+        updated[entryIndex] = {
+          ...updated[entryIndex],
+          sub_attributes: {
+            ...updated[entryIndex].sub_attributes,
+            [subAttrId]: value
+          }
+        };
+      }
+      return { ...prev, entries: updated };
+    });
+  };
+
   const handleEntryChange = (
     index: number,
     e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>
@@ -1784,8 +1826,44 @@ const PurchaseVoucher: React.FC = () => {
           batchExpiryDate: "",
           batchManufacturingDate: "",
           quantity: 1, // ✅ Fixed: Set to 1 instead of 0 for 'real' feel
+          tracking_id: "",
+          trackingOptions: [],
+          sub_attributes: {}
         };
 
+        setFormData(prev => ({ ...prev, entries: updatedEntries }));
+
+        if (selected?.id) {
+          fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/${selected.id}`)
+            .then(res => res.json())
+            .then(resData => {
+              const trackingRows = resData?.data?.attributeTrackingRows || resData?.attributeTrackingRows;
+              if (trackingRows && trackingRows.length > 0) {
+                setFormData(prev => {
+                  const currentEntries = [...prev.entries];
+                  if (currentEntries[index] && currentEntries[index].itemId === selected.id.toString()) {
+                    currentEntries[index] = {
+                      ...currentEntries[index],
+                      trackingOptions: trackingRows
+                    };
+                  }
+                  return { ...prev, entries: currentEntries };
+                });
+              }
+            })
+            .catch(err => console.error("Error fetching attribute tracking", err));
+        }
+
+        return;
+      }
+
+      // 2.5️⃣ TRACKING ID CHANGE
+      if (name === "tracking_id") {
+        updatedEntries[index] = {
+          ...entry,
+          tracking_id: value,
+          sub_attributes: {}
+        };
         setFormData(prev => ({ ...prev, entries: updatedEntries }));
         return;
       }
@@ -3359,6 +3437,11 @@ const PurchaseVoucher: React.FC = () => {
                         <th className={TABLE_STYLES.header}>Batch</th>
                       )}
 
+                      {/* Dynamic Attribute Column */}
+                      {formData.entries.some((e: any) => e.trackingOptions && e.trackingOptions.length > 0) && (
+                        <th className={TABLE_STYLES.header}>Attribute</th>
+                      )}
+
                       <th className={TABLE_STYLES.headerRight}>Quantity</th>
 
                       <th className={TABLE_STYLES.header}>Unit</th>
@@ -3429,29 +3512,6 @@ const PurchaseVoucher: React.FC = () => {
                                 </span>
                               )}
                             </div>
-
-                            {/* Item Attributes Display */}
-                            {(() => {
-                              const attributes = itemDetails.attributes || [];
-                              if (attributes.length === 0) return null;
-                              return (
-                                <div className="mt-1 space-y-1">
-                                  {attributes.map((attr: any, i: number) => (
-                                    <div key={i} className="flex items-center gap-1">
-                                      <span className="text-[11px] font-medium min-w-[40px] capitalize ">{attr.name}:</span>
-                                      <input
-                                        type="text"
-                                        value={attr.value || ""}
-                                        onChange={(e) => handleAttributeValueChange(entry.itemId, attr.id, e.target.value)}
-                                        onBlur={(e) => handleAttributeValueSave(attr.id, e.target.value)}
-                                        placeholder={`Enter ${attr.name}`}
-                                        className={`${theme === "dark" ? "bg-gray-700 border-gray-600 focus:border-blue-500" : "bg-white border-gray-300 focus:border-blue-500"} w-full p-2 rounded border outline-none transition-colors text-[11px] h-6 flex-1 px-1 py-0`}
-                                      />
-                                    </div>
-                                  ))}
-                                </div>
-                              );
-                            })()}
                           </td>
 
                           {/* HSN */}
@@ -3728,6 +3788,51 @@ const PurchaseVoucher: React.FC = () => {
                                   </div>
                                 </div>
                               )}
+                            </td>
+                          )}
+
+                          {/* ATTRIBUTE COLUMN */}
+                          {formData.entries.some((e: any) => e.trackingOptions && e.trackingOptions.length > 0) && (
+                            <td className="px-1 py-2 min-w-[140px] align-top relative">
+                              {entry.trackingOptions && entry.trackingOptions.length > 0 ? (
+                                <div className="w-full space-y-2">
+                                  <select
+                                    name="tracking_id"
+                                    value={entry.tracking_id || ""}
+                                    onChange={(e) => handleEntryChange(index, e)}
+                                    className={`${TABLE_STYLES.select} text-xs`}
+                                  >
+                                    <option value="">Select Attribute</option>
+                                    {entry.trackingOptions.map((opt: any) => (
+                                      <option key={opt.id} value={opt.id}>
+                                        {opt.primaryAttributeValue} (Qty: {opt.quantity})
+                                      </option>
+                                    ))}
+                                  </select>
+
+                                  {/* Sub-attributes */}
+                                  {entry.tracking_id && (() => {
+                                    const selectedTracking = entry.trackingOptions.find((t: any) => String(t.id) === String(entry.tracking_id));
+                                    if (!selectedTracking || !selectedTracking.subAttributes) return null;
+
+                                    return (
+                                      <div className="mt-2 pl-2 border-l-2 border-gray-300 space-y-1">
+                                        {selectedTracking.subAttributes.map((subAttr: any) => (
+                                          <div key={subAttr.id} className="flex items-center gap-1 text-[11px]">
+                                            <span className="font-medium text-gray-500 min-w-[50px] capitalize">{subAttr.name}:</span>
+                                            <input
+                                              type="text"
+                                              value={(entry.sub_attributes || {})[subAttr.id] !== undefined ? (entry.sub_attributes || {})[subAttr.id] : subAttr.value}
+                                              onChange={(e) => handleSubAttributeChange(index, subAttr.id, e.target.value)}
+                                              className={`${TABLE_STYLES.input} flex-1 p-1 h-6`}
+                                            />
+                                          </div>
+                                        ))}
+                                      </div>
+                                    );
+                                  })()}
+                                </div>
+                              ) : null}
                             </td>
                           )}
 
