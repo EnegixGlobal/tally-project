@@ -1643,6 +1643,55 @@ router.put("/:id", upload.single("image"), async (req, res) => {
   }
 });
 
+// POST add tracking
+router.post("/add-tracking", async (req, res) => {
+  const { stock_item_id, primary_attribute_id, primary_attribute_value, sub_attributes, quantity, rate, total_value } = req.body;
+  
+  if (!stock_item_id || !primary_attribute_id) {
+    return res.status(400).json({ success: false, message: "Missing required fields" });
+  }
+
+  const connection = await db.getConnection();
+  try {
+    await connection.beginTransaction();
+
+    const [trackingResult] = await connection.execute(
+      `INSERT INTO stock_item_attribute_tracking 
+       (stock_item_id, primary_attribute_id, primary_attribute_value, quantity, rate, total_value, mode)
+       VALUES (?, ?, ?, ?, ?, ?, 'purchase')`,
+      [stock_item_id, primary_attribute_id, primary_attribute_value || '', quantity || 0, rate || 0, total_value || 0]
+    );
+    
+    const newTrackingId = trackingResult.insertId;
+
+    if (Array.isArray(sub_attributes) && sub_attributes.length > 0) {
+      for (const subAttrId of sub_attributes) {
+        const val = req.body.sub_attribute_values ? req.body.sub_attribute_values[subAttrId] || '' : '';
+        await connection.execute(
+          `INSERT INTO tracking_sub_attributes (tracking_id, sub_attribute_id, sub_attribute_value)
+           VALUES (?, ?, ?)`,
+          [newTrackingId, subAttrId, val]
+        );
+      }
+    }
+
+    // Automatically assign this tracking attribute to the stock item if it doesn't have one
+    await connection.execute(
+      `UPDATE stock_items SET attributeId = ? WHERE id = ? AND (attributeId IS NULL OR attributeId = 0)`,
+      [primary_attribute_id, stock_item_id]
+    );
+
+    await connection.commit();
+    res.json({ success: true, tracking_id: newTrackingId, message: "Tracking added successfully" });
+  } catch (err) {
+    await connection.rollback();
+    console.error("🔥 Error adding tracking:", err);
+    res.status(500).json({ success: false, message: "Server error" });
+  } finally {
+    connection.release();
+  }
+});
+
 //single get
 
 router.get("/:id", async (req, res) => {

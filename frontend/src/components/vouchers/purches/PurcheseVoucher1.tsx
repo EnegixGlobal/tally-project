@@ -249,6 +249,78 @@ const PurchaseVoucher: React.FC = () => {
   const [showTableConfig, setShowTableConfig] = useState(false);
   const [supplierState, setSupplierState] = useState("");
 
+  // --- Add Attribute Modal State ---
+  const [showAttributeModal, setShowAttributeModal] = useState(false);
+  const [masterAttributes, setMasterAttributes] = useState<any[]>([]);
+  const [modalFormData, setModalFormData] = useState({
+    stock_item_id: "",
+    primary_attribute_id: "",
+    primary_attribute_value: "",
+    sub_attributes: [] as string[],
+    sub_attribute_values: {} as any,
+    quantity: 0,
+    rate: 0,
+    total_value: 0,
+    entryIndex: -1
+  });
+
+  useEffect(() => {
+    fetch(`${import.meta.env.VITE_API_URL}/api/stock-attributes`)
+      .then(res => res.json())
+      .then(data => {
+        if (data && data.success && Array.isArray(data.data)) {
+          setMasterAttributes(data.data);
+        }
+      })
+      .catch(err => console.error("Error fetching master attributes", err));
+  }, []);
+
+  const submitAttributeModal = async () => {
+    if (!modalFormData.primary_attribute_id) {
+      alert("Please select a Primary Attribute");
+      return;
+    }
+    try {
+      const res = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/add-tracking`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(modalFormData)
+      });
+      const data = await res.json();
+      if (data.success) {
+        // Refresh tracking options for this item
+        const itemRes = await fetch(`${import.meta.env.VITE_API_URL}/api/stock-items/${modalFormData.stock_item_id}`);
+        const itemData = await itemRes.json();
+        const trackingRows = itemData?.data?.attributeTrackingRows || itemData?.attributeTrackingRows;
+        
+        setFormData((prev) => {
+          const currentEntries = [...prev.entries];
+          const idx = modalFormData.entryIndex;
+          if (currentEntries[idx]) {
+            currentEntries[idx] = {
+              ...currentEntries[idx],
+              trackingOptions: trackingRows || [],
+              tracking_id: data.tracking_id,
+              sub_attributes: { ...modalFormData.sub_attribute_values },
+              quantity: modalFormData.quantity > 0 ? modalFormData.quantity : currentEntries[idx].quantity,
+              rate: modalFormData.rate > 0 ? modalFormData.rate : currentEntries[idx].rate,
+              amount: modalFormData.total_value > 0 ? modalFormData.total_value : currentEntries[idx].amount
+            };
+          }
+          return { ...prev, entries: currentEntries };
+        });
+        
+        setShowAttributeModal(false);
+      } else {
+        alert("Error: " + data.message);
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Error adding tracking");
+    }
+  };
+
+
   const [itemSelectionModal, setItemSelectionModal] = useState<{
     isOpen: boolean;
     index: number | null;
@@ -3437,10 +3509,8 @@ const PurchaseVoucher: React.FC = () => {
                         <th className={TABLE_STYLES.header}>Batch</th>
                       )}
 
-                      {/* Dynamic Attribute Column */}
-                      {formData.entries.some((e: any) => e.trackingOptions && e.trackingOptions.length > 0) && (
-                        <th className={TABLE_STYLES.header}>Attribute</th>
-                      )}
+                      {/* Attribute Column (Always Visible) */}
+                      <th className={TABLE_STYLES.header}>Attribute</th>
 
                       <th className={TABLE_STYLES.headerRight}>Quantity</th>
 
@@ -3791,50 +3861,66 @@ const PurchaseVoucher: React.FC = () => {
                             </td>
                           )}
 
-                          {/* ATTRIBUTE COLUMN */}
-                          {formData.entries.some((e: any) => e.trackingOptions && e.trackingOptions.length > 0) && (
-                            <td className="px-1 py-2 min-w-[140px] align-top relative">
-                              {entry.trackingOptions && entry.trackingOptions.length > 0 ? (
-                                <div className="w-full space-y-2">
-                                  <select
-                                    name="tracking_id"
-                                    value={entry.tracking_id || ""}
-                                    onChange={(e) => handleEntryChange(index, e)}
-                                    className={`${TABLE_STYLES.select} text-xs`}
-                                  >
-                                    <option value="">Select Attribute</option>
-                                    {entry.trackingOptions.map((opt: any) => (
-                                      <option key={opt.id} value={opt.id}>
-                                        {opt.primaryAttributeValue} (Qty: {opt.quantity})
-                                      </option>
-                                    ))}
-                                  </select>
+                          {/* ATTRIBUTE COLUMN (Always Visible) */}
+                          <td className="px-1 py-2 min-w-[140px] align-top relative">
+                            <div className="w-full space-y-2">
+                              <select
+                                name="tracking_id"
+                                value={entry.tracking_id || ""}
+                                onChange={(e) => {
+                                  if (e.target.value === "__add_new__") {
+                                    setModalFormData({
+                                      stock_item_id: String(entry.itemId),
+                                      primary_attribute_id: "",
+                                      primary_attribute_value: "",
+                                      sub_attributes: [],
+                                      sub_attribute_values: {},
+                                      quantity: Number(entry.quantity) || 0,
+                                      rate: Number(entry.rate) || 0,
+                                      total_value: (Number(entry.quantity) || 0) * (Number(entry.rate) || 0),
+                                      entryIndex: index
+                                    });
+                                    setShowAttributeModal(true);
+                                    return;
+                                  }
+                                  handleEntryChange(index, e);
+                                }}
+                                className={`${TABLE_STYLES.select} text-xs`}
+                              >
+                                <option value="">Select Attribute</option>
+                                <option value="__add_new__" className="text-blue-500 font-medium">
+                                  + Add Attribute
+                                </option>
+                                {(entry.trackingOptions || []).map((opt: any) => (
+                                  <option key={opt.id} value={opt.id}>
+                                    {opt.primaryAttributeValue} (Qty: {opt.quantity})
+                                  </option>
+                                ))}
+                              </select>
 
-                                  {/* Sub-attributes */}
-                                  {entry.tracking_id && (() => {
-                                    const selectedTracking = entry.trackingOptions.find((t: any) => String(t.id) === String(entry.tracking_id));
-                                    if (!selectedTracking || !selectedTracking.subAttributes) return null;
+                              {/* Sub-attributes */}
+                              {entry.tracking_id && entry.trackingOptions && (() => {
+                                const selectedTracking = entry.trackingOptions.find((t: any) => String(t.id) === String(entry.tracking_id));
+                                if (!selectedTracking || !selectedTracking.subAttributes) return null;
 
-                                    return (
-                                      <div className="mt-2 pl-2 border-l-2 border-gray-300 space-y-1">
-                                        {selectedTracking.subAttributes.map((subAttr: any) => (
-                                          <div key={subAttr.id} className="flex items-center gap-1 text-[11px]">
-                                            <span className="font-medium text-gray-500 min-w-[50px] capitalize">{subAttr.name}:</span>
-                                            <input
-                                              type="text"
-                                              value={(entry.sub_attributes || {})[subAttr.id] !== undefined ? (entry.sub_attributes || {})[subAttr.id] : subAttr.value}
-                                              onChange={(e) => handleSubAttributeChange(index, subAttr.id, e.target.value)}
-                                              className={`${TABLE_STYLES.input} flex-1 p-1 h-6`}
-                                            />
-                                          </div>
-                                        ))}
+                                return (
+                                  <div className="mt-2 pl-2 border-l-2 border-gray-300 space-y-1">
+                                    {selectedTracking.subAttributes.map((subAttr: any) => (
+                                      <div key={subAttr.id} className="flex items-center gap-1 text-[11px]">
+                                        <span className="font-medium text-gray-500 min-w-[50px] capitalize">{subAttr.name}:</span>
+                                        <input
+                                          type="text"
+                                          value={(entry.sub_attributes || {})[subAttr.id] !== undefined ? (entry.sub_attributes || {})[subAttr.id] : subAttr.value}
+                                          onChange={(e) => handleSubAttributeChange(index, subAttr.id, e.target.value)}
+                                          className={`${TABLE_STYLES.input} flex-1 p-1 h-6`}
+                                        />
                                       </div>
-                                    );
-                                  })()}
-                                </div>
-                              ) : null}
-                            </td>
-                          )}
+                                    ))}
+                                  </div>
+                                );
+                              })()}
+                            </div>
+                          </td>
 
                           {/* QUANTITY */}
                           <td className="px-1 py-2 min-w-[55px] align-top">
@@ -5137,6 +5223,149 @@ const PurchaseVoucher: React.FC = () => {
           Esc to cancel.
         </p>
       </div>
+
+      {/* ADD ATTRIBUTE MODAL */}
+      {showAttributeModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className={`${theme === "dark" ? "bg-gray-800 text-white border-gray-700" : "bg-white"} rounded-lg shadow-xl w-full max-w-md overflow-hidden border`}>
+            <div className="px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex justify-between items-center bg-gray-50 dark:bg-gray-800/50">
+              <h3 className="text-lg font-semibold text-gray-800 dark:text-gray-100">Add Attribute Tracking</h3>
+              <button
+                onClick={() => setShowAttributeModal(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <div className="p-6 space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-1">Primary Attribute</label>
+                <select 
+                  className={`${TABLE_STYLES.select} w-full`}
+                  value={modalFormData.primary_attribute_id}
+                  onChange={(e) => setModalFormData(p => ({ ...p, primary_attribute_id: e.target.value }))}
+                >
+                  <option value="">Select Primary Attribute</option>
+                  {masterAttributes.map(attr => (
+                    <option key={attr.id} value={attr.id}>{attr.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Primary Attribute Value</label>
+                <input 
+                  type="text"
+                  placeholder="e.g. IMEI number, Color name..."
+                  className={`${TABLE_STYLES.input} w-full`}
+                  value={modalFormData.primary_attribute_value}
+                  onChange={(e) => setModalFormData(p => ({ ...p, primary_attribute_value: e.target.value }))}
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Sub Attributes</label>
+                <div className="border border-gray-300 dark:border-gray-600 rounded-md p-3 max-h-56 overflow-y-auto space-y-2 bg-gray-50 dark:bg-gray-900/50">
+                  {masterAttributes.filter(a => String(a.id) !== String(modalFormData.primary_attribute_id)).map(attr => (
+                    <div key={attr.id} className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer w-32 shrink-0">
+                        <input 
+                          type="checkbox" 
+                          checked={modalFormData.sub_attributes.includes(String(attr.id))}
+                          onChange={(e) => {
+                            if (e.target.checked) {
+                              setModalFormData(p => ({ ...p, sub_attributes: [...p.sub_attributes, String(attr.id)] }));
+                            } else {
+                              setModalFormData(p => {
+                                const newValues = { ...p.sub_attribute_values };
+                                delete newValues[String(attr.id)];
+                                return { 
+                                  ...p, 
+                                  sub_attributes: p.sub_attributes.filter(id => id !== String(attr.id)),
+                                  sub_attribute_values: newValues 
+                                };
+                              });
+                            }
+                          }}
+                          className="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                        />
+                        <span className="text-sm capitalize truncate">{attr.name}</span>
+                      </label>
+                      
+                      {modalFormData.sub_attributes.includes(String(attr.id)) && (
+                        <input
+                          type="text"
+                          placeholder={`Enter ${attr.name}...`}
+                          className={`${TABLE_STYLES.input} flex-1 text-xs p-1 min-w-0`}
+                          value={(modalFormData.sub_attribute_values || {})[String(attr.id)] || ""}
+                          onChange={(e) => setModalFormData(p => ({
+                            ...p,
+                            sub_attribute_values: { ...p.sub_attribute_values, [String(attr.id)]: e.target.value }
+                          }))}
+                        />
+                      )}
+                    </div>
+                  ))}
+                  {masterAttributes.length === 0 && <span className="text-sm text-gray-500">No attributes available</span>}
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium mb-1">Quantity</label>
+                  <input 
+                    type="number"
+                    className={`${TABLE_STYLES.input} w-full`}
+                    value={modalFormData.quantity}
+                    onChange={(e) => {
+                      const q = Number(e.target.value) || 0;
+                      setModalFormData(p => ({ ...p, quantity: q, total_value: q * p.rate }));
+                    }}
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium mb-1">Rate</label>
+                  <input 
+                    type="number"
+                    className={`${TABLE_STYLES.input} w-full`}
+                    value={modalFormData.rate}
+                    onChange={(e) => {
+                      const r = Number(e.target.value) || 0;
+                      setModalFormData(p => ({ ...p, rate: r, total_value: p.quantity * r }));
+                    }}
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-1">Total Value</label>
+                <input 
+                  type="number"
+                  readOnly
+                  className={`${TABLE_STYLES.input} w-full bg-gray-100 dark:bg-gray-700 cursor-not-allowed font-semibold`}
+                  value={modalFormData.total_value}
+                />
+              </div>
+            </div>
+
+            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-800/50 border-t border-gray-200 dark:border-gray-700 flex justify-end gap-3">
+              <button
+                onClick={() => setShowAttributeModal(false)}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-md hover:bg-gray-50 dark:bg-gray-700 dark:text-gray-200 dark:border-gray-600 dark:hover:bg-gray-600 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={submitAttributeModal}
+                className="px-4 py-2 text-sm font-medium text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 shadow-sm transition-colors"
+              >
+                Save & Select
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div >
   );
 };
