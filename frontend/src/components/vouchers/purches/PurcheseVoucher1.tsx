@@ -3077,9 +3077,17 @@ const PurchaseVoucher: React.FC = () => {
     const item = stockItems.find((s) => String(s.id) === String(entry.itemId));
     // Show batch column if item has enableBatchTracking OR already has batches in the entry
     return (
-      (item as any)?.enableBatchTracking === true ||
-      (item as any)?.enableBatchTracking === 1 ||
+      (item as any)?.tracking_type === "batch" ||
       (entry.batches && entry.batches.some((b: any) => b?.batchName))
+    );
+  });
+
+  const hasAnyAttribute = formData.entries?.some((entry) => {
+    if (!entry.itemId) return false;
+    const item = stockItems.find((s) => String(s.id) === String(entry.itemId));
+    return (
+      (item as any)?.tracking_type === "attribute" ||
+      (entry.trackingOptions && entry.trackingOptions.length > 0)
     );
   });
 
@@ -3503,12 +3511,12 @@ const PurchaseVoucher: React.FC = () => {
                       {visibleColumns.hsn && <th>HSN/SAC</th>}
 
                       {/* Batch column */}
-                      {visibleColumns.batch && (
+                      {visibleColumns.batch && hasAnyBatch && (
                         <th className={TABLE_STYLES.header}>Batch</th>
                       )}
 
                       {/* Attribute Column */}
-                      {visibleColumns.attribute && (
+                      {visibleColumns.attribute && hasAnyAttribute && (
                         <th className={TABLE_STYLES.header}>Attribute</th>
                       )}
 
@@ -3599,9 +3607,11 @@ const PurchaseVoucher: React.FC = () => {
                           )}
 
                           {/* BATCH */}
-                          {visibleColumns.batch && (
-                            <td className="px-1 py-2 min-w-[140px] flex items-center gap-2 align-top">
-                              <select
+                          {visibleColumns.batch && hasAnyBatch && (
+                            <td className="px-1 py-2 min-w-[140px] align-top">
+                              {itemDetails.tracking_type === "batch" ? (
+                                <div className="flex items-center gap-2 w-full">
+                                  <select
                                 name="batchNumber"
                                 value={entry.batchNumber || ""}
                                 onChange={(e) => {
@@ -3858,13 +3868,16 @@ const PurchaseVoucher: React.FC = () => {
                                   </div>
                                 </div>
                               )}
+                                </div>
+                              ) : null}
                             </td>
                           )}
 
                           {/* ATTRIBUTE COLUMN */}
-                          {visibleColumns.attribute && (
+                          {visibleColumns.attribute && hasAnyAttribute && (
                             <td className="px-1 py-2 min-w-[140px] align-top relative">
-                              <div className="w-full space-y-2">
+                              {itemDetails.tracking_type === "attribute" ? (
+                                <div className="w-full space-y-2">
                                 <select
                                   name="tracking_id"
                                   value={entry.tracking_id || ""}
@@ -3920,7 +3933,8 @@ const PurchaseVoucher: React.FC = () => {
                                     </div>
                                   );
                                 })()}
-                              </div>
+                                </div>
+                              ) : null}
                             </td>
                           )}
 
@@ -4070,9 +4084,9 @@ const PurchaseVoucher: React.FC = () => {
                     {(() => {
                       const colSpanBeforeAmount =
                         5 + // Sr(1) + Item(1) + Qty(1) + Unit(1) + Rate(1)
-                        (visibleColumns.attribute ? 1 : 0) +
+                        (visibleColumns.attribute && hasAnyAttribute ? 1 : 0) +
                         (visibleColumns.hsn ? 1 : 0) +
-                        (visibleColumns.batch ? 1 : 0) +
+                        (visibleColumns.batch && hasAnyBatch ? 1 : 0) +
                         (visibleColumns.gst ? (isIntraState ? 2 : 1) : 0);
 
                       const colSpanAfterAmount =

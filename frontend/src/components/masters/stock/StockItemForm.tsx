@@ -397,7 +397,9 @@ const StockItemForm = () => {
             setPreview(item.image);
           }
 
-          if (!!item.enableAttributeTracking || (Array.isArray(item.attributeTrackingRows) && item.attributeTrackingRows.length > 0)) {
+          if (item.tracking_type) {
+            setTrackingSystem(item.tracking_type as "batch" | "attribute");
+          } else if (!!item.enableAttributeTracking || (Array.isArray(item.attributeTrackingRows) && item.attributeTrackingRows.length > 0)) {
             setTrackingSystem("attribute");
           } else if (!!item.enableBatchTracking || (Array.isArray(item.batches) && item.batches.some((b: any) => b.batchName && b.batchName.trim() !== ""))) {
             setTrackingSystem("batch");
@@ -880,6 +882,7 @@ const StockItemForm = () => {
       attributes: formData.attributes,
 
       enableBatchTracking: formData.enableBatchTracking,
+      tracking_type: trackingSystem,
       allowNegativeStock: formData.allowNegativeStock,
       maintainInPieces: formData.maintainInPieces,
       secondaryUnit: formData.secondaryUnit,
