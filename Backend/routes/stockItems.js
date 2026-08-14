@@ -32,6 +32,7 @@ router.get("/", async (req, res) => {
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "attributeId", "INT NULL");
+    await ensureColumn("stock_items", "tracking_type", "VARCHAR(50) NULL");
     await ensureColumn("stock_items", "godown_id", "INT NULL");
     await ensureColumn("stock_items", "gstRate", "DECIMAL(5,2) DEFAULT 0.00");
     let query = `
@@ -55,6 +56,8 @@ router.get("/", async (req, res) => {
         s.godown_id,
         s.barcode,
         s.batches,
+        s.enableBatchTracking,
+        s.tracking_type,
         s.type,
         s.image,
         s.company_id,
@@ -420,6 +423,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "attributeId", "INT NULL");
+    await ensureColumn("stock_items", "tracking_type", "VARCHAR(50) NULL");
     await ensureColumn("stock_items", "godown_id", "INT NULL");
     await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
 
@@ -446,6 +450,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       standardPurchaseRate,
       standardSaleRate,
       enableBatchTracking,
+      tracking_type,
       allowNegativeStock,
       maintainInPieces,
       secondaryUnit,
@@ -604,6 +609,13 @@ router.post("/", upload.single("image"), async (req, res) => {
        ✅ EXPLICIT & SAFE INSERT
        =============================== */
 
+    if (tracking_type === "batch" && parsedAttributeTrackingRows.length > 0) {
+      return res.status(400).json({ success: false, message: "A Batch-tracked item cannot receive Attribute tracking data." });
+    }
+    if (tracking_type === "attribute" && batchData.some((b) => b.batchName)) {
+      return res.status(400).json({ success: false, message: "An Attribute-tracked item cannot receive Batch tracking data." });
+    }
+
     const insertQuery = `
   INSERT INTO stock_items (
     name,
@@ -618,6 +630,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     attributeId,
     godown_id,
     enableBatchTracking,
+    tracking_type,
     barcode,
     batches,
     company_id,
@@ -625,7 +638,7 @@ router.post("/", upload.single("image"), async (req, res) => {
     owner_id,
     type,
     image
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 `;
 
     const values = [
@@ -641,6 +654,7 @@ router.post("/", upload.single("image"), async (req, res) => {
       sanitize(attributeId),
       sanitize(godown_id),
       enableBatchTracking ? 1 : 0,
+      sanitize(tracking_type),
       sanitize(barcode),
       JSON.stringify(batchData),
       sanitize(company_id),
@@ -1393,6 +1407,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "attributeId", "INT NULL");
+    await ensureColumn("stock_items", "tracking_type", "VARCHAR(50) NULL");
     await ensureColumn("stock_items", "image", "VARCHAR(255) NULL");
 
 
@@ -1419,6 +1434,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       standardPurchaseRate,
       standardSaleRate,
       enableBatchTracking,
+      tracking_type,
       allowNegativeStock,
       maintainInPieces,
       secondaryUnit,
@@ -1497,6 +1513,20 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       }
     }
 
+    let parsedAttributeTrackingRows = [];
+    if (Array.isArray(attributeTrackingRows)) {
+      parsedAttributeTrackingRows = attributeTrackingRows;
+    } else if (typeof attributeTrackingRows === "string") {
+      try { parsedAttributeTrackingRows = JSON.parse(attributeTrackingRows); } catch (e) { parsedAttributeTrackingRows = []; }
+    }
+
+    if (tracking_type === "batch" && parsedAttributeTrackingRows.length > 0) {
+      return res.status(400).json({ success: false, message: "A Batch-tracked item cannot receive Attribute tracking data." });
+    }
+    if (tracking_type === "attribute" && batchData.some((b) => b.batchName)) {
+      return res.status(400).json({ success: false, message: "An Attribute-tracked item cannot receive Batch tracking data." });
+    }
+
     /* ===============================
        🧠 UPDATE QUERY
        =============================== */
@@ -1514,6 +1544,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
         godown_id = ?,
         taxType = ?,
         enableBatchTracking = ?,
+        tracking_type = ?,
         batches = ?,
         barcode = ?,
         company_id = ?,
@@ -1535,6 +1566,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
       sanitize(godown_id),
       taxType ?? "Taxable",
       enableBatchTracking ? 1 : 0,
+      sanitize(tracking_type),
       JSON.stringify(batchData),
       sanitize(barcode),
       sanitize(company_id),
@@ -1581,7 +1613,7 @@ router.put("/:id", upload.single("image"), async (req, res) => {
     /* ===============================
         📈 RE-INSERT ATTRIBUTE TRACKING ROWS
        =============================== */
-    let parsedAttributeTrackingRows = Array.isArray(attributeTrackingRows) ? attributeTrackingRows : [];
+    parsedAttributeTrackingRows = Array.isArray(attributeTrackingRows) ? attributeTrackingRows : [];
     if (typeof attributeTrackingRows === "string") {
       try { parsedAttributeTrackingRows = JSON.parse(attributeTrackingRows); } catch (e) { parsedAttributeTrackingRows = []; }
     }
@@ -1720,6 +1752,7 @@ router.get("/:id", async (req, res) => {
     await ensureColumn("stock_items", "cgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "sgstLedgerId", "INT NULL");
     await ensureColumn("stock_items", "attributeId", "INT NULL");
+    await ensureColumn("stock_items", "tracking_type", "VARCHAR(50) NULL");
     await ensureColumn("stock_items", "godown_id", "INT NULL");
 
     let query = `
@@ -1745,6 +1778,7 @@ router.get("/:id", async (req, res) => {
         s.barcode,
         s.batches,
         s.enableBatchTracking,
+        s.tracking_type,
         NULL AS allowNegativeStock,
         NULL AS maintainInPieces,
         NULL AS secondaryUnit,

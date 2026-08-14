@@ -173,6 +173,7 @@ const StockItemForm = () => {
   const [isAttributeDropdownOpen, setIsAttributeDropdownOpen] = useState(false);
   const [openSubAttrDropdownId, setOpenSubAttrDropdownId] = useState<string | null>(null);
   const attributeDropdownRef = useRef<HTMLDivElement>(null);
+  const [trackingSystem, setTrackingSystem] = useState<"batch" | "attribute" | "">("");
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -394,6 +395,16 @@ const StockItemForm = () => {
 
           if (item.image) {
             setPreview(item.image);
+          }
+
+          if (item.tracking_type) {
+            setTrackingSystem(item.tracking_type as "batch" | "attribute");
+          } else if (Array.isArray(item.attributeTrackingRows) && item.attributeTrackingRows.length > 0) {
+            setTrackingSystem("attribute");
+          } else if (Array.isArray(item.batches) && item.batches.some((b: any) => b.batchName && b.batchName.trim() !== "")) {
+            setTrackingSystem("batch");
+          } else {
+            setTrackingSystem("");
           }
 
           if (item.godown_id) {
@@ -871,20 +882,25 @@ const StockItemForm = () => {
       attributes: formData.attributes,
 
       enableBatchTracking: formData.enableBatchTracking,
+      tracking_type: trackingSystem,
       allowNegativeStock: formData.allowNegativeStock,
       maintainInPieces: formData.maintainInPieces,
       secondaryUnit: formData.secondaryUnit,
 
-      batches: batchRows
-        .filter((b) => b.batchQuantity || b.batchRate || b.mrp || b.batchName)
-        .map((b) => ({
-          ...b,
-          mode: "opening",
-          batchQuantity: Number(b.batchQuantity) || 0,
-          batchRate: Number(b.batchRate) || 0,
-          openingRate: Number(b.batchRate || 0) * Number(b.batchQuantity || 0),
-        })),
-      attributeTrackingRows: formData.enableAttributeTracking ? attributeRows.filter(a => a.primaryAttribute || a.quantity || a.rate) : [],
+      batches: trackingSystem === "batch" 
+        ? batchRows
+            .filter((b) => b.batchQuantity || b.batchRate || b.mrp || b.batchName)
+            .map((b) => ({
+              ...b,
+              mode: "opening",
+              batchQuantity: Number(b.batchQuantity) || 0,
+              batchRate: Number(b.batchRate) || 0,
+              openingRate: Number(b.batchRate || 0) * Number(b.batchQuantity || 0),
+            }))
+        : [],
+      attributeTrackingRows: trackingSystem === "attribute" 
+        ? attributeRows.filter(a => a.primaryAttribute || a.quantity || a.rate) 
+        : [],
       godownAllocations,
       barcode,
       godown_id: rage,
@@ -1165,6 +1181,55 @@ const StockItemForm = () => {
 
 
 
+            {/* ----------------- Tracking System Selection ----------------- */}
+            <div className={`flex flex-col gap-3 md:col-span-2 mt-4 mb-2 p-4 border rounded-lg ${theme === 'dark' ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-50'}`}>
+              <h4 className="font-semibold text-sm">Select Tracking System</h4>
+              <div className="flex flex-col sm:flex-row gap-6 mt-1 items-center">
+                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input
+                    type="radio"
+                    name="trackingSystem"
+                    value="batch"
+                    checked={trackingSystem === "batch"}
+                    onChange={() => {
+                      setTrackingSystem("batch");
+                      setFormData(prev => ({ ...prev, enableAttributeTracking: false }));
+                    }}
+                    className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  Batch System
+                </label>
+                <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
+                  <input
+                    type="radio"
+                    name="trackingSystem"
+                    value="attribute"
+                    checked={trackingSystem === "attribute"}
+                    onChange={() => {
+                      setTrackingSystem("attribute");
+                      setFormData(prev => ({ ...prev, enableBatchTracking: false }));
+                    }}
+                    className="h-4 w-4 text-blue-600 border-gray-300 focus:ring-blue-500"
+                  />
+                  Attribute System
+                </label>
+                {trackingSystem !== "" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrackingSystem("");
+                      setFormData(prev => ({ ...prev, enableBatchTracking: false, enableAttributeTracking: false }));
+                    }}
+                    className="text-xs text-red-500 hover:text-red-700 underline font-medium"
+                  >
+                    Clear Selection
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {trackingSystem === "batch" && (
+              <>
             {/* ----------------- Batch Tracking Dynamic Rows ----------------- */}
             <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mt-4 gap-3 md:col-span-2">
               {/* Left: Checkboxes */}
@@ -1322,10 +1387,13 @@ const StockItemForm = () => {
                 </div>
               ))}
             </div>
+            </>
+            )}
 
             {/* ---------------------------------------------------------------- */}
 
-            <div className="flex flex-col gap-2 md:col-span-2">
+            {trackingSystem === "attribute" && (
+            <div className="flex flex-col gap-2 md:col-span-2 mt-4">
               <label className="flex items-center gap-2 text-sm font-medium mb-2">
                 <input
                   type="checkbox"
@@ -1478,7 +1546,10 @@ const StockItemForm = () => {
                   ))}
                 </div>
               )}
+            </div>
+            )}
 
+            <div className="flex flex-col gap-2 md:col-span-2 mt-4">
               <label className="flex items-center gap-2 text-sm font-medium">
                 <input
                   type="checkbox"

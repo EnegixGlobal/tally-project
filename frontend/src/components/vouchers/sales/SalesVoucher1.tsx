@@ -328,6 +328,7 @@ const SalesVoucher: React.FC = () => {
         }
       })(),
       attributes: (item as any).attributes || [],
+      tracking_type: (item as any).tracking_type || ((item as any).enableBatchTracking ? "batch" : ""),
     };
   };
 
@@ -2846,9 +2847,17 @@ const SalesVoucher: React.FC = () => {
     };
   };
 
-  const hasAnyBatch = formData.entries?.some((entry) =>
-    entry?.batches?.some((b) => b?.batchName)
-  );
+  const hasAnyBatch = formData.entries?.some((entry) => {
+    if (!entry.itemId) return false;
+    const item = stockItems.find((s) => String(s.id) === String(entry.itemId));
+    return (item as any)?.tracking_type === "batch" || entry?.batches?.some((b: any) => b?.batchName);
+  });
+
+  const hasAnyAttribute = formData.entries?.some((entry) => {
+    if (!entry.itemId) return false;
+    const item = stockItems.find((s) => String(s.id) === String(entry.itemId));
+    return (item as any)?.tracking_type === "attribute" || (entry.trackingOptions && entry.trackingOptions.length > 0);
+  });
 
   const hasAnyGodown = formData.entries?.some((entry) => {
     if (!entry.itemId) return false;
@@ -3386,9 +3395,11 @@ const SalesVoucher: React.FC = () => {
                         <th className="px-4 py-2 text-left whitespace-nowrap">
                           HSN/SAC
                         </th>
-                        <th className="px-4 py-2 text-left whitespace-nowrap">
-                          Attribute
-                        </th>
+                        {hasAnyAttribute && (
+                          <th className="px-4 py-2 text-left whitespace-nowrap">
+                            Attribute
+                          </th>
+                        )}
                         {columnSettings.showBatch && hasAnyBatch && (
                           <th className="whitespace-nowrap">Batch</th>
                         )}
@@ -3547,45 +3558,52 @@ const SalesVoucher: React.FC = () => {
                             </td>
 
                             {/* ATTRIBUTE */}
-                            <td className="px-1 py-2 text-center min-w-[150px] text-xs align-top">
-                              <select
-                                name="tracking_id"
-                                value={entry.tracking_id || ""}
-                                onChange={(e) => handleEntryChange(index, e)}
-                                className={`${FORM_STYLES.tableSelect(theme)} w-full text-xs font-mono`}
-                              >
-                                <option value="">Attribute</option>
-                                {(entry.trackingOptions || []).map((t: any) => {
-                                  const pAttr = masterAttributes.find(ma => String(ma.id) === String(t.primaryAttribute));
-                                  return (
-                                    <option key={t.id} value={t.id}>
-                                      {pAttr ? pAttr.name : 'Attribute'}: {t.primaryAttributeValue}
-                                    </option>
-                                  );
-                                })}
-                              </select>
-                              
-                              {/* DISPLAY SUB-ATTRIBUTES IN ROW */}
-                              {entry.sub_attributes && Object.keys(entry.sub_attributes).length > 0 && (
-                                <div className="mt-1 text-left text-[10px] text-gray-500 bg-gray-50 p-1 rounded border border-gray-200">
-                                  {Object.entries(entry.sub_attributes).map(([subId, val]) => {
-                                    const subAttr = masterAttributes.find(a => String(a.id) === String(subId));
-                                    return subAttr && val ? (
-                                      <div key={subId} className="flex justify-between border-b border-gray-100 last:border-0">
-                                        <span className="text-gray-400 capitalize">{subAttr.name}:</span>
-                                        <span className="font-medium text-gray-700">{String(val)}</span>
+                            {hasAnyAttribute && (
+                              <td className="px-1 py-2 text-center min-w-[150px] text-xs align-top">
+                                {itemDetails.tracking_type === "attribute" ? (
+                                  <>
+                                    <select
+                                      name="tracking_id"
+                                      value={entry.tracking_id || ""}
+                                      onChange={(e) => handleEntryChange(index, e)}
+                                      className={`${FORM_STYLES.tableSelect(theme)} w-full text-xs font-mono`}
+                                    >
+                                      <option value="">Attribute</option>
+                                      {(entry.trackingOptions || []).map((t: any) => {
+                                        const pAttr = masterAttributes.find(ma => String(ma.id) === String(t.primaryAttribute));
+                                        return (
+                                          <option key={t.id} value={t.id}>
+                                            {pAttr ? pAttr.name : 'Attribute'}: {t.primaryAttributeValue}
+                                          </option>
+                                        );
+                                      })}
+                                    </select>
+                                    
+                                    {/* DISPLAY SUB-ATTRIBUTES IN ROW */}
+                                    {entry.sub_attributes && Object.keys(entry.sub_attributes).length > 0 && (
+                                      <div className="mt-1 text-left text-[10px] text-gray-500 bg-gray-50 p-1 rounded border border-gray-200">
+                                        {Object.entries(entry.sub_attributes).map(([subId, val]) => {
+                                          const subAttr = masterAttributes.find(a => String(a.id) === String(subId));
+                                          return subAttr && val ? (
+                                            <div key={subId} className="flex justify-between border-b border-gray-100 last:border-0">
+                                              <span className="text-gray-400 capitalize">{subAttr.name}:</span>
+                                              <span className="font-medium text-gray-700">{String(val)}</span>
+                                            </div>
+                                          ) : null;
+                                        })}
                                       </div>
-                                    ) : null;
-                                  })}
-                                </div>
-                              )}
-                            </td>
+                                    )}
+                                  </>
+                                ) : null}
+                              </td>
+                            )}
 
                             {/* BATCH */}
-                            {columnSettings.showBatch &&
-                              entry.batches?.some((b) => b.batchName) && (
+                            {columnSettings.showBatch && hasAnyBatch && (
                                 <td className="px-1 py-2 min-w-[180px] align-top">
-                                  <select
+                                  {itemDetails.tracking_type === "batch" ? (
+                                    <>
+                                      <select
                                     name="batchNumber"
                                     value={entry.batchNumber || ""}
                                     onChange={(e) =>
@@ -3617,7 +3635,9 @@ const SalesVoucher: React.FC = () => {
                                           </option>
                                         );
                                       })}
-                                  </select>
+                                      </select>
+                                    </>
+                                  ) : null}
                                 </td>
                               )}
 
@@ -3839,6 +3859,7 @@ const SalesVoucher: React.FC = () => {
                         let totalCols = 7; // S.No, Item, HSN, Quantity, Unit, Rate, Amount
                         if (columnSettings.showBatch && hasAnyBatch)
                           totalCols += 1; // Batch
+                        if (hasAnyAttribute) totalCols += 1; // Attribute
                         if (columnSettings.showGST) {
                           if (!hasParty) {
                             // No party: Only GST% column

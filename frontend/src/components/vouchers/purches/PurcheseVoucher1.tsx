@@ -329,6 +329,7 @@ const PurchaseVoucher: React.FC = () => {
 
   const [visibleColumns, setVisibleColumns] = useState(
     {
+      attribute: true,
       hsn: true,
       gst: true,
       batch: true,   // ✅ Default ON — but column only shows when item has batches (hasAnyBatch)
@@ -3076,17 +3077,21 @@ const PurchaseVoucher: React.FC = () => {
     const item = stockItems.find((s) => String(s.id) === String(entry.itemId));
     // Show batch column if item has enableBatchTracking OR already has batches in the entry
     return (
-      (item as any)?.enableBatchTracking === true ||
-      (item as any)?.enableBatchTracking === 1 ||
+      (item as any)?.tracking_type === "batch" ||
       (entry.batches && entry.batches.some((b: any) => b?.batchName))
     );
   });
 
-  const hasAnyGodown = formData.entries?.some((entry) => {
+  const hasAnyAttribute = formData.entries?.some((entry) => {
     if (!entry.itemId) return false;
     const item = stockItems.find((s) => String(s.id) === String(entry.itemId));
-    return (item as any)?.godown_id || entry.godownId;
+    return (
+      (item as any)?.tracking_type === "attribute" ||
+      (entry.trackingOptions && entry.trackingOptions.length > 0)
+    );
   });
+
+
 
   return (
     <div className="pt-[56px] px-4">
@@ -3140,6 +3145,7 @@ const PurchaseVoucher: React.FC = () => {
             <h3 className="text-lg font-semibold mb-4">Table Settings</h3>
 
             {[
+              { key: "attribute", label: "Show Attribute Column" },
               { key: "hsn", label: "Show HSN Column" },
               { key: "batch", label: "Show Batch Column" },
               { key: "gst", label: "Show GST Column" },
@@ -3370,7 +3376,7 @@ const PurchaseVoucher: React.FC = () => {
                 </select>
               </div>
 
-              {formData.mode === "item-invoice" && visibleColumns.godown && hasAnyGodown && (
+              {formData.mode === "item-invoice" && visibleColumns.godown && (
                 <div>
                   <label className="block text-[11px] font-bold uppercase tracking-wider mb-1 opacity-60">
                     Godown Tracking
@@ -3505,12 +3511,14 @@ const PurchaseVoucher: React.FC = () => {
                       {visibleColumns.hsn && <th>HSN/SAC</th>}
 
                       {/* Batch column */}
-                      {visibleColumns.batch && (
+                      {visibleColumns.batch && hasAnyBatch && (
                         <th className={TABLE_STYLES.header}>Batch</th>
                       )}
 
-                      {/* Attribute Column (Always Visible) */}
-                      <th className={TABLE_STYLES.header}>Attribute</th>
+                      {/* Attribute Column */}
+                      {visibleColumns.attribute && hasAnyAttribute && (
+                        <th className={TABLE_STYLES.header}>Attribute</th>
+                      )}
 
                       <th className={TABLE_STYLES.headerRight}>Quantity</th>
 
@@ -3530,7 +3538,7 @@ const PurchaseVoucher: React.FC = () => {
                       )}
 
                       <th className={TABLE_STYLES.headerRight}>Taxable </th>
-                      {godownEnabled === "yes" && visibleColumns.godown && hasAnyGodown && (
+                      {godownEnabled === "yes" && visibleColumns.godown && (
                         <th className={TABLE_STYLES.header}>Godown</th>
                       )}
                       <th className={TABLE_STYLES.header}>Purchase Ledger</th>
@@ -3599,9 +3607,11 @@ const PurchaseVoucher: React.FC = () => {
                           )}
 
                           {/* BATCH */}
-                          {visibleColumns.batch && (
-                            <td className="px-1 py-2 min-w-[140px] flex items-center gap-2 align-top">
-                              <select
+                          {visibleColumns.batch && hasAnyBatch && (
+                            <td className="px-1 py-2 min-w-[140px] align-top">
+                              {itemDetails.tracking_type === "batch" ? (
+                                <div className="flex items-center gap-2 w-full">
+                                  <select
                                 name="batchNumber"
                                 value={entry.batchNumber || ""}
                                 onChange={(e) => {
@@ -3858,69 +3868,75 @@ const PurchaseVoucher: React.FC = () => {
                                   </div>
                                 </div>
                               )}
+                                </div>
+                              ) : null}
                             </td>
                           )}
 
-                          {/* ATTRIBUTE COLUMN (Always Visible) */}
-                          <td className="px-1 py-2 min-w-[140px] align-top relative">
-                            <div className="w-full space-y-2">
-                              <select
-                                name="tracking_id"
-                                value={entry.tracking_id || ""}
-                                onChange={(e) => {
-                                  if (e.target.value === "__add_new__") {
-                                    setModalFormData({
-                                      stock_item_id: String(entry.itemId),
-                                      primary_attribute_id: "",
-                                      primary_attribute_value: "",
-                                      sub_attributes: [],
-                                      sub_attribute_values: {},
-                                      quantity: Number(entry.quantity) || 0,
-                                      rate: Number(entry.rate) || 0,
-                                      total_value: (Number(entry.quantity) || 0) * (Number(entry.rate) || 0),
-                                      entryIndex: index
-                                    });
-                                    setShowAttributeModal(true);
-                                    return;
-                                  }
-                                  handleEntryChange(index, e);
-                                }}
-                                className={`${TABLE_STYLES.select} text-xs`}
-                              >
-                                <option value="">Select Attribute</option>
-                                <option value="__add_new__" className="text-blue-500 font-medium">
-                                  + Add Attribute
-                                </option>
-                                {(entry.trackingOptions || []).map((opt: any) => (
-                                  <option key={opt.id} value={opt.id}>
-                                    {opt.primaryAttributeValue} (Qty: {opt.quantity})
+                          {/* ATTRIBUTE COLUMN */}
+                          {visibleColumns.attribute && hasAnyAttribute && (
+                            <td className="px-1 py-2 min-w-[140px] align-top relative">
+                              {itemDetails.tracking_type === "attribute" ? (
+                                <div className="w-full space-y-2">
+                                <select
+                                  name="tracking_id"
+                                  value={entry.tracking_id || ""}
+                                  onChange={(e) => {
+                                    if (e.target.value === "__add_new__") {
+                                      setModalFormData({
+                                        stock_item_id: String(entry.itemId),
+                                        primary_attribute_id: "",
+                                        primary_attribute_value: "",
+                                        sub_attributes: [],
+                                        sub_attribute_values: {},
+                                        quantity: Number(entry.quantity) || 0,
+                                        rate: Number(entry.rate) || 0,
+                                        total_value: (Number(entry.quantity) || 0) * (Number(entry.rate) || 0),
+                                        entryIndex: index
+                                      });
+                                      setShowAttributeModal(true);
+                                      return;
+                                    }
+                                    handleEntryChange(index, e);
+                                  }}
+                                  className={`${TABLE_STYLES.select} text-xs`}
+                                >
+                                  <option value="">Select Attribute</option>
+                                  <option value="__add_new__" className="text-blue-500 font-medium">
+                                    + Add Attribute
                                   </option>
-                                ))}
-                              </select>
+                                  {(entry.trackingOptions || []).map((opt: any) => (
+                                    <option key={opt.id} value={opt.id}>
+                                      {opt.primaryAttributeValue} (Qty: {opt.quantity})
+                                    </option>
+                                  ))}
+                                </select>
 
-                              {/* Sub-attributes */}
-                              {entry.tracking_id && entry.trackingOptions && (() => {
-                                const selectedTracking = entry.trackingOptions.find((t: any) => String(t.id) === String(entry.tracking_id));
-                                if (!selectedTracking || !selectedTracking.subAttributes) return null;
+                                {/* Sub-attributes */}
+                                {entry.tracking_id && entry.trackingOptions && (() => {
+                                  const selectedTracking = entry.trackingOptions.find((t: any) => String(t.id) === String(entry.tracking_id));
+                                  if (!selectedTracking || !selectedTracking.subAttributes) return null;
 
-                                return (
-                                  <div className="mt-2 pl-2 border-l-2 border-gray-300 space-y-1">
-                                    {selectedTracking.subAttributes.map((subAttr: any) => (
-                                      <div key={subAttr.id} className="flex items-center gap-1 text-[11px]">
-                                        <span className="font-medium text-gray-500 min-w-[50px] capitalize">{subAttr.name}:</span>
-                                        <input
-                                          type="text"
-                                          value={(entry.sub_attributes || {})[subAttr.id] !== undefined ? (entry.sub_attributes || {})[subAttr.id] : subAttr.value}
-                                          onChange={(e) => handleSubAttributeChange(index, subAttr.id, e.target.value)}
-                                          className={`${TABLE_STYLES.input} flex-1 p-1 h-6`}
-                                        />
-                                      </div>
-                                    ))}
-                                  </div>
-                                );
-                              })()}
-                            </div>
-                          </td>
+                                  return (
+                                    <div className="mt-2 pl-2 border-l-2 border-gray-300 space-y-1">
+                                      {selectedTracking.subAttributes.map((subAttr: any) => (
+                                        <div key={subAttr.id} className="flex items-center gap-1 text-[11px]">
+                                          <span className="font-medium text-gray-500 min-w-[50px] capitalize">{subAttr.name}:</span>
+                                          <input
+                                            type="text"
+                                            value={(entry.sub_attributes || {})[subAttr.id] !== undefined ? (entry.sub_attributes || {})[subAttr.id] : subAttr.value}
+                                            onChange={(e) => handleSubAttributeChange(index, subAttr.id, e.target.value)}
+                                            className={`${TABLE_STYLES.input} flex-1 p-1 h-6`}
+                                          />
+                                        </div>
+                                      ))}
+                                    </div>
+                                  );
+                                })()}
+                                </div>
+                              ) : null}
+                            </td>
+                          )}
 
                           {/* QUANTITY */}
                           <td className="px-1 py-2 min-w-[55px] align-top">
@@ -3996,7 +4012,7 @@ const PurchaseVoucher: React.FC = () => {
                           </td>
 
                           {/* GODOWN (Show only if Enabled) */}
-                          {godownEnabled === "yes" && visibleColumns.godown && hasAnyGodown && (
+                          {godownEnabled === "yes" && visibleColumns.godown && (
                             <td className="px-1 py-2 min-w-[95px] align-top">
                               <select
                                 name="godownId"
@@ -4068,13 +4084,14 @@ const PurchaseVoucher: React.FC = () => {
                     {(() => {
                       const colSpanBeforeAmount =
                         5 + // Sr(1) + Item(1) + Qty(1) + Unit(1) + Rate(1)
+                        (visibleColumns.attribute && hasAnyAttribute ? 1 : 0) +
                         (visibleColumns.hsn ? 1 : 0) +
-                        (visibleColumns.batch ? 1 : 0) +
+                        (visibleColumns.batch && hasAnyBatch ? 1 : 0) +
                         (visibleColumns.gst ? (isIntraState ? 2 : 1) : 0);
 
                       const colSpanAfterAmount =
                         2 + // Purchase Ledger(1) + Action(1)
-                        ((godownEnabled === "yes" && visibleColumns.godown && hasAnyGodown) ? 1 : 0);
+                        ((godownEnabled === "yes" && visibleColumns.godown) ? 1 : 0);
 
                       return (
                         <>
