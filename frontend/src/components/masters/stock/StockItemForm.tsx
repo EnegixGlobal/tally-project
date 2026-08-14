@@ -399,9 +399,9 @@ const StockItemForm = () => {
 
           if (item.tracking_type) {
             setTrackingSystem(item.tracking_type as "batch" | "attribute");
-          } else if (!!item.enableAttributeTracking || (Array.isArray(item.attributeTrackingRows) && item.attributeTrackingRows.length > 0)) {
+          } else if (Array.isArray(item.attributeTrackingRows) && item.attributeTrackingRows.length > 0) {
             setTrackingSystem("attribute");
-          } else if (!!item.enableBatchTracking || (Array.isArray(item.batches) && item.batches.some((b: any) => b.batchName && b.batchName.trim() !== ""))) {
+          } else if (Array.isArray(item.batches) && item.batches.some((b: any) => b.batchName && b.batchName.trim() !== "")) {
             setTrackingSystem("batch");
           } else {
             setTrackingSystem("");
@@ -887,16 +887,20 @@ const StockItemForm = () => {
       maintainInPieces: formData.maintainInPieces,
       secondaryUnit: formData.secondaryUnit,
 
-      batches: batchRows
-        .filter((b) => b.batchQuantity || b.batchRate || b.mrp || b.batchName)
-        .map((b) => ({
-          ...b,
-          mode: "opening",
-          batchQuantity: Number(b.batchQuantity) || 0,
-          batchRate: Number(b.batchRate) || 0,
-          openingRate: Number(b.batchRate || 0) * Number(b.batchQuantity || 0),
-        })),
-      attributeTrackingRows: formData.enableAttributeTracking ? attributeRows.filter(a => a.primaryAttribute || a.quantity || a.rate) : [],
+      batches: trackingSystem === "batch" 
+        ? batchRows
+            .filter((b) => b.batchQuantity || b.batchRate || b.mrp || b.batchName)
+            .map((b) => ({
+              ...b,
+              mode: "opening",
+              batchQuantity: Number(b.batchQuantity) || 0,
+              batchRate: Number(b.batchRate) || 0,
+              openingRate: Number(b.batchRate || 0) * Number(b.batchQuantity || 0),
+            }))
+        : [],
+      attributeTrackingRows: trackingSystem === "attribute" 
+        ? attributeRows.filter(a => a.primaryAttribute || a.quantity || a.rate) 
+        : [],
       godownAllocations,
       barcode,
       godown_id: rage,
@@ -1180,7 +1184,7 @@ const StockItemForm = () => {
             {/* ----------------- Tracking System Selection ----------------- */}
             <div className={`flex flex-col gap-3 md:col-span-2 mt-4 mb-2 p-4 border rounded-lg ${theme === 'dark' ? 'border-gray-600 bg-gray-800' : 'border-gray-300 bg-gray-50'}`}>
               <h4 className="font-semibold text-sm">Select Tracking System</h4>
-              <div className="flex flex-col sm:flex-row gap-6 mt-1">
+              <div className="flex flex-col sm:flex-row gap-6 mt-1 items-center">
                 <label className="flex items-center gap-2 text-sm font-medium cursor-pointer">
                   <input
                     type="radio"
@@ -1209,6 +1213,18 @@ const StockItemForm = () => {
                   />
                   Attribute System
                 </label>
+                {trackingSystem !== "" && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setTrackingSystem("");
+                      setFormData(prev => ({ ...prev, enableBatchTracking: false, enableAttributeTracking: false }));
+                    }}
+                    className="text-xs text-red-500 hover:text-red-700 underline font-medium"
+                  >
+                    Clear Selection
+                  </button>
+                )}
               </div>
             </div>
 
