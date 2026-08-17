@@ -15,7 +15,7 @@ import {
   Layers,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import axios from "axios";
 import Swal from "sweetalert2";
 import * as pdfjsLib from "pdfjs-dist";
@@ -1753,6 +1753,27 @@ const BankStatementImport: React.FC = () => {
       ],
     ];
     const ws = XLSX.utils.aoa_to_sheet(aoa);
+    
+    // Add styles to headers
+    const range = XLSX.utils.decode_range(ws['!ref'] || "A1:H5");
+    ws['!rows'] = [{ hpt: 20 }, { hpt: 20 }, { hpt: 35 }]; // Make header row taller
+    ws['!cols'] = Array(range.e.c + 1).fill({ wch: 18 }); // Make columns wider
+
+    for (let C = 0; C <= 7; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 2, c: C });
+        if (!ws[cellAddress]) continue;
+        ws[cellAddress].s = {
+            font: { bold: true, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "4F46E5" } }, // Indigo background
+            alignment: { wrapText: true, horizontal: "center", vertical: "center" }
+        };
+    }
+    // Also style the first row Bank header
+    const cellA1 = XLSX.utils.encode_cell({ r: 0, c: 0 });
+    if(ws[cellA1]) {
+        ws[cellA1].s = { font: { bold: true } };
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
     XLSX.writeFile(wb, "Bank_Statement_Template.xlsx");

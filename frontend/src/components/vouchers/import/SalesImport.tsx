@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCompany } from "../../../context/CompanyContext";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import axios from "axios";
 import Swal from "sweetalert2";
 
@@ -1457,8 +1457,37 @@ const SalesImport: React.FC = () => {
     };
 
     const downloadTemplate = (mode: 'item' | 'accounting') => {
-        const itemH = ["GSTIN of Customer", "Trade/Legal name of the Customer", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Sales Ledger", "Item Name", "HSN Code", "Batch No", "Quantity", "Item Rate (₹)", "Rate (%)", "Taxable Value (₹)", "Discount (%)", "Overall all Discount (₹)"];
-        const accH = ["GSTIN of Customer", "Trade/Legal name of the Customer", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Taxable Value (₹)", "GST Rate (%)", "Sales Ledger", "Discount (₹)", "Overall all Discount (₹)"];
+        const itemH = [
+            "GSTIN of\nCustomer", 
+            "Trade/Legal name\nof the Customer", 
+            "Invoice\nnumber", 
+            "Invoice\nDate", 
+            "Invoice Value\n(₹)", 
+            "Place of\nsupply", 
+            "Sales\nLedger", 
+            "Item\nName", 
+            "HSN\nCode", 
+            "Batch\nNo", 
+            "Quantity", 
+            "Item Rate\n(₹)", 
+            "Rate\n(%)", 
+            "Taxable Value\n(₹)", 
+            "Discount\n(%)", 
+            "Overall all\nDiscount (₹)"
+        ];
+        const accH = [
+            "GSTIN of\nCustomer", 
+            "Trade/Legal name\nof the Customer", 
+            "Invoice\nnumber", 
+            "Invoice\nDate", 
+            "Invoice Value\n(₹)", 
+            "Place of\nsupply", 
+            "Taxable Value\n(₹)", 
+            "GST Rate\n(%)", 
+            "Sales\nLedger", 
+            "Discount\n(₹)", 
+            "Overall all\nDiscount (₹)"
+        ];
 
         const itemData = [
             ["20AAAAA0000A1Z5", "ABC CUSTOMER CORP", "INV/25-26/101", "16-02-2026", 118000, "Jharkhand(20)", "18% Inter State Sales", "Biscute", "5555", "B-001", 100, 1000, 18, 100000, 1],
@@ -1468,6 +1497,22 @@ const SalesImport: React.FC = () => {
         ];
 
         const worksheet = XLSX.utils.aoa_to_sheet([mode === 'item' ? itemH : accH, ...(mode === 'item' ? itemData : accData)]);
+        
+        // Add styles for header
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || "A1:A1");
+        worksheet['!rows'] = [{ hpt: 35 }]; // Set height for first row to fit 2 lines
+        worksheet['!cols'] = Array(range.e.c + 1).fill({ wch: 18 }); // Make columns wider
+
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+            if (!worksheet[cellAddress]) continue;
+            worksheet[cellAddress].s = {
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "4F46E5" } }, // Indigo background
+                alignment: { wrapText: true, horizontal: "center", vertical: "center" }
+            };
+        }
+
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Sales_Import");
         XLSX.writeFile(workbook, `Sales_Import_Template_${mode}.xlsx`);

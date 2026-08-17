@@ -377,6 +377,30 @@ router.post("/bulk-delete", async (req, res) => {
       itemsTable = "purchase_voucher_items";
       historyTable = "purchase_history";
       numField = "number";
+    } else if (voucherType === "stock_journal") {
+      mainTable = "stock_journal_vouchers";
+      entriesTable = "stock_journal_entries";
+      itemsTable = null;
+      historyTable = null;
+      numField = "number";
+    } else if (voucherType === "credit_note") {
+      mainTable = "credit_vouchers";
+      entriesTable = "credit_voucher_items";
+      itemsTable = "credit_voucher_accounts";
+      historyTable = "credit_voucher_double_entry";
+      numField = "number";
+    } else if (voucherType === "debit_note") {
+      mainTable = "debit_note_vouchers";
+      entriesTable = "debit_note_entries";
+      itemsTable = null;
+      historyTable = null;
+      numField = "number";
+    } else if (voucherType === "delivery_note") {
+      mainTable = "delivery_items";
+      entriesTable = "delivery_entries";
+      itemsTable = null;
+      historyTable = null;
+      numField = "number";
     } else {
       mainTable = "voucher_main";
       entriesTable = "voucher_entries";
@@ -508,6 +532,20 @@ router.post("/bulk-delete", async (req, res) => {
         ]);
       }
       await conn.query(`DELETE FROM ${mainTable} WHERE id IN (?)`, [ids]);
+    } else if (voucherType === "stock_journal") {
+      await conn.query(`DELETE FROM stock_journal_entries WHERE voucher_id IN (?)`, [ids]);
+      await conn.query(`DELETE FROM stock_journal_vouchers WHERE id IN (?)`, [ids]);
+    } else if (voucherType === "credit_note") {
+      await conn.query(`DELETE FROM credit_voucher_items WHERE voucher_id IN (?)`, [ids]);
+      await conn.query(`DELETE FROM credit_voucher_accounts WHERE voucher_id IN (?)`, [ids]);
+      await conn.query(`DELETE FROM credit_voucher_double_entry WHERE voucher_id IN (?)`, [ids]);
+      await conn.query(`DELETE FROM credit_vouchers WHERE id IN (?)`, [ids]);
+    } else if (voucherType === "debit_note") {
+      await conn.query(`DELETE FROM debit_note_entries WHERE voucher_id IN (?)`, [ids]);
+      await conn.query(`DELETE FROM debit_note_vouchers WHERE id IN (?)`, [ids]);
+    } else if (voucherType === "delivery_note") {
+      await conn.query(`DELETE FROM delivery_entries WHERE delivery_item_id IN (?)`, [ids]);
+      await conn.query(`DELETE FROM delivery_items WHERE id IN (?)`, [ids]);
     } else {
       await conn.query(`DELETE FROM voucher_entries WHERE voucher_id IN (?)`, [
         ids,

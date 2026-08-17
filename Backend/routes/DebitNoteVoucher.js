@@ -400,18 +400,32 @@ router.delete("/:id", async (req, res) => {
     return res.status(400).json({ success: false });
   }
 
-  await db.query(
-    `
-    DELETE FROM debit_note_vouchers
-    WHERE id = ?
-      AND company_id = ?
-      AND owner_type = ?
-      AND owner_id = ?
-    `,
-    [req.params.id, companyId, ownerType, ownerId]
-  );
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
 
-  res.json({ success: true, message: "Debit Note deleted" });
+    await conn.query(`DELETE FROM debit_note_entries WHERE voucher_id = ?`, [req.params.id]);
+
+    await conn.query(
+      `
+      DELETE FROM debit_note_vouchers
+      WHERE id = ?
+        AND company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+      `,
+      [req.params.id, companyId, ownerType, ownerId]
+    );
+
+    await conn.commit();
+    res.json({ success: true, message: "Debit Note deleted" });
+  } catch (error) {
+    if (conn) await conn.rollback();
+    console.error("Error deleting debit note:", error);
+    res.status(500).json({ success: false, message: "Error deleting Debit Note", error: error.message });
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 module.exports = router;

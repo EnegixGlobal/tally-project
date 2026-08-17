@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { ArrowLeft, Box } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useAppContext } from "../../context/AppContext";
@@ -55,6 +55,22 @@ const AttributeSummary: React.FC = () => {
 
   const isDark = theme === "dark";
 
+  // Dynamically calculate unique attributes across all items
+  const uniqueAttributes = useMemo(() => {
+    const attributes = new Set<string>();
+    data.forEach((row) => {
+      if (row.attribute_name) {
+        attributes.add(row.attribute_name);
+      }
+      if (row.sub_attributes && Array.isArray(row.sub_attributes)) {
+        row.sub_attributes.forEach((sub) => {
+          if (sub.name) attributes.add(sub.name);
+        });
+      }
+    });
+    return Array.from(attributes);
+  }, [data]);
+
   return (
     <div className={`min-h-screen pt-[60px] ${isDark ? "bg-slate-950 text-slate-200" : "bg-slate-50 text-slate-800"} font-sans transition-colors duration-300`}>
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -89,20 +105,23 @@ const AttributeSummary: React.FC = () => {
             ) : error ? (
               <div className="p-12 text-center text-red-500 bg-red-500/10 rounded-xl m-4 border border-red-500/20">{error}</div>
             ) : (
-              <table className="w-full border-collapse">
-                <thead>
-                  <tr className={`${isDark ? "bg-slate-800/80 text-slate-300" : "bg-slate-100/80 text-slate-600"} uppercase text-xs tracking-wider font-bold`}>
-                    <th className="p-5 text-left min-w-[300px]">Item & Attributes</th>
-                    <th className="p-5 text-right w-32 border-l border-white/5">Opening</th>
-                    <th className="p-5 text-right w-32 border-l border-white/5">Purchase</th>
-                    <th className="p-5 text-right w-32 border-l border-white/5">Sales</th>
-                    <th className="p-5 text-right w-32 border-l border-white/5">Closing</th>
+              <table className={`w-full border-collapse whitespace-nowrap border text-sm ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>
+                <thead className={`sticky top-0 z-10 shadow-sm ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
+                  <tr className={`font-semibold border-b ${isDark ? 'text-slate-300 border-slate-700' : 'text-slate-700 border-slate-300'}`}>
+                    <th className={`min-w-[250px] px-6 py-3 text-left border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Item</th>
+                    {uniqueAttributes.map((attr) => (
+                      <th key={attr} className={`min-w-[180px] px-6 py-3 text-left border-r capitalize ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>{attr}</th>
+                    ))}
+                    <th className={`min-w-[140px] px-6 py-3 text-right border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Opening</th>
+                    <th className={`min-w-[140px] px-6 py-3 text-right border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Purchase</th>
+                    <th className={`min-w-[140px] px-6 py-3 text-right border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Sales</th>
+                    <th className="min-w-[140px] px-6 py-3 text-right">Closing</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-slate-200/10 dark:divide-slate-800/50">
+                <tbody className={isDark ? 'bg-slate-900' : 'bg-white'}>
                   {data.length === 0 ? (
                     <tr>
-                      <td colSpan={5} className="p-16 text-center">
+                      <td colSpan={5 + uniqueAttributes.length} className="p-16 text-center">
                         <div className="flex flex-col items-center gap-3">
                           <Box size={48} className={isDark ? "text-slate-700" : "text-slate-300"} />
                           <p className={`font-medium ${isDark ? "text-slate-500" : "text-slate-400"}`}>No attribute data available for this company.</p>
@@ -110,67 +129,50 @@ const AttributeSummary: React.FC = () => {
                       </td>
                     </tr>
                   ) : (
-                    data.map((row, index) => (
-                      <tr 
-                        key={index} 
-                        className={`group transition-all duration-300 ${isDark ? "hover:bg-slate-800/60" : "hover:bg-blue-50/50 hover:shadow-sm"}`}
-                      >
-                        <td className="p-5">
-                          <div className="flex flex-col gap-2">
-                            {/* Item Name */}
-                            <span className={`text-xs font-semibold uppercase tracking-wider ${isDark ? "text-indigo-400" : "text-indigo-600"}`}>
-                              {row.item_name}
-                            </span>
-                            
-                            {/* Prime Attribute */}
-                            <div className="flex items-center gap-2">
-                              <span className={`px-2.5 py-1 rounded-md text-sm font-semibold border ${isDark ? "bg-slate-800 border-slate-700 text-slate-200" : "bg-white border-slate-200 shadow-sm text-slate-800"}`}>
-                                <span className={isDark ? "text-slate-400" : "text-slate-500"}>{row.attribute_name}:</span> {row.prime_attribute}
-                              </span>
-                            </div>
+                    data.map((row, index) => {
+                      // Map all attributes for the current row
+                      const rowAttributes: Record<string, string> = {};
+                      if (row.attribute_name) {
+                        rowAttributes[row.attribute_name] = row.prime_attribute;
+                      }
+                      if (row.sub_attributes && Array.isArray(row.sub_attributes)) {
+                        row.sub_attributes.forEach((sub) => {
+                          if (sub.name) {
+                            rowAttributes[sub.name] = sub.value;
+                          }
+                        });
+                      }
 
-                            {/* Sub Attributes */}
-                            {row.sub_attributes && row.sub_attributes.length > 0 && (
-                              <div className="flex flex-wrap gap-2 mt-1">
-                                {row.sub_attributes.map((sub, idx) => (
-                                  <span 
-                                    key={idx} 
-                                    className={`px-2 py-0.5 rounded-full text-xs font-medium border transition-colors ${
-                                      isDark 
-                                        ? "bg-indigo-500/10 border-indigo-500/20 text-indigo-300 group-hover:bg-indigo-500/20 group-hover:border-indigo-500/40" 
-                                        : "bg-blue-50 border-blue-100 text-blue-700 group-hover:bg-blue-100 group-hover:border-blue-200"
-                                    }`}
-                                  >
-                                    <span className="opacity-75">{sub.name}:</span> {sub.value}
-                                  </span>
-                                ))}
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        
-                        <td className="p-5 text-right font-medium text-slate-500">
-                          {row.opening > 0 ? (
-                            <span className="px-3 py-1 rounded-full bg-slate-500/10 text-slate-600 dark:text-slate-400">{row.opening}</span>
-                          ) : "-"}
-                        </td>
-                        <td className="p-5 text-right font-medium">
-                          {row.purchase > 0 ? (
-                            <span className="px-3 py-1 rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">{row.purchase}</span>
-                          ) : "-"}
-                        </td>
-                        <td className="p-5 text-right font-medium">
-                          {row.sales > 0 ? (
-                            <span className="px-3 py-1 rounded-full bg-rose-500/10 text-rose-600 dark:text-rose-400 border border-rose-500/20">{row.sales}</span>
-                          ) : "-"}
-                        </td>
-                        <td className="p-5 text-right">
-                          <span className={`text-lg font-bold ${row.closing < 0 ? "text-rose-500" : row.closing > 0 ? "text-blue-500 dark:text-blue-400" : "text-slate-400"}`}>
+                      return (
+                        <tr 
+                          key={index} 
+                          className={`border-b last:border-b-0 transition-colors ${isDark ? 'hover:bg-slate-800 border-slate-700' : 'hover:bg-blue-50 border-slate-300'}`}
+                        >
+                          <td className={`px-6 py-3 text-left border-r font-medium ${isDark ? 'border-slate-700 text-slate-200' : 'border-slate-300 text-slate-800'}`}>
+                            {row.item_name}
+                          </td>
+                          
+                          {uniqueAttributes.map((attr) => (
+                            <td key={attr} className={`px-6 py-3 text-left border-r ${isDark ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-600'}`}>
+                              {rowAttributes[attr] || "-"}
+                            </td>
+                          ))}
+                          
+                          <td className={`px-6 py-3 text-right border-r ${isDark ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-600'}`}>
+                            {row.opening > 0 ? row.opening : "-"}
+                          </td>
+                          <td className={`px-6 py-3 text-right border-r ${isDark ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-600'}`}>
+                            {row.purchase > 0 ? row.purchase : "-"}
+                          </td>
+                          <td className={`px-6 py-3 text-right border-r ${isDark ? 'border-slate-700 text-slate-400' : 'border-slate-300 text-slate-600'}`}>
+                            {row.sales > 0 ? row.sales : "-"}
+                          </td>
+                          <td className={`px-6 py-3 text-right font-bold ${isDark ? 'text-slate-200' : 'text-slate-800'}`}>
                             {row.closing}
-                          </span>
-                        </td>
-                      </tr>
-                    ))
+                          </td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>
