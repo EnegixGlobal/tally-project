@@ -123,6 +123,7 @@ import PurchaseInvoiceMatching1 from "./components/reports/PurchaseInvoiceMatchi
 import B2B from "./components/reports/B2B";
 import B2C from "./components/reports/B2C";
 import Consolidation from "./components/reports/Consolidation";
+import LedgerCaraction from "./components/reports/LedgerCaraction";
 import AttributeSummary from "./components/reports/AttributeSummary";
 
 // GST Module Components
@@ -1574,6 +1575,22 @@ function App() {
                   element={
                     <RequireCompany>
                       <Consolidation />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="reports/ledger-caraction"
+                  element={
+                    <RequireCompany>
+                      <LedgerCaraction />
+                    </RequireCompany>
+                  }
+                />
+                <Route
+                  path="reports/ledger-caraction/:id"
+                  element={
+                    <RequireCompany>
+                      <LedgerCaraction />
                     </RequireCompany>
                   }
                 />

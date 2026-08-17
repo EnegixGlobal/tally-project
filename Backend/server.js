@@ -248,6 +248,9 @@ app.use("/api/stock-items", bulkStockItemsRouter);
 const ledgerReportRouter = require("./routes/ledger-report");
 app.use("/api/ledger-report", ledgerReportRouter);
 
+const ledgerCaractionRouter = require("./routes/ledger-caraction");
+app.use("/api/ledger-caraction", ledgerCaractionRouter);
+
 const permissionsRouter = require("./routes/permissions");
 app.use(permissionsRouter);
 
