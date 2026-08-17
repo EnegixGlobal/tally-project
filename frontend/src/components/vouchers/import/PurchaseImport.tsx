@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { useCompany } from "../../../context/CompanyContext";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import axios from "axios";
 import Swal from "sweetalert2";
 
@@ -1514,8 +1514,35 @@ const PurchaseImport: React.FC = () => {
     };
 
     const downloadTemplate = (mode: 'item' | 'accounting') => {
-        const itemH = ["GSTIN of supplier", "Trade/Legal name of the Supplier", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Purchase Ledger", "Item Name", "HSN Code", "Batch No", "Quantity", "Item Rate (₹)", "Rate (%)", "Taxable Value (₹)"];
-        const accH = ["GSTIN of supplier", "Trade/Legal name of the Supplier", "Invoice number", "Invoice Date", "Invoice Value (₹)", "Place of supply", "Taxable Value (₹)", "GST Rate (%)", "Purchase Ledger", "Discount (₹)", "TDS"];
+        const itemH = [
+            "GSTIN of\nsupplier", 
+            "Trade/Legal name\nof the Supplier", 
+            "Invoice\nnumber", 
+            "Invoice\nDate", 
+            "Invoice Value\n(₹)", 
+            "Place of\nsupply", 
+            "Purchase\nLedger", 
+            "Item\nName", 
+            "HSN\nCode", 
+            "Batch\nNo", 
+            "Quantity", 
+            "Item Rate\n(₹)", 
+            "Rate\n(%)", 
+            "Taxable Value\n(₹)"
+        ];
+        const accH = [
+            "GSTIN of\nsupplier", 
+            "Trade/Legal name\nof the Supplier", 
+            "Invoice\nnumber", 
+            "Invoice\nDate", 
+            "Invoice Value\n(₹)", 
+            "Place of\nsupply", 
+            "Taxable Value\n(₹)", 
+            "GST Rate\n(%)", 
+            "Purchase\nLedger", 
+            "Discount\n(₹)", 
+            "TDS"
+        ];
 
         const itemData = [
             ["20AABCM4621M1ZR", "MONGIA STEEL LIMITED", "MSL/25-26/14420", "16-02-2026", 472000, "Jharkhand(20)", "18% Inter State Purchase", "Biscute", "5555", "B-001", 100, 4000, 18, 400000],
@@ -1525,6 +1552,22 @@ const PurchaseImport: React.FC = () => {
         ];
 
         const worksheet = XLSX.utils.aoa_to_sheet([mode === 'item' ? itemH : accH, ...(mode === 'item' ? itemData : accData)]);
+        
+        // Add styles for header
+        const range = XLSX.utils.decode_range(worksheet['!ref'] || "A1:A1");
+        worksheet['!rows'] = [{ hpt: 35 }]; // Set height for first row to fit 2 lines
+        worksheet['!cols'] = Array(range.e.c + 1).fill({ wch: 18 }); // Make columns wider
+
+        for (let C = range.s.c; C <= range.e.c; ++C) {
+            const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+            if (!worksheet[cellAddress]) continue;
+            worksheet[cellAddress].s = {
+                font: { bold: true, color: { rgb: "FFFFFF" } },
+                fill: { fgColor: { rgb: "4F46E5" } }, // Indigo background
+                alignment: { wrapText: true, horizontal: "center", vertical: "center" }
+            };
+        }
+
         const workbook = XLSX.utils.book_new();
         XLSX.utils.book_append_sheet(workbook, worksheet, "Purchase_Import");
         XLSX.writeFile(workbook, `Purchase_Import_Template_${mode}.xlsx`);

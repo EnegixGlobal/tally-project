@@ -11,7 +11,7 @@ import {
   FileSpreadsheet,
 } from "lucide-react";
 import { useNavigate, useLocation } from "react-router-dom";
-import * as XLSX from "xlsx";
+import * as XLSX from "xlsx-js-style";
 import Swal from "sweetalert2";
 
 interface ImportedVoucher {
@@ -478,6 +478,22 @@ const VoucherImport: React.FC = () => {
 
   const downloadTemplate = (template: VoucherTemplate) => {
     const ws = XLSX.utils.json_to_sheet(template.sampleData);
+    
+    // Add styles to headers
+    const range = XLSX.utils.decode_range(ws['!ref'] || "A1:A1");
+    ws['!rows'] = [{ hpt: 35 }]; // Set height for first row to fit 2 lines
+    ws['!cols'] = Array(range.e.c + 1).fill({ wch: 18 }); // Make columns wider
+
+    for (let C = range.s.c; C <= range.e.c; ++C) {
+        const cellAddress = XLSX.utils.encode_cell({ r: 0, c: C });
+        if (!ws[cellAddress]) continue;
+        ws[cellAddress].s = {
+            font: { bold: true, color: { rgb: "FFFFFF" } },
+            fill: { fgColor: { rgb: "4F46E5" } }, // Indigo background
+            alignment: { wrapText: true, horizontal: "center", vertical: "center" }
+        };
+    }
+
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "Template");
     XLSX.writeFile(wb, `${template.name.replace(" ", "_")}.xlsx`);
