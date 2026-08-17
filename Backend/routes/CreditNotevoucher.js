@@ -398,18 +398,34 @@ router.delete("/:id", async (req, res) => {
     return res.status(400).json({ success: false });
   }
 
-  await db.query(
-    `
-    DELETE FROM credit_vouchers
-    WHERE id = ?
-      AND company_id = ?
-      AND owner_type = ?
-      AND owner_id = ?
-    `,
-    [req.params.id, companyId, ownerType, ownerId]
-  );
+  const conn = await db.getConnection();
+  try {
+    await conn.beginTransaction();
 
-  res.json({ success: true, message: "Credit Note deleted" });
+    await conn.query(`DELETE FROM credit_voucher_items WHERE voucher_id = ?`, [req.params.id]);
+    await conn.query(`DELETE FROM credit_voucher_accounts WHERE voucher_id = ?`, [req.params.id]);
+    await conn.query(`DELETE FROM credit_voucher_double_entry WHERE voucher_id = ?`, [req.params.id]);
+
+    await conn.query(
+      `
+      DELETE FROM credit_vouchers
+      WHERE id = ?
+        AND company_id = ?
+        AND owner_type = ?
+        AND owner_id = ?
+      `,
+      [req.params.id, companyId, ownerType, ownerId]
+    );
+
+    await conn.commit();
+    res.json({ success: true, message: "Credit Note deleted" });
+  } catch (error) {
+    if (conn) await conn.rollback();
+    console.error("Error deleting credit note:", error);
+    res.status(500).json({ success: false, message: "Error deleting Credit Note", error: error.message });
+  } finally {
+    if (conn) conn.release();
+  }
 });
 
 module.exports = router;
