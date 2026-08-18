@@ -96,7 +96,7 @@ const AttributeSummary: React.FC = () => {
         {/* Main Content Area */}
         <div className={`rounded-2xl shadow-xl overflow-hidden border backdrop-blur-sm ${isDark ? "bg-slate-900/60 border-slate-800 shadow-black/50" : "bg-white/80 border-slate-200 shadow-slate-200/50"}`}>
           
-          <div className="overflow-x-auto">
+          <div className="w-full">
             {loading ? (
               <div className="p-12 flex flex-col items-center justify-center gap-4">
                 <div className="w-10 h-10 rounded-full border-4 border-blue-500/30 border-t-blue-500 animate-spin"></div>
@@ -105,17 +105,17 @@ const AttributeSummary: React.FC = () => {
             ) : error ? (
               <div className="p-12 text-center text-red-500 bg-red-500/10 rounded-xl m-4 border border-red-500/20">{error}</div>
             ) : (
-              <table className={`w-full border-collapse whitespace-nowrap border text-sm ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>
+              <table className={`w-full border-collapse border text-sm ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>
                 <thead className={`sticky top-0 z-10 shadow-sm ${isDark ? 'bg-slate-800' : 'bg-slate-100'}`}>
                   <tr className={`font-semibold border-b ${isDark ? 'text-slate-300 border-slate-700' : 'text-slate-700 border-slate-300'}`}>
-                    <th className={`min-w-[250px] px-6 py-3 text-left border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Item</th>
+                    <th className={`px-6 py-3 text-left border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Item</th>
                     {uniqueAttributes.map((attr) => (
-                      <th key={attr} className={`min-w-[180px] px-6 py-3 text-left border-r capitalize ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>{attr}</th>
+                      <th key={attr} className={`px-6 py-3 text-left border-r capitalize ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>{attr}</th>
                     ))}
-                    <th className={`min-w-[140px] px-6 py-3 text-right border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Opening</th>
-                    <th className={`min-w-[140px] px-6 py-3 text-right border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Purchase</th>
-                    <th className={`min-w-[140px] px-6 py-3 text-right border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Sales</th>
-                    <th className="min-w-[140px] px-6 py-3 text-right">Closing</th>
+                    <th className={`px-6 py-3 text-right border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Opening</th>
+                    <th className={`px-6 py-3 text-right border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Purchase</th>
+                    <th className={`px-6 py-3 text-right border-r ${isDark ? 'border-slate-700' : 'border-slate-300'}`}>Sales</th>
+                    <th className="px-6 py-3 text-right">Closing</th>
                   </tr>
                 </thead>
                 <tbody className={isDark ? 'bg-slate-900' : 'bg-white'}>
