@@ -83,7 +83,7 @@ const DayBook: React.FC = () => {
   const [selectedDateRange, setSelectedDateRange] = useState("Daily");
   const [selectedMonth, setSelectedMonth] = useState("Select Month");
   const [selectedVoucherType, setSelectedVoucherType] = useState("");
-  const [viewMode, setViewMode] = useState<"detailed" | "grouped">("grouped");
+  const [viewMode, setViewMode] = useState<"detailed" | "grouped" | "monthly">("grouped");
   const [selectedVoucher, setSelectedVoucher] = useState<VoucherGroup | null>(
     null
   );
@@ -679,7 +679,7 @@ const DayBook: React.FC = () => {
                 title="Select View Mode"
                 value={viewMode}
                 onChange={(e) =>
-                  setViewMode(e.target.value as "detailed" | "grouped")
+                  setViewMode(e.target.value as "detailed" | "grouped" | "monthly")
                 }
                 className={`w-full p-2 rounded border ${theme === "dark"
                   ? "bg-gray-700 border-gray-600"
@@ -688,6 +688,7 @@ const DayBook: React.FC = () => {
               >
                 <option value="grouped">Grouped by Voucher</option>
                 <option value="detailed">Detailed Entries</option>
+                <option value="monthly">Month Wise</option>
               </select>
             </div>
           </div>
@@ -757,10 +758,10 @@ const DayBook: React.FC = () => {
 
       {/* View Mode Tabs */}
       <div className="flex space-x-1 mb-4">
-        {["grouped", "detailed"].map((mode) => (
+        {["grouped", "detailed", "monthly"].map((mode) => (
           <button
             key={mode}
-            onClick={() => setViewMode(mode as "detailed" | "grouped")}
+            onClick={() => setViewMode(mode as "detailed" | "grouped" | "monthly")}
             className={`px-4 py-2 rounded-t-lg text-sm font-medium ${viewMode === mode
               ? theme === "dark"
                 ? "bg-gray-800 text-white"
@@ -770,7 +771,7 @@ const DayBook: React.FC = () => {
                 : "bg-gray-100 text-gray-600 hover:bg-gray-200"
               }`}
           >
-            {mode === "grouped" ? "Grouped by Voucher" : "Detailed Entries"}
+            {mode === "grouped" ? "Grouped by Voucher" : mode === "detailed" ? "Detailed Entries" : "Month Wise"}
           </button>
         ))}
       </div>
@@ -983,7 +984,7 @@ const DayBook: React.FC = () => {
                 </tfoot>
               )}
             </table>
-          ) : (
+          ) : viewMode === "detailed" ? (
             <table className="w-full">
               <thead>
                 <tr
@@ -1113,7 +1114,108 @@ const DayBook: React.FC = () => {
                 </tfoot>
               )}
             </table>
-          )}
+          ) : viewMode === "monthly" ? (
+            <table className="w-full">
+              <thead>
+                <tr
+                  className={`${theme === "dark"
+                    ? "border-b border-gray-700"
+                    : "border-b-2 border-gray-300"
+                    }`}
+                >
+                  <th className="px-4 py-3 text-left">Month</th>
+                  <th className="px-4 py-3 text-right">Debit</th>
+                  <th className="px-4 py-3 text-right">Credit</th>
+                  <th className="px-4 py-3 text-right">Closing Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {(() => {
+                  const monthsOrder = [
+                    "April", "May", "June", "July", "August", "September", "October", "November", "December", "January", "February", "March"
+                  ];
+                
+                  let entries = [...allProcessedEntries];
+                  if (selectedVoucherType) {
+                    entries = entries.filter((e) => e.voucherType.toLowerCase() === selectedVoucherType.toLowerCase());
+                  }
+                
+                  const monthlyTotals: Record<string, { debit: number; credit: number }> = {};
+                  monthsOrder.forEach(m => monthlyTotals[m] = { debit: 0, credit: 0 });
+                
+                  entries.forEach(entry => {
+                    const d = new Date(entry.date);
+                    const monthName = d.toLocaleString('en-US', { month: 'long' });
+                    if (monthlyTotals[monthName]) {
+                      monthlyTotals[monthName].debit += entry.debit || 0;
+                      monthlyTotals[monthName].credit += entry.credit || 0;
+                    }
+                  });
+                
+                  let runningBalance = 0;
+                  let totalDebit = 0;
+                  let totalCredit = 0;
+                  
+                  const monthlyData = monthsOrder.map(month => {
+                    const debit = monthlyTotals[month].debit;
+                    const credit = monthlyTotals[month].credit;
+                    totalDebit += debit;
+                    totalCredit += credit;
+                    runningBalance += (debit - credit);
+                    return {
+                      month,
+                      debit,
+                      credit,
+                      closingBalance: Math.abs(runningBalance),
+                      closingBalanceType: runningBalance >= 0 ? 'Dr' : 'Cr'
+                    };
+                  });
+
+                  return (
+                    <>
+                      {monthlyData.map((data, index) => (
+                        <tr
+                          key={data.month}
+                          className={`transition-colors duration-150 ${theme === "dark"
+                            ? "border-b border-gray-700 hover:bg-gray-700"
+                            : "border-b border-gray-200 hover:bg-gray-50"
+                            }`}
+                        >
+                          <td className="px-4 py-3 font-medium">{data.month}</td>
+                          <td className="px-4 py-3 text-right font-mono">
+                            {data.debit > 0 ? formatCurrency(data.debit) : ""}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">
+                            {data.credit > 0 ? formatCurrency(data.credit) : ""}
+                          </td>
+                          <td className="px-4 py-3 text-right font-mono">
+                            {data.closingBalance > 0 ? `${formatCurrency(data.closingBalance)} ${data.closingBalanceType}` : ""}
+                          </td>
+                        </tr>
+                      ))}
+                      <tr
+                        className={`font-bold ${theme === "dark"
+                          ? "border-t-2 border-gray-600 bg-gray-700"
+                          : "border-t-2 border-gray-400 bg-gray-50"
+                          }`}
+                      >
+                        <td className="px-4 py-3">Grand Total</td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {totalDebit > 0 ? formatCurrency(totalDebit) : ""}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {totalCredit > 0 ? formatCurrency(totalCredit) : ""}
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono">
+                          {Math.abs(totalDebit - totalCredit) > 0 ? `${formatCurrency(Math.abs(totalDebit - totalCredit))} ${totalDebit - totalCredit >= 0 ? 'Dr' : 'Cr'}` : ""}
+                        </td>
+                      </tr>
+                    </>
+                  );
+                })()}
+              </tbody>
+            </table>
+          ) : null}
         </div>
       </div>
 
