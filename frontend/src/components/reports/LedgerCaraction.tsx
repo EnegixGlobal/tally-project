@@ -193,7 +193,7 @@ const LedgerCaraction: React.FC = () => {
     wsData.push([]);
     
     // Report Title
-    wsData.push(["Ledger Caraction Report"]);
+    wsData.push(["Ledger Correction Report"]);
     wsData.push([`Ledger: ${selectedLedgerData?.name || ""}`]);
     wsData.push([`Address: ${selectedLedgerData?.address || ""}`]);
     wsData.push([`Period: ${formatDate(fromDate)} to ${formatDate(toDate)}`]);
@@ -238,7 +238,7 @@ const LedgerCaraction: React.FC = () => {
 
     const ws = XLSX.utils.aoa_to_sheet(wsData);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, "Ledger Caraction Report");
+    XLSX.utils.book_append_sheet(wb, ws, "Ledger Correction Report");
     XLSX.writeFile(
       wb,
       `Ledger_Report_${selectedLedgerData?.name || "Report"}_${new Date().toISOString().split("T")[0]}.xlsx`
@@ -749,7 +749,7 @@ const LedgerCaraction: React.FC = () => {
         >
           <ArrowLeft size={20} />
         </button>
-        <h1 className="text-2xl font-bold">Ledger Caraction Report</h1>
+        <h1 className="text-2xl font-bold">Ledger Correction Report</h1>
         <div className="ml-auto flex space-x-2">
           <button
             title="Toggle Filters"
