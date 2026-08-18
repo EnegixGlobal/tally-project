@@ -1243,8 +1243,8 @@ const LedgerCaraction: React.FC = () => {
                                     value={transferSelections[first.id] || ""}
                                     onChange={(e) => setTransferSelections(prev => ({ ...prev, [first.id]: e.target.value }))}
                                   >
-                                    <option value="" disabled>Select Bank Ledger</option>
-                                    {bankLedgers.map(l => (
+                                    <option value="" disabled>Select Ledger</option>
+                                    {ledgers.map(l => (
                                       <option key={l.id} value={l.id}>{l.name}</option>
                                     ))}
                                   </select>
