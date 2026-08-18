@@ -33,7 +33,7 @@ const ReportsIndex: React.FC = () => {
         { icon: <PieChart size={20} />, name: 'Fund Flow', path: '/app/reports/fund-flow' },
         { icon: <AlertTriangle size={20} />, name: 'Outstanding', path: '/app/reports/outstanding' },
         { icon: <BookCopy size={20} />, name: 'Consolidation', path: '/app/reports/consolidation' },
-        { icon: <FileText size={20} />, name: 'Ledger Caraction', path: '/app/reports/ledger-caraction' }
+        { icon: <FileText size={20} />, name: 'Ledger Correction', path: '/app/reports/ledger-caraction' }
       ]
     },
     {
