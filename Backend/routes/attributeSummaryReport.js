@@ -20,7 +20,13 @@ router.get("/", async (req, res) => {
           SELECT CONCAT('[', GROUP_CONCAT(JSON_OBJECT('name', sa2.name, 'value', tsa.sub_attribute_value)), ']')
           FROM tracking_sub_attributes tsa
           JOIN stock_attributes sa2 ON tsa.sub_attribute_id = sa2.id
-          WHERE tsa.tracking_id = MAX(t.id)
+          WHERE tsa.tracking_id = (
+            SELECT MAX(tsa2.tracking_id)
+            FROM stock_item_attribute_tracking t2
+            JOIN tracking_sub_attributes tsa2 ON t2.id = tsa2.tracking_id
+            WHERE t2.stock_item_id = t.stock_item_id 
+              AND t2.primary_attribute_value = t.primary_attribute_value
+          )
         ) as sub_attributes,
         COALESCE(SUM(CASE WHEN t.mode = 'opening' THEN t.quantity ELSE 0 END), 0) AS opening_qty,
         COALESCE(SUM(p.purchase_qty), 0) AS purchase_qty,
