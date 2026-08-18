@@ -1176,7 +1176,11 @@ const DayBook: React.FC = () => {
                       {monthlyData.map((data, index) => (
                         <tr
                           key={data.month}
-                          className={`transition-colors duration-150 ${theme === "dark"
+                          onClick={() => {
+                            setSelectedMonth(data.month);
+                            setViewMode("grouped");
+                          }}
+                          className={`cursor-pointer transition-colors duration-150 ${theme === "dark"
                             ? "border-b border-gray-700 hover:bg-gray-700"
                             : "border-b border-gray-200 hover:bg-gray-50"
                             }`}
