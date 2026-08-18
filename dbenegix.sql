@@ -3,7 +3,7 @@
 -- https://www.phpmyadmin.net/
 --
 -- Host: 127.0.0.1
--- Generation Time: Jun 12, 2026 at 09:07 AM
+-- Generation Time: Aug 18, 2026 at 08:22 AM
 -- Server version: 10.4.32-MariaDB
 -- PHP Version: 8.0.30
 
@@ -174,6 +174,57 @@ CREATE TABLE `capital_gains` (
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `ca_company`
+--
+
+CREATE TABLE `ca_company` (
+  `id` int(11) NOT NULL,
+  `ca_id` int(11) NOT NULL,
+  `company_id` int(11) NOT NULL,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `ca_company`
+--
+
+INSERT INTO `ca_company` (`id`, `ca_id`, `company_id`, `created_at`) VALUES
+(10, 3, 1, '2026-07-18 12:28:27');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `ca_users`
+--
+
+CREATE TABLE `ca_users` (
+  `id` int(11) NOT NULL,
+  `name` varchar(255) NOT NULL,
+  `email` varchar(255) NOT NULL,
+  `phone` varchar(20) NOT NULL,
+  `firm_name` varchar(255) NOT NULL,
+  `registration_number` varchar(100) NOT NULL,
+  `designation` varchar(255) DEFAULT NULL,
+  `membership_number` varchar(100) DEFAULT NULL,
+  `pan_number` varchar(20) DEFAULT NULL,
+  `udin` varchar(100) DEFAULT NULL,
+  `stamp_url` varchar(500) DEFAULT NULL,
+  `password` varchar(255) NOT NULL,
+  `status` enum('active','suspended','pending') DEFAULT 'active',
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `updated_at` timestamp NOT NULL DEFAULT current_timestamp() ON UPDATE current_timestamp()
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `ca_users`
+--
+
+INSERT INTO `ca_users` (`id`, `name`, `email`, `phone`, `firm_name`, `registration_number`, `designation`, `membership_number`, `pan_number`, `udin`, `stamp_url`, `password`, `status`, `created_at`, `updated_at`) VALUES
+(3, 'Piyush', 'piyush@gmail.com', '8709916110', 'Piysh', '131212', 'Electrician', '321321', '1541f24', '14531', NULL, '$2b$10$ELJuXE.v5GOiOTioKyHKP.cFFllceWavFnN/iBHGEzUf.7.dPZY22', 'active', '2026-07-07 10:38:11', '2026-07-07 10:38:11');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `company_subscriptions`
 --
 
@@ -234,13 +285,6 @@ CREATE TABLE `credit_vouchers` (
   `owner_type` varchar(50) NOT NULL,
   `owner_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `credit_vouchers`
---
-
-INSERT INTO `credit_vouchers` (`id`, `date`, `number`, `mode`, `partyId`, `narration`, `employee_id`, `company_id`, `owner_type`, `owner_id`) VALUES
-(1, '2026-06-01', 'CNV/26-27/000001', 'accounting-invoice', NULL, '{\"accountingEntries\":[{\"ledgerId\":35,\"type\":\"debit\",\"amount\":100},{\"ledgerId\":7,\"type\":\"credit\",\"amount\":100}],\"note\":\"\"}', NULL, 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -344,13 +388,6 @@ CREATE TABLE `debit_note_vouchers` (
   `owner_type` varchar(50) NOT NULL,
   `owner_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `debit_note_vouchers`
---
-
-INSERT INTO `debit_note_vouchers` (`id`, `date`, `number`, `mode`, `party_id`, `sales_ledger_id`, `narration`, `created_at`, `company_id`, `owner_type`, `owner_id`) VALUES
-(1, '2026-05-31', 'DNV/26-27/000001', 'accounting-invoice', NULL, NULL, '{\"accountingEntries\":[{\"ledgerId\":36,\"type\":\"debit\",\"amount\":100},{\"ledgerId\":7,\"type\":\"credit\",\"amount\":100}],\"note\":\"\"}', '2026-06-01 10:31:34', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -477,7 +514,7 @@ CREATE TABLE `godowns` (
 
 INSERT INTO `godowns` (`id`, `name`, `address`, `description`, `company_id`, `owner_type`, `owner_id`) VALUES
 (1, 'Dhanbad', 'vigyan vihar colony near hawai adda dhanbad', '', 1, 'employee', 1),
-(3, 'kadru', 'Kadru Ranchi', '', 1, 'employee', 1);
+(5, 'adsf', 'adf', 'asdf', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -654,21 +691,14 @@ CREATE TABLE `ledgers` (
 --
 
 INSERT INTO `ledgers` (`id`, `name`, `group_id`, `opening_balance`, `balance_type`, `address`, `email`, `phone`, `gst_number`, `pan_number`, `created_at`, `company_id`, `owner_type`, `owner_id`, `closing_balance`, `state`, `district`, `pin_code`) VALUES
-(2, '18% Inter Purchase', -15, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:15:07', 1, 'employee', 1, 0.00, '', '', ''),
-(3, '18% Inter Sales', -16, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:15:27', 1, 'employee', 1, 0.00, '', '', ''),
-(4, '18% Intra Sales', -16, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:15:39', 1, 'employee', 1, 0.00, '', '', ''),
-(5, '18% Igst', -103, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:15:53', 1, 'employee', 1, 0.00, '', '', ''),
-(6, '9% Cgst', -103, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:16:01', 1, 'employee', 1, 0.00, '', '', ''),
-(7, '9% Sgst', -103, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:16:10', 1, 'employee', 1, 0.00, '', '', ''),
-(8, 'AMAN KUMAR', -109, 0.00, 'debit', 'Ranchi Jharkhand Indian\n\n', 'aman@gmail.com', '1234567890', '20AAACL4159L1ZN', 'ABCDE1234F', '2026-05-01 07:16:23', 1, 'employee', 1, 0.00, 'Jharkhand(20)', 'Palamu', '822124'),
+(8, 'AMAN KUMAR', -109, 0.00, 'debit', 'Ranchi Jharkhand Indian\n\n', 'aman@gmail.com', '1234567890', '20ARDPM5490Q2ZD', 'ABCDE1234F', '2026-05-01 07:16:23', 1, 'employee', 1, 0.00, 'Jharkhand(20)', 'Palamu', '822124'),
 (9, 'Sohna Kumar', -110, 0.00, 'debit', '', '', '', '', '', '2026-05-01 07:16:51', 1, 'employee', 1, 0.00, '', '', ''),
 (10, '18% intra state purchase', -15, 0.00, 'debit', '', '', '', '', '', '2026-05-02 07:40:34', 1, 'employee', 1, 0.00, '', '', ''),
 (16, 'Nuvoco vistas corporation ltd', -109, 0.00, 'credit', '', '', '', '20AAACL4159L1ZM', '', '2026-05-02 08:26:45', 1, 'employee', 1, 0.00, 'Jharkhand(20)', 'Palamu', ''),
 (18, 'Rebate & Discount ', -11, 0.00, 'debit', '', '', '', '', '', '2026-05-16 11:38:57', 1, 'employee', 1, 0.00, '', '', ''),
 (19, 'Tds 1%', -19, 0.00, 'debit', '', '', '', '', '', '2026-05-16 11:57:24', 1, 'employee', 1, 0.00, '', '', ''),
-(20, 'Ayush', -110, 0.00, 'debit', '', '', '', '', '', '2026-05-18 11:18:49', 1, 'employee', 1, 0.00, 'Odisha(21)', '', ''),
-(21, 'axis bank', -113, 0.00, 'debit', '', '', '', '', '', '2026-05-19 06:38:32', 1, 'employee', 1, 0.00, '', '', ''),
-(22, 'Discount to Customer', -10, 0.00, 'debit', '', '', '', '', '', '2026-05-19 11:08:33', 1, 'employee', 1, 0.00, '', '', ''),
+(20, 'Ayush', -110, 0.00, 'debit', '', '', '', '20BDAPP6208H2ZY', '', '2026-05-18 11:18:49', 1, 'employee', 1, 0.00, 'Odisha(21)', '', ''),
+(21, 'HDFC Bank', -113, 0.00, 'debit', '', '', '', '', '', '2026-05-19 06:38:32', 1, 'employee', 1, 0.00, '', '', ''),
 (23, 'Discount to Customer 1%', -10, 0.00, 'debit', '', '', '', '', '', '2026-05-19 11:18:11', 1, 'employee', 1, 0.00, '', '', ''),
 (24, 'B2B', 1, 0.00, 'debit', '', '', '', '', '', '2026-05-20 06:12:26', 1, 'employee', 1, 0.00, '', '', ''),
 (25, '19AAACL4159L1ZM', -109, 0.00, 'credit', '', '', '', '19AAACL4159L1ZM', '', '2026-05-20 07:14:41', 1, 'employee', 1, 0.00, 'West Bengal(19)', '', ''),
@@ -677,10 +707,42 @@ INSERT INTO `ledgers` (`id`, `name`, `group_id`, `opening_balance`, `balance_typ
 (28, 'ARVIND KUMAR PANDEY', -110, 0.00, 'debit', '', '', '', '', '', '2026-05-21 07:25:17', 1, 'employee', 1, 0.00, '', '', ''),
 (29, 'SUSPENSE', -113, 0.00, 'debit', '', '', '', '', '', '2026-05-21 10:13:26', 1, 'employee', 1, 0.00, '', '', ''),
 (30, '19AAACL4159L1Z5', -109, 0.00, 'credit', '', '', '', '19AAACL4159L1Z5', '', '2026-05-23 06:24:52', 1, 'employee', 1, 0.00, 'West Bengal(19)', '', ''),
-(31, '20ADAPT1906B1ZD', -109, 0.00, 'credit', '', '', '', '20ADAPT1906B1ZD', '', '2026-05-23 06:24:52', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', ''),
-(32, 'cash a/c', -114, 0.00, 'debit', '', '', '', '20AAACL4159L1ZD', '', '2026-05-23 10:53:52', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', ''),
+(32, 'cash a/c', -112, 0.00, 'debit', '', '', '', '', '', '2026-05-23 10:53:52', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', ''),
 (35, '18% intra state credit note', -16, 0.00, 'debit', '', '', '', '', '', '2026-06-01 10:36:01', 1, 'employee', 1, 0.00, '', '', ''),
-(36, '18% intra state debit note', -16, 0.00, 'debit', '', '', '', '', '', '2026-06-01 10:47:00', 1, 'employee', 1, 0.00, '', '', '');
+(36, '18% intra state debit note', -16, 0.00, 'debit', '', '', '', '', '', '2026-06-01 10:47:00', 1, 'employee', 1, 0.00, '', '', ''),
+(37, '20AABCM4621M1ZR', -109, 0.00, 'credit', '', '', '', '20AABCM4621M1ZR', '', '2026-06-12 08:01:27', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', ''),
+(38, '20ADAPT1906B1ZD', -109, 0.00, 'credit', '', '', '', '20ADAPT1906B1ZD', '', '2026-06-12 09:46:32', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', ''),
+(39, 'Discount to Customer', -10, 0.00, 'debit', '', '', '', '', '', '2026-06-13 06:37:50', 1, 'employee', 1, 0.00, '', '', ''),
+(41, 'NUVOCO VISTAS CORP. LTD.', -109, 0.00, 'debit', '', '', '', '20AAACL4159L1ZO', '', '2026-06-13 09:57:07', 1, 'employee', 1, 0.00, 'Jharkhand(20)', 'Ranchi', ''),
+(42, '20AAACL4159L1ZD', -110, 0.00, 'debit', '', '', '', '20AAACL4159L1ZD', '', '2026-06-15 04:35:53', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', ''),
+(44, 'Stock-in-Hand', -108, 500.00, 'debit', '', '', '', '', '', '2026-06-15 11:32:24', 1, 'employee', 1, 0.00, '', '', ''),
+(49, 'MONGIA STEEL LIMITED', -109, 0.00, 'credit', 'BURHIADIH, TUNDI ROAD GIRIDIH', '', '', '20AABCM4621M1ZR', 'AABCM4621M', '2026-06-17 06:34:41', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', ''),
+(51, 'Asian Paints Ltd-15F4 Jinwani Ispat Private Limited', -109, 0.00, 'credit', 'Vill: Tilebani, Tundi Road., Po & Ps: Govindpur, Dist: Dhanbad', '', '', '20AAAACA3622K1Z', 'AAAACA3622', '2026-06-22 08:21:56', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', '828109'),
+(52, 'NUVCO VISTAS CORP. LTD.', -109, 0.00, 'credit', 'JOJOBERA CEMENT PLANT\nSOUTH GATE, RAHARGORA\nEAST SINGHBHUM, 20-JHARKHAND', '', '', '', '', '2026-06-22 08:23:13', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', ''),
+(53, 'Asian Paints Limited', -109, 0.00, 'credit', 'Jinwani Ispat Private Limited, Vill Tilibani, Tundi Road, Po & Ps: Govindpur, Dist: Dhanbad, 828109', '', '', '20AAACA3622K1Z9', 'AAACA3622K', '2026-06-23 10:38:24', 1, 'employee', 1, 0.00, 'Jharkhand(20)', '', '828109'),
+(54, 'axis bank', -113, 0.00, 'debit', '', '', '', '', '', '2026-06-24 05:36:05', 1, 'employee', 1, 0.00, '', '', ''),
+(59, 'Admin data', -16, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-06-25 07:19:05', 0, 'admin', 0, 0.00, '', '', ''),
+(60, 'Admin data', -16, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-06-25 07:19:05', 1, 'employee', 0, 0.00, '', '', ''),
+(63, 'Admin data', -16, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-07 09:58:52', 2, 'employee', 0, 0.00, '', '', ''),
+(65, '18% Inter State Purchase', -15, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:20:16', 0, 'admin', 0, 0.00, '', '', ''),
+(66, '18% Inter State Purchase', -15, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:20:16', 1, 'employee', 0, 0.00, '', '', ''),
+(67, '18% Inter State Sales', -16, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:20:35', 0, 'admin', 0, 0.00, '', '', ''),
+(68, '18% Inter State Sales', -16, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:20:35', 1, 'employee', 0, 0.00, '', '', ''),
+(69, '18% Intra State Purchase', -15, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:20:52', 0, 'admin', 0, 0.00, '', '', ''),
+(70, '18% Intra State Purchase', -15, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:20:52', 1, 'employee', 0, 0.00, '', '', ''),
+(71, '18% Intra State Sales', -16, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:21:03', 0, 'admin', 0, 0.00, '', '', ''),
+(72, '18% Intra State Sales', -16, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:21:03', 1, 'employee', 0, 0.00, '', '', ''),
+(74, '18%Igst', -103, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:21:14', 1, 'employee', 0, 0.00, '', '', ''),
+(76, '9%Cgst', -103, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:21:29', 1, 'employee', 0, 0.00, '', '', ''),
+(78, '9%Sgst', -103, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-13 05:21:38', 1, 'employee', 0, 0.00, '', '', ''),
+(79, 'Gst payable', -6, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-18 04:54:56', 0, 'admin', 0, 0.00, '', '', ''),
+(80, 'Gst payable', -6, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-18 04:54:56', 1, 'employee', 0, 0.00, '', '', ''),
+(81, 'Non-GST', -16, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-18 04:55:22', 0, 'admin', 0, 0.00, '', '', ''),
+(82, 'Non-GST', -16, 0.00, 'debit', NULL, NULL, NULL, NULL, NULL, '2026-07-18 04:55:22', 1, 'employee', 0, 0.00, '', '', ''),
+(84, '5% IGST', -103, 0.00, 'debit', '', '', '', '', '', '2026-08-17 09:40:31', 1, 'employee', 1, 0.00, '', '', ''),
+(85, '2.5%cgst', -103, 0.00, 'debit', '', '', '', '', '', '2026-08-17 09:40:41', 1, 'employee', 1, 0.00, '', '', ''),
+(86, '2.5%sgst', -103, 0.00, 'debit', '', '', '', '', '', '2026-08-17 09:40:56', 1, 'employee', 1, 0.00, '', '', ''),
+(87, '5% Inter State Purchase', -15, 0.00, 'debit', '', '', '', '', '', '2026-08-17 09:41:47', 1, 'employee', 1, 0.00, '', '', '');
 
 -- --------------------------------------------------------
 
@@ -770,13 +832,6 @@ CREATE TABLE `purchase_history` (
   `mrp` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `purchase_history`
---
-
-INSERT INTO `purchase_history` (`id`, `itemName`, `hsnCode`, `batchNumber`, `purchaseQuantity`, `purchaseDate`, `companyId`, `ownerType`, `ownerId`, `type`, `rate`, `voucherNumber`, `godownId`, `mrp`) VALUES
-(182, 'Biscute', '4444', NULL, 1000, '2026-06-02', '1', 'employee', '1', 'purchase', 2342.00, 'PRV/26-27/000001', NULL, NULL);
-
 -- --------------------------------------------------------
 
 --
@@ -858,13 +913,6 @@ CREATE TABLE `purchase_vouchers` (
   `mode` varchar(50) DEFAULT 'item-invoice'
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `purchase_vouchers`
---
-
-INSERT INTO `purchase_vouchers` (`id`, `number`, `date`, `supplierInvoiceDate`, `narration`, `partyId`, `referenceNo`, `dispatchDocNo`, `dispatchThrough`, `destination`, `purchaseLedgerId`, `subtotal`, `cgstTotal`, `sgstTotal`, `igstTotal`, `discountTotal`, `total`, `company_id`, `owner_type`, `owner_id`, `tdsTotal`, `mode`) VALUES
-(724, 'PRV/26-27/000001', '2026-06-02', '2026-06-02', NULL, 8, '1', NULL, NULL, NULL, NULL, 2342000.00, 210780.00, 210780.00, 0.00, 0.00, 2786980.00, 1, 'employee', 1, 23420.00, 'item-invoice');
-
 -- --------------------------------------------------------
 
 --
@@ -885,15 +933,9 @@ CREATE TABLE `purchase_voucher_items` (
   `godownId` int(11) DEFAULT NULL,
   `purchaseLedgerId` int(11) DEFAULT NULL,
   `tdsRate` decimal(10,2) DEFAULT 0.00,
-  `discountLedgerId` int(11) DEFAULT NULL
+  `discountLedgerId` int(11) DEFAULT NULL,
+  `tracking_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `purchase_voucher_items`
---
-
-INSERT INTO `purchase_voucher_items` (`id`, `voucherId`, `itemId`, `quantity`, `rate`, `discount`, `cgstRate`, `sgstRate`, `igstRate`, `amount`, `godownId`, `purchaseLedgerId`, `tdsRate`, `discountLedgerId`) VALUES
-(462, 724, 21, 1000.00, 2342.00, 0.00, 6.00, 7.00, 0.00, 2342000.00, NULL, 10, 19.00, 0);
 
 -- --------------------------------------------------------
 
@@ -972,8 +1014,8 @@ CREATE TABLE `sales_types` (
 --
 
 INSERT INTO `sales_types` (`id`, `sales_type`, `type`, `prefix`, `suffix`, `current_no`, `company_id`, `owner_type`, `owner_id`, `created_at`, `updated_at`) VALUES
-(1, 'B2B', 'Sales', 'b2b/', '/26-27', 3, '1', 'employee', '1', '2026-05-01 08:21:24', '2026-06-05 07:10:42'),
-(2, 'B2C', 'Sales', 'b2c/', '/26-27', 1, '1', 'employee', '1', '2026-05-01 08:21:33', '2026-05-23 10:57:38');
+(1, 'B2B', 'Sales', 'b2b/', '/26-27', 1, '1', 'employee', '1', '2026-05-01 08:21:24', '2026-08-17 10:30:26'),
+(2, 'B2C', 'Sales', 'b2c/', '/26-27', 1, '1', 'employee', '1', '2026-05-01 08:21:33', '2026-08-17 10:30:26');
 
 -- --------------------------------------------------------
 
@@ -1013,14 +1055,6 @@ CREATE TABLE `sales_vouchers` (
   `overallDiscountAmount` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `sales_vouchers`
---
-
-INSERT INTO `sales_vouchers` (`id`, `number`, `date`, `narration`, `partyId`, `referenceNo`, `dispatchDocNo`, `dispatchThrough`, `destination`, `subtotal`, `cgstTotal`, `sgstTotal`, `igstTotal`, `discountTotal`, `total`, `createdAt`, `company_id`, `owner_type`, `owner_id`, `type`, `isQuotation`, `salesLedgerId`, `supplierInvoiceDate`, `sales_type_id`, `bill_no`, `mode`, `approxDistance`, `overallDiscountLedgerId`, `overallDiscountAmount`) VALUES
-(442, 'b2b//26-27/1', '2026-06-03', '', 4, '121212', NULL, NULL, NULL, 2500.00, 250.00, 250.00, 0.00, 0.00, 1500.00, '2026-06-05 04:30:44', '1', 'employee', '1', 'sales', 0, NULL, NULL, 1, 'b2b/3/26-27', 'accounting-invoice', NULL, NULL, 0.00),
-(443, 'b2b//26-27/2', '2026-06-05', '', 8, '33333', NULL, NULL, NULL, 1700.00, 153.00, 153.00, 0.00, 0.00, 2006.00, '2026-06-05 07:10:42', '1', 'employee', '1', 'sales', 0, NULL, NULL, 1, 'b2b/2/26-27', 'item-invoice', NULL, NULL, 0.00);
-
 -- --------------------------------------------------------
 
 --
@@ -1042,15 +1076,9 @@ CREATE TABLE `sales_voucher_items` (
   `hsnCode` varchar(16) DEFAULT NULL,
   `batchNumber` varchar(32) DEFAULT NULL,
   `godownId` varchar(64) DEFAULT NULL,
-  `discountLedgerId` int(11) DEFAULT NULL
+  `discountLedgerId` int(11) DEFAULT NULL,
+  `tracking_id` int(11) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `sales_voucher_items`
---
-
-INSERT INTO `sales_voucher_items` (`id`, `voucherId`, `salesLedgerId`, `itemId`, `quantity`, `rate`, `amount`, `cgstRate`, `sgstRate`, `igstRate`, `discount`, `hsnCode`, `batchNumber`, `godownId`, `discountLedgerId`) VALUES
-(206, 443, 4, 21, 5.00, 340.00, 1700.00, 6.00, 7.00, 0.00, 0.00, '4444', '', '1', 0);
 
 -- --------------------------------------------------------
 
@@ -1083,15 +1111,20 @@ CREATE TABLE `sale_history` (
 --
 
 INSERT INTO `sale_history` (`id`, `companyId`, `ownerType`, `ownerId`, `itemId`, `quantity`, `rate`, `value`, `movementType`, `movementDate`, `createdAt`, `itemName`, `hsnCode`, `batchNumber`, `qtyChange`, `voucherNumber`, `godownId`) VALUES
-(213, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-04 00:00:00', '2026-06-05 10:01:34', '-', '', NULL, 0, 'b2b//26-27/1', NULL),
-(214, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-04 00:00:00', '2026-06-05 10:01:34', '-', '', NULL, 0, 'b2b//26-27/1', NULL),
-(215, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-04 00:00:00', '2026-06-05 10:01:34', '-', '', NULL, 0, 'b2b//26-27/1', NULL),
-(216, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-04 00:00:00', '2026-06-05 10:01:34', '-', '', NULL, 0, 'b2b//26-27/1', NULL),
-(217, 1, 'employee', 1, NULL, 0.00, 340.00, 0.00, NULL, '2026-06-05 00:00:00', '2026-06-05 12:40:42', 'Biscute', '4444', NULL, -5, 'b2b/2/26-27', 1),
-(218, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-03 00:00:00', '2026-06-12 12:19:46', '-', '', NULL, 0, 'b2b/3/26-27', NULL),
-(219, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-03 00:00:00', '2026-06-12 12:19:46', '-', '', NULL, 0, 'b2b/3/26-27', NULL),
-(220, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-03 00:00:00', '2026-06-12 12:19:46', '-', '', NULL, 0, 'b2b/3/26-27', NULL),
-(221, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-06-03 00:00:00', '2026-06-12 12:19:46', '-', '', NULL, 0, 'b2b/3/26-27', NULL);
+(824, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-07-02 00:00:00', '2026-07-02 11:27:05', '-', '', NULL, 0, 'b2b/31/26-27', NULL),
+(825, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-07-02 00:00:00', '2026-07-02 11:27:05', '-', '', NULL, 0, 'b2b/31/26-27', 1),
+(826, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-07-02 00:00:00', '2026-07-02 11:27:05', '-', '', NULL, 0, 'b2b/31/26-27', 1),
+(827, 1, 'employee', 1, NULL, 0.00, 0.00, 0.00, NULL, '2026-07-02 00:00:00', '2026-07-02 11:27:05', '-', '', NULL, 0, 'b2b/31/26-27', 1),
+(845, 1, 'employee', 1, NULL, 0.00, 50.00, 0.00, NULL, '2026-07-09 00:00:00', '2026-07-09 16:01:27', 'Abc', '4444', NULL, -1, 'b2b/32/26-27', 1),
+(854, 1, 'employee', 1, NULL, 0.00, 100.00, 0.00, NULL, '2026-07-14 00:00:00', '2026-07-14 10:53:40', 'Abc', '4444', NULL, -1, 'b2b/1/26-27', 1),
+(855, 1, 'employee', 1, NULL, 0.00, 100.00, 0.00, NULL, '2026-07-14 00:00:00', '2026-07-14 11:03:56', 'Abc', '4444', NULL, -1, 'b2b/2/26-27', 1),
+(856, 1, 'employee', 1, NULL, 0.00, 100.00, 0.00, NULL, '2026-07-14 00:00:00', '2026-07-14 16:00:17', 'Abc', '4444', NULL, -1, 'b2c/1/26-27', 1),
+(859, 1, 'employee', 1, NULL, 0.00, 235.00, 0.00, NULL, '2026-07-17 00:00:00', '2026-07-17 12:15:14', 'Abc', '4444', NULL, -1, 'b2b/3/26-27', 1),
+(861, 1, 'employee', 1, NULL, 0.00, 235.00, 0.00, NULL, '2026-07-17 00:00:00', '2026-07-17 12:16:11', 'Abc', '4444', NULL, -11, 'b2b/4/26-27', 1),
+(863, 1, 'employee', 1, NULL, 0.00, 100.00, 0.00, NULL, '2026-07-18 00:00:00', '2026-07-18 11:22:22', 'Abc', '4444', NULL, -1, 'b2b/5/26-27', 1),
+(864, 1, 'employee', 1, NULL, 0.00, 100.00, 0.00, NULL, '2026-07-18 00:00:00', '2026-07-18 11:38:53', 'Abc', '4444', NULL, -1, 'b2c/2/26-27', 1),
+(865, 1, 'employee', 1, NULL, 0.00, 100.00, 0.00, NULL, '2026-08-12 00:00:00', '2026-08-12 10:53:27', 'Abc', '4444', NULL, -10, 'b2b/6/26-27', 1),
+(866, 1, 'employee', 1, NULL, 0.00, 10.00, 0.00, NULL, '2026-08-13 00:00:00', '2026-08-13 12:45:39', 'Abc', '4444', NULL, -10, 'b2c/3/26-27', 1);
 
 -- --------------------------------------------------------
 
@@ -1133,6 +1166,13 @@ CREATE TABLE `set_profit` (
   `retailer_method` varchar(50) DEFAULT NULL,
   `retailer_value` decimal(10,2) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `set_profit`
+--
+
+INSERT INTO `set_profit` (`id`, `customer_type`, `method`, `value`, `owner_type`, `owner_id`, `created_at`, `wholesale_method`, `wholesale_value`, `retailer_method`, `retailer_value`) VALUES
+(1, NULL, NULL, NULL, 'employee', 1, '2026-06-25 08:21:11', 'profit_percentage', 2.00, 'profit_percentage', 5.00);
 
 -- --------------------------------------------------------
 
@@ -1242,21 +1282,28 @@ CREATE TABLE `stock_items` (
   `image` varchar(255) DEFAULT NULL,
   `is_visible` tinyint(1) DEFAULT 1,
   `attributeId` int(11) DEFAULT NULL,
-  `gstRate` decimal(5,2) DEFAULT 0.00
+  `gstRate` decimal(5,2) DEFAULT 0.00,
+  `godown_id` int(11) DEFAULT NULL,
+  `tracking_type` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `stock_items`
 --
 
-INSERT INTO `stock_items` (`id`, `name`, `unit`, `hsnCode`, `taxType`, `enableBatchTracking`, `createdAt`, `company_id`, `owner_type`, `owner_id`, `barcode`, `batches`, `type`, `categoryId`, `gstLedgerId`, `cgstLedgerId`, `sgstLedgerId`, `image`, `is_visible`, `attributeId`, `gstRate`) VALUES
-(14, 'Biscute', '2', '1111', 'Taxable', 1, '2026-05-23 09:34:33', 1, 'employee', 1, '8908375740717', '[]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
-(15, 'Mobile', '2', '4444', 'Taxable', 1, '2026-05-23 09:35:44', 1, 'employee', 1, '8906627161242', '[{\"batchName\":\"Oppo\",\"batchQuantity\":1000,\"openingRate\":50,\"openingValue\":50000,\"batchExpiryDate\":\"2026-05-24\",\"batchManufacturingDate\":\"2026-05-23\",\"mode\":\"opening\",\"mrp\":40},{\"batchName\":\"Vivo\",\"batchQuantity\":2000,\"openingRate\":30,\"openingValue\":60000,\"batchExpiryDate\":\"2026-05-24\",\"batchManufacturingDate\":\"2026-05-23\",\"mode\":\"opening\",\"mrp\":30}]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
-(16, 'Nuvoco cement psc', '2', '25232940', 'Taxable', 1, '2026-05-26 05:45:03', 1, 'employee', 1, '8909506983966', '[]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
-(17, 'Nuvoco cement crt', '2', '25232940', 'Taxable', 1, '2026-05-26 05:45:43', 1, 'employee', 1, '8901703133601', '[]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
-(18, 'Nuvoco cement Uno', '2', '25232940', 'Taxable', 1, '2026-05-26 05:46:08', 1, 'employee', 1, '8909264326197', '[]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
-(19, 'M S Bar', '2', '72142090', 'Taxable', 1, '2026-05-26 05:46:33', 1, 'employee', 1, '8904213420674', '[]', 'opening', 'SC-1777619861560', 5, 6, 7, NULL, 1, NULL, 0.00),
-(21, 'Biscute', '2', '4444', 'Taxable', 1, '2026-06-02 10:49:01', 1, 'employee', 1, '8903654638563', '[{\"batchName\":null,\"batchQuantity\":1000,\"batchRate\":2342,\"batchExpiryDate\":null,\"mode\":\"purchase\",\"batchManufacturingDate\":null,\"mrp\":0}]', 'opening', 'SC-1780396454634', 5, 6, 7, NULL, 1, NULL, 0.00);
+INSERT INTO `stock_items` (`id`, `name`, `unit`, `hsnCode`, `taxType`, `enableBatchTracking`, `createdAt`, `company_id`, `owner_type`, `owner_id`, `barcode`, `batches`, `type`, `categoryId`, `gstLedgerId`, `cgstLedgerId`, `sgstLedgerId`, `image`, `is_visible`, `attributeId`, `gstRate`, `godown_id`, `tracking_type`) VALUES
+(14, 'Biscute', '2', '1111', 'Taxable', 1, '2026-05-23 09:34:33', 1, 'employee', 1, '8908375740717', '[]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 0.00, NULL, NULL),
+(15, 'Mobile', '2', '4444', 'Taxable', 1, '2026-05-23 09:35:44', 1, 'employee', 1, '8906627161242', '[]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 0.00, NULL, NULL),
+(16, 'Nuvoco cement psc', '2', '25232940', 'Taxable', 1, '2026-05-26 05:45:03', 1, 'employee', 1, '8909506983966', '[]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 0.00, NULL, NULL),
+(17, 'Nuvoco cement crt', '2', '25232940', 'Taxable', 1, '2026-05-26 05:45:43', 1, 'employee', 1, '8901703133601', '[]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 0.00, NULL, NULL),
+(18, 'Nuvoco cement Uno', '2', '25232940', 'Taxable', 1, '2026-05-26 05:46:08', 1, 'employee', 1, '8909264326197', '[]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 0.00, NULL, NULL),
+(21, 'Biscute', '2', '4444', 'Taxable', 1, '2026-06-02 10:49:01', 1, 'employee', 1, '8903654638563', '[{\"batchName\":null,\"batchQuantity\":10,\"batchRate\":200,\"batchExpiryDate\":null,\"mode\":\"purchase\",\"batchManufacturingDate\":null,\"mrp\":0}]', 'opening', 'SC-1777619861560', 84, 85, 86, NULL, 1, NULL, 0.00, NULL, NULL),
+(25, 'M.S.Bars', '2', '721420', 'Taxable', 1, '2026-06-17 07:29:23', 1, 'employee', 1, '232378222515', '[]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 18.00, NULL, NULL),
+(26, 'PSC PP_EU CEMENT', '2', '25232940', 'Taxable', 1, '2026-06-17 07:42:08', 1, 'employee', 1, '669599711798', '[]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 18.00, NULL, NULL),
+(28, 'CLRTLSCWWARRANTYCARD 1PC', '2', '482110', 'Taxable', 1, '2026-06-22 08:22:00', 1, 'employee', 1, '658414622429', '[]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 0.00, NULL, NULL),
+(29, 'ZBHO M 1WC+ 10L / 38246090 / 10 L per 1 EA', '2', '9061000032', 'Taxable', 1, '2026-06-22 08:23:15', 1, 'employee', 1, '269553381135', '[]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 18.00, NULL, NULL),
+(30, 'Abc', '1', '4444', 'Taxable', 1, '2026-06-25 09:41:29', 1, 'employee', 1, '8906456732316', '[]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 18.00, 1, NULL),
+(31, 'Mobile', '2', '1111', 'Taxable', 1, '2026-08-08 06:25:07', 1, 'employee', 1, '8900013613032', '[{\"batchName\":null,\"batchQuantity\":10,\"batchRate\":300,\"batchExpiryDate\":null,\"mode\":\"purchase\",\"batchManufacturingDate\":null,\"mrp\":0}]', 'opening', 'SC-1777619861560', 74, 76, 78, NULL, 1, NULL, 18.00, NULL, 'attribute');
 
 -- --------------------------------------------------------
 
@@ -1277,12 +1324,33 @@ CREATE TABLE `stock_item_attributes` (
 --
 
 INSERT INTO `stock_item_attributes` (`id`, `stock_item_id`, `attribute_id`, `attribute_value`, `created_at`) VALUES
-(15, 2, 7, NULL, '2026-05-19 10:44:04'),
-(16, 2, 8, NULL, '2026-05-19 10:44:04'),
-(18, 3, 11, '1', '2026-05-21 10:44:24'),
-(19, 1, 8, NULL, '2026-05-23 07:41:34'),
-(20, 1, 7, NULL, '2026-05-23 07:41:34'),
-(21, 1, 9, NULL, '2026-05-23 07:41:34');
+(60, 30, 11, NULL, '2026-08-14 10:24:45'),
+(61, 30, 10, NULL, '2026-08-14 10:24:45');
+
+-- --------------------------------------------------------
+
+--
+-- Table structure for table `stock_item_attribute_tracking`
+--
+
+CREATE TABLE `stock_item_attribute_tracking` (
+  `id` int(11) NOT NULL,
+  `stock_item_id` int(11) NOT NULL,
+  `primary_attribute_id` int(11) NOT NULL,
+  `quantity` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `rate` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `total_value` decimal(10,2) NOT NULL DEFAULT 0.00,
+  `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
+  `primary_attribute_value` varchar(255) DEFAULT NULL,
+  `mode` varchar(50) DEFAULT 'opening'
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `stock_item_attribute_tracking`
+--
+
+INSERT INTO `stock_item_attribute_tracking` (`id`, `stock_item_id`, `primary_attribute_id`, `quantity`, `rate`, `total_value`, `created_at`, `primary_attribute_value`, `mode`) VALUES
+(7, 31, 7, 10.00, 10.00, 100.00, '2026-08-14 09:59:15', '333333', 'opening');
 
 -- --------------------------------------------------------
 
@@ -1322,14 +1390,6 @@ CREATE TABLE `stock_journal_entries` (
   `batch_no` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
---
--- Dumping data for table `stock_journal_entries`
---
-
-INSERT INTO `stock_journal_entries` (`id`, `voucher_id`, `ledger_id`, `type`, `quantity`, `rate`, `amount`, `batch_no`) VALUES
-(1, 1, 2, 'credit', 10.00, 10.00, 100.00, ''),
-(2, 1, NULL, 'debit', 0.00, 0.00, 0.00, '');
-
 -- --------------------------------------------------------
 
 --
@@ -1347,13 +1407,6 @@ CREATE TABLE `stock_journal_vouchers` (
   `owner_type` varchar(50) NOT NULL,
   `owner_id` int(11) NOT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
-
---
--- Dumping data for table `stock_journal_vouchers`
---
-
-INSERT INTO `stock_journal_vouchers` (`id`, `date`, `number`, `narration`, `employee_id`, `created_at`, `company_id`, `owner_type`, `owner_id`) VALUES
-(1, '2026-05-21', 'STKJ/26-27/000001', '', NULL, '2026-05-21 05:40:53', 1, 'employee', 1);
 
 -- --------------------------------------------------------
 
@@ -1400,17 +1453,23 @@ CREATE TABLE `stock_units` (
   `created_at` timestamp NOT NULL DEFAULT current_timestamp(),
   `company_id` int(11) NOT NULL,
   `owner_type` varchar(50) NOT NULL,
-  `owner_id` int(11) NOT NULL
+  `owner_id` int(11) NOT NULL,
+  `type` varchar(20) DEFAULT 'Simple',
+  `formalName` varchar(100) DEFAULT NULL,
+  `decimalPlaces` int(11) DEFAULT 2,
+  `firstUnit` varchar(50) DEFAULT NULL,
+  `conversionFactor` decimal(10,3) DEFAULT NULL,
+  `secondUnit` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `stock_units`
 --
 
-INSERT INTO `stock_units` (`id`, `name`, `symbol`, `created_at`, `company_id`, `owner_type`, `owner_id`) VALUES
-(1, 'kg', 'KG', '2026-05-01 07:18:04', 1, 'employee', 1),
-(2, 'Bags', 'BG', '2026-05-19 10:24:37', 1, 'employee', 1),
-(4, '1 BG of 1 BG', 'BG of 1 BG', '2026-05-21 10:26:07', 1, 'employee', 1);
+INSERT INTO `stock_units` (`id`, `name`, `symbol`, `created_at`, `company_id`, `owner_type`, `owner_id`, `type`, `formalName`, `decimalPlaces`, `firstUnit`, `conversionFactor`, `secondUnit`) VALUES
+(1, 'kg', 'KG', '2026-05-01 07:18:04', 1, 'employee', 1, 'Simple', NULL, 0, NULL, 1.000, NULL),
+(2, 'Bags', 'BG', '2026-05-19 10:24:37', 1, 'employee', 1, 'Simple', NULL, 1, NULL, 1.000, NULL),
+(4, '1 BG of 1 BG', 'BG of 1 BG', '2026-05-21 10:26:07', 1, 'employee', 1, 'Simple', NULL, 2, NULL, NULL, NULL);
 
 -- --------------------------------------------------------
 
@@ -1489,7 +1548,7 @@ CREATE TABLE `tbca` (
 --
 
 INSERT INTO `tbca` (`fdSiNo`, `fdname`, `fdphone`, `email`, `fdpassword`, `fdstatus`, `fdlast_login`, `fdterms_file`) VALUES
-(1, 'Ayush', '1234567890', 'ayush@gmail.com', '$2b$10$RMBaYC9U0eeF/nCZPkLUBO/DtbjpUq/8MEZQAPWpVdJhVdVmal3Wm', 'active', '2026-06-05 11:45:34', NULL);
+(2, 'Ayush', '8709916110', 'ayush@gmail.com', '$2b$10$M34yKeywhQswkmiqQwRSdeKWXF.vnbJurhq9nUePD01iZeOwf1HS2', 'active', '2026-07-08 18:15:13', NULL);
 
 -- --------------------------------------------------------
 
@@ -1548,15 +1607,17 @@ CREATE TABLE `tbcompanies` (
   `fdAccountType` varchar(50) DEFAULT NULL,
   `fdAccountantName` varchar(100) DEFAULT NULL,
   `tan_number` varchar(20) DEFAULT NULL,
-  `back_date_allowed` tinyint(1) DEFAULT 1
+  `back_date_allowed` tinyint(1) DEFAULT 1,
+  `assessee_name` varchar(100) DEFAULT NULL,
+  `company_type` varchar(50) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
 --
 -- Dumping data for table `tbcompanies`
 --
 
-INSERT INTO `tbcompanies` (`id`, `name`, `financial_year`, `books_beginning_year`, `address`, `pin`, `phone_number`, `email`, `pan_number`, `gst_number`, `state`, `country`, `tax_type`, `employee_id`, `vault_password`, `created_at`, `vat_number`, `fdAccountType`, `fdAccountantName`, `tan_number`, `back_date_allowed`) VALUES
-(1, 'ApnoTax solutions', '2026', '2026-2027', 'vigyan vihar colony near hawai adda dhanbad', '826004', '1234567890', 'arvind12601@gmail.com', 'BDAPP6208H', '20BDAPP6208H2ZY', 'Jharkhand(20)', 'India', 'GST', 1, NULL, '2026-05-01 07:14:19', NULL, 'accountant', 'Ayush', 'ABCDE1234G', 1);
+INSERT INTO `tbcompanies` (`id`, `name`, `financial_year`, `books_beginning_year`, `address`, `pin`, `phone_number`, `email`, `pan_number`, `gst_number`, `state`, `country`, `tax_type`, `employee_id`, `vault_password`, `created_at`, `vat_number`, `fdAccountType`, `fdAccountantName`, `tan_number`, `back_date_allowed`, `assessee_name`, `company_type`) VALUES
+(1, 'ApnoTax solutions', '2026-27', '2026-04-01', 'vigyan vihar colony near hawai adda dhanbad', '826004', '', 'arvind12601@gmail.com', 'BDAPP6208H', '27ABCDE1234F1Z5', 'Jharkhand(20)', 'India', 'GST', 1, NULL, '2026-05-01 07:14:19', NULL, 'accountant', 'Ayush', 'ABCDE1234G', 1, 'Ayush', 'Trust');
 
 -- --------------------------------------------------------
 
@@ -1587,7 +1648,7 @@ CREATE TABLE `tbemployees` (
 --
 
 INSERT INTO `tbemployees` (`id`, `firstName`, `lastName`, `pan`, `address`, `email`, `phoneNumber`, `password`, `token`, `created_at`, `userLimit`, `fdterms_file`, `trial_started_at`, `trial_expires_at`, `is_purchased`) VALUES
-(1, 'A', 'k', 'BDAPP6208H', 'VIHYAN VIHAR COLONY DHANBAD 826004', 'arvind12601@gmail.com', '1234567890', '$2b$10$o0kxC43BqdN3ep1E5s25f.KnTA.rXecbiN2V2uERTVQv3Ki3N/uxm', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFydmluZDEyNjAxQGdtYWlsLmNvbSIsImlhdCI6MTc3NzYxOTU4MSwiZXhwIjoxNzc4MjI0MzgxfQ.jpG6xUTdWuTWKaeckgARWguvMY3Vc_PSkKqrkwZdNF4', '2026-05-01 07:13:01', 1, NULL, NULL, NULL, 0);
+(1, 'A', 'k', 'BDAPP6208H', 'VIHYAN VIHAR COLONY DHANBAD 826004', 'arvind12601@gmail.com', '1234567890', '$2b$10$o0kxC43BqdN3ep1E5s25f.KnTA.rXecbiN2V2uERTVQv3Ki3N/uxm', 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJlbWFpbCI6ImFydmluZDEyNjAxQGdtYWlsLmNvbSIsImlhdCI6MTc3NzYxOTU4MSwiZXhwIjoxNzc4MjI0MzgxfQ.jpG6xUTdWuTWKaeckgARWguvMY3Vc_PSkKqrkwZdNF4', '2026-05-01 07:13:01', 5, NULL, NULL, NULL, 0);
 
 -- --------------------------------------------------------
 
@@ -2126,6 +2187,26 @@ INSERT INTO `tds_26q_returns` (`id`, `tan`, `assessment_year`, `pan_of_deductor`
 -- --------------------------------------------------------
 
 --
+-- Table structure for table `tracking_sub_attributes`
+--
+
+CREATE TABLE `tracking_sub_attributes` (
+  `id` int(11) NOT NULL,
+  `tracking_id` int(11) NOT NULL,
+  `sub_attribute_id` int(11) NOT NULL,
+  `sub_attribute_value` varchar(255) DEFAULT NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `tracking_sub_attributes`
+--
+
+INSERT INTO `tracking_sub_attributes` (`id`, `tracking_id`, `sub_attribute_id`, `sub_attribute_value`) VALUES
+(11, 7, 9, '54555523');
+
+-- --------------------------------------------------------
+
+--
 -- Table structure for table `voucher_entries`
 --
 
@@ -2149,10 +2230,96 @@ CREATE TABLE `voucher_entries` (
 --
 
 INSERT INTO `voucher_entries` (`id`, `voucher_id`, `ledger_id`, `amount`, `entry_type`, `narration`, `bank_name`, `cheque_number`, `cost_centre_id`, `item_id`, `ledger_name`, `voucher_type`) VALUES
-(2633, 442, 16, 1500.00, 'credit', NULL, NULL, NULL, NULL, NULL, NULL, 'accounting'),
-(2634, 442, 4, 1000.00, 'debit', NULL, NULL, NULL, NULL, NULL, NULL, 'accounting'),
-(2635, 442, 6, 250.00, 'debit', NULL, NULL, NULL, NULL, NULL, NULL, 'accounting'),
-(2636, 442, 7, 250.00, 'debit', NULL, NULL, NULL, NULL, NULL, NULL, 'accounting');
+(3047, 493, 29, 165000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3048, 493, 54, 165000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3049, 494, 29, 482000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3050, 494, 54, 482000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3051, 495, 29, 165000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3052, 495, 54, 165000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3053, 496, 29, 2360.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3054, 496, 54, 2360.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3055, 497, 29, 14079.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3056, 497, 54, 14079.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3057, 498, 29, 16439.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3058, 498, 54, 16439.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3059, 499, 29, 31500.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3060, 499, 54, 31500.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3061, 500, 29, 1.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3062, 500, 54, 1.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3063, 501, 29, 30400.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3064, 501, 54, 30400.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3065, 502, 29, 210000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3066, 502, 54, 210000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3067, 503, 29, 1450000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3068, 503, 54, 1450000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3069, 504, 29, 162500.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3070, 504, 54, 162500.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3071, 505, 29, 162500.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3072, 505, 54, 162500.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3073, 506, 29, 8771.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3074, 506, 54, 8771.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3075, 507, 29, 1300000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3076, 507, 54, 1300000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3077, 508, 29, 430000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3078, 508, 54, 430000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3079, 509, 29, 270000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3080, 509, 54, 270000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3081, 510, 29, 150000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3082, 510, 54, 150000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3083, 511, 29, 300000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3084, 511, 54, 300000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3085, 512, 29, 145000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3086, 512, 54, 145000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3087, 513, 29, 142500.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3088, 513, 54, 142500.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3089, 514, 29, 100.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3090, 514, 54, 100.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3091, 515, 29, 40281.64, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3092, 515, 54, 40281.64, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3093, 516, 29, 88000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3094, 516, 54, 88000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3095, 517, 29, 12000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3096, 517, 54, 12000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3097, 518, 29, 500000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3098, 518, 54, 500000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3099, 519, 29, 170000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3100, 519, 54, 170000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3101, 520, 29, 94300.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3102, 520, 54, 94300.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3103, 521, 29, 600000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3104, 521, 54, 600000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3105, 522, 29, 100000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3106, 522, 54, 100000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3107, 523, 29, 168000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3108, 523, 54, 168000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3109, 524, 29, 1500000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3110, 524, 54, 1500000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3111, 525, 29, 1000000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3112, 525, 54, 1000000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3113, 526, 29, 180000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3114, 526, 54, 180000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3115, 527, 29, 185000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3116, 527, 54, 185000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3117, 528, 29, 185000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3118, 528, 54, 185000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3119, 529, 29, 300000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3120, 529, 54, 300000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3121, 530, 29, 1000000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3122, 530, 54, 1000000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3123, 531, 29, 550000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3124, 531, 54, 550000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3125, 532, 29, 160000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3126, 532, 54, 160000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3127, 533, 29, 260000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3128, 533, 54, 260000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3129, 534, 29, 500000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3130, 534, 54, 500000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3131, 535, 29, 198000.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3132, 535, 54, 198000.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3133, 536, 29, 96700.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3134, 536, 54, 96700.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'axis bank', 'accounting'),
+(3225, 538, 54, 44440.00, 'credit', NULL, NULL, NULL, NULL, NULL, 'SUSPENSE', 'accounting'),
+(3226, 538, 8, 44440.00, 'debit', NULL, NULL, NULL, NULL, NULL, 'AMAN KUMAR', 'accounting');
 
 -- --------------------------------------------------------
 
@@ -2193,6 +2360,57 @@ CREATE TABLE `voucher_main` (
   `owner_type` varchar(32) DEFAULT NULL,
   `owner_id` varchar(64) DEFAULT NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
+
+--
+-- Dumping data for table `voucher_main`
+--
+
+INSERT INTO `voucher_main` (`id`, `voucher_type`, `voucher_number`, `date`, `narration`, `reference_no`, `supplier_invoice_date`, `due_date`, `company_id`, `owner_type`, `owner_id`) VALUES
+(493, 'receipt', 'RV/25-26/000001', '2025-11-01', 'IMPS/P2A/530509137597/VIKASKUM/BANKOFIN/UAMBCeme/9193732722429013000', NULL, '2025-11-01', NULL, '1', 'employee', '1'),
+(494, 'payment', 'PV/25-26/000001', '2025-11-03', 'RTGS/SK/UTIBR52025110300366090/3252/NOVOCO VISTAS CORP L/HSBC BANK', NULL, '2025-11-03', NULL, '1', 'employee', '1'),
+(495, 'receipt', 'RV/25-26/000002', '2025-11-05', 'IMPS/P2A/530907367530/VIKASKUM/BANKOFIN/UAMBCeme/9193732722429013000', NULL, '2025-11-05', NULL, '1', 'employee', '1'),
+(496, 'payment', 'PV/25-26/000002', '2025-11-05', 'ANNSC-ASC charges Incl GST', NULL, '2025-11-05', NULL, '1', 'employee', '1'),
+(497, 'payment', 'PV/25-26/000003', '2025-11-05', '924030071869537:Int.Coll:06-10-2025 to 05-11-2025', NULL, '2025-11-05', NULL, '1', 'employee', '1'),
+(498, 'receipt', 'RV/25-26/000003', '2025-11-06', 'TRF/PARMJEET KAUR/transfer by cheque', NULL, '2025-11-06', NULL, '1', 'employee', '1'),
+(499, 'receipt', 'RV/25-26/000004', '2025-11-06', 'CLG/020231/011125/Icici Bank/', NULL, '2025-11-06', NULL, '1', 'employee', '1'),
+(500, 'receipt', 'RV/25-26/000005', '2025-11-08', 'UPI/P2A/318607093379/MUKESH KU/BKID/Payment/', NULL, '2025-11-08', NULL, '1', 'employee', '1'),
+(501, 'receipt', 'RV/25-26/000006', '2025-11-08', 'UPI/P2A/896859054967/MUKESH KU/BANK OF B/Payment/', NULL, '2025-11-08', NULL, '1', 'employee', '1'),
+(502, 'receipt', 'RV/25-26/000007', '2025-11-10', 'RTGS/CNRBR52025111069706782/MS SARVODAYA CONSTRUCT/CANARA BANK//FAST/FAST', NULL, '2025-11-10', NULL, '1', 'employee', '1'),
+(503, 'payment', 'PV/25-26/000004', '2025-11-10', 'RTGS/SK/UTIBR52025111000371727/3252/NOVOCO VISTAS CORP L/HSBC BANK', NULL, '2025-11-10', NULL, '1', 'employee', '1'),
+(504, 'receipt', 'RV/25-26/000008', '2025-11-10', 'IMPS/P2A/531418691101/VIKASKUM/BANKOFIN/UAMBCeme/9193732722429013000', NULL, '2025-11-10', NULL, '1', 'employee', '1'),
+(505, 'receipt', 'RV/25-26/000009', '2025-11-12', 'IMPS/P2A/531609775165/VIKASKUM/BANKOFIN/UAMBCeme/9193732722429013000', NULL, '2025-11-12', NULL, '1', 'employee', '1'),
+(506, 'payment', 'PV/25-26/000005', '2025-11-13', 'NEFT/SK/AXSK253170005278/3252/NUVOCO VISTAS CORP L/HSBC BANK', NULL, '2025-11-13', NULL, '1', 'employee', '1'),
+(507, 'receipt', 'RV/25-26/000010', '2025-11-13', 'NEFT/HDFCH00611968037/R K CONSTRUCTIONS/HDFC BANK/0001NEFT - MP TRADERS-502000', NULL, '2025-11-13', NULL, '1', 'employee', '1'),
+(508, 'payment', 'PV/25-26/000006', '2025-11-14', 'TRF/3252/M S SHANKER YADAV/TRANSFER BY CHQ', NULL, '2025-11-14', NULL, '1', 'employee', '1'),
+(509, 'receipt', 'RV/25-26/000011', '2025-11-14', 'CLG/907389/131125/State Bank/', NULL, '2025-11-14', NULL, '1', 'employee', '1'),
+(510, 'receipt', 'RV/25-26/000012', '2025-11-17', 'TRF/M S KRISHI TRADERS/TRANSFER BY CHQ', NULL, '2025-11-17', NULL, '1', 'employee', '1'),
+(511, 'payment', 'PV/25-26/000007', '2025-11-17', 'RTGS/SK/UTIBR52025111700363231/3252/NUVOCO VISTAS CORP L/HSBC BANK', NULL, '2025-11-17', NULL, '1', 'employee', '1'),
+(512, 'receipt', 'RV/25-26/000013', '2025-11-18', 'IMPS/P2A/532212074507/VIKASKUM/BANKOFIN/UAMBCeme/9193732722429013000', NULL, '2025-11-18', NULL, '1', 'employee', '1'),
+(513, 'receipt', 'RV/25-26/000014', '2025-11-19', 'IMPS/P2A/532320154095/VIKASKUM/BANKOFIN/UAMBCeme/9193732722429013000', NULL, '2025-11-19', NULL, '1', 'employee', '1'),
+(514, 'payment', 'PV/25-26/000008', '2025-11-19', 'Renewal - AOD-924030071869537', NULL, '2025-11-19', NULL, '1', 'employee', '1'),
+(515, 'payment', 'PV/25-26/000009', '2025-11-19', 'Renewal - PF-924030071869537', NULL, '2025-11-19', NULL, '1', 'employee', '1'),
+(516, 'receipt', 'RV/25-26/000015', '2025-11-20', 'UPI/P2A/532403475583/Mrs Jyoti/INDIAN BA/UPI/', NULL, '2025-11-20', NULL, '1', 'employee', '1'),
+(517, 'receipt', 'RV/25-26/000016', '2025-11-20', 'UPI/P2A/569083035549/Rajesh Ku/AIRP/UPI/', NULL, '2025-11-20', NULL, '1', 'employee', '1'),
+(518, 'payment', 'PV/25-26/000010', '2025-11-20', 'RTGS/SK/UTIBR52025112000364482/3252/NUVOCO VISTAS CORP /HSBC BANK', NULL, '2025-11-20', NULL, '1', 'employee', '1'),
+(519, 'receipt', 'RV/25-26/000017', '2025-11-21', 'NEFT/BKIDN25325870695/M P TRADERS/BANK OF INDIA/MP TRADERS', NULL, '2025-11-21', NULL, '1', 'employee', '1'),
+(520, 'receipt', 'RV/25-26/000018', '2025-11-22', 'IMPS/P2A/532616308359/VIKASKUM/BANKOFIN/UAMBCeme/9193732722429013000', NULL, '2025-11-22', NULL, '1', 'employee', '1'),
+(521, 'payment', 'PV/25-26/000011', '2025-11-24', 'RTGS/SK/UTIBR52025112400358960/3252/NUVOCO VISTAS CORP L/HSBC BANK', NULL, '2025-11-24', NULL, '1', 'employee', '1'),
+(522, 'receipt', 'RV/25-26/000019', '2025-11-25', 'TRF/M S KRISHI TRADERS/TRANSFER BY CHQ', NULL, '2025-11-25', NULL, '1', 'employee', '1'),
+(523, 'payment', 'PV/25-26/000012', '2025-11-26', 'NEFT/SK/AXSK253300005626/3252/SIDHI VINAYAK ENTERP/ICICI BANK LIMITED', NULL, '2025-11-26', NULL, '1', 'employee', '1'),
+(524, 'payment', 'PV/25-26/000013', '2025-11-26', 'NEFT/SK/AXSK253300010786/3252/NUVOCO VISTAS CORP L/HSBC BANK', NULL, '2025-11-26', NULL, '1', 'employee', '1'),
+(525, 'receipt', 'RV/25-26/000020', '2025-11-26', 'RTGS/HDFCR52025112687867451/GANESH YADAV/HDFC BANK///M P', NULL, '2025-11-26', NULL, '1', 'employee', '1'),
+(526, 'receipt', 'RV/25-26/000021', '2025-11-26', 'CLG/907390/261125/State Bank/M P TRADERS', NULL, '2025-11-26', NULL, '1', 'employee', '1'),
+(527, 'receipt', 'RV/25-26/000022', '2025-11-27', 'Clg/907391/State Bank /241125/', NULL, '2025-11-27', NULL, '1', 'employee', '1'),
+(528, 'payment', 'PV/25-26/000014', '2025-11-27', 'BRN-OW RTN CLG: REJECT:907391:Funds insufficient', NULL, '2025-11-27', NULL, '1', 'employee', '1'),
+(529, 'receipt', 'RV/25-26/000023', '2025-11-27', 'TRF/PARMJEET KAUR/TRANSFER BY CHQ', NULL, '2025-11-27', NULL, '1', 'employee', '1'),
+(530, 'payment', 'PV/25-26/000015', '2025-11-27', 'RTGS/SK/UTIBR52025112700363826/3252/NUVOCO VISTAS CORP L/HSBC BANK', NULL, '2025-11-27', NULL, '1', 'employee', '1'),
+(531, 'payment', 'PV/25-26/000016', '2025-11-28', 'RTGS/SK/UTIBR52025112800360727/3252/MONGIA STEEL LTD/STATE BANK OF INDIA', NULL, '2025-11-28', NULL, '1', 'employee', '1'),
+(532, 'receipt', 'RV/25-26/000024', '2025-11-29', 'IMPS/P2A/533312660591/VIKASKUM/BANKOFIN/UAMBCeme/9193732722429013000', NULL, '2025-11-29', NULL, '1', 'employee', '1'),
+(533, 'receipt', 'RV/25-26/000025', '2025-11-29', 'TRF/M S SHANKER YADAV/TRANSFER BY CHQ', NULL, '2025-11-29', NULL, '1', 'employee', '1'),
+(534, 'payment', 'PV/25-26/000017', '2025-11-29', 'RTGS/SK/UTIBR52025112900360146/3252/NUVOCO VISTAS CORP L/HSBC BANK', NULL, '2025-11-29', NULL, '1', 'employee', '1'),
+(535, 'receipt', 'RV/25-26/000026', '2025-11-29', 'CLG/907392/271125/State Bank/MP TRADERS', NULL, '2025-11-29', NULL, '1', 'employee', '1'),
+(536, 'receipt', 'RV/25-26/000027', '2025-11-30', 'IMPS/P2A/533420744095/VIKASKUM/BANKOFIN/UAMBCeme/9193732722429013000', NULL, '2025-11-30', NULL, '1', 'employee', '1'),
+(538, 'receipt', 'RV/26-27/000001', '2026-08-17', NULL, '1', '2026-08-17', NULL, '1', 'employee', '1');
 
 -- --------------------------------------------------------
 
@@ -2299,6 +2517,22 @@ ALTER TABLE `business_incomes`
 --
 ALTER TABLE `capital_gains`
   ADD PRIMARY KEY (`id`);
+
+--
+-- Indexes for table `ca_company`
+--
+ALTER TABLE `ca_company`
+  ADD PRIMARY KEY (`id`),
+  ADD KEY `idx_ca_id` (`ca_id`),
+  ADD KEY `idx_company_id` (`company_id`);
+
+--
+-- Indexes for table `ca_users`
+--
+ALTER TABLE `ca_users`
+  ADD PRIMARY KEY (`id`),
+  ADD UNIQUE KEY `email` (`email`),
+  ADD UNIQUE KEY `registration_number` (`registration_number`);
 
 --
 -- Indexes for table `company_subscriptions`
@@ -2620,6 +2854,12 @@ ALTER TABLE `stock_item_attributes`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `stock_item_attribute_tracking`
+--
+ALTER TABLE `stock_item_attribute_tracking`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `stock_item_batches`
 --
 ALTER TABLE `stock_item_batches`
@@ -2855,6 +3095,12 @@ ALTER TABLE `tds_26q_returns`
   ADD PRIMARY KEY (`id`);
 
 --
+-- Indexes for table `tracking_sub_attributes`
+--
+ALTER TABLE `tracking_sub_attributes`
+  ADD PRIMARY KEY (`id`);
+
+--
 -- Indexes for table `voucher_entries`
 --
 ALTER TABLE `voucher_entries`
@@ -2933,10 +3179,22 @@ ALTER TABLE `capital_gains`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
 
 --
+-- AUTO_INCREMENT for table `ca_company`
+--
+ALTER TABLE `ca_company`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=11;
+
+--
+-- AUTO_INCREMENT for table `ca_users`
+--
+ALTER TABLE `ca_users`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+
+--
 -- AUTO_INCREMENT for table `company_subscriptions`
 --
 ALTER TABLE `company_subscriptions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `cost_centers`
@@ -2948,7 +3206,7 @@ ALTER TABLE `cost_centers`
 -- AUTO_INCREMENT for table `credit_vouchers`
 --
 ALTER TABLE `credit_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=13;
 
 --
 -- AUTO_INCREMENT for table `credit_voucher_accounts`
@@ -2984,7 +3242,7 @@ ALTER TABLE `debit_note_entries`
 -- AUTO_INCREMENT for table `debit_note_vouchers`
 --
 ALTER TABLE `debit_note_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
 -- AUTO_INCREMENT for table `deductees`
@@ -3026,7 +3284,7 @@ ALTER TABLE `fifo_transactions`
 -- AUTO_INCREMENT for table `godowns`
 --
 ALTER TABLE `godowns`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=4;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=6;
 
 --
 -- AUTO_INCREMENT for table `godown_allocations`
@@ -3062,7 +3320,7 @@ ALTER TABLE `itr_tax_payments`
 -- AUTO_INCREMENT for table `ledgers`
 --
 ALTER TABLE `ledgers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=37;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=88;
 
 --
 -- AUTO_INCREMENT for table `ledger_groups`
@@ -3080,7 +3338,7 @@ ALTER TABLE `payments`
 -- AUTO_INCREMENT for table `purchase_history`
 --
 ALTER TABLE `purchase_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=183;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=567;
 
 --
 -- AUTO_INCREMENT for table `purchase_orders`
@@ -3098,13 +3356,13 @@ ALTER TABLE `purchase_order_items`
 -- AUTO_INCREMENT for table `purchase_vouchers`
 --
 ALTER TABLE `purchase_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=725;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1132;
 
 --
 -- AUTO_INCREMENT for table `purchase_voucher_items`
 --
 ALTER TABLE `purchase_voucher_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=463;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=847;
 
 --
 -- AUTO_INCREMENT for table `sales_orders`
@@ -3128,19 +3386,19 @@ ALTER TABLE `sales_types`
 -- AUTO_INCREMENT for table `sales_vouchers`
 --
 ALTER TABLE `sales_vouchers`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=444;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=1062;
 
 --
 -- AUTO_INCREMENT for table `sales_voucher_items`
 --
 ALTER TABLE `sales_voucher_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=207;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=824;
 
 --
 -- AUTO_INCREMENT for table `sale_history`
 --
 ALTER TABLE `sale_history`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=222;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=867;
 
 --
 -- AUTO_INCREMENT for table `scenarios`
@@ -3152,7 +3410,7 @@ ALTER TABLE `scenarios`
 -- AUTO_INCREMENT for table `set_profit`
 --
 ALTER TABLE `set_profit`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `stock_attributes`
@@ -3170,13 +3428,19 @@ ALTER TABLE `stock_groups`
 -- AUTO_INCREMENT for table `stock_items`
 --
 ALTER TABLE `stock_items`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=32;
 
 --
 -- AUTO_INCREMENT for table `stock_item_attributes`
 --
 ALTER TABLE `stock_item_attributes`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=22;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=62;
+
+--
+-- AUTO_INCREMENT for table `stock_item_attribute_tracking`
+--
+ALTER TABLE `stock_item_attribute_tracking`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=8;
 
 --
 -- AUTO_INCREMENT for table `stock_item_batches`
@@ -3230,7 +3494,7 @@ ALTER TABLE `tbadmin`
 -- AUTO_INCREMENT for table `tbca`
 --
 ALTER TABLE `tbca`
-  MODIFY `fdSiNo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `fdSiNo` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `tbcaemployeecompanies`
@@ -3248,7 +3512,7 @@ ALTER TABLE `tbcaemployees`
 -- AUTO_INCREMENT for table `tbcompanies`
 --
 ALTER TABLE `tbcompanies`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3;
 
 --
 -- AUTO_INCREMENT for table `tbemployees`
@@ -3371,10 +3635,16 @@ ALTER TABLE `tds_26q_returns`
   MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=5;
 
 --
+-- AUTO_INCREMENT for table `tracking_sub_attributes`
+--
+ALTER TABLE `tracking_sub_attributes`
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=12;
+
+--
 -- AUTO_INCREMENT for table `voucher_entries`
 --
 ALTER TABLE `voucher_entries`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=2637;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=3227;
 
 --
 -- AUTO_INCREMENT for table `voucher_entries_old`
@@ -3386,7 +3656,7 @@ ALTER TABLE `voucher_entries_old`
 -- AUTO_INCREMENT for table `voucher_main`
 --
 ALTER TABLE `voucher_main`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=321;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=539;
 
 --
 -- AUTO_INCREMENT for table `voucher_main_old`
