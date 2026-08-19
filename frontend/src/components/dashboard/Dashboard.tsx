@@ -436,6 +436,22 @@ const Dashboard: React.FC = () => {
                 {companyCount} of {userLimit} allowed
               </div>
             </div>
+
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => navigate('/app/vouchers/sales/create')}
+                className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-lg font-medium hover:bg-indigo-100 transition-colors shadow-sm border border-indigo-100"
+              >
+                Sales
+              </button>
+              <button
+                onClick={() => navigate('/app/vouchers/purchase/create')}
+                className="px-4 py-2 bg-purple-50 text-purple-700 rounded-lg font-medium hover:bg-purple-100 transition-colors shadow-sm border border-purple-100"
+              >
+                Purchase
+              </button>
+            </div>
+
             <div className="flex flex-col sm:flex-row items-center gap-4">
               {userType !== "company_user" && (
                 canCreateCompany ? (
